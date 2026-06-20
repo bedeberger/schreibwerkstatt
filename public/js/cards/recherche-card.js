@@ -28,7 +28,10 @@ export function registerRechercheCard() {
     filterKind: '',
     filterTag: '',
     filterLinked: '',
+    filterLinkedKind: '',
+    filterLinkedTargetId: '',
     filterText: '',
+    sortBy: 'updated',
     showArchived: false,
 
     menuOpenId: null,

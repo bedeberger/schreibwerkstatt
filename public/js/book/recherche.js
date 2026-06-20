@@ -7,6 +7,8 @@ import { fetchJson } from '../utils.js';
 import { startPoll } from '../cards/job-helpers.js';
 
 const KINDS = ['note', 'link', 'quote', 'fact', 'image'];
+// Verknüpfungs-Kategorien (Reihenfolge = Anzeige in Picker/Filter/Sortierung).
+const LINK_KINDS = ['figure', 'location', 'scene', 'beat', 'thread', 'chapter', 'page'];
 
 function _emptyDraft() {
   return { kind: 'note', title: '', body: '', url: '', source: '', tags: '' };
@@ -26,10 +28,12 @@ export const rechercheMethods = {
       if (this.filterLinked) qs.set('linked', this.filterLinked);
       if ((this.filterText || '').trim()) qs.set('q', this.filterText.trim());
       if (this.showArchived) qs.set('archived', '1');
+      if (this.sortBy && this.sortBy !== 'updated') qs.set('sort', this.sortBy);
       const rows = await fetchJson(`/research?${qs.toString()}`);
       this.items = Array.isArray(rows) ? rows : [];
       this.errorMessage = '';
       this._loadTags();
+      this.ensureLinkTargets();
     } catch (e) {
       this.errorMessage = app.t('recherche.error.load');
       this.items = [];
@@ -68,7 +72,10 @@ export const rechercheMethods = {
     this.filterKind = '';
     this.filterTag = '';
     this.filterLinked = '';
+    this.filterLinkedKind = '';
+    this.filterLinkedTargetId = '';
     this.filterText = '';
+    this.sortBy = 'updated';
     this.showArchived = false;
     this.menuOpenId = null;
     this.linkPickerItemId = null;
@@ -81,7 +88,8 @@ export const rechercheMethods = {
   // ── Filter ───────────────────────────────────────────────────────────────
   applyFilters() { return this.loadRecherche(); },
   clearFilters() {
-    this.filterKind = ''; this.filterTag = ''; this.filterLinked = ''; this.filterText = '';
+    this.filterKind = ''; this.filterTag = ''; this.filterText = '';
+    this.filterLinked = ''; this.filterLinkedKind = ''; this.filterLinkedTargetId = '';
     return this.loadRecherche();
   },
   kindOptions() {
@@ -90,6 +98,34 @@ export const rechercheMethods = {
   },
   tagFilterOptions() {
     return (this.tagPool || []).map(r => ({ value: r.tag, label: `${r.tag} (${r.n})` }));
+  },
+
+  // Alle Verknüpfungs-Kategorien (geteilt zwischen Filter + Link-Picker).
+  linkKinds() {
+    return LINK_KINDS.map(k => ({ value: k, label: this.linkKindLabel(k) }));
+  },
+  // Sortier-Modi: feste Felder + „nach verknüpfter Entität" (link:<dimension>).
+  sortOptions() {
+    const t = window.__app.t;
+    const opts = ['updated', 'created', 'title', 'kind'].map(s => ({ value: s, label: t(`recherche.sort.${s}`) }));
+    for (const k of LINK_KINDS) opts.push({ value: `link:${k}`, label: t(`recherche.sort.by`, { kind: this.linkKindLabel(k) }) });
+    return opts;
+  },
+  applySort() { return this.loadRecherche(); },
+
+  // Filter „nach Verknüpfung": Kategorie + konkreter Eintrag → filterLinked.
+  linkedFilterTargetOptions() {
+    const arr = (this.linkTargets || {})[this.filterLinkedKind] || [];
+    return arr.map(o => ({ value: String(o.id), label: o.label }));
+  },
+  onLinkedFilterKindChange() {
+    this.filterLinkedTargetId = '';
+    return this.applyLinkedFilter();
+  },
+  applyLinkedFilter() {
+    this.filterLinked = (this.filterLinkedKind && this.filterLinkedTargetId)
+      ? `${this.filterLinkedKind}:${this.filterLinkedTargetId}` : '';
+    return this.loadRecherche();
   },
 
   // ── Anlegen ────────────────────────────────────────────────────────────────

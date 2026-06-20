@@ -66,13 +66,17 @@ test('md: Headings + Markdown-Escape', () => {
   assert.ok(/Text eins\./.test(s));
 });
 
-test('md scope=page nutzt page.markdown wenn vorhanden', () => {
+test('md scope=page leitet immer aus body_html ab (ignoriert Alt-markdown-Feld)', () => {
   const bundle = {
     scope: 'page', book, chapter, page,
-    groups: [{ chapterId: 10, chapter, pages: [{ p: page, pd: { ...page, markdown: '**Bold**' } }] }],
+    groups: [{ chapterId: 10, chapter, pages: [
+      // Alt-Spalte (BookStack-Ära) darf nicht mehr durchschlagen: html ist SSoT.
+      { p: page, pd: { ...page, html: '<p>Aus <strong>HTML</strong>.</p>', markdown: '# Stale' } },
+    ] }],
   };
   const s = buildMd(bundle).toString('utf8');
-  assert.ok(s.includes('**Bold**'));
+  assert.ok(s.includes('Aus **HTML**.'));
+  assert.ok(!s.includes('Stale'));
 });
 
 test('html: Wohlgeformtheit (DOCTYPE + body)', () => {

@@ -109,11 +109,16 @@
     flex: 0 0 var(--cell-w);
     width: var(--cell-w);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-xs);
+    gap: var(--space-2xs) var(--space-xs);
     padding-bottom: var(--space-xs);
     border-bottom: 2px solid var(--col-accent);
   }
+  /* Swatch + Titel teilen die erste Zeile (Titel nimmt die volle Restbreite →
+     bleibt lesbar auf einer Zeile), die Icons rutschen auf eine eigene Zeile
+     darunter — analog zur Strang-Lane (.plot-swim-lane-actions). */
+  .plot-swim-acthead .plot-column-actions { flex: 1 0 100%; }
 
   /* ── Lane-Label (sticky) ────────────────────────────────────────────────── */
   .plot-swim-lane {

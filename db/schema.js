@@ -153,10 +153,7 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
     const insZep = db.prepare('INSERT INTO zeitstrahl_event_pages    (event_id, page_id, sort_order)    VALUES (?, ?, ?)');
     const insZef = db.prepare('INSERT INTO zeitstrahl_event_figures  (event_id, figure_id, figur_name, sort_order) VALUES (?, ?, ?, ?)');
     // figures-Lookup TEXT-fig_id → INTEGER figures.id (FK-Target seit Mig 73).
-    const figRows = db.prepare(
-      'SELECT id, fig_id, name, kurzname FROM figures WHERE book_id = ? AND user_email IS ?'
-    ).all(bookId, userEmail || null);
-    const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
+    const { rows: figRows, byFigId: figIdToRowId } = figures.figIdMaps(bookId, userEmail);
     const figNameToRowId = {};
     for (const r of figRows) {
       for (const n of [r.name, r.kurzname]) {
@@ -347,10 +344,7 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
     const resetGeo = db.prepare('UPDATE locations SET geo_query = NULL, geo_land = NULL WHERE id = ?');
     const setGeo = db.prepare('UPDATE locations SET geo_query = ?, geo_land = ? WHERE id = ?');
     // location_figures.figure_id ist INTEGER (figures.id) seit Mig 73 — Lookup TEXT → INT.
-    const figRows = db.prepare(
-      'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email IS ?'
-    ).all(bookId, userEmail || null);
-    const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
+    const { byFigId: figIdToRowId } = figures.figIdMaps(bookId, userEmail);
     const insLf = db.prepare('INSERT OR IGNORE INTO location_figures (location_id, figure_id) VALUES (?, ?)');
     const insLc = db.prepare('INSERT INTO location_chapters (location_id, chapter_id, haeufigkeit) VALUES (?, ?, ?)');
 

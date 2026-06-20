@@ -49,6 +49,25 @@ test('research_item_links: CHECK erzwingt target_kind passend zum gesetzten *_id
   /CHECK|constraint/i);
 });
 
+test('research_item_links: thread (Handlungsstrang) ist ein gültiges Verknüpfungsziel', () => {
+  const db = freshDb();
+  const { bookId, itemId } = seedBook(db);
+  const threadId = db.prepare('INSERT INTO plot_threads(book_id, user_email, name) VALUES(?,?,?)')
+    .run(bookId, 'a@b.c', 'Hauptstrang').lastInsertRowid;
+  // gültig: target_kind=thread mit gesetztem thread_id
+  db.prepare('INSERT INTO research_item_links(item_id, target_kind, thread_id, created_at) VALUES(?,?,?,?)')
+    .run(itemId, 'thread', threadId, T);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM research_item_links WHERE target_kind='thread'").get().n, 1);
+  // ungültig: target_kind=thread aber figure_id statt thread_id
+  assert.throws(() =>
+    db.prepare('INSERT INTO research_item_links(item_id, target_kind, figure_id, created_at) VALUES(?,?,?,?)')
+      .run(itemId, 'thread', 1, T),
+  /CHECK|constraint/i);
+  // Strang-Löschung kaskadiert auf die Verknüpfung
+  db.prepare('DELETE FROM plot_threads WHERE id = ?').run(threadId);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM research_item_links WHERE target_kind='thread'").get().n, 0);
+});
+
 test('research_item_links: UNIQUE verhindert doppelte Verknüpfung zum selben Ziel', () => {
   const db = freshDb();
   const { chapterId, itemId } = seedBook(db);

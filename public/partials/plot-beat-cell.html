@@ -1,10 +1,13 @@
 <!-- Plot-Werkstatt: geteiltes Beat-Karten-Markup (Ansicht + Bearbeiten).
-     SSoT für die Beat-Innenansicht — via `<!-- @include plot-beat-cell -->`
-     (string-seitiger Fragment-Include, siehe app-ui.js#_resolveIncludes) in
+     SSoT fuer die Beat-Innenansicht — per string-seitigem Fragment-Include
+     (Marker @include plot-beat-cell, siehe app-ui.js#_resolveIncludes) in
      plot-board-flat.html UND plot-board-grid.html eingebettet. Erwartet im Scope
-     die x-for-Variable `beat` plus den plotCard-State (beatDraft, editingBeatId,
-     draftFiguren, $app …). Der umschliessende `.plot-beat`-Wrapper inkl. DnD-
-     Handler bleibt pro Board-Datei (flach vs. Zelle unterscheiden sich dort). -->
+     die x-for-Variable beat plus den plotCard-State (beatDraft, editingBeatId,
+     draftFiguren, $app …). Der umschliessende .plot-beat-Wrapper inkl. DnD-
+     Handler bleibt pro Board-Datei (flach vs. Zelle unterscheiden sich dort).
+     WICHTIG: in diesem Kommentar nie die Marker-Delimiter ausschreiben — der
+     Resolver wuerde sie erneut expandieren und der innere Delimiter beendet
+     diesen Kommentar vorzeitig (Doku-Text leckt sichtbar in jede Beat-Karte). -->
 <!-- Ansicht -->
 <template x-if="editingBeatId !== beat.id">
   <div class="plot-beat-view">

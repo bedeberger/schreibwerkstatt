@@ -331,21 +331,26 @@ export const appUiMethods = {
   },
 
   // String-seitige Fragment-Includes: ersetzt jeden Marker `<!-- @include NAME -->`
-  // durch den Inhalt von `/partials/NAME.html` (rekursiv, Tiefenlimit gegen Zyklen;
-  // jeder Name pro Pass nur einmal gefetcht). Reines Text-Splicing vor jeglichem
-  // DOM/Alpine-Processing — der eingefügte Markup-Block ist danach Teil des
-  // Template-Contents und wird pro x-for-Iteration normal geklont.
-  async _resolveIncludes(html, depth = 0) {
-    if (depth > 5) return html;
+  // durch den Inhalt von `/partials/NAME.html` (rekursiv; jeder Name pro Pass nur
+  // einmal gefetcht). Reines Text-Splicing vor jeglichem DOM/Alpine-Processing —
+  // der eingefügte Markup-Block ist danach Teil des Template-Contents und wird pro
+  // x-for-Iteration normal geklont.
+  // `seen` bricht Selbst-/Zyklen-Referenzen by name ab: enthält ein Fragment einen
+  // Marker auf sich selbst (z.B. in einem Doku-Kommentar), wird der zu '' aufgelöst
+  // statt N-fach expandiert zu werden.
+  async _resolveIncludes(html, seen = new Set()) {
     const re = /<!--\s*@include\s+([\w-]+)\s*-->/g;
     const matches = [...html.matchAll(re)];
     if (!matches.length) return html;
     const cache = {};
     for (const m of matches) {
       const frag = m[1];
-      if (!(frag in cache)) {
-        cache[frag] = await this._resolveIncludes(await fetchText(`/partials/${frag}.html`), depth + 1);
-      }
+      if (frag in cache) continue;
+      if (seen.has(frag)) { cache[frag] = ''; continue; }
+      cache[frag] = await this._resolveIncludes(
+        await fetchText(`/partials/${frag}.html`),
+        new Set([...seen, frag]),
+      );
     }
     return html.replace(re, (_, frag) => cache[frag] ?? '');
   },

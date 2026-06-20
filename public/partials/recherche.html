@@ -28,11 +28,25 @@
            x-modelable="value" x-model="filterTag"
            x-effect="options = tagFilterOptions()"
            @combobox-change="applyFilters()"></div>
+      <!-- Filter nach verknüpfter Entität: Kategorie + konkreter Eintrag -->
+      <div x-data="combobox($app.t('recherche.filter.allLinked'), $app.t('recherche.filter.allLinked'))"
+           x-modelable="value" x-model="filterLinkedKind"
+           x-effect="options = linkKinds()"
+           @combobox-change="onLinkedFilterKindChange()"></div>
+      <div x-show="filterLinkedKind" x-cloak
+           x-data="combobox($app.t('recherche.filter.allLinkedTargets'), $app.t('recherche.filter.allLinkedTargets'))"
+           x-modelable="value" x-model="filterLinkedTargetId"
+           x-effect="options = linkedFilterTargetOptions()"
+           @combobox-change="applyLinkedFilter()"></div>
       <input type="text" class="filter-search-input recherche-search"
              x-model.debounce.400ms="filterText"
              @input.debounce.400ms="applyFilters()"
              :placeholder="$app.t('recherche.filter.search')"
              :aria-label="$app.t('recherche.filter.search')">
+      <div x-data="combobox($app.t('recherche.sort.label'))"
+           x-modelable="value" x-model="sortBy"
+           x-effect="options = sortOptions()"
+           @combobox-change="applySort()"></div>
       <label class="recherche-archived-toggle">
         <input type="checkbox" x-model="showArchived" @change="applyFilters()">
         <span x-text="$app.t('recherche.filter.showArchived')"></span>
@@ -185,14 +199,7 @@
     <span class="recherche-linkpicker-label" x-text="$app.t('recherche.link.pickerLabel')"></span>
     <div x-data="combobox($app.t('recherche.link.pickKind'))"
          x-modelable="value" x-model="linkPickerKind"
-         x-effect="options = [
-           { value: 'figure',   label: linkKindLabel('figure') },
-           { value: 'location', label: linkKindLabel('location') },
-           { value: 'scene',    label: linkKindLabel('scene') },
-           { value: 'beat',     label: linkKindLabel('beat') },
-           { value: 'chapter',  label: linkKindLabel('chapter') },
-           { value: 'page',     label: linkKindLabel('page') }
-         ]"
+         x-effect="options = linkKinds()"
          @combobox-change="linkPickerTargetId = ''"></div>
     <div x-data="combobox($app.t('recherche.link.pickTarget'))"
          x-modelable="value" x-model="linkPickerTargetId"

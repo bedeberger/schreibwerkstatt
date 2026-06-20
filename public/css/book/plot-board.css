@@ -40,12 +40,17 @@
     top: 0;
     z-index: var(--z-base);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-xs);
+    gap: var(--space-2xs) var(--space-xs);
     border-bottom: 2px solid var(--col-accent);
     padding-bottom: var(--space-xs);
     background: var(--color-surface);
   }
+  /* Swatch + Titel + Count teilen die erste Zeile (Titel nimmt die volle
+     Restbreite → bleibt lesbar auf einer Zeile), die Icons rutschen auf eine
+     eigene Zeile darunter — analog zur Strang-Lane / zum Grid-Akt-Kopf. */
+  .plot-column-header .plot-column-actions { flex: 1 0 100%; }
   .plot-column-title {
     font-weight: 600;
     font-size: var(--font-size-sm);

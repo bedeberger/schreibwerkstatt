@@ -140,10 +140,10 @@ function _insertAt(pageId, bookId, bodyHtml, daysAgo, anchorMs = Date.now()) {
   // Stats analog _statsFromHtml: hier reicht ein Wert >0; pruneTiered liest sie nicht.
   const { lastInsertRowid } = db.prepare(`
     INSERT INTO page_revisions
-      (page_id, book_id, body_html, body_markdown, chars, words, tok,
+      (page_id, book_id, body_html, chars, words, tok,
        source, user_email, summary, created_at)
     VALUES
-      (?, ?, ?, NULL, ?, ?, ?, 'main', NULL, NULL, ?)
+      (?, ?, ?, ?, ?, ?, 'main', NULL, NULL, ?)
   `).run(pageId, bookId, bodyHtml, bodyHtml.length, 1, 1, created);
   return { id: lastInsertRowid, created };
 }

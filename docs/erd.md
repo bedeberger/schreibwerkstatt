@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 204, 107 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 208, 107 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -232,7 +232,6 @@ erDiagram
     TEXT    preview_text
     TEXT    last_seen_at
     TEXT    body_html
-    TEXT    body_markdown
     INTEGER position
     INTEGER priority
     TEXT    slug
@@ -269,7 +268,6 @@ erDiagram
     INTEGER page_id       FK "ON DELETE CASCADE"
     INTEGER book_id       FK "ON DELETE CASCADE"
     TEXT    body_html
-    TEXT    body_markdown
     INTEGER chars
     INTEGER words
     INTEGER tok
@@ -379,13 +377,14 @@ erDiagram
   research_item_links {
     INTEGER id          PK
     INTEGER item_id     FK "ON DELETE CASCADE"
-    TEXT    target_kind "chapter|page|figure|location|scene|beat"
+    TEXT    target_kind "chapter|page|figure|location|scene|beat|thread"
     INTEGER chapter_id  FK "ON DELETE CASCADE, genau eins gesetzt passend zu target_kind"
     INTEGER page_id     FK "ON DELETE CASCADE"
     INTEGER figure_id   FK "ON DELETE CASCADE"
     INTEGER location_id FK "ON DELETE CASCADE"
     INTEGER scene_id    FK "ON DELETE CASCADE"
     INTEGER beat_id     FK "ON DELETE CASCADE"
+    INTEGER thread_id   FK "ON DELETE CASCADE"
     TEXT    created_at
     %% UNIQUE(item_id, target_kind, COALESCE(alle *_id,0))
   }
@@ -401,6 +400,7 @@ erDiagram
   locations         ||--o{ research_item_links : "linked (location)"
   figure_scenes     ||--o{ research_item_links : "linked (scene)"
   plot_beats        ||--o{ research_item_links : "linked (beat)"
+  plot_threads      ||--o{ research_item_links : "linked (thread)"
   books     ||--o{ chapters    : has
   books     ||--o{ pages       : has
   chapters  ||--o{ pages       : groups

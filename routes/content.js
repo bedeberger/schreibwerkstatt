@@ -505,7 +505,7 @@ router.post('/pages/:page_id/revisions/:rev_id/restore', jsonBody, async (req, r
   try {
     const saved = await contentStore.savePage(
       pageId,
-      { html: rev.body_html, markdown: rev.body_markdown, source: 'main', summary: `restored from #${revId}` },
+      { html: rev.body_html, source: 'main', summary: `restored from #${revId}` },
       req,
     );
     res.json({ ok: true, page: saved, restored_from: revId });

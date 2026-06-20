@@ -28,6 +28,7 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 - **Komplettanalyse** – Pipeline, die Figuren, Schauplätze, Szenen, Ereignisse, Weltfakten, Soziogramm und Kontinuität aus dem Buch extrahiert (Delta-Cache + Checkpoint, Nacht-Cron). [docs/komplett.md](docs/komplett.md).
 - **Figurenübersicht** – Charakterextraktion mit Beziehungsgraph (Vollbild); Figurenkontext im Lektorat einblendbar.
 - **Figuren-Werkstatt** – jsMind-Mindmap-Editor mit KI-Brainstorm pro Knoten + Konsistenz-Check. [docs/figur-werkstatt.md](docs/figur-werkstatt.md).
+- **Plot-Werkstatt** – Beat-Board zum Planen der Handlung: Akte & Handlungspunkte als Kanban, optionale Handlungsstränge als Swimlanes (Raster Akt × Strang), KI-Brainstorm pro Akt/Zelle + Konsistenz-Check gegen die Buchrealität (nie generativ im Text). [docs/plot.md](docs/plot.md).
 - **Ereignisse / Schauplätze / Szenen** – Übersichten pro Kapitel, Ereignisse zusätzlich als Jahres-Zeitstrahl.
 - **Orte-Karte** – Geocodierte Schauplätze auf interaktiver Leaflet-Karte; KI-gestützte Verortung, Geocoding via Nominatim/Photon. [docs/geocode.md](docs/geocode.md).
 - **Weltfakten** – Sammlung von Weltregeln/Lore/Kanon aus der Komplettanalyse.
@@ -35,6 +36,7 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 - **Stil-Heatmap / Fehler-Heatmap** – Satzlänge, Adverbien, Füllwörter, Fehlertypen pro Kapitel.
 - **Buchstatistik** – Tägliche Snapshots (Zeichen, Wörter, Tokens) als Zeitliniendiagramm.
 - **Ideen-Sammlung** – Notiz-Sammelbox pro Buch oder Seite.
+- **Recherche** – Buchweites Wissensboard: Notizen, Links, Zitate, Faktensplitter und Bilder, mit Buch-Entitäten (Kapitel/Seite/Figur/Ort/Szene/Beat) verknüpfbar und über Tags filterbar; KI-gestützte Verknüpfungs-Vorschläge zu bestehenden Entitäten.
 - **Musikbibliothek** – Pro Buch kuratierte Tracks (Titel, Interpret, Genre, Stimmung, Kontext-Typ) als Schreib-Inspiration; KI-gestützter Stimmungs-Match.
 - **Tagebuch-Rückblick** – Rückwärtsgewandte KI-Verdichtung für Bücher vom Typ Tagebuch.
 

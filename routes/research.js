@@ -31,14 +31,25 @@ const SOURCE_MAX = 1000;
 const TAG_MAX = 60;
 const MAX_TAGS = 20;
 
-// target_kind → { col, table, pk, nameCol } für Validierung + Display-JOIN.
+// target_kind → { col, table, pk, nameCol, orderCol } für Validierung,
+// Display-JOIN und Sortierung „nach verknüpfter Entität". orderCol ist die Spalte,
+// nach der die Entität in ihrer eigenen Ansicht geordnet ist (Buch-Reihenfolge).
 const LINK_TARGETS = {
-  chapter:  { col: 'chapter_id',  table: 'chapters',      pk: 'chapter_id', nameCol: 'chapter_name' },
-  page:     { col: 'page_id',     table: 'pages',         pk: 'page_id',    nameCol: 'page_name' },
-  figure:   { col: 'figure_id',   table: 'figures',       pk: 'id',         nameCol: 'name' },
-  location: { col: 'location_id', table: 'locations',     pk: 'id',         nameCol: 'name' },
-  scene:    { col: 'scene_id',    table: 'figure_scenes', pk: 'id',         nameCol: 'titel' },
-  beat:     { col: 'beat_id',     table: 'plot_beats',    pk: 'id',         nameCol: 'titel' },
+  chapter:  { col: 'chapter_id',  table: 'chapters',      pk: 'chapter_id', nameCol: 'chapter_name', orderCol: 'position' },
+  page:     { col: 'page_id',     table: 'pages',         pk: 'page_id',    nameCol: 'page_name',    orderCol: 'position' },
+  figure:   { col: 'figure_id',   table: 'figures',       pk: 'id',         nameCol: 'name',         orderCol: 'sort_order' },
+  location: { col: 'location_id', table: 'locations',     pk: 'id',         nameCol: 'name',         orderCol: 'sort_order' },
+  scene:    { col: 'scene_id',    table: 'figure_scenes', pk: 'id',         nameCol: 'titel',        orderCol: 'sort_order' },
+  beat:     { col: 'beat_id',     table: 'plot_beats',    pk: 'id',         nameCol: 'titel',        orderCol: 'sort_order' },
+  thread:   { col: 'thread_id',   table: 'plot_threads',  pk: 'id',         nameCol: 'name',         orderCol: 'position' },
+};
+
+// Erlaubte Sortier-Modi: feste Felder + „link:<dimension>" (nach verknüpfter Entität).
+const FIXED_SORTS = {
+  updated: 'ri.pinned DESC, ri.updated_at DESC',
+  created: 'ri.pinned DESC, ri.created_at DESC',
+  title:   "ri.pinned DESC, (ri.title IS NULL OR ri.title = ''), ri.title COLLATE NOCASE, ri.updated_at DESC",
+  kind:    'ri.pinned DESC, ri.kind, ri.updated_at DESC',
 };
 
 function userEmailOrNull(req) {
@@ -175,13 +186,34 @@ router.get('/', (req, res) => {
     }
   }
 
+  // sort=updated|created|title|kind oder sort=link:<dimension> (nach verknüpfter
+  // Entität, in deren Buch-Reihenfolge; Unverknüpfte ans Ende). Angeheftet bleibt
+  // immer oben. Der Link-Sort braucht eine korrelierte Subquery, deren Platzhalter
+  // VOR den WHERE-Werten gebunden wird → selectVals zuerst.
+  const sortRaw = String(req.query.sort || 'updated').trim();
+  let selectExtra = '';
+  const selectVals = [];
+  let orderBy = FIXED_SORTS.updated;
+  const linkSort = /^link:(\w+)$/.exec(sortRaw);
+  if (FIXED_SORTS[sortRaw]) {
+    orderBy = FIXED_SORTS[sortRaw];
+  } else if (linkSort && LINK_TARGETS[linkSort[1]]) {
+    const t = LINK_TARGETS[linkSort[1]];
+    selectExtra = `, (SELECT MIN(e.${t.orderCol}) FROM research_item_links l
+                        JOIN ${t.table} e ON e.${t.pk} = l.${t.col}
+                       WHERE l.item_id = ri.id AND l.target_kind = ?) AS link_rank`;
+    selectVals.push(linkSort[1]);
+    orderBy = 'ri.pinned DESC, (link_rank IS NULL), link_rank, ri.updated_at DESC';
+  }
+
   const rows = db.prepare(
     `SELECT ri.id, ri.book_id, ri.user_email, ri.kind, ri.title, ri.body, ri.url,
-            ri.source, ri.image_mime, ri.pinned, ri.archived, ri.created_at, ri.updated_at
+            ri.source, ri.image_mime, ri.pinned, ri.archived, ri.created_at, ri.updated_at${selectExtra}
        FROM research_items ri
       WHERE ${where.join(' AND ')}
-      ORDER BY ri.pinned DESC, ri.updated_at DESC`
-  ).all(...vals);
+      ORDER BY ${orderBy}`
+  ).all(...selectVals, ...vals);
+  for (const r of rows) delete r.link_rank;
   res.json(_attachRelations(rows));
 });
 
@@ -207,10 +239,10 @@ router.get('/link-targets', (req, res) => {
   const userEmail = userEmailOrNull(req);
   const out = {};
   out.chapter = db.prepare(
-    'SELECT chapter_id AS id, chapter_name AS label FROM chapters WHERE book_id = ? ORDER BY sort_order, chapter_name'
+    'SELECT chapter_id AS id, chapter_name AS label FROM chapters WHERE book_id = ? ORDER BY position, chapter_name'
   ).all(bookId);
   out.page = db.prepare(
-    'SELECT page_id AS id, page_name AS label FROM pages WHERE book_id = ? ORDER BY page_name'
+    'SELECT page_id AS id, page_name AS label FROM pages WHERE book_id = ? ORDER BY position, page_name'
   ).all(bookId);
   // user-skopierte Welt-Entitäten: nur die des anfragenden Users anbieten.
   out.figure = db.prepare(
@@ -224,6 +256,9 @@ router.get('/link-targets', (req, res) => {
   ).all(bookId, userEmail);
   out.beat = db.prepare(
     'SELECT id, titel AS label FROM plot_beats WHERE book_id = ? AND user_email = ? ORDER BY sort_order, titel'
+  ).all(bookId, userEmail);
+  out.thread = db.prepare(
+    'SELECT id, name AS label FROM plot_threads WHERE book_id = ? AND user_email = ? ORDER BY position, name'
   ).all(bookId, userEmail);
   res.json(out);
 });

@@ -18,7 +18,7 @@ Regeln:
 - Hinter jeder Entität steht nach «—» ein kurzer Kontext (Typ, Rolle, Beschreibung). Nutze ihn zum Abgleich, auch wenn der Name selbst im Schnipsel nicht vorkommt (z.B. Schnipsel über Bronzezeit-Grabungen passt zur Figur «Archäologin»).
 - Verknüpfe nur bei klarem inhaltlichem Bezug (genannte Figur, beschriebener Ort, thematisch passende Szene). Im Zweifel weglassen — lieber wenige präzise Treffer als viele vage.
 - Eine Entität höchstens einmal.
-- «art» ist die Kategorie der Entität: «figur», «ort», «szene» oder «beat».
+- «art» ist die Kategorie der Entität: «figur», «ort», «szene», «beat» oder «strang» (Handlungsstrang).
 - «grund» ist eine sehr kurze Begründung (wenige Wörter), warum der Schnipsel zu dieser Entität passt.${_jsonOnly()}`;
 }
 
@@ -36,11 +36,13 @@ export function buildResearchLinkPrompt(snippet, candidates) {
   const ortMeta = (c) => [head(c.typ, c.land), trunc(c.beschreibung, 150)].filter(Boolean).join(' · ');
   const szeneMeta = (c) => trunc(c.kommentar, 150);
   const beatMeta = (c) => [head(c.status), trunc(c.beschreibung, 150)].filter(Boolean).join(' · ');
+  const strangMeta = () => '';
   const parts = [
     block('Figuren', candidates.figur, figMeta),
     block('Schauplätze', candidates.ort, ortMeta),
     block('Szenen', candidates.szene, szeneMeta),
     block('Plot-Abschnitte', candidates.beat, beatMeta),
+    block('Handlungsstränge', candidates.strang, strangMeta),
   ].join('\n\n');
   const snip = [snippet.title, snippet.body, snippet.source, snippet.url]
     .filter(Boolean).join('\n').slice(0, 4000);
@@ -56,7 +58,7 @@ ${parts}
 Antworte mit diesem JSON-Schema:
 {
   "links": [
-    { "art": "figur|ort|szene|beat", "id": "exakt eine id von oben", "grund": "kurze Begründung" }
+    { "art": "figur|ort|szene|beat|strang", "id": "exakt eine id von oben", "grund": "kurze Begründung" }
   ]
 }
 Gib ein leeres "links"-Array zurück, wenn keine Entität klar passt.`;

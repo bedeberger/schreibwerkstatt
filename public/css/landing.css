@@ -121,6 +121,8 @@ html, body {
 .public-feature--chat         { --card-accent: var(--card-accent-chat); }
 .public-feature--review       { --card-accent: var(--card-accent-review); }
 .public-feature--pdfexport    { --card-accent: var(--card-accent-pdfexport); }
+.public-feature--plot         { --card-accent: var(--card-accent-plot); }
+.public-feature--recherche    { --card-accent: var(--card-accent-recherche); }
 
 .public-macclient {
   display: flex;

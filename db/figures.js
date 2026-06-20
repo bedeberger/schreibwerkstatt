@@ -24,6 +24,24 @@ function dedupRelations(relations, validIds) {
   return result;
 }
 
+/** SSoT für die fig_id→id-Übersetzung im Write-Path. `figures.fig_id` (TEXT,
+ *  KI-stabil) ist nur pro (book_id, user_email) eindeutig; die FK-Targets in
+ *  figure_relations/figure_events/location_figures/zeitstrahl_event_figures sind
+ *  INTEGER `figures.id`. Jede Stelle, die fig_id-basierten KI-Output in diese
+ *  INTEGER-FKs schreibt, MUSS diesen Helper nutzen statt selbst
+ *  `SELECT id, fig_id … + Object.fromEntries` zu wiederholen — sonst landet bei
+ *  einer neuen Write-Stelle still eine TEXT-fig_id in einer INTEGER-Spalte.
+ *  Liefert `rows` (inkl. name/kurzname für Namens-Lookups) + `byFigId`.
+ *  Ausnahme: saveFigurenToDb baut die Map beim INSERT aus lastInsertRowid, weil
+ *  die Figuren dort noch nicht in der DB stehen. */
+function figIdMaps(bookId, userEmail) {
+  const rows = db.prepare(
+    'SELECT id, fig_id, name, kurzname FROM figures WHERE book_id = ? AND user_email IS ?'
+  ).all(bookId, userEmail || null);
+  const byFigId = Object.fromEntries(rows.map(r => [r.fig_id, r.id]));
+  return { rows, byFigId };
+}
+
 // KI liefert Kapitel-/Seitennamen gelegentlich mit Markdown-Header-Präfix
 // (##/###, wörtlich aus dem Prompt-Text kopiert) oder als Schema-Platzhalter-Echo
 // («## Kapitel-Header», «### Seiten-Header»). Beides strippen/nullen, damit der
@@ -184,12 +202,9 @@ function updateFigurenEvents(bookId, assignments, userEmail, idMaps) {
   const { parseDatum } = require('../lib/datum-parse');
   const { normEventSubtyp } = require('./event-subtyp');
   db.transaction(() => {
-    const figRows = db.prepare(
-      'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email = ?'
-    ).all(bookId, userEmail || null);
+    const { rows: figRows, byFigId: figIdToRowId } = figIdMaps(bookId, userEmail);
     if (!figRows.length) return;
 
-    const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
     const delEvt = db.prepare('DELETE FROM figure_events WHERE figure_id = ? AND manually_edited = 0');
     for (const row of figRows) delEvt.run(row.id);
 
@@ -249,10 +264,7 @@ function updateFigurenSoziogramm(bookId, figurenSoziogramm, beziehungenMacht, us
       updFig.run(f.sozialschicht || null, bookId, f.fig_id, userEmail || null);
     }
     // figure_relations.from_fig_id/to_fig_id sind INTEGER (figures.id) — Lookup TEXT → INTEGER.
-    const figRows = db.prepare(
-      'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email IS ?'
-    ).all(bookId, userEmail || null);
-    const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
+    const { byFigId: figIdToRowId } = figIdMaps(bookId, userEmail);
     const updRel = db.prepare(
       'UPDATE figure_relations SET machtverhaltnis = ? WHERE book_id = ? AND from_fig_id = ? AND to_fig_id = ? AND user_email IS ?'
     );
@@ -273,10 +285,7 @@ function updateFigurenSoziogramm(bookId, figurenSoziogramm, beziehungenMacht, us
 function addFigurenBeziehungen(bookId, beziehungen, userEmail, idMaps) {
   const em = userEmail || null;
   // Lookup TEXT-fig_id → INTEGER figures.id (FK-Target seit Mig 72).
-  const figRows = db.prepare(
-    'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email IS ?'
-  ).all(bookId, em);
-  const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
+  const { byFigId: figIdToRowId } = figIdMaps(bookId, em);
   const pairExists = db.prepare(
     'SELECT COUNT(*) as cnt FROM figure_relations WHERE book_id = ? AND ((from_fig_id = ? AND to_fig_id = ?) OR (from_fig_id = ? AND to_fig_id = ?)) AND user_email IS ?'
   );
@@ -600,6 +609,7 @@ function getFigureWithDetails(figureId) {
 module.exports = {
   RELATION_INVERSES,
   dedupRelations,
+  figIdMaps,
   saveFigurenToDb,
   updateFigurenEvents,
   updateFigurenSoziogramm,

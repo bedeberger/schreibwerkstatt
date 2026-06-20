@@ -8134,6 +8134,129 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 204 abgeschlossen (plot_brainstorm_runs).');
   }
 
+  if (version < 206) {
+    // Index-Hygiene: deckende Indexe fuer FK-Spalten, die bislang ohne Index
+    // liefen. Zwei Klassen: (a) heiss gelesene Eltern-FKs (pages/chapters per
+    // book_id, zeitstrahl_events per book_id/storyline_id, figure_events per
+    // figure_id/chapter_id/page_id) und (b) CASCADE/SET-NULL-Kinder, deren
+    // Parent-Loeschung (Buch/Kapitel/Seite/Figur/Event/Issue) sonst pro
+    // Kind-Tabelle einen Full-Scan zum Aufloesen der Referenz kostet. Rein
+    // additiv (CREATE INDEX), kein Tabellen-Recreate.
+
+    // (a) Heiss gelesene Eltern-FKs
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_pages_book_id ON pages(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_chapters_book_id ON chapters(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_zeitstrahl_events_book_id ON zeitstrahl_events(book_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_zeitstrahl_events_storyline ON zeitstrahl_events(storyline_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_fe_figure ON figure_events(figure_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_fe_chapter ON figure_events(chapter_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_fe_page ON figure_events(page_id)').run();
+
+    // (b) Bruecken-/Detail-Kinder (Parent-Delete-Scan vermeiden)
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_figapp_chapter ON figure_appearances(chapter_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_frel_from ON figure_relations(from_fig_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_frel_to ON figure_relations(to_fig_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_zec_event ON zeitstrahl_event_chapters(event_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_zec_chapter ON zeitstrahl_event_chapters(chapter_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_zep_event ON zeitstrahl_event_pages(event_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_zep_page ON zeitstrahl_event_pages(page_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_zef_event ON zeitstrahl_event_figures(event_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_zef_figure ON zeitstrahl_event_figures(figure_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_cic_issue ON continuity_issue_chapters(issue_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_cic_chapter ON continuity_issue_chapters(chapter_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_cif_issue ON continuity_issue_figures(issue_id)').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_cif_figure ON continuity_issue_figures(figure_id)').run();
+
+    const fkErrors206 = db.pragma('foreign_key_check');
+    if (fkErrors206.length) {
+      throw new Error(`Migration 206: foreign_key_check meldet ${fkErrors206.length} Verstoesse: ${JSON.stringify(fkErrors206.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 206').run();
+    logger.info('DB-Migration auf Version 206 abgeschlossen (FK-Index-Hygiene, 20 Indexe).');
+  }
+
+  if (version < 207) {
+    // Recherche-Verknuepfung um Handlungsstrang (plot_threads) erweitern: neue
+    // Spalte thread_id + target_kind- und Storage-XOR-CHECK angepasst. SQLite
+    // kann CHECK nicht via ALTER aendern → Recreate-Pattern.
+    db.pragma('foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS research_item_links_new');
+    db.exec(`
+      CREATE TABLE research_item_links_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id     INTEGER NOT NULL REFERENCES research_items(id) ON DELETE CASCADE,
+        target_kind TEXT    NOT NULL
+                      CHECK(target_kind IN ('chapter','page','figure','location','scene','beat','thread')),
+        chapter_id  INTEGER REFERENCES chapters(chapter_id)   ON DELETE CASCADE,
+        page_id     INTEGER REFERENCES pages(page_id)         ON DELETE CASCADE,
+        figure_id   INTEGER REFERENCES figures(id)            ON DELETE CASCADE,
+        location_id INTEGER REFERENCES locations(id)          ON DELETE CASCADE,
+        scene_id    INTEGER REFERENCES figure_scenes(id)      ON DELETE CASCADE,
+        beat_id     INTEGER REFERENCES plot_beats(id)         ON DELETE CASCADE,
+        thread_id   INTEGER REFERENCES plot_threads(id)       ON DELETE CASCADE,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        -- Genau ein *_id passend zu target_kind gesetzt, alle anderen NULL
+        -- (sentinel-frei; eine Zeile = genau eine Verknuepfung).
+        CHECK (
+          (target_kind='chapter'  AND chapter_id  IS NOT NULL AND page_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND scene_id IS NULL AND beat_id IS NULL AND thread_id IS NULL) OR
+          (target_kind='page'     AND page_id     IS NOT NULL AND chapter_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND scene_id IS NULL AND beat_id IS NULL AND thread_id IS NULL) OR
+          (target_kind='figure'   AND figure_id   IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND location_id IS NULL AND scene_id IS NULL AND beat_id IS NULL AND thread_id IS NULL) OR
+          (target_kind='location' AND location_id IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND figure_id IS NULL AND scene_id IS NULL AND beat_id IS NULL AND thread_id IS NULL) OR
+          (target_kind='scene'    AND scene_id    IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND beat_id IS NULL AND thread_id IS NULL) OR
+          (target_kind='beat'     AND beat_id     IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND scene_id IS NULL AND thread_id IS NULL) OR
+          (target_kind='thread'   AND thread_id   IS NOT NULL AND chapter_id IS NULL AND page_id IS NULL AND figure_id IS NULL AND location_id IS NULL AND scene_id IS NULL AND beat_id IS NULL)
+        )
+      );
+    `);
+    db.exec(`INSERT INTO research_item_links_new
+        (id, item_id, target_kind, chapter_id, page_id, figure_id, location_id, scene_id, beat_id, thread_id, created_at)
+        SELECT id, item_id, target_kind, chapter_id, page_id, figure_id, location_id, scene_id, beat_id, NULL, created_at
+          FROM research_item_links`);
+    db.exec('DROP TABLE research_item_links');
+    db.exec('ALTER TABLE research_item_links_new RENAME TO research_item_links');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_links_item     ON research_item_links(item_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_links_chapter  ON research_item_links(chapter_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_links_page     ON research_item_links(page_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_links_figure   ON research_item_links(figure_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_links_location ON research_item_links(location_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_links_scene    ON research_item_links(scene_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_links_beat     ON research_item_links(beat_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_links_thread   ON research_item_links(thread_id)');
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_research_links_unique ON research_item_links(
+        item_id, target_kind,
+        COALESCE(chapter_id,0), COALESCE(page_id,0), COALESCE(figure_id,0),
+        COALESCE(location_id,0), COALESCE(scene_id,0), COALESCE(beat_id,0), COALESCE(thread_id,0)
+      )`);
+    db.pragma('foreign_keys = ON');
+    const fkErrors207 = db.pragma('foreign_key_check');
+    if (fkErrors207.length) {
+      throw new Error(`Migration 207: foreign_key_check meldet ${fkErrors207.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 207').run();
+    logger.info('DB-Migration auf Version 207 abgeschlossen (research_item_links.thread_id — Handlungsstrang verknuepfbar).');
+  }
+
+  if (version < 208) {
+    // body_markdown faellt weg: einzige Write-Path-Wahrheit fuer den Seiten-Body
+    // ist body_html (am html-clean-Chokepoint bereinigt). Der Markdown-Export
+    // leitet jetzt immer aus body_html ab. Rein additiv-loeschend (DROP COLUMN);
+    // keine Indexe/Trigger/Views referenzieren die Spalte.
+    const pagesCols208 = db.pragma('table_info(pages)').map(c => c.name);
+    if (pagesCols208.includes('body_markdown')) {
+      db.exec('ALTER TABLE pages DROP COLUMN body_markdown');
+    }
+    const revCols208 = db.pragma('table_info(page_revisions)').map(c => c.name);
+    if (revCols208.includes('body_markdown')) {
+      db.exec('ALTER TABLE page_revisions DROP COLUMN body_markdown');
+    }
+    const fkErrors208 = db.pragma('foreign_key_check');
+    if (fkErrors208.length) {
+      throw new Error(`Migration 208: foreign_key_check meldet ${fkErrors208.length} Verstoesse: ${JSON.stringify(fkErrors208.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 208').run();
+    logger.info('DB-Migration auf Version 208 abgeschlossen (pages/page_revisions.body_markdown entfernt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

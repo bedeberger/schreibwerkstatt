@@ -18,15 +18,16 @@ const researchLinkRouter = express.Router();
 const MAX_CANDIDATES = 200;
 
 // KI-«art» → research_item_links.target_kind.
-const ART_TO_KIND = { figur: 'figure', ort: 'location', szene: 'scene', beat: 'beat' };
+const ART_TO_KIND = { figur: 'figure', ort: 'location', szene: 'scene', beat: 'beat', strang: 'thread' };
 
 function _loadCandidates(bookId, userEmail) {
   const q = (sql) => db.prepare(sql).all(bookId, userEmail).slice(0, MAX_CANDIDATES);
   return {
-    figur: q('SELECT id, name AS label, typ, beruf, rolle, beschreibung FROM figures WHERE book_id = ? AND user_email = ? ORDER BY sort_order, name'),
-    ort:   q('SELECT id, name AS label, typ, land, beschreibung FROM locations WHERE book_id = ? AND user_email = ? ORDER BY sort_order, name'),
-    szene: q('SELECT id, titel AS label, kommentar FROM figure_scenes WHERE book_id = ? AND user_email = ? ORDER BY sort_order, titel'),
-    beat:  q('SELECT id, titel AS label, status, beschreibung FROM plot_beats WHERE book_id = ? AND user_email = ? ORDER BY sort_order, titel'),
+    figur:  q('SELECT id, name AS label, typ, beruf, rolle, beschreibung FROM figures WHERE book_id = ? AND user_email = ? ORDER BY sort_order, name'),
+    ort:    q('SELECT id, name AS label, typ, land, beschreibung FROM locations WHERE book_id = ? AND user_email = ? ORDER BY sort_order, name'),
+    szene:  q('SELECT id, titel AS label, kommentar FROM figure_scenes WHERE book_id = ? AND user_email = ? ORDER BY sort_order, titel'),
+    beat:   q('SELECT id, titel AS label, status, beschreibung FROM plot_beats WHERE book_id = ? AND user_email = ? ORDER BY sort_order, titel'),
+    strang: q('SELECT id, name AS label FROM plot_threads WHERE book_id = ? AND user_email = ? ORDER BY position, name'),
   };
 }
 
@@ -40,7 +41,8 @@ async function runResearchLinkJob(jobId, itemId, bookId, userEmail) {
     if (!item) throw i18nError('job.error.researchItemMissing');
 
     const cands = _loadCandidates(bookId, userEmail);
-    const total = cands.figur.length + cands.ort.length + cands.szene.length + cands.beat.length;
+    const total = cands.figur.length + cands.ort.length + cands.szene.length
+      + cands.beat.length + cands.strang.length;
     if (!total) {
       completeJob(jobId, { suggestions: [], empty: true }, null, '0 Kandidaten');
       return;
