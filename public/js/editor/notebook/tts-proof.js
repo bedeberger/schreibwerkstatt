@@ -22,6 +22,14 @@
 
 const TTS_HIGHLIGHT = 'tts-sentence';
 const TTS_PREFETCH_AHEAD = 1;   // wie viele Saetze im Voraus synthetisiert werden
+// Mindest-Zeichenzahl pro Synthese-Chunk. Sehr kurze Eingaben (Einzelfragmente
+// wie „Er nickte.") lassen XTTS-v2 am Satzende einen erfundenen Restlaut
+// anhaengen (Kurz-Input-Halluzination). Darum werden kurze Saetze innerhalb
+// EINES Blocks zu einem Chunk gebuendelt, bis diese Laenge erreicht ist — der
+// Highlight markiert dann die Gruppe. Normale Saetze (>= Schwelle) bleiben
+// einzeln, der Highlight also satzgenau. Piper braucht das nicht, schadet aber
+// nicht; das Frontend kennt die Engine nicht (`/config` liefert nur `enabled`).
+const TTS_MIN_CHUNK_CHARS = 60;
 const TTS_MAX_RETRY = 1;
 const TTS_RETRY_DELAY_MS = 600;
 const TTS_RETRYABLE_STATUS = new Set([408, 500, 502, 503]);
@@ -81,6 +89,29 @@ export const ttsProofMethods = {
     return out;
   },
 
+  // Kurze Satz-Ranges (in `text`) zu Chunks >= minLen buendeln, damit XTTS bei
+  // sehr kurzen Eingaben nicht halluziniert (siehe TTS_MIN_CHUNK_CHARS). Ein
+  // anwachsender Chunk schluckt Folgesaetze, bis seine getrimmte Laenge die
+  // Schwelle erreicht; ein zu kurzer Rest am Ende wird in den Vorgaenger
+  // gezogen (sonst bliebe genau das problematische Kurz-Fragment uebrig).
+  // Ranges bleiben innerhalb eines Blocks (der Aufrufer ruft pro Block). Pure.
+  _coalesceTtsRanges(ranges, text, minLen = TTS_MIN_CHUNK_CHARS) {
+    if (!Array.isArray(ranges) || ranges.length <= 1) return ranges || [];
+    const len = ([s, e]) => text.slice(s, e).trim().length;
+    const merged = [];
+    let cur = null;
+    for (const [s, e] of ranges) {
+      if (!cur) { cur = [s, e]; continue; }
+      if (len(cur) < minLen) { cur[1] = e; }      // Chunk noch zu kurz -> anhaengen
+      else { merged.push(cur); cur = [s, e]; }     // Chunk lang genug -> abschliessen
+    }
+    if (cur) {
+      if (len(cur) < minLen && merged.length) merged[merged.length - 1][1] = cur[1];
+      else merged.push(cur);
+    }
+    return merged;
+  },
+
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
   _initTtsProof(signal) {
@@ -124,7 +155,8 @@ export const ttsProofMethods = {
       const text = block.textContent || '';
       if (!text.trim()) continue;
       const ranges = this._computeTtsSentences(text, locale);
-      const list = ranges.length ? ranges : [[0, text.length]];
+      const base = ranges.length ? ranges : [[0, text.length]];
+      const list = this._coalesceTtsRanges(base, text);
       for (const [s, e] of list) {
         const t = text.slice(s, e).trim();
         if (t) segs.push({ text: t, block, startOff: s, endOff: e });

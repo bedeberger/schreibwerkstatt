@@ -54,3 +54,68 @@ test('Text ohne Satzendezeichen -> eine Range', () => {
   const ranges = split('nur ein fragment ohne punkt', 'de');
   assert.equal(ranges.length, 1);
 });
+
+// ── Kurz-Satz-Buendelung (XTTS-Halluzinations-Schutz) ──────────────────────
+const coalesce = (ranges, text, minLen) =>
+  ttsProofMethods._coalesceTtsRanges(ranges, text, minLen);
+
+test('kurze Folgesaetze werden bis zur Schwelle gebuendelt', () => {
+  const text = 'Ja. Nein. Vielleicht doch nicht.';
+  const ranges = split(text, 'de');
+  const chunks = coalesce(ranges, text, 20);
+  // Alle drei Fragmente sind < 20 Zeichen -> ein einziger Chunk.
+  assert.equal(chunks.length, 1);
+  assert.equal(text.slice(...chunks[0]).trim(), text.trim());
+});
+
+test('normale Saetze (>= Schwelle) bleiben einzeln', () => {
+  const a = 'Am frühen Morgen ging die alte Frau langsam über den Marktplatz.';
+  const b = 'Der Brunnen plätscherte leise und beruhigend in der Stille des Hofs.';
+  const text = `${a} ${b}`;
+  const ranges = split(text, 'de');
+  const chunks = coalesce(ranges, text, 60);
+  assert.equal(chunks.length, 2);
+  assert.equal(text.slice(...chunks[0]).trim(), a);
+  assert.equal(text.slice(...chunks[1]).trim(), b);
+});
+
+test('zu kurzer Rest am Ende wird in den Vorgaenger gezogen', () => {
+  const a = 'Am frühen Morgen ging die alte Frau langsam über den Marktplatz.';
+  const text = `${a} Ja.`;
+  const ranges = split(text, 'de');
+  const chunks = coalesce(ranges, text, 60);
+  // „Ja." allein wuerde halluzinieren -> an den langen Vorsatz angehaengt.
+  assert.equal(chunks.length, 1);
+  assert.equal(text.slice(...chunks[0]).trim(), text.trim());
+});
+
+test('Buendelung verliert keinen Inhalt und bleibt monoton', () => {
+  const text = 'A. Bee. Cee dee. Eff gee haa ii. Jott. Kah ell emm enn oo pee.';
+  const ranges = split(text, 'de');
+  const chunks = coalesce(ranges, text, 30);
+  for (let i = 1; i < chunks.length; i++) {
+    assert.ok(chunks[i][0] >= chunks[i - 1][1], `Chunk ${i} ueberlappt`);
+  }
+  const covered = chunks.map(r => text.slice(...r)).join('');
+  assert.equal(covered.replace(/\s/g, ''), text.replace(/\s/g, ''));
+});
+
+test('eine einzelne Range bleibt unveraendert', () => {
+  const text = 'Nur ein Satz hier.';
+  const ranges = split(text, 'de');
+  assert.deepEqual(coalesce(ranges, text, 60), ranges);
+});
+
+test('Satzzeichen bleiben im gesendeten Chunk erhalten (Betonung)', () => {
+  const text = 'Ja! Was nun? Er ging. Am Ende blieb nur die Stille des Abends zurück.';
+  const ranges = split(text, 'de');
+  const chunks = coalesce(ranges, text, 60);
+  // Kurze Fragmente werden gebuendelt -> ein Chunk; alle inneren + finalen
+  // Satzzeichen muessen wortwoertlich drinbleiben, sonst fehlt XTTS die Prosodie.
+  const sent = chunks.map(r => text.slice(...r).trim());
+  const all = sent.join(' ');
+  assert.ok(all.includes('Ja!'), 'Ausrufezeichen fehlt');
+  assert.ok(all.includes('Was nun?'), 'Fragezeichen fehlt');
+  assert.ok(all.includes('Er ging.'), 'Punkt fehlt');
+  assert.ok(/[.!?]$/.test(sent[sent.length - 1]), 'finales Satzzeichen fehlt');
+});
