@@ -21,6 +21,16 @@ const TILE_TIMEOUT_MS = 30000;
 // Kacheln aendern sich praktisch nie → Browser darf lange cachen (spart dem
 // Tile-Server die Cold-Render-Last bei jedem erneuten Betrachten).
 const CACHE_CONTROL = 'public, max-age=86400';
+// Socket-Level-Fehler sind transient: der self-hosted Tile-Server droppt eine
+// bestehende Verbindung gelegentlich mitten in der Antwort. Ein einziger sofortiger
+// Re-Fetch heilt das fast immer. Nur diese Codes retryen — AbortError (Timeout) und
+// HTTP-Status vom Upstream NICHT (die sind nicht selbstheilend).
+const RETRYABLE_CAUSE_CODES = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'ECONNABORTED']);
+const RETRY_BACKOFF_MS = 150;
+
+function isRetryable(err) {
+  return err && err.name !== 'AbortError' && RETRYABLE_CAUSE_CODES.has(err.cause && err.cause.code);
+}
 
 function upstreamTileUrl(z, x, y) {
   const tpl = String(appSettings.get('geocode.tiles.url') || '').trim();
@@ -43,7 +53,20 @@ router.get('/:z/:x/:y', async (req, res) => {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TILE_TIMEOUT_MS);
   try {
-    const upstream = await fetch(url, { signal: ctrl.signal });
+    // Ein Retry auf transiente Socket-Drops; das 30s-Timeout deckt beide Versuche ab.
+    let upstream;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        upstream = await fetch(url, { signal: ctrl.signal });
+        break;
+      } catch (err) {
+        if (attempt === 0 && isRetryable(err)) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_BACKOFF_MS));
+          continue;
+        }
+        throw err;
+      }
+    }
     if (!upstream.ok) return res.status(upstream.status === 404 ? 404 : 502).end();
     const buf = Buffer.from(await upstream.arrayBuffer());
     res.setHeader('Content-Type', upstream.headers.get('content-type') || 'image/png');
