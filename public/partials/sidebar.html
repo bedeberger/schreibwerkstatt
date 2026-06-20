@@ -146,9 +146,11 @@
                 <span class="tok-badge tok-empty" x-text="t('sidebar.empty')"></span>
               </template>
               <span x-show="ideenCounts[page.id] > 0"
-                    class="ideen-count-badge"
+                    class="ideen-count-badge internal-link"
+                    @click.stop="openIdeenForPage(page.id)"
                     x-text="ideenCounts[page.id]"
-                    :data-tip="t('ideen.openCountTitle', { n: ideenCounts[page.id] })"></span>
+                    :data-tip="t('ideen.openCountTitle', { n: ideenCounts[page.id] })"
+                    :aria-label="t('ideen.openCountTitle', { n: ideenCounts[page.id] })"></span>
               <span x-show="rechercheCounts[page.id] > 0"
                     class="recherche-count-badge internal-link"
                     @click.stop="openRechercheForPage(page.id)"

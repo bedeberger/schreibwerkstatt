@@ -451,6 +451,21 @@ export const appViewMethods = {
     }
     this._scrollToCardByKey('recherche');
   },
+  // Sprung vom Ideen-Indikator im Pagetree: Seite öffnen (Page-Ideen sitzen im
+  // Editor-Slot) und die Ideen-Karte aufklappen. Kein Toggle — ist sie schon
+  // offen, bleibt sie offen.
+  async openIdeenForPage(pageId) {
+    const pid = parseInt(pageId, 10);
+    if (!pid) return;
+    if (this.currentPage?.id !== pid) {
+      const page = (this.pages || []).find(p => p.id === pid);
+      if (!page) return;
+      await this.selectPage(page);
+    }
+    if (!(this.showIdeenCard && this.ideenScope === 'page')) {
+      await this.toggleIdeenCard();
+    }
+  },
   // Seiten-Chat: lebt neben dem Editor, schließt NICHT den Editor. Toggle
   // merkt sich checkDone-Snapshot (Chat soll Findings temporär verbergen).
   // checkDoneBeforeChat wird in chat-base beim onVisible gesetzt.
