@@ -1,17 +1,20 @@
 'use strict';
-// Proof-Listening / Text-to-Speech (nur Notebook-Editor). Liest den Text des
-// Edit-Felds satzweise vor: pro Satz ein POST /tts/speak, das Audio wird
-// sequenziell abgespielt, der gerade gehoerte Satz per CSS-Custom-Highlight
-// markiert und ins Sichtfeld gescrollt. Den eigenen Text gehoert aufzudecken
-// Stolperstellen, die das Auge ueberliest — Gegenstueck zum STT-Diktat.
+// Proof-Listening / Text-to-Speech (Notebook-Seitenansicht, Read-Modus). Liest
+// den gerenderten Seitentext satzweise vor: pro Satz ein POST /tts/speak, das
+// Audio wird sequenziell abgespielt, der gerade gehoerte Satz per
+// CSS-Custom-Highlight markiert und ins Sichtfeld gescrollt. Den eigenen Text
+// gehoert aufzudecken Stolperstellen, die das Auge ueberliest.
+//
+// Laeuft in der Leseansicht (`.page-content-view`), NICHT im Edit-Modus —
+// Korrekturhoeren am fertigen Text, nicht waehrend des Tippens.
 //
 // Reines Lesen: KEINE DOM-Mutation, kein Save-Pfad, kein data-bid, kein
 // Stale-Write. Der Highlight laeuft ueber die CSS Custom Highlight API (wie
 // Bucheditor-Find/Replace + LanguageTool-Squiggles) — er faerbt nur, er
-// veraendert den Editor-Inhalt nicht.
+// veraendert den Seiteninhalt nicht.
 //
 // Diese Methoden werden in den Root (`Alpine.data('lektorat')`) gespreaded —
-// der Vorlese-Dock laeuft wie der STT-Mic im Root-Scope.
+// der Vorlese-Dock laeuft im Root-Scope.
 //
 // Durchsatz: das Audio des aktuellen Satzes wird abgespielt, waehrend das des
 // naechsten schon vorgeladen wird (Prefetch-Kette) — das Gegenstueck zur
@@ -24,16 +27,23 @@ const TTS_RETRY_DELAY_MS = 600;
 const TTS_RETRYABLE_STATUS = new Set([408, 500, 502, 503]);
 
 export const ttsProofMethods = {
-  // Diagnostik-Logger: einheitlicher `[tts]`-Prefix, grep-bar in der Konsole.
-  // Lifecycle laeuft auf console.debug (still im Default-Level), Fehler/Retry
-  // auf console.warn (sichtbar) — analog dem Logging-Stil in notebook/edit.js.
-  _ttsLog(msg, data) {
-    if (data !== undefined) console.debug(`[tts] ${msg}`, data);
-    else console.debug(`[tts] ${msg}`);
+  // Diagnostik-Logger: meldet reine Vorlese-Frontend-Events fire-and-forget an
+  // POST /telemetry/tts-log, sodass sie zentral in schreibwerkstatt.log landen
+  // (der /tts/speak-Proxy loggt nur die einzelnen Synthese-Calls). Lifecycle als
+  // level=info, Fehler/Retry als level=warn. Best-effort: Netzfehler verschluckt.
+  _ttsLog(msg, level = 'info') {
+    const body = { level, msg, bookId: this.selectedBookId || null };
+    try {
+      fetch('/telemetry/tts-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        keepalive: true,
+      }).catch(() => {});
+    } catch { /* noop */ }
   },
   _ttsWarn(msg, data) {
-    if (data !== undefined) console.warn(`[tts] ${msg}`, data);
-    else console.warn(`[tts] ${msg}`);
+    this._ttsLog(data !== undefined ? `${msg} (${data})` : msg, 'warn');
   },
 
   // ── Pure Compute (testbar ohne Browser) ─────────────────────────────────
@@ -73,13 +83,21 @@ export const ttsProofMethods = {
     const stop = () => { if (this.ttsPlaying) this._ttsStop(); };
     window.addEventListener('book:changed', stop, { signal });
     window.addEventListener('view:reset', stop, { signal });
-    // Edit-Modus verlassen / Seite gewechselt -> Vorlesen beenden, Audio freigeben.
-    this.$watch('editMode', (on) => { if (!on) stop(); });
+    // In den Edit-Modus wechseln (Dock ist read-only) / Seite gewechselt ->
+    // Vorlesen beenden, Audio freigeben.
+    this.$watch('editMode', (on) => { if (on) stop(); });
     this.$watch(() => this.currentPage?.id, () => stop());
   },
 
   _ttsLocaleCode() {
     return String(this.uiLocale || 'de').split('-')[0].trim().toLowerCase() || 'de';
+  },
+
+  // Container der Leseansicht (Read-Modus). Bewusst nicht der Edit-Container
+  // (`_getEditEl`): TTS liest den gerenderten Seitentext, nicht das
+  // contenteditable. `:not(--editing)` grenzt gegen das Edit-Feld ab.
+  _ttsGetReadEl() {
+    return document.querySelector('#editor-card .page-content-view:not(.page-content-view--editing)');
   },
 
   // ── DOM-Segmentierung ──────────────────────────────────────────────────────
@@ -88,7 +106,7 @@ export const ttsProofMethods = {
   // mit Block-Referenz + Zeichen-Offsets. Die Range wird erst beim Highlight
   // gebaut (ueberlebt so minimale Reflows). Leere Bloecke werden uebersprungen.
   _ttsCollectSegments() {
-    const editEl = this._getEditEl?.();
+    const editEl = this._ttsGetReadEl();
     if (!editEl) return [];
     const locale = this._ttsLocaleCode();
     const blocks = editEl.children.length ? Array.from(editEl.children) : [editEl];
@@ -135,9 +153,26 @@ export const ttsProofMethods = {
     return r;
   },
 
+  // Rect des aktuellen Satzes in der Leseansicht ins Sichtfeld nudgen. Die
+  // `.page-content-view` ist (wie das Edit-Feld) ihr eigener Scroll-Container
+  // (max-height + overflow-y:auto) -> scrollTop direkt nachziehen, nur wenn der
+  // Satz ueber/unter den sichtbaren Rand rutscht. Eigene Methode statt
+  // `_scrollEditCaretIntoView`, weil jene gegen den Edit-Container misst.
+  _ttsScrollViewIntoView(rect) {
+    const el = this._ttsGetReadEl();
+    if (!el || !rect || (!rect.height && !rect.top && !rect.bottom)) return;
+    const host = el.getBoundingClientRect();
+    const margin = 28;
+    if (rect.bottom > host.bottom - margin) {
+      el.scrollTop += rect.bottom - (host.bottom - margin);
+    } else if (rect.top < host.top + margin) {
+      el.scrollTop -= (host.top + margin) - rect.top;
+    }
+  },
+
   // Den gerade vorgelesenen Satz markieren + ins Sichtfeld holen. Reiner
-  // CSS-Custom-Highlight (keine DOM-Mutation). Editor ist sein eigener
-  // Scroll-Container -> Rect des Satzes an den generischen scrollTop-Nudge geben.
+  // CSS-Custom-Highlight (keine DOM-Mutation). Leseansicht ist ihr eigener
+  // Scroll-Container -> Rect des Satzes an den scrollTop-Nudge geben.
   _ttsHighlight(idx) {
     if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') return;
     CSS.highlights.delete(TTS_HIGHLIGHT);
@@ -149,7 +184,7 @@ export const ttsProofMethods = {
     try { CSS.highlights.set(TTS_HIGHLIGHT, new Highlight(range)); } catch { return; }
     let rect = null;
     try { rect = range.getBoundingClientRect(); } catch { /* noop */ }
-    this._scrollEditCaretIntoView?.(rect);
+    this._ttsScrollViewIntoView(rect);
   },
 
   _ttsClearHighlight() {

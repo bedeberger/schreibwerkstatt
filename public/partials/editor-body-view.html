@@ -1,10 +1,51 @@
-<div x-show="!editMode && renderedPageHtml"
-     class="page-content-view"
-     x-html="renderedPageHtml"
-     @click="handleMarkClick($event)"
-     @copy="handleViewCopy($event)"
-     @pointermove="handleMarkPointer($event)"
-     @pointerleave="handleMarkPointerLeave($event)"></div>
+<!-- Leseansicht (Read-Modus). Der TTS-/Vorlese-Dock lebt hier (nicht im Edit-
+     Modus): Proof-Listening liest den gerenderten Seitentext satzweise vor. -->
+<div x-show="!editMode" class="page-view-wrap">
+  <div x-show="renderedPageHtml"
+       class="page-content-view"
+       x-html="renderedPageHtml"
+       @click="handleMarkClick($event)"
+       @copy="handleViewCopy($event)"
+       @pointermove="handleMarkPointer($event)"
+       @pointerleave="handleMarkPointerLeave($event)"></div>
+
+  <!-- TTS / Proof-Listening: schwebender Vorlese-Dock unten LINKS über dem
+       Seitentext. Liest den Text satzweise vor, markiert den aktuellen Satz.
+       Nur sichtbar, wenn Admin TTS aktiviert hat (ttsEnabled = Root-State aus
+       /config) und die Seite Inhalt hat. -->
+  <template x-if="ttsEnabled">
+    <div class="tts-dock" x-show="renderedPageHtml" x-cloak>
+      <!-- Status links: „liest" mit Satz-Fortschritt bzw. „pausiert". -->
+      <span class="tts-status" aria-live="polite"
+            x-show="ttsPlaying"
+            :class="ttsPaused ? 'is-paused' : 'is-reading'"
+            x-text="ttsPaused ? t('tts.status.paused') : (ttsLoading && !ttsIndex ? t('tts.status.loading') : t('tts.status.reading', { i: ttsIndex, n: ttsTotal }))"></span>
+      <!-- Naechster Satz (nur waehrend laufender Wiedergabe). -->
+      <button type="button" class="tts-dock-btn tts-dock-btn--sub"
+              x-show="ttsPlaying && !ttsPaused"
+              :data-tip="t('tts.skip')" :aria-label="t('tts.skip')"
+              @click="skipTtsProof()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#chevron-last"/></svg>
+      </button>
+      <!-- Stoppen (nur wenn aktiv). -->
+      <button type="button" class="tts-dock-btn tts-dock-btn--sub"
+              x-show="ttsPlaying"
+              :data-tip="t('tts.stop')" :aria-label="t('tts.stop')"
+              @click="stopTtsProof()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#square"/></svg>
+      </button>
+      <!-- Haupttaste: starten (Kopfhoerer) / pausieren / fortsetzen. -->
+      <button type="button" class="tts-dock-btn"
+              :aria-pressed="ttsPlaying && !ttsPaused"
+              :class="{ 'is-reading': ttsPlaying && !ttsPaused }"
+              :data-tip="!ttsPlaying ? t('tts.listen') : (ttsPaused ? t('tts.resume') : t('tts.pause'))"
+              :aria-label="!ttsPlaying ? t('tts.listen') : (ttsPaused ? t('tts.resume') : t('tts.pause'))"
+              @click="toggleTtsProof()">
+        <svg class="icon" aria-hidden="true"><use :href="`/icons.svg?v=694#${!ttsPlaying ? 'headphones' : (ttsPaused ? 'play' : 'pause')}`"/></svg>
+      </button>
+    </div>
+  </template>
+</div>
 
 <div class="page-empty-state"
      x-show="!editMode && currentPage && currentPageEmpty && originalHtml !== null"

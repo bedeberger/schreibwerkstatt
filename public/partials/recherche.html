@@ -50,7 +50,7 @@
              x-model="draft.title" :placeholder="$app.t('recherche.field.title')"
              :aria-label="$app.t('recherche.field.title')" data-spellcheck="spelling">
     </div>
-    <textarea class="recherche-input" x-model="draft.body" rows="3"
+    <textarea class="recherche-input" x-model="draft.body" rows="2"
               :placeholder="$app.t('recherche.field.body')" :aria-label="$app.t('recherche.field.body')"
               data-spellcheck="spelling"></textarea>
     <div class="recherche-form-row">
@@ -87,14 +87,14 @@
                 <button type="button" class="icon-btn" @click="openLinkPicker(item)" :disabled="busy" :data-tip="$app.t('recherche.link.add')" :aria-label="$app.t('recherche.link.add')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg></button>
                 <button type="button" class="icon-btn" @click="suggestLinks(item)" :disabled="busy || suggestItemId === item.id" :data-tip="$app.t('recherche.suggest.btn')" :aria-label="$app.t('recherche.suggest.btn')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg></button>
                 <button type="button" class="icon-btn" @click.stop="menuOpenId = (menuOpenId === item.id ? null : item.id)" :disabled="busy" :aria-label="$app.t('recherche.actions')" aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg></button>
-                <div class="research-menu" x-show="menuOpenId === item.id" x-cloak @click.outside="menuOpenId = null" @keydown.escape.window="menuOpenId = null" role="menu">
-                  <button type="button" role="menuitem" @click="togglePin(item)" x-text="item.pinned ? $app.t('recherche.unpin') : $app.t('recherche.pin')"></button>
-                  <button type="button" role="menuitem" @click="toggleArchive(item)" x-text="item.archived ? $app.t('recherche.unarchive') : $app.t('recherche.archive')"></button>
-                  <label role="menuitem" class="research-menu-upload">
+                <div class="context-menu context-menu--dropdown" x-show="menuOpenId === item.id" x-cloak @click.outside="menuOpenId = null" @keydown.escape.window="menuOpenId = null" role="menu">
+                  <button type="button" class="context-menu-item" role="menuitem" @click="togglePin(item)" x-text="item.pinned ? $app.t('recherche.unpin') : $app.t('recherche.pin')"></button>
+                  <button type="button" class="context-menu-item" role="menuitem" @click="toggleArchive(item)" x-text="item.archived ? $app.t('recherche.unarchive') : $app.t('recherche.archive')"></button>
+                  <label class="context-menu-item research-menu-upload" role="menuitem">
                     <span x-text="$app.t('recherche.image.upload')"></span>
                     <input type="file" accept="image/*" @change="onImagePick(item, $event); menuOpenId = null">
                   </label>
-                  <button type="button" role="menuitem" class="research-menu-item--danger" @click="deleteItem(item)" x-text="$app.t('recherche.delete')"></button>
+                  <button type="button" class="context-menu-item context-menu-item--danger" role="menuitem" @click="deleteItem(item)" x-text="$app.t('recherche.delete')"></button>
                 </div>
               </div>
             </div>
@@ -158,7 +158,7 @@
                      x-model="editDraft.title" :placeholder="$app.t('recherche.field.title')"
                      :aria-label="$app.t('recherche.field.title')" data-spellcheck="spelling">
             </div>
-            <textarea class="recherche-input" x-model="editDraft.body" rows="3"
+            <textarea class="recherche-input" x-model="editDraft.body" rows="2"
                       :placeholder="$app.t('recherche.field.body')" :aria-label="$app.t('recherche.field.body')"
                       data-spellcheck="spelling"></textarea>
             <div class="recherche-form-row">

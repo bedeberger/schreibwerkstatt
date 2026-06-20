@@ -19,6 +19,9 @@
     overflow-y: auto;
     height: 100%;
   }
+  /* Read-Modus-Wrap (TTS-Dock-Container) reicht die Hoehe durch, damit das
+     `height:100%` der Content-View greift. */
+  .lektorat-split-preview .page-view-wrap { height: 100%; }
   .lektorat-split-preview .page-content-view {
     max-height: none;
     height: 100%;

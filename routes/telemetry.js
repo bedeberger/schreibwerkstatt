@@ -74,4 +74,23 @@ router.post('/js-error', jsonBody, (req, res) => {
   }
 });
 
+// ── POST /telemetry/tts-log ───────────────────────────────────────────────────
+// Fire-and-forget: das Vorlese-Frontend (public/js/editor/notebook/tts-proof.js)
+// meldet reine Client-Events (Start/Stop/Skip, uebersprungene Segmente,
+// Audio-Fehler), die der Server sonst nicht sieht — der /tts/speak-Proxy loggt
+// nur die einzelnen Synthese-Calls. Landet im selben [tts|user|book]-Child-
+// Logger wie routes/tts.js, mit [client]-Marker. Session-authed, best-effort.
+const TTS_LOG_MAX = 500;
+router.post('/tts-log', jsonBody, (req, res) => {
+  const userEmail = req.session?.user?.email;
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const msg = (req.body?.msg || '').toString().trim().slice(0, TTS_LOG_MAX);
+  if (!msg) return res.status(400).json({ error_code: 'NO_MESSAGE' });
+  const level = req.body?.level === 'warn' ? 'warn' : 'info';
+  const bookId = _toInt(req.body?.bookId);
+  const log = logger.child({ job: 'tts', user: userEmail, book: bookId || '-' });
+  log[level](`[client] ${msg}`);
+  res.json({ ok: true });
+});
+
 module.exports = router;

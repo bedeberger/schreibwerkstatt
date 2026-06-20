@@ -466,9 +466,20 @@
   .stt-dock .stt-status::before { animation: none !important; }
 }
 
-/* TTS / Proof-Listening: schwebender Vorlese-Dock unten LINKS im Editorfeld
-   (Gegenstueck zum STT-Mic unten rechts — gleiche sticky/floating-Mechanik,
-   nur an die andere Ecke verankert, damit beide nie kollidieren). */
+/* Leseansicht-Wrap: Flex-Column wie .page-editor-wrap, damit der sticky
+   TTS-Dock (align-self: flex-start) unten links ueber dem Seitentext schwebt.
+   Read-Content-View braucht hier width:100% (sonst absorbiert margin-inline:auto
+   den Cross-Axis-Slot und collapsed die Seite auf Content-Breite — analog dem
+   --editing-Fix). */
+.page-view-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.page-view-wrap > .page-content-view { width: 100%; }
+
+/* TTS / Proof-Listening: schwebender Vorlese-Dock unten LINKS ueber dem
+   Seitentext (sticky/floating-Mechanik, an die linke Ecke verankert). */
 .tts-dock {
   position: sticky;
   bottom: var(--space-sm);
@@ -556,8 +567,8 @@
   .tts-dock .tts-status::before { animation: none !important; }
 }
 
-/* Der gerade vorgelesene Satz: weiche akzentfarbene Markierung im Edit-Feld.
-   CSS Custom Highlight (keine DOM-Spans) — faerbt nur, mutiert nichts. */
+/* Der gerade vorgelesene Satz: weiche akzentfarbene Markierung in der
+   Leseansicht. CSS Custom Highlight (keine DOM-Spans) — faerbt nur, mutiert nichts. */
 ::highlight(tts-sentence) {
   background-color: color-mix(in srgb, var(--color-accent) 24%, transparent);
   color: var(--color-text);

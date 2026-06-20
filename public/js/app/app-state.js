@@ -85,9 +85,9 @@ const shellState = () => ({
   // Caret-Position, sonst haengt es ans Editorende an. Auto-Fokus beim Öffnen
   // des Edit-Modus zaehlt NICHT (in startEdit auf false zurueckgesetzt).
   sttCaretUserSet: false,
-  // TTS / Proof-Listening (nur Notebook-Editor). /config liefert `tts.enabled`
-  // (true wenn Admin enabled + Host gesetzt). Blendet den Vorlese-Dock im
-  // Edit-Feld ein. Voice/Speed/Format loest der /tts/speak-Proxy serverseitig
+  // TTS / Proof-Listening (Notebook-Seitenansicht, Read-Modus). /config liefert
+  // `tts.enabled` (true wenn Admin enabled + Host gesetzt). Blendet den
+  // Vorlese-Dock in der Leseansicht ein. Voice/Speed/Format loest der /tts/speak-Proxy serverseitig
   // auf — kein Frontend-State dafuer. ttsPlaying = Session aktiv (inkl.
   // pausiert); ttsPaused = pausiert; ttsLoading = wartet auf Audio des aktuellen
   // Satzes; ttsIndex/ttsTotal = Satz-Fortschritt fuer die Status-Pille.
