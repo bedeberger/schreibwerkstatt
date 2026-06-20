@@ -1702,6 +1702,31 @@ Verbindlich pro Tile-Typ. `grid-auto-flow: row dense` füllt mittlere Lücken, T
 
 ---
 
+## Karten-Board (2-Spalten-Grid)
+
+**Use:** Sammlungen heterogener, variabel hoher Karten (Bild / Zitat / kurze Notiz / langer Faktensplitter) als kompaktes, geordnetes Board statt full-width-Listenzeilen mit viel Leerraum. Erste Verwendung: Recherche-/Wissensboard ([public/css/entities/recherche.css](public/css/entities/recherche.css), `.recherche-list` + `.research-item`).
+
+**Pattern (CSS-Grid, kein JS, kein Lib):**
+```css
+.list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+  align-items: start;   /* kürzere Karten sitzen oben, strecken sich nicht auf Zeilenhöhe */
+}
+.item:has(.form) { grid-column: 1 / -1; }   /* Inline-Edit-Karte spannt über beide Spalten */
+@media (max-width: 640px) { .list { grid-template-columns: 1fr; } }
+```
+
+**Regeln:**
+- Grid (nicht column-Layout) → **zeilenweise** Lesereihenfolge (links→rechts, oben→unten) bleibt erhalten; das ist der Grund, Grid statt Masonry zu wählen.
+- `align-items: start` Pflicht — sonst strecken sich Karten auf die Höhe der höchsten Karte der Zeile.
+- `minmax(0, 1fr)` statt `1fr` — verhindert Überlauf von langem unbrechbarem Inhalt (URLs).
+- Karten mit Inline-Edit-Formular: `.item:has(.form) { grid-column: 1 / -1; }` — Formular über volle Breite statt in eine schmale Spalte gequetscht.
+- **Trade-off:** Reihen richten sich an der höchsten Karte aus (keine dichte Masonry-Packung). Akzeptiert zugunsten der Lesereihenfolge. Wer dichtes Packen ohne Reihenfolge-Anspruch braucht, nutzt stattdessen CSS-Multi-Column (`columns: <breite>` + `break-inside: avoid`).
+
+---
+
 ## Container-Queries vs. Media-Queries
 
 **Wann was:** Komponente in **fixem Layout-Slot** (Sidebar 280 px breit, Modal 600 px max) → `@media (max-width: …px)`. Komponente in **variablem Slot** (Tile-Grid mit `--hero`/`--medium`/small-Spans, Drawer-Content das je nach Höhe scrollt) → `@container (max-width: …px)`.
@@ -2047,6 +2072,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [entities/ideen.css](public/css/entities/ideen.css) | Ideen-Karte. |
 | [entities/entity-list.css](public/css/entities/entity-list.css) | `.entity-list` / `-row`, `.severity-tag*`, `.collapsible-*`, Skeleton, `.ort-*` Schauplätze. |
 | [entities/orte-map.css](public/css/entities/orte-map.css) | Orte-Karte View-Mode `map` (Geo-Karte via Leaflet): `.ort-map*` Container + Geocode-Liste. Nur bei `book_settings.orte_real`. |
+| [entities/recherche.css](public/css/entities/recherche.css) | Recherche-/Wissensboard: Toolbar/Filter, Anlege-/Edit-Formular, Karten als **2-Spalten-Grid** (`.recherche-list` + `.research-item`, siehe „Karten-Board (2-Spalten-Grid)"), Kind-Badges, Verknüpfungs-/Tag-Chips, KI-Vorschläge, Link-Picker. Native-Vollbild (`.card--recherche:fullscreen`, Toggle via `fullscreen.js` wie Plot-Board) → Board auf `auto-fit`-Spalten. |
 
 ### analysis/
 | File | Inhalt |

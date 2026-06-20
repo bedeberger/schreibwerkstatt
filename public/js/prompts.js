@@ -176,6 +176,11 @@ export {
 } from './prompts/synonym.js';
 
 export {
+  buildStilprofilPrompt,
+  SCHEMA_STILPROFIL,
+} from './prompts/stilprofil.js';
+
+export {
   buildRueckblickPrompt,
   buildRueckblickReducePrompt,
   SCHEMA_RUECKBLICK,

@@ -859,13 +859,14 @@ function deleteFinetuneAiCache(bookId, userEmail) {
 
 // ── Buch-Einstellungen (Sprache + Region) ─────────────────────────────────────
 
-const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, entities_enabled, orte_real, schauplatz_land FROM book_settings WHERE book_id = ?');
+const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, entities_enabled, orte_real, schauplatz_land FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
-  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     language=excluded.language, region=excluded.region,
     buchtyp=excluded.buchtyp, buch_kontext=excluded.buch_kontext,
+    stilprofil=excluded.stilprofil,
     erzaehlperspektive=excluded.erzaehlperspektive, erzaehlzeit=excluded.erzaehlzeit,
     is_finished=excluded.is_finished,
     allow_lektor_book_chat=excluded.allow_lektor_book_chat,
@@ -881,6 +882,13 @@ const _updateBookSettingsEntitiesEnabled = db.prepare(`
   VALUES (?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     entities_enabled=excluded.entities_enabled,
+    updated_at=excluded.updated_at
+`);
+const _updateBookStilprofil = db.prepare(`
+  INSERT INTO book_settings (book_id, stilprofil, updated_at)
+  VALUES (?, ?, ?)
+  ON CONFLICT(book_id) DO UPDATE SET
+    stilprofil=excluded.stilprofil,
     updated_at=excluded.updated_at
 `);
 
@@ -902,10 +910,10 @@ function getBookSettings(bookId, userEmail = null) {
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
-      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
+      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
     }
   }
-  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
+  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null };
 }
 
 /** Locale-Key für ein Buch: z.B. "de-CH", "en-US". */
@@ -916,10 +924,11 @@ function getBookLocale(bookId, userEmail = null) {
 
 /** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars.
  *  `entities_enabled` wird hier nicht angefasst — Quick-Toggle aus der Notebook-Toolbar laeuft ueber setBookEntitiesEnabled. */
-function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0, schauplatzLand = null, goalTargetChars = null, goalDeadline = null) {
+function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0, schauplatzLand = null, goalTargetChars = null, goalDeadline = null, stilprofil = null) {
   _upsertBookSettings.run(
     parseInt(bookId), language, region,
     buchtyp || null, buchKontext || null,
+    stilprofil || null,
     erzaehlperspektive || null, erzaehlzeit || null,
     isFinished ? 1 : 0,
     allowLektorBookChat ? 1 : 0,
@@ -938,6 +947,16 @@ function setBookEntitiesEnabled(bookId, enabled) {
   _updateBookSettingsEntitiesEnabled.run(
     parseInt(bookId),
     enabled ? 1 : 0,
+    new Date().toISOString()
+  );
+}
+
+/** Quick-Update nur fuer stilprofil — der Stilprofil-Extraktions-Job persistiert
+ *  sein Ergebnis, ohne die uebrigen Settings (die er nicht geladen hat) zu beruehren. */
+function setBookStilprofil(bookId, stilprofil) {
+  _updateBookStilprofil.run(
+    parseInt(bookId),
+    stilprofil || null,
     new Date().toISOString()
   );
 }
@@ -1269,7 +1288,7 @@ module.exports = {
   insertJobRun, startJobRun, endJobRun, cleanupStuckJobRuns,
   getDailyTokenUsage:    tokenUsage.getDailyTokenUsage,
   getDailyTotalsByUser:  tokenUsage.getDailyTotalsByUser,
-  getBookSettings, getBookLocale, saveBookSettings, setBookEntitiesEnabled,
+  getBookSettings, getBookLocale, saveBookSettings, setBookEntitiesEnabled, setBookStilprofil,
   loadChapterExtractCache, saveChapterExtractCache, deleteChapterExtractCache,
   loadChapterReviewCache, saveChapterReviewCache,
   loadBookReviewCache, saveBookReviewCache, deleteReviewCache,

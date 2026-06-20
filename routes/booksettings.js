@@ -12,6 +12,9 @@ const VALID_BUCHTYPEN = ['roman', 'kurzgeschichten', 'gesellschaft', 'krimi', 'h
 const VALID_POV     = ['ich', 'er_sie_personal', 'er_sie_auktorial', 'du', 'wir', 'gemischt'];
 const VALID_TEMPUS  = ['praeteritum', 'praesens', 'gemischt'];
 const BUCH_KONTEXT_MAX = 1000;
+// Stilprofil: KI-destilliert ~1-2k Zeichen; 6000 als grosszuegige Obergrenze
+// gegen versehentliches Einfuegen ganzer Kapitel.
+const STILPROFIL_MAX = 6000;
 // Tagesziel: 100 Zeichen ≈ kurzer Tweet (Untergrenze gegen Tippfehler),
 // 50 000 ≈ 33 Normseiten als praktisches Maximum.
 const DAILY_GOAL_MIN = 100;
@@ -32,7 +35,7 @@ router.get('/:book_id', aclParamGuard('viewer'), (req, res) => {
 router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const bookId = req.bookId;
 
-  const { language, region, buchtyp, buch_kontext, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land } = req.body || {};
+  const { language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land } = req.body || {};
   if (!language || !region) {
     return res.status(400).json({ error_code: 'LANGUAGE_REGION_REQUIRED' });
   }
@@ -47,6 +50,9 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   }
   if (buch_kontext && buch_kontext.length > BUCH_KONTEXT_MAX) {
     return res.status(400).json({ error_code: 'BUCH_KONTEXT_TOO_LONG', params: { max: BUCH_KONTEXT_MAX } });
+  }
+  if (stilprofil && String(stilprofil).length > STILPROFIL_MAX) {
+    return res.status(400).json({ error_code: 'STILPROFIL_TOO_LONG', params: { max: STILPROFIL_MAX } });
   }
   if (erzaehlperspektive && !VALID_POV.includes(erzaehlperspektive)) {
     return res.status(400).json({ error_code: 'INVALID_POV', params: { allowed: VALID_POV.join(', ') } });
@@ -94,10 +100,11 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const finished = is_finished ? 1 : 0;
   const lektorBookChat = allow_lektor_book_chat ? 1 : 0;
   const orteReal = orte_real ? 1 : 0;
-  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal, schauplatzLand, goalTarget, goalDeadline);
+  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal, schauplatzLand, goalTarget, goalDeadline, stilprofil || null);
   res.json({
     ok: true, language, region,
     buchtyp: buchtyp || null, buch_kontext: buch_kontext || null,
+    stilprofil: stilprofil || null,
     erzaehlperspektive: erzaehlperspektive || null,
     erzaehlzeit: erzaehlzeit || null,
     is_finished: finished,

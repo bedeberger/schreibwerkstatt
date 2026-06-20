@@ -461,6 +461,14 @@
   font-weight: 600;
 }
 
+/* Stilprofil-Sektion: Generieren-Button + Zeichenzähler nebeneinander. */
+.book-settings-stilprofil-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
 @media (max-width: 600px) {
   .pub-image-block { flex-direction: column; }
   .pub-image-preview { width: 100%; max-width: 200px; }

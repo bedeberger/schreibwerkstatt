@@ -23,7 +23,8 @@ function _synonymKeyHash(wort, satz, bookSettings, cacheVersion) {
   const buchtyp = bookSettings?.buchtyp || '';
   const locale = `${bookSettings?.language || 'de'}-${bookSettings?.region || 'CH'}`;
   const buchKontext = bookSettings?.buch_kontext || '';
-  const raw = `${wort.trim().toLowerCase()}|${satz.trim().toLowerCase()}|${buchtyp}|${locale}|${buchKontext}|${cacheVersion}`;
+  const stilprofil = bookSettings?.stilprofil || '';
+  const raw = `${wort.trim().toLowerCase()}|${satz.trim().toLowerCase()}|${buchtyp}|${locale}|${buchKontext}|${stilprofil}|${cacheVersion}`;
   return crypto.createHash('sha1').update(raw).digest('hex');
 }
 

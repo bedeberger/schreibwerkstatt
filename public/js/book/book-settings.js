@@ -18,6 +18,7 @@ export const bookSettingsMethods = {
       this.bookSettingsRegion    = data.region      || 'CH';
       this.bookSettingsBuchtyp   = data.buchtyp     || '';
       this.bookSettingsBuchKontext = data.buch_kontext || '';
+      this.bookSettingsStilprofil = data.stilprofil || '';
       this.bookSettingsErzaehlperspektive = data.erzaehlperspektive || '';
       this.bookSettingsErzaehlzeit        = data.erzaehlzeit        || '';
       this.bookSettingsIsFinished         = !!data.is_finished;
@@ -31,6 +32,31 @@ export const bookSettingsMethods = {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
       this.bookSettingsLoading = false;
+    }
+  },
+
+  // Stilprofil aus dem Buch destillieren (KI-Job). Ergebnis wird serverseitig in
+  // book_settings.stilprofil persistiert; bei job:finished (Handler in der Karte)
+  // wird nur das Stilprofil-Feld aus dem Job-Result übernommen — der Rest des
+  // Formulars (ggf. ungespeicherte Edits) bleibt unangetastet.
+  async generateStilprofil() {
+    const bookId = window.__app.selectedBookId;
+    if (!bookId || this.stilprofilGenerating) return;
+    this.stilprofilGenerating = true;
+    this.stilprofilError = '';
+    try {
+      const res = await fetch('/jobs/stilprofil', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: Number(bookId) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(window.__app.tError(data) || `HTTP ${res.status}`);
+      this.stilprofilJobId = data.jobId;
+      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'stilprofil', jobId: data.jobId } }));
+    } catch (e) {
+      this.stilprofilGenerating = false;
+      this.stilprofilError = e.message;
     }
   },
 
@@ -111,6 +137,7 @@ export const bookSettingsMethods = {
           region:            this.bookSettingsRegion,
           buchtyp:           this.bookSettingsBuchtyp              || null,
           buch_kontext:      this.bookSettingsBuchKontext          || null,
+          stilprofil:        this.bookSettingsStilprofil           || null,
           erzaehlperspektive: this.bookSettingsErzaehlperspektive  || null,
           erzaehlzeit:       this.bookSettingsErzaehlzeit          || null,
           is_finished:       this.bookSettingsIsFinished ? 1 : 0,

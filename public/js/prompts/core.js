@@ -86,11 +86,13 @@ function _toCacheBlocks(stableSysString, bookContextStr) {
 // Rolle + Locale-Norm (korrekturRegeln) + optionaler Autor-Kontext + JSON_ONLY.
 // Bewusst ohne baseRules/commonRules, da die Aufgabe eng umrissen ist
 // und volle Lektoratsregeln ~650 Input-Tokens kosten würden.
-function buildSystemSynonym(prefix, korrekturRegeln, buchKontext) {
+function buildSystemSynonym(prefix, korrekturRegeln, buchKontext, stilHint = '') {
   const parts = [prefix || ''];
   if (korrekturRegeln) parts.push(korrekturRegeln);
   const k = (buchKontext || '').trim();
   if (k) parts.push(`AUTOR-KONTEXT: ${k}`);
+  const s = (stilHint || '').trim();
+  if (s) parts.push(s);
   return parts.filter(Boolean).join('\n\n') + _jsonOnly();
 }
 
@@ -111,7 +113,7 @@ let _defaultLocale = 'de-CH';
  *  bleiben davon unberührt – dort soll die Kritik nicht durch Autorenstil-Imitation
  *  abgemildert werden.
  */
-function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '', autorenstilRule = '', localChatAddon = '', bookContextStr = '') {
+function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '', autorenstilRule = '', localChatAddon = '', bookContextStr = '', stilprofil = '') {
   const rules = localeConfig.baseRules || '';
   const rulesWithAutorenstil = autorenstilRule ? `${rules}\n\n${autorenstilRule}` : rules;
   const sp    = localeConfig.systemPrompts || {};
@@ -128,6 +130,10 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
   const SYS_KONTINUITAET_CORE     = buildSystem(sp.kontinuitaet      || 'Du bist ein sorgfältiger Literaturlektor. Du prüfst einen Roman auf Kontinuitätsfehler und Widersprüche – Figuren, Zeitabläufe, Orte, Objekte und Charakterverhalten.', rules);
   const SYS_ZEITSTRAHL_CORE       = buildSystem(sp.zeitstrahl        || '', rules);
   const SYS_RUECKBLICK_CORE       = buildSystem(sp.rueckblick        || 'Du bist ein aufmerksamer, einfühlsamer Beobachter. Du verdichtest datierte Tagebuch-Einträge rückblickend zu Themen, Personen, Orten und bemerkenswerten Tagen – ausschliesslich belegt, ohne zu werten und ohne den Tagebuchtext fortzuschreiben.', rules);
+  // Stilprofil-Extraktion: rein deskriptive Analyse. Kein Buch-Kontext-Block
+  // (das Profil wird gerade ERST aus dem Text destilliert; VORRANGIGE-ANGABEN
+  // sollen die Beschreibung nicht einfärben).
+  const SYS_STILPROFIL_CORE       = buildSystem(sp.stilprofil        || 'Du bist ein literarischer Stilanalytiker. Du destillierst aus einer Leseprobe den unverwechselbaren Stil des Autors – rein deskriptiv, ohne zu werten und ohne den Text fortzuschreiben.', rules);
   // Komplett-Extraktion enthält das Schema; buchKontext fliesst in das Schema-Embedding ein,
   // bleibt aber für die _toCacheBlocks-Split-Logik separat sichtbar — der Core ist
   // bewusst der Builder-Output OHNE bookContextStr-Section (siehe getLocalePromptsForBook).
@@ -142,32 +148,53 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
   // Konsumenten ohne Multi-Block-Support (chat-builder, proxies.js) bleiben funktionsfähig.
   const _aug = (core) => bookContextStr ? `${core}\n\n${bookContextStr}` : core;
 
+  // Stilprofil-Injektion (per-Buch, gezielt). Zwei Framings:
+  //  · Imitate  → text-erzeugende Prompts (Lektorat/Synonym/Chat): Vorschläge
+  //    sollen sich in den Stil einfügen, ohne die Schärfe der Kritik zu mildern.
+  //  · Reference → Bewertungs-Prompts (Buch-/Kapitel-Review): das Profil ist der
+  //    Massstab für Stimmen-Treue, Abweichungen werden benannt.
+  // Bewusst NICHT in Analyse-Prompts (Figuren/Komplett/Orte/Kontinuität) – dort
+  // hätte ein Stil-Hinweis keinen Nutzen und nur Token-Kosten.
+  const stp = (stilprofil || '').trim();
+  const stilImitate = stp
+    ? `ETABLIERTES STILPROFIL DES AUTORS (Korrektur- und Textvorschläge müssen sich nahtlos in diesen Stil einfügen, als wären sie vom Autor selbst geschrieben; dein Urteil über Schwächen bleibt davon unberührt – direkt und schonungslos):\n${stp}`
+    : '';
+  const stilReference = stp
+    ? `ETABLIERTES STILPROFIL DES AUTORS (Massstab für Stimmen-Treue: Passagen, die deutlich von diesem Stil abweichen oder generisch/fremd klingen, im Urteil benennen):\n${stp}`
+    : '';
+  const lektoratCtx = [bookContextStr, stilImitate].filter(Boolean).join('\n\n');
+  const reviewCtx   = [bookContextStr, stilReference].filter(Boolean).join('\n\n');
+  // Wie _aug, aber mit explizitem Kontext-String (statt dem geteilten bookContextStr).
+  const _augCtx = (core, ctx) => ctx ? `${core}\n\n${ctx}` : core;
+
   return {
     ERKLAERUNG_RULE:             globalErklaerungRule || '',
     KORREKTUR_REGELN:            localeConfig.korrekturRegeln || '',
     STOPWORDS:                   Array.isArray(localeConfig.stopwords) ? localeConfig.stopwords : [],
     BUCH_KONTEXT:                buchKontext,
-    SYSTEM_LEKTORAT:             _aug(SYS_LEKTORAT_CORE),
-    SYSTEM_LEKTORAT_BLOCKS:      _toCacheBlocks(SYS_LEKTORAT_CORE, bookContextStr),
-    SYSTEM_BUCHBEWERTUNG:        _aug(SYS_BUCHBEWERTUNG_CORE),
-    SYSTEM_BUCHBEWERTUNG_BLOCKS: _toCacheBlocks(SYS_BUCHBEWERTUNG_CORE, bookContextStr),
+    SYSTEM_LEKTORAT:             _augCtx(SYS_LEKTORAT_CORE, lektoratCtx),
+    SYSTEM_LEKTORAT_BLOCKS:      _toCacheBlocks(SYS_LEKTORAT_CORE, lektoratCtx),
+    SYSTEM_BUCHBEWERTUNG:        _augCtx(SYS_BUCHBEWERTUNG_CORE, reviewCtx),
+    SYSTEM_BUCHBEWERTUNG_BLOCKS: _toCacheBlocks(SYS_BUCHBEWERTUNG_CORE, reviewCtx),
+    // Stilprofil-Extraktion: deskriptive Analyse, kein Buch-Kontext-Block.
+    SYSTEM_STILPROFIL:           SYS_STILPROFIL_CORE,
     SYSTEM_KAPITELANALYSE:       _aug(SYS_KAPITELANALYSE_CORE),
     SYSTEM_KAPITELANALYSE_BLOCKS:_toCacheBlocks(SYS_KAPITELANALYSE_CORE, bookContextStr),
     // Kapitel-Review nutzt die gleiche Bewerter-Rolle wie die Buchbewertung,
     // wenn prompt-config.json keinen eigenen `kapitelreview`-Slot liefert.
-    SYSTEM_KAPITELREVIEW:        _aug(SYS_KAPITELREVIEW_CORE),
-    SYSTEM_KAPITELREVIEW_BLOCKS: _toCacheBlocks(SYS_KAPITELREVIEW_CORE, bookContextStr),
+    SYSTEM_KAPITELREVIEW:        _augCtx(SYS_KAPITELREVIEW_CORE, reviewCtx),
+    SYSTEM_KAPITELREVIEW_BLOCKS: _toCacheBlocks(SYS_KAPITELREVIEW_CORE, reviewCtx),
     SYSTEM_FIGUREN:              _aug(SYS_FIGUREN_CORE),
     SYSTEM_FIGUREN_BLOCKS:       _toCacheBlocks(SYS_FIGUREN_CORE, bookContextStr),
     // Synonym-Suche: schlanker System-Prompt – nur Rolle + Locale-Norm (korrekturRegeln)
     // + optionaler Autor-Kontext. Ohne baseRules/commonRules. buchKontext ist hier bereits
     // im Core eingebaut (buildSystemSynonym) — kein zusätzlicher Cache-Split nötig.
-    SYSTEM_SYNONYM:              buildSystemSynonym(sp.synonym    || '', localeConfig.korrekturRegeln || '', buchKontext),
+    SYSTEM_SYNONYM:              buildSystemSynonym(sp.synonym    || '', localeConfig.korrekturRegeln || '', buchKontext, stilImitate),
     // Chat-Prompts bleiben String (chat-builder konkateniert weitere Sektionen).
-    // bookContextStr wird hier ebenfalls inline gemerged — kein Multi-Block-Split,
-    // weil der Builder darauf String erwartet.
-    SYSTEM_CHAT:                 _aug(buildSystemNoJson(sp.chat        || '', rulesWithAutorenstil)) + chatAddonSuffix,
-    SYSTEM_BOOK_CHAT:            _aug(buildSystemNoJson(sp.buchchat    || '', rules)) + chatAddonSuffix,
+    // lektoratCtx (= bookContextStr + Stilprofil-Imitate) wird hier inline
+    // gemerged — kein Multi-Block-Split, weil der Builder darauf String erwartet.
+    SYSTEM_CHAT:                 _augCtx(buildSystemNoJson(sp.chat        || '', rulesWithAutorenstil), lektoratCtx) + chatAddonSuffix,
+    SYSTEM_BOOK_CHAT:            _augCtx(buildSystemNoJson(sp.buchchat    || '', rules), lektoratCtx) + chatAddonSuffix,
     SYSTEM_ORTE:                 _aug(SYS_ORTE_CORE),
     SYSTEM_ORTE_BLOCKS:          _toCacheBlocks(SYS_ORTE_CORE, bookContextStr),
     SYSTEM_KONTINUITAET:         _aug(SYS_KONTINUITAET_CORE),
@@ -321,7 +348,7 @@ export function configureLocales(cfg) {
  * @param {boolean}     isFinished  Buch wurde vom Autor als abgeschlossen markiert
  * @returns {{ SYSTEM_LEKTORAT, ..., BUCH_KONTEXT }}
  */
-export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false, hauptland = null) {
+export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false, hauptland = null, stilprofil = null) {
   const rawLocale = _rawLocales.get(localeKey) || _rawLocales.get(_defaultLocale) || {};
   const kontext   = (buchKontext || '').trim();
 
@@ -354,7 +381,7 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinis
   // autorenstilRule wird nur an Lektorat/Chat angehängt (siehe _buildLocalePrompts).
   const autorenstil = _autorenstilByLocale.get(localeKey) || _autorenstilByLocale.get(_defaultLocale) || '';
   const localChatAddon = _localChatAddonByLocale.get(localeKey) || _localChatAddonByLocale.get(_defaultLocale) || '';
-  return _buildLocalePrompts(rawLocale, _erklaerungRule, kontext, autorenstil, localChatAddon, bookContextStr);
+  return _buildLocalePrompts(rawLocale, _erklaerungRule, kontext, autorenstil, localChatAddon, bookContextStr, (stilprofil || '').trim());
 }
 
 /**

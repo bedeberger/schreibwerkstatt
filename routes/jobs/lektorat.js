@@ -209,6 +209,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       fig: figuren, ort: orte, bez: figurenBeziehungen,
       nar: narrativeLabels(bookSettings),
       sw: lektoratStopwords, er: lektoratErklaerungRule, kr: lektoratKorrekturRegeln,
+      stp: bookSettings?.stilprofil || '',
       pe: previousExcerpt, cn: chapterName, pn: pd.name, cv: cacheVersion, lc: langCode,
     }) : null;
     const cached = ctxSig ? loadLektoratCache(bookId, userEmail, pageId, ctxSig, effectiveProvider) : null;
@@ -359,6 +360,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
           ep: bookSettings?.erzaehlperspektive || null,
           ez: bookSettings?.erzaehlzeit || null,
           sw: batchStopwords, er: batchErklaerungRule, kr: batchKorrekturRegeln,
+          stp: bookSettings?.stilprofil || '',
           pe: previousExcerpt, cn: chapterName, pn: p.name, cv: cacheVersion, lc: langCode,
         });
         const cached = loadLektoratCache(bookId, userEmail, p.id, ctxSig, effectiveProvider);

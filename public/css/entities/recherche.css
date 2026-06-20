@@ -87,10 +87,15 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   color: var(--color-muted);
 }
 
+/* Karten-Board: 2-Spalten-Grid mit zeilenweiser Lesereihenfolge (links→rechts,
+   oben→unten). align-items: start → kürzere Karten sitzen oben statt sich auf
+   die Zeilenhöhe zu strecken. Bewusst Grid (nicht column-Layout): erhält die
+   Reihenfolge, Preis ist Zeilen-Ausrichtung statt dichter Masonry-Packung. */
 .recherche-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-6);
+  align-items: start;
 }
 
 .research-item {
@@ -99,9 +104,18 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   border-radius: var(--radius-md);
   background: var(--color-card-bg);
   padding: var(--space-6) var(--space-sm);
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.research-item:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--color-border-input);
 }
 .research-item--pinned { background: var(--color-bg); }
 .research-item--archived { opacity: 0.6; }
+
+/* Karte im Bearbeiten-Modus spannt über beide Spalten, sonst quetscht das
+   Formular in eine schmale Spalte. */
+.research-item:has(.recherche-form) { grid-column: 1 / -1; }
 
 .research-item-body { display: flex; flex-direction: column; gap: var(--space-3); }
 
@@ -294,6 +308,20 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 .recherche-linkpicker-label { font-weight: 600; }
 .recherche-linkpicker-target { min-width: 14rem; }
 
+/* ── Vollbild: ganze Karte nimmt den Viewport; das Board nutzt die volle
+     Breite mit auto-fit (so viele ~22rem-Spalten wie passen, statt fixer 2). */
+.card--recherche:fullscreen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-surface);
+  padding: var(--space-lg);
+  z-index: var(--z-overlay);
+  overflow-y: auto;
+}
+.card--recherche:fullscreen .recherche-list {
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+}
+
 /* ── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .recherche-toolbar { flex-direction: column; align-items: stretch; }
@@ -301,6 +329,8 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   .recherche-search { min-width: 0; }
   .research-item-actions { margin-left: 0; }
   .research-item-head { gap: var(--space-2xs); }
+  /* Eine Spalte auf dem Phone (sonst zu schmale Karten). */
+  .recherche-list { grid-template-columns: 1fr; }
   /* iOS-Zoom-Schutz: Prosa-Inputs ≥16px (Klassen-font-size kann darunter liegen). */
   .recherche-input { font-size: 16px; }
 }

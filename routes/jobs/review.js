@@ -71,7 +71,9 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   // werden alle persistierten Review-Caches automatisch verworfen.
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
   const narrativeSig = _sigHash(narrative);
-  const optionsSig = _sigHash({ schwerpunkt: reviewSchwerpunkt, komplettContext, narrative });
+  // Stilprofil fliesst in SYSTEM_BUCHBEWERTUNG (Referenz-Framing) → muss den
+  // Cache invalidieren, wenn der Autor das Profil ändert.
+  const optionsSig = _sigHash({ schwerpunkt: reviewSchwerpunkt, komplettContext, narrative, stilprofil: bookSettings?.stilprofil || '' });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)

@@ -8307,6 +8307,23 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 209 abgeschlossen (research_items: Dokument-Upload doc/doc_text + kind document).');
   }
 
+  if (version < 210) {
+    // Stilprofil pro Buch: KI-destilliertes, editierbares Autorenstil-Profil.
+    // Wird in text-erzeugende Prompts (Lektorat/Synonym/Chat) als Imitations-
+    // Referenz und in Buch-/Kapitel-Review als Massstab fuer Stimmen-Treue
+    // injiziert. Additive Spalte → ADD COLUMN reicht.
+    const bsCols210 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols210.includes('stilprofil')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN stilprofil TEXT');
+    }
+    const fkErrors210 = db.pragma('foreign_key_check');
+    if (fkErrors210.length) {
+      throw new Error(`Migration 210: foreign_key_check meldet ${fkErrors210.length} Verstoesse: ${JSON.stringify(fkErrors210.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 210').run();
+    logger.info('DB-Migration auf Version 210 abgeschlossen (book_settings.stilprofil).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

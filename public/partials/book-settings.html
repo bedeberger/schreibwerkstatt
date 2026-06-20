@@ -146,6 +146,30 @@
         </div>
       </div>
 
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" for="bs-stilprofil" x-text="$app.t('book.settings.stilprofil')"></label>
+        <div class="book-settings-kontext-wrap">
+          <p class="card-form-hint" x-text="$app.t('book.settings.stilprofil.hint')"></p>
+          <textarea
+            id="bs-stilprofil"
+            class="card-form-textarea"
+            x-model="bookSettingsStilprofil"
+            :placeholder="$app.t('book.settings.stilprofil.placeholder')"
+            rows="8"
+            maxlength="6000"
+            data-spellcheck="spelling"
+          ></textarea>
+          <div class="book-settings-stilprofil-actions">
+            <button type="button" class="btn-compact"
+                    @click="generateStilprofil()"
+                    :disabled="stilprofilGenerating"
+                    x-text="stilprofilGenerating ? $app.t('book.settings.stilprofil.generating') : $app.t('book.settings.stilprofil.generate')"></button>
+            <span class="card-form-hint" x-text="(bookSettingsStilprofil || '').length + ' / 6000'"></span>
+          </div>
+          <p class="card-form-error" x-show="stilprofilError" x-text="stilprofilError" x-cloak></p>
+        </div>
+      </div>
+
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('book.settings.status')"></label>
         <div class="form-stack">

@@ -38,6 +38,10 @@ export function registerBookSettingsCard() {
     bookSettingsRegion: 'CH',
     bookSettingsBuchtyp: '',
     bookSettingsBuchKontext: '',
+    bookSettingsStilprofil: '',
+    stilprofilGenerating: false,
+    stilprofilJobId: null,
+    stilprofilError: '',
     bookSettingsErzaehlperspektive: '',
     bookSettingsErzaehlzeit: '',
     bookSettingsIsFinished: false,
@@ -113,6 +117,7 @@ export function registerBookSettingsCard() {
     _lifecycle: null,
     _onBlogJobFinished: null,
     _onHubspotJobFinished: null,
+    _onStilprofilJobFinished: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
@@ -121,6 +126,9 @@ export function registerBookSettingsCard() {
         load: () => Promise.all([this.loadBookSettings(), this.loadBookJobStats(), this.loadBookAccess(), this.loadBookCategory(), this.loadBlogStatus(), this.loadHubspotStatus(), this.loadPublication()]),
         resetState: {
           bookSettingsTab: 'book',
+          bookSettingsStilprofil: '',
+          stilprofilGenerating: false,
+          stilprofilJobId: null,
           expandedJobType: null,
           bookJobRuns: {},
           bookHistoryResetMessage: '',
@@ -160,6 +168,7 @@ export function registerBookSettingsCard() {
         resetStateView: {
           bookSettingsSaved: false,
           bookSettingsError: '',
+          stilprofilError: '',
           bookHistoryResetMessage: '',
           bookHistoryResetError: '',
           bookDeleteError: '',
@@ -202,6 +211,22 @@ export function registerBookSettingsCard() {
         }
       };
       window.addEventListener('job:finished', this._onHubspotJobFinished);
+
+      // Stilprofil-Job: bei Done nur das Stilprofil-Feld aus dem Job-Result
+      // übernehmen (nicht das ganze Formular neu laden → keine ungespeicherten
+      // Edits verlieren). Das Profil ist serverseitig bereits persistiert.
+      this._onStilprofilJobFinished = (ev) => {
+        if (ev?.detail?.type !== 'stilprofil') return;
+        this.stilprofilGenerating = false;
+        this.stilprofilJobId = null;
+        const job = ev.detail.job;
+        if (job?.status === 'done' && job.result?.stilprofil) {
+          this.bookSettingsStilprofil = job.result.stilprofil;
+        } else if (job?.status === 'error') {
+          this.stilprofilError = window.__app.t('book.settings.stilprofil.genError');
+        }
+      };
+      window.addEventListener('job:finished', this._onStilprofilJobFinished);
     },
 
     destroy() {
@@ -216,6 +241,10 @@ export function registerBookSettingsCard() {
       if (this._onHubspotJobFinished) {
         window.removeEventListener('job:finished', this._onHubspotJobFinished);
         this._onHubspotJobFinished = null;
+      }
+      if (this._onStilprofilJobFinished) {
+        window.removeEventListener('job:finished', this._onStilprofilJobFinished);
+        this._onStilprofilJobFinished = null;
       }
       this._lifecycle?.destroy();
     },

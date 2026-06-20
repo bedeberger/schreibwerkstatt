@@ -5,6 +5,7 @@
 
 import { fetchJson } from '../utils.js';
 import { startPoll } from '../cards/job-helpers.js';
+import { toggleWrapFullscreen } from '../fullscreen.js';
 
 const KINDS = ['note', 'link', 'quote', 'fact', 'image', 'document'];
 // Verknüpfungs-Kategorien (Reihenfolge = Anzeige in Picker/Filter/Sortierung).
@@ -83,6 +84,16 @@ export const rechercheMethods = {
     this.errorMessage = '';
     this.busy = false;
     if (this._suggestTimer) { clearInterval(this._suggestTimer); this._suggestTimer = null; }
+  },
+
+  // Ganze Recherche-Karte ins Native-Vollbild — mehr Platz fürs Karten-Board.
+  // Status-Sync via fullscreenchange-Listener in recherche-card.js (rechercheFullscreen).
+  async toggleRechercheFullscreen() {
+    try {
+      await toggleWrapFullscreen(this.$root);
+    } catch {
+      this.errorMessage = window.__app.t('recherche.error.fullscreen');
+    }
   },
 
   // ── Filter ───────────────────────────────────────────────────────────────
