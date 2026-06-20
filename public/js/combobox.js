@@ -81,6 +81,25 @@ export function comboboxData(cfg = {}) {
           String(o.label).toLowerCase().includes(q) ||
           (o.sublabel && String(o.sublabel).toLowerCase().includes(q)));
       },
+      // Render-Plan der Liste: optionale Gruppen-Header (opt.group) zwischen den
+      // Optionen. Trägt KEINE Option ein `group`, fällt das auf eine reine
+      // Options-Liste zurück (byte-gleich zum ungruppierten Verhalten — additiv).
+      // Header-Zeilen sind nicht fokussierbar/auswählbar; `highlighted` indexiert
+      // weiterhin nur die Optionen (= Index in `filtered`), sodass Tastatur-Nav
+      // die Header automatisch überspringt.
+      get groupedRows() {
+        const rows = [];
+        let lastGroup;
+        const f = this.filtered;
+        for (let i = 0; i < f.length; i++) {
+          const opt = f[i];
+          const g = (opt.group == null || opt.group === '') ? null : opt.group;
+          if (g !== null && g !== lastGroup) rows.push({ kind: 'header', label: g, key: 'h:' + g });
+          lastGroup = g;
+          rows.push({ kind: 'option', opt, optIndex: i, key: 'o:' + (g ?? '') + ':' + String(opt.value) });
+        }
+        return rows;
+      },
       _isSelected(val) {
         if (this._multiple) {
           const arr = Array.isArray(this.value) ? this.value : [];
@@ -179,10 +198,10 @@ export function comboboxData(cfg = {}) {
         }
       },
       _scrollHl() {
+        // Per Klasse statt Kind-Index scrollen — bei gruppierten Listen liegen
+        // Header-Zeilen dazwischen, sodass `children[highlighted]` danebenläge.
         this.$nextTick(() => {
-          const list = this._rootEl.querySelector('.combobox-list');
-          const item = list?.children[this.highlighted];
-          item?.scrollIntoView({ block: 'nearest' });
+          this._rootEl.querySelector('.combobox-option--hl')?.scrollIntoView({ block: 'nearest' });
         });
       },
       init() {
@@ -222,15 +241,15 @@ export function comboboxData(cfg = {}) {
           '         :placeholder="$app.t(\'common.searchShort\')" role="searchbox" :aria-label="$app.t(\'common.searchShort\')">',
           '  <ul class="combobox-list" role="listbox"',
           '      :aria-activedescendant="highlighted >= 0 ? ($id(\'cb-opt\') + \'-\' + highlighted) : null">',
-          '    <template x-for="(opt, i) in filtered" :key="opt.value">',
-          '      <li class="combobox-option"',
-          '          role="option"',
-          '          :id="$id(\'cb-opt\') + \'-\' + i"',
-          '          :aria-selected="_isSelected(opt.value) ? \'true\' : \'false\'"',
-          '          :class="{\'combobox-option--selected\': _isSelected(opt.value), \'combobox-option--hl\': i === highlighted}"',
-          '          @click="select(opt.value)" @mouseenter="highlighted = i">',
-          '        <span class="combobox-option__label" x-text="opt.label"></span>',
-          '        <span class="combobox-option__sub" x-show="opt.sublabel" x-cloak x-text="opt.sublabel"></span>',
+          '    <template x-for="row in groupedRows" :key="row.key">',
+          '      <li :class="row.kind === \'header\' ? \'combobox-group\' : {\'combobox-option\': true, \'combobox-option--selected\': _isSelected(row.opt.value), \'combobox-option--hl\': row.optIndex === highlighted}"',
+          '          :role="row.kind === \'header\' ? \'presentation\' : \'option\'"',
+          '          :id="row.kind === \'option\' ? ($id(\'cb-opt\') + \'-\' + row.optIndex) : null"',
+          '          :aria-selected="row.kind === \'option\' ? (_isSelected(row.opt.value) ? \'true\' : \'false\') : null"',
+          '          @click="row.kind === \'option\' && select(row.opt.value)" @mouseenter="row.kind === \'option\' && (highlighted = row.optIndex)">',
+          '        <span class="combobox-group__label" x-show="row.kind === \'header\'" x-text="row.label"></span>',
+          '        <span class="combobox-option__label" x-show="row.kind === \'option\'" x-text="row.opt?.label"></span>',
+          '        <span class="combobox-option__sub" x-show="row.kind === \'option\' && row.opt?.sublabel" x-cloak x-text="row.opt?.sublabel"></span>',
           '      </li>',
           '    </template>',
           '    <li class="combobox-empty" x-show="filtered.length === 0" x-text="$app.t(\'find.noMatches\')"></li>',

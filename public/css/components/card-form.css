@@ -347,6 +347,16 @@ textarea:disabled,
   color: var(--color-muted);
   font-style: italic;
 }
+/* Nicht auswählbarer Gruppen-Header (opt.group) zwischen den Optionen. */
+.combobox-group {
+  list-style: none;
+  padding: var(--space-6) var(--space-8) var(--space-3);
+  font-size: var(--size-compact-font-size);
+  font-weight: 600;
+  color: var(--color-muted);
+  letter-spacing: .02em;
+  cursor: default;
+}
 .combobox-wrap--disabled .combobox-trigger {
   opacity: var(--opacity-hint);
   cursor: not-allowed;

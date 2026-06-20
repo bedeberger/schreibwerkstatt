@@ -222,53 +222,55 @@
     display: flex;
     flex-wrap: wrap;
     width: 100%;
+    gap: var(--space-3);
   }
   .plot-status-tabs .tabs-btn {
     flex: 1 1 40%;
     padding: var(--space-2xs) var(--space-xs);
     font-size: var(--font-size-xs);
     text-align: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
   }
+  /* Status-Picker signalisiert die Auswahl über die semantische Füllfarbe (s. u.),
+     nicht über den generischen Akzent-Underline des Tab-Patterns; jede Stufe ist
+     eine eigene Pille (eigener Rahmen, kein Shared-Border). */
+  .plot-status-tabs .tabs-btn::after { content: none; }
+  .plot-status-tabs .tabs-btn:not(:last-child) { border-right: 1px solid var(--color-border); }
+  /* Aktive Stufe trägt die Status-Farbe der Ansichts-Pille (.plot-status-tag--*)
+     → Lese- und Edit-Modus lesen als dasselbe System. */
+  .plot-status-tabs .tabs-btn--active.plot-status-seg--geplant   { background: var(--color-tag-bg);  color: var(--color-muted);     border-color: var(--color-muted); }
+  .plot-status-tabs .tabs-btn--active.plot-status-seg--entwurf   { background: var(--color-warn-bg); color: var(--color-warn-text); border-color: var(--color-warn-text); }
+  .plot-status-tabs .tabs-btn--active.plot-status-seg--im_buch   { background: var(--color-ok-bg);   color: var(--color-ok-text);   border-color: var(--color-ok-border); }
+  .plot-status-tabs .tabs-btn--active.plot-status-seg--verworfen { background: var(--color-tag-bg);  color: var(--color-muted);     border-color: var(--color-border); text-decoration: line-through; }
   .plot-edit-label {
     font-size: var(--font-size-micro);
     color: var(--color-muted);
     margin-top: var(--space-2xs);
   }
-  .plot-figure-picker {
+  /* Gewählte Figuren des Beat-Edits als entfernbare Chips unter der Combobox. */
+  .plot-fig-chips {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2xs);
-    max-height: 120px;
-    overflow-y: auto;
+    margin-top: var(--space-2xs);
   }
-  .plot-figure-chip {
-    cursor: pointer;
-    border: 1px solid var(--color-border);
-    background: var(--color-tag-bg);
+  .plot-fig-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
   }
-  .plot-figure-chip--on {
-    border-color: var(--card-accent);
-    background: var(--card-accent);
-    color: var(--color-on-accent-fill);
+  .plot-fig-chip-remove {
+    display: inline-flex;
+    padding: 0;
+    color: var(--color-muted);
   }
-  /* Globales `button:hover { background: var(--color-hover) }` (gleiche @layer)
-     wuerde den Chip-Hintergrund ueberschreiben — beim ausgewaehlten Chip bliebe
-     dann weisser Text auf hellem Hover-Tint stehen. Hover-Hintergrund explizit
-     re-asserten (Specificity 0,2,0 schlaegt button:hover 0,1,1). */
-  .plot-figure-chip:hover { background: var(--color-tag-bg); border-color: var(--card-accent); }
-  .plot-figure-chip--on:hover { background: var(--card-accent); }
-
-  /* Werkstatt-Figuren (draft_figures) vom Katalog absetzen: gestrichelter Rahmen
-     = „in Entwicklung, evtl. noch nicht im Manuskript", eigener Werkstatt-Akzent
-     (gleicher Token wie die Figuren-Werkstatt-Karte). */
-  .plot-figure-chip--werkstatt { border-style: dashed; border-color: var(--card-accent-werkstatt); }
-  .plot-figure-chip--werkstatt:hover { border-color: var(--card-accent-werkstatt); }
-  .plot-figure-chip--werkstatt.plot-figure-chip--on {
-    border-style: solid;
-    border-color: var(--card-accent-werkstatt);
-    background: var(--card-accent-werkstatt);
-  }
-  .plot-figure-chip--werkstatt.plot-figure-chip--on:hover { background: var(--card-accent-werkstatt); }
+  .plot-fig-chip-remove:hover { background: transparent; color: var(--color-text); }
+  .plot-fig-chip-remove .icon { width: 12px; height: 12px; }
+  /* Werkstatt-Chip (draft_figures) vom Katalog absetzen: gestrichelter Rahmen
+     = „in Entwicklung, evtl. noch nicht im Manuskript", eigener Werkstatt-Akzent. */
+  .plot-fig-chip.tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
   /* Werkstatt-Badge im Beat-Meta (Ansichtsmodus). */
   .plot-beat-meta .tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
   /* Vom Strang geerbte Figur/Kapitel: gedämpft + gepunkteter Rahmen = „nicht

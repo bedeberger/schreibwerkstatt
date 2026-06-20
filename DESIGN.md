@@ -229,6 +229,8 @@ Eine eigenständige, per-Boolean klappbare Sektion nutzt **`Alpine.data('collaps
 
 **Optionale Zweitzeile:** Eine Option darf neben `{ value, label }` ein `sublabel` tragen (`{ value, label, sublabel }`). Die Combobox rendert es als gedämpfte zweite Zeile unter dem Label und bezieht es in die Such-Filterung mit ein. Fehlt `sublabel`, bleibt die Option einzeilig (rein additiv, alle bestehenden Comboboxen unverändert). Use-Case: Kontext zur Auswahl (z. B. Figuren-Import-Picker zeigt Hauptkapitel · Beruf · Jahrgang).
 
+**Optionale Gruppen-Header:** Eine Option darf ein `group` tragen (`{ value, label, group }`). Die Combobox fügt vor dem ersten Element jeder Gruppe einen nicht auswählbaren Header (`.combobox-group`, `role="presentation"`) ein — die Optionen müssen dafür bereits **nach Gruppe sortiert** geliefert werden (gleiche Gruppe = zusammenhängend). Tastatur-Nav überspringt Header automatisch (`highlighted` indexiert weiter nur die Optionen). Eine Option darf in mehreren Gruppen erscheinen (gleicher `value`, unterschiedliche `group`) — Auswahl togglet den Wert überall. Fehlt `group` auf allen Optionen, rendert die Liste byte-gleich ohne Header (rein additiv). Kombinierbar mit `multiple: true` + `sublabel`. Use-Case: Beat-Edit-Figurenwahl gruppiert nach Kapitel (Kapitel → Figur A, Figur B).
+
 ### Catalog-Filter-Spezialisierung
 
 Filter-Comboboxen in Katalog-Karten (Figuren/Orte/Szenen/Ereignisse/Songs/Kontinuität) nutzen den dünnen Wrapper `catalogFilter(kind)` aus [public/js/catalog-filter.js](public/js/catalog-filter.js). Erbt die volle Combobox-Mechanik via `comboboxData`-Factory und reicht nur Placeholder + Empty-Label per Filter-Typ rein. Spart pro Aufruf vier i18n-Lookups und zentralisiert die Label-Konvention.

@@ -60,7 +60,7 @@
     <div class="tabs plot-status-tabs" role="group" :aria-label="$app.t('plot.beat.statusLabel')">
       <template x-for="s in statusList()" :key="s">
         <button type="button" class="tabs-btn"
-                :class="{ 'tabs-btn--active': beatDraft.status === s }"
+                :class="['plot-status-seg--' + s, { 'tabs-btn--active': beatDraft.status === s }]"
                 @click="beatDraft.status = s"
                 x-text="$app.t('plot.status.' + s)"></button>
       </template>
@@ -81,21 +81,35 @@
          x-modelable="value" x-model="beatDraft.chapter_id"
          x-effect="options = $app.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
     <label class="plot-edit-label" x-show="$app.figuren.length" x-text="$app.t('plot.beat.figuren')"></label>
-    <div class="plot-figure-picker" x-show="$app.figuren.length">
-      <template x-for="f in $app.figuren" :key="f.id">
-        <button type="button" class="tag plot-figure-chip"
-                :class="{ 'plot-figure-chip--on': beatDraft.figure_ids.includes(f.id) }"
-                @click="toggleBeatDraftFigure(f.id)"
-                x-text="f.kurzname || f.name"></button>
+    <div x-show="$app.figuren.length"
+         x-data="combobox({ placeholder: $app.t('plot.beat.figurenPick'), multiple: true })"
+         x-modelable="value" x-model="beatDraft.figure_ids"
+         x-effect="options = beatFigureOptions()"></div>
+    <div class="plot-fig-chips" x-show="beatFigureChips().length">
+      <template x-for="chip in beatFigureChips()" :key="chip.id">
+        <span class="tag plot-fig-chip">
+          <span x-text="chip.label"></span>
+          <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                  @click="toggleBeatDraftFigure(chip.id)">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+          </button>
+        </span>
       </template>
     </div>
     <label class="plot-edit-label" x-show="draftFiguren.length" x-text="$app.t('plot.beat.werkstattFiguren')"></label>
-    <div class="plot-figure-picker" x-show="draftFiguren.length">
-      <template x-for="d in draftFiguren" :key="'d' + d.id">
-        <button type="button" class="tag plot-figure-chip plot-figure-chip--werkstatt"
-                :class="{ 'plot-figure-chip--on': beatDraft.draft_figure_ids.includes(d.id) }"
-                @click="toggleBeatDraftWerkstattFigure(d.id)"
-                x-text="d.name"></button>
+    <div x-show="draftFiguren.length"
+         x-data="combobox({ placeholder: $app.t('plot.beat.werkstattPick'), multiple: true })"
+         x-modelable="value" x-model="beatDraft.draft_figure_ids"
+         x-effect="options = (draftFiguren, beatWerkstattOptions())"></div>
+    <div class="plot-fig-chips" x-show="beatWerkstattChips().length">
+      <template x-for="chip in beatWerkstattChips()" :key="'d' + chip.id">
+        <span class="tag tag--werkstatt plot-fig-chip">
+          <span x-text="chip.label"></span>
+          <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                  @click="toggleBeatDraftWerkstattFigure(chip.id)">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+          </button>
+        </span>
       </template>
     </div>
     <div class="plot-beat-edit-actions">
