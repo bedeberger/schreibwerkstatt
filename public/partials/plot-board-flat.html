@@ -73,7 +73,7 @@
         <div class="plot-beats" data-plot-cell :data-act-id="act.id">
           <template x-for="beat in visibleBeatsForAct(act.id)" :key="beat.id">
             <div class="plot-beat" :data-beat-id="beat.id"
-                 :class="['plot-beat--' + beat.status, { 'plot-beat--editing': editingBeatId === beat.id }]">
+                 :class="{ ['plot-beat--' + beat.status]: true, 'plot-beat--editing': editingBeatId === beat.id }">
 
               <!-- Beat-Karte (Ansicht + Bearbeiten) — geteilt mit dem Grid-Board.
                    SSoT: plot-beat-cell.html (string-seitiger Fragment-Include). -->

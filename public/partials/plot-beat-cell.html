@@ -60,7 +60,7 @@
     <div class="tabs plot-status-tabs" role="group" :aria-label="$app.t('plot.beat.statusLabel')">
       <template x-for="s in statusList()" :key="s">
         <button type="button" class="tabs-btn"
-                :class="['plot-status-seg--' + s, { 'tabs-btn--active': beatDraft.status === s }]"
+                :class="{ ['plot-status-seg--' + s]: true, 'tabs-btn--active': beatDraft.status === s }"
                 @click="beatDraft.status = s"
                 x-text="$app.t('plot.status.' + s)"></button>
       </template>

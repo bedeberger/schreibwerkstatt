@@ -61,7 +61,7 @@ export const dndMethods = {
     // Karten-Elementen (Status-Badge, Tags, Edit-Form) fern; preventOnFilter
     // false lässt deren Klick durch (Status zyklen, Beat öffnen, Figur springen).
     const baseOpts = {
-      animation: 150,
+      animation: 0,
       forceFallback: true,
       fallbackOnBody: true,
       fallbackTolerance: 5,
@@ -69,7 +69,11 @@ export const dndMethods = {
       invertSwap: true,
       direction: 'vertical',
       revertOnSpill: true,
-      emptyInsertThreshold: 10,
+      // Grosszügiger Trefferradius um jede Zelle — zusammen mit der min-height der
+      // Drop-Zonen (plot/board.css/plot/swimlane.css) fängt auch ein schneller
+      // Akt-/Zell-übergreifender Drag zuverlässig im Ziel, statt im Spalten-Gap zu
+      // verpuffen. Niedriger Wert (10) verfehlte schnelle Cross-Cell-Drags.
+      emptyInsertThreshold: 24,
       scroll: true,
       draggable: '.plot-beat',
       filter: '.plot-beat--editing, .plot-beat-edit, .plot-beat-meta, .plot-status-tag, .plot-beat-warn, button, input, textarea, a, .combobox-wrap',

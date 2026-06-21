@@ -1,6 +1,7 @@
 /* Plot-Werkstatt: Swimlane-Grid (Akte = Spalten × Stränge = Zeilen). Ergänzt
-   plot-board.css — Beat-/Add-/Farb-/Brainstorm-/Intensitäts-Styles werden von
-   dort wiederverwendet; hier nur die Grid-spezifischen Klassen + die Strang-Leiste.
+   plot/board.css + plot/widgets.css — Beat-/Add-/Farb-/Brainstorm-/Intensitäts-
+   Styles werden von dort wiederverwendet (lädt NACH beiden); hier nur die Grid-
+   spezifischen Klassen + die Strang-Leiste.
    Render-Weiche: nur sichtbar, sobald ≥1 Strang existiert (sonst flaches Board). */
 
 @layer components {
@@ -63,7 +64,11 @@
      .plot-swim bleiben (sticky-left + max-content-Breite). contents blendet die
      Wrapper-Box aus, sodass die Zeile selbst zum Flex-Item wird. */
   .plot-swim-rowgroup { display: contents; }
-  .plot-swim-row { display: flex; gap: var(--space-sm); align-items: stretch; }
+  /* Zellen sitzen auf Inhaltshöhe (flex-start), nicht auf die höchste Zelle der
+     Zeile gestreckt: leere Zellen bleiben kompakt (min-height: 56px) statt eine
+     Spalte voller Leerraum zu erzeugen. Eine zeilenübergreifende „Linie" gäbe es
+     ohnehin nicht (jeder Strang ist eine eigene Zeile mit eigener Höhe). */
+  .plot-swim-row { display: flex; gap: var(--space-sm); align-items: flex-start; }
   .plot-swim-row--header { align-items: flex-end; }
   /* Strang-eigene Aktstruktur (Hybrid): die Kopfzeile bekommt etwas Luft nach
      oben, damit der eigene Block optisch vom geteilten Raster getrennt ist. */
@@ -132,7 +137,7 @@
   }
   .plot-swim-row--default .plot-swim-lane { border-left-color: var(--color-border); }
   /* Im Edit-Modus enthält die Lane die Combobox-Dropdowns (position:fixed). Die
-     Lane ist sticky mit z-index:var(--z-base) → eigener Stacking-Context, der das
+     Lane ist sticky mit z-index:var(--z-sticky) → eigener Stacking-Context, der das
      fixed Dropdown einsperrt: spätere Lanes/Zellen im DOM (gleicher z-index, später
      gemalt) überdecken sonst die nach unten aufklappende Liste → unleserlich. Die
      editierende Lane über --z-popover heben hebt ihren Subtree (inkl. Dropdown)
@@ -173,6 +178,13 @@
     border-radius: var(--radius-md);
     background: var(--color-surface);
   }
+  /* Leere Zelle (nur der <template>-Anker, keine .plot-beat-Karte): Drop-Zone +
+     Zwischen-Gap kollabieren, damit kein hohes Leerrechteck über dem +-Button
+     klafft. Die Zelle bleibt trotzdem Drop-Ziel — SortableJS' emptyInsertThreshold
+     erweitert den Trefferbereich (dnd.js). `:not(:has())`, weil `.plot-beats` durch
+     den Alpine-<template>-Anker nie CSS-`:empty` ist. */
+  .plot-swim-cell:not(:has(.plot-beat)) { gap: var(--space-2xs); min-height: 0; }
+  .plot-swim-cell .plot-beats:not(:has(.plot-beat)) { min-height: 0; }
   .plot-swim-cell-foot { display: flex; gap: var(--space-2xs); }
   /* Kompakte Icon-Add-/Brainstorm-Buttons in der Zelle (Basis: .plot-add-beat-btn). */
   .plot-add-beat-btn--cell { flex: 1 1 auto; width: auto; padding: var(--space-2xs); }
@@ -202,31 +214,38 @@
      Horizontal-Scroll. Zellen `flex: 1 0 0` mit `min-width: var(--cell-w)` als
      Floor (treibt auch die max-content-Breite); `width: auto`, weil `flex-basis: 0`
      die fixe Zellbreite ablöst. acthead + cell + spacer teilen exakt dieselbe
-     Flex-Regel → Spalten bleiben ausgerichtet. Lane/Corner bleiben fix (kein
-     Override).
+     Flex-Regel → Spalten bleiben ausgerichtet (der Spacer trägt sie zusätzlich
+     im eigenen Block unten, weil er nur im Vollbild sichtbar wird). Lane/Corner
+     bleiben fix (kein Override).
      WICHTIG: Die Kopfzeile trägt zusätzlich die „Akt hinzufügen"-Spalte, die
      Lane-Zeilen NICHT. Ohne Ausgleich verteilt die Kopfzeile den Platz auf N+1
      Spalten, die Lanes nur auf N → Kopf-Spalten schmaler als ihre Zellen, der
      Versatz akkumuliert nach rechts. `.plot-swim-spacer` ist der unsichtbare
      Lane-Zwilling der Add-Spalte und stellt gleiche Spaltenzahl pro Zeile her. */
-  .card--plot:fullscreen .plot-swimlane { max-height: none; }
   .card--plot:fullscreen .plot-swim {
     width: max-content;
     min-width: 100%;
   }
   .card--plot:fullscreen .plot-swim-acthead,
-  .card--plot:fullscreen .plot-swim-cell,
-  .card--plot:fullscreen .plot-swim-spacer {
+  .card--plot:fullscreen .plot-swim-cell {
     flex: 1 0 0;
     width: auto;
     min-width: var(--cell-w);
     max-width: 420px;
   }
 
-  /* Lane-Zwilling der Add-Spalte: nur im Vollbild aktiv (sonst ist die Kopfzeile
-     wie gehabt um eine Spalte länger und die N Akt-Spalten sind fix breit). */
+  /* Lane-Zwilling der Add-Spalte: nur im Vollbild sichtbar (sonst ist die Kopfzeile
+     wie gehabt um eine Spalte länger und die N Akt-Spalten sind fix breit). Trägt
+     dort dieselbe Flex-Regel wie acthead/cell — eigener Block, weil der Spacer im
+     Normalmodus display:none ist (kein zweites Mal denselben Selektor splitten). */
   .plot-swim-spacer { display: none; }
-  .card--plot:fullscreen .plot-swim-spacer { display: block; }
+  .card--plot:fullscreen .plot-swim-spacer {
+    display: block;
+    flex: 1 0 0;
+    width: auto;
+    min-width: var(--cell-w);
+    max-width: 420px;
+  }
 
   /* ── Mobile: engere Spuren, Grid bleibt horizontal scrollbar (2D-Struktur) ─ */
   @media (max-width: 600px) {
