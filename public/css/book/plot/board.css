@@ -191,6 +191,11 @@
     border-radius: var(--radius-sm);
     opacity: 0.95;
     cursor: grabbing;
+    /* SortableJS positioniert den Fallback-Klon via inline transform:translate3d
+       pro Mousemove. Die geerbte `transition: transform` (für den Hover-Lift)
+       würde jede Positions-Aktualisierung animieren → der Klon lerpt der Maus
+       nur hinterher und bleibt scheinbar am Startplatz kleben. */
+    transition: none;
   }
 
   .plot-beat-head {
