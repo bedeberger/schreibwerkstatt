@@ -60,6 +60,21 @@ export function handleEditorPaste(e) {
   return false;
 }
 
+// Paste als reiner Text — keine Formatierung, kein Whitelist-HTML, keine
+// Konfig-Block-Heuristik. Nur text/plain wird via insertText eingefügt. Für
+// den Focus-Standalone-Editor (ablenkungsfreier Schreibmodus, auch der
+// eingebettete macOS-Client): fremdes Markup hat hier nichts zu suchen.
+// Rückgabe: true wenn etwas eingefügt wurde, false bei leerem Clipboard.
+export function handleEditorPastePlain(e) {
+  const cd = e.clipboardData;
+  if (!cd) return false;
+  e.preventDefault();
+  const plain = cd.getData('text/plain') || '';
+  if (!plain) return false;
+  document.execCommand('insertText', false, plain);
+  return true;
+}
+
 // Copy nur als text/plain. Rückgabe: true wenn Override aktiv wurde,
 // false wenn keine Selektion (Browser-Default greift dann nicht, weil
 // es nichts zu kopieren gibt).

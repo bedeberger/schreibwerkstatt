@@ -23,6 +23,7 @@ import { focusCardMethods } from './card.js';
 import { setEditorHost } from '../shared/editor-host.js';
 import { isNoChange } from '../shared/save-pipeline.js';
 import { stripLektoratMarks } from '../shared/html-clean.js';
+import { handleEditorPastePlain, handleEditorCopy, handleEditorCut } from '../shared/paste.js';
 
 const DEFAULT_AUTOSAVE_MS = 1500;
 
@@ -155,6 +156,15 @@ export async function mountStandaloneFocus({ mount, bridge, autosaveMs = DEFAULT
 
   // Eingaben markieren dirty (Engine ruft _markEditDirty nur bei Inline-Format).
   content.addEventListener('input', () => host._markEditDirty());
+
+  // Einfügen immer als reiner Text — Formatierung aus der Zwischenablage wird
+  // im ablenkungsfreien Focus-Editor grundsätzlich verworfen.
+  content.addEventListener('paste', (e) => {
+    if (handleEditorPastePlain(e)) host._markEditDirty();
+  });
+  // Kopieren/Ausschneiden schreiben analog nur text/plain ins Clipboard.
+  content.addEventListener('copy', (e) => { handleEditorCopy(e); });
+  content.addEventListener('cut', (e) => { if (handleEditorCut(e)) host._markEditDirty(); });
 
   controller.enterFocusMode();
 
