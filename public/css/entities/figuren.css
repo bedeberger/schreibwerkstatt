@@ -285,6 +285,8 @@
 .bewertung-section-title--inline { display: inline; }
 
 .figur-detail-value { font-size: var(--font-size-sm); }
+/* Anker-Ereignis hinter "Jahr / Alter" — gedämpft (das "weil …"). */
+.figur-jahr-anchor { font-size: var(--font-size-sm); color: var(--color-muted); }
 
 .figur-eigenschaften-list { margin-bottom: var(--space-sm); }
 .figur-detail .figur-eigenschaften-list li { padding-top: var(--space-6); padding-bottom: var(--space-6); }

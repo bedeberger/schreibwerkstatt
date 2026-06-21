@@ -63,6 +63,14 @@
   font-size: var(--font-size-mini);
   color: var(--color-muted);
 }
+/* "Stand:"-Zeile (das verankernde Ereignis) — gedämpft, darf umbrechen. */
+.figur-lookup-row--anchor {
+  align-items: flex-start;
+}
+.figur-lookup-row--anchor > span:last-child {
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+}
 .figur-lookup-footer {
   border-top: 1px solid var(--color-border);
 }

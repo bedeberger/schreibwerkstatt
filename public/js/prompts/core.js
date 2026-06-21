@@ -348,7 +348,7 @@ export function configureLocales(cfg) {
  * @param {boolean}     isFinished  Buch wurde vom Autor als abgeschlossen markiert
  * @returns {{ SYSTEM_LEKTORAT, ..., BUCH_KONTEXT }}
  */
-export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false, hauptland = null, stilprofil = null) {
+export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false, hauptland = null, stilprofil = null, zeitlinieReal = false) {
   const rawLocale = _rawLocales.get(localeKey) || _rawLocales.get(_defaultLocale) || {};
   const kontext   = (buchKontext || '').trim();
 
@@ -370,6 +370,9 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinis
     let landName = landCode.toUpperCase();
     try { landName = new Intl.DisplayNames([langCode], { type: 'region' }).of(landCode.toUpperCase()) || landName; } catch { /* Intl-Fallback: Code */ }
     bookCtxParts.push(`HAUPT-SCHAUPLATZLAND: ${landName} (${landCode}). Sofern der Text keinen anderen Schauplatz-Ort belegt, sind Schauplätze in diesem Land verortet; nutze diesen Code als Default für das «land»-Feld von Orten.`);
+  }
+  if (zeitlinieReal) {
+    bookCtxParts.push(`REALE ZEITLINIE: Dieses Buch spielt auf einem realen, kalendarischen Zeitstrahl (echte Jahreszahlen, keine rein erfundene Story-Zeit). Verankere Lebensereignisse deshalb so konkret wie möglich mit echten Jahreszahlen (datum_year) und nutze die Jahres-Inferenz aus dem Kontext (verankerte Jahreszahlen, Lebensspannen, Epoche) besonders konsequent statt dich auf relative Angaben zu beschränken. story_tag (relative Story-Tage) nur, wenn der Text keinerlei kalendarischen Anhaltspunkt bietet.`);
   }
   if (isFinished) {
     const fertigRule = _werkAbgeschlossenByLang?.[langCode];

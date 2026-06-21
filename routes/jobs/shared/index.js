@@ -21,9 +21,9 @@ async function getBookPrompts(bookId, userEmail = null) {
   const { getLocalePromptsForBook } = await getPrompts();
   const settings = bookId
     ? getBookSettings(bookId, userEmail)
-    : { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, is_finished: 0, schauplatz_land: null };
+    : { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, is_finished: 0, schauplatz_land: null, zeitlinie_real: 0 };
   const locale = `${settings.language}-${settings.region}`;
-  return getLocalePromptsForBook(locale, settings.buchtyp || null, settings.buch_kontext || null, !!settings.is_finished, settings.schauplatz_land || null, settings.stilprofil || null);
+  return getLocalePromptsForBook(locale, settings.buchtyp || null, settings.buch_kontext || null, !!settings.is_finished, settings.schauplatz_land || null, settings.stilprofil || null, !!settings.zeitlinie_real);
 }
 
 // Rückwärtskompatibler Export – einige Module lesen _promptConfig direkt.

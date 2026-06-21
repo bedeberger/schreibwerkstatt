@@ -146,6 +146,7 @@
           <span class="figur-typ-dot" :class="'figur-typ-dot--' + (f.typ || 'unknown')"></span>
           <span class="figur-name" x-text="f.name"></span>
           <span class="tag" x-text="$app.t('figuren.type.' + f.typ)"></span>
+          <span x-show="$app.figurJahrLabel(f)" class="tag" x-text="$app.figurJahrLabel(f)"></span>
           <span x-show="f.geburtstag" class="tag" x-text="'* ' + f.geburtstag"></span>
           <!-- Kapitel-Badges -->
           <template x-if="f.kapitel?.length">
@@ -161,7 +162,12 @@
         <div x-show="$app.selectedFigurId === f.id" class="figur-detail">
           <p x-show="f.beschreibung" x-text="f.beschreibung" class="figur-beschreibung"></p>
           <!-- Rolle / Motivation / Konflikt / Äusseres / Stimme / Hintergrund -->
-          <div x-show="f.rolle || f.motivation || f.konflikt || f.aeusseres || f.stimme || f.hintergrund" class="figur-kerninfo">
+          <div x-show="$app.figurJahrLabel(f) || f.rolle || f.motivation || f.konflikt || f.aeusseres || f.stimme || f.hintergrund" class="figur-kerninfo">
+            <div x-show="$app.figurJahrLabel(f)" class="figur-kerninfo-row">
+              <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.jahrAlter') + ' '"></span>
+              <span class="figur-detail-value" x-text="$app.figurJahrLabel(f)"></span>
+              <span x-show="$app.figurJahrAnchor(f)" class="figur-jahr-anchor" x-text="' — ' + $app.figurJahrAnchor(f)"></span>
+            </div>
             <div x-show="f.rolle" class="figur-kerninfo-row">
               <span class="bewertung-section-title bewertung-section-title--inline" x-text="$app.t('figuren.field.rolle') + ' '"></span>
               <span class="figur-detail-value" x-text="f.rolle"></span>

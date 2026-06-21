@@ -124,6 +124,19 @@ test('getLocalePromptsForBook: isFinished default (omitted) → kein Block', asy
   assert.doesNotMatch(out.SYSTEM_LEKTORAT, /WERK ABGESCHLOSSEN/);
 });
 
+test('getLocalePromptsForBook: zeitlinieReal=true injiziert REALE ZEITLINIE in Komplett-Extraktion', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.getLocalePromptsForBook('de-CH', null, '', false, null, null, true);
+  assert.match(out.SYSTEM_KOMPLETT_EXTRAKTION, /REALE ZEITLINIE/, 'Komplett-Extraktion fehlt REALE-ZEITLINIE-Block');
+  assert.match(out.SYSTEM_KOMPLETT_EXTRAKTION, /datum_year/, 'Block soll konkrete Jahreszahlen-Verankerung fordern');
+});
+
+test('getLocalePromptsForBook: zeitlinieReal=false/omitted → kein REALE-ZEITLINIE-Block', async () => {
+  const m = await freshPrompts('claude');
+  assert.doesNotMatch(m.getLocalePromptsForBook('de-CH', null, '', false, null, null, false).SYSTEM_KOMPLETT_EXTRAKTION, /REALE ZEITLINIE/);
+  assert.doesNotMatch(m.getLocalePromptsForBook('de-CH', null, '').SYSTEM_KOMPLETT_EXTRAKTION, /REALE ZEITLINIE/);
+});
+
 test('getLocalePromptsForBook (en-US): isFinished → englische WORK-COMPLETED-Variante', async () => {
   const m = await freshPrompts('claude');
   if (!cfg.locales['en-US']) return;

@@ -84,6 +84,30 @@ export function _sanitizeFigur(f) {
 }
 
 export const figurenMethods = {
+  // Kompaktes "Jahr · Alter"-Label einer Figur (nur befüllt bei Romanen mit
+  // echter Zeitlinie — book_settings.zeitlinie_real; sonst leerer String → Tag
+  // bleibt aus). jahr_im_roman/alter_im_roman kommen serverseitig aus den
+  // datierten Figuren-Ereignissen. Geteilt von Figurenübersicht, Kontext-Leiste
+  // und Figur-Lookup im Editor.
+  figurJahrLabel(fig) {
+    if (!fig) return '';
+    const jahr = fig.jahr_im_roman;
+    const alter = fig.alter_im_roman;
+    if (jahr == null && alter == null) return '';
+    if (jahr != null && alter != null) return this.t('figuren.jahrAlter', { jahr, alter });
+    if (jahr != null) return String(jahr);
+    return '';
+  },
+
+  // Das datierte Ereignis, das den aktuellen Stand der Figur setzt (das "weil
+  // …"). Leerer String, wenn die Figur kein eigenes datiertes Ereignis hat.
+  figurJahrAnchor(fig) {
+    if (!fig?.anchor_ereignis) return '';
+    return fig.anchor_kapitel
+      ? this.t('figuren.jahrAnchor', { ereignis: fig.anchor_ereignis, kapitel: fig.anchor_kapitel })
+      : fig.anchor_ereignis;
+  },
+
   async loadFiguren(bookId, { signal } = {}) {
     try {
       const data = await fetchJson('/figures/' + bookId, { signal });

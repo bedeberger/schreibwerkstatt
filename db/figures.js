@@ -522,7 +522,7 @@ function cleanupDuplicateFiguren(bookId, userEmail, onProgress = null) {
  *  Gibt kompakte Objekte zurück: { name, kurzname, geschlecht, beruf, wohnadresse, beschreibung, typ } */
 function getChapterFigures(bookId, chapterId, userEmail) {
   if (!bookId) return [];
-  const cols = 'f.name, f.kurzname, f.geschlecht, f.beruf, f.wohnadresse, f.beschreibung, f.typ, f.geburtstag';
+  const cols = 'f.id, f.name, f.kurzname, f.geschlecht, f.beruf, f.wohnadresse, f.beschreibung, f.typ, f.geburtstag';
   if (chapterId) {
     const rows = db.prepare(`
       SELECT ${cols} FROM figures f

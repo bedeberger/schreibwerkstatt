@@ -18,6 +18,14 @@
               <span class="figur-lookup-label" x-text="$app.t('figurLookup.geburt')"></span>
               <span x-text="figurLookupGeburt()"></span>
             </div>
+            <div x-show="$app.figurJahrLabel(figurLookupData)" class="figur-lookup-row">
+              <span class="figur-lookup-label" x-text="$app.t('figuren.field.jahrAlter')"></span>
+              <span x-text="$app.figurJahrLabel(figurLookupData)"></span>
+            </div>
+            <div x-show="$app.figurJahrAnchor(figurLookupData)" class="figur-lookup-row figur-lookup-row--anchor">
+              <span class="figur-lookup-label" x-text="$app.t('figuren.field.jahrStand')"></span>
+              <span x-text="$app.figurJahrAnchor(figurLookupData)"></span>
+            </div>
             <div x-show="figurLookupData.wohnadresse" class="figur-lookup-row">
               <span class="figur-lookup-label" x-text="$app.t('figurLookup.wohnadresse')"></span>
               <span x-text="figurLookupData.wohnadresse"></span>

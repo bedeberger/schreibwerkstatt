@@ -48,6 +48,7 @@
                     @click="openPopoverForChip('figure', fig, fig.name, $event)">
                 <span x-text="fig.kurzname || fig.name"></span>
                 <span x-show="fig.typ" class="tag" x-text="$app.t('figuren.type.' + fig.typ)"></span>
+                <span x-show="$app.figurJahrLabel(fig)" class="tag" x-text="$app.figurJahrLabel(fig)"></span>
                 <span x-show="fig.geburtstag" class="tag" x-text="'* ' + fig.geburtstag"></span>
               </span>
             </template>
