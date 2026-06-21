@@ -323,9 +323,9 @@ for (const provider of ['ollama', 'claude']) {
 
 const ANACHRO = {
   minYear: 1985, maxYear: 1987,
-  songs: [{ titel: 'Smells Like Teen Spirit', interpret: 'Nirvana' }],
-  technik: ['Smartphone: Figur tippt auf einem Touchscreen-Handy'],
-  ereignisse: ['Mauerfall: Die Berliner Mauer fällt'],
+  songs: [{ titel: 'Smells Like Teen Spirit', interpret: 'Nirvana', jahr: '1985' }],
+  technik: [{ text: 'Smartphone: Figur tippt auf einem Touchscreen-Handy', jahr: null }],
+  ereignisse: [{ text: 'Mauerfall: Die Berliner Mauer fällt', jahr: '1986–1987' }],
 };
 
 test('buildKontinuitaetSinglePassPrompt: ohne Anachronismus-Daten kein Block/keine Regel', async () => {
@@ -343,6 +343,15 @@ test('buildKontinuitaetSinglePassPrompt: mit Anachronismus-Daten → Block, Span
   assert.ok(out.includes('Smells Like Teen Spirit'), 'Song muss im Prompt stehen');
   assert.ok(out.includes('Smartphone'), 'Technik-Fakt muss im Prompt stehen');
   assert.match(out, /typ «anachronismus»/);
+});
+
+test('buildKontinuitaetSinglePassPrompt: Per-Eintrag-Erzähljahr wird als «(Szene ~JAHR)» markiert', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.buildKontinuitaetSinglePassPrompt('Buch', 'Text.', [], [], {}, ANACHRO);
+  // Song mit Jahr → markiert; Technik ohne Jahr → keine Markierung an der Zeile.
+  assert.match(out, /Smells Like Teen Spirit».*\(Szene ~1985\)/);
+  assert.match(out, /Mauerfall.*\(Szene ~1986–1987\)/);
+  assert.doesNotMatch(out, /Smartphone[^\n]*\(Szene/);
 });
 
 test('buildKontinuitaetCheckPrompt: Anachronismus-Block opt-in über 5. Argument', async () => {

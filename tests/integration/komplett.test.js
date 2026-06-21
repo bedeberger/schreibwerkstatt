@@ -167,16 +167,19 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
   assert.equal(ortRows.length, 1);
   assert.equal(ortRows[0].name, 'Wald');
 
-  // World-Fakten persisted (Single-Pass 'Gesamtbuch' → kein Chapter-Bridge).
+  // World-Fakten persisted. Single-Pass-Fakt unter 'Gesamtbuch' matcht kein Kapitel,
+  // bekommt aber über seinen eindeutigen Seitennamen ('Seite Eins' → page 1200 →
+  // chapter 1100) eine Chapter-Bridge (saveFaktenToDb-Seiten-Fallback).
   const faktRows = ctx.dbSchema.db.prepare(
-    'SELECT kategorie, subjekt, fakt FROM world_facts WHERE book_id = ? AND user_email = ?'
+    'SELECT id, kategorie, subjekt, fakt FROM world_facts WHERE book_id = ? AND user_email = ?'
   ).all(BOOK_ID, 'tester@test.dev');
   assert.equal(faktRows.length, 1);
   assert.equal(faktRows[0].fakt, 'kalt');
-  const wfcCount = ctx.dbSchema.db.prepare(
-    'SELECT COUNT(*) AS n FROM world_fact_chapters wfc JOIN world_facts wf ON wf.id = wfc.fact_id WHERE wf.book_id = ?'
-  ).get(BOOK_ID);
-  assert.equal(wfcCount.n, 0, 'Gesamtbuch-Fakt darf keinen Chapter-Bridge haben');
+  const wfcRows = ctx.dbSchema.db.prepare(
+    'SELECT chapter_id FROM world_fact_chapters wfc JOIN world_facts wf ON wf.id = wfc.fact_id WHERE wf.book_id = ?'
+  ).all(BOOK_ID);
+  assert.equal(wfcRows.length, 1, 'Seiten-Fallback verbrückt den Gesamtbuch-Fakt aufs Kapitel');
+  assert.equal(wfcRows[0].chapter_id, 1100);
 
   // Continuity check stored.
   const cont = ctx.dbSchema.getLatestContinuityCheck(BOOK_ID, 'tester@test.dev');

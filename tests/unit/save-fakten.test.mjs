@@ -85,3 +85,41 @@ test('saveFaktenToDb: leeres chapterFakten → 0 Rows', () => {
   schema.saveFaktenToDb(BOOK, [], USER, {});
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM world_facts WHERE book_id=? AND user_email=?').get(BOOK, USER).n, 0);
 });
+
+// Single-Pass-Fallback: kapitel='Gesamtbuch' → kein Kapitel-Match, aber der
+// eindeutige Seitenname des Fakts (f.seite) löst über pages auf chapter_id auf.
+test('saveFaktenToDb: Gesamtbuch-Fakt bekommt Bridge über eindeutigen Seitennamen', () => {
+  setup();
+  db.prepare(`INSERT OR IGNORE INTO pages (page_id, book_id, page_name, chapter_id, updated_at)
+              VALUES (?, ?, ?, ?, '2026-01-01T00:00:00.000Z')`).run(70011, BOOK, 'Seite Eins', 7001);
+  schema.saveFaktenToDb(BOOK, [
+    { kapitel: 'Gesamtbuch', fakten: [
+      { fakt: 'auf Seite Eins erwähnt', seite: 'Seite Eins' },
+      { fakt: 'unbekannte Seite',       seite: 'Gibt es nicht' },
+      { fakt: 'ohne Seite' },
+    ] },
+  ], USER, {});
+
+  const bridges = db.prepare(`
+    SELECT wf.fakt, wfc.chapter_id FROM world_fact_chapters wfc
+    JOIN world_facts wf ON wf.id = wfc.fact_id WHERE wf.book_id = ?`).all(BOOK);
+  assert.equal(bridges.length, 1);
+  assert.equal(bridges[0].fakt, 'auf Seite Eins erwähnt');
+  assert.equal(bridges[0].chapter_id, 7001);
+});
+
+// Mehrdeutiger Seitenname (zwei Seiten gleichen Namens in versch. Kapiteln) → kein Bridge.
+test('saveFaktenToDb: mehrdeutiger Seitenname löst NICHT auf', () => {
+  setup();
+  db.prepare('INSERT OR IGNORE INTO chapters (chapter_id, book_id, chapter_name) VALUES (?, ?, ?)')
+    .run(7002, BOOK, 'Kapitel 2');
+  db.prepare(`INSERT OR IGNORE INTO pages (page_id, book_id, page_name, chapter_id, updated_at)
+              VALUES (?, ?, ?, ?, '2026-01-01T00:00:00.000Z')`).run(70021, BOOK, 'Doppelt', 7001);
+  db.prepare(`INSERT OR IGNORE INTO pages (page_id, book_id, page_name, chapter_id, updated_at)
+              VALUES (?, ?, ?, ?, '2026-01-01T00:00:00.000Z')`).run(70022, BOOK, 'Doppelt', 7002);
+  schema.saveFaktenToDb(BOOK, [
+    { kapitel: 'Gesamtbuch', fakten: [{ fakt: 'mehrdeutig verortet', seite: 'Doppelt' }] },
+  ], USER, {});
+
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM world_fact_chapters').get().n, 0);
+});

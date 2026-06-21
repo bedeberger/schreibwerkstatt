@@ -102,9 +102,16 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
 
 // ── Anachronismus-Datenbasis für die Kontinuitätsprüfung ─────────────────────
 // Nur bei Romanen mit echter Zeitlinie (book_settings.zeitlinie_real). Liefert die
-// Erzählzeit-Spanne aus sicher datierten Figuren-/Zeitstrahl-Ereignissen plus die im
-// Buch erwähnten Songs und Welt-Fakten (Technik/Historie/Ereignis/Kultur). Das Modell
-// vergleicht deren reale Entstehungs-/Veröffentlichungszeit gegen die Erzählzeit.
+// globale Erzählzeit-Spanne aus sicher datierten Figuren-/Zeitstrahl-Ereignissen plus
+// die im Buch erwähnten Songs und Welt-Fakten (Technik/Historie/Ereignis/Kultur). Jeder
+// Eintrag bekommt – soweit ableitbar – das Erzähljahr SEINER Erwähnung: Entität → Kapitel
+// (song_chapters / world_fact_chapters) → in diesem Kapitel datierte Ereignisse. So
+// vergleicht das Modell das reale Entstehungs-/Veröffentlichungsjahr (Eigenwissen) gegen
+// die lokale Szenen-Zeit statt nur gegen die Gesamtspanne (präzise bei Rückblenden/
+// Mehr-Epochen-Büchern). Auch Single-Pass-Fakten haben einen Kapitel-Link, weil
+// saveFaktenToDb dort über den Seitennamen (f.seite → page → chapter) backfillt. Fakten
+// ohne auflösbaren Kapitel-Link oder in undatierten Kapiteln tragen kein Per-Eintrag-Jahr
+// → Fallback auf die Gesamtspanne.
 // null, wenn die Zeitlinie aus ist, keine datierten Ereignisse vorliegen oder es nichts
 // Prüfbares gibt → der Prompt-Builder lässt die Anachronismus-Prüfung dann ganz weg.
 // Lesepfad-sicher in beiden Aufrufern: figure_events (saveSzenenAndEvents), songs
@@ -112,6 +119,7 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
 function buildAnachronismusData(bookIdInt, email) {
   const { zeitlinie_real } = getBookSettings(bookIdInt, email);
   if (!zeitlinie_real) return null;
+  // Globale Spanne (Header + Fallback) aus ALLEN datierten Ereignissen – auch ohne Kapitel-Link.
   const yearRow = db.prepare(`
     SELECT MIN(datum_year) AS minY, MAX(COALESCE(datum_ende_year, datum_year)) AS maxY FROM (
       SELECT fe.datum_year AS datum_year, fe.datum_ende_year AS datum_ende_year
@@ -123,19 +131,71 @@ function buildAnachronismusData(bookIdInt, email) {
     )
   `).get(bookIdInt, email, bookIdInt, email);
   if (!yearRow || yearRow.minY == null) return null;
-  const songs = db.prepare(
-    'SELECT titel, interpret FROM songs WHERE book_id = ? AND user_email IS ? ORDER BY sort_order'
-  ).all(bookIdInt, email).map(s => ({ titel: s.titel, interpret: s.interpret || '' }));
-  const factRows = db.prepare(
-    `SELECT kategorie, subjekt, fakt FROM world_facts
-     WHERE book_id = ? AND user_email IS ? AND kategorie IN ('technik','historie','ereignis','kultur')
-     ORDER BY sort_order`
-  ).all(bookIdInt, email);
-  const fmtFact = (f) => `${f.subjekt ? f.subjekt + ': ' : ''}${f.fakt}`;
-  const technik = factRows.filter(f => f.kategorie === 'technik').map(fmtFact);
-  const ereignisse = factRows.filter(f => f.kategorie !== 'technik').map(fmtFact);
+  const minYear = yearRow.minY, maxYear = yearRow.maxY;
+  // Kapitel → {minY, maxY} aus den datierten Ereignissen dieses Kapitels (Per-Eintrag-Jahr).
+  const chapterRows = db.prepare(`
+    SELECT chapter_id, MIN(y) AS minY, MAX(ey) AS maxY FROM (
+      SELECT fe.chapter_id AS chapter_id, fe.datum_year AS y,
+             COALESCE(fe.datum_ende_year, fe.datum_year) AS ey
+        FROM figure_events fe JOIN figures f ON f.id = fe.figure_id
+        WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0
+          AND fe.datum_year IS NOT NULL AND fe.chapter_id IS NOT NULL
+      UNION ALL
+      SELECT zec.chapter_id, ze.datum_year, COALESCE(ze.datum_ende_year, ze.datum_year)
+        FROM zeitstrahl_events ze JOIN zeitstrahl_event_chapters zec ON zec.event_id = ze.id
+        WHERE ze.book_id = ? AND ze.user_email IS ? AND ze.datum_unsicher = 0
+          AND ze.datum_year IS NOT NULL AND zec.chapter_id IS NOT NULL
+    ) GROUP BY chapter_id
+  `).all(bookIdInt, email, bookIdInt, email);
+  const chMap = new Map(chapterRows.map(r => [r.chapter_id, { minY: r.minY, maxY: r.maxY }]));
+
+  // Erzähljahr-Spanne über eine Menge Kapitel-IDs → "1985" | "1985–1986" | null.
+  const jahrFor = (chapterIds) => {
+    let lo = null, hi = null;
+    for (const cid of chapterIds) {
+      const ce = chMap.get(cid);
+      if (!ce) continue;
+      if (lo == null || ce.minY < lo) lo = ce.minY;
+      if (hi == null || ce.maxY > hi) hi = ce.maxY;
+    }
+    if (lo == null) return null;
+    return lo === hi ? String(lo) : `${lo}–${hi}`;
+  };
+  // Mehrere Bridge-Zeilen pro Entität (1 je Kapitel) zu {…, chapterIds[]} gruppieren.
+  const groupByEntity = (rows, baseOf) => {
+    const byId = new Map();
+    for (const r of rows) {
+      let e = byId.get(r.id);
+      if (!e) { e = { ...baseOf(r), chapterIds: [] }; byId.set(r.id, e); }
+      if (r.chapter_id != null) e.chapterIds.push(r.chapter_id);
+    }
+    return [...byId.values()];
+  };
+
+  const songRows = db.prepare(`
+    SELECT s.id, s.titel, s.interpret, sc.chapter_id
+      FROM songs s LEFT JOIN song_chapters sc ON sc.song_id = s.id
+     WHERE s.book_id = ? AND s.user_email IS ? ORDER BY s.sort_order
+  `).all(bookIdInt, email);
+  const songs = groupByEntity(songRows, s => ({ titel: s.titel, interpret: s.interpret || '' }))
+    .map(s => ({ titel: s.titel, interpret: s.interpret, jahr: jahrFor(s.chapterIds) }));
+
+  const factRows = db.prepare(`
+    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, wfc.chapter_id
+      FROM world_facts wf LEFT JOIN world_fact_chapters wfc ON wfc.fact_id = wf.id
+     WHERE wf.book_id = ? AND wf.user_email IS ?
+       AND wf.kategorie IN ('technik','historie','ereignis','kultur')
+     ORDER BY wf.sort_order
+  `).all(bookIdInt, email);
+  const facts = groupByEntity(factRows, f => ({
+    kategorie: f.kategorie,
+    text: `${f.subjekt ? f.subjekt + ': ' : ''}${f.fakt}`,
+  })).map(f => ({ kategorie: f.kategorie, text: f.text, jahr: jahrFor(f.chapterIds) }));
+  const technik = facts.filter(f => f.kategorie === 'technik').map(({ text, jahr }) => ({ text, jahr }));
+  const ereignisse = facts.filter(f => f.kategorie !== 'technik').map(({ text, jahr }) => ({ text, jahr }));
+
   if (!songs.length && !technik.length && !ereignisse.length) return null;
-  return { minYear: yearRow.minY, maxYear: yearRow.maxY, songs, technik, ereignisse };
+  return { minYear, maxYear, songs, technik, ereignisse };
 }
 
 // ── Job: Komplettanalyse ─────────────────────────────────────────────────────

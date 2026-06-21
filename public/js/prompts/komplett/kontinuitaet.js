@@ -52,20 +52,24 @@ Eine kontextfreie Erwähnung nur des geteilten Tokens (z.B. «Dieter») kann jed
 }
 
 // Anachronismus-Kontext (nur bei Romanen mit echter Zeitlinie, book_settings.zeitlinie_real).
-// Erzählzeit-Spanne aus datierten Ereignissen + die im Buch erwähnten Songs/Technologien/
-// historischen Ereignisse. Das Modell vergleicht deren reale Entstehungs-/Veröffentlichungs-
-// zeit (aus eigenem Wissen) gegen die Erzählzeit. Leer, wenn keine Spanne oder keine prüfbaren
-// Entitäten vorliegen → Anachronismus-Prüfung entfällt (z.B. zeitlose/relative Erzählung).
+// Globale Erzählzeit-Spanne aus datierten Ereignissen + die im Buch erwähnten Songs/Technologien/
+// historischen Ereignisse. Jeder Eintrag trägt, soweit aus seiner Kapitel-Datierung ableitbar,
+// das Erzähljahr SEINER Erwähnung als «(Szene ~JAHR)» – damit prüft das Modell gegen die lokale
+// Szenen-Zeit (Rückblenden!) statt nur gegen die Gesamtspanne. Das reale Entstehungs-/Veröffent-
+// lichungsjahr bleibt Modellwissen. Leer, wenn keine Spanne oder keine prüfbaren Entitäten
+// vorliegen → Anachronismus-Prüfung entfällt (z.B. zeitlose/relative Erzählung).
 function _buildAnachronismusBlock(anachronismus) {
   if (!anachronismus || anachronismus.minYear == null || anachronismus.maxYear == null) return '';
   const { minYear, maxYear, songs = [], technik = [], ereignisse = [] } = anachronismus;
   if (!songs.length && !technik.length && !ereignisse.length) return '';
   const spanne = minYear === maxYear ? `${minYear}` : `${minYear}–${maxYear}`;
+  // Per-Eintrag-Erzähljahr (aus der Kapitel-Datierung) – nur markieren, wenn vorhanden.
+  const szeneSuffix = (jahr) => jahr ? ` (Szene ~${jahr})` : '';
   const parts = [`\n\n## Zeitliche Verortung (Anachronismus-Prüfung)
-Dieses Buch hat eine reale, kalendarische Chronologie. Die datierte Handlung spielt etwa im Zeitraum ${spanne}.`];
-  if (songs.length) parts.push('\n### Erwähnte Songs/Musik\n' + songs.slice(0, 80).map(s => `- «${s.titel}»${s.interpret ? ` – ${s.interpret}` : ''}`).join('\n'));
-  if (technik.length) parts.push('\n### Erwähnte Technik/Wissenschaft\n' + technik.slice(0, 60).map(t => `- ${t}`).join('\n'));
-  if (ereignisse.length) parts.push('\n### Erwähnte historische/welt-bezogene Ereignisse\n' + ereignisse.slice(0, 60).map(e => `- ${e}`).join('\n'));
+Dieses Buch hat eine reale, kalendarische Chronologie. Die datierte Handlung spielt etwa im Zeitraum ${spanne}. Trägt ein Eintrag «(Szene ~JAHR)», ist das die aus der datierten Handlung abgeleitete Erzählzeit genau dieser Erwähnung – prüfe gegen DIESES Jahr; ohne Markierung gilt die Gesamtspanne.`];
+  if (songs.length) parts.push('\n### Erwähnte Songs/Musik\n' + songs.slice(0, 80).map(s => `- «${s.titel}»${s.interpret ? ` – ${s.interpret}` : ''}${szeneSuffix(s.jahr)}`).join('\n'));
+  if (technik.length) parts.push('\n### Erwähnte Technik/Wissenschaft\n' + technik.slice(0, 60).map(t => `- ${t.text}${szeneSuffix(t.jahr)}`).join('\n'));
+  if (ereignisse.length) parts.push('\n### Erwähnte historische/welt-bezogene Ereignisse\n' + ereignisse.slice(0, 60).map(e => `- ${e.text}${szeneSuffix(e.jahr)}`).join('\n'));
   return parts.join('\n');
 }
 
@@ -76,7 +80,7 @@ Dieses Buch hat eine reale, kalendarische Chronologie. Die datierte Handlung spi
 // etablierte Jahresangabe.
 const _ANACHRONISMUS_RULE = `
 
-Anachronismus-Prüfung (typ «anachronismus»): Vergleiche die oben unter «Zeitliche Verortung» gelisteten Songs, Technologien und historischen Ereignisse mit ihrer realen Entstehungs- bzw. Veröffentlichungszeit (aus deinem Allgemeinwissen). Wird etwas erwähnt, das es zur Erzählzeit real noch nicht gab (ein Song nach seinem Erscheinungsjahr, eine Technologie vor ihrer Erfindung, ein Ereignis vor seinem tatsächlichen Datum), ist das ein Anachronismus. Für typ «anachronismus» gilt abweichend: stelle_a = wörtliches Zitat bzw. exakte Bezeichnung der Erwähnung im Buch; stelle_b = die etablierte Jahresangabe oder das datierte Ereignis, das die Erzählzeit festlegt – als Klartext-Jahresangabe OHNE «» (kein Buchzitat nötig). Beschreibung nennt das reale Datum (z.B. «Der Song … erschien erst 1991, die Handlung spielt 1985»). Nur melden, wenn du dir beim realen Datum sicher bist; im Zweifel weglassen.`;
+Anachronismus-Prüfung (typ «anachronismus»): Vergleiche die oben unter «Zeitliche Verortung» gelisteten Songs, Technologien und historischen Ereignisse mit ihrer realen Entstehungs- bzw. Veröffentlichungszeit (aus deinem Allgemeinwissen). Maßgeblich ist je Eintrag das markierte «(Szene ~JAHR)» – fehlt es, gilt die Gesamtspanne. Wird etwas erwähnt, das es zu dieser Erzählzeit real noch nicht gab (ein Song nach seinem Erscheinungsjahr, eine Technologie vor ihrer Erfindung, ein Ereignis vor seinem tatsächlichen Datum), ist das ein Anachronismus. Für typ «anachronismus» gilt abweichend: stelle_a = wörtliches Zitat bzw. exakte Bezeichnung der Erwähnung im Buch; stelle_b = die für diesen Eintrag maßgebliche Erzählzeit (das «(Szene ~JAHR)» bzw. die Gesamtspanne) – als Klartext-Jahresangabe OHNE «» (kein Buchzitat nötig). Beschreibung nennt das reale Datum (z.B. «Der Song … erschien erst 1991, die Handlung spielt 1985»). Nur melden, wenn du dir beim realen Datum sicher bist; im Zweifel weglassen.`;
 
 export function buildKontinuitaetChapterFactsPrompt(chapterName, chText) {
   return `Extrahiere alle konkreten Fakten und Behauptungen aus dem Kapitel «${chapterName}» die für die Kontinuitätsprüfung relevant sind: Figuren-Zustände (lebendig/tot, Verletzungen, Wissen, Beziehungen), Ortsbeschreibungen, Zeitangaben, Objekte und deren Besitz/Zustand, sowie wichtige Handlungsereignisse.
