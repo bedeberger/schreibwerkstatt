@@ -405,6 +405,7 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 - **Icon + Label** behalten: primäre Formular-Aktionen im Footer/Settings (z.B. „Speichern"), prominente nav-Buttons mit Text (Revisions Vor/Zurück). Label = Klarheit + A11y. Konsistenz kommt hier aus dem [Button-System](#buttons), nicht aus Icon-only.
 - **Schliessen = immer `x`** (Sprite), nie `×`/`&#x2715;`/Text-„Schliessen". Siehe Icon-Liste unten.
 - **Destruktiv** (Löschen) = `trash`; **Entfernen/Chip/Dismiss** = `x`. Andere Semantik als Schliessen.
+- **Bündel-Trenner = `.action-sep`** (siehe [Aktions-Trennstrich](#aktions-trennstrich-action-sep--ssot-für-gebündelte-aktionsreihen)). Zerfällt eine Icon-Aktionsreihe semantisch (z.B. „Form bestätigen/abbrechen" ↔ „Datensatz verwerfen/löschen"), trennt **ausschliesslich** `<span class="action-sep" aria-hidden="true">` die Bündel — nie ein `border`-Hack oder `<hr>` pro Feature.
 - **Reaktive Icons** via `<use :href="…">`, nie `x-text` (killt das SVG).
 - **Verboten:** Unicode-Glyphen als Icon-Inhalt eines Buttons (`× ✕ ↑ ↓ ← → ⤢ ⛶ …`). Ausnahme nur als visuell versteckter Fallback in `.history-chevron`-SPANs (kein Button).
 - **Neue Aktion** → erst Icon-Map (Icon-System + Icon-Button) prüfen/erweitern, Sprite-Symbol in [public/icons.svg](public/icons.svg) ergänzen, `SHELL_CACHE` bumpen.
@@ -1552,11 +1553,11 @@ Markup: [public/partials/avatar-menu.html](public/partials/avatar-menu.html). Be
 
 Nicht eigene Toolbar-Layouts pro Karte erfinden.
 
-### Card-Actions: Gruppierung (`.card-actions--grouped`)
+### Aktions-Trennstrich (`.action-sep`) — SSoT für gebündelte Aktionsreihen
 
-**Use:** Karten-Header mit ≥4 Aktionen, die semantisch in Bündel zerfallen (z.B. Editor: run-Aktionen / Modus-Toggles / Side-Card-Toggles). Trennstrich zwischen Bündeln macht die Aktionstypen visuell unterscheidbar.
+**Use:** Der **einzige** Trenner zwischen semantischen Bündeln in einer horizontalen Aktionsreihe — egal ob Karten-Header (`.card-actions`), Editor-Toolbar oder eine Inline-Edit-Form-Aktionsleiste (z.B. Beat-Karte der Plot-Werkstatt). Trennstrich macht die Aktionstypen visuell unterscheidbar (commit-Paar ↔ Lifecycle-/State-Aktionen). **Kein** eigener Trenner pro Feature (kein `border-left`-Hack, kein `<hr>`, kein zweites Margin-Cluster).
 
-**Markup:**
+**Markup (Karten-Header mit `.action-group`-Bündeln):**
 ```html
 <div class="card-actions card-actions--grouped">
   <span class="action-group">
@@ -1571,15 +1572,26 @@ Nicht eigene Toolbar-Layouts pro Karte erfinden.
 </div>
 ```
 
+**Markup (Inline-Icon-Aktionsleiste, direkt zwischen zwei Icon-Buttons):**
+```html
+<div class="plot-beat-edit-actions">
+  <button class="icon-btn icon-btn--ghost ..."><!-- Speichern (check) --></button>
+  <button class="icon-btn icon-btn--ghost ..."><!-- Abbrechen (x) --></button>
+  <span class="action-sep" aria-hidden="true"></span>
+  <button class="icon-btn icon-btn--ghost ..."><!-- Verwerfen (minus/rotate-cw) --></button>
+  <button class="icon-btn icon-btn--ghost ... --danger"><!-- Löschen (trash) --></button>
+</div>
+```
+
 **Klassen** ([public/css/components/card-form.css](public/css/components/card-form.css)):
-- `.action-group` — `display: contents` — semantischer Wrapper, kein Layout-Bruch zum Flex-Parent
-- `.action-sep` — 1 px Trennstrich (`var(--color-border)`), full-height via `align-self: stretch`
+- `.action-group` — `display: contents` — semantischer Wrapper, kein Layout-Bruch zum Flex-Parent (nur nötig, wenn Bündel als Einheit angesprochen werden; bei direkten Geschwister-Buttons reicht der nackte `.action-sep`)
+- `.action-sep` — 1 px Trennstrich (`var(--color-border)`), full-height via `align-self: stretch`; der umschliessende Container muss `display: flex` sein
 
-**Mobile (≤700 px):** `.action-sep` wird ausgeblendet (Buttons stapeln ohnehin auf 100% Breite via Flex-Reflow). Kein paralleler Stack-Marker nötig.
+**Mobile (≤700 px):** in `.card-actions--grouped` wird `.action-sep` ausgeblendet (Buttons stapeln ohnehin auf 100% Breite via Flex-Reflow). In kompakten Icon-only-Reihen, die nicht stapeln (z.B. Beat-Karte), bleibt er sichtbar.
 
-**Wann nicht:** Karten mit ≤3 Aktionen oder ohne semantische Bündel — bleiben bei flachem `.card-actions`. Gruppierung nur, wenn die Sektionen wirklich unterschiedliche Aktionstypen sind.
+**Wann nicht:** Reihen mit ≤3 Aktionen ohne semantische Bündel — bleiben flach, ohne Trenner. Trenner nur, wenn die Sektionen wirklich unterschiedliche Aktionstypen sind (z.B. „Form bestätigen/verwerfen" vs. „Datensatz-Lifecycle").
 
-**Referenz:** [public/partials/editor.html](public/partials/editor.html) (View-Mode: 3 Gruppen × run/mode/side; Edit-Mode: 2 Gruppen × commit/mode).
+**Referenz:** [public/partials/editor.html](public/partials/editor.html) (View-Mode: 3 Gruppen × run/mode/side; Edit-Mode: 2 Gruppen × commit/mode), [public/partials/plot-beat-cell.html](public/partials/plot-beat-cell.html) (Beat-Edit: commit-Paar ↔ verwerfen/löschen).
 
 ---
 

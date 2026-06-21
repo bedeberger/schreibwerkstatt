@@ -118,12 +118,21 @@
       </template>
     </div>
     <div class="plot-beat-edit-actions">
-      <button type="button" class="btn-compact" @click="saveEditBeat(beat)" :disabled="busy" x-text="$app.t('common.save')"></button>
-      <button type="button" class="btn-compact btn-compact--ghost" @click="cancelEditBeat()" x-text="$app.t('common.cancel')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditBeat(beat)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+      </button>
+      <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="cancelEditBeat()" :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+      </button>
+      <span class="action-sep" aria-hidden="true"></span>
       <!-- Verwerfen ist eine eigene Achse (Flag), kein Status — sofort persistiert. -->
-      <button type="button" class="btn-compact btn-compact--ghost plot-beat-discard"
+      <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-beat-discard"
+              :class="{ 'is-active': beat.verworfen }"
               @click="toggleBeatVerworfen(beat)"
-              x-text="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')"></button>
+              :data-tip="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')"
+              :aria-label="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')">
+        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=691#' + (beat.verworfen ? 'rotate-cw' : 'minus')"/></svg>
+      </button>
       <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger plot-beat-delete" @click="deleteBeat(beat)" :data-tip="$app.t('plot.beat.delete')" :aria-label="$app.t('plot.beat.delete')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
       </button>

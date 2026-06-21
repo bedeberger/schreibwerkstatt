@@ -130,6 +130,12 @@
     --col-accent: var(--card-accent);
     display: flex;
     align-items: flex-start;
+    /* Volle Zeilenhöhe (die Zeile ist flex-start → ohne Stretch bliebe die Lane nur
+       so hoch wie ihr Label/Icons). Höhere Zellen derselben Zeile scrollen beim
+       H-Scroll sonst unter der zu kurzen Lane in die Sticky-Spalte → Inhalt leckt
+       links durch. Stretch lässt den opaken Lane-Hintergrund die ganze Zeile decken;
+       align-items:flex-start hält den Lane-Inhalt oben. Pendant zu .plot-swim-corner. */
+    align-self: stretch;
     border-left: 3px solid var(--col-accent);
     border-right: 1px solid var(--color-border);
     border-radius: var(--radius-sm) 0 0 var(--radius-sm);

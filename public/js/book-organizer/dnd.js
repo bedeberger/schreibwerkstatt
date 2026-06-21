@@ -1,19 +1,15 @@
 // DnD-Slice: Sortable-Setup, Page-/Chapter-Drop-Handler.
 //
-// Sortable v1.15.6-Patch: `_onDragOver` kann auf einer destroyten Instanz
-// (this.el === null) feuern, wenn Alpine x-for nach einem Drop neu reconciliated.
-// Native dragover-Listener wird in destroy() vor el=null entfernt, aber zwischen
-// Alpine-Reordering und Sortable-State-Update treten gelegentlich stale Refs
-// auf. No-op auf null el statt zu crashen.
-function _patchSortableOnce(Sortable) {
-  if (Sortable.prototype._dragOverGuarded) return;
-  const orig = Sortable.prototype._onDragOver;
-  Sortable.prototype._onDragOver = function (evt) {
-    if (!this.el) return;
-    return orig.call(this, evt);
-  };
-  Sortable.prototype._dragOverGuarded = true;
-}
+// Geteilter SortableJS-Kern (Patch, Revert, Tuning, x-ignore) liegt in
+// [public/js/sortable-dnd.js] — beim Sortable-Bump dort verifizieren.
+
+import {
+  patchSortableOnce,
+  revertSortable,
+  markDragIgnore,
+  unmarkDragIgnore,
+  BASE_SORTABLE_OPTS,
+} from '../sortable-dnd.js';
 
 export const dndMethods = {
   _destroySortables() {
@@ -36,36 +32,17 @@ export const dndMethods = {
   _initSortables() {
     const Sortable = window.Sortable;
     if (!Sortable) return;
-    _patchSortableOnce(Sortable);
+    patchSortableOnce(Sortable);
     this._destroySortables();
-    // x-ignore auf das Drag-Item setzen, damit der via cloneNode(true) erzeugte
-    // Fallback-Ghost im <body> von Alpines MutationObserver übersprungen wird —
-    // sonst evaluiert Alpine `:value="page.name"` ausserhalb des x-for-Scopes
-    // und wirft "page is not defined". Nach Drag wieder entfernen.
-    const markIgnore = (evt) => evt.item?.setAttribute('x-ignore', '');
-    const unmarkIgnore = (evt) => evt.item?.removeAttribute('x-ignore');
-    // Präzisions-Tuning (gegen "Nachbar verrutscht beim Ziehen"-Bug):
-    // - forceFallback: konsistenter Klon-Ghost im <body>, umgeht HTML5-DnD-
-    //   Browser-Quirks (sprunghafter Cursor, ungenaue dragover-Targets).
-    // - swapThreshold 0.65: Swap erst, wenn Cursor 65% in Ziel-Item — Default
-    //   1.0 swappt schon bei minimaler Überlappung, dann "flackern" Nachbarn.
-    // - invertSwap: Backward-Drops in nested Listen werden stabil erkannt.
-    // - fallbackTolerance 5: 5px Bewegung nötig bevor Drag startet — Klick auf
-    //   Handle-Span löst nicht versehentlich Drag aus.
-    // - revertOnSpill: Drop außerhalb gültiger Liste (Toolbar, Empty-Bereich)
-    //   springt zurück statt Item-Loss.
-    // - direction vertical: Sortable optimiert Swap-Berechnung explizit.
+    // Geteiltes Präzisions-Tuning aus BASE_SORTABLE_OPTS (forceFallback-Ghost,
+    // swapThreshold 0.65 gegen Nachbar-Flackern, invertSwap für stabile Backward-
+    // Drops in nested Listen, revertOnSpill gegen Item-Loss). Board-spezifisch:
+    // - emptyInsertThreshold 8: restriktiverer Trefferradius als das Plot-Board.
+    // - scroll false: Organizer-Listen scrollen nicht beim Drag am Rand.
     // - chosenClass/ghostClass/dragClass: eigene CSS-Klassen für klares
     //   visuelles Feedback (Pickup-Highlight, Ghost-Slot, Hover-Karte).
     const baseOpts = {
-      animation: 0,
-      forceFallback: true,
-      fallbackOnBody: true,
-      fallbackTolerance: 5,
-      swapThreshold: 0.65,
-      invertSwap: true,
-      direction: 'vertical',
-      revertOnSpill: true,
+      ...BASE_SORTABLE_OPTS,
       emptyInsertThreshold: 8,
       scroll: false,
       chosenClass: 'organizer-chosen',
@@ -82,10 +59,10 @@ export const dndMethods = {
         handle: '.organizer-drag-handle--chapter',
         draggable: '.organizer-chapter',
         group: { name: 'chapters', pull: true, put: ['chapters'] },
-        onChoose: markIgnore,
-        onUnchoose: unmarkIgnore,
+        onChoose: markDragIgnore,
+        onUnchoose: unmarkDragIgnore,
         onMove: (evt) => this._validateChapterMove(evt),
-        onEnd: (evt) => { unmarkIgnore(evt); this._onChapterDrop(evt); },
+        onEnd: (evt) => { unmarkDragIgnore(evt); this._onChapterDrop(evt); },
       }));
     }
     const pageLists = this.$root.querySelectorAll('[data-organizer="page-list"]');
@@ -95,9 +72,9 @@ export const dndMethods = {
         handle: '.organizer-drag-handle',
         draggable: '.organizer-page',
         group: { name: 'pages', pull: true, put: ['pages'] },
-        onChoose: markIgnore,
-        onUnchoose: unmarkIgnore,
-        onEnd: (evt) => { unmarkIgnore(evt); this._onPageDrop(evt); },
+        onChoose: markDragIgnore,
+        onUnchoose: unmarkDragIgnore,
+        onEnd: (evt) => { unmarkDragIgnore(evt); this._onPageDrop(evt); },
       }));
     }
   },
@@ -130,44 +107,6 @@ export const dndMethods = {
     return parseInt(raw, 10) || 0;
   },
 
-  // Nimmt Sortables physischen DOM-Move zurück (Node zurück in Quell-Container an
-  // alten Index). Pflicht vor jeder Modell-Mutation: SortableJS und Alpine x-for
-  // besitzen sonst dieselben <li>/<div>-Nodes doppelt — verschiebt Sortable einen
-  // Node über Container-Grenzen, zeigt Alpines key→el-Map einer anderen x-for-
-  // Scope weiterhin auf ihn → Orphan/Duplikat-Nodes, driftender DOM, falsche
-  // Positionen. Nach Revert ist Alpine alleiniger DOM-Besitzer; das Modell (unten
-  // mutiert) ist die Wahrheit, x-for rendert daraus neu.
-  // Draggable-Space-Index eines Elements innerhalb seines Parents — zählt
-  // exakt wie SortableJS' internes index() (Template-Anker + Clone übersprungen),
-  // damit Revert-Refs im selben Indexraum wie evt.oldIndex/newIndex liegen.
-  _sortableIndexOf(el) {
-    let idx = 0;
-    let cur = el;
-    while ((cur = cur.previousElementSibling)) {
-      if (cur.tagName !== 'TEMPLATE') idx++;
-    }
-    return idx;
-  },
-
-  _revertSortable(evt) {
-    const { item, from, oldIndex } = evt;
-    if (!item || !from || !Number.isFinite(oldIndex)) return;
-    // Schon am richtigen Slot? (Index im SortableJS-Raum vergleichen, nicht im
-    // rohen from.children-Raum — Alpines <template x-for> ist immer erstes Kind
-    // und verschiebt die rohe HTMLCollection um 1 gegen evt.oldIndex.)
-    if (item.parentNode === from && this._sortableIndexOf(item) === oldIndex) return;
-    // Referenz-Knoten am draggable-Slot oldIndex finden — Template (und das
-    // gezogene Item selbst, falls noch in `from`) beim Zählen überspringen.
-    let ref = null;
-    let idx = 0;
-    for (const child of from.children) {
-      if (child === item || child.tagName === 'TEMPLATE') continue;
-      if (idx === oldIndex) { ref = child; break; }
-      idx++;
-    }
-    from.insertBefore(item, ref); // ref===null → ans Ende
-  },
-
   _setSubtreeDepth(node, depth) {
     node.depth = depth;
     for (const sub of (node.subchapters || [])) this._setSubtreeDepth(sub, depth + 1);
@@ -181,7 +120,7 @@ export const dndMethods = {
     if (!Number.isFinite(movedId)) return;
     const before = this._snapshotWorkstate();
 
-    this._revertSortable(evt);
+    revertSortable(evt);
 
     const toParentId = parseInt(evt.to?.dataset?.parentChapterId, 10) || null;
     const targetDepth = parseInt(evt.to?.dataset?.organizerDepth, 10) || 1;
@@ -217,7 +156,7 @@ export const dndMethods = {
     const toChapId = this._parseChapterIdAttr(evt.to);
     const pageId = parseInt(evt.item.dataset.pageId, 10);
 
-    this._revertSortable(evt);
+    revertSortable(evt);
 
     const pageObj = this._removePageFromBucket(fromChapId, pageId);
     if (!pageObj) return;
