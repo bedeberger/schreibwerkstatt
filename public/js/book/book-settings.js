@@ -28,6 +28,7 @@ export const bookSettingsMethods = {
       this.bookSettingsGoalDeadline       = data.goal_deadline || '';
       this.bookSettingsOrteReal           = !!data.orte_real;
       this.bookSettingsSchauplatzLand     = data.schauplatz_land || '';
+      this.bookSettingsZeitlinieReal      = !!data.zeitlinie_real;
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -148,6 +149,7 @@ export const bookSettingsMethods = {
           goal_deadline:     this.bookSettingsGoalDeadline || null,
           orte_real:         this.bookSettingsOrteReal ? 1 : 0,
           schauplatz_land:   this.bookSettingsSchauplatzLand || null,
+          zeitlinie_real:    this.bookSettingsZeitlinieReal ? 1 : 0,
         }),
       });
       if (!r.ok) {

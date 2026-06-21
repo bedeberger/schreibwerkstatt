@@ -11,6 +11,9 @@ export function registerCatalogStore() {
     songs: [],
     szenen: [],
     globalZeitstrahl: [],
+    // Abgeleitete Jahres-Kennzahlen der Zeitstrahl-Ansicht (nur bei
+    // book_settings.zeitlinie_real befüllt, sonst null). Siehe ereignisse.js.
+    zeitstrahlChronology: null,
 
     clear() {
       this.figuren = [];
@@ -18,6 +21,7 @@ export function registerCatalogStore() {
       this.songs = [];
       this.szenen = [];
       this.globalZeitstrahl = [];
+      this.zeitstrahlChronology = null;
     },
   });
 }

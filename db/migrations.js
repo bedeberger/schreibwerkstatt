@@ -8378,6 +8378,22 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 211 abgeschlossen (plot_beats: Status binaer geplant/im_buch + verworfen-Flag).');
   }
 
+  if (version < 212) {
+    // "Echte Zeitlinie": kennzeichnet Romane mit realer, kalendarischer
+    // Chronologie (analog orte_real fuer reale Schauplaetze). Gate fuer die
+    // Jahres-Anzeige in der Zeitstrahl-Ansicht.
+    const bsCols212 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols212.includes('zeitlinie_real')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN zeitlinie_real INTEGER NOT NULL DEFAULT 0');
+    }
+    const fkErrors212 = db.pragma('foreign_key_check');
+    if (fkErrors212.length) {
+      throw new Error(`Migration 212: foreign_key_check meldet ${fkErrors212.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 212').run();
+    logger.info('DB-Migration auf Version 212 abgeschlossen (book_settings.zeitlinie_real).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

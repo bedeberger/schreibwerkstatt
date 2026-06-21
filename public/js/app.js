@@ -361,6 +361,8 @@ document.addEventListener('alpine:init', () => {
     set szenen(v) { Alpine.store('catalog').szenen = v; },
     get globalZeitstrahl() { return Alpine.store('catalog').globalZeitstrahl; },
     set globalZeitstrahl(v) { Alpine.store('catalog').globalZeitstrahl = v; },
+    get zeitstrahlChronology() { return Alpine.store('catalog').zeitstrahlChronology; },
+    set zeitstrahlChronology(v) { Alpine.store('catalog').zeitstrahlChronology = v; },
 
     // ── Computed ─────────────────────────────────────────────────────────────
     // Admin-only View: Globaler Admin (global_role='admin') bekommt eine

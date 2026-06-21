@@ -1,5 +1,6 @@
 const express = require('express');
-const { db, saveFigurenToDb, saveZeitstrahlEvents, getChapterFigures } = require('../db/schema');
+const { db, saveFigurenToDb, saveZeitstrahlEvents, getChapterFigures, getBookSettings } = require('../db/schema');
+const { ensureTree } = require('../db/book-order');
 const { recomputeBookFigureMentions } = require('../lib/page-index');
 const { toIntId, inClause } = require('../lib/validate');
 const { aclParamGuard } = require('../lib/acl');
@@ -12,6 +13,53 @@ const router = express.Router();
 // und Viewer sehen die Karten nicht — Server folgt der Frontend-Sicht.
 router.param('book_id', aclParamGuard('editor'));
 const jsonBody = express.json();
+
+// Lese-Reihenfolge: globaler Ordinalwert je Kapitel/Seite aus dem book_order-Tree
+// (Depth-First). Brücke, um zu einer Event-Referenz (chapter_id/page_id) die
+// Position im Manuskript zu bestimmen.
+function _readingOrdinalMap(bookId) {
+  const order = ensureTree(bookId);
+  const map = new Map();
+  let i = 0;
+  (function walk(nodes) {
+    for (const n of (nodes || [])) {
+      if (n.type === 'chapter') { map.set('c' + n.id, i++); walk(n.children); }
+      else if (n.type === 'page') { map.set('p' + n.id, i++); }
+    }
+  })(order?.tree || []);
+  return map;
+}
+
+// "In welchem Jahr stecken die Figuren?" — abgeleitet aus den sicher datierten
+// Zeitstrahl-Events (datum_unsicher === false, datum_year gesetzt).
+//   minYear/maxYear  → Jahres-Spektrum des Romans (Start inkl. Spannen-Ende)
+//   endYear          → Jahr des Events, das der zuletzt geschriebenen Manuskript-
+//                      Stelle am nächsten liegt ("wo ich aufgehört habe")
+// null, wenn es keine sicher datierten Events gibt. Abgeleitete Jahre
+// (datum_unsicher) fliessen bewusst NICHT ein.
+function _computeChronology(bookId, events) {
+  const secure = (events || []).filter(e => !e.datum_unsicher && e.datum_year != null);
+  if (!secure.length) return null;
+  let minYear = Infinity, maxYear = -Infinity;
+  for (const e of secure) {
+    if (e.datum_year < minYear) minYear = e.datum_year;
+    const end = e.datum_ende_year != null ? e.datum_ende_year : e.datum_year;
+    if (end > maxYear) maxYear = end;
+  }
+  const ordinal = _readingOrdinalMap(bookId);
+  let bestOrd = -1, endYear = null;
+  for (const e of secure) {
+    let ord = -1;
+    for (const cid of (e.chapter_ids || [])) { const o = ordinal.get('c' + cid); if (o != null && o > ord) ord = o; }
+    for (const pid of (e.page_ids || []))    { const o = ordinal.get('p' + pid); if (o != null && o > ord) ord = o; }
+    if (ord < 0) continue;
+    if (ord > bestOrd || (ord === bestOrd && e.datum_year > endYear)) { bestOrd = ord; endYear = e.datum_year; }
+  }
+  // Kein Event mit Manuskript-Position (z.B. nur Figuren-Events ohne Verortung):
+  // Fallback auf das späteste Story-Jahr.
+  if (endYear == null) endYear = maxYear;
+  return { minYear, maxYear, endYear };
+}
 
 // Konsolidierten Zeitstrahl eines Buchs laden (vor /:book_id definiert um Konflikte zu vermeiden)
 router.get('/zeitstrahl/:book_id', (req, res) => {
@@ -125,7 +173,11 @@ router.get('/zeitstrahl/:book_id', (req, res) => {
     page_ids:         pgByEvt.get(r.id)?.page_ids    || [],
     figuren:          fgByEvt.get(r.id) || [],
   }));
-  res.json({ ereignisse });
+
+  // Jahres-Anzeige nur bei Romanen mit "echter Zeitlinie" (book_settings.zeitlinie_real).
+  const { zeitlinie_real } = getBookSettings(bookId, userEmail);
+  const chronology = zeitlinie_real ? _computeChronology(bookId, ereignisse) : null;
+  res.json({ ereignisse, chronology });
 });
 
 // Szenen eines Buchs laden (vor /:book_id definiert um Konflikte zu vermeiden)

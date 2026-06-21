@@ -19,6 +19,19 @@
     </div>
   </div>
 
+  <!-- Jahres-Stand (nur bei „echter Zeitlinie" in den Buch-Einstellungen) -->
+  <div class="gz-chronology" x-show="$app.zeitstrahlChronology && $app.globalZeitstrahl.length > 0" x-cloak>
+    <div class="gz-chronology-stat">
+      <span class="gz-chronology-label" x-text="$app.t('events.chronologyEnd')"></span>
+      <span class="gz-chronology-value" x-text="$app.zeitstrahlChronology?.endYear"></span>
+    </div>
+    <div class="gz-chronology-stat">
+      <span class="gz-chronology-label" x-text="$app.t('events.chronologySpan')"></span>
+      <span class="gz-chronology-value"
+            x-text="$app.zeitstrahlChronology ? ($app.zeitstrahlChronology.minYear === $app.zeitstrahlChronology.maxYear ? $app.zeitstrahlChronology.minYear : $app.zeitstrahlChronology.minYear + '–' + $app.zeitstrahlChronology.maxYear) : ''"></span>
+    </div>
+  </div>
+
   <!-- Fortschritt Ermittlung -->
   <div x-show="ereignisseLoading && ereignisseProgress > 0" class="progress-bar-wrap">
     <div class="progress-bar" :style="{ '--progress': ereignisseProgress + '%' }"></div>

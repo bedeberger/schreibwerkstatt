@@ -51,6 +51,7 @@ export function registerBookSettingsCard() {
     bookSettingsGoalDeadline: '',
     bookSettingsOrteReal: false,
     bookSettingsSchauplatzLand: '',
+    bookSettingsZeitlinieReal: false,
     // Sharing: Access-Liste + Invite-Form.
     bookAccessList: [],
     bookAccessLoading: false,
