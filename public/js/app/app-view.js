@@ -107,29 +107,11 @@ export const appViewMethods = {
 
     this._loadPageBadgeCounts(p.id);
 
-    // Seiteninhalt laden und als formatiertes HTML rendern
-    try {
-      let pd = await contentRepo.loadPage(p.id);
-      // Stale-Check: Wenn der Tree-Eintrag (`p.updated_at`, kann selbst aus
-      // SW-Cache stammen) jünger ist als die Detail-Antwort, hat der SW eine
-      // veraltete Version geliefert → einmalig mit __fresh nachziehen.
-      if (p.updated_at && pd.updated_at && new Date(pd.updated_at) < new Date(p.updated_at)) {
-        pd = await contentRepo.loadPage(p.id, { fresh: true });
-      }
-      const html = pd.html || '';
-      this.originalHtml = html;
-      this.renderedPageHtml = decorateMentions(html);
-      this._updatePageViewHeight();
-      // Listing-Cache kann stale sein (Page-Save aktualisiert ihn nicht).
-      if (pd.updated_at) p.updated_at = pd.updated_at;
-      this.currentPageEmpty = !htmlToText(html).trim();
-      this.pageLastEditor = this._resolvePageLastEditor(pd.last_editor);
-      this.analysisOut = '';
-      this._refreshPendingDraft(p.id, html);
-    } catch (e) {
-      console.error('[selectPage load-page]', e);
-      this.setStatus(this.t('chat.pageLoadFailed'));
-    }
+    // Seiteninhalt laden und als formatiertes HTML rendern. Fehler landen
+    // nicht still in einer leeren Seite, sondern in einem Retry-Block
+    // (pageLoadError) — inkl. einmaligem stillem Auto-Retry mit Cache-Bypass.
+    this.analysisOut = '';
+    await this._loadCurrentPageContent(p);
 
     // Prüfen ob ein Lektorat-Check-Job für diese Seite läuft (Server-seitig oder aus früherer Session)
     try {
@@ -181,20 +163,82 @@ export const appViewMethods = {
     return { device_name: le.device_name, updated_at: le.updated_at || null };
   },
 
+  // Page-Detail-Antwort in den Render-State übernehmen. Geteilt von
+  // selectPage-Load und _refetchCurrentPage, damit beide Pfade exakt dieselben
+  // Felder setzen (kein Drift). `p` ist die Page (currentPage).
+  _applyPageData(p, pd) {
+    const html = pd.html || '';
+    this.originalHtml = html;
+    this.renderedPageHtml = decorateMentions(html);
+    this._updatePageViewHeight();
+    // Listing-Cache kann stale sein (Page-Save aktualisiert ihn nicht).
+    if (pd.updated_at) p.updated_at = pd.updated_at;
+    this.currentPageEmpty = !htmlToText(html).trim();
+    this.pageLastEditor = this._resolvePageLastEditor(pd.last_editor);
+    this._refreshPendingDraft(p.id, html);
+    return html;
+  },
+
+  // Seiteninhalt für `p` laden und rendern. Bei Ladefehler einmaliger stiller
+  // Auto-Retry mit Cache-Bypass (`fresh`) — deckt transiente Netz-/SW-Cache-
+  // Zustände ab (typisch direkt nach Deploy). Schlägt auch der Retry fehl,
+  // wird `pageLoadError` gesetzt → View zeigt Retry-Block statt leerer Seite.
+  // `auto`=false unterdrückt den stillen Retry (manueller Retry-Button).
+  async _loadCurrentPageContent(p, { auto = true } = {}) {
+    const pageId = p.id;
+    this.pageLoadError = false;
+    try {
+      let pd = await contentRepo.loadPage(pageId);
+      // Während des await kann der User weggewechselt haben → nichts anwenden.
+      if (this.currentPage?.id !== pageId) return true;
+      // Stale-Check: Wenn der Tree-Eintrag (`p.updated_at`, kann selbst aus
+      // SW-Cache stammen) jünger ist als die Detail-Antwort, hat der SW eine
+      // veraltete Version geliefert → einmalig mit `fresh` nachziehen.
+      if (p.updated_at && pd.updated_at && new Date(pd.updated_at) < new Date(p.updated_at)) {
+        pd = await contentRepo.loadPage(pageId, { fresh: true });
+        if (this.currentPage?.id !== pageId) return true;
+      }
+      this._applyPageData(p, pd);
+      return true;
+    } catch (e) {
+      console.error('[selectPage load-page]', e);
+      if (this.currentPage?.id !== pageId) return false;
+      if (auto) {
+        try {
+          const pd = await contentRepo.loadPage(pageId, { fresh: true });
+          if (this.currentPage?.id !== pageId) return false;
+          this._applyPageData(p, pd);
+          return true;
+        } catch (e2) {
+          console.error('[selectPage load-page retry]', e2);
+          if (this.currentPage?.id !== pageId) return false;
+        }
+      }
+      this.pageLoadError = true;
+      this.setStatus(this.t('chat.pageLoadFailed'));
+      return false;
+    }
+  },
+
+  // Aus dem Retry-Block im View-Modus: Seiteninhalt erneut laden (Cache-Bypass
+  // via `fresh` greift im stillen Auto-Retry-Zweig von _loadCurrentPageContent).
+  async retryLoadPage() {
+    if (!this.currentPage || this._retryingPageLoad) return;
+    this._retryingPageLoad = true;
+    try {
+      await this._loadCurrentPageContent(this.currentPage);
+    } finally {
+      this._retryingPageLoad = false;
+    }
+  },
+
   async _refetchCurrentPage() {
     if (!this.currentPage) return;
     const pageId = this.currentPage.id;
     try {
       const pd = await contentRepo.loadPage(pageId, { fresh: true });
       if (this.currentPage?.id !== pageId) return;
-      const html = pd.html || '';
-      this.originalHtml = html;
-      this.renderedPageHtml = decorateMentions(html);
-      this._updatePageViewHeight();
-      if (pd.updated_at) this.currentPage.updated_at = pd.updated_at;
-      this.currentPageEmpty = !htmlToText(html).trim();
-      this.pageLastEditor = this._resolvePageLastEditor(pd.last_editor);
-      this._refreshPendingDraft(pageId, html);
+      const html = this._applyPageData(this.currentPage, pd);
       // Findings/Marks erhalten: ohne Refilter würden Marks beim Refetch
       // (Re-Klick, Collab-Remote-Edit, Revision-Restore) verschwinden, obwohl
       // `checkDone` + `lektoratFindings` noch gesetzt sind.
@@ -538,6 +582,7 @@ export const appViewMethods = {
     this.currentPage = null;
     this.pageLastEditor = null;
     this.currentPageEmpty = false;
+    this.pageLoadError = false;
     this.currentPageIdeenOpenCount = 0;
     this.currentPageRechercheCount = 0;
     this.currentPageChatSessionCount = 0;

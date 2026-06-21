@@ -2000,6 +2000,7 @@
   "editor.btn.checkTitle":       "Lektorat starten (Strg+Enter)",
   "editor.btn.pageEmpty":        "Seite ist leer",
   "editor.btn.deleteEmptyPage":  "Leere Seite löschen",
+  "editor.btn.retryLoad":        "Erneut laden",
   "editor.emptyPageHint":        "Diese Seite ist leer.",
   "editor.btn.edit":             "Bearbeiten",
   "editor.btn.editTitle":        "Text manuell bearbeiten",

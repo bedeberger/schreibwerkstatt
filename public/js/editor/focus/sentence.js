@@ -85,22 +85,35 @@ export function applySentenceHighlight(block, selection) {
   if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') return;
   CSS.highlights.delete('focus-sentence-dim');
   if (!block) return;
-  const info = findSentenceAtCaret(block, selection);
-  if (!info) return;
-  const [s, e] = info.sentence;
   const text = block.textContent || '';
-  const ranges = [];
+  let active = null;
+  const info = findSentenceAtCaret(block, selection);
+  if (info) {
+    active = info.sentence;
+  } else {
+    // Caret sitzt nicht in diesem Block — passiert beim manuellen Scroll
+    // (preferCenter: aktiver Block kommt aus der Viewport-Mitte, der Caret
+    // steht noch im alten Block) oder ohne Selection. Ersten Satz als „aktiv"
+    // nehmen, damit das Satz-Dimming sichtbar bleibt, statt den ganzen Block
+    // voll aufleuchten zu lassen (sonst stünden 3 Grautöne nebeneinander:
+    // andere Blöcke gedimmt, zentraler Block voll hell, kein Satz-Spotlight).
+    const sentences = findSentenceRanges(text);
+    if (sentences.length === 0) return;
+    active = sentences[0];
+  }
+  const [s, e] = active;
+  const dimRanges = [];
   if (s > 0) {
     const r = rangeFromOffsets(block, 0, s);
-    if (r) ranges.push(r);
+    if (r) dimRanges.push(r);
   }
   if (e < text.length) {
     const r = rangeFromOffsets(block, e, text.length);
-    if (r) ranges.push(r);
+    if (r) dimRanges.push(r);
   }
-  if (ranges.length === 0) return;
+  if (dimRanges.length === 0) return;
   try {
-    const hl = new Highlight(...ranges);
+    const hl = new Highlight(...dimRanges);
     CSS.highlights.set('focus-sentence-dim', hl);
   } catch { /* unsupported / Range invalid */ }
 }

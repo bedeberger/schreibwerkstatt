@@ -1999,6 +1999,7 @@
   "editor.btn.checkTitle":       "Run check (Ctrl+Enter)",
   "editor.btn.pageEmpty":        "Page is empty",
   "editor.btn.deleteEmptyPage":  "Delete empty page",
+  "editor.btn.retryLoad":        "Reload",
   "editor.emptyPageHint":        "This page is empty.",
   "editor.btn.edit":             "Edit",
   "editor.btn.editTitle":        "Edit text manually",

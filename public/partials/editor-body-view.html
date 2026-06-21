@@ -47,8 +47,19 @@
   </template>
 </div>
 
+<!-- Lade-Fehler im View-Modus: Seiteninhalt konnte nicht geladen werden
+     (Netz-/SW-Cache-Fehler). Sichtbarer Retry statt stiller leerer Seite. -->
+<div class="page-load-error"
+     x-show="!editMode && currentPage && pageLoadError"
+     x-cloak>
+  <span class="page-load-error__text" x-text="t('chat.pageLoadFailed')"></span>
+  <button type="button" @click="retryLoadPage()"
+          :disabled="_retryingPageLoad"
+          x-text="t('editor.btn.retryLoad')"></button>
+</div>
+
 <div class="page-empty-state"
-     x-show="!editMode && currentPage && currentPageEmpty && originalHtml !== null"
+     x-show="!editMode && currentPage && currentPageEmpty && !pageLoadError && originalHtml !== null"
      x-cloak>
   <span class="page-empty-state__text" x-text="t('editor.emptyPageHint')"></span>
   <template x-if="canEdit()">

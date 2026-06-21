@@ -198,6 +198,13 @@ const pageState = () => ({
   // null = kein Hint (eigener Browser, fehlende Daten oder fremder User).
   pageLastEditor: null,
   currentPageEmpty: false,
+  // true, wenn der Seiteninhalt nicht geladen werden konnte (Netz-/SW-Cache-
+  // Fehler beim Öffnen). Zeigt im View-Modus einen Retry-Block statt einer
+  // stillen leeren Seite. Wird bei jedem Ladeversuch (selectPage/Retry) genullt.
+  pageLoadError: false,
+  // Re-Entry-Guard für den manuellen Retry-Button (deaktiviert ihn während des
+  // Ladens). Im Template gebunden → muss explizit deklariert sein.
+  _retryingPageLoad: false,
   currentPageIdeenOpenCount: 0,
   currentPageRechercheCount: 0,
   currentPageChatSessionCount: 0,
