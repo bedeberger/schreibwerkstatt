@@ -2,7 +2,7 @@
 // Stränge/Swimlanes, Hybrid-Akte, Grid-Render-Plan, Spannungsbogen, Filter.
 // Reine Compute aus Board-State, keine Server-Mutationen.
 
-import { STATUSES, ACT_PALETTE, _intensityBottomPct } from './constants.js';
+import { STATUSES, DIST_SEGMENTS, ACT_PALETTE, _intensityBottomPct } from './constants.js';
 
 // Schwere-Rangfolge (höher = gravierender) für die Badge-Farbwahl am Beat.
 const SEV_RANK = { kritisch: 5, stark: 4, mittel: 3, schwach: 2, niedrig: 1 };
@@ -35,11 +35,16 @@ export const derivedMethods = {
     return this._memo('stats', [this.beats], () => this._computeStats(this.beats || []));
   },
 
-  // Status-Zählung über eine Beat-Liste (board-weit oder pro Akt). imBuch/geplant
-  // bleiben als Top-Level-Felder erhalten (von plot.stats-i18n konsumiert).
+  // Status-Zählung über eine Beat-Liste (board-weit oder pro Akt). geplant/im_buch
+  // zählen nur aktive (nicht verworfene) Beats; verworfen ist eine eigene Achse
+  // (Flag) und wird separat gezählt — die drei Segmente summieren sich zu total.
+  // imBuch/geplant bleiben als Top-Level-Felder erhalten (von plot.stats-i18n konsumiert).
   _computeStats(list) {
-    const by = { geplant: 0, entwurf: 0, im_buch: 0, verworfen: 0 };
-    for (const b of list) if (by[b.status] != null) by[b.status]++;
+    const by = { geplant: 0, im_buch: 0, verworfen: 0 };
+    for (const b of list) {
+      if (b.verworfen) by.verworfen++;
+      else if (by[b.status] != null) by[b.status]++;
+    }
     return { total: list.length, by, imBuch: by.im_buch, geplant: by.geplant };
   },
 
@@ -50,6 +55,10 @@ export const derivedMethods = {
   },
 
   statusList() { return STATUSES; },
+
+  // Segmente der board-weiten/akt-weiten Verteilungsleiste (zwei Status + die
+  // Verwerfen-Achse). Eigene Liste, damit die Edit-Status-Tabs binär bleiben.
+  distStatusList() { return DIST_SEGMENTS; },
 
   // ── Figuren-Picker (gruppierte Combobox-Optionen) ───────────────────────────
   // Katalog-Figuren als Multi-Select-Combobox-Optionen, gruppiert nach Kapitel
@@ -248,7 +257,7 @@ export const derivedMethods = {
       // Eine Punkt-Reihe aus einer Beat-Teilmenge (verworfene + ohne Intensität raus).
       const _line = (subset, color) => {
         const seq = subset
-          .filter(b => b.status !== 'verworfen' && b.intensitaet != null)
+          .filter(b => !b.verworfen && b.intensitaet != null)
           .sort(order);
         const n = seq.length;
         const pts = seq.map((b, k) => {
@@ -263,7 +272,7 @@ export const derivedMethods = {
       };
 
       // Globale Kurve (alle Beats, Akt-Akzent pro Punkt) — Board ohne Stränge.
-      const all = (this.beats || []).filter(b => b.status !== 'verworfen' && b.intensitaet != null).sort(order);
+      const all = (this.beats || []).filter(b => !b.verworfen && b.intensitaet != null).sort(order);
       const nAll = all.length;
       const points = all.map((b, k) => {
         const act = actById.get(b.act_id) || null;
@@ -294,11 +303,11 @@ export const derivedMethods = {
   visibleBeatsForAct(actId) {
     const base = this.filteredBeatsForAct(actId);
     if (this.verworfenOpen[actId]) return base;
-    return this._memo(`vbeats:${actId}`, [base], () => base.filter(b => b.status !== 'verworfen'));
+    return this._memo(`vbeats:${actId}`, [base], () => base.filter(b => !b.verworfen));
   },
 
   verworfenCountForAct(actId) {
-    return this.filteredBeatsForAct(actId).filter(b => b.status === 'verworfen').length;
+    return this.filteredBeatsForAct(actId).filter(b => b.verworfen).length;
   },
 
   toggleVerworfen(actId) {
@@ -356,7 +365,7 @@ export const derivedMethods = {
       const chapters = tree.filter(it => it.type === 'chapter');
       const covered = new Set((this.beats || []).map(b => b.chapter_name).filter(Boolean));
       const uncovered = chapters.filter(c => !covered.has(c.name)).map(c => c.name);
-      const beatsNoChapter = (this.beats || []).filter(b => !b.chapter_name && b.status !== 'verworfen').length;
+      const beatsNoChapter = (this.beats || []).filter(b => !b.chapter_name && !b.verworfen).length;
       return { uncovered, beatsNoChapter, totalChapters: chapters.length };
     });
   },
@@ -377,7 +386,7 @@ export const derivedMethods = {
 
   plotFilterActive() {
     const f = this.plotFilters;
-    return !!(f.kapitel || f.figurId || f.draftFigurId || (f.text || '').trim());
+    return !!(f.kapitel || f.figurId || f.draftFigurId || f.status || (f.text || '').trim());
   },
 
   _beatMatchesFilter(b) {
@@ -387,6 +396,7 @@ export const derivedMethods = {
     // koerziert vergleichen, da draft_fig_ids INTEGER sind.
     return (!txt || (b.titel || '').toLowerCase().includes(txt) || (b.beschreibung || '').toLowerCase().includes(txt)) &&
            (!f.kapitel || b.chapter_name === f.kapitel) &&
+           (!f.status || b.status === f.status) &&
            (!f.figurId || (b.fig_ids || []).includes(f.figurId)) &&
            (!f.draftFigurId || (b.draft_fig_ids || []).map(String).includes(String(f.draftFigurId)));
   },
@@ -397,13 +407,13 @@ export const derivedMethods = {
     const f = this.plotFilters;
     const base = this.beatsForAct(actId);
     if (!this.plotFilterActive()) return base;
-    return this._memo(`fbeats:${actId}`, [base, f.kapitel, f.figurId, f.draftFigurId, f.text], () =>
+    return this._memo(`fbeats:${actId}`, [base, f.kapitel, f.figurId, f.draftFigurId, f.status, f.text], () =>
       base.filter(b => this._beatMatchesFilter(b)));
   },
 
   filteredBeatCount() {
     const f = this.plotFilters;
-    return this._memo('fcount', [this.beats, f.kapitel, f.figurId, f.draftFigurId, f.text], () =>
+    return this._memo('fcount', [this.beats, f.kapitel, f.figurId, f.draftFigurId, f.status, f.text], () =>
       (this.beats || []).filter(b => this._beatMatchesFilter(b)).length);
   },
 
@@ -415,7 +425,7 @@ export const derivedMethods = {
     const base = this.beatsForCell(actId, threadId);
     if (!this.plotFilterActive()) return base;
     const tid = threadId == null ? null : threadId;
-    return this._memo(`fcell:${actId}:${tid}`, [base, f.kapitel, f.figurId, f.draftFigurId, f.text], () =>
+    return this._memo(`fcell:${actId}:${tid}`, [base, f.kapitel, f.figurId, f.draftFigurId, f.status, f.text], () =>
       base.filter(b => this._beatMatchesFilter(b)));
   },
 };

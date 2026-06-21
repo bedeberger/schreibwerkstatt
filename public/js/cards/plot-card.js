@@ -46,7 +46,7 @@ export function registerPlotCard() {
     // Filter (Kapitel / Figur / Werkstatt-Figur) — wie szenen/ereignisse; filtert
     // die Beats pro Akt-Spalte rein fürs Rendering (beatsForAct bleibt ungefiltert
     // für Drag&Drop + Order-Persistenz).
-    plotFilters: { kapitel: '', figurId: '', draftFigurId: '', text: '' },
+    plotFilters: { kapitel: '', figurId: '', draftFigurId: '', status: '', text: '' },
 
     // Beat-Edit / -Add
     editingBeatId: null,

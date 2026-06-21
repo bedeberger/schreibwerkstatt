@@ -57,7 +57,7 @@
 
       <!-- Mini-Fortschritt: Status-Verteilung dieses Akts -->
       <div class="plot-dist-bar plot-dist-bar--mini" x-show="actStats(act.id).total > 0">
-        <template x-for="s in statusList()" :key="s">
+        <template x-for="s in distStatusList()" :key="s">
           <div class="plot-dist-seg" :class="'plot-dist-seg--' + s"
                x-show="actStats(act.id).by[s] > 0"
                :style="{ '--seg-grow': actStats(act.id).by[s] }"
@@ -73,7 +73,7 @@
         <div class="plot-beats" data-plot-cell :data-act-id="act.id">
           <template x-for="beat in visibleBeatsForAct(act.id)" :key="beat.id">
             <div class="plot-beat" :data-beat-id="beat.id"
-                 :class="{ ['plot-beat--' + beat.status]: true, 'plot-beat--editing': editingBeatId === beat.id }">
+                 :class="{ ['plot-beat--' + beat.status]: true, 'plot-beat--verworfen': !!beat.verworfen, 'plot-beat--editing': editingBeatId === beat.id }">
 
               <!-- Beat-Karte (Ansicht + Bearbeiten) — geteilt mit dem Grid-Board.
                    SSoT: plot-beat-cell.html (string-seitiger Fragment-Include). -->

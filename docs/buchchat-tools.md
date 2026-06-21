@@ -117,7 +117,7 @@ Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([l
 
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
-| `get_plot_board` | `status?` (`geplant`/`entwurf`/`im_buch`/`verworfen`), `act_id?` | Geplantes Beat-Board (vorwärtsgerichtete Planung, getrennt vom geschriebenen Text): Akte → Beats mit Titel, Beschreibung (Preview 600 Zeichen), Status, Zielkapitel (`chapter_name`), beteiligte Katalog- + Werkstatt-Figuren (auf Namen aufgelöst). `status_counts` = Gesamtverteilung über alle Beats (immer, vor Filter). Pro Buch + User. Leeres Board → `hint` statt Fehler. | `plot_acts` + `plot_beats` (via [db/plot.js](../db/plot.js)) + `figures`/`draft_figures` (Namens-Maps) |
+| `get_plot_board` | `status?` (`geplant`/`im_buch`), `act_id?` | Geplantes Beat-Board (vorwärtsgerichtete Planung, getrennt vom geschriebenen Text): Akte → Beats mit Titel, Beschreibung (Preview 600 Zeichen), Status (binär; `verworfen` als eigenes Flag pro Beat), Zielkapitel (`chapter_name`), beteiligte Katalog- + Werkstatt-Figuren (auf Namen aufgelöst). `status_counts` = Gesamtverteilung über alle Beats inkl. `verworfen`-Zählung (immer, vor Filter). Pro Buch + User. Leeres Board → `hint` statt Fehler. | `plot_acts` + `plot_beats` (via [db/plot.js](../db/plot.js)) + `figures`/`draft_figures` (Namens-Maps) |
 
 ### Endpunkt
 

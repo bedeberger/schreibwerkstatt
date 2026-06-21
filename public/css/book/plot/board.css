@@ -136,13 +136,29 @@
     border-left: 3px solid var(--color-muted);
     border-radius: var(--radius-sm);
     padding: var(--space-sm);
-    cursor: grab;
     transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
   }
   .plot-beat:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-  .plot-beat:active { cursor: grabbing; }
+
+  /* ── Drag-Griff (einzige Greiffläche; SortableJS handle) ────────────────────
+     Dezent, bis die Karte gehovert wird; dann deutlich greifbar. `grab`-Cursor
+     nur hier — die restliche Karte bleibt klick-fokussiert. touch-action:none
+     lässt den Fallback-Drag (forceFallback) auch auf Touch sauber starten. */
+  .plot-beat-grip {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    margin: -2px var(--space-3) 0 calc(-1 * var(--space-3));
+    color: var(--color-border);
+    cursor: grab;
+    touch-action: none;
+    transition: color var(--transition-fast);
+  }
+  .plot-beat:hover .plot-beat-grip { color: var(--color-muted); }
+  .plot-beat-grip:hover { color: var(--color-text); }
+  .plot-beat-grip:active { cursor: grabbing; }
+  .plot-beat-grip .icon { width: 16px; height: 16px; }
   .plot-beat--geplant   { border-left-color: var(--color-muted); }
-  .plot-beat--entwurf   { border-left-color: var(--color-warn-text); }
   .plot-beat--im_buch   { border-left-color: var(--color-ok-border); }
   .plot-beat--verworfen { border-left-color: var(--color-border); opacity: 0.6; }
   /* Karte im Edit-Modus nicht ziehen (Textauswahl/Inputs) — SortableJS filtert
@@ -230,24 +246,6 @@
     margin-top: var(--space-xs);
   }
 
-  /* ── Status-Badge (eckig, klickbar = zyklisch) ──────────────────────────── */
-  .plot-status-tag {
-    flex: 0 0 auto;
-    font-size: var(--font-size-micro);
-    line-height: 1.25;
-    padding: 1px var(--space-2xs);
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  /* Border-Color = derselbe „solide" Indikator-Token wie Beat-Border-Left /
-     Verteilungsbalken-Segment → Pille und Balken/Border lesen als ein System. */
-  .plot-status-tag--geplant   { background: var(--color-tag-bg);  color: var(--color-muted);     border-color: var(--color-muted); }
-  .plot-status-tag--entwurf   { background: var(--color-warn-bg); color: var(--color-warn-text); border-color: var(--color-warn-text); }
-  .plot-status-tag--im_buch   { background: var(--color-ok-bg);   color: var(--color-ok-text);   border-color: var(--color-ok-border); }
-  .plot-status-tag--verworfen { background: var(--color-tag-bg);  color: var(--color-muted);     border-color: var(--color-border); text-decoration: line-through; }
-
   /* ── Beat-Edit ─────────────────────────────────────────────────────────── */
   .plot-beat-edit {
     display: flex;
@@ -285,12 +283,10 @@
      nicht über den generischen Akzent-Underline des Tab-Patterns; jede Stufe ist
      eine eigene Pille (eigener Rahmen, kein Shared-Border). */
   .plot-status-tabs .tabs-btn::after { content: none; }
-  /* Aktive Stufe trägt die Status-Farbe der Ansichts-Pille (.plot-status-tag--*)
-     → Lese- und Edit-Modus lesen als dasselbe System. */
+  /* Aktive Stufe trägt die semantische Status-Farbe (gleiche Tokens wie Beat-
+     Border-Left + Verteilungsbalken-Segment → ein Farb-System). */
   .plot-status-tabs .tabs-btn--active.plot-status-seg--geplant   { background: var(--color-tag-bg);  color: var(--color-muted);     border-color: var(--color-muted); }
-  .plot-status-tabs .tabs-btn--active.plot-status-seg--entwurf   { background: var(--color-warn-bg); color: var(--color-warn-text); border-color: var(--color-warn-text); }
   .plot-status-tabs .tabs-btn--active.plot-status-seg--im_buch   { background: var(--color-ok-bg);   color: var(--color-ok-text);   border-color: var(--color-ok-border); }
-  .plot-status-tabs .tabs-btn--active.plot-status-seg--verworfen { background: var(--color-tag-bg);  color: var(--color-muted);     border-color: var(--color-border); text-decoration: line-through; }
   .plot-edit-label {
     font-size: var(--font-size-micro);
     color: var(--color-muted);

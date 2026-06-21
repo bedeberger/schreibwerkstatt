@@ -1,8 +1,7 @@
-// Plot-Werkstatt: Beat-CRUD (flach + grid-zellen-granular), Quick-Status,
+// Plot-Werkstatt: Beat-CRUD (flach + grid-zellen-granular), Verwerfen-Flag,
 // Intensität/Figuren-Draft und Drag-&-Drop-Reordering über beide Pfade.
 
 import { fetchJson } from '../../utils.js';
-import { STATUSES } from './constants.js';
 
 export const beatsMethods = {
   // ── Beats ──────────────────────────────────────────────────────────────────
@@ -207,15 +206,15 @@ export const beatsMethods = {
     } finally { this.busy = false; }
   },
 
-  // Quick-Status: Klick auf das Status-Badge zyklisch weiterschalten.
-  async cycleBeatStatus(beat) {
+  // Verwerfen-Flag umschalten (eigene Achse, unabhängig vom Status). Sofort
+  // persistiert — funktioniert aus Ansicht und Edit-Panel.
+  async toggleBeatVerworfen(beat) {
     const app = window.__app;
-    const next = STATUSES[(STATUSES.indexOf(beat.status) + 1) % STATUSES.length];
     try {
       const updated = await fetchJson(`/plot/beats/${beat.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: next }),
+        body: JSON.stringify({ verworfen: beat.verworfen ? 0 : 1 }),
       });
       this._replaceBeat(updated);
     } catch (e) { this.errorMessage = app.t('plot.error.save'); }

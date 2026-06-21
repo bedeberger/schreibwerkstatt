@@ -668,14 +668,15 @@ test('plotMethods.actAccent: Palette-Key → --palette-*, sonst Karten-Akzent', 
   assert.equal(ctx.actAccent({ farbe: 'evil); }' }), 'var(--card-accent)');
 });
 
-test('plotMethods.boardStats/_computeStats: Status-Zählung + imBuch/geplant-Spiegel', () => {
+test('plotMethods.boardStats/_computeStats: binärer Status + verworfen als eigene Achse', () => {
   const ctx = makeCtx({ beats: [
     { status: 'geplant' }, { status: 'geplant' }, { status: 'im_buch' },
-    { status: 'entwurf' }, { status: 'verworfen' },
+    // verworfen ist ein Flag (eigene Achse): zählt nur in by.verworfen, nicht im Status.
+    { status: 'geplant', verworfen: 1 }, { status: 'im_buch', verworfen: 1 },
   ] });
   const s = ctx.boardStats();
   assert.equal(s.total, 5);
-  assert.deepEqual(s.by, { geplant: 2, entwurf: 1, im_buch: 1, verworfen: 1 });
+  assert.deepEqual(s.by, { geplant: 2, im_buch: 1, verworfen: 2 });
   assert.equal(s.imBuch, 1);
   assert.equal(s.geplant, 2);
 });
@@ -686,7 +687,7 @@ test('plotMethods.tensionCurve: nur Beats mit Intensität, Board-Reihenfolge, ve
     { id: 10, act_id: 2, sort_order: 0, status: 'geplant', intensitaet: 4, titel: 'Mitte' },
     { id: 11, act_id: 1, sort_order: 1, status: 'im_buch', intensitaet: 2, titel: 'Auftakt2' },
     { id: 12, act_id: 1, sort_order: 0, status: 'geplant', intensitaet: 1, titel: 'Auftakt1' },
-    { id: 13, act_id: 2, sort_order: 1, status: 'verworfen', intensitaet: 5, titel: 'gestrichen' },
+    { id: 13, act_id: 2, sort_order: 1, status: 'geplant', verworfen: 1, intensitaet: 5, titel: 'gestrichen' },
     { id: 14, act_id: 2, sort_order: 2, status: 'geplant', intensitaet: null, titel: 'ohne' },
   ];
   const curve = makeCtx({ beats, acts }).tensionCurve();
@@ -715,8 +716,8 @@ test('plotMethods.tensionCurve: <2 Punkte → count steuert Sichtbarkeit', () =>
 test('plotMethods.visibleBeatsForAct: verworfen versteckt bis aufgeklappt', () => {
   const acts = [{ id: 1, name: 'A1', position: 0 }];
   const beats = [
-    { id: 1, act_id: 1, sort_order: 0, status: 'geplant', fig_ids: [], draft_fig_ids: [] },
-    { id: 2, act_id: 1, sort_order: 1, status: 'verworfen', fig_ids: [], draft_fig_ids: [] },
+    { id: 1, act_id: 1, sort_order: 0, status: 'geplant', verworfen: 0, fig_ids: [], draft_fig_ids: [] },
+    { id: 2, act_id: 1, sort_order: 1, status: 'geplant', verworfen: 1, fig_ids: [], draft_fig_ids: [] },
   ];
   const ctx = makeCtx({ beats, acts });
   assert.deepEqual(ctx.visibleBeatsForAct(1).map(b => b.id), [1]);

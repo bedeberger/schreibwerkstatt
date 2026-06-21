@@ -10,7 +10,9 @@ const { listDraftFigures } = require('../../../db/draft-figures');
 const { _truncateResult } = require('./shared');
 
 const BEAT_DESC_PREVIEW = 600;
-const BEAT_STATUS = ['geplant', 'entwurf', 'im_buch', 'verworfen'];
+// status = binäre Realisierungsachse (Idee ↔ eingearbeitet); verworfen ist ein
+// eigenes Flag, kein Status-Wert.
+const BEAT_STATUS = ['geplant', 'im_buch'];
 
 // fig_id (TEXT, Frontend-Identitaet) → Anzeigename, aufs (Buch, User)-Subset
 // gescoped — analog zu db/plot.js#resolveFigureIds.
@@ -71,9 +73,11 @@ function tool_get_plot_board(input, ctx) {
   });
 
   // Statusverteilung ueber das GANZE Board (vor Filter) — gibt dem Modell die
-  // Gesamtsicht „wie viel geplant vs. schon im Buch".
-  const statusCounts = { geplant: 0, entwurf: 0, im_buch: 0, verworfen: 0 };
+  // Gesamtsicht „wie viel geplant vs. schon im Buch". verworfen ist eine eigene
+  // Achse (Flag) und wird separat gezaehlt (unabhaengig vom Status).
+  const statusCounts = { geplant: 0, im_buch: 0, verworfen: 0 };
   for (const b of allBeats) {
+    if (b.verworfen) statusCounts.verworfen++;
     if (statusCounts[b.status] != null) statusCounts[b.status]++;
   }
 
@@ -94,6 +98,7 @@ function tool_get_plot_board(input, ctx) {
         ? b.beschreibung.slice(0, BEAT_DESC_PREVIEW) + '…'
         : (b.beschreibung || null),
       status: b.status,
+      ...(b.verworfen ? { verworfen: true } : {}),
       chapter_id: b.chapter_id || null,
       chapter_name: b.chapter_name || null,
       thread: b.thread_id != null ? (threadNameById[b.thread_id] || null) : null,
@@ -126,7 +131,7 @@ function tool_get_plot_board(input, ctx) {
     ...(threadList.length ? { threads: threadList } : {}),
     status_counts: statusCounts,
     ...(statusFilter ? { status_filter: statusFilter } : {}),
-    status_legende: 'geplant = noch nicht geschrieben · entwurf = in Arbeit · im_buch = im Manuskript umgesetzt · verworfen = aufgegeben',
+    status_legende: 'status = geplant (Idee, noch nicht geschrieben) oder im_buch (im Manuskript umgesetzt). verworfen ist ein separates Flag (true = ausgemustert, soll nicht mehr ins Buch) — unabhaengig vom status.',
     ...(threadList.length ? { strang_hinweis: 'threads = parallele Erzähllinien (Swimlanes), oft je Hauptfigur, optional mit gebundenem Kapitel. Jeder Beat trägt sein thread-Feld (Strang-Name oder null = ohne Strang). Beats erben die Hauptfigur (geerbte_figur) und — ohne eigenes Kapitel — das Kapitel (geerbtes_kapitel) ihres Strangs implizit. Akte ohne eigener_akt_von_strang sind GETEILT (gelten für alle Stränge); ein Akt mit eigener_akt_von_strang gehört nur diesem Strang (Hybrid — dieser Strang plant mit einer eigenen Aktstruktur).' } : {}),
   });
 }

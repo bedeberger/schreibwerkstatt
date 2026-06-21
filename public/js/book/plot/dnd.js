@@ -24,6 +24,11 @@ export const dndMethods = {
   _destroySortables() {
     for (const s of (this._sortables || [])) { try { s.destroy(); } catch {} }
     this._sortables = [];
+    // Falls ein Drag durch Reattach/Teardown unterbrochen wurde, Drag-Klasse +
+    // gemessene Karten-Höhe nicht permanent stehen lassen (sonst bleiben leere
+    // Zellen aufgebläht bzw. auf einer veralteten Höhe).
+    document.body.classList.remove('plot-dnd-active');
+    document.body.style.removeProperty('--plot-drag-h');
   },
 
   // Reattach coalescen: strukturelle Änderungen (Akt-/Strang-CRUD, Fork, loadBoard)
@@ -55,11 +60,29 @@ export const dndMethods = {
     // "beat is not defined". Nach Drag wieder entfernen.
     const markIgnore = (evt) => evt.item?.setAttribute('x-ignore', '');
     const unmarkIgnore = (evt) => evt.item?.removeAttribute('x-ignore');
+    // Während eines Drags eine Klasse auf <body> setzen → CSS bläht leere
+    // Swimlane-Zellen zur erreichbaren Drop-Zone auf (sonst min-height: 0, eine
+    // leere Akt×Strang-Zelle wäre kaum als Drop-Ziel zu treffen). onStart/onEnd
+    // statt onChoose/onUnchoose: ein reiner Klick (ohne Drag) toggelt nichts.
+    // `--plot-drag-h` = Höhe der gezogenen Karte → die aufgeblähte Drop-Zone ist
+    // exakt so hoch wie das gezogene Element, statt eines fixen (oft zu grossen)
+    // Leerrechtecks (CSS liest die Var mit Fallback).
+    const setDragging = (on, item) => {
+      document.body.classList.toggle('plot-dnd-active', on);
+      if (on && item) {
+        const h = Math.round(item.getBoundingClientRect().height);
+        if (h > 0) document.body.style.setProperty('--plot-drag-h', `${h}px`);
+      } else {
+        document.body.style.removeProperty('--plot-drag-h');
+      }
+    };
     // Tuning analog Organizer (forceFallback-Ghost, swapThreshold gegen
     // Nachbar-Flackern, invertSwap für stabile Backward-Drops, revertOnSpill
-    // gegen Item-Loss bei Drop ausserhalb). filter hält Drag von interaktiven
-    // Karten-Elementen (Status-Badge, Tags, Edit-Form) fern; preventOnFilter
-    // false lässt deren Klick durch (Status zyklen, Beat öffnen, Figur springen).
+    // gegen Item-Loss bei Drop ausserhalb). `handle` = der Drag-Griff
+    // (.plot-beat-grip, nur im Ansichtsmodus gerendert): einzige Greiffläche, so
+    // dass die übrige Karte voll klickbar bleibt (Status zyklen, Titel→Edit,
+    // Tags→Figur springen) ohne Drag/Klick-Konflikt. Kein `filter` nötig — der
+    // Griff fehlt im Edit-Modus, ein bearbeiteter Beat ist also nie ziehbar.
     const baseOpts = {
       animation: 0,
       forceFallback: true,
@@ -76,15 +99,15 @@ export const dndMethods = {
       emptyInsertThreshold: 24,
       scroll: true,
       draggable: '.plot-beat',
-      filter: '.plot-beat--editing, .plot-beat-edit, .plot-beat-meta, .plot-status-tag, .plot-beat-warn, button, input, textarea, a, .combobox-wrap',
-      preventOnFilter: false,
+      handle: '.plot-beat-grip',
       group: { name: 'plot-beats', pull: true, put: ['plot-beats'] },
       chosenClass: 'plot-beat-chosen',
       ghostClass: 'plot-beat-ghost',
       dragClass: 'plot-beat-drag-active',
       onChoose: markIgnore,
       onUnchoose: unmarkIgnore,
-      onEnd: (evt) => { unmarkIgnore(evt); this.onBeatSortEnd(evt); },
+      onStart: (evt) => setDragging(true, evt.item),
+      onEnd: (evt) => { setDragging(false); unmarkIgnore(evt); this.onBeatSortEnd(evt); },
     };
     // Eine Sortable-Instanz pro Beat-Zelle (.plot-beats[data-plot-cell]). Flaches
     // Board und Grid sind beide im DOM (x-show); die jeweils versteckten Container

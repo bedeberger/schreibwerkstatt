@@ -17,7 +17,9 @@ const logger = require('../logger');
 const router = express.Router();
 const jsonBody = express.json();
 
-const STATUSES = ['geplant', 'entwurf', 'im_buch', 'verworfen'];
+// Status ist die binäre Realisierungsachse (Idee ↔ eingearbeitet). „Verworfen" ist
+// ein eigenes Flag (verworfen 0/1), keine Status-Stufe.
+const STATUSES = ['geplant', 'im_buch'];
 const MAX_TITEL = 200;
 const MAX_BESCHREIBUNG = 4000;
 const MAX_ACT_NAME = 120;
@@ -267,6 +269,7 @@ router.post('/beats', jsonBody, (req, res) => {
   }
   const beschreibung = req.body?.beschreibung ? String(req.body.beschreibung).slice(0, MAX_BESCHREIBUNG) : null;
   const status = STATUSES.includes(req.body?.status) ? req.body.status : 'geplant';
+  const verworfen = req.body?.verworfen ? 1 : 0;
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
   const intensitaet = _validIntensitaet(req.body?.intensitaet);
   const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
@@ -274,7 +277,7 @@ router.post('/beats', jsonBody, (req, res) => {
   const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
   const draftFigureIds = plotDb.resolveDraftFigureIds(bookId, userEmail, req.body?.draft_figure_ids);
 
-  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, chapterId, intensitaet, threadId, figureIds, draftFigureIds });
+  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, verworfen, chapterId, intensitaet, threadId, figureIds, draftFigureIds });
   logger.info(`[plot] beat create id=${beat.id} act=${actId} book=${bookId}`);
   res.json(beat);
 });
@@ -301,6 +304,9 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
   if (typeof req.body?.status !== 'undefined') {
     if (!STATUSES.includes(req.body.status)) return res.status(400).json({ error_code: 'INVALID_STATUS' });
     fields.status = req.body.status;
+  }
+  if (typeof req.body?.verworfen !== 'undefined') {
+    fields.verworfen = req.body.verworfen ? 1 : 0;
   }
   if (typeof req.body?.chapter_id !== 'undefined') {
     fields.chapter_id = _validChapterId(beat.book_id, toIntId(req.body.chapter_id));

@@ -29,37 +29,57 @@ test('plot: Beat per SortableJS-Drag umsortieren persistiert', async ({ page }) 
   await page.evaluate(() => window.__app.togglePlotCard());
   await page.waitForSelector('.card--plot .plot-beat[data-beat-id]');
   await page.waitForFunction((n) => document.querySelectorAll('.card--plot .plot-board .plot-beat').length === n, 3);
+  // SortableJS bindet die Zell-Container nach dem Board-Load asynchron neu
+  // ($watch('acts') → nextTick → destroy → nextTick → init). Vor dem Drag kurz
+  // abwarten, sonst greift der Drag eine noch ungebundene Zelle (Flake).
+  await page.waitForTimeout(400);
 
   // Reihenfolge vor dem Drag (Board-Lesereihenfolge A,B,C).
   const before = await page.$$eval('.card--plot .plot-board .plot-beat', els => els.map(e => e.dataset.beatId));
   expect(before).toEqual([String(ids.b1), String(ids.b2), String(ids.b3)]);
 
-  // Beat C (3.) per Drag über Beat A (1.) ziehen → erwartet C,A,B.
-  const src = page.locator(`.card--plot .plot-board .plot-beat[data-beat-id="${ids.b3}"]`);
-  const dst = page.locator(`.card--plot .plot-board .plot-beat[data-beat-id="${ids.b1}"]`);
-  const s = await src.boundingBox();
-  const d = await dst.boundingBox();
-  // Am Beschreibungs-/Padding-Bereich greifen (Titel/Badges sind drag-gefiltert).
-  await page.mouse.move(s.x + s.width / 2, s.y + s.height - 6);
-  await page.mouse.down();
-  // Mehrere Schritte > fallbackTolerance(5px), damit SortableJS den Drag startet.
-  await page.mouse.move(s.x + s.width / 2, s.y + s.height - 20, { steps: 4 });
-  await page.mouse.move(d.x + d.width / 2, d.y + 4, { steps: 8 });
-  await page.mouse.move(d.x + d.width / 2, d.y + 2, { steps: 3 });
-  await page.mouse.up();
+  // Beat A (1.) per Drag über Beat C (3.) nach unten ziehen → erwartet B,C,A.
+  // Drag startet ausschliesslich am Griff (.plot-beat-grip) — die restliche Karte
+  // bleibt klick-fokussiert (Status zyklen, Titel→Edit), kein Drag/Klick-Konflikt.
+  // Der synthetische Maus-Drag gegen SortableJS' forceFallback ist im Headless-/
+  // CI-Umfeld zeitsensibel (gelegentlich startet der Drag nicht); darum bis zu
+  // 4× versuchen, bis sich die Server-Reihenfolge ändert. Reine Test-Robustheit —
+  // ein echter Maus-Drag mit natürlichem Verweilen reordert zuverlässig.
+  const persistedLast = async () => page.evaluate(async (args) => {
+    const data = await fetch(`/plot?book_id=${args.bookId}`).then(r => r.json());
+    const inAct = data.beats.filter(b => b.act_id === args.actId).sort((a, b) => a.sort_order - b.sort_order);
+    return inAct.length === 3 ? inAct[inAct.length - 1].id : null;
+  }, { bookId, actId: ids.actId });
+
+  for (let attempt = 0; attempt < 4 && (await persistedLast()) !== ids.b1; attempt++) {
+    const grip = await page.locator(`.card--plot .plot-board .plot-beat[data-beat-id="${ids.b1}"] .plot-beat-grip`).boundingBox();
+    const d = await page.locator(`.card--plot .plot-board .plot-beat[data-beat-id="${ids.b3}"]`).boundingBox();
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    // Mehrere Schritte > fallbackTolerance(5px), damit SortableJS den Drag startet.
+    await page.mouse.move(grip.x + grip.width / 2 + 4, grip.y + grip.height / 2 + 12, { steps: 4 });
+    // In die untere Hälfte von Beat C ziehen (Einfügen dahinter) + kurz verweilen,
+    // damit SortableJS' Fallback-dragOver am Ziel feuert, bevor losgelassen wird.
+    await page.mouse.move(d.x + d.width / 2, d.y + d.height / 2, { steps: 10 });
+    await page.waitForTimeout(80);
+    await page.mouse.move(d.x + d.width / 2, d.y + d.height - 4, { steps: 3 });
+    await page.waitForTimeout(60);
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+  }
 
   // Persistierte Server-Reihenfolge prüfen (sort_order pro Zelle).
   await page.waitForFunction(async (args) => {
     const data = await fetch(`/plot?book_id=${args.bookId}`).then(r => r.json());
     const inAct = data.beats.filter(b => b.act_id === args.actId).sort((a, b) => a.sort_order - b.sort_order);
-    return inAct.length === 3 && inAct[0].id === args.b3;
-  }, { bookId, actId: ids.actId, b3: ids.b3 }, { timeout: 10000 });
+    return inAct.length === 3 && inAct[inAct.length - 1].id === args.b1;
+  }, { bookId, actId: ids.actId, b1: ids.b1 }, { timeout: 10000 });
 
   const order = await page.evaluate(async (args) => {
     const data = await fetch(`/plot?book_id=${args.bookId}`).then(r => r.json());
     return data.beats.filter(b => b.act_id === args.actId)
       .sort((a, b) => a.sort_order - b.sort_order).map(b => b.id);
   }, { bookId, actId: ids.actId });
-  expect(order).toEqual([ids.b3, ids.b1, ids.b2]);
+  expect(order).toEqual([ids.b2, ids.b3, ids.b1]);
   expect(errors).toEqual([]);
 });

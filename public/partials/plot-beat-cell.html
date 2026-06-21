@@ -12,9 +12,14 @@
 <template x-if="editingBeatId !== beat.id">
   <div class="plot-beat-view">
     <div class="plot-beat-head">
-      <button type="button" class="plot-status-tag" :class="'plot-status-tag--' + beat.status"
-              @click.stop="cycleBeatStatus(beat)" :data-tip="$app.t('plot.status.cycleTip')"
-              x-text="$app.t('plot.status.' + beat.status)"></button>
+      <!-- Drag-Griff: einzige Greiffläche für SortableJS (handle '.plot-beat-grip').
+           So bleibt die übrige Karte voll klickbar (Titel→Edit, Tags→Figur
+           springen) ohne Drag/Klick-Konflikt. Nur Ansichtsmodus. Status wird
+           nicht mehr in der Kopfzeile gezeigt (nur Border-Farbe + Status-Filter),
+           gesetzt wird er über die Status-Tabs im Bearbeiten-Modus. -->
+      <span class="plot-beat-grip" :data-tip="$app.t('plot.beat.dragHandle')" :aria-label="$app.t('plot.beat.dragHandle')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#grip-vertical"/></svg>
+      </span>
       <span class="plot-beat-title" @click="startEditBeat(beat)" x-text="beat.titel"></span>
       <!-- Konsistenz-Warn-Badge: zeigt, dass der aktive Prüflauf diesen Beat beanstandet -->
       <button type="button" class="plot-beat-warn" :class="'plot-beat-warn--' + beatTopSeverity(beat)"
@@ -115,6 +120,10 @@
     <div class="plot-beat-edit-actions">
       <button type="button" class="btn-compact" @click="saveEditBeat(beat)" :disabled="busy" x-text="$app.t('common.save')"></button>
       <button type="button" class="btn-compact btn-compact--ghost" @click="cancelEditBeat()" x-text="$app.t('common.cancel')"></button>
+      <!-- Verwerfen ist eine eigene Achse (Flag), kein Status — sofort persistiert. -->
+      <button type="button" class="btn-compact btn-compact--ghost plot-beat-discard"
+              @click="toggleBeatVerworfen(beat)"
+              x-text="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')"></button>
       <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger plot-beat-delete" @click="deleteBeat(beat)" :data-tip="$app.t('plot.beat.delete')" :aria-label="$app.t('plot.beat.delete')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
       </button>

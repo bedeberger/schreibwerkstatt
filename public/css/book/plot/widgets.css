@@ -121,7 +121,6 @@
     min-width: 3px;
   }
   .plot-dist-seg--geplant   { background: var(--color-muted); }
-  .plot-dist-seg--entwurf   { background: var(--color-warn-text); }
   .plot-dist-seg--im_buch   { background: var(--color-ok-border); }
   /* Schraffur statt Vollton: liest als „durchgestrichen/verworfen", deutlich
      abgesetzt vom Vollton-Grau von „geplant" (sonst zwei kaum trennbare Graus). */

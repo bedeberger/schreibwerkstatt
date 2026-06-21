@@ -8324,6 +8324,60 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 210 abgeschlossen (book_settings.stilprofil).');
   }
 
+  if (version < 211) {
+    // Beat-Status entkoppelt: die fruehere lineare 4-Wege-Reihe
+    // (geplant→entwurf→im_buch→verworfen) vermischte zwei Achsen. Status ist jetzt
+    // BINAER (geplant ↔ im_buch = „Idee vs. eingearbeitet"); „verworfen" wird ein
+    // eigenes Flag (orthogonale Verwerfen-Achse, bleibt bei Status-Wechsel erhalten).
+    // SQLite kann die status-CHECK nicht via ALTER aendern → Recreate-Pattern.
+    // Datenabbildung:
+    //   entwurf   → status=geplant, verworfen=0  (Zwischenstufe faellt auf Idee)
+    //   verworfen → status=geplant, verworfen=1  (alter Realisierungsstand verloren)
+    //   geplant/im_buch unveraendert, verworfen=0
+    // FK-Kinder (plot_beat_figures/_draft_figures) referenzieren plot_beats(id) und
+    // bleiben ueber den id-erhaltenden Recreate intakt.
+    db.pragma('foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS plot_beats_new');
+    db.exec(`
+      CREATE TABLE plot_beats_new (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        act_id       INTEGER NOT NULL REFERENCES plot_acts(id) ON DELETE CASCADE,
+        thread_id    INTEGER REFERENCES plot_threads(id) ON DELETE SET NULL,
+        user_email   TEXT    NOT NULL,
+        titel        TEXT    NOT NULL,
+        beschreibung TEXT,
+        status       TEXT    NOT NULL DEFAULT 'geplant' CHECK(status IN ('geplant','im_buch')),
+        verworfen    INTEGER NOT NULL DEFAULT 0 CHECK(verworfen IN (0,1)),
+        chapter_id   INTEGER REFERENCES chapters(chapter_id) ON DELETE SET NULL,
+        intensitaet  INTEGER CHECK(intensitaet IS NULL OR (intensitaet BETWEEN 1 AND 5)),
+        sort_order   INTEGER NOT NULL DEFAULT 0,
+        created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+    `);
+    db.exec(`INSERT INTO plot_beats_new
+        (id, book_id, act_id, thread_id, user_email, titel, beschreibung, status, verworfen, chapter_id, intensitaet, sort_order, created_at, updated_at)
+        SELECT id, book_id, act_id, thread_id, user_email, titel, beschreibung,
+               CASE WHEN status = 'im_buch' THEN 'im_buch' ELSE 'geplant' END,
+               CASE WHEN status = 'verworfen' THEN 1 ELSE 0 END,
+               chapter_id, intensitaet, sort_order, created_at, updated_at
+          FROM plot_beats`);
+    db.exec('DROP TABLE plot_beats');
+    db.exec('ALTER TABLE plot_beats_new RENAME TO plot_beats');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beats_act ON plot_beats(act_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beats_book ON plot_beats(book_id, user_email)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beats_chapter ON plot_beats(chapter_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beats_thread ON plot_beats(thread_id)');
+    db.pragma('foreign_keys = ON');
+    const fkErrors211 = db.pragma('foreign_key_check');
+    if (fkErrors211.length) {
+      throw new Error(`Migration 211: foreign_key_check meldet ${fkErrors211.length} Verstoesse: ${JSON.stringify(fkErrors211.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 211').run();
+    logger.info('DB-Migration auf Version 211 abgeschlossen (plot_beats: Status binaer geplant/im_buch + verworfen-Flag).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -36,7 +36,7 @@
   <!-- Status-Verteilung (board-weit): segmentierter Balken + Legende -->
   <div class="plot-progress" x-show="Object.values(boardStats().by).filter(n => n > 0).length > 1" x-cloak>
     <div class="plot-dist-bar">
-      <template x-for="s in statusList()" :key="s">
+      <template x-for="s in distStatusList()" :key="s">
         <div class="plot-dist-seg" :class="'plot-dist-seg--' + s"
              x-show="boardStats().by[s] > 0"
              :style="{ '--seg-grow': boardStats().by[s] }"
@@ -44,7 +44,7 @@
       </template>
     </div>
     <div class="plot-progress-legend">
-      <template x-for="s in statusList()" :key="s">
+      <template x-for="s in distStatusList()" :key="s">
         <span class="plot-legend-item" x-show="boardStats().by[s] > 0">
           <span class="plot-legend-swatch" :class="'plot-dist-seg--' + s"></span>
           <span x-text="$app.t('plot.status.' + s) + ' · ' + boardStats().by[s]"></span>
@@ -87,6 +87,10 @@
     <div x-data="catalogFilter('chapter')"
          x-modelable="value" x-model="plotFilters.kapitel"
          x-effect="options = plotKapitelListe().map(k => ({value: k, label: k}))">
+    </div>
+    <div x-data="catalogFilter('status')"
+         x-modelable="value" x-model="plotFilters.status"
+         x-effect="options = statusList().map(s => ({value: s, label: $app.t('plot.status.' + s)}))">
     </div>
     <span class="filter-count" x-text="filteredBeatCount() + ' / ' + beats.length"></span>
   </div>

@@ -197,7 +197,7 @@
                      :data-thread-id="row.lane.id === null ? '' : row.lane.id">
                   <template x-for="beat in filteredBeatsForCell(act.id, row.lane.id)" :key="beat.id">
                     <div class="plot-beat" :data-beat-id="beat.id"
-                         :class="{ ['plot-beat--' + beat.status]: true, 'plot-beat--editing': editingBeatId === beat.id }">
+                         :class="{ ['plot-beat--' + beat.status]: true, 'plot-beat--verworfen': !!beat.verworfen, 'plot-beat--editing': editingBeatId === beat.id }">
 
                       <!-- Beat-Karte (Ansicht + Bearbeiten) — geteilt mit dem flachen Board.
                            SSoT: plot-beat-cell.html (string-seitiger Fragment-Include). -->

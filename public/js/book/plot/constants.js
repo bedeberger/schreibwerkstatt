@@ -1,6 +1,12 @@
 // Geteilte Konstanten der Plot-Werkstatt — von mehreren Sub-Modulen konsumiert.
 
-export const STATUSES = ['geplant', 'entwurf', 'im_buch', 'verworfen'];
+// Status = binäre Realisierungsachse (Idee ↔ eingearbeitet). „Verworfen" ist ein
+// eigenes Flag (beat.verworfen 0/1), keine Status-Stufe.
+export const STATUSES = ['geplant', 'im_buch'];
+
+// Segmente der board-weiten Status-Verteilungsleiste: die zwei Status + die
+// Verwerfen-Achse als drittes Segment (verworfene Beats, unabhängig vom Status).
+export const DIST_SEGMENTS = ['geplant', 'im_buch', 'verworfen'];
 
 // Akt-Farbpalette: Schlüssel referenzieren die theme-aware --palette-*-Tokens
 // (tokens/colors.css, geteilt mit der Figuren-Palette). In plot_acts.farbe wird

@@ -15,9 +15,7 @@ const SEVERITY_ENUM = ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig'];
 
 const STATUS_LABEL = {
   geplant: 'geplant',
-  entwurf: 'Entwurf',
   im_buch: 'im Buch',
-  verworfen: 'verworfen',
 };
 
 // ── Hilfen ───────────────────────────────────────────────────────────────────
@@ -32,7 +30,7 @@ function _boardOutline(acts, beats, threadInfo = null) {
     const own = (beats || [])
       .filter(b => b.act_id === act.id)
       .map(b => {
-        const st = STATUS_LABEL[b.status] || b.status;
+        const st = (STATUS_LABEL[b.status] || b.status) + (b.verworfen ? ', verworfen' : '');
         const info = threadInfo && b.thread_id != null ? threadInfo[b.thread_id] : null;
         const kap = b.chapter_name
           ? ` → Kapitel: ${b.chapter_name}`
@@ -302,7 +300,7 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
 GEPLANTES BEAT-BOARD:
 ${_boardOutline(acts, beats, _threadInfoMap(threads))}
 ${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${orteSeg}${zeitSeg}${kontiSeg}${strSeg}${hybridNote}
-Status-Legende der Beats: geplant (noch nicht geschrieben) · Entwurf (in Arbeit) · im Buch (laut Plan schon geschrieben) · verworfen (ausgemustert).
+Status-Legende der Beats: geplant (Idee, noch nicht eingearbeitet) · im Buch (laut Plan schon geschrieben). Zusätzlich kann ein Beat als "verworfen" markiert sein (ausgemustert, soll nicht mehr ins Buch).
 
 Prüfe auf:
 - Beats mit Status "im Buch", für die sich in den Szenen/Kapiteln KEINE Entsprechung finden lässt (Plan behauptet etwas, das nicht im Buch steht)
