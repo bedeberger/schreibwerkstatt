@@ -170,7 +170,7 @@ export const PROBLEME_SCHEMA = `{
   "probleme": [
     {
       "schwere": "kritisch|mittel|niedrig",
-      "typ": "figur|zeitlinie|ort|objekt|verhalten|soziolekt|sonstiges",
+      "typ": "figur|zeitlinie|ort|objekt|verhalten|soziolekt|anachronismus|sonstiges",
       "beschreibung": "Was genau widerspricht sich (1-2 Sätze)",
       "stelle_a": "Kapitel + wörtliches Zitat (5-15 Wörter) der widersprechenden Aussage",
       "stelle_b": "Kapitel + wörtliches Zitat (5-15 Wörter) der Gegen-Aussage",

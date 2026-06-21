@@ -100,6 +100,44 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
   return { ...result, probleme: kept };
 }
 
+// ── Anachronismus-Datenbasis für die Kontinuitätsprüfung ─────────────────────
+// Nur bei Romanen mit echter Zeitlinie (book_settings.zeitlinie_real). Liefert die
+// Erzählzeit-Spanne aus sicher datierten Figuren-/Zeitstrahl-Ereignissen plus die im
+// Buch erwähnten Songs und Welt-Fakten (Technik/Historie/Ereignis/Kultur). Das Modell
+// vergleicht deren reale Entstehungs-/Veröffentlichungszeit gegen die Erzählzeit.
+// null, wenn die Zeitlinie aus ist, keine datierten Ereignisse vorliegen oder es nichts
+// Prüfbares gibt → der Prompt-Builder lässt die Anachronismus-Prüfung dann ganz weg.
+// Lesepfad-sicher in beiden Aufrufern: figure_events (saveSzenenAndEvents), songs
+// (runPhase3Songs) und world_facts (saveFaktenToDb) sind vor P8 bereits persistiert.
+function buildAnachronismusData(bookIdInt, email) {
+  const { zeitlinie_real } = getBookSettings(bookIdInt, email);
+  if (!zeitlinie_real) return null;
+  const yearRow = db.prepare(`
+    SELECT MIN(datum_year) AS minY, MAX(COALESCE(datum_ende_year, datum_year)) AS maxY FROM (
+      SELECT fe.datum_year AS datum_year, fe.datum_ende_year AS datum_ende_year
+        FROM figure_events fe JOIN figures f ON f.id = fe.figure_id
+        WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0 AND fe.datum_year IS NOT NULL
+      UNION ALL
+      SELECT datum_year, datum_ende_year FROM zeitstrahl_events
+        WHERE book_id = ? AND user_email IS ? AND datum_unsicher = 0 AND datum_year IS NOT NULL
+    )
+  `).get(bookIdInt, email, bookIdInt, email);
+  if (!yearRow || yearRow.minY == null) return null;
+  const songs = db.prepare(
+    'SELECT titel, interpret FROM songs WHERE book_id = ? AND user_email IS ? ORDER BY sort_order'
+  ).all(bookIdInt, email).map(s => ({ titel: s.titel, interpret: s.interpret || '' }));
+  const factRows = db.prepare(
+    `SELECT kategorie, subjekt, fakt FROM world_facts
+     WHERE book_id = ? AND user_email IS ? AND kategorie IN ('technik','historie','ereignis','kultur')
+     ORDER BY sort_order`
+  ).all(bookIdInt, email);
+  const fmtFact = (f) => `${f.subjekt ? f.subjekt + ': ' : ''}${f.fakt}`;
+  const technik = factRows.filter(f => f.kategorie === 'technik').map(fmtFact);
+  const ereignisse = factRows.filter(f => f.kategorie !== 'technik').map(fmtFact);
+  if (!songs.length && !technik.length && !ereignisse.length) return null;
+  return { minYear: yearRow.minY, maxYear: yearRow.maxY, songs, technik, ereignisse };
+}
+
 // ── Job: Komplettanalyse ─────────────────────────────────────────────────────
 // Pipeline (token-optimiert):
 //   P1 (Vollextraktion: Figuren+Orte+Fakten+Szenen+Events, parallel/Kapitel, SYSTEM_KOMPLETT_EXTRAKTION)
@@ -341,6 +379,9 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     ).all(bookIdInt, email);
     const orteKompakt = ortRows.map(o => ({ name: o.name, typ: o.typ, beschreibung: o.beschreibung || '' }));
 
+    // Anachronismus-Kontext (nur bei echter Zeitlinie) – Daten stehen hier bereits in der DB
+    // (Figuren-Events, Songs, Fakten alle vor Block 2 persistiert).
+    const anachronismus = buildAnachronismusData(bookIdInt, email);
     // Single-Pass nur bei Claude (voller Buchtext im 1h-Cache); sonst Fakten-Multi-Pass.
     const kontMultiPass = !(totalChars <= singlePassLimit && effectiveProvider === 'claude');
     // P8-Call als Closure – wird je nach Provider parallel oder sequentiell ausgeführt.
@@ -350,14 +391,14 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
           log.info(`Kontinuität Single-Pass: ${fullBookText.length} Zeichen, ${figKompakt.length} Figuren, ${orteKompakt.length} Orte`);
           const bookSystemBlock = { text: buildBookSystemBlockText(bookName, pageContents.length, fullBookText), ttl: '1h' };
           return await retryOnTransientAi(() => call(jobId, tok,
-            prompts.buildKontinuitaetSinglePassPrompt(bookName, null, figKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
+            prompts.buildKontinuitaetSinglePassPrompt(bookName, null, figKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email)), anachronismus),
             [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KONTINUITAET_BLOCKS, '1h')],
             82, 97, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
           ), { log, label: 'Kontinuität Single-Pass (P8)' });
         }
         log.info(`Kontinuität facts-basiert: ${chapterFakten.length} Kapitel, ${figKompakt.length} Figuren`);
         return await retryOnTransientAi(() => call(jobId, tok,
-          prompts.buildKontinuitaetCheckPrompt(bookName, chapterFakten, figKompakt, orteKompakt),
+          prompts.buildKontinuitaetCheckPrompt(bookName, chapterFakten, figKompakt, orteKompakt, anachronismus),
           sys.SYSTEM_KONTINUITAET_BLOCKS, 82, 97, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
         ), { log, label: 'Kontinuität facts-basiert (P8)' });
       } catch (e) {
@@ -490,6 +531,8 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       'SELECT name, typ, beschreibung FROM locations WHERE book_id = ? AND user_email = ? ORDER BY sort_order'
     ).all(bookIdInt, email);
     const orteKompakt = ortRows.map(o => ({ name: o.name, typ: o.typ, beschreibung: o.beschreibung || '' }));
+    // Anachronismus-Kontext (nur bei echter Zeitlinie) aus dem zuletzt gespeicherten Katalog.
+    const anachronismus = buildAnachronismusData(bookIdInt, email);
 
     const pageContents = await loadPageContents(pages, chMap, 30, (i, total) => {
       updateJob(jobId, {
@@ -523,7 +566,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       const bookText = buildSinglePassBookText(groups, groupOrder);
       kontFullText = bookText;
       result = await retryOnTransientAi(() => call(jobId, tok,
-        prompts.buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email))),
+        prompts.buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, narrativeLabels(getBookSettings(bookIdInt, email)), anachronismus),
         sys.SYSTEM_KONTINUITAET_BLOCKS, 60, 97, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       ), { log, label: 'Kontinuität Single-Pass' });
       pt.mark('Single-Pass Check');
@@ -595,7 +638,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
 
       updateJob(jobId, { progress: 88, statusText: 'job.phase.checkContradictions' });
       result = await retryOnTransientAi(() => call(jobId, tok,
-        prompts.buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKompakt, orteKompakt),
+        prompts.buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKompakt, orteKompakt, anachronismus),
         sys.SYSTEM_KONTINUITAET_BLOCKS, 88, 95, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_KONTINUITAET_PROBLEME,
       ), { log, label: 'Kontinuität Check (Multi-Pass)' });
       // Fakten-basierte Befunde gegen den Originaltext verifizieren (False-Positive-Filter).

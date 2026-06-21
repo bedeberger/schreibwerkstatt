@@ -316,3 +316,47 @@ for (const provider of ['ollama', 'claude']) {
     assert.equal(s.additionalProperties, false);
   });
 }
+
+// ── Anachronismus-Block (nur bei echter Zeitlinie) ───────────────────────────
+// Wird nur eingebunden, wenn der Job-Layer (buildAnachronismusData) Erzählzeit-Spanne
+// + prüfbare Entitäten liefert. Ohne Daten (null) bleibt der Prompt unverändert.
+
+const ANACHRO = {
+  minYear: 1985, maxYear: 1987,
+  songs: [{ titel: 'Smells Like Teen Spirit', interpret: 'Nirvana' }],
+  technik: ['Smartphone: Figur tippt auf einem Touchscreen-Handy'],
+  ereignisse: ['Mauerfall: Die Berliner Mauer fällt'],
+};
+
+test('buildKontinuitaetSinglePassPrompt: ohne Anachronismus-Daten kein Block/keine Regel', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.buildKontinuitaetSinglePassPrompt('Buch', 'Text.', [], []);
+  assert.doesNotMatch(out, /Zeitliche Verortung/);
+  assert.doesNotMatch(out, /typ «anachronismus»/);
+});
+
+test('buildKontinuitaetSinglePassPrompt: mit Anachronismus-Daten → Block, Spanne, Entitäten, Regel', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.buildKontinuitaetSinglePassPrompt('Buch', 'Text.', [], [], {}, ANACHRO);
+  assert.match(out, /Zeitliche Verortung \(Anachronismus-Prüfung\)/);
+  assert.match(out, /1985–1987/);
+  assert.ok(out.includes('Smells Like Teen Spirit'), 'Song muss im Prompt stehen');
+  assert.ok(out.includes('Smartphone'), 'Technik-Fakt muss im Prompt stehen');
+  assert.match(out, /typ «anachronismus»/);
+});
+
+test('buildKontinuitaetCheckPrompt: Anachronismus-Block opt-in über 5. Argument', async () => {
+  const m = await freshPrompts('claude');
+  const ohne = m.buildKontinuitaetCheckPrompt('Buch', [], [], []);
+  const mit  = m.buildKontinuitaetCheckPrompt('Buch', [], [], [], ANACHRO);
+  assert.doesNotMatch(ohne, /Zeitliche Verortung/);
+  assert.match(mit, /Zeitliche Verortung/);
+  assert.match(mit, /typ «anachronismus»/);
+});
+
+test('buildKontinuitaetSinglePassPrompt: leere Entitäten-Listen → kein Block trotz Spanne', async () => {
+  const m = await freshPrompts('claude');
+  const out = m.buildKontinuitaetSinglePassPrompt('Buch', 'Text.', [], [], {},
+    { minYear: 1985, maxYear: 1987, songs: [], technik: [], ereignisse: [] });
+  assert.doesNotMatch(out, /Zeitliche Verortung/);
+});

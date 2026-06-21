@@ -51,6 +51,33 @@ ${lines}
 Eine kontextfreie Erwähnung nur des geteilten Tokens (z.B. «Dieter») kann jede dieser Figuren meinen. Übertrage Eigenschaften, Aufenthalte, Ereignisse einer Figur NICHT auf die andere. Melde keinen Widerspruch, wenn die Zuordnung im Text mehrdeutig bleibt.`;
 }
 
+// Anachronismus-Kontext (nur bei Romanen mit echter Zeitlinie, book_settings.zeitlinie_real).
+// Erzählzeit-Spanne aus datierten Ereignissen + die im Buch erwähnten Songs/Technologien/
+// historischen Ereignisse. Das Modell vergleicht deren reale Entstehungs-/Veröffentlichungs-
+// zeit (aus eigenem Wissen) gegen die Erzählzeit. Leer, wenn keine Spanne oder keine prüfbaren
+// Entitäten vorliegen → Anachronismus-Prüfung entfällt (z.B. zeitlose/relative Erzählung).
+function _buildAnachronismusBlock(anachronismus) {
+  if (!anachronismus || anachronismus.minYear == null || anachronismus.maxYear == null) return '';
+  const { minYear, maxYear, songs = [], technik = [], ereignisse = [] } = anachronismus;
+  if (!songs.length && !technik.length && !ereignisse.length) return '';
+  const spanne = minYear === maxYear ? `${minYear}` : `${minYear}–${maxYear}`;
+  const parts = [`\n\n## Zeitliche Verortung (Anachronismus-Prüfung)
+Dieses Buch hat eine reale, kalendarische Chronologie. Die datierte Handlung spielt etwa im Zeitraum ${spanne}.`];
+  if (songs.length) parts.push('\n### Erwähnte Songs/Musik\n' + songs.slice(0, 80).map(s => `- «${s.titel}»${s.interpret ? ` – ${s.interpret}` : ''}`).join('\n'));
+  if (technik.length) parts.push('\n### Erwähnte Technik/Wissenschaft\n' + technik.slice(0, 60).map(t => `- ${t}`).join('\n'));
+  if (ereignisse.length) parts.push('\n### Erwähnte historische/welt-bezogene Ereignisse\n' + ereignisse.slice(0, 60).map(e => `- ${e}`).join('\n'));
+  return parts.join('\n');
+}
+
+// Wird NUR angehängt, wenn ein Anachronismus-Block vorhanden ist – sonst soll das Modell
+// gar nicht erst nach Anachronismen suchen (keine reale Zeitlinie). Überschreibt bewusst die
+// allgemeine «beide Stellen müssen Zitate sein»-Regel für genau diesen typ: bei einem
+// Anachronismus gibt es nur EINE Buchstelle (die Erwähnung); die zweite Stelle ist die
+// etablierte Jahresangabe.
+const _ANACHRONISMUS_RULE = `
+
+Anachronismus-Prüfung (typ «anachronismus»): Vergleiche die oben unter «Zeitliche Verortung» gelisteten Songs, Technologien und historischen Ereignisse mit ihrer realen Entstehungs- bzw. Veröffentlichungszeit (aus deinem Allgemeinwissen). Wird etwas erwähnt, das es zur Erzählzeit real noch nicht gab (ein Song nach seinem Erscheinungsjahr, eine Technologie vor ihrer Erfindung, ein Ereignis vor seinem tatsächlichen Datum), ist das ein Anachronismus. Für typ «anachronismus» gilt abweichend: stelle_a = wörtliches Zitat bzw. exakte Bezeichnung der Erwähnung im Buch; stelle_b = die etablierte Jahresangabe oder das datierte Ereignis, das die Erzählzeit festlegt – als Klartext-Jahresangabe OHNE «» (kein Buchzitat nötig). Beschreibung nennt das reale Datum (z.B. «Der Song … erschien erst 1991, die Handlung spielt 1985»). Nur melden, wenn du dir beim realen Datum sicher bist; im Zweifel weglassen.`;
+
 export function buildKontinuitaetChapterFactsPrompt(chapterName, chText) {
   return `Extrahiere alle konkreten Fakten und Behauptungen aus dem Kapitel «${chapterName}» die für die Kontinuitätsprüfung relevant sind: Figuren-Zustände (lebendig/tot, Verletzungen, Wissen, Beziehungen), Ortsbeschreibungen, Zeitangaben, Objekte und deren Besitz/Zustand, sowie wichtige Handlungsereignisse.
 
@@ -66,7 +93,7 @@ Kapiteltext:
 ${chText}`;
 }
 
-export function buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKompakt, orteKompakt) {
+export function buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKompakt, orteKompakt, anachronismus = null) {
   const factsText = chapterFacts.map(cf =>
     `## ${cf.kapitel}\n` + cf.fakten.map(f => `[${f.kategorie}] ${f.subjekt}: ${f.fakt}${f.seite ? ` (${f.seite})` : ''}`).join('\n')
   ).join('\n\n');
@@ -78,8 +105,9 @@ export function buildKontinuitaetCheckPrompt(bookName, chapterFacts, figurenKomp
   const orteStr = orteKompakt && orteKompakt.length
     ? '\n\n## Bekannte Schauplätze\n' + orteKompakt.map(o => `${o.name} (${o.typ || 'andere'}): ${o.beschreibung || ''}`).join('\n')
     : '';
+  const anachronismusStr = _buildAnachronismusBlock(anachronismus);
 
-  return `Prüfe das Buch «${bookName}» auf Kontinuitätsfehler und Widersprüche. Dir liegen die extrahierten Fakten aller Kapitel vor.${figurenStr}${disambigStr}${orteStr}
+  return `Prüfe das Buch «${bookName}» auf Kontinuitätsfehler und Widersprüche. Dir liegen die extrahierten Fakten aller Kapitel vor.${figurenStr}${disambigStr}${orteStr}${anachronismusStr}
 
 ## Extrahierte Fakten nach Kapitel:
 
@@ -92,7 +120,7 @@ Prüfe zusätzlich die Soziolekt-Kohärenz: Spricht jede Figur konsistent mit de
 Antworte mit diesem JSON-Schema:
 ${PROBLEME_SCHEMA}
 
-${PROBLEME_RULES}`;
+${PROBLEME_RULES}${anachronismusStr ? _ANACHRONISMUS_RULE : ''}`;
 }
 
 // Verify-Stufe für den Multi-Pass-Check: Der Fakten-basierte Check (buildKontinuitaetCheckPrompt)
@@ -123,7 +151,7 @@ Antworte mit diesem JSON-Schema:
 }`;
 }
 
-export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null } = {}) {
+export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null } = {}, anachronismus = null) {
   const figurenStr = figurenKompakt && figurenKompakt.length
     ? '\n\n## Bekannte Figuren\n' + figurenKompakt.map(f => `${f.name} (${f.typ || ''}): ${f.beschreibung || ''}`).join('\n')
     : '';
@@ -131,6 +159,7 @@ export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKom
   const orteStr = orteKompakt && orteKompakt.length
     ? '\n\n## Bekannte Schauplätze\n' + orteKompakt.map(o => `${o.name} (${o.typ || 'andere'}): ${o.beschreibung || ''}`).join('\n')
     : '';
+  const anachronismusStr = _buildAnachronismusBlock(anachronismus);
   const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
   const erzaehlformHint = (erzaehlperspektive || erzaehlzeit) && buchtyp !== 'kurzgeschichten'
     ? ' Erzählform-Brüche: Kapitel oder Passagen, die die oben angegebene Erzählperspektive oder Erzählzeit unbegründet verlassen (Wechsel nur an Szenen-/Kapitelgrenzen oder bei expliziten Rückblenden zulässig) – typ «sonstiges», Beschreibung: «Erzählform-Bruch: …».'
@@ -139,7 +168,7 @@ export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKom
   const textBlock = bookText == null
     ? 'Der Buchtext steht im System-Prompt oben.'
     : `Buchtext:\n\n${bookText}`;
-  return `Prüfe das Buch «${bookName}» auf Kontinuitätsfehler und Widersprüche.${figurenStr}${disambigStr}${orteStr}
+  return `Prüfe das Buch «${bookName}» auf Kontinuitätsfehler und Widersprüche.${figurenStr}${disambigStr}${orteStr}${anachronismusStr}
 ${povBlock}
 Suche aktiv nach: Figuren die nach ihrem Tod wieder auftauchen; Orte die sich widersprüchlich beschrieben werden; Zeitangaben die nicht vereinbar sind; Objekte die falsch verwendet werden; Figuren die Wissen haben das sie noch nicht haben könnten; Charakterverhalten das ihrer etablierten Persönlichkeit widerspricht; Soziolekt-Brüche: Figuren die plötzlich anders sprechen als durch ihre Herkunft, Bildung und soziale Schicht etabliert (Registerwechsel ohne dramaturgische Begründung).${erzaehlformHint}
 
@@ -148,5 +177,5 @@ ${textBlock}
 Antworte mit diesem JSON-Schema:
 ${PROBLEME_SCHEMA}
 
-${PROBLEME_RULES}`;
+${PROBLEME_RULES}${anachronismusStr ? _ANACHRONISMUS_RULE : ''}`;
 }
