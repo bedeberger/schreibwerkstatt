@@ -27,6 +27,14 @@ function _wrapP(text) {
 const HL_ALL = 'comment-rail-anchor';
 const HL_ACTIVE = 'comment-rail-anchor-active';
 
+// Read-Modus-Seitenansicht. Scope auf `.page-view-wrap`, weil der Edit-Modus
+// ein zweites, früher im DOM stehendes `.page-content-view--editing` (leerer
+// contenteditable) führt — ein nacktes querySelector('.page-content-view')
+// träfe das und fände nie die data-bid-Blöcke der gerenderten Leseansicht.
+function readView() {
+  return document.querySelector('.page-view-wrap .page-content-view');
+}
+
 function anchorOf(root) {
   return { bid: root.anchor_bid, quote: root.anchor_quote, start: root.anchor_start, end: root.anchor_end };
 }
@@ -47,8 +55,10 @@ export const editorCommentsRailMethods = {
     this._railAbort = new AbortController();
     // Buchwechsel: State leeren + Kommentare des neuen Buchs laden.
     this.$watch(() => window.__app?.selectedBookId, (id) => this._onBookChange(id));
-    // Seitenwechsel / Edit↔Read / frisch gerendertes Seiten-HTML → neu auflösen.
-    this.$watch(() => window.__app?.currentPage?.id, () => this.scheduleRecompute());
+    // Seitenwechsel: Leiste einklappen (Toggle ist pro Seite — sonst „folgt" der
+    // offene Zustand auf die nächste Seite, die zufällig Kommentare hat) + neu
+    // auflösen. Edit↔Read / frisch gerendertes Seiten-HTML nur neu auflösen.
+    this.$watch(() => window.__app?.currentPage?.id, () => { this.railVisible = false; this.scheduleRecompute(); });
     this.$watch(() => window.__app?.editMode, () => this.scheduleRecompute());
     this.$watch(() => window.__app?.checkDone, () => this.scheduleRecompute());
     this.$watch(() => window.__app?.renderedPageHtml, () => this.scheduleRecompute());
@@ -104,7 +114,7 @@ export const editorCommentsRailMethods = {
     const run = () => {
       const app = window.__app;
       const idle = !app || app.editMode || app.checkDone || !app.currentPage;
-      const rendered = !!(document.querySelector('.page-content-view') && app?.renderedPageHtml);
+      const rendered = !!(readView() && app?.renderedPageHtml);
       if (!idle && !rendered && (this._recomputeTries = (this._recomputeTries || 0) + 1) < 20) {
         this._recomputeRaf = requestAnimationFrame(() => setTimeout(run, 80));
         return;
@@ -123,7 +133,7 @@ export const editorCommentsRailMethods = {
       this._mirrorFlag();
       return;
     }
-    const view = document.querySelector('.page-content-view');
+    const view = readView();
     if (!view) { this.pageThreads = []; clearHighlights(); this._mirrorFlag(); return; }
 
     const blockIndex = new Map();
@@ -185,7 +195,7 @@ export const editorCommentsRailMethods = {
     if (api) { try { api.delete(HL_ACTIVE); } catch {} }
     if (!this.selectedRootId) return;
     const thread = this.pageThreads.find(t => t.root.id === rootId);
-    const view = document.querySelector('.page-content-view');
+    const view = readView();
     if (!thread || !view) return;
     const range = locateRange(view, anchorOf(thread.root));
     if (!range) return;

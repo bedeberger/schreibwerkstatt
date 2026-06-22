@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "6bc9a8ce14f4294e";
+self.__SHELL_BUILD = "0101cbd9fffafa2e";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -271,6 +271,7 @@ self.__SHELL_MANIFEST = [
   "/js/copy-button.js",
   "/js/country-codes.js",
   "/js/device-id.js",
+  "/js/editor/book-editor-comments.js",
   "/js/editor/comment-threads.js",
   "/js/editor/comments-rail.js",
   "/js/editor/draft-storage.js",

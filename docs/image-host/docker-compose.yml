@@ -1,0 +1,35 @@
+# Bild-Generierung fuer die Schreibwerkstatt via LocalAI auf einer NVIDIA
+# RTX 3060 (8 GB). LocalAI spricht das OpenAI-Image-Protokoll
+# (POST /v1/images/generations) nativ -- kein Adapter, kein Graph-Capture.
+#
+# Im Admin-Tab "Bilder" der Schreibwerkstatt traegst du als Host
+# http://<docker-host>:8080 ein.
+#
+# Voraussetzung: NVIDIA-Treiber + NVIDIA Container Toolkit auf dem Host
+# (sudo apt install nvidia-container-toolkit && sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker).
+
+services:
+  localai:
+    image: localai/localai:latest-gpu-nvidia-cuda-12
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - THREADS=8
+      # Auf 8 GB nur EIN Modell gleichzeitig im VRAM halten.
+      - LOCALAI_SINGLE_ACTIVE_BACKEND=true
+      # Idle-Watchdog: stoppt das Modell-Backend nach X Inaktivitaet und gibt damit
+      # den VRAM wieder frei (z.B. fuer InvokeAI). Naechster Bild-Request laedt es
+      # neu (kostet den einmaligen Lade-Overhead). Timeout nach Geschmack kuerzen.
+      - LOCALAI_WATCHDOG_IDLE=true
+      - LOCALAI_WATCHDOG_IDLE_TIMEOUT=5m
+    volumes:
+      # Hier liegen die Modell-YAMLs (models/) + von LocalAI gezogene Gewichte.
+      - ./models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

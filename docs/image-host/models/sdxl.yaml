@@ -1,0 +1,17 @@
+# SDXL — bessere Qualitaet, auf 8 GB nur knapp. Braucht CPU-Offload (low_vram)
+# und ist deutlich langsamer als SD 1.5. Nutze 1024x1024.
+name: sdxl
+backend: diffusers
+f16: true
+low_vram: true                  # sequentielles CPU-Offload; entlastet 8 GB VRAM.
+                                # Falls deine LocalAI-Version den Key nicht kennt:
+                                # Zeile entfernen + auf SD 1.5 (dreamshaper) ausweichen.
+parameters:
+  model: stabilityai/stable-diffusion-xl-base-1.0
+step: 28
+cfg_scale: 6.5
+diffusers:
+  cuda: true
+  pipeline_type: StableDiffusionXLPipeline
+  scheduler_type: k_dpmpp_2m
+  enable_parameters: "negative_prompt,num_inference_steps"

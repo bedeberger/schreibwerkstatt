@@ -15,7 +15,9 @@
 // Replace via Range.deleteContents + Text-Insert; Block wird dirty + queued.
 
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { attachFullscreenSync, toggleWrapFullscreen } from '../fullscreen.js';
 import { fromPages } from '../manuscript-stream.js';
+import { bookEditorCommentsMethods } from '../editor/book-editor-comments.js';
 import { stripFocusArtefacts, htmlToText, fetchJson, escHtml } from '../utils.js';
 import { handleEditorPaste, handleEditorCopy, handleEditorCut } from '../editor/shared/paste.js';
 import { savePage } from '../editor/shared/page-api.js';
@@ -128,6 +130,23 @@ export function registerBookEditorCard() {
     outlineOpen: true,
     _outlineObserver: null,
 
+    // Native-Fullscreen-Status (gespiegelt vom fullscreenchange-Listener) — mehr
+    // Platz für den Manuskript-Stream. Toggle in toggleBookEditorFullscreen.
+    bookEditorFullscreen: false,
+
+    // Kommentar-Leiste (verankerte Leser-Kommentare des ganzen Buchs) —
+    // Methoden in editor/book-editor-comments.js.
+    bookComments: [],
+    commentThreads: [],
+    commentSelectedRootId: null,
+    commentReplyDrafts: {},
+    commentSavingReply: null,
+    commentSavingResolve: null,
+    commentRailVisible: true,
+    _commentLoadingBookId: null,
+    _commentRecomputeRaf: null,
+    _pendingGotoBid: null,
+
     _lifecycle: null,
 
     init() {
@@ -143,6 +162,8 @@ export function registerBookEditorCard() {
           findOpen: false, findTerm: '', findReplace: '',
           findMatches: [], findIndex: -1,
           visiblePageId: null, collapsedChapters: {},
+          bookComments: [], commentThreads: [], commentSelectedRootId: null,
+          commentReplyDrafts: {}, commentSavingReply: null, commentSavingResolve: null,
         },
         load: (root) => this._load(root.selectedBookId),
       });
@@ -160,6 +181,22 @@ export function registerBookEditorCard() {
       window.addEventListener('book-editor:open-find', () => {
         if (window.__app?.showBookEditorCard) this.openFind();
       }, { signal: this._lifecycle.signal });
+
+      // Sprung aus der „Geteilte Links"-Karte (Buch-/Kapitel-Share): zur
+      // kommentierten Stelle im Stream + Thread in der Leiste öffnen.
+      window.addEventListener('book-editor:goto-comment', (e) => {
+        this.commentRailVisible = true;
+        this._pendingGotoBid = e.detail?.bid || null;
+        if (this.blocks.length) this._scheduleCommentRecompute();
+      }, { signal: this._lifecycle.signal });
+
+      // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit).
+      // $root = die Karten-Wurzel (.card--bookeditor), unabhängig vom Klick-Kontext.
+      attachFullscreenSync({
+        resolveWrap: () => this.$root,
+        signal: this._lifecycle.signal,
+        onChange: (active) => { this.bookEditorFullscreen = active; },
+      });
     },
 
     destroy() {
@@ -168,6 +205,8 @@ export function registerBookEditorCard() {
       this._autosaveTimers.clear();
       this._autosaveMaxTimers.clear();
       this._teardownOutlineObserver();
+      if (this._commentRecomputeRaf) { cancelAnimationFrame(this._commentRecomputeRaf); this._commentRecomputeRaf = null; }
+      this._clearCommentHL();
       clearHighlights();
       this._lifecycle?.destroy();
     },
@@ -191,11 +230,15 @@ export function registerBookEditorCard() {
         }
         // Outline-IntersectionObserver nach Render bauen.
         this.$nextTick(() => this._initOutlineObserver());
+        // Verankerte Leser-Kommentare des Buchs laden + über den Stream auflösen.
+        this._loadBookComments();
       } catch (e) {
         this.loading = false;
         this.loadError = e.message || 'Load failed';
       }
     },
+
+    ...bookEditorCommentsMethods,
 
     // ── Rendering-Sync ────────────────────────────────────────────────────
     // Initialer Mount-Hook (x-init). Setzt rev-Marker + Initial-Body imperativ.
@@ -753,6 +796,17 @@ export function registerBookEditorCard() {
       if (mod && !event.shiftKey && !event.altKey && (event.key === 's' || event.key === 'S')) {
         event.preventDefault();
         this.saveAllDirty();
+      }
+    },
+
+    // Ganze Bucheditor-Karte ins Native-Vollbild — mehr Platz für den Stream.
+    // Status-Sync via fullscreenchange-Listener in init() (bookEditorFullscreen).
+    async toggleBookEditorFullscreen() {
+      try {
+        await toggleWrapFullscreen(this.$root);
+      } catch {
+        const app = window.__app;
+        app?.setStatus?.(app.t('bookEditor.error.fullscreen'), true, 4000);
       }
     },
 

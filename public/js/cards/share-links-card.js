@@ -402,15 +402,15 @@ export function registerShareLinksCard() {
       if (!comment.anchor_bid) return;
       const app = window.__app;
       if (!app) return;
-      // Seite ermitteln: Page-Share = link.page_id; Chapter-Share = Block per
-      // bid serverseitig der Seite zuordnen (Anker speichert keine page_id).
-      let pageId = link.page_id;
+      // Buch-/Kapitel-Share: in den Bucheditor springen (ganzer Manuskript-Stream
+      // + Kommentar-Leiste über alle Seiten), Thread per data-bid dort öffnen.
       if (link.kind === 'chapter' || link.kind === 'book') {
-        try {
-          const r = await fetchJson(`/share/api/links/${encodeURIComponent(link.token)}/locate?bid=${encodeURIComponent(comment.anchor_bid)}`);
-          pageId = r && r.page_id;
-        } catch { pageId = null; }
+        if (!app.showBookEditorCard) await app.toggleBookEditorCard?.();
+        window.dispatchEvent(new CustomEvent('book-editor:goto-comment', { detail: { bid: comment.anchor_bid } }));
+        return;
       }
+      // Seiten-Share: Page-View (Notebook-Read-Modus) + Stelle transient markieren.
+      const pageId = link.page_id;
       if (!pageId) { this.loadError = window.__app.t('share.comments.pageGone'); return; }
       app.gotoPageById(pageId);
       this._highlightInEditor({

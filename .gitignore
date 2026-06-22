@@ -11,6 +11,7 @@ schreibwerkstatt.log.*
 schreibwerkstatt*.log
 ai_parse_fails/
 .DS_Store
+__pycache__/
 test-results/
 playwright-report/
 schreibwerkstatt.db.*.bak

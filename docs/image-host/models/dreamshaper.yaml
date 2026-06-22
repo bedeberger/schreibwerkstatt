@@ -1,0 +1,14 @@
+# SD 1.5 (DreamShaper) — sicherer Default auf 8 GB VRAM (~3-4 GB, schnell).
+# Der Name unten ist der Wert, den du im Admin-Tab "Bilder" als Modell eintraegst.
+name: dreamshaper
+backend: diffusers
+f16: true                       # float16 — halbiert den VRAM-Bedarf
+parameters:
+  model: Lykon/dreamshaper-8    # wird beim ersten Aufruf von HuggingFace gezogen
+step: 25
+cfg_scale: 7
+diffusers:
+  cuda: true
+  pipeline_type: StableDiffusionPipeline
+  scheduler_type: k_dpmpp_2m
+  enable_parameters: "negative_prompt,num_inference_steps"

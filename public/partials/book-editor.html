@@ -29,6 +29,16 @@
                 :aria-label="$app.t('bookEditor.btn.find')">
           <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#search"/></svg>
         </button>
+        <span class="icon-btn-badge-wrap" x-show="commentThreads.length > 0" x-cloak>
+          <button type="button" class="icon-btn icon-btn--ghost" @click="toggleCommentRail()"
+                  :class="{ 'is-active': commentRailVisible }"
+                  :aria-pressed="commentRailVisible"
+                  :data-tip="$app.t('share.rail.toggle')" :aria-label="$app.t('share.rail.toggle')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#quote"/></svg>
+          </button>
+          <span class="icon-btn-badge" x-text="commentThreads.length"
+                :data-tip="$app.t('share.openCommentsTitle', { n: commentThreads.length })"></span>
+        </span>
         <span class="icon-btn-badge-wrap">
           <button type="button" class="icon-btn icon-btn--ghost icon-btn--success" @click="saveAllDirty()"
                   :disabled="saveAllRunning || dirtyCount === 0"
@@ -39,6 +49,13 @@
           </button>
           <span class="icon-btn-badge" x-show="dirtyCount > 0" x-text="dirtyCount"></span>
         </span>
+        <button type="button" class="icon-btn icon-btn--ghost"
+                :aria-pressed="bookEditorFullscreen"
+                @click="toggleBookEditorFullscreen()"
+                :aria-label="bookEditorFullscreen ? $app.t('bookEditor.fullscreenExit.tip') : $app.t('bookEditor.fullscreen.tip')"
+                :data-tip="bookEditorFullscreen ? $app.t('bookEditor.fullscreenExit.tip') : $app.t('bookEditor.fullscreen.tip')">
+          <svg class="icon" aria-hidden="true"><use :href="bookEditorFullscreen ? '/icons.svg?v=693#minimize-2' : '/icons.svg?v=693#maximize-2'"/></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -49,7 +66,9 @@
   </div>
   <div x-show="loadError" class="card-status book-editor-load-error" x-text="loadError"></div>
 
-  <div class="book-editor-layout" :class="{ 'book-editor-layout--no-outline': !outlineOpen }"
+  <div class="book-editor-layout"
+       :class="{ 'book-editor-layout--no-outline': !outlineOpen,
+                 'book-editor-layout--comments': commentRailVisible && commentThreads.length }"
        x-show="!loading && blocks.length > 0">
 
     <!-- Outline / Inhaltsverzeichnis -->
@@ -173,13 +192,93 @@
       </div>
     </template>
     </div>
+
+    <!-- Kommentar-Leiste: verankerte Leser-Kommentare des ganzen Buchs (reuse
+         .comment-rail*-Optik). Methoden in editor/book-editor-comments.js. -->
+    <aside class="comment-rail book-editor-comments"
+           x-show="commentRailVisible && commentThreads.length" x-cloak
+           :aria-label="$app.t('share.rail.title')">
+      <div class="comment-rail__head">
+        <span class="comment-rail__title" x-text="$app.t('share.comments.countLabel', { count: commentThreads.length })"></span>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="toggleCommentRail()"
+                :data-tip="$app.t('share.rail.collapse')" :aria-label="$app.t('share.rail.collapse')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        </button>
+      </div>
+
+      <template x-for="thread in commentThreads" :key="thread.root.id">
+        <div class="comment-rail__thread"
+             :class="{ 'comment-rail__thread--selected': commentSelectedRootId === thread.root.id,
+                       'comment-rail__thread--resolved': thread.root.resolved_at }">
+
+          <div class="comment-rail__anchor internal-link" role="button" tabindex="0"
+               @click="selectCommentThread(thread.root.id)"
+               @keydown.enter.prevent="selectCommentThread(thread.root.id)">
+            <span class="comment-rail__quote" x-show="!thread.changed"
+                  x-text="'„' + (thread.root.anchor_quote || '') + '“'"></span>
+            <template x-if="thread.changed">
+              <div class="comment-rail__changed">
+                <span class="comment-rail__changed-badge" x-text="$app.t('share.comments.textChanged')"></span>
+                <div class="comment-rail-diff" x-show="thread._diffHtml" x-html="thread._diffHtml"></div>
+                <span class="comment-rail__quote comment-rail__quote--stale" x-show="!thread._diffHtml"
+                      x-text="'„' + (thread.root.anchor_quote || '') + '“'"></span>
+              </div>
+            </template>
+          </div>
+
+          <div class="comment-rail__comment">
+            <div class="comment-rail__meta">
+              <span x-text="commentAuthorLabel(thread.root)"></span>
+              <span x-show="thread.root.resolved_at" class="comment-rail__resolved"
+                    x-text="$app.t('share.comments.resolved')"></span>
+            </div>
+            <div class="comment-rail__body" x-text="thread.root.body"></div>
+          </div>
+
+          <template x-for="r in thread.replies" :key="r.id">
+            <div class="comment-rail__comment comment-rail__comment--reply"
+                 :class="{ 'comment-rail__comment--author': r.author_email }">
+              <div class="comment-rail__meta"><span x-text="commentAuthorLabel(r)"></span></div>
+              <div class="comment-rail__body" x-text="r.body"></div>
+              <button type="button" class="comment-rail__link" @click="deleteBookComment(r)"
+                      x-text="$app.t('common.delete')"></button>
+            </div>
+          </template>
+
+          <template x-if="commentSelectedRootId === thread.root.id">
+            <div class="comment-rail__foot">
+              <div class="comment-rail__actions">
+                <button type="button" class="comment-rail__link"
+                        :disabled="commentSavingResolve === thread.root.id"
+                        @click="toggleCommentResolve(thread.root)"
+                        x-text="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')"></button>
+                <button type="button" class="comment-rail__link comment-rail__link--danger"
+                        @click="deleteBookComment(thread.root)"
+                        x-text="$app.t('common.delete')"></button>
+              </div>
+              <form class="comment-rail__reply" @submit.prevent="replyToCommentRoot(thread)">
+                <textarea x-model="commentReplyDrafts[thread.root.id]" rows="2"
+                          :placeholder="$app.t('share.comments.replyPlaceholder')"
+                          maxlength="4000" data-spellcheck="spelling"
+                          class="comment-rail__textarea"></textarea>
+                <button type="submit" class="btn-compact"
+                        :disabled="commentSavingReply === thread.root.id || !(commentReplyDrafts[thread.root.id] || '').trim()"
+                        x-text="$app.t('share.comments.send')"></button>
+              </form>
+            </div>
+          </template>
+        </div>
+      </template>
+    </aside>
   </div>
 
   <div x-show="!loading && blocks.length === 0 && !loadError" class="card-status"
        x-text="$app.t('bookEditor.empty')"></div>
 
-  <!-- Find / Replace Bar — teleportiert nach <body>, damit position:fixed greift. -->
-  <template x-teleport="body">
+  <!-- Find / Replace Bar — teleportiert in die Karten-Wurzel (nicht <body>),
+       damit die Bar im Native-Vollbild Teil des Top-Layers bleibt; position:fixed
+       greift weiterhin (die Karte hat keinen persistenten Transform). -->
+  <template x-teleport=".card--bookeditor">
     <div x-show="findOpen && $app.showBookEditorCard" x-cloak
          class="book-editor-find"
          role="dialog"

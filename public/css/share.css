@@ -478,6 +478,28 @@ body.share-page {
   padding: 1px 6px;
   font-size: 11px;
 }
+/* „Stelle seither geändert": Quote→aktuell-Wortdiff unter der Anker-Zeile. */
+.share-thread__diff {
+  margin: 4px 0 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--share-muted);
+}
+.share-thread__diff ins.diff-add {
+  text-decoration: none;
+  background: color-mix(in srgb, #2e7d32 22%, transparent);
+  color: var(--share-text);
+  border-radius: var(--share-radius-sm);
+  padding: 0 2px;
+}
+.share-thread__diff del.diff-del {
+  text-decoration: line-through;
+  background: color-mix(in srgb, #c62828 20%, transparent);
+  color: var(--share-muted);
+  border-radius: var(--share-radius-sm);
+  padding: 0 2px;
+}
+
 .share-comment__who--author { color: var(--share-accent); font-weight: 600; }
 .share-thread__resolved-badge {
   display: inline-block;

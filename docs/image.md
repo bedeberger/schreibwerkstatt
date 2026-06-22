@@ -40,7 +40,7 @@ Die App spricht **ausschliesslich** das OpenAI-Image-Protokoll: `POST ${host}/v1
 
 ### Variante A — LocalAI (empfohlener Drop-in)
 
-[LocalAI](https://localai.io) exponiert `/v1/images/generations` nativ und rendert SD-/Flux-Modelle. Kein Adapter nötig.
+[LocalAI](https://localai.io) exponiert `/v1/images/generations` nativ und rendert SD-/Flux-Modelle. Kein Adapter nötig. Fertiges Rezept für eine **NVIDIA RTX 3060 (8 GB)** inkl. `docker-compose.yml` (GPU, Single-Active-Backend, Idle-Watchdog) + Modell-YAMLs (SD 1.5 / SDXL low-VRAM) + Admin-Setup: **[image-host/](image-host/)**.
 
 ```yaml
 # docker-compose.yml

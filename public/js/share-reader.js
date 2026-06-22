@@ -10,7 +10,7 @@
 // driften. Findet sich der Quote nicht mehr, bleibt der Thread gelistet, aber
 // ohne Inline-Highlight ("Stelle geändert").
 
-import { charOffset, locateRange } from './share-anchor.js';
+import { charOffset, locateRange, resolveCurrentQuote } from './share-anchor.js';
 
 (function () {
   const cfgEl = document.getElementById('share-config');
@@ -57,6 +57,39 @@ import { charOffset, locateRange } from './share-anchor.js';
     if (text != null) e.textContent = text;
     return e;
   }
+  // jsdiff lazy laden (vendor, cache-first; nur wenn eine Stelle seit dem
+  // Kommentar geändert wurde). Bewusst minimal statt page-revision-diff.js +
+  // utils.js zu importieren — hält das anonyme Reader-Bundle schlank.
+  let _diffPromise = null;
+  function loadDiffLib() {
+    if (typeof window.Diff !== 'undefined') return Promise.resolve(window.Diff);
+    if (!_diffPromise) {
+      _diffPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'vendor/diff-9.0.0.min.js';
+        s.onload = () => resolve(window.Diff);
+        s.onerror = reject;
+        document.head.appendChild(s);
+      }).catch((e) => { _diffPromise = null; throw e; });
+    }
+    return _diffPromise;
+  }
+
+  // Wort-Diff „Quote (damals) → aktueller Text" als del/ins-DOM-Knoten anhängen
+  // (textContent → kein XSS). Gleiche .diff-add/.diff-del-Optik wie der Editor.
+  function appendQuoteDiff(container, oldText, newText) {
+    loadDiffLib().then((Diff) => {
+      if (!Diff || typeof Diff.diffWords !== 'function') return;
+      const wrap = el('div', 'share-thread__diff');
+      for (const part of Diff.diffWords(oldText || '', newText || '')) {
+        if (part.added) wrap.appendChild(el('ins', 'diff-add', part.value));
+        else if (part.removed) wrap.appendChild(el('del', 'diff-del', part.value));
+        else wrap.appendChild(el('span', null, part.value));
+      }
+      container.appendChild(wrap);
+    }).catch(() => {});
+  }
+
   function fmtDate(iso) {
     try { return new Date(iso).toLocaleString(); } catch { return iso; }
   }
@@ -204,8 +237,20 @@ import { charOffset, locateRange } from './share-anchor.js';
       anchorRow.appendChild(label);
       const quote = el('span', 'share-thread__quote', '„' + (root.anchor.quote || '') + '"');
       anchorRow.appendChild(quote);
-      if (root._stale) {
+      // resolveCurrentQuote trennt „Block weg" (gone) von „Text geändert"
+      // (changed) — nur bei changed gibt es einen aktuellen Text zum Diffen.
+      const res = resolveCurrentQuote(article, root.anchor);
+      if (res.status === 'changed') {
+        anchorRow.appendChild(el('span', 'share-thread__stale', t('anchor_changed')));
+        li.appendChild(anchorRow);
+        // Platzhalter direkt unter der Anker-Zeile, damit der async geladene
+        // Diff an der richtigen Stelle landet (nicht ans li-Ende).
+        const diffBox = el('div');
+        li.appendChild(diffBox);
+        appendQuoteDiff(diffBox, root.anchor.quote || '', res.currentText || '');
+      } else if (root._stale || res.status === 'gone') {
         anchorRow.appendChild(el('span', 'share-thread__stale', t('anchor_stale')));
+        li.appendChild(anchorRow);
       } else {
         anchorRow.classList.add('share-thread__anchor--clickable');
         anchorRow.setAttribute('role', 'button');
@@ -213,8 +258,8 @@ import { charOffset, locateRange } from './share-anchor.js';
         const jump = () => scrollToAnchor(root.id);
         anchorRow.addEventListener('click', jump);
         anchorRow.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
+        li.appendChild(anchorRow);
       }
-      li.appendChild(anchorRow);
     }
 
     li.appendChild(renderMeta(root));

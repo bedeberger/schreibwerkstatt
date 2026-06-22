@@ -45,6 +45,12 @@ bash "$INSTALL_DIR/deploy/apply-migrations.sh" "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 npm install --omit=dev --quiet
 
+# Service-Unit startet via `node server.js` (nicht `npm start`) → das prestart-Hook
+# läuft auf Prod nie. Darum den Shell-Cache-Hash hier explizit aus dem deployten
+# Asset-Stand regenerieren. Idempotent: rsync lieferte exakt die CI-getesteten
+# Files, der Hash ist also identisch zum committeten Manifest.
+node scripts/sw-manifest.js
+
 # Service-Unit immer aktualisieren (User, Pfade etc. können sich ändern)
 if [ -f "$INSTALL_DIR/deploy/schreibwerkstatt.service" ]; then
   cp "$INSTALL_DIR/deploy/schreibwerkstatt.service" /etc/systemd/system/

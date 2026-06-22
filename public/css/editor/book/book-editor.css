@@ -17,6 +17,21 @@
   .book-editor-layout--no-outline {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* Kommentar-Leiste als dritte Spalte (Outline | Stream | Kommentare). */
+  .book-editor-layout--comments {
+    grid-template-columns: 280px minmax(0, 1fr) clamp(280px, 22vw, 340px);
+  }
+  .book-editor-layout--comments.book-editor-layout--no-outline {
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 22vw, 340px);
+  }
+  .book-editor-comments {
+    position: sticky;
+    top: var(--space-sm);
+    align-self: start;
+    max-height: calc(100dvh - 120px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 
   .book-editor-outline {
     position: sticky;
@@ -344,6 +359,14 @@
     color: var(--color-text);
   }
 
+  /* Verankerte Leser-Kommentar-Stellen (Kommentar-Leiste). */
+  ::highlight(book-editor-comment-anchor) {
+    background: color-mix(in srgb, var(--card-accent, currentColor) 16%, transparent);
+  }
+  ::highlight(book-editor-comment-anchor-active) {
+    background: color-mix(in srgb, var(--card-accent, currentColor) 42%, transparent);
+  }
+
   /* Konflikt-Banner — Marginalie, dünner Rail. */
   .book-editor-conflict {
     display: flex;
@@ -453,12 +476,33 @@
     font-size: var(--font-size-md);
   }
   .book-editor-find-close:hover { color: var(--color-text); }
+
+  /* ── Vollbild: ganze Karte nimmt den Viewport; der Stream behält seinen
+       lesbaren Reading-Frame (max-width auf dem Stream bleibt aktiv), die
+       Outline scrollt sticky mit. Distraktionsfreies Schreiben am ganzen Buch. */
+  .card--bookeditor:fullscreen {
+    position: fixed;
+    inset: 0;
+    background: var(--color-surface);
+    padding: var(--space-lg);
+    z-index: var(--z-overlay);
+    overflow-y: auto;
+  }
 }
 
 /* Mobile: Outline stapelt sich über den Stream, Stream nutzt ganze Breite.
    Viewport-bezogen — Bucheditor ist Hauptkarte, kein variabler Slot. */
 @media (max-width: 800px) {
-  .book-editor-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+  .book-editor-layout,
+  .book-editor-layout--comments,
+  .book-editor-layout--comments.book-editor-layout--no-outline { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+  .book-editor-comments {
+    position: static;
+    max-height: none;
+    margin-block-start: var(--space-md);
+    border-block-start: 1px solid var(--color-border);
+    padding-block-start: var(--space-md);
+  }
   .book-editor-outline {
     position: static;
     max-height: 200px;

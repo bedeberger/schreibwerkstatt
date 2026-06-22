@@ -253,7 +253,7 @@ router.get('/:token', async (req, res) => {
   // "application/json"> — `<` escapen, damit kein `</script>`-Breakout moeglich.
   const readerKeys = ['anchor_cta', 'composer_title', 'composer_general_title', 'reply',
     'reply_placeholder', 'send', 'cancel', 'you_badge', 'author_badge', 'resolved_badge',
-    'jump_to_text', 'anchor_stale', 'threads_heading', 'threads_empty', 'quote_label',
+    'jump_to_text', 'anchor_stale', 'anchor_changed', 'threads_heading', 'threads_empty', 'quote_label',
     'your_name', 'anon', 'comment_form_body', 'comment_form_submit', 'comment_submitted',
     'comment_rate_limited', 'form_empty', 'form_error'];
   const readerI18n = {};
