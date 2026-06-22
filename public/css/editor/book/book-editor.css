@@ -477,8 +477,8 @@
   }
   .book-editor-find-close:hover { color: var(--color-text); }
 
-  /* ── Vollbild: ganze Karte nimmt den Viewport; der Stream behält seinen
-       lesbaren Reading-Frame (max-width auf dem Stream bleibt aktiv), die
+  /* ── Vollbild: ganze Karte nimmt den Viewport; Outline, Stream und (falls
+       aktiv) Kommentar-Leiste verbreitern sich, um den Platz zu nutzen.
        Outline scrollt sticky mit. Distraktionsfreies Schreiben am ganzen Buch. */
   .card--bookeditor:fullscreen {
     position: fixed;
@@ -487,6 +487,21 @@
     padding: var(--space-lg);
     z-index: var(--z-overlay);
     overflow-y: auto;
+  }
+  .card--bookeditor:fullscreen .book-editor-layout {
+    grid-template-columns: 360px minmax(0, 1fr);
+  }
+  .card--bookeditor:fullscreen .book-editor-layout--no-outline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .card--bookeditor:fullscreen .book-editor-layout--comments {
+    grid-template-columns: 360px minmax(0, 1fr) clamp(320px, 26vw, 460px);
+  }
+  .card--bookeditor:fullscreen .book-editor-layout--comments.book-editor-layout--no-outline {
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 26vw, 460px);
+  }
+  .card--bookeditor:fullscreen .book-editor-stream {
+    max-width: 96ch;
   }
 }
 

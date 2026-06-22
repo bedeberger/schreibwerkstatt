@@ -142,7 +142,7 @@ export function registerBookEditorCard() {
     commentReplyDrafts: {},
     commentSavingReply: null,
     commentSavingResolve: null,
-    commentRailVisible: true,
+    commentRailVisible: false,
     _commentLoadingBookId: null,
     _commentRecomputeRaf: null,
     _pendingGotoBid: null,

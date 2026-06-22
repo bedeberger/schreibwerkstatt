@@ -101,9 +101,11 @@ export const bookEditorCommentsMethods = {
     this.commentThreads = onStream;
     if (this.commentSelectedRootId && !onStream.some(t => t.root.id === this.commentSelectedRootId)) this.commentSelectedRootId = null;
 
+    // Anker-Highlights nur bei sichtbarer Leiste — eingeklappt = Kommentare aus,
+    // also auch keine markierten Stellen im Stream.
     const api = highlightsApi();
     if (api) {
-      try { if (ranges.length) api.set(HL_ALL, new Highlight(...ranges)); else api.delete(HL_ALL); } catch {}
+      try { if (this.commentRailVisible && ranges.length) api.set(HL_ALL, new Highlight(...ranges)); else api.delete(HL_ALL); } catch {}
     }
     this._computeCommentDiffs();
 
@@ -206,7 +208,13 @@ export const bookEditorCommentsMethods = {
     } catch { /* no-op */ }
   },
 
-  toggleCommentRail() { this.commentRailVisible = !this.commentRailVisible; },
+  toggleCommentRail() {
+    this.commentRailVisible = !this.commentRailVisible;
+    // Highlights folgen der Sichtbarkeit: einblenden = neu lokalisieren+markieren,
+    // ausblenden = Anker-Markierung im Stream entfernen.
+    if (this.commentRailVisible) this._recomputeCommentThreads();
+    else this._clearCommentHL();
+  },
 
   _clearCommentHL() {
     const api = highlightsApi();

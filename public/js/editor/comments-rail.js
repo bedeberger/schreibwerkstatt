@@ -164,9 +164,11 @@ export const editorCommentsRailMethods = {
     this.pageThreads = onPage;
     if (this.selectedRootId && !onPage.some(t => t.root.id === this.selectedRootId)) this.selectedRootId = null;
 
+    // Anker-Highlights nur bei sichtbarer Leiste — eingeklappt = Kommentare aus,
+    // also auch keine markierten Stellen im Seitentext.
     const api = highlightsApi();
     if (api) {
-      try { if (ranges.length) api.set(HL_ALL, new Highlight(...ranges)); else api.delete(HL_ALL); } catch {}
+      try { if (this.railVisible && ranges.length) api.set(HL_ALL, new Highlight(...ranges)); else api.delete(HL_ALL); } catch {}
     }
     this._mirrorFlag();
     this._computeChangedDiffs();
@@ -276,8 +278,14 @@ export const editorCommentsRailMethods = {
     } catch { /* no-op */ }
   },
 
-  collapseRail() { this.railVisible = false; this._mirrorFlag(); },
-  toggleRail() { this.railVisible = !this.railVisible; this._mirrorFlag(); },
+  collapseRail() { this.railVisible = false; clearHighlights(); this._mirrorFlag(); },
+  toggleRail() {
+    this.railVisible = !this.railVisible;
+    // Highlights folgen der Sichtbarkeit: einblenden = neu lokalisieren+markieren,
+    // ausblenden = Anker-Markierung im Seitentext entfernen.
+    if (this.railVisible) this.recomputePageThreads();
+    else { clearHighlights(); this._mirrorFlag(); }
+  },
 
   // Root-Flag spiegeln: steuert die Grid-Klasse `comments-split` an
   // .editor-body-wrap (analog checkDone → lektorat-split). Zusätzlich die
