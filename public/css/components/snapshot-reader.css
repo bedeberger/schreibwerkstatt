@@ -14,7 +14,10 @@
   justify-content: center;
   align-items: flex-start;
   padding: var(--space-lg);
-  overflow: auto;
+  /* Kein Scroll auf dem Overlay selbst — der Body scrollt intern. Sonst
+     zentriert ein zu hohes Panel via margin/align und schneidet den Kopf ab
+     (Flex-Center-Overflow-Falle), der dann nicht mehr erreichbar ist. */
+  overflow: hidden;
 }
 
 .snapshot-reader__backdrop {
@@ -28,19 +31,19 @@
   position: relative;
   z-index: var(--z-modal-front);
   width: min(60rem, 100%);
-  margin: auto 0;
+  max-height: 100%;          /* passt in die Overlay-Padding-Box */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;          /* Kopf/Toolbar fix, nur der Body scrollt */
   background: var(--color-bg);
   border: var(--border-thin);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
 }
 
+/* Fixe Regionen oben (kein Sticky, kein Mitscrollen). */
 .snapshot-reader__header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  flex: none;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -56,6 +59,7 @@
 .snapshot-reader__date { color: var(--color-muted); font-size: 0.85em; }
 
 .snapshot-reader__export {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -66,10 +70,27 @@
 .snapshot-reader__export-label { font-weight: 600; margin-right: var(--space-xs); }
 .snapshot-reader__pdf { display: flex; align-items: center; gap: var(--space-sm); }
 
-.snapshot-reader__status { padding: 0 var(--space-lg) var(--space-sm); font-size: 0.9em; }
-.snapshot-reader__hint { padding: var(--space-sm) var(--space-lg); color: var(--color-muted); font-size: 0.85em; }
+.snapshot-reader__status { flex: none; padding: 0 var(--space-lg) var(--space-sm); font-size: 0.9em; }
+.snapshot-reader__hint { flex: none; padding: var(--space-sm) var(--space-lg); color: var(--color-muted); font-size: 0.85em; }
 
-.snapshot-reader__body { padding: var(--space-md) var(--space-lg) var(--space-2xl); }
+/* Scrollender Bereich. min-height:0 ist Pflicht, damit das Flex-Item unter
+   seine Inhaltshöhe schrumpfen und überhaupt scrollen darf. Sichtbarer
+   Scrollbalken via scrollbar-gutter + scrollbar-width. */
+.snapshot-reader__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  padding: var(--space-md) var(--space-lg) var(--space-2xl);
+}
+.snapshot-reader__body::-webkit-scrollbar { width: 10px; }
+.snapshot-reader__body::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-bg);
+}
+.snapshot-reader__body::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
 
 /* Stream erbt Papier-Look + Typografie aus book-editor.css. Im Overlay zentriert
    das Panel bereits — die Stream-Eigen-Margin auf 0. */
