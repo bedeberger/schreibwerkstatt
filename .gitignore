@@ -15,8 +15,9 @@ __pycache__/
 test-results/
 playwright-report/
 schreibwerkstatt.db.*.bak
-# Verirrte SQLite-Datei (nicht vom App-Pfad genutzt; Default ist schreibwerkstatt.db)
+# Verirrte SQLite-Dateien (nicht vom App-Pfad genutzt; Default ist schreibwerkstatt.db)
 app.db
+data.db
 # Output-Intent-ICC: Binaerprofil, per Deploy-Migration geladen (assets/icc/README.md)
 assets/icc/*.icc
 
