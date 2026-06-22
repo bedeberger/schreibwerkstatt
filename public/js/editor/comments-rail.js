@@ -53,6 +53,9 @@ export const editorCommentsRailMethods = {
     this.$watch(() => window.__app?.checkDone, () => this.scheduleRecompute());
     this.$watch(() => window.__app?.renderedPageHtml, () => this.scheduleRecompute());
     window.addEventListener('view:reset', () => this._onBookChange(null), { signal: this._railAbort.signal });
+    // Toggle-Button in den Seiten-Actions (Root-Scope) steuert die Sichtbarkeit
+    // per Window-Event (Trampolin, da der Button nicht im Karten-Scope liegt).
+    window.addEventListener('comments-rail:toggle', () => this.toggleRail(), { signal: this._railAbort.signal });
     // Initial laden, falls schon ein Buch offen ist.
     const id = window.__app?.selectedBookId;
     if (id) this._onBookChange(id);
@@ -64,14 +67,14 @@ export const editorCommentsRailMethods = {
     if (this._railActiveTimer) { clearTimeout(this._railActiveTimer); this._railActiveTimer = null; }
     clearHighlights();
     const app = window.__app;
-    if (app) app.pageCommentRailOpen = false;
+    if (app) { app.pageCommentRailOpen = false; app.pageCommentCount = 0; }
   },
 
   async _onBookChange(bookId) {
     this.bookComments = [];
     this.pageThreads = [];
     this.selectedRootId = null;
-    this.railVisible = true;
+    this.railVisible = false;
     clearHighlights();
     this._mirrorFlag();
     if (!bookId) return;
@@ -187,8 +190,22 @@ export const editorCommentsRailMethods = {
     const range = locateRange(view, anchorOf(thread.root));
     if (!range) return;
     if (api) { try { api.set(HL_ACTIVE, new Highlight(range)); } catch {} }
+    this._scrollRangeIntoView(range);
+  },
+
+  // Im Desktop-Split scrollt .editor-preview-wrap selbst (overflow-y:auto,
+  // height:100%) — window.scrollTo greift dort nicht. Gestapelt (<1100px)
+  // scrollt das Fenster. Scroll-Container daher dynamisch wählen.
+  _scrollRangeIntoView(range) {
     const r = range.getBoundingClientRect();
-    if (r && r.height) window.scrollTo({ top: window.scrollY + r.top - 140, behavior: 'smooth' });
+    if (!r || !r.height) return;
+    const pane = document.querySelector('.editor-preview-wrap');
+    if (pane && pane.scrollHeight > pane.clientHeight + 1) {
+      const paneRect = pane.getBoundingClientRect();
+      pane.scrollTo({ top: pane.scrollTop + (r.top - paneRect.top) - 80, behavior: 'smooth' });
+      return;
+    }
+    window.scrollTo({ top: window.scrollY + r.top - 140, behavior: 'smooth' });
   },
 
   commentAuthorLabel(c) {
@@ -250,15 +267,17 @@ export const editorCommentsRailMethods = {
   },
 
   collapseRail() { this.railVisible = false; this._mirrorFlag(); },
-  expandRail() { this.railVisible = true; this._mirrorFlag(); },
+  toggleRail() { this.railVisible = !this.railVisible; this._mirrorFlag(); },
 
   // Root-Flag spiegeln: steuert die Grid-Klasse `comments-split` an
-  // .editor-body-wrap (analog checkDone → lektorat-split). window.__app ist der
-  // reaktive Alpine-Proxy.
+  // .editor-body-wrap (analog checkDone → lektorat-split). Zusätzlich die
+  // verankerte Thread-Anzahl spiegeln (Badge + Sichtbarkeit des Toggle-Buttons
+  // in den Seiten-Actions). window.__app ist der reaktive Alpine-Proxy.
   _mirrorFlag() {
     const app = window.__app;
     if (!app) return;
-    app.pageCommentRailOpen = !!(this.railVisible && this.pageThreads.length
-      && !app.editMode && !app.checkDone);
+    const onPage = !app.editMode && !app.checkDone ? this.pageThreads.length : 0;
+    app.pageCommentCount = onPage;
+    app.pageCommentRailOpen = !!(this.railVisible && onPage);
   },
 };

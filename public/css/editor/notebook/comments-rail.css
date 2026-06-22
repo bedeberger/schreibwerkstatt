@@ -179,27 +179,6 @@
   .comment-rail__textarea { font-size: var(--font-size-reading); }
 }
 
-/* Eingeklappt: schwebender Wieder-Öffnen-Chip. */
-.comment-rail-fab {
-  position: fixed;
-  right: var(--space-md);
-  bottom: var(--space-md);
-  z-index: var(--z-sticky);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-  padding: var(--pad-badge);
-  background: var(--card-accent-share);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.comment-rail-fab .icon { width: 16px; height: 16px; }
-
 /* Verankerte Stellen im Text: dezent alle, kräftig die selektierte.
    CSS Custom Highlight Registry — paint-only, keine DOM-Mutation. */
 ::highlight(comment-rail-anchor) {

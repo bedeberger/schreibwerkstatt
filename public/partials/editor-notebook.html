@@ -167,6 +167,12 @@
               </button>
               <span class="icon-btn-badge" x-show="currentPageChatSessionCount > 0" x-text="currentPageChatSessionCount" :data-tip="t('editor.btn.chatCountTitle', { n: currentPageChatSessionCount })"></span>
             </span>
+            <span class="icon-btn-badge-wrap" x-show="pageCommentCount > 0">
+              <button type="button" class="icon-btn icon-btn--ghost" @click="window.dispatchEvent(new CustomEvent('comments-rail:toggle'))" :class="{ 'is-active': pageCommentRailOpen }" :data-tip="t('share.rail.toggle')" :aria-label="t('share.rail.toggle')" :aria-pressed="pageCommentRailOpen">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#quote"/></svg>
+              </button>
+              <span class="icon-btn-badge" x-text="pageCommentCount" :data-tip="t('share.openCommentsTitle', { n: pageCommentCount })"></span>
+            </span>
             <span class="action-overflow" @click.outside="pageActionsMenuOpen = false" @keydown.escape.window="pageActionsMenuOpen = false">
               <span class="icon-btn-badge-wrap">
                 <button type="button" class="icon-btn icon-btn--ghost"

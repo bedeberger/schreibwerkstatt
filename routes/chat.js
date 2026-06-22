@@ -191,10 +191,18 @@ router.get('/image/:id', (req, res) => {
   if (!row) return res.status(404).json({ error_code: 'IMAGE_NOT_FOUND' });
   if (row.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
 
-  const ext = (row.mime && row.mime.split('/')[1]) || 'png';
-  res.setHeader('Content-Type', row.mime || 'image/png');
+  // Defense-in-depth gegen Stored XSS: row.mime stammt letztlich aus dem
+  // (untrusted) Upstream-Image-Endpunkt. Nur Raster-MIMEs inline ausliefern;
+  // alles andere als Download mit neutralem Typ. nosniff + restriktive CSP
+  // verhindern, dass der Browser den Body als HTML/Script interpretiert.
+  const SAFE_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+  const safe = SAFE_IMAGE_MIME.has(row.mime);
+  const ext = (safe && row.mime.split('/')[1]) || 'png';
+  res.setHeader('Content-Type', safe ? row.mime : 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
   res.setHeader('Cache-Control', 'private, max-age=3600');
-  if (req.query.download) {
+  if (req.query.download || !safe) {
     res.setHeader('Content-Disposition', `attachment; filename="bild-${id}.${ext}"`);
   }
   res.setHeader('Content-Length', row.image.length);

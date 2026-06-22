@@ -93,14 +93,4 @@
       </div>
     </template>
   </aside>
-
-  <!-- Eingeklappt: schwebender Wieder-Öffnen-Chip mit Anzahl. -->
-  <button type="button" class="comment-rail-fab"
-          x-show="!railVisible && pageThreads.length && !$app.editMode && !$app.checkDone"
-          x-cloak
-          @click="expandRail()"
-          :aria-label="$app.t('share.rail.reopen', { n: pageThreads.length })">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#message-square"/></svg>
-    <span x-text="pageThreads.length"></span>
-  </button>
 </div>

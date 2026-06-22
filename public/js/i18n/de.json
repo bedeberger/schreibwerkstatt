@@ -3460,7 +3460,7 @@
   "share.comments.pageGone": "Die Seite zu dieser Markierung existiert nicht mehr.",
   "share.rail.title": "Kommentare",
   "share.rail.collapse": "Kommentar-Leiste einklappen",
-  "share.rail.reopen": "{n} Kommentare anzeigen",
+  "share.rail.toggle": "Kommentare ein-/ausblenden",
   "share.error.pageRequired": "Bitte Seite wählen.",
   "share.error.chapterRequired": "Bitte Kapitel wählen.",
   "share.error.bookRequired": "Kein Buch ausgewählt.",

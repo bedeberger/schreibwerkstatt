@@ -16,7 +16,7 @@ export function registerEditorCommentsCard() {
     bookComments: [],     // Rohzeilen aller Link-Kommentare des Buchs
     pageThreads: [],      // Threads, die auf der aktuellen Seite verankert sind
     selectedRootId: null,
-    railVisible: true,
+    railVisible: false,  // Default verborgen; Sichtbarkeit über Toggle-Button in den Seiten-Actions
     replyDrafts: {},
     savingReply: null,
     savingResolve: null,

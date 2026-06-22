@@ -3460,7 +3460,7 @@
   "share.comments.pageGone": "The page for this highlight no longer exists.",
   "share.rail.title": "Comments",
   "share.rail.collapse": "Collapse comment rail",
-  "share.rail.reopen": "Show {n} comments",
+  "share.rail.toggle": "Toggle comments",
   "share.error.pageRequired": "Please pick a page.",
   "share.error.chapterRequired": "Please pick a chapter.",
   "share.error.bookRequired": "No book selected.",

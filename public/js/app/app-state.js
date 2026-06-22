@@ -211,8 +211,12 @@ const pageState = () => ({
   currentPageChatSessionCount: 0,
   // Kommentar-Leiste (Leseansicht): die editorCommentsCard spiegelt hierhin,
   // ob sie für die offene Seite Threads zeigt → Grid-Klasse `comments-split`
-  // an .editor-body-wrap (analog checkDone → lektorat-split).
+  // an .editor-body-wrap (analog checkDone → lektorat-split). pageCommentCount
+  // ist die Anzahl auf der Seite verankerter Threads (unabhängig von der
+  // Sichtbarkeit) — speist Badge + Sichtbarkeit des Toggle-Buttons in den
+  // Seiten-Actions.
   pageCommentRailOpen: false,
+  pageCommentCount: 0,
   renderedPageHtml: '',
   chapterFigures: [],
   showChapterFigures: false,
