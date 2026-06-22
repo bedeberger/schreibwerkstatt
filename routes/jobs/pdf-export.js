@@ -25,6 +25,8 @@ const {
   getAuthorImage: getBookPublicationAuthorImage,
 } = require('../../db/book-publication');
 const { loadContents } = require('../../lib/load-contents');
+const { getSnapshot } = require('../../db/book-snapshots');
+const { snapshotToBundle } = require('../../lib/snapshot-export');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { renderCoverBuffer, computeSpineMm } = require('../../lib/pdf-cover-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
@@ -49,7 +51,7 @@ function _scheduleResultCleanup(jobId) {
   t.unref?.();
 }
 
-async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target = 'interior', userEmail, userToken }) {
+async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target = 'interior', snapshotId = null, userEmail, userToken }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
 
@@ -60,12 +62,26 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     if (profile.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
     updateJob(jobId, { progress: 10, statusText: 'job.phase.loadBook' });
-    const bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+    // snapshotId gesetzt → Bundle aus dem selbsttragenden Fassungs-Stand bauen
+    // (scope ist dann immer 'book', entityId = bookId). Sonst Live-Buchinhalt.
+    let bundle;
+    if (snapshotId) {
+      const snap = getSnapshot(entityId, snapshotId);
+      if (!snap) throw i18nError('job.error.snapshotNotFound');
+      let content;
+      try { content = JSON.parse(snap.content_json); }
+      catch { throw i18nError('job.error.snapshotCorrupt'); }
+      bundle = snapshotToBundle(content, { bookId: entityId });
+      if (!bundle.groups.length) throw i18nError('job.error.snapshotCorrupt');
+    } else {
+      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+    }
     const { book, chapter, page, groups } = bundle;
+    const snapDetail = snapshotId ? `, fassungId=${snapshotId}` : '';
     const scopeDetail = scope === 'chapter' && chapter?.id ? `, chapter=${chapter.id}${includeSubchapters ? '+sub' : ''}`
                       : scope === 'page'    && page?.id    ? `, page=${page.id}`
                       : '';
-    log.info(`Start PDF-Export «${book.name}» (scope=${scope}${scopeDetail}, profile=${profile.name})`);
+    log.info(`Start PDF-Export «${book.name}» (scope=${scope}${scopeDetail}${snapDetail}, profile=${profile.name})`);
 
     updateJob(jobId, { progress: 30, statusText: 'job.phase.loadPages' });
 
@@ -227,12 +243,15 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   const userEmail = req.session?.user?.email || null;
   const userToken = null;
 
-  const rawTarget = String(req.body?.target || 'interior').toLowerCase();
+  // Fassungs-Export: snapshotId gesetzt → immer ganzes Buch, Innenteil.
+  const snapshotId = toIntId(req.body?.snapshot_id || req.body?.snapshotId);
+
+  const rawTarget = snapshotId ? 'interior' : String(req.body?.target || 'interior').toLowerCase();
   const target = VALID_TARGETS.has(rawTarget) ? rawTarget : null;
   if (!target) return res.status(400).json({ error_code: 'BAD_TARGET' });
 
-  // Umschlag-PDF gibt es nur fuer das ganze Buch.
-  const rawScope = target === 'cover' ? 'book' : String(req.body?.scope || 'book').toLowerCase();
+  // Umschlag-PDF gibt es nur fuer das ganze Buch; Fassungs-Export ebenso.
+  const rawScope = (target === 'cover' || snapshotId) ? 'book' : String(req.body?.scope || 'book').toLowerCase();
   const scope = VALID_SCOPES.has(rawScope) ? rawScope : null;
   if (!scope) return res.status(400).json({ error_code: 'BAD_SCOPE' });
 
@@ -244,6 +263,11 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   const profile = getPdfExportProfile(profileId);
   if (!profile) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
   if (profile.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+
+  // Fassung muss existieren (entityId ist bei snapshotId immer die bookId).
+  if (snapshotId && !getSnapshot(entityId, snapshotId)) {
+    return res.status(404).json({ error_code: 'SNAPSHOT_NOT_FOUND' });
+  }
 
   // Buch-ID fuer Logging + Dedup ableiten: bei scope='book' === entityId,
   // sonst via content-store-Lookup (Chapter/Page).
@@ -272,12 +296,12 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
 
-  const dedupId = `${target}:${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}`;
+  const dedupId = `${target}:${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}`;
   const existing = findActiveJobId('pdf-export', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('pdf-export', bookId, userEmail, 'job.label.pdfExportProfile', { profile: profile.name }, dedupId);
-  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target, userEmail, userToken }));
+  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target, snapshotId, userEmail, userToken }));
   res.status(202).json({ jobId });
 });
 

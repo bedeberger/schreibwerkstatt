@@ -14,25 +14,9 @@ const { FORMATS } = require('../lib/export-builders');
 const { buildExportFilename } = require('../lib/filenames');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
-const { getBookSettings } = require('../db/schema');
-const { getOwnerEmail } = require('../db/book-access');
-const { getUser } = require('../db/app-users');
+const { buildExportMeta, sendExportBuffer } = require('../lib/export-send');
 
 const router = express.Router();
-
-// Buch-Sprache (book_settings) + Autor (Owner-Anzeigename) fuer die Builder.
-// EPUB/DOCX schreiben dc:language / dc:creator daraus; das Domain-Shape von
-// loadContents fuehrt beides (noch) nicht.
-function _exportMeta(bookId) {
-  if (!bookId) return { lang: 'de', author: '' };
-  const lang = getBookSettings(bookId)?.language || 'de';
-  let author = '';
-  try {
-    const ownerEmail = getOwnerEmail(bookId);
-    if (ownerEmail) author = getUser(ownerEmail)?.display_name || '';
-  } catch { /* Owner/User nicht aufloesbar -> Autor leer */ }
-  return { lang, author };
-}
 
 const VALID_SCOPES = new Set(['book', 'chapter', 'page']);
 
@@ -65,23 +49,7 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
 
-  const buildOpts = _exportMeta(bundle.book?.id);
-  // EPUB konsumiert zusaetzlich die buch-weiten Publikations-Metadaten
-  // (Cover/Titelei/Bio). Lazy geladen — nur fuer epub, nur die BLOBs bei Bedarf.
-  if (fmt === 'epub' && bundle.book?.id) {
-    try {
-      const bp = require('../db/book-publication');
-      const meta = bp.getMeta(bundle.book.id);
-      buildOpts.meta = meta;
-      // Publikationsname (book_publication.author_name) uebersteuert den Account-Namen.
-      if ((meta.author_name || '').trim()) buildOpts.author = meta.author_name.trim();
-      buildOpts.tocTitle = meta.epub_toc_title || undefined;
-      if (meta.has_cover) buildOpts.cover = bp.getCover(bundle.book.id);
-      if (meta.has_author_image) buildOpts.authorImage = bp.getAuthorImage(bundle.book.id);
-    } catch (e) {
-      logger.warn(`Publikations-Metadaten fuer EPUB nicht ladbar (book=${bundle.book.id}): ${e.message}`);
-    }
-  }
+  const buildOpts = buildExportMeta(bundle.book?.id, fmt);
 
   let buf;
   try {
@@ -90,7 +58,6 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
     logger.error(`Export-Build fehlgeschlagen (scope=${scope}, id=${id}, fmt=${fmt}): ${e.message}`);
     return res.status(502).json({ error_code: 'EXPORT_FAILED' });
   }
-  if (!Buffer.isBuffer(buf)) buf = Buffer.from(buf);
 
   const { resolveSlug } = require('../lib/export-builders/shared');
   const slug = resolveSlug(bundle);
@@ -99,20 +66,10 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
   const scopeDetail = scope === 'chapter' && bundle.chapter?.id ? `, chapter=${bundle.chapter.id}`
                     : scope === 'page'    && bundle.page?.id    ? `, page=${bundle.page.id}`
                     : '';
-  const sizeKb = Math.round(buf.length / 1024);
+  const sizeKb = Math.round((Buffer.isBuffer(buf) ? buf.length : Buffer.byteLength(buf)) / 1024);
   logger.info(`Export «${filename}» (${sizeKb} KB, scope=${scope}${scopeDetail}, fmt=${fmt})`);
 
-  res.setHeader('Content-Type', spec.mime);
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  if (spec.bom) {
-    const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
-    res.setHeader('Content-Length', bom.length + buf.length);
-    res.write(bom);
-    res.end(buf);
-    return;
-  }
-  res.setHeader('Content-Length', buf.length);
-  res.end(buf);
+  sendExportBuffer(res, { spec, buf, filename });
 });
 
 module.exports = router;

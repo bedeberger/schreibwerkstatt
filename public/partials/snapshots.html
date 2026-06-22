@@ -1,7 +1,7 @@
 <!-- Manuskript-Meilensteine („Fassung 1/2/3").
      Alpine.data-Sub-Komponente — siehe public/js/cards/snapshots-card.js.
      `showSnapshotsCard` bleibt im Root (Hash-Router + Exklusivitaet),
-     fachlicher State in dieser Komponente. v1: Lese-/Diff-only. -->
+     fachlicher State in dieser Komponente. -->
 <div class="card card--snapshots" x-data="snapshotsCard" x-show="$app.showSnapshotsCard" x-cloak>
   <div class="card-header">
     <div class="card-header-titlebar">
@@ -92,6 +92,9 @@
             <td class="snapshots-num" x-text="formatNum(s.chapters)"></td>
             <td>
               <div class="snapshots-actions">
+                <button type="button" class="btn-compact"
+                        @click="openSnapshot(s)"
+                        x-text="$app.t('snapshots.open')"></button>
                 <button type="button" class="btn-compact"
                         @click="restoreSnapshot(s)"
                         :disabled="restoringId === s.id || deletingId === s.id"
@@ -197,4 +200,66 @@
       </div>
     </template>
   </section>
+
+  <!-- Reader: Fassung nur-lesend oeffnen (Modal-Charakter). -->
+  <div class="snapshot-reader" x-show="readerOpen" x-cloak
+       @keydown.escape.window="readerOpen && closeReader()"
+       role="dialog" aria-modal="true" :aria-label="$app.t('snapshots.reader.title')">
+    <div class="snapshot-reader__backdrop" @click="closeReader()"></div>
+    <div class="snapshot-reader__panel">
+      <header class="snapshot-reader__header">
+        <div class="snapshot-reader__titles">
+          <span class="snapshot-reader__title" x-text="readerSnap ? fassungLabel(readerSnap) : ''"></span>
+          <span class="snapshot-reader__date" x-show="readerSnap"
+                x-text="readerSnap ? $app.formatDate(readerSnap.created_at) : ''"></span>
+        </div>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="closeReader()"
+                :aria-label="$app.t('snapshots.reader.close')" :data-tip="$app.t('snapshots.reader.close')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        </button>
+      </header>
+
+      <!-- Export-Leiste: Schnell-Formate (Download-Links) + PDF (Profil + Job). -->
+      <div class="snapshot-reader__export">
+        <span class="snapshot-reader__export-label" x-text="$app.t('snapshots.export.heading')"></span>
+        <template x-for="f in quickFormats()" :key="f">
+          <a class="btn-compact" :href="exportUrl(f)" x-text="formatLabel(f)"></a>
+        </template>
+        <div class="snapshot-reader__pdf" x-show="pdfProfiles.length">
+          <div x-data="combobox($app.t('snapshots.export.pdfProfile'))"
+               x-modelable="value" x-model="pdfProfileId"
+               x-effect="options = pdfProfiles.map(p => ({ value: String(p.id), label: p.name }))"></div>
+          <button type="button" class="btn-compact" @click="exportPdf()"
+                  :disabled="pdfExporting || !pdfProfileId"
+                  x-text="pdfExporting ? $app.t('snapshots.export.creating') : $app.t('snapshots.export.pdfCreate')"></button>
+        </div>
+        <span class="muted-msg muted-msg--sm" x-show="!pdfProfiles.length"
+              x-text="$app.t('snapshots.export.pdfNoProfiles')"></span>
+      </div>
+      <div class="snapshot-reader__status" x-show="pdfStatus" x-cloak x-text="pdfStatus"></div>
+      <div class="snapshot-reader__status muted-msg--error" x-show="pdfError" x-cloak x-text="pdfError"></div>
+      <p class="snapshot-reader__hint" x-text="$app.t('snapshots.reader.hint')"></p>
+
+      <!-- Body: Kapitel-Ueberschriften + Seiten im Buchsatz. -->
+      <div class="snapshot-reader__body">
+        <div x-show="readerLoading" class="muted-msg" x-text="$app.t('snapshots.reader.loading')"></div>
+        <div x-show="!readerLoading && !readerSections.length" class="muted-msg"
+             x-text="$app.t('snapshots.reader.empty')"></div>
+        <template x-for="s in readerSections" :key="s.key">
+          <div>
+            <template x-if="s.kind === 'chapter'">
+              <div class="snapshot-reader__chapter" :class="'snapshot-reader__chapter--d' + s.depth"
+                   x-text="s.name || $app.t('snapshots.untitled')"></div>
+            </template>
+            <template x-if="s.kind === 'page'">
+              <article class="snapshot-reader__page">
+                <div class="snapshot-reader__page-name" x-show="s.name" x-text="s.name"></div>
+                <div class="page-content-view" x-html="s.html"></div>
+              </article>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
 </div>

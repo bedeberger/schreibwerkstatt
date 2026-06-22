@@ -15,6 +15,10 @@ const { getBookSettings, saveBookSettings, setBookEntitiesEnabled } = require('.
 const { treeToNodes, buildBookJson, validateBookJson, planFromNodes } = require('../lib/book-bundle');
 const { collectExtras } = require('../db/book-migration-data');
 const { htmlToPlainText } = require('../lib/html-text');
+const { snapshotToBundle } = require('../lib/snapshot-export');
+const { FORMATS } = require('../lib/export-builders');
+const { buildExportMeta, sendExportBuffer } = require('../lib/export-send');
+const { buildExportFilename } = require('../lib/filenames');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
@@ -158,6 +162,54 @@ router.get('/:bookId/:id', (req, res) => {
       content,
     },
   });
+});
+
+// ── Export (Fassung in pdf/html/txt/md/epub/docx) ───────────────────────────────
+// Exportiert den selbsttragenden Stand der Fassung — unabhaengig vom aktuellen
+// Buchinhalt. PDF laeuft NICHT hier, sondern als Job (routes/jobs/pdf-export.js
+// mit snapshotId), wegen Render-Dauer + Profil-Auswahl. Synchroner Pfad wie
+// routes/export.js (reiner DB-Read + Build).
+router.get('/:bookId/:id/export/:fmt', async (req, res) => {
+  const bookId = toIntId(req.params.bookId);
+  const id = toIntId(req.params.id);
+  const fmt = String(req.params.fmt || '').toLowerCase();
+  if (!bookId || !id) return res.status(400).json({ error_code: 'ID_REQUIRED' });
+  setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, 'viewer'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+
+  // PDF laeuft ausschliesslich ueber den Job-Pfad (Custom-Profile) — hier nicht.
+  const spec = fmt === 'pdf' ? null : FORMATS[fmt];
+  if (!spec) return res.status(400).json({ error_code: 'BAD_FORMAT' });
+
+  const row = snapshots.getSnapshot(bookId, id);
+  if (!row) return res.status(404).json({ error_code: 'SNAPSHOT_NOT_FOUND' });
+
+  let bundle;
+  try {
+    const content = JSON.parse(row.content_json);
+    validateBookJson(content);
+    bundle = snapshotToBundle(content, { bookId });
+    if (!bundle.groups.length) throw _err('CORRUPT_SNAPSHOT');
+  } catch (e) {
+    logger.error(`Fassungs-Export: Fassung defekt (book=${bookId}, id=${id}): ${e.message}`);
+    return res.status(422).json({ error_code: 'CORRUPT_SNAPSHOT' });
+  }
+
+  let buf;
+  try {
+    buf = await spec.build(bundle, buildExportMeta(bookId, fmt));
+  } catch (e) {
+    logger.error(`Fassungs-Export-Build fehlgeschlagen (book=${bookId}, id=${id}, fmt=${fmt}): ${e.message}`);
+    return res.status(502).json({ error_code: 'EXPORT_FAILED' });
+  }
+
+  const { resolveSlug } = require('../lib/export-builders/shared');
+  const slug = `${resolveSlug(bundle)}-fassung-${row.seq}`;
+  const filename = buildExportFilename({ prefix: 'fassung', slug, ext: fmt, date: new Date() });
+  const sizeKb = Math.round((Buffer.isBuffer(buf) ? buf.length : Buffer.byteLength(buf)) / 1024);
+  logger.info(`Fassungs-Export «${filename}» (${sizeKb} KB, book=${bookId}, seq=${row.seq}, fmt=${fmt})`);
+  return sendExportBuffer(res, { spec, buf, filename });
 });
 
 // ── Create (Fassung speichern) ──────────────────────────────────────────────────

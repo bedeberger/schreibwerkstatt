@@ -1,13 +1,15 @@
 // Alpine.data('snapshotsCard') — Manuskript-Meilensteine („Fassung 1/2/3").
 // Hauptkarte auf Buchebene. Liste aller Fassungen + „Neue Fassung erstellen"
 // (Capture des ganzen Buchs) + Vergleich zweier Fassungen (Buch-Level-Diff via
-// book-snapshot-diff.js, Seiten-Diff via page-revision-diff.js#renderSideBySide).
-// v1 ist Lese-/Diff-only — kein ganz-Buch-Restore.
+// book-snapshot-diff.js, Seiten-Diff via page-revision-diff.js#renderSideBySide)
+// + Reader (Fassung nur-lesend oeffnen) + Export (HTML/TXT/MD/EPUB/DOCX sync,
+// PDF via Job) + destruktiver Restore.
 
 import { fetchJson } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
 import { renderSideBySide } from '../page-revision-diff.js';
 import { diffSnapshots } from '../book-snapshot-diff.js';
+import { startPoll } from './job-helpers.js';
 
 export function registerSnapshotsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -30,6 +32,19 @@ export function registerSnapshotsCard() {
     showUnchanged: false,
     expanded: {},          // srcId -> rendered side-by-side HTML (lazy)
     expandLoading: {},     // srcId -> bool
+
+    // Reader (Fassung nur-lesend oeffnen) + Export aus dem Reader.
+    readerOpen: false,
+    readerSnap: null,      // Meta der geoeffneten Fassung
+    readerSections: [],    // [{ kind:'chapter'|'page', name, depth, html, key }]
+    readerLoading: false,
+    pdfProfiles: [],
+    pdfProfileId: '',
+    pdfExporting: false,
+    pdfStatus: '',
+    pdfError: '',
+    pdfJobId: null,
+    _pdfPollTimer: null,   // transienter Timer-Guard (siehe startPoll)
 
     init() {
       const app = window.__app;
@@ -54,6 +69,7 @@ export function registerSnapshotsCard() {
       window.removeEventListener('card:refresh', this._onRefresh);
       window.removeEventListener('book:changed', this._onBookChanged);
       window.removeEventListener('view:reset', this._onViewReset);
+      this._stopPdfPoll();
     },
 
     reset() {
@@ -66,6 +82,7 @@ export function registerSnapshotsCard() {
       this.newDescription = '';
       this._bookId = null;
       this._resetCompare();
+      this.closeReader();
     },
 
     _resetCompare() {
@@ -186,6 +203,176 @@ export function registerSnapshotsCard() {
       } finally {
         this.restoringId = null;
       }
+    },
+
+    // ── Reader (Fassung nur-lesend oeffnen) ─────────────────────────────────────────
+    async openSnapshot(snap) {
+      const app = window.__app;
+      const bookId = app?.selectedBookId;
+      if (!snap?.id || !bookId) return;
+      this.readerSnap = snap;
+      this.readerOpen = true;
+      this.readerLoading = true;
+      this.readerSections = [];
+      this._resetPdfExport();
+      // PDF-Profile lazy laden (fuer das Export-Menue im Reader).
+      this.loadPdfProfiles();
+      try {
+        const data = await fetchJson(`/snapshots/${bookId}/${snap.id}`);
+        this.readerSections = this._buildReaderSections(data?.snapshot?.content);
+      } catch (e) {
+        console.error('[snapshots:open]', e);
+        this.readerSections = [];
+      } finally {
+        this.readerLoading = false;
+      }
+    },
+
+    closeReader() {
+      this.readerOpen = false;
+      this.readerSnap = null;
+      this.readerSections = [];
+      this._resetPdfExport();
+      this._stopPdfPoll();
+    },
+
+    // Snapshot-Tree (buildBookJson-Format) → flache Render-Liste: Kapitel-
+    // Ueberschriften (mit Tiefe) + Seiten (Name + inline-HTML, Lesereihenfolge).
+    _buildReaderSections(content) {
+      const nodes = Array.isArray(content?.tree) ? content.tree : [];
+      const out = [];
+      (function walk(list, depth) {
+        for (const node of (list || [])) {
+          if (!node || typeof node !== 'object') continue;
+          if (node.type === 'chapter') {
+            out.push({ kind: 'chapter', name: typeof node.name === 'string' ? node.name : '', depth, key: 'c' + out.length });
+            walk(node.children, depth + 1);
+          } else if (node.type === 'page') {
+            out.push({
+              kind: 'page',
+              name: typeof node.name === 'string' ? node.name : '',
+              html: typeof node.html === 'string' ? node.html : '',
+              depth,
+              key: 'p' + out.length,
+            });
+          }
+        }
+      })(nodes, 0);
+      return out;
+    },
+
+    // ── Export (aus dem Reader) ─────────────────────────────────────────────────────
+    // Schnell-Formate: direkter Download-Link auf die Sync-Route.
+    quickFormats() {
+      return ['html', 'epub', 'docx', 'md', 'txt'];
+    },
+
+    formatLabel(fmt) {
+      return window.__app.t('book.export.' + fmt);
+    },
+
+    exportUrl(fmt) {
+      const app = window.__app;
+      const bookId = app?.selectedBookId;
+      if (!bookId || !this.readerSnap?.id) return '#';
+      return `/snapshots/${bookId}/${this.readerSnap.id}/export/${fmt}`;
+    },
+
+    async loadPdfProfiles() {
+      try {
+        const d = await fetchJson('/pdf-export/profiles');
+        this.pdfProfiles = Array.isArray(d?.profiles) ? d.profiles : [];
+        const def = this.pdfProfiles.find(p => p.is_default) || this.pdfProfiles[0] || null;
+        if (def && (!this.pdfProfileId || !this.pdfProfiles.some(p => String(p.id) === String(this.pdfProfileId)))) {
+          this.pdfProfileId = String(def.id);
+        }
+      } catch (e) {
+        console.error('[snapshots:pdfProfiles]', e);
+        this.pdfProfiles = [];
+      }
+    },
+
+    pdfProfileOptions() {
+      return this.pdfProfiles.map(p => ({ value: String(p.id), label: p.name }));
+    },
+
+    async exportPdf() {
+      const app = window.__app;
+      const bookId = app?.selectedBookId;
+      if (!bookId || !this.readerSnap?.id || !this.pdfProfileId || this.pdfExporting) return;
+      this.pdfExporting = true;
+      this.pdfError = '';
+      this.pdfStatus = app.t('snapshots.export.creating');
+      try {
+        const r = await fetch('/jobs/pdf-export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scope: 'book',
+            entityId: parseInt(bookId, 10),
+            profile_id: parseInt(this.pdfProfileId, 10),
+            snapshot_id: this.readerSnap.id,
+          }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d?.error_code || `HTTP ${r.status}`);
+        }
+        const { jobId } = await r.json();
+        this.pdfJobId = jobId;
+        this._startPdfPoll(jobId);
+      } catch (e) {
+        console.error('[snapshots:exportPdf]', e);
+        this.pdfExporting = false;
+        this.pdfError = app.t('snapshots.export.pdfFailed') + ' ' + (e.message || '');
+        this.pdfStatus = '';
+      }
+    },
+
+    _startPdfPoll(jobId) {
+      this._stopPdfPoll();
+      startPoll(this, {
+        timerProp: '_pdfPollTimer',
+        jobId,
+        intervalMs: 1000,
+        onProgress: (job) => {
+          const app = window.__app;
+          this.pdfStatus = job.statusText ? app.t(job.statusText, job.statusParams) : app.t('snapshots.export.creating');
+        },
+        onError: (job) => {
+          const app = window.__app;
+          this.pdfExporting = false;
+          this.pdfStatus = '';
+          this.pdfError = app.t('snapshots.export.pdfFailed') + ' ' + (job.error ? app.t(job.error, job.errorParams) : '');
+        },
+        onDone: (job) => {
+          const app = window.__app;
+          this.pdfExporting = false;
+          this.pdfStatus = app.t('snapshots.export.pdfDone');
+          this._triggerPdfDownload(jobId, job.result?.filename);
+          setTimeout(() => { this.pdfStatus = ''; }, 3500);
+        },
+      });
+    },
+
+    _stopPdfPoll() {
+      if (this._pdfPollTimer) { clearInterval(this._pdfPollTimer); this._pdfPollTimer = null; }
+    },
+
+    _triggerPdfDownload(jobId, filename) {
+      const a = document.createElement('a');
+      a.href = `/jobs/pdf-export/${jobId}/file`;
+      a.download = filename || 'fassung.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    },
+
+    _resetPdfExport() {
+      this.pdfExporting = false;
+      this.pdfStatus = '';
+      this.pdfError = '';
+      this.pdfJobId = null;
     },
 
     // ── Anzeige-Helfer ────────────────────────────────────────────────────────────

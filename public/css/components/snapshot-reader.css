@@ -1,0 +1,108 @@
+/* Fassungs-Reader: eine Fassung (book_snapshots) nur-lesend im Vollbild-Overlay.
+   Modal-Charakter (Backdrop + Esc + Backdrop-Klick schliessen). Der Buchsatz
+   erbt vom Reading-Frame .page-content-view (page/page-view.css); hier nur das
+   Overlay-Gehaeuse, die Export-Leiste und die Kapitel-/Seiten-Gliederung.
+   Markup: public/partials/snapshots.html, Logik: snapshots-card.js. */
+
+.snapshot-reader {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--space-lg);
+  overflow: auto;
+}
+
+.snapshot-reader__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+  backdrop-filter: blur(2px);
+}
+
+.snapshot-reader__panel {
+  position: relative;
+  z-index: var(--z-modal-front);
+  width: min(56rem, 100%);
+  margin: auto 0;
+  background: var(--color-bg);
+  border: var(--border-thin);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+}
+
+.snapshot-reader__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  border-bottom: var(--border-thin);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.snapshot-reader__titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.snapshot-reader__title { font-weight: 600; }
+.snapshot-reader__date { color: var(--color-muted); font-size: 0.85em; }
+
+.snapshot-reader__export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: var(--border-thin);
+}
+.snapshot-reader__export-label { font-weight: 600; margin-right: var(--space-xs); }
+.snapshot-reader__pdf { display: flex; align-items: center; gap: var(--space-sm); }
+
+.snapshot-reader__status {
+  padding: 0 var(--space-lg) var(--space-sm);
+  font-size: 0.9em;
+}
+.snapshot-reader__hint {
+  padding: var(--space-sm) var(--space-lg);
+  color: var(--color-muted);
+  font-size: 0.85em;
+}
+
+.snapshot-reader__body { padding: var(--space-lg) var(--space-xl) var(--space-2xl); }
+
+/* Kapitel-Ueberschriften — Tiefe 0/1/2 (entspricht den Export-Heading-Stufen). */
+.snapshot-reader__chapter {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  margin: var(--space-xl) 0 var(--space-sm);
+}
+.snapshot-reader__chapter--d0 { font-size: 1.6rem; }
+.snapshot-reader__chapter--d1 { font-size: 1.3rem; }
+.snapshot-reader__chapter--d2 { font-size: 1.1rem; }
+
+.snapshot-reader__page { margin: var(--space-lg) 0; }
+.snapshot-reader__page-name {
+  color: var(--color-muted);
+  font-size: 0.85em;
+  margin-bottom: var(--space-xs);
+}
+
+/* Mobile: Overlay randlos, Panel volle Breite. */
+@media (max-width: 720px) {
+  .snapshot-reader { padding: 0; }
+  .snapshot-reader__panel {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .snapshot-reader__header { border-radius: 0; }
+  .snapshot-reader__body { padding: var(--space-md) var(--space-md) var(--space-xl); }
+}

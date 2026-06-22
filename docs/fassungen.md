@@ -1,6 +1,6 @@
 # Fassungen (Manuskript-Meilensteine)
 
-Ganze-Buch-Schnappschüsse: der User friert den aktuellen Stand des **gesamten** Buchs per Knopfdruck als „Fassung 1/2/3…" ein, vergleicht zwei Fassungen miteinander und kann das Buch auf eine Fassung **zurücksetzen** (Restore). Pro Buch skopiert, user-initiiert, kein Pruning (Gegenstück zu `page_revisions`, die seitenweise + automatisch entstehen). Route: `#book/:bookId/fassungen`.
+Ganze-Buch-Schnappschüsse: der User friert den aktuellen Stand des **gesamten** Buchs per Knopfdruck als „Fassung 1/2/3…" ein, vergleicht zwei Fassungen miteinander, **öffnet** eine Fassung nur-lesend (Reader), **exportiert** sie (HTML/TXT/MD/EPUB/DOCX + Custom-PDF) und kann das Buch auf eine Fassung **zurücksetzen** (Restore). Reader + Export operieren auf dem selbsttragenden `content_json` der Fassung — der aktuelle Buchstand bleibt dabei unberührt. Pro Buch skopiert, user-initiiert, kein Pruning (Gegenstück zu `page_revisions`, die seitenweise + automatisch entstehen). Route: `#book/:bookId/fassungen`.
 
 ## Datenmodell
 
@@ -20,7 +20,8 @@ Eine Zeile pro Fassung in `book_snapshots` ([db/book-snapshots.js](../db/book-sn
 Alle book-scoped (`setContext({ book })`), ACL via `requireBookAccess`. Synchroner Pfad (reiner DB-Read/-Write, kein KI-/Netz-Call) — bewusste Ausnahme zur Job-Queue-Regel, analog zum Capture.
 
 - `GET /snapshots/:bookId` (viewer) — Meta-Liste **ohne** `content_json`/`extras_json` (können MB groß sein), `has_extras` als Flag, DESC nach `created_at`.
-- `GET /snapshots/:bookId/:id` (viewer) — Vollzeile inkl. geparstem `content` (ohne `extras_json`). Quelle für den Diff.
+- `GET /snapshots/:bookId/:id` (viewer) — Vollzeile inkl. geparstem `content` (ohne `extras_json`). Quelle für Diff **und** Reader.
+- `GET /snapshots/:bookId/:id/export/:fmt` (viewer) — synchroner Fassungs-Export in `html`/`txt`/`md`/`epub`/`docx`. Baut das Export-Bundle via `snapshotToBundle` ([lib/snapshot-export.js](../lib/snapshot-export.js)) aus dem `content_json` (statt Live-Buch), rendert mit demselben `FORMATS[fmt].build` wie [routes/export.js](../routes/export.js) und teilt dessen Meta-/Antwort-Helper ([lib/export-send.js](../lib/export-send.js)). `pdf` ist hier bewusst **ausgeschlossen** (`BAD_FORMAT`) — PDF läuft über den Job (Profile). Filename-Slug `…-fassung-<seq>`. Fehler: `SNAPSHOT_NOT_FOUND` (404), `CORRUPT_SNAPSHOT` (422).
 - `POST /snapshots/:bookId` (editor) — „Fassung speichern". Baut Payload via `_buildSnapshotPayload` (geteilt mit dem Restore-Backup) und legt eine Zeile an. `BOOK_EMPTY` → 400.
 - `POST /snapshots/:bookId/:id/restore` (editor) — **destruktiv**, setzt das Buch auf die Ziel-Fassung zurück (siehe unten).
 - `DELETE /snapshots/:bookId/:id` (editor).
@@ -48,6 +49,8 @@ Alle book-scoped (`setContext({ book })`), ACL via `requireBookAccess`. Synchron
 
 - **Speichern** — Name + Notiz (optional, `data-spellcheck`) → `captureSnapshot`.
 - **Liste** — `entity-grid-table` (Standard-Tabellenklasse, sortierbar via `sortableTable`, `persistKey: 'book.snapshots'`). Numerik-Spalten rechtsbündig über `.snapshots-table .snapshots-num` (schlägt die linksbündige `entity-grid-table`-Default-Regel per Specificity). Autor-Chip nur bei geteilten Büchern.
+- **Öffnen (Reader)** — `openSnapshot` lädt `GET /snapshots/:bookId/:id` (liefert `content`) und rendert ein Vollbild-Overlay (Modal-Charakter, Esc/Backdrop schliessen, `closeReader`): Kapitel-Überschriften nach Tiefe + Seiten im Buchsatz (erbt `.page-content-view`, Seiten-HTML via `x-html` — gecleant am Write-Chokepoint). `_buildReaderSections` flacht den Tree zu `[{kind,name,depth,html}]`. CSS: [public/css/components/snapshot-reader.css](../public/css/components/snapshot-reader.css).
+- **Export** — im Reader-Header: Schnell-Formate (HTML/EPUB/DOCX/MD/TXT) als Download-`<a>` auf die Sync-Route; **PDF** über eine Profil-Combobox (`/pdf-export/profiles`) → `POST /jobs/pdf-export` mit `snapshot_id` → Polling via `startPoll` → Download `/jobs/pdf-export/:id/file`. Der PDF-Job ([routes/jobs/pdf-export.js](../routes/jobs/pdf-export.js)) baut bei gesetztem `snapshotId` das Bundle via `snapshotToBundle` statt `loadContents`; `scope`/`target` sind dann fix `book`/`interior`, buch-weite Publikations-Metadaten (Cover/Titelei) kommen weiterhin aus dem Live-`book_publication`. Dedup-Key trägt `:snap<id>`.
 - **Wiederherstellen** — `restoreSnapshot` mit `confirm`-Dialog; nach Erfolg `app.loadPages()` + Liste neu laden (Auto-Sicherung erscheint dort). `restoringId` sperrt die Zeile.
 - **Löschen** — `deleteSnapshot` mit Bestätigung.
 - **Vergleich** — zwei Comboboxen (Default: zweitneueste vs. neueste), Buch-Level-Diff via [book-snapshot-diff.js](../public/js/book-snapshot-diff.js) (`diffSnapshots`): Summen-Badges (hinzugefügt/entfernt/geändert/umbenannt/verschoben) + Zeichen-Delta, pro geänderter Seite lazy ein Wort-genauer Side-by-Side-Diff via [page-revision-diff.js](../public/js/page-revision-diff.js)#`renderSideBySide`.
