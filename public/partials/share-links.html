@@ -38,6 +38,16 @@
       </div>
     </template>
 
+    <template x-if="createKind !== 'page'">
+      <div class="share-create__row">
+        <label class="checkbox-row">
+          <input type="checkbox" x-model="createShowToc">
+          <span x-text="$app.t('share.create.toc')"></span>
+        </label>
+        <span class="share-create__hint" x-text="$app.t('share.create.tocHint')"></span>
+      </div>
+    </template>
+
     <div class="share-create__row">
       <label class="share-create__label" x-text="$app.t('share.intro.label')"></label>
       <textarea x-model="createIntro" rows="3"
@@ -69,8 +79,10 @@
     <div x-show="loadingLinks" class="muted-msg" x-text="$app.t('common.loading')"></div>
     <div x-show="!loadingLinks && links.length === 0" class="muted-msg" x-text="$app.t('share.list.empty')"></div>
 
+    <div class="share-panel" :class="{ 'share-panel--open': openCommentsToken }">
+    <div class="share-panel__links">
     <template x-for="link in links" :key="link.token">
-      <article class="share-row" :class="'share-row--' + linkStatus(link)">
+      <article class="share-row" :class="('share-row--' + linkStatus(link)) + (openCommentsToken === link.token ? ' share-row--selected' : '')">
         <div class="share-row__head">
           <div class="share-row__meta">
             <span class="badge" :class="'badge--' + linkStatus(link)"
@@ -114,6 +126,12 @@
             <textarea x-model="editIntro" rows="3" maxlength="2000" data-spellcheck="spelling" class="share-create__textarea"></textarea>
             <label class="share-create__label" x-text="$app.t('share.expires.label')"></label>
             <input type="datetime-local" x-model="editExpiresAt" class="share-create__input">
+            <template x-if="link.kind !== 'page'">
+              <label class="checkbox-row">
+                <input type="checkbox" x-model="editShowToc">
+                <span x-text="$app.t('share.create.toc')"></span>
+              </label>
+            </template>
             <div class="share-row__edit-actions">
               <button type="button" class="primary" @click="saveEdit(link.token)" :disabled="savingEdit">
                 <span x-text="$app.t('common.save')"></span>
@@ -132,76 +150,90 @@
           </template>
         </div>
 
-        <!-- Kommentar-Threads -->
-        <template x-if="openCommentsToken === link.token">
-          <div class="share-row__comments">
-            <template x-if="!(commentsByToken[link.token]?.length)">
-              <div class="muted-msg" x-text="$app.t('share.comments.empty')"></div>
-            </template>
-
-            <template x-for="thread in threadsFor(link.token)" :key="thread.root.id">
-              <div class="share-thread-owner" :class="{ 'share-thread-owner--resolved': thread.root.resolved_at }">
-                <!-- Anker-Zeile -->
-                <template x-if="thread.root.anchor_bid">
-                  <div class="share-thread-owner__anchor share-thread-owner__anchor--clickable"
-                       role="button" tabindex="0"
-                       :data-tip="$app.t('share.comments.jumpToText')"
-                       @click="gotoComment(link, thread.root)"
-                       @keydown.enter.prevent="gotoComment(link, thread.root)">
-                    <span class="share-thread-owner__anchor-label" x-text="$app.t('share.comments.anchorLabel')"></span>
-                    <span class="share-thread-owner__quote" x-text="'„' + (thread.root.anchor_quote || '') + '\"'"></span>
-                    <svg class="icon share-thread-owner__goto" aria-hidden="true"><use href="/icons.svg?v=693#arrow-right"/></svg>
-                  </div>
-                </template>
-
-                <!-- Root -->
-                <div class="share-comment">
-                  <div class="share-comment__meta">
-                    <span x-text="commentAuthorLabel(thread.root)"></span>
-                    <span x-text="' · ' + formatExpires(thread.root.created_at)"></span>
-                    <span x-show="thread.root.resolved_at" class="share-comment__resolved"
-                          x-text="$app.t('share.comments.resolved')"></span>
-                  </div>
-                  <div class="share-comment__body" x-text="thread.root.body"></div>
-                  <div class="share-comment__actions">
-                    <button type="button" class="share-comment__action"
-                            @click="toggleResolve(link.token, thread.root)"
-                            :disabled="savingResolve === thread.root.id"
-                            x-text="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')"></button>
-                    <button type="button" class="share-comment__delete"
-                            @click="deleteComment(link.token, thread.root.id)"
-                            x-text="$app.t('common.delete')"></button>
-                  </div>
-                </div>
-
-                <!-- Antworten -->
-                <template x-for="r in thread.replies" :key="r.id">
-                  <div class="share-comment share-comment--reply"
-                       :class="{ 'share-comment--author': r.author_email }">
-                    <div class="share-comment__meta">
-                      <span x-text="commentAuthorLabel(r)"></span>
-                      <span x-text="' · ' + formatExpires(r.created_at)"></span>
-                    </div>
-                    <div class="share-comment__body" x-text="r.body"></div>
-                    <button type="button" class="share-comment__delete"
-                            @click="deleteComment(link.token, r.id)"
-                            x-text="$app.t('common.delete')"></button>
-                  </div>
-                </template>
-
-                <!-- Owner-Antwort -->
-                <form class="share-thread-owner__reply" @submit.prevent="replyToComment(link.token, thread.root.id)">
-                  <textarea x-model="replyDrafts[thread.root.id]" rows="2"
-                            :placeholder="$app.t('share.comments.replyPlaceholder')"
-                            maxlength="4000" data-spellcheck="spelling"></textarea>
-                  <button type="submit" :disabled="savingReply === thread.root.id || !(replyDrafts[thread.root.id] || '').trim()"
-                          x-text="$app.t('share.comments.send')"></button>
-                </form>
-              </div>
-            </template>
-          </div>
-        </template>
       </article>
     </template>
+    </div><!-- /.share-panel__links -->
+
+    <!-- Kommentar-Seiten-Panel: zeigt die Threads des selektierten Links. -->
+    <aside class="share-comments-panel" x-show="openCommentsToken" x-cloak
+           :aria-label="$app.t('share.comments.label')">
+      <template x-if="commentPanelLink()">
+        <div class="share-comments-panel__inner">
+          <div class="share-comments-panel__head">
+            <span class="share-comments-panel__target" x-text="targetLabel(commentPanelLink())"></span>
+            <button type="button" class="btn-card-close" @click="openCommentsToken = null"
+                    :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+            </button>
+          </div>
+
+          <template x-if="!(commentsByToken[openCommentsToken]?.length)">
+            <div class="muted-msg" x-text="$app.t('share.comments.empty')"></div>
+          </template>
+
+          <template x-for="thread in threadsFor(openCommentsToken)" :key="thread.root.id">
+            <div class="share-thread-owner" :class="{ 'share-thread-owner--resolved': thread.root.resolved_at }">
+              <!-- Anker-Zeile -->
+              <template x-if="thread.root.anchor_bid">
+                <div class="share-thread-owner__anchor share-thread-owner__anchor--clickable"
+                     role="button" tabindex="0"
+                     :data-tip="$app.t('share.comments.jumpToText')"
+                     @click="gotoComment(commentPanelLink(), thread.root)"
+                     @keydown.enter.prevent="gotoComment(commentPanelLink(), thread.root)">
+                  <span class="share-thread-owner__anchor-label" x-text="$app.t('share.comments.anchorLabel')"></span>
+                  <span class="share-thread-owner__quote" x-text="'„' + (thread.root.anchor_quote || '') + '\"'"></span>
+                  <svg class="icon share-thread-owner__goto" aria-hidden="true"><use href="/icons.svg?v=693#arrow-right"/></svg>
+                </div>
+              </template>
+
+              <!-- Root -->
+              <div class="share-comment">
+                <div class="share-comment__meta">
+                  <span x-text="commentAuthorLabel(thread.root)"></span>
+                  <span x-text="' · ' + formatExpires(thread.root.created_at)"></span>
+                  <span x-show="thread.root.resolved_at" class="share-comment__resolved"
+                        x-text="$app.t('share.comments.resolved')"></span>
+                </div>
+                <div class="share-comment__body" x-text="thread.root.body"></div>
+                <div class="share-comment__actions">
+                  <button type="button" class="share-comment__action"
+                          @click="toggleResolve(openCommentsToken, thread.root)"
+                          :disabled="savingResolve === thread.root.id"
+                          x-text="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')"></button>
+                  <button type="button" class="share-comment__delete"
+                          @click="deleteComment(openCommentsToken, thread.root.id)"
+                          x-text="$app.t('common.delete')"></button>
+                </div>
+              </div>
+
+              <!-- Antworten -->
+              <template x-for="r in thread.replies" :key="r.id">
+                <div class="share-comment share-comment--reply"
+                     :class="{ 'share-comment--author': r.author_email }">
+                  <div class="share-comment__meta">
+                    <span x-text="commentAuthorLabel(r)"></span>
+                    <span x-text="' · ' + formatExpires(r.created_at)"></span>
+                  </div>
+                  <div class="share-comment__body" x-text="r.body"></div>
+                  <button type="button" class="share-comment__delete"
+                          @click="deleteComment(openCommentsToken, r.id)"
+                          x-text="$app.t('common.delete')"></button>
+                </div>
+              </template>
+
+              <!-- Owner-Antwort -->
+              <form class="share-thread-owner__reply" @submit.prevent="replyToComment(openCommentsToken, thread.root.id)">
+                <textarea x-model="replyDrafts[thread.root.id]" rows="2"
+                          :placeholder="$app.t('share.comments.replyPlaceholder')"
+                          maxlength="4000" data-spellcheck="spelling"></textarea>
+                <button type="submit" :disabled="savingReply === thread.root.id || !(replyDrafts[thread.root.id] || '').trim()"
+                        x-text="$app.t('share.comments.send')"></button>
+              </form>
+            </div>
+          </template>
+        </div>
+      </template>
+    </aside>
+    </div><!-- /.share-panel -->
   </section>
 </div>

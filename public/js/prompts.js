@@ -166,6 +166,7 @@ export {
   buildBookChatSystemPrompt,
   buildBookChatAgentSystemPrompt,
   BOOK_CHAT_TOOLS,
+  BOOK_CHAT_FORCE_FINAL_INSTRUCTION,
   SCHEMA_CHAT,
   SCHEMA_BOOK_CHAT,
 } from './prompts/chat.js';

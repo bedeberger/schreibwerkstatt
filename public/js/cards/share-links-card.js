@@ -21,12 +21,14 @@ export function registerShareLinksCard() {
     createChapterId: '',
     createIntro: '',
     createExpiresAt: '',
+    createShowToc: false,
     creating: false,
     createError: '',
     // Edit-State
     editingToken: null,
     editIntro: '',
     editExpiresAt: '',
+    editShowToc: false,
     savingEdit: false,
     // Comment-Liste-Toggle
     openCommentsToken: null,
@@ -253,6 +255,7 @@ export function registerShareLinksCard() {
         kind: this.createKind,
         intro: this.createIntro || null,
         expires_at: this.createExpiresAt || null,
+        show_toc: this.createKind !== 'page' && this.createShowToc,
       };
       if (this.createKind === 'page') {
         body.page_id = parseInt(this.createPageId, 10);
@@ -279,6 +282,7 @@ export function registerShareLinksCard() {
         this.links = [j, ...this.links];
         this.createIntro = '';
         this.createExpiresAt = '';
+        this.createShowToc = false;
         copyText(this.linkUrl(j.token));
         this.copiedToken = j.token;
         if (this._copiedTimer) clearTimeout(this._copiedTimer);
@@ -310,12 +314,14 @@ export function registerShareLinksCard() {
       this.editingToken = link.token;
       this.editIntro = link.intro || '';
       this.editExpiresAt = link.expires_at ? link.expires_at.slice(0, 16) : '';
+      this.editShowToc = !!link.show_toc;
     },
 
     cancelEdit() {
       this.editingToken = null;
       this.editIntro = '';
       this.editExpiresAt = '';
+      this.editShowToc = false;
     },
 
     async saveEdit(token) {
@@ -327,6 +333,7 @@ export function registerShareLinksCard() {
           body: JSON.stringify({
             intro: this.editIntro || null,
             expires_at: this.editExpiresAt || null,
+            show_toc: this.editShowToc,
           }),
         });
         if (!res.ok) throw new Error('patch failed');
@@ -382,6 +389,11 @@ export function registerShareLinksCard() {
     commentAuthorLabel(c) {
       if (c.author_email) return window.__app.t('share.reader.author_badge');
       return c.reader_name || window.__app.t('share.reader.anon');
+    },
+
+    // Der Link, dessen Kommentare im Seiten-Panel angezeigt werden (oder null).
+    commentPanelLink() {
+      return this.openCommentsToken ? this.links.find(l => l.token === this.openCommentsToken) || null : null;
     },
 
     // ── Sprung zur kommentierten Stelle im Notebook-Editor ────────────────────

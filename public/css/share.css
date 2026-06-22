@@ -158,6 +158,44 @@ body.share-page {
 }
 .share-chapter-block__title:first-child { margin-top: 0; }
 
+/* Sprungziele nicht hinter dem sticky Header verstecken. */
+.share-chapter-block__title[id],
+.share-page-block__title[id] { scroll-margin-top: 96px; }
+
+/* Inhaltsverzeichnis (optional, bei Buch-/Kapitel-Shares). */
+.share-toc {
+  margin: 0 0 32px;
+  padding: 16px 20px;
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius);
+  background: var(--share-hover);
+}
+.share-toc__heading {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--share-muted);
+}
+.share-toc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.share-toc__item { margin: 0; }
+.share-toc__item--l1 { font-weight: 600; margin-top: 6px; }
+.share-toc__item--l1:first-child { margin-top: 0; }
+.share-toc__item--l2 { padding-left: 18px; font-weight: 400; }
+.share-toc__link {
+  display: inline-block;
+  padding: 3px 0;
+  color: var(--share-accent);
+  text-decoration: none;
+  line-height: 1.4;
+}
+.share-toc__link:hover { text-decoration: underline; }
+
 /* Findings-Marks und Spellcheck-Squiggles aus Editor-Runtime neutralisieren:
    landen nicht im persistierten HTML, aber falls Klassen doch durchblitzen
    (Custom-Highlights API hat Browser-Quirks), keine farbigen Marker im Reader. */

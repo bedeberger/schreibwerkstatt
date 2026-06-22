@@ -8472,6 +8472,21 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 214 abgeschlossen (docx_export_profile angelegt).');
   }
 
+  if (version < 215) {
+    // Optionales Inhaltsverzeichnis im Reader-View bei Buch-/Kapitel-Shares.
+    // Additiv (kein Recreate) — Default 0 (aus, Live-Verhalten unverändert).
+    const slCols215 = db.pragma('table_info(share_links)').map(c => c.name);
+    if (!slCols215.includes('show_toc')) {
+      db.exec('ALTER TABLE share_links ADD COLUMN show_toc INTEGER NOT NULL DEFAULT 0');
+    }
+    const fkErrors215 = db.pragma('foreign_key_check');
+    if (fkErrors215.length) {
+      throw new Error(`Migration 215: foreign_key_check meldet ${fkErrors215.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 215').run();
+    logger.info('DB-Migration auf Version 215 abgeschlossen (share_links.show_toc).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

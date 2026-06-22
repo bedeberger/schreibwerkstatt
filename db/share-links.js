@@ -8,20 +8,22 @@ function newToken() {
   return crypto.randomBytes(16).toString('base64url');
 }
 
-function createShareLink({ kind, pageId = null, chapterId = null, bookId, ownerEmail, intro = null, expiresAt = null }) {
+function createShareLink({ kind, pageId = null, chapterId = null, bookId, ownerEmail, intro = null, expiresAt = null, showToc = false }) {
   if (kind !== 'page' && kind !== 'chapter' && kind !== 'book') throw new Error('invalid kind');
   if (kind === 'page' && !pageId) throw new Error('page_id required');
   if (kind === 'chapter' && !chapterId) throw new Error('chapter_id required');
   if (!bookId) throw new Error('book_id required');
+  // TOC nur bei Buch-/Kapitel-Shares sinnvoll (eine Seite hat keins).
+  const toc = kind !== 'page' && showToc ? 1 : 0;
   const stmt = db.prepare(`
-    INSERT INTO share_links (token, kind, page_id, chapter_id, book_id, owner_email, intro, expires_at, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})
+    INSERT INTO share_links (token, kind, page_id, chapter_id, book_id, owner_email, intro, expires_at, show_toc, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})
   `);
   for (let i = 0; i < 3; i++) {
     const token = newToken();
     try {
       stmt.run(token, kind, kind === 'page' ? pageId : null, kind === 'chapter' ? chapterId : null,
-               bookId, ownerEmail, intro, expiresAt);
+               bookId, ownerEmail, intro, expiresAt, toc);
       return getShareLinkByToken(token);
     } catch (e) {
       if (!/UNIQUE/i.test(e.message)) throw e;
@@ -91,11 +93,12 @@ function revokeShareLink(token, ownerEmail) {
   return r.changes > 0;
 }
 
-function updateShareLink(token, ownerEmail, { intro, expiresAt }) {
+function updateShareLink(token, ownerEmail, { intro, expiresAt, showToc }) {
   const sets = [];
   const params = [];
   if (intro !== undefined) { sets.push('intro = ?'); params.push(intro); }
   if (expiresAt !== undefined) { sets.push('expires_at = ?'); params.push(expiresAt); }
+  if (showToc !== undefined) { sets.push('show_toc = ?'); params.push(showToc ? 1 : 0); }
   if (!sets.length) return false;
   params.push(token, ownerEmail);
   const r = db.prepare(`UPDATE share_links SET ${sets.join(', ')} WHERE token = ? AND owner_email = ?`).run(...params);

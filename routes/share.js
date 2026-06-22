@@ -96,6 +96,7 @@ async function loadContentForLink(link) {
       return {
         title: pd.name || '',
         html: pd.html || '',
+        toc: [],
       };
     } catch {
       return null;
@@ -107,13 +108,19 @@ async function loadContentForLink(link) {
     try {
       const { book, groups } = await loadContents({ scope: 'book', id: link.book_id });
       const sections = [];
+      const toc = [];
+      let anchorN = 0;
       for (const g of groups) {
         if (g.chapter) {
-          sections.push(`<h2 class="share-chapter-block__title">${escHtml(g.chapter.name || '')}</h2>`);
+          const a = `sec${++anchorN}`;
+          toc.push({ level: 1, label: g.chapter.name || '', anchor: a });
+          sections.push(`<h2 id="${a}" class="share-chapter-block__title">${escHtml(g.chapter.name || '')}</h2>`);
         }
         for (const { pd } of g.pages) {
+          const a = `sec${++anchorN}`;
+          toc.push({ level: g.chapter ? 2 : 1, label: pd.name || '', anchor: a });
           sections.push(`<section class="share-page-block">
-            <h3 class="share-page-block__title">${escHtml(pd.name || '')}</h3>
+            <h3 id="${a}" class="share-page-block__title">${escHtml(pd.name || '')}</h3>
             <div class="share-page-block__body">${pd.html || ''}</div>
           </section>`);
         }
@@ -121,6 +128,7 @@ async function loadContentForLink(link) {
       return {
         title: book.name || '',
         html: sections.join('\n'),
+        toc,
       };
     } catch {
       return null;
@@ -134,20 +142,39 @@ async function loadContentForLink(link) {
       .filter(p => p.chapter_id === link.chapter_id)
       .sort((a, b) => (a.position || 0) - (b.position || 0));
     const blocks = [];
+    const toc = [];
+    let anchorN = 0;
     for (const meta of chapterPages) {
       const pd = await contentStore.loadPage(meta.id);
+      const a = `sec${++anchorN}`;
+      toc.push({ level: 1, label: pd.name || '', anchor: a });
       blocks.push(`<section class="share-page-block">
-        <h2 class="share-page-block__title">${escHtml(pd.name || '')}</h2>
+        <h2 id="${a}" class="share-page-block__title">${escHtml(pd.name || '')}</h2>
         <div class="share-page-block__body">${pd.html || ''}</div>
       </section>`);
     }
     return {
       title: chapter.name || chapter.chapter_name || '',
       html: blocks.join('\n'),
+      toc,
     };
   } catch {
     return null;
   }
+}
+
+// Inhaltsverzeichnis-Block fuer Buch-/Kapitel-Shares (nur wenn show_toc aktiv
+// und mehr als ein Eintrag vorhanden — ein Single-Eintrag-TOC bringt nichts).
+function buildTocBlock(content, lang) {
+  if (!content?.toc || content.toc.length < 2) return '';
+  const items = content.toc.map(e =>
+    `<li class="share-toc__item share-toc__item--l${e.level}"><a class="share-toc__link" href="#${escHtml(e.anchor)}">${escHtml(e.label)}</a></li>`
+  ).join('');
+  const heading = escHtml(tServer('share.reader.toc_heading', lang));
+  return `<nav class="share-toc" aria-label="${heading}">
+    <h2 class="share-toc__heading">${heading}</h2>
+    <ol class="share-toc__list">${items}</ol>
+  </nav>`;
 }
 
 function renderGone(req, res, kind) {
@@ -180,6 +207,8 @@ router.get('/:token', async (req, res) => {
   const introBlock = link.intro
     ? `<blockquote class="share-intro">${paragraphifyIntro(link.intro)}</blockquote>`
     : '';
+
+  const tocBlock = link.show_toc ? buildTocBlock(content, lang) : '';
 
   // SSR-Fallback zeigt nur allgemeine Anmerkungen (kein Anker, kein Reply) —
   // verankerte Threads werden client-seitig via /threads hydriert (share-reader.js).
@@ -249,6 +278,7 @@ router.get('/:token', async (req, res) => {
     t_skip: escHtml(tServer('share.reader.skip_to_content', lang)),
     t_comments: escHtml(tServer('share.reader.comments_heading', lang)),
     intro_block: introBlock,
+    toc_block: tocBlock,
     content_html: content.html,
     comments_html: commentsHtml,
     form_block: formBlock,
@@ -475,7 +505,7 @@ router.get('/api/book-comments/:book_id', requireSession, (req, res) => {
 
 router.post('/api/links', requireSession, jsonBody, async (req, res) => {
   const ownerEmail = req.session.user.email;
-  const { kind, page_id, chapter_id, book_id, intro, expires_at } = req.body || {};
+  const { kind, page_id, chapter_id, book_id, intro, expires_at, show_toc } = req.body || {};
   if (kind !== 'page' && kind !== 'chapter' && kind !== 'book') return res.status(400).json({ error_code: 'INVALID_KIND' });
   if (kind === 'page' && !Number.isInteger(parseInt(page_id, 10))) return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
   if (kind === 'chapter' && !Number.isInteger(parseInt(chapter_id, 10))) return res.status(400).json({ error_code: 'CHAPTER_ID_REQUIRED' });
@@ -522,6 +552,7 @@ router.post('/api/links', requireSession, jsonBody, async (req, res) => {
       ownerEmail,
       intro: intro ? String(intro).slice(0, INTRO_MAX) : null,
       expiresAt: expires_at || null,
+      showToc: !!show_toc,
     });
     logger.info(`[share/api/links POST] kind=${kind} book=${bookId} token=${created.token.slice(0, 8)}`);
     res.json(created);
@@ -550,6 +581,9 @@ router.patch('/api/links/:token', requireSession, jsonBody, (req, res) => {
       if (isNaN(d.getTime())) return res.status(400).json({ error_code: 'INVALID_EXPIRES_AT' });
     }
     patch.expiresAt = exp || null;
+  }
+  if ('show_toc' in (req.body || {})) {
+    patch.showToc = !!req.body.show_toc;
   }
   try {
     shareLinks.updateShareLink(token, ownerEmail, patch);

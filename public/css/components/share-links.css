@@ -190,14 +190,6 @@
   margin-top: var(--space-sm);
 }
 
-.share-row__comments {
-  margin-top: var(--space-md);
-  padding-top: var(--space-10);
-  border-top: 1px dashed var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
 
 .share-comment {
   position: relative;
@@ -349,4 +341,43 @@
 @media (max-width: 600px) {
   .share-row__head { flex-direction: column; align-items: flex-start; }
   .share-row__url { flex-direction: column; align-items: stretch; }
+}
+
+/* ── Kommentar-Seiten-Panel: Links-Liste + Threads des selektierten Links ──── */
+.share-panel { display: flex; flex-direction: column; gap: var(--space-md); }
+.share-panel__links { display: flex; flex-direction: column; }
+.share-row--selected { background: var(--color-hover); }
+
+.share-comments-panel {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  padding: var(--space-md) var(--space-14);
+}
+.share-comments-panel__inner { display: flex; flex-direction: column; gap: var(--space-sm); }
+.share-comments-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-border);
+}
+.share-comments-panel__target { font-weight: 600; }
+
+/* Ab ≥900px: zweispaltig (Liste links, sticky Panel rechts). Darunter gestapelt. */
+@media (min-width: 900px) {
+  .share-panel--open {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+    gap: var(--space-lg);
+    align-items: start;
+  }
+  .share-panel--open .share-comments-panel {
+    position: sticky;
+    top: var(--space-md);
+    max-height: calc(100dvh - 7rem);
+    overflow-y: auto;
+  }
 }

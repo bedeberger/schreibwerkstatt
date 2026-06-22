@@ -514,9 +514,51 @@ function _bookChatUseAgent() {
   return provider === 'claude'; // 'auto'
 }
 
+// final_answer-Tool-Use auswerten: Zitate validieren (Beweisspur, nicht blockierend),
+// toolLog-Eintrag schreiben und den antwort-Envelope zurückgeben. Geteilt zwischen
+// der regulären Loop-Terminierung und dem erzwungenen Synthese-Turn.
+async function _consumeFinalAnswer(finalUse, ctx, toolLog, iterNum, logger) {
+  const antwort = typeof finalUse.input?.antwort === 'string' ? finalUse.input.antwort : '';
+  const zitate  = Array.isArray(finalUse.input?.zitate) ? finalUse.input.zitate : null;
+  let citationValidation = null;
+  let invalidCount = 0;
+  if (zitate && zitate.length) {
+    try {
+      citationValidation = await validateFinalAnswerCitations(zitate, ctx);
+      invalidCount = citationValidation.filter(v => !v.valid).length;
+      if (invalidCount > 0) {
+        logger.warn(`final_answer: ${invalidCount}/${citationValidation.length} Zitate ungültig (siehe context_info).`);
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      logger.warn(`final_answer-Zitat-Validierung fehlgeschlagen: ${e.message}`);
+      citationValidation = [{ valid: false, reason: `validator_error: ${e.message}` }];
+      invalidCount = 1;
+    }
+  }
+  toolLog.push({
+    name: 'final_answer',
+    input: {
+      antwort_chars: antwort.length,
+      ...(zitate ? { zitate_count: zitate.length } : {}),
+    },
+    ok: true,
+    durationMs: 0,
+    resultBytes: antwort.length,
+    truncated: false,
+    iter: iterNum,
+    ...(citationValidation ? {
+      citation_validation: citationValidation,
+      citations_invalid: invalidCount,
+    } : {}),
+  });
+  logger.info(`tool=final_answer antwort_chars=${antwort.length} zitate=${zitate?.length || 0} invalid=${invalidCount} iter=${iterNum} (terminal)`);
+  return JSON.stringify({ antwort });
+}
+
 async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
-  const { buildBookChatAgentSystemPrompt, BOOK_CHAT_TOOLS } = await getPrompts();
+  const { buildBookChatAgentSystemPrompt, BOOK_CHAT_TOOLS, BOOK_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts();
   const effectiveProvider = resolveProvider({ userEmail });
   _applyBookChatClaudeOverrides(effectiveProvider, logger);
   const aiCfg = getContextConfigFor(effectiveProvider);
@@ -622,42 +664,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       // weitere Tool-Uses emittiert, ignorieren — final_answer terminiert.
       const finalUse = result.toolUses.find(tu => tu.name === 'final_answer');
       if (finalUse) {
-        const antwort = typeof finalUse.input?.antwort === 'string' ? finalUse.input.antwort : '';
-        const zitate  = Array.isArray(finalUse.input?.zitate) ? finalUse.input.zitate : null;
-        finalText = JSON.stringify({ antwort });
-        let citationValidation = null;
-        let invalidCount = 0;
-        if (zitate && zitate.length) {
-          try {
-            citationValidation = await validateFinalAnswerCitations(zitate, ctx);
-            invalidCount = citationValidation.filter(v => !v.valid).length;
-            if (invalidCount > 0) {
-              logger.warn(`final_answer: ${invalidCount}/${citationValidation.length} Zitate ungültig (siehe context_info).`);
-            }
-          } catch (e) {
-            if (e.name === 'AbortError') throw e;
-            logger.warn(`final_answer-Zitat-Validierung fehlgeschlagen: ${e.message}`);
-            citationValidation = [{ valid: false, reason: `validator_error: ${e.message}` }];
-            invalidCount = 1;
-          }
-        }
-        toolLog.push({
-          name: 'final_answer',
-          input: {
-            antwort_chars: antwort.length,
-            ...(zitate ? { zitate_count: zitate.length } : {}),
-          },
-          ok: true,
-          durationMs: 0,
-          resultBytes: antwort.length,
-          truncated: false,
-          iter: iter + 1,
-          ...(citationValidation ? {
-            citation_validation: citationValidation,
-            citations_invalid: invalidCount,
-          } : {}),
-        });
-        logger.info(`tool=final_answer antwort_chars=${antwort.length} zitate=${zitate?.length || 0} invalid=${invalidCount} iter=${iter + 1} (terminal)`);
+        finalText = await _consumeFinalAnswer(finalUse, ctx, toolLog, iter + 1, logger);
         break;
       }
 
@@ -708,8 +715,56 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
     }
 
     if (finalText == null) {
-      logger.warn(`Max-Iterationen (${maxToolIter}) erreicht ohne finale Antwort.`);
-      finalText = JSON.stringify({ antwort: '__i18n:chat.errors.maxIterReached__' });
+      // Iterationen erschöpft, ohne dass final_answer gerufen wurde (z.B. breite
+      // Recherche-Aufgaben wie "Zitate aus 10–20 Kapiteln"). Statt mit einem
+      // Fehler aufzugeben: ein erzwungener Synthese-Turn. Die bereits gesammelten
+      // tool_results hängen in `messages`; wir bieten dem Modell nur noch
+      // final_answer als Werkzeug an (kein tool_choice-Forcing — das kollidiert
+      // mit adaptive thinking; die Werkzeug-Beschränkung reicht: das Modell ruft
+      // final_answer oder antwortet in Prosa, beides terminal).
+      logger.warn(`Max-Iterationen (${maxToolIter}) erreicht – erzwinge Synthese aus dem bereits gesammelten Kontext.`);
+      updateJob(jobId, { statusText: 'job.phase.agentSynthesize', progress: 92 });
+      messages.push({ role: 'user', content: BOOK_CHAT_FORCE_FINAL_INSTRUCTION });
+      const finalOnlyTools = BOOK_CHAT_TOOLS.filter(t => t.name === 'final_answer');
+      try {
+        const result = await callAIWithTools(
+          messages, systemPrompt, finalOnlyTools,
+          ({ chars, tokIn }) => {
+            const updates = {};
+            if (tokIn > 0) updates.tokensIn  = totalTokIn + tokIn;
+            if (chars > 0) updates.tokensOut = totalTokOut + Math.floor(chars / aiCfg.charsPerToken);
+            if (Object.keys(updates).length) updateJob(jobId, updates);
+          },
+          undefined, jobSignal, undefined
+        );
+        totalTokIn  += result.tokensIn;
+        totalTokOut += result.tokensOut;
+        totalCacheRead       += (result.cacheReadIn || 0);
+        totalCacheCreation   += (result.cacheCreationIn || 0);
+        totalCacheCreation1h += (result.cacheCreation1hIn || 0);
+        if (result.genDurationMs) genMs += result.genDurationMs;
+        if (result.model) lastModel = result.model;
+        updateJob(jobId, {
+          tokensIn: totalTokIn, tokensOut: totalTokOut,
+          cacheReadIn: totalCacheRead, cacheCreationIn: totalCacheCreation,
+          cacheCreation1hIn: totalCacheCreation1h,
+        });
+        const finalUse = result.toolUses?.find(tu => tu.name === 'final_answer');
+        if (finalUse) {
+          finalText = await _consumeFinalAnswer(finalUse, ctx, toolLog, maxToolIter + 1, logger);
+        } else {
+          // Modell antwortete in Prosa statt via final_answer — Prosa IST die Antwort.
+          const raw = (result.text || '').trim();
+          if (raw) finalText = raw.startsWith('{') ? raw : JSON.stringify({ antwort: _stripTrailingEmptyJson(raw) || raw });
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        logger.warn(`Synthese-Turn fehlgeschlagen: ${e.message}`);
+      }
+      if (finalText == null) {
+        logger.warn('Synthese-Turn lieferte keine Antwort – Fallback-Meldung.');
+        finalText = JSON.stringify({ antwort: '__i18n:chat.errors.maxIterReached__' });
+      }
     }
 
     const { antwort, fallback } = _parseChatResponse(finalText);
