@@ -279,6 +279,24 @@ import { charOffset, locateRange } from './share-anchor.js';
     const li = list && list.querySelector(`.share-thread[data-comment-id="${id}"]`);
     if (li) {
       li.classList.add('share-thread--active');
+      scrollThreadIntoView(li);
+    }
+  }
+  // Den Thread in der rechten Befund-Leiste sichtbar machen. Ist das Panel ein
+  // eigener Scroll-Container (Desktop ≥1100px, sticky + overflow-y:auto), nur
+  // darin scrollen — der Artikel (window) bleibt an der angeklickten Stelle
+  // stehen. Sonst (gestapeltes Mobile-Layout) Default-Scroll.
+  function scrollThreadIntoView(li) {
+    const panel = li.closest('.share-comments');
+    const scrollable = panel
+      && panel.scrollHeight > panel.clientHeight + 1
+      && /(auto|scroll)/.test(getComputedStyle(panel).overflowY);
+    if (scrollable) {
+      const liRect = li.getBoundingClientRect();
+      const pRect = panel.getBoundingClientRect();
+      const delta = (liRect.top - pRect.top) - (pRect.height - liRect.height) / 2;
+      panel.scrollTo({ top: panel.scrollTop + delta, behavior: 'smooth' });
+    } else {
       li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   }

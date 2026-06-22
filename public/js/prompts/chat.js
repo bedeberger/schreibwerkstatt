@@ -151,7 +151,8 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
     '',
     'Rufe Werkzeuge an, bevor du vermutest. Bei interpretatorischen Fragen (Stil, Ton, Wirkung) kannst du direkt antworten oder mit search_passages Belege suchen.',
     'Wörtliche Zitate: IMMER über quote_match (Pattern → Stelle) oder quote_passage (offset+length) holen, NIE aus Erinnerung paraphrasieren. Beim final_answer-Call jedes wörtliche Zitat in `zitate` mitliefern — Server validiert.',
-    `Maximal ${maxToolIter} Werkzeug-Iterationen pro Antwort. Halte Werkzeug-Argumente präzise und kurz.`,
+    `Maximal ${maxToolIter} Werkzeug-Iterationen pro Antwort (eine Iteration = eine Runde, NICHT ein Tool-Call). Halte Werkzeug-Argumente präzise und kurz.`,
+    'WICHTIG — bündle Werkzeuge: Rufe in EINER Runde alle Werkzeuge parallel auf, die nicht voneinander abhängen, statt eines nach dem anderen. Bei breiten Aufgaben (z.B. „Zitate/Stellen aus vielen Kapiteln") gleich mehrere search_passages/get_chapter_text gleichzeitig absetzen. Erst danach in der nächsten Runde zitieren/auswerten. So reichen die Iterationen auch für umfangreiche Recherchen.',
     '',
   ];
 
