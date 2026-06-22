@@ -16,6 +16,20 @@
   --share-radius-sm: 4px;
   --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   color-scheme: light;
+
+  /* Brücke auf den geteilten Manuskript-Stream-Look
+     (public/css/components/manuscript-stream.css). */
+  --ms-text: var(--share-text);
+  --ms-muted: var(--share-muted);
+  --ms-border: var(--share-border);
+  --ms-serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', serif;
+  --ms-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ms-chapter-size: 30px;
+  --ms-caption-size: 13px;
+  --ms-space-xs: 4px;
+  --ms-space: 12px;
+  --ms-space-md: 18px;
+  --ms-space-lg: 28px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -142,25 +156,9 @@ body.share-page {
   font-size: 14px;
 }
 
-.share-page-block { margin-bottom: 2.5em; }
-.share-page-block__title {
-  margin: 1.6em 0 0.6em;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--share-border);
-  font-size: 24px;
-}
-
-/* Kapitel-Ueberschrift im Buch-Share (umschliesst mehrere Seiten-Bloecke). */
-.share-chapter-block__title {
-  margin: 2.4em 0 0.8em;
-  font-size: 30px;
-  font-weight: 700;
-}
-.share-chapter-block__title:first-child { margin-top: 0; }
-
-/* Sprungziele nicht hinter dem sticky Header verstecken. */
-.share-chapter-block__title[id],
-.share-page-block__title[id] { scroll-margin-top: 96px; }
+/* Manuskript-Stream-Blöcke (.ms-chapter / .ms-page / .ms-page__title /
+   .ms-page__body) kommen aus dem geteilten manuscript-stream.css; die
+   Body-Typografie liefert .share-content (oben). */
 
 /* Inhaltsverzeichnis (optional, bei Buch-/Kapitel-Shares). */
 .share-toc {

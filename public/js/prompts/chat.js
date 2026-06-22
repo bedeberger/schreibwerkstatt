@@ -149,9 +149,10 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
     '- Kapitel-Qualität, Stärken/Schwächen → get_reviews',
     '- Geplante Handlung / Beat-Board / was noch nicht geschrieben ist → get_plot_board',
     '',
-    'Rufe Werkzeuge an, bevor du vermutest. Bei interpretatorischen Fragen (Stil, Ton, Wirkung) kannst du direkt antworten oder mit search_passages Belege suchen.',
+    'Rufe Werkzeuge an, bevor du vermutest.',
+    'STRATEGIE — Suche vs. Lektüre: `search_passages` ist Stichwort-Suche („wo kommt das bekannte Wort/der Name X vor?"). Für SEMANTISCHE Aufgaben, bei denen du Stellen nach einer EIGENSCHAFT auswählst (lustigste/schönste/spannendste/traurigste Stellen, Humor, Ton, Stimmung, Beispiele für ein Stilmittel) hat das Gesuchte KEINE Stichwort-Signatur — rate dann NICHT mit search_passages nach Wörtern. Lies stattdessen den Text selbst: lade ganze Kapitel via `get_chapter_text` (mehrere gebündelt in einer Runde) und wähle die Stellen aus eigener Lektüre aus. Bei kleinen/mittleren Büchern, die in den Kontext passen (siehe `hint` aus list_chapters), lade gleich das ganze Buch statt es in vielen Runden zu durchforsten.',
     'Wörtliche Zitate: IMMER über quote_match (Pattern → Stelle) oder quote_passage (offset+length) holen, NIE aus Erinnerung paraphrasieren. Beim final_answer-Call jedes wörtliche Zitat in `zitate` mitliefern — Server validiert.',
-    `Maximal ${maxToolIter} Werkzeug-Iterationen pro Antwort (eine Iteration = eine Runde, NICHT ein Tool-Call). Halte Werkzeug-Argumente präzise und kurz.`,
+    `Maximal ${maxToolIter} Werkzeug-Iterationen pro Antwort (eine Iteration = eine Runde, NICHT ein Tool-Call). Halte Werkzeug-Argumente präzise und kurz. Die Iterationen sind knapp — verschwende sie nicht mit seriellem Stichwort-Raten, wenn ein paar gebündelte get_chapter_text-Calls den ganzen relevanten Text in einer Runde liefern.`,
     'WICHTIG — bündle Werkzeuge: Rufe in EINER Runde alle Werkzeuge parallel auf, die nicht voneinander abhängen, statt eines nach dem anderen. Bei breiten Aufgaben (z.B. „Zitate/Stellen aus vielen Kapiteln") gleich mehrere search_passages/get_chapter_text gleichzeitig absetzen. Erst danach in der nächsten Runde zitieren/auswerten. So reichen die Iterationen auch für umfangreiche Recherchen.',
     '',
   ];
@@ -234,11 +235,11 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'search_passages',
-    description: 'Durchsucht den Buch-Volltext via FTS5 (Literal-Pfad, bm25-sortiert) und liefert exakte Treffer-Offsets + Snippets. Standard: case-insensitive Literal-Suche; mit regex=true als JavaScript-Regex (umgeht FTS5 und scannt alle Seiten direkt). Mit chapter_id/page_id auf ein Kapitel oder eine Seite einschränken. Offsets sind kompatibel mit `quote_passage`. Nutze dies für "wo kommt X vor?"-Fragen über das ganze Buch. Nicht nutzen, wenn du bereits page_ids kennst und den vollen Seitentext brauchst (→ `get_pages` / `get_chapter_text`) oder für Figuren-Auftritte (→ `get_figure_mentions`).',
+    description: 'Durchsucht den Buch-Volltext via FTS5 (Literal-Pfad, bm25-sortiert) und liefert exakte Treffer-Offsets + Snippets. Standard: case-insensitive Literal-Suche; mit regex=true als JavaScript-Regex (umgeht FTS5 und scannt alle Seiten direkt). Mit chapter_id/page_id auf ein Kapitel oder eine Seite einschränken. Offsets sind kompatibel mit `quote_passage`. Nutze dies für "wo kommt X vor?"-Fragen über das ganze Buch, wenn X ein KONKRETES Wort/Name/eine Phrase ist. NICHT nutzen, um Stellen nach einer Eigenschaft zu finden, die nicht im Wortlaut steht (lustig/schön/spannend/traurig, Humor, Ton, Stimmung) — solche Aufgaben durch eigene Lektüre lösen (→ `get_chapter_text`, ganze Kapitel gebündelt laden), nicht durch Raten von Stichwörtern. Auch nicht nutzen, wenn du bereits page_ids kennst und den vollen Seitentext brauchst (→ `get_pages` / `get_chapter_text`) oder für Figuren-Auftritte (→ `get_figure_mentions`).',
     input_schema: {
       type: 'object',
       properties: {
-        pattern:     { type: 'string',  description: 'Suchmuster (literal oder Regex). Mehrere Wörter werden im Literal-Modus als AND über FTS5 vorgefiltert; final wird die exakte Phrase im Seitentext gesucht.' },
+        pattern:     { type: 'string',  description: 'Suchmuster (literal oder Regex). Im Literal-Modus ist dies eine PHRASEN-Suche, KEINE Stichwort-ODER-Suche: mehrere Wörter werden als exakte Wortfolge gesucht (FTS5 filtert die Seiten nur vor). „lustig komisch witzig" matcht also nur diese Wortfolge, nicht Seiten, die irgendeines der Wörter enthalten. Suche nach EINEM konkreten Wort/Namen/einer festen Phrase; für „irgendwo etwas Lustiges/Schönes" ist das Tool ungeeignet (→ Kapitel lesen). Mehrere Alternativen brauchst du regex=true (z.B. `lustig|komisch|witzig`).' },
         regex:       { type: 'boolean', description: 'true = pattern als JavaScript-Regex interpretieren, scannt alle Buchseiten ohne FTS5-Vorfilter. Default: false.' },
         chapter_id:  { type: 'integer', description: 'Optional: Suche auf ein Kapitel einschränken.' },
         page_id:     { type: 'integer', description: 'Optional: Suche auf eine einzelne Seite einschränken (überschreibt chapter_id-Wirkung).' },
@@ -533,7 +534,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'get_dialogue',
-    description: 'Extrahiert Dialog-Passagen (heuristisch via Anführungszeichen «»/„"/""/»«, Speech-Verb+Doppelpunkt, Em-Dash am Zeilenanfang). Mit figur_id/figur_name nur Dialoge, in deren ±100 Zeichen Umfeld der Figurenname vorkommt (Sprecher-Heuristik). Liefert results[{page_id, page_name, offset, length, text, before, after}] – die offsets sind kompatibel mit `quote_passage` und `search_passages`. Ideal für "wie spricht X?", "Dialoge in Kapitel 3", "wo wird viel gesprochen?". Einfache gerade Quotes (\'…\') werden bewusst NICHT erkannt (Apostroph-False-Positives).',
+    description: 'Extrahiert Dialog-Passagen (heuristisch via Anführungszeichen «»/„"/""/»«, Speech-Verb+Doppelpunkt, Em-Dash am Zeilenanfang). Mit figur_id/figur_name nur Dialoge, in deren ±100 Zeichen Umfeld der Figurenname vorkommt (Sprecher-Heuristik). Liefert results[{page_id, page_name, offset, length, text, before, after}] – die offsets sind kompatibel mit `quote_passage` und `search_passages`. Ideal für "wie spricht X?", "Dialoge in Kapitel 3", "wo wird viel gesprochen?". Auch der beste Einstieg für inhaltliche Zitat-Selektion nach Eigenschaft (lustigste/schlagfertigste/markanteste Stellen, Humor, Figuren-Stimme): Pointen leben meist im Dialog — gezielter als search_passages (das nur Wortlaut findet) und bei grossen Büchern fokussierter als ganze Kapitel zu laden. Einfache gerade Quotes (\'…\') werden bewusst NICHT erkannt (Apostroph-False-Positives).',
     input_schema: {
       type: 'object',
       properties: {
@@ -598,6 +599,18 @@ export const BOOK_CHAT_TOOLS = [
         context_chars: { type: 'integer', description: 'Vor-/Nach-Kontext (default 80, max 300, 0 = ohne).' },
       },
       required: ['page_id', 'pattern'],
+    },
+  },
+  {
+    name: 'generate_image',
+    description: 'Erzeugt EIN Bild zu einer textuellen Beschreibung und zeigt es dem User unter deiner Antwort an (im Chat-Verlauf, herunterladbar). Nutze dies nur, wenn der User ausdrücklich ein Bild/eine Illustration/eine Visualisierung wünscht — z.B. ein Figurenporträt, einen Schauplatz, eine Szene oder eine Stimmungs-Illustration zum Buch. Baue den Bild-Prompt selbst aus dem Buchwissen (Aussehen einer Figur, Beschreibung eines Orts/einer Szene) — am besten auf Englisch und mit konkreten visuellen Details (Stil, Licht, Komposition), das liefert bessere Resultate. Das Bild ist reine Visualisierung und wird NICHT in den Buchtext geschrieben. Nach dem Aufruf in final_answer kurz auf das angezeigte Bild verweisen, aber KEINE Bild-URL und keine Markdown-Bildsyntax ausgeben (das Bild rendert das Frontend selbst). Nicht ungefragt aufrufen und nicht für Textfragen verwenden.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Bildbeschreibung für den Generator. Konkret und visuell; bevorzugt Englisch. Pflichtfeld.' },
+        size:   { type: 'string', description: 'Optionales Seitenverhältnis/Format als "BREITExHÖHE" (z.B. "1024x1024", "1024x1536"). Ohne Angabe: Server-Default.' },
+      },
+      required: ['prompt'],
     },
   },
   {

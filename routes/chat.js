@@ -180,6 +180,27 @@ router.get('/session/:id', (req, res) => {
   });
 });
 
+/** Im Buch-Chat generiertes Bild streamen (Owner-Scope via Session-Join).
+ *  ?download=1 erzwingt den Attachment-Disposition (Speichern-Dialog). */
+router.get('/image/:id', (req, res) => {
+  const userEmail = req.session?.user?.email || null;
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const { getChatImage } = require('../db/chat-images');
+  const row = getChatImage(id);
+  if (!row) return res.status(404).json({ error_code: 'IMAGE_NOT_FOUND' });
+  if (row.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+
+  const ext = (row.mime && row.mime.split('/')[1]) || 'png';
+  res.setHeader('Content-Type', row.mime || 'image/png');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  if (req.query.download) {
+    res.setHeader('Content-Disposition', `attachment; filename="bild-${id}.${ext}"`);
+  }
+  res.setHeader('Content-Length', row.image.length);
+  res.end(row.image);
+});
+
 /** Session löschen */
 router.delete('/session/:id', (req, res) => {
   const userEmail = req.session?.user?.email || null;

@@ -13,6 +13,7 @@ const analysis = require('./tools-analysis');
 const revisions = require('./tools-revisions');
 const werkstatt = require('./tools-werkstatt');
 const plot = require('./tools-plot');
+const image = require('./tools-image');
 const { validateFinalAnswerCitations } = require('./citations');
 
 const TOOLS = {
@@ -55,6 +56,8 @@ const TOOLS = {
   get_werkstatt_draft:    werkstatt.tool_get_werkstatt_draft,
 
   get_plot_board:         plot.tool_get_plot_board,
+
+  generate_image:         image.tool_generate_image,
 };
 
 async function executeTool(name, input, ctx) {

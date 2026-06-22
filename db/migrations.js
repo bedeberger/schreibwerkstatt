@@ -8487,6 +8487,31 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 215 abgeschlossen (share_links.show_toc).');
   }
 
+  if (version < 216) {
+    // Im Buch-Chat generierte Bilder (Weltaufbau-/Chat-Visualisierung, NIE im
+    // Manuskript). An die Chat-Session gebunden; CASCADE mit der Session, da das
+    // Bild ohne seinen Verlauf keinen Bezug mehr hat. BLOB inline, da klein und
+    // selten (kein Cover-/Asset-Volumen wie beim PDF-Export).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_images (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id  INTEGER NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        prompt      TEXT    NOT NULL DEFAULT '',
+        mime        TEXT    NOT NULL DEFAULT 'image/png',
+        size        TEXT    NOT NULL DEFAULT '',
+        image       BLOB    NOT NULL,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_chat_images_session ON chat_images(session_id)');
+    const fkErrors216 = db.pragma('foreign_key_check');
+    if (fkErrors216.length) {
+      throw new Error(`Migration 216: foreign_key_check meldet ${fkErrors216.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 216').run();
+    logger.info('DB-Migration auf Version 216 abgeschlossen (chat_images angelegt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

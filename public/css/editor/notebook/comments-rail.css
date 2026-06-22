@@ -89,6 +89,37 @@
 .comment-rail__thread--selected .comment-rail__quote,
 .comment-rail__anchor:hover .comment-rail__quote { color: var(--card-accent); }
 
+/* „Stelle seither geändert": Badge + Quote→aktuell-Inline-Diff. */
+.comment-rail__changed { display: flex; flex-direction: column; gap: 4px; }
+.comment-rail__changed-badge {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.comment-rail__quote--stale { opacity: 0.75; }
+.comment-rail-diff { font-size: 13px; line-height: 1.5; }
+.comment-rail-diff .diff-line { margin: 0; }
+.comment-rail-diff ins.diff-add {
+  text-decoration: none;
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+  border-radius: var(--radius-sm);
+  padding: 0 2px;
+}
+.comment-rail-diff del.diff-del {
+  text-decoration: line-through;
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
+  border-radius: var(--radius-sm);
+  padding: 0 2px;
+}
+
 .comment-rail__comment { font-size: 14px; }
 .comment-rail__comment--reply {
   margin-left: var(--space-sm);

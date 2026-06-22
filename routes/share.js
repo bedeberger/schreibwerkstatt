@@ -8,6 +8,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const contentStore = require('../lib/content-store');
 const { loadContents } = require('../lib/load-contents');
 const shareLinks = require('../db/share-links');
@@ -89,6 +90,23 @@ function paragraphifyIntro(text) {
   return blocks.map(b => `<p>${escHtml(b).replace(/\n/g, '<br>')}</p>`).join('');
 }
 
+// Geteilter Manuskript-Stream-Renderer (public/js/, ESM) lazy + gecacht laden,
+// Muster wie lib/prompts-loader.js. SSoT für den Stream-Look von Bucheditor,
+// Fassungen-Reader und Share.
+let _streamPromise = null;
+function getStream() {
+  if (_streamPromise) return _streamPromise;
+  _streamPromise = (async () => {
+    const base = path.join(__dirname, '..', 'public', 'js');
+    const [render, model] = await Promise.all([
+      import(pathToFileURL(path.join(base, 'manuscript-render.js')).href),
+      import(pathToFileURL(path.join(base, 'manuscript-stream.js')).href),
+    ]);
+    return { renderStreamHtml: render.renderStreamHtml, fromGroups: model.fromGroups };
+  })();
+  return _streamPromise;
+}
+
 async function loadContentForLink(link) {
   if (link.kind === 'page') {
     try {
@@ -103,59 +121,37 @@ async function loadContentForLink(link) {
     }
   }
   if (link.kind === 'book') {
-    // Ganzes Buch in Reihenfolge: Kapitel-Ueberschrift + Seiten (inkl. Sub-
-    // Kapitel, da loadContents alle Seiten chapter-geordnet liefert).
+    // Ganzes Buch in Reihenfolge: Kapitel-Ueberschrift (h2) + Seiten (h3),
+    // inkl. Sub-Kapitel (loadContents liefert alle Seiten chapter-geordnet).
     try {
       const { book, groups } = await loadContents({ scope: 'book', id: link.book_id });
-      const sections = [];
-      const toc = [];
-      let anchorN = 0;
-      for (const g of groups) {
-        if (g.chapter) {
-          const a = `sec${++anchorN}`;
-          toc.push({ level: 1, label: g.chapter.name || '', anchor: a });
-          sections.push(`<h2 id="${a}" class="share-chapter-block__title">${escHtml(g.chapter.name || '')}</h2>`);
-        }
-        for (const { pd } of g.pages) {
-          const a = `sec${++anchorN}`;
-          toc.push({ level: g.chapter ? 2 : 1, label: pd.name || '', anchor: a });
-          sections.push(`<section class="share-page-block">
-            <h3 id="${a}" class="share-page-block__title">${escHtml(pd.name || '')}</h3>
-            <div class="share-page-block__body">${pd.html || ''}</div>
-          </section>`);
-        }
-      }
-      return {
-        title: book.name || '',
-        html: sections.join('\n'),
-        toc,
-      };
+      const { renderStreamHtml, fromGroups } = await getStream();
+      const { html, toc } = renderStreamHtml(fromGroups(groups));
+      return { title: book.name || '', html, toc };
     } catch {
       return null;
     }
   }
-  // chapter — alle Seiten des Kapitels (ohne Sub-Kapitel, MVP).
+  // chapter — alle Seiten des Kapitels (ohne Sub-Kapitel, MVP). Kapitelname
+  // steht bereits im Seiten-Header (h1), darum kein Kapitel-Heading im Body
+  // (omitChapterHeaders) und Seiten als h2.
   try {
     const chapter = await contentStore.loadChapter(link.chapter_id);
     const pages = await contentStore.listPages(link.book_id);
     const chapterPages = pages
       .filter(p => p.chapter_id === link.chapter_id)
       .sort((a, b) => (a.position || 0) - (b.position || 0));
-    const blocks = [];
-    const toc = [];
-    let anchorN = 0;
+    const groupPages = [];
     for (const meta of chapterPages) {
       const pd = await contentStore.loadPage(meta.id);
-      const a = `sec${++anchorN}`;
-      toc.push({ level: 1, label: pd.name || '', anchor: a });
-      blocks.push(`<section class="share-page-block">
-        <h2 id="${a}" class="share-page-block__title">${escHtml(pd.name || '')}</h2>
-        <div class="share-page-block__body">${pd.html || ''}</div>
-      </section>`);
+      groupPages.push({ pd });
     }
+    const { renderStreamHtml, fromGroups } = await getStream();
+    const entries = fromGroups([{ chapterId: link.chapter_id, chapter, pages: groupPages }]);
+    const { html, toc } = renderStreamHtml(entries, { pageTag: 'h2', omitChapterHeaders: true });
     return {
       title: chapter.name || chapter.chapter_name || '',
-      html: blocks.join('\n'),
+      html,
       toc,
     };
   } catch {

@@ -59,7 +59,7 @@ init ──setupCardLifecycle──▶ idle
 
 ### Laden (`_load`)
 1. `fetchJson('/book-editor/:book_id/contents')` — Server liefert alle Pages in Lesereihenfolge (Depth-First durch Kapitel-Hierarchie).
-2. `buildBlocksFromPages(pages)` produziert die Block-Liste mit Chapter-Markern an Kapitel-Grenzen.
+2. `buildBlocksFromPages(pages)` produziert die Block-Liste mit Chapter-Markern an Kapitel-Grenzen. Die Struktur (Kapitel-Header + Seiten-Sequenz) kommt aus dem geteilten Stream-Modell [public/js/manuscript-stream.js](../public/js/manuscript-stream.js) (`fromPages`, geteilt mit Fassungen-Reader und Share-SSR); `buildBlocksFromPages` wrappt nur jeden Page-Entry mit dem Editor-State (dirty/saving/_rev/originalHtml). `stripFocusArtefacts` bleibt im Wrapper (browser-only).
 3. `missing > 0` → Status-Toast (`bookEditor.missingPages`); Bucheditor bleibt lauffähig.
 4. `$nextTick(_initOutlineObserver)` — IO an alle `.book-editor-page-card`-Targets.
 

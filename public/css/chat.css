@@ -383,3 +383,48 @@
 }
 
 }
+
+/* Im Buch-Chat generierte Bilder (Weltaufbau-/Chat-Visualisierung) */
+.chat-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+.chat-image {
+  margin: 0;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.chat-image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+.chat-image-cap {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+  font-size: var(--font-size-micro);
+  color: var(--color-subtle);
+}
+.chat-image-prompt {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-image-dl {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .chat-image {
+    max-width: 100%;
+  }
+}

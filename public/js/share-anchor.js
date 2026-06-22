@@ -44,6 +44,35 @@ export function rangeFromOffsets(block, start, end) {
   return (didStart && didEnd) ? range : null;
 }
 
+// Status der gespeicherten Anmerkung gegen den aktuellen (live editierten) Text:
+//   'match'   — Block da, Quote unverändert an den gespeicherten Offsets.
+//   'moved'   — Block da, Quote wörtlich vorhanden, nur verschoben.
+//   'changed' — Block da, Quote nicht mehr auffindbar → Text wurde geändert.
+//               currentText = aktueller Block-Text um die alten Offsets (gekappt).
+//   'gone'    — kein Block mit dieser data-bid in rootEl (gelöscht / andere Seite).
+// Für 'changed' kann der Aufrufer Quote (damals) vs. currentText (jetzt) als
+// Inline-Diff zeigen. anchor_quote ist serverseitig auf 600 Zeichen gekappt →
+// der Diff ist quote-scoped, nicht ganzer Block.
+export function resolveCurrentQuote(rootEl, anchor) {
+  if (!rootEl || !anchor || !anchor.bid) return { status: 'gone', currentText: '' };
+  let block;
+  try { block = rootEl.querySelector(`[data-bid="${CSS.escape(anchor.bid)}"]`); } catch { block = null; }
+  if (!block) return { status: 'gone', currentText: '' };
+  const txt = block.textContent || '';
+  const q = anchor.quote || '';
+  const s = anchor.start, e = anchor.end;
+  if (q && Number.isInteger(s) && Number.isInteger(e) && txt.slice(s, e) === q) {
+    return { status: 'match', currentText: q };
+  }
+  if (q && txt.indexOf(q) >= 0) return { status: 'moved', currentText: q };
+  let currentText = txt;
+  if (Number.isInteger(s) && Number.isInteger(e) && e > s) {
+    const pad = Math.max(8, Math.round((e - s) * 0.5));
+    currentText = txt.slice(Math.max(0, s - pad), Math.min(txt.length, e + pad));
+  }
+  return { status: 'changed', currentText };
+}
+
 // Live-Range einer gespeicherten Anmerkung in `rootEl` finden (re-anchor by quote).
 export function locateRange(rootEl, anchor) {
   if (!rootEl || !anchor || !anchor.bid) return null;

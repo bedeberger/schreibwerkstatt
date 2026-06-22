@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 215, 108 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 216, 109 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -184,6 +184,7 @@ erDiagram
   continuity_issues ||--o{ continuity_issue_chapters  : refs
 
   chat_sessions ||--o{ chat_messages     : has
+  chat_sessions ||--o{ chat_images       : "generated in chat"
 ```
 
 ---
@@ -884,6 +885,15 @@ erDiagram
     REAL    tps
     TEXT    created_at
   }
+  chat_images {
+    INTEGER id          PK
+    INTEGER session_id  FK
+    TEXT    prompt
+    TEXT    mime
+    TEXT    size        "WIDTHxHEIGHT"
+    BLOB    image
+    TEXT    created_at
+  }
 
   book_reviews {
     INTEGER id          PK
@@ -1508,6 +1518,7 @@ erDiagram
   app_users        ||--o{ device_tokens     : owns
 
   chat_sessions ||--o{ chat_messages : has
+  chat_sessions ||--o{ chat_images   : "generated in chat"
   user_invites  ||--o{ registration_requests : "linked invite"
 ```
 

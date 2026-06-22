@@ -13,6 +13,7 @@ const {
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
 const { executeTool, validateFinalAnswerCitations } = require('./book-chat-tools');
+const { imageGenEnabled } = require('../../lib/image-gen');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
@@ -583,13 +584,27 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       session.book_name || '', figuren, review, bookChatSys, maxToolIter
     );
 
+    // generate_image nur anbieten, wenn der Bild-Endpunkt konfiguriert ist —
+    // sonst spart das Input-Tokens und das Modell ruft kein totes Werkzeug.
+    const activeTools = imageGenEnabled()
+      ? BOOK_CHAT_TOOLS
+      : BOOK_CHAT_TOOLS.filter(t => t.name !== 'generate_image');
+
     const jobSignal = jobAbortControllers.get(jobId)?.signal;
     const ctx = {
       bookId: session.book_id,
+      sessionId: session.id,
       userEmail,
       userToken,
       jobSignal,
       logger,
+      // generate_image-Tool sammelt hier {image_id, prompt, mime}; wird nach dem
+      // Loop in context_info.images persistiert (Frontend-Anzeige im Verlauf).
+      images: [],
+      // Input-Budget des effektiven Providers (inkl. Bookchat-Override) — list_chapters
+      // leitet daraus ab, ob das ganze Buch in den Kontext passt und gibt dem Agenten
+      // einen entsprechenden Lade-Hinweis (Voll-Lektüre statt search_passages-Raten).
+      inputBudgetChars: aiCfg.inputBudgetChars,
     };
 
     // Historien-Rolling-Window (Anker + letzte 10 Nachrichten)
@@ -619,7 +634,7 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       };
 
       const result = await callAIWithTools(
-        messages, systemPrompt, BOOK_CHAT_TOOLS, onProgress,
+        messages, systemPrompt, activeTools, onProgress,
         undefined, jobSignal, undefined
       );
       totalTokIn  += result.tokensIn;
@@ -779,6 +794,9 @@ async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEma
       mode: 'agent',
       tool_calls: toolLog,
       iterations: iter + 1,
+      // Im Chat generierte Bilder (Weltaufbau-/Chat-Visualisierung) — Frontend
+      // rendert sie unter der Antwort und bietet Download via /chat/image/:id.
+      ...(ctx.images.length ? { images: ctx.images } : {}),
     };
     const asstMsgResult = db.prepare(`
       INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, provider, model, tps, context_info, created_at)

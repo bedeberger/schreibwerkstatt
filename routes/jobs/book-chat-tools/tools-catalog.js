@@ -27,7 +27,8 @@ function tool_list_chapters(_input, ctx) {
 
   // Seiten mit ihren Kapitelzuordnungen laden – inkl. Seiten ohne Kapitel (chapter_id IS NULL)
   const pageRows = db.prepare(`
-    SELECT p.page_id, p.page_name, p.chapter_id, COALESCE(ps.words, 0) AS words
+    SELECT p.page_id, p.page_name, p.chapter_id,
+           COALESCE(ps.words, 0) AS words, COALESCE(ps.chars, 0) AS chars
     FROM pages p
     LEFT JOIN page_stats ps ON ps.page_id = p.page_id
     WHERE p.book_id = ?
@@ -36,10 +37,11 @@ function tool_list_chapters(_input, ctx) {
 
   const pagesByChapter = new Map();
   const orphanPages = [];
-  let totalWords = 0, totalPages = 0;
+  let totalWords = 0, totalPages = 0, totalChars = 0;
   for (const p of pageRows) {
     totalPages++;
     totalWords += p.words;
+    totalChars += p.chars;
     const entry = { page_id: p.page_id, page_name: p.page_name, words: p.words };
     if (p.chapter_id == null) orphanPages.push(entry);
     else {
@@ -61,10 +63,28 @@ function tool_list_chapters(_input, ctx) {
     ...(orphanPages.length ? { pages_without_chapter: orphanPages } : {}),
     total_pages: totalPages,
     total_words: totalWords,
-    hint: totalWords < 12000
-      ? 'Kleines Buch – du kannst alle Seiten via get_pages laden, wenn das für die Frage sinnvoll ist.'
-      : undefined,
+    hint: _listChaptersHint(totalChars, ctx.inputBudgetChars),
   });
+}
+
+// Lade-Hinweis abhängig davon, ob das ganze Buch in das Input-Budget passt.
+// Schwelle 50 % des Budgets: lässt Platz für System-Prompt, Tool-Schemas und
+// Chat-Historie. Ziel: bei semantischen Selektions-Aufgaben (lustigste/schönste
+// Stellen, Ton, Stimmung) den Agenten zur Voll-Lektüre lenken statt zum seriellen
+// search_passages-Stichwort-Raten. budget unbekannt → konservativer Wort-Fallback.
+function _listChaptersHint(totalChars, inputBudgetChars) {
+  const budget = Number(inputBudgetChars) || 0;
+  if (budget > 0 && totalChars > 0 && totalChars < budget * 0.5) {
+    return 'Das ganze Buch passt komplett in den Kontext. Für inhaltliche/semantische Selektion '
+      + '(z.B. lustigste/schönste/spannendste Stellen, Ton, Stimmung) lade ganze Kapitel via '
+      + 'get_chapter_text (mehrere gebündelt in EINER Runde) und wähle aus eigener Lektüre aus — '
+      + 'nicht mit search_passages nach Stichwörtern raten.';
+  }
+  if (totalChars > 0 && totalChars < 60000) {
+    return 'Eher kleines Buch – du kannst ganze Kapitel via get_chapter_text (gebündelt) oder '
+      + 'Seiten via get_pages laden, wenn die Frage Lektüre statt Stichwort-Suche verlangt.';
+  }
+  return undefined;
 }
 
 // ── list_ideen ────────────────────────────────────────────────────────────────

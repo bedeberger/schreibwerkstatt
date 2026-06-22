@@ -1,0 +1,51 @@
+/* Geteilter read-only Manuskript-Stream-Look: Kapitel + Seiten als durchgehender
+   Fluss. Spiegelt den Bucheditor-Stream (public/css/editor/book/book-editor.css —
+   dort die editierbare Master-Variante mit Save-/Active-States) für read-only
+   Konsumenten; aktuell die Share-Reader-SSR. Markup erzeugt
+   public/js/manuscript-render.js (.ms-chapter / .ms-page / .ms-page__title /
+   .ms-page__body).
+
+   Token-Brücke: neutrale --ms-*-Variablen, jeder Kontext mappt sie auf seine
+   eigenen Tokens (Share: --share-* in share.css). Body-Typografie (Absätze,
+   Zitate, Listen) bleibt bewusst kontext-spezifisch (Share: .share-content) —
+   hier nur die Stream-Rahmung. */
+@layer components {
+  /* Kapitel-Überschrift: typografisch, dünne Rule darunter (kein Farbbalken). */
+  .ms-chapter {
+    margin: var(--ms-space-lg, 28px) 0 var(--ms-space, 12px);
+    padding-block-end: var(--ms-space-xs, 4px);
+    border-bottom: 1px solid var(--ms-border, rgba(0, 0, 0, 0.12));
+    font-family: var(--ms-serif, Georgia, serif);
+    font-size: var(--ms-chapter-size, 30px);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+    color: var(--ms-text, inherit);
+  }
+  .ms-chapter:first-child { margin-top: 0; }
+
+  .ms-page { margin-block: var(--ms-space-md, 18px) 0; }
+
+  /* Seiten-Caption: kleine, gesperrte Marginalie wie im Bucheditor. */
+  .ms-page__title {
+    display: block;
+    margin: 0;
+    padding-block-end: var(--ms-space-xs, 4px);
+    border-bottom: 1px dotted var(--ms-border, rgba(0, 0, 0, 0.12));
+    font-family: var(--ms-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    font-size: var(--ms-caption-size, 13px);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ms-muted, #6b6258);
+  }
+
+  .ms-page__body {
+    padding-block: var(--ms-space-lg, 28px);
+    overflow-wrap: anywhere;
+  }
+
+  /* Sprungziele nicht hinter sticky Headern verstecken. */
+  .ms-chapter[id],
+  .ms-page__title[id] { scroll-margin-top: 96px; }
+}

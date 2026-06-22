@@ -15,6 +15,7 @@
 // Replace via Range.deleteContents + Text-Insert; Block wird dirty + queued.
 
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { fromPages } from '../manuscript-stream.js';
 import { stripFocusArtefacts, htmlToText, fetchJson, escHtml } from '../utils.js';
 import { handleEditorPaste, handleEditorCopy, handleEditorCut } from '../editor/shared/paste.js';
 import { savePage } from '../editor/shared/page-api.js';
@@ -62,34 +63,33 @@ function cleanForSave(html) {
 }
 
 // Build-Funktion getrennt für Unit-Tests.
+// Baut die Render-Blockliste über das geteilte Stream-Modell (fromPages) und
+// wrappt jeden Page-Entry mit dem Editor-State (dirty/saving/_rev/originalHtml).
+// stripFocusArtefacts bleibt hier (browser-only) statt im pure Modell.
+// originalUpdatedAt kommt aus der Quell-Page (das Modell trägt kein updated_at).
 export function buildBlocksFromPages(pages) {
-  const blocks = [];
-  let lastChapterId = undefined;
-  for (const p of pages || []) {
-    if (p.chapterId !== lastChapterId) {
-      lastChapterId = p.chapterId;
-      if (p.chapterId) {
-        blocks.push({ kind: 'chapter', chapterId: p.chapterId, name: p.chapterName || '' });
-      }
-    }
-    const html = stripFocusArtefacts(p.html || '');
-    blocks.push({
+  const byId = new Map();
+  for (const p of (pages || [])) byId.set(p.pageId, p);
+  return fromPages(pages).map((e) => {
+    if (e.kind === 'chapter') return { kind: 'chapter', chapterId: e.chapterId, name: e.name };
+    const src = byId.get(e.id) || {};
+    const html = stripFocusArtefacts(e.html || '');
+    return {
       kind: 'page',
-      pageId: p.pageId,
-      name: p.pageName || '',
-      chapterId: p.chapterId,
+      pageId: e.id,
+      name: e.name,
+      chapterId: e.chapterId,
       html,
       originalHtml: html,
-      originalUpdatedAt: p.updated_at || null,
+      originalUpdatedAt: src.updated_at || null,
       dirty: false,
       saving: false,
       saveError: '',
       conflict: null,
       savedAt: null,
       _rev: 0,
-    });
-  }
-  return blocks;
+    };
+  });
 }
 
 export function registerBookEditorCard() {

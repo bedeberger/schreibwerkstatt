@@ -8,6 +8,8 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 `ctx` (gebaut in [chat.js#L460](../routes/jobs/chat.js#L460)):
 - `bookId` — aus `chat_sessions.book_id` der aktiven Session.
+- `sessionId` — `chat_sessions.id` der aktiven Session (für Tools mit Session-Bindung, z.B. `generate_image` → `chat_images`).
+- `images` — Array, in das `generate_image` `{image_id,prompt,mime}` pusht; der Loop persistiert es in `context_info.images`.
 - `userEmail` — Owner-Scope für alle Reads (Reviews, Ideen, Werkstatt sind user-scoped).
 - `jobSignal` — `AbortController.signal`, wird vor jedem Tool-Call und im Loop geprüft.
 - `logger` — Job-Child-Logger.
@@ -35,7 +37,7 @@ Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([l
 
 ## Tools
 
-32 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read).
+33 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read) und `generate_image` (Seiteneffekt + externer Bild-Call — bewusste Ausnahme zum Read-Only-/deterministisch-/kein-KI-Call-Vertrag, siehe unten).
 
 ### Buch/Kapitel-Überblick
 
@@ -118,6 +120,12 @@ Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([l
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `get_plot_board` | `status?` (`geplant`/`im_buch`), `act_id?` | Geplantes Beat-Board (vorwärtsgerichtete Planung, getrennt vom geschriebenen Text): Akte → Beats mit Titel, Beschreibung (Preview 600 Zeichen), Status (binär; `verworfen` als eigenes Flag pro Beat), Zielkapitel (`chapter_name`), beteiligte Katalog- + Werkstatt-Figuren (auf Namen aufgelöst). `status_counts` = Gesamtverteilung über alle Beats inkl. `verworfen`-Zählung (immer, vor Filter). Pro Buch + User. Leeres Board → `hint` statt Fehler. | `plot_acts` + `plot_beats` (via [db/plot.js](../db/plot.js)) + `figures`/`draft_figures` (Namens-Maps) |
+
+### Bild-Generierung
+
+| Tool | Input | Zweck | Quelle |
+|------|-------|-------|--------|
+| `generate_image` | `prompt`, `size?` | **Bewusste Ausnahme zum Tool-Vertrag** (nicht read-only, nicht deterministisch, externer Call). Erzeugt EIN Bild via self-hosted OpenAI-kompatiblen Endpunkt ([lib/image-gen.js](../lib/image-gen.js) → `${host}/v1/images/generations`), persistiert es in `chat_images` (FK auf `chat_sessions`, CASCADE) und gibt nur JSON-Metadaten (`image_id`, `mime`, `size`) in den Loop zurück — **kein Bild im tool_result** (Binärdaten passen nicht in den JSON-Loop). Der Loop sammelt `{image_id,prompt,mime}` in `ctx.images` → persistiert in `context_info.images` der Assistant-Nachricht; das Frontend rendert das Bild unter der Antwort und streamt es via `GET /chat/image/:id`. Nur freigeschaltet, wenn `image.enabled` + `image.host` gesetzt sind (sonst aus `BOOK_CHAT_TOOLS` gefiltert). App-Philosophie: reine Weltaufbau-/Chat-Visualisierung, **nie** im Manuskript-Text. | `lib/image-gen.js` + `db/chat-images.js` (kein Buch-DB-Read) |
 
 ### Endpunkt
 

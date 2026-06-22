@@ -7,6 +7,7 @@
 
 import { fetchJson } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
+import { fromSnapshotTree } from '../manuscript-stream.js';
 import { renderSideBySide, renderInline } from '../page-revision-diff.js';
 import { diffSnapshots } from '../book-snapshot-diff.js';
 import { startPoll } from './job-helpers.js';
@@ -36,7 +37,7 @@ export function registerSnapshotsCard() {
     // Reader (Fassung nur-lesend oeffnen, Bucheditor-Look) + Export.
     readerOpen: false,
     readerSnap: null,      // Meta der geoeffneten Fassung
-    readerSections: [],    // [{ kind:'chapter'|'page', name, depth, html, srcId, status, renderHtml, key }]
+    readerSections: [],    // [{ kind:'chapter'|'page', name, depth, html, id, status, renderHtml, key }]
     readerLoading: false,
     readerAddedSince: 0,   // Seiten, die seit der Fassung neu dazugekommen sind
     pdfProfiles: [],
@@ -234,8 +235,8 @@ export function registerSnapshotsCard() {
         const snapIds = new Set();
         for (const s of sections) {
           if (s.kind !== 'page') continue;
-          if (s.srcId != null) snapIds.add(s.srcId);
-          const curHtml = s.srcId != null ? currentById.get(s.srcId) : undefined;
+          if (s.id != null) snapIds.add(s.id);
+          const curHtml = s.id != null ? currentById.get(s.id) : undefined;
           if (curHtml === undefined) {
             // In der Fassung vorhanden, im aktuellen Buch geloescht.
             s.status = 'removed';
@@ -274,32 +275,13 @@ export function registerSnapshotsCard() {
       this._stopPdfPoll();
     },
 
-    // Snapshot-Tree (buildBookJson-Format) → flache Render-Liste: Kapitel-
-    // Ueberschriften (mit Tiefe) + Seiten (Name + inline-HTML + srcId).
+    // Snapshot-Tree (buildBookJson-Format) → kanonisches Stream-Modell
+    // (fromSnapshotTree, geteilt mit Bucheditor/Share). Page-Entries werden um
+    // die Reader-Diff-State-Felder (status/renderHtml) ergaenzt; `id` ist die
+    // alte page_id (srcId), gegen die der Inline-Diff matcht.
     _buildReaderSections(content) {
-      const nodes = Array.isArray(content?.tree) ? content.tree : [];
-      const out = [];
-      (function walk(list, depth) {
-        for (const node of (list || [])) {
-          if (!node || typeof node !== 'object') continue;
-          if (node.type === 'chapter') {
-            out.push({ kind: 'chapter', name: typeof node.name === 'string' ? node.name : '', depth, key: 'c' + out.length });
-            walk(node.children, depth + 1);
-          } else if (node.type === 'page') {
-            out.push({
-              kind: 'page',
-              name: typeof node.name === 'string' ? node.name : '',
-              html: typeof node.html === 'string' ? node.html : '',
-              srcId: Number.isFinite(node.srcId) ? node.srcId : null,
-              status: '',
-              renderHtml: typeof node.html === 'string' ? node.html : '',
-              depth,
-              key: 'p' + out.length,
-            });
-          }
-        }
-      })(nodes, 0);
-      return out;
+      return fromSnapshotTree(content?.tree).map((e) =>
+        e.kind === 'page' ? { ...e, status: '', renderHtml: e.html } : e);
     },
 
     // ── Export (aus dem Reader) ─────────────────────────────────────────────────────

@@ -11,8 +11,18 @@
 // bricht (Host-Objekt, siehe block-merge/TTS-Proxy-Erfahrung).
 
 import { fetchJson } from '../utils.js';
-import { locateRange } from '../share-anchor.js';
+import { loadDiff } from '../lazy-libs.js';
+import { renderInline } from '../page-revision-diff.js';
+import { locateRange, resolveCurrentQuote } from '../share-anchor.js';
 import { groupThreads } from './comment-threads.js';
+
+// Plaintext für renderInline (block-/wort-basiert) als ein <p> verpacken;
+// HTML-Sonderzeichen escapen, damit der DOMParser sie als Text liest.
+function _wrapP(text) {
+  const esc = String(text == null ? '' : text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<p>${esc}</p>`;
+}
 
 const HL_ALL = 'comment-rail-anchor';
 const HL_ACTIVE = 'comment-rail-anchor-active';
@@ -121,11 +131,21 @@ export const editorCommentsRailMethods = {
     for (const g of groupThreads(this.bookComments)) {
       const root = g.root;
       if (!root.anchor_bid) continue; // allgemeine Kommentare: Sache der Karte
+      const sortKey = (bi) => bi * 1e6 + (Number.isInteger(root.anchor_start) ? root.anchor_start : 0);
       const range = locateRange(view, anchorOf(root));
-      if (!range) continue;           // gehört nicht auf diese Seite / Stelle weg
+      if (range) {
+        const bi = blockIndex.has(String(root.anchor_bid)) ? blockIndex.get(String(root.anchor_bid)) : 1e6;
+        onPage.push({ root, replies: g.replies, changed: false, currentText: '', _diffHtml: '', _sort: sortKey(bi) });
+        ranges.push(range);
+        continue;
+      }
+      // Kein Range: entweder andere Seite (bid weg) ODER Stelle seit dem
+      // Kommentar geändert. resolveCurrentQuote trennt beides.
+      const res = resolveCurrentQuote(view, anchorOf(root));
+      if (res.status !== 'changed') continue; // 'gone' = nicht diese Seite
       const bi = blockIndex.has(String(root.anchor_bid)) ? blockIndex.get(String(root.anchor_bid)) : 1e6;
-      onPage.push({ root, replies: g.replies, _sort: bi * 1e6 + (Number.isInteger(root.anchor_start) ? root.anchor_start : 0) });
-      ranges.push(range);
+      onPage.push({ root, replies: g.replies, changed: true, currentText: res.currentText, _diffHtml: undefined, _sort: sortKey(bi) });
+      // kein Highlight (Stelle nicht mehr lokalisierbar)
     }
     onPage.sort((a, b) => a._sort - b._sort);
     this.pageThreads = onPage;
@@ -136,6 +156,22 @@ export const editorCommentsRailMethods = {
       try { if (ranges.length) api.set(HL_ALL, new Highlight(...ranges)); else api.delete(HL_ALL); } catch {}
     }
     this._mirrorFlag();
+    this._computeChangedDiffs();
+  },
+
+  // Für „Stelle geändert"-Threads den Quote-vs-aktuell-Diff lazy berechnen
+  // (jsdiff lazy geladen). Setzt thread._diffHtml reaktiv → Re-Render.
+  async _computeChangedDiffs() {
+    const pending = this.pageThreads.filter(t => t.changed && t._diffHtml === undefined);
+    if (!pending.length) return;
+    let diffLib;
+    try { diffLib = await loadDiff(); } catch { pending.forEach(t => { t._diffHtml = ''; }); return; }
+    for (const t of pending) {
+      try {
+        const out = renderInline(_wrapP(t.root.anchor_quote || ''), _wrapP(t.currentText || ''), diffLib);
+        t._diffHtml = out.unchanged ? '' : out.html;
+      } catch { t._diffHtml = ''; }
+    }
   },
 
   // Kommentar selektieren: Thread öffnen + Textstelle hervorheben/scrollen.

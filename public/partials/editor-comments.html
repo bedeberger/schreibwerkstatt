@@ -30,7 +30,17 @@
              role="button" tabindex="0"
              @click="selectThread(thread.root.id)"
              @keydown.enter.prevent="selectThread(thread.root.id)">
-          <span class="comment-rail__quote" x-text="'„' + (thread.root.anchor_quote || '') + '“'"></span>
+          <span class="comment-rail__quote" x-show="!thread.changed"
+                x-text="'„' + (thread.root.anchor_quote || '') + '“'"></span>
+          <!-- Stelle seit dem Kommentar geändert: Quote→aktuell als Inline-Diff. -->
+          <template x-if="thread.changed">
+            <div class="comment-rail__changed">
+              <span class="comment-rail__changed-badge" x-text="$app.t('share.comments.textChanged')"></span>
+              <div class="comment-rail-diff" x-show="thread._diffHtml" x-html="thread._diffHtml"></div>
+              <span class="comment-rail__quote comment-rail__quote--stale" x-show="!thread._diffHtml"
+                    x-text="'„' + (thread.root.anchor_quote || '') + '“'"></span>
+            </div>
+          </template>
         </div>
 
         <!-- Root-Kommentar des Lesers. -->
