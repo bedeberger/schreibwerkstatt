@@ -16,7 +16,7 @@ export function registerShareLinksCard() {
     loadingLinks: false,
     loadError: '',
     // Create-Form-State
-    createKind: 'page', // 'page' | 'chapter'
+    createKind: 'page', // 'page' | 'chapter' | 'book'
     createPageId: '',
     createChapterId: '',
     createIntro: '',
@@ -46,6 +46,7 @@ export function registerShareLinksCard() {
       return [
         { value: 'page',    label: app.t('share.create.page') },
         { value: 'chapter', label: app.t('share.create.chapter') },
+        { value: 'book',    label: app.t('share.create.book') },
       ];
     },
 
@@ -76,6 +77,8 @@ export function registerShareLinksCard() {
               } else if (d.kind === 'chapter') {
                 this.createKind = 'chapter';
                 this.createChapterId = String(d.id || '');
+              } else if (d.kind === 'book') {
+                this.createKind = 'book';
               }
           } },
         ],
@@ -91,6 +94,8 @@ export function registerShareLinksCard() {
       } else if (pf.kind === 'chapter') {
         this.createKind = 'chapter';
         this.createChapterId = String(pf.id || '');
+      } else if (pf.kind === 'book') {
+        this.createKind = 'book';
       }
       window.__app._shareLinksPrefill = null;
     },
@@ -133,6 +138,7 @@ export function registerShareLinksCard() {
 
     targetLabel(link) {
       if (link.kind === 'page') return link.page_name || `Page #${link.page_id}`;
+      if (link.kind === 'book') return link.book_name || window.__app.selectedBookName || window.__app.t('share.target.book');
       return link.chapter_name || `Chapter #${link.chapter_id}`;
     },
 
@@ -177,9 +183,12 @@ export function registerShareLinksCard() {
       if (this.createKind === 'page') {
         body.page_id = parseInt(this.createPageId, 10);
         if (!body.page_id) { this.createError = window.__app.t('share.error.pageRequired'); return; }
-      } else {
+      } else if (this.createKind === 'chapter') {
         body.chapter_id = parseInt(this.createChapterId, 10);
         if (!body.chapter_id) { this.createError = window.__app.t('share.error.chapterRequired'); return; }
+      } else {
+        body.book_id = parseInt(window.__app.selectedBookId, 10);
+        if (!body.book_id) { this.createError = window.__app.t('share.error.bookRequired'); return; }
       }
       this.creating = true;
       try {
@@ -310,7 +319,7 @@ export function registerShareLinksCard() {
       // Seite ermitteln: Page-Share = link.page_id; Chapter-Share = Block per
       // bid serverseitig der Seite zuordnen (Anker speichert keine page_id).
       let pageId = link.page_id;
-      if (link.kind === 'chapter') {
+      if (link.kind === 'chapter' || link.kind === 'book') {
         try {
           const r = await fetchJson(`/share/api/links/${encodeURIComponent(link.token)}/locate?bid=${encodeURIComponent(comment.anchor_bid)}`);
           pageId = r && r.page_id;

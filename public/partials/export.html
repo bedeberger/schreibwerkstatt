@@ -26,7 +26,7 @@
   </div>
 
   <div class="book-export-buttons">
-    <template x-for="fmt in ['pdf','docx','html','txt','md']" :key="fmt">
+    <template x-for="fmt in ['pdf','docx','docx-normseite','html','txt','md']" :key="fmt">
       <button type="button"
               :class="{ 'is-running': bookExportLoading === fmt }"
               :disabled="!!bookExportLoading || !$app.selectedBookId"

@@ -9,9 +9,10 @@ function newToken() {
 }
 
 function createShareLink({ kind, pageId = null, chapterId = null, bookId, ownerEmail, intro = null, expiresAt = null }) {
-  if (kind !== 'page' && kind !== 'chapter') throw new Error('invalid kind');
+  if (kind !== 'page' && kind !== 'chapter' && kind !== 'book') throw new Error('invalid kind');
   if (kind === 'page' && !pageId) throw new Error('page_id required');
   if (kind === 'chapter' && !chapterId) throw new Error('chapter_id required');
+  if (!bookId) throw new Error('book_id required');
   const stmt = db.prepare(`
     INSERT INTO share_links (token, kind, page_id, chapter_id, book_id, owner_email, intro, expires_at, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})

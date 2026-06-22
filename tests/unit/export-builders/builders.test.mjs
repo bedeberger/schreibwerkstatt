@@ -13,7 +13,7 @@ const { buildTxt }  = await import('../../../lib/export-builders/txt.js');
 const { buildMd }   = await import('../../../lib/export-builders/md.js');
 const { buildHtml } = await import('../../../lib/export-builders/html.js');
 const { buildEpub } = await import('../../../lib/export-builders/epub.js');
-const { buildDocx } = await import('../../../lib/export-builders/docx.js');
+const { buildDocx, buildDocxNormseite } = await import('../../../lib/export-builders/docx.js');
 const { buildPdf }  = await import('../../../lib/export-builders/pdf.js');
 
 const book = { id: 1, name: 'Mein Buch', slug: 'mein-buch', description: 'Beschreibung' };
@@ -110,6 +110,13 @@ test('docx: ZIP-Magic + Manifest-Entry', async () => {
   assert.equal(buf[1], 0x4B);
   const s = buf.toString('binary');
   assert.ok(s.includes('word/document.xml'));
+});
+
+test('docx-normseite: ZIP-Magic + Manifest-Entry', async () => {
+  const buf = await buildDocxNormseite(bookBundle);
+  assert.equal(buf[0], 0x50);
+  assert.equal(buf[1], 0x4B);
+  assert.ok(buf.toString('binary').includes('word/document.xml'));
 });
 
 test('pdf scope=page: %PDF-Header + kein Cover-Page', async () => {

@@ -150,6 +150,14 @@ body.share-page {
   font-size: 24px;
 }
 
+/* Kapitel-Ueberschrift im Buch-Share (umschliesst mehrere Seiten-Bloecke). */
+.share-chapter-block__title {
+  margin: 2.4em 0 0.8em;
+  font-size: 30px;
+  font-weight: 700;
+}
+.share-chapter-block__title:first-child { margin-top: 0; }
+
 /* Findings-Marks und Spellcheck-Squiggles aus Editor-Runtime neutralisieren:
    landen nicht im persistierten HTML, aber falls Klassen doch durchblitzen
    (Custom-Highlights API hat Browser-Quirks), keine farbigen Marker im Reader. */

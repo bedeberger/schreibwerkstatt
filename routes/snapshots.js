@@ -206,7 +206,7 @@ router.get('/:bookId/:id/export/:fmt', async (req, res) => {
 
   const { resolveSlug } = require('../lib/export-builders/shared');
   const slug = `${resolveSlug(bundle)}-fassung-${row.seq}`;
-  const filename = buildExportFilename({ prefix: 'fassung', slug, ext: fmt, date: new Date() });
+  const filename = buildExportFilename({ prefix: 'fassung', slug, ext: spec.ext || fmt, date: new Date() });
   const sizeKb = Math.round((Buffer.isBuffer(buf) ? buf.length : Buffer.byteLength(buf)) / 1024);
   logger.info(`Fassungs-Export «${filename}» (${sizeKb} KB, book=${bookId}, seq=${row.seq}, fmt=${fmt})`);
   return sendExportBuffer(res, { spec, buf, filename });

@@ -883,6 +883,18 @@ export const appViewMethods = {
       this._scrollToCardByKey('shareLinks');
     }
   },
+  // Ganzes Buch teilen (Trigger: Quick-Action in der Buch-Uebersicht). Kein
+  // Ziel-Picker noetig — der Server zieht book_id aus dem aktiven Buch.
+  async openShareLinksForBook() {
+    this._shareLinksPrefill = { kind: 'book' };
+    if (!this.showShareLinksCard) {
+      this._captureShareReturn();
+      await this.toggleShareLinksCard();
+    } else {
+      window.dispatchEvent(new CustomEvent('share:prefill', { detail: { kind: 'book' } }));
+      this._scrollToCardByKey('shareLinks');
+    }
+  },
 
   // Vor dem Öffnen der Teilen-Karte die aktuelle Ansicht festhalten, damit der
   // "Schliessen"-Button dorthin zurückkehrt statt auf der Buchübersicht zu

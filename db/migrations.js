@@ -8394,6 +8394,56 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 212 abgeschlossen (book_settings.zeitlinie_real).');
   }
 
+  if (version < 213) {
+    // Share-Links auch auf Buch-Ebene: kind erhaelt 'book' (ganzes Buch teilen,
+    // page_id + chapter_id beide NULL). Da die kind-CHECK-Constraint geaendert
+    // wird, via Recreate-Pattern (SQLite kann CHECKs nicht via ALTER aendern).
+    db.pragma('foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS share_links_new');
+    db.exec(`
+      CREATE TABLE share_links_new (
+        token TEXT PRIMARY KEY,
+        kind TEXT NOT NULL CHECK(kind IN ('page','chapter','book')),
+        page_id INTEGER REFERENCES pages(page_id) ON DELETE CASCADE,
+        chapter_id INTEGER REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        book_id INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        owner_email TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        intro TEXT,
+        expires_at TEXT,
+        revoked_at TEXT,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        owner_last_seen_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        CHECK (
+          (kind='page'    AND page_id IS NOT NULL AND chapter_id IS NULL) OR
+          (kind='chapter' AND chapter_id IS NOT NULL AND page_id IS NULL) OR
+          (kind='book'    AND page_id IS NULL AND chapter_id IS NULL)
+        )
+      )
+    `);
+    db.exec(`
+      INSERT INTO share_links_new
+        (token, kind, page_id, chapter_id, book_id, owner_email, intro,
+         expires_at, revoked_at, view_count, owner_last_seen_at, created_at)
+      SELECT token, kind, page_id, chapter_id, book_id, owner_email, intro,
+         expires_at, revoked_at, view_count, owner_last_seen_at, created_at
+      FROM share_links
+    `);
+    db.exec('DROP TABLE share_links');
+    db.exec('ALTER TABLE share_links_new RENAME TO share_links');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_share_links_book ON share_links(book_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_email)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_share_links_page ON share_links(page_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_share_links_chapter ON share_links(chapter_id)');
+    db.pragma('foreign_keys = ON');
+    const fkErrors213 = db.pragma('foreign_key_check');
+    if (fkErrors213.length) {
+      throw new Error(`Migration 213: foreign_key_check meldet ${fkErrors213.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 213').run();
+    logger.info('DB-Migration auf Version 213 abgeschlossen (share_links.kind erweitert um book).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

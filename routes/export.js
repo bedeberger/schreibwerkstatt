@@ -61,7 +61,7 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
 
   const { resolveSlug } = require('../lib/export-builders/shared');
   const slug = resolveSlug(bundle);
-  const filename = buildExportFilename({ prefix: scope, slug, ext: fmt, date: new Date() });
+  const filename = buildExportFilename({ prefix: scope, slug, ext: spec.ext || fmt, date: new Date() });
 
   const scopeDetail = scope === 'chapter' && bundle.chapter?.id ? `, chapter=${bundle.chapter.id}`
                     : scope === 'page'    && bundle.page?.id    ? `, page=${bundle.page.id}`

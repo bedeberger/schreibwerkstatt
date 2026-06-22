@@ -9,6 +9,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const contentStore = require('../lib/content-store');
+const { loadContents } = require('../lib/load-contents');
 const shareLinks = require('../db/share-links');
 const rateLimit = require('../lib/share-ratelimit');
 const { requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
@@ -95,6 +96,31 @@ async function loadContentForLink(link) {
       return {
         title: pd.name || '',
         html: pd.html || '',
+      };
+    } catch {
+      return null;
+    }
+  }
+  if (link.kind === 'book') {
+    // Ganzes Buch in Reihenfolge: Kapitel-Ueberschrift + Seiten (inkl. Sub-
+    // Kapitel, da loadContents alle Seiten chapter-geordnet liefert).
+    try {
+      const { book, groups } = await loadContents({ scope: 'book', id: link.book_id });
+      const sections = [];
+      for (const g of groups) {
+        if (g.chapter) {
+          sections.push(`<h2 class="share-chapter-block__title">${escHtml(g.chapter.name || '')}</h2>`);
+        }
+        for (const { pd } of g.pages) {
+          sections.push(`<section class="share-page-block">
+            <h3 class="share-page-block__title">${escHtml(pd.name || '')}</h3>
+            <div class="share-page-block__body">${pd.html || ''}</div>
+          </section>`);
+        }
+      }
+      return {
+        title: book.name || '',
+        html: sections.join('\n'),
       };
     } catch {
       return null;
@@ -209,11 +235,14 @@ router.get('/:token', async (req, res) => {
   for (const k of readerKeys) readerI18n[k] = tServer(`share.reader.${k}`, lang);
   const configJson = JSON.stringify({ token, lang, i18n: readerI18n }).replace(/</g, '\\u003c');
 
+  // Bei Buch-Shares ist content.title bereits der Buchname — keine Doppelung
+  // (Buch-Zeile leer, H1 = Buchname). Sonst "Seite/Kapitel · Buch".
+  const isBook = link.kind === 'book';
   const html = fillTemplate(TEMPLATE_OK, {
     lang,
     config_json: configJson,
-    title: escHtml(`${content.title} · ${link.book_name}`),
-    book_name: escHtml(link.book_name || ''),
+    title: escHtml(isBook ? content.title : `${content.title} · ${link.book_name}`),
+    book_name: escHtml(isBook ? '' : (link.book_name || '')),
     target_name: escHtml(content.title),
     author_name: escHtml(link.owner_display_name || tServer('share.reader.anon_author', lang)),
     t_by: escHtml(tServer('share.reader.by', lang)),
@@ -382,10 +411,11 @@ router.get('/api/links', requireSession, (req, res) => {
 
 router.post('/api/links', requireSession, jsonBody, async (req, res) => {
   const ownerEmail = req.session.user.email;
-  const { kind, page_id, chapter_id, intro, expires_at } = req.body || {};
-  if (kind !== 'page' && kind !== 'chapter') return res.status(400).json({ error_code: 'INVALID_KIND' });
+  const { kind, page_id, chapter_id, book_id, intro, expires_at } = req.body || {};
+  if (kind !== 'page' && kind !== 'chapter' && kind !== 'book') return res.status(400).json({ error_code: 'INVALID_KIND' });
   if (kind === 'page' && !Number.isInteger(parseInt(page_id, 10))) return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
   if (kind === 'chapter' && !Number.isInteger(parseInt(chapter_id, 10))) return res.status(400).json({ error_code: 'CHAPTER_ID_REQUIRED' });
+  if (kind === 'book' && !Number.isInteger(parseInt(book_id, 10))) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (intro && String(intro).length > INTRO_MAX) return res.status(400).json({ error_code: 'INTRO_TOO_LONG' });
   if (expires_at) {
     const d = new Date(expires_at);
@@ -402,10 +432,14 @@ router.post('/api/links', requireSession, jsonBody, async (req, res) => {
       pageId = parseInt(page_id, 10);
       const pd = await contentStore.loadPage(pageId);
       bookId = pd.book_id;
-    } else {
+    } else if (kind === 'chapter') {
       chapterId = parseInt(chapter_id, 10);
       const ch = await contentStore.loadChapter(chapterId);
       bookId = ch.book_id;
+    } else {
+      bookId = parseInt(book_id, 10);
+      const b = await contentStore.loadBook(bookId);
+      if (!b) throw new Error('book not found');
     }
   } catch {
     return res.status(404).json({ error_code: 'TARGET_NOT_FOUND' });
@@ -509,9 +543,12 @@ router.get('/api/links/:token/locate', requireSession, async (req, res) => {
   if (!ANCHOR_BID_RE.test(bid)) return res.status(400).json({ error_code: 'INVALID_ANCHOR' });
   if (link.kind === 'page') return res.json({ page_id: link.page_id });
   try {
+    // Chapter-Share: nur Kapitel-Seiten; Book-Share: alle Buch-Seiten.
     const pages = await contentStore.listPages(link.book_id);
-    const chapterPages = pages.filter(p => p.chapter_id === link.chapter_id);
-    for (const meta of chapterPages) {
+    const candidates = link.kind === 'book'
+      ? pages
+      : pages.filter(p => p.chapter_id === link.chapter_id);
+    for (const meta of candidates) {
       const pd = await contentStore.loadPage(meta.id);
       if ((pd.html || '').includes(`data-bid="${bid}"`)) return res.json({ page_id: meta.id });
     }
