@@ -198,8 +198,24 @@ async function runPhase1(ctx) {
         let stammFiguren = stamm.figuren || [];
         const completenessPasses = ctx.completenessPasses || 0;
         if (completenessPasses > 0) {
-          if (stammFiguren.length > 0) {
-            const freshFig = await runCompletenessGap(ctx, {
+          // Die vier Gap-Ströme (Figuren/Orte/Fakten/Szenen) ziehen je ihren eigenen
+          // Long-Tail nach und sind voneinander UNABHÄNGIG → bei Claude parallel statt
+          // seriell (der `bookSystemBlock`-Cache ist nach dem A1-Warmup bereits warm,
+          // alle Ströme zahlen cache_read). Jeder Strom bleibt intern seine eigene
+          // loop-until-dry-Sequenz (Runde N+1 braucht die Namen aus Runde N) — nur die
+          // vier Ströme zueinander laufen nebenläufig. settledAll serialisiert für
+          // lokale Provider automatisch (Mutex) und cappt Claude auf phase1_concurrency
+          // (TPM-Schutz, gleiche Konstante wie der Multi-Pass-Fan-out). Known-Listen vor
+          // dem Fan-out kapseln; die additiven Merges laufen danach sequenziell (pure JS).
+          const knownOrte = passB.orte || [];
+          const knownFakten = passB.fakten || [];
+          const knownSzenen = passB.szenen || [];
+          const faktKey = (f) => `${f.subjekt || ''}: ${f.fakt || ''}`;
+          const szeneKey = (s) => `${s.titel || ''} (${s.kapitel || ''})`;
+          const gapConcurrency = Math.max(1, parseInt(appSettings.get('ai.claude.phase1_concurrency'), 10) || 4);
+          const noGap = () => [];
+          const [figRes, orteRes, faktenRes, szenenRes] = await settledAll([
+            stammFiguren.length > 0 ? () => runCompletenessGap(ctx, {
               label: 'Single-Pass Figuren', statusText: 'job.phase.completenessFiguren',
               knownNames: stammFiguren.flatMap(f => [f.name, f.kurzname]),
               buildPrompt: (known) => prompts.buildFigurenStammGapPrompt(bookName, known),
@@ -207,28 +223,57 @@ async function runPhase1(ctx) {
               schema: prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
               extractItems: (r) => r?.figuren,
               claudeExtractCap, maxPasses: completenessPasses,
-            });
-            if (freshFig.length) {
-              // Frische, kollisionsfreie IDs (Gap-Output beginnt wieder bei fig_1).
-              // Events/Assignments referenzieren Klarnamen → von der Neu-ID unberührt;
-              // A2 unten bezieht die ergänzten Figuren über die vereinigte Liste ein.
-              let maxIdx = 0;
-              for (const f of stammFiguren) { const m = /^fig_(\d+)$/.exec(f.id || ''); if (m) maxIdx = Math.max(maxIdx, +m[1]); }
-              for (const f of freshFig) f.id = 'fig_' + (++maxIdx);
-              stammFiguren = stammFiguren.concat(freshFig);
-              log.info(`Completeness: +${freshFig.length} Figuren ergänzt (gesamt ${stammFiguren.length}).`);
-            }
+            }) : noGap,
+            () => runCompletenessGap(ctx, {
+              label: 'Single-Pass Orte', statusText: 'job.phase.completenessOrte',
+              knownNames: knownOrte.map(o => o.name),
+              buildPrompt: (known) => prompts.buildOrteGapPrompt(bookName, known),
+              systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
+              schema: prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+              extractItems: (r) => r?.orte,
+              claudeExtractCap, maxPasses: completenessPasses,
+            }),
+            // Fakten-Gap nur wenn der Erst-Fakten-Pass (C) erfolgreich war – sonst würde der
+            // Gap-Pass die ausgefallene Faktenerfassung kaschieren, während faktenFailed den
+            // Cache-Skip beibehält (Teilstand bliebe trotzdem nicht eingefroren).
+            !faktenFailed ? () => runCompletenessGap(ctx, {
+              label: 'Single-Pass Fakten', statusText: 'job.phase.completenessFakten',
+              knownNames: knownFakten.map(faktKey),
+              buildPrompt: (known) => prompts.buildFaktenGapPrompt(bookName, known),
+              systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FAKTEN_PASS_BLOCKS, '1h')],
+              schema: prompts.SCHEMA_KOMPLETT_FAKTEN_PASS,
+              extractItems: (r) => r?.fakten,
+              keyOf: faktKey, displayOf: faktKey, isValid: (f) => f && f.fakt,
+              claudeExtractCap, maxPasses: completenessPasses,
+            }) : noGap,
+            () => runCompletenessGap(ctx, {
+              label: 'Single-Pass Szenen', statusText: 'job.phase.completenessSzenen',
+              knownNames: knownSzenen.map(szeneKey),
+              buildPrompt: (known) => prompts.buildSzenenGapPrompt(bookName, known),
+              systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
+              schema: prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+              extractItems: (r) => r?.szenen,
+              keyOf: szeneKey, displayOf: szeneKey, isValid: (s) => s && s.titel,
+              claudeExtractCap, maxPasses: completenessPasses,
+            }),
+          ], { concurrency: gapConcurrency });
+          // runCompletenessGap fängt eigene Fehler ab (ausser AbortError, den settledAll
+          // weiterreicht) → fulfilled mit (ggf. leerem) Array; .value-Fallback defensiv.
+          const freshFig    = figRes.status    === 'fulfilled' ? (figRes.value    || []) : [];
+          const freshOrte   = orteRes.status   === 'fulfilled' ? (orteRes.value   || []) : [];
+          const freshFakten = faktenRes.status === 'fulfilled' ? (faktenRes.value || []) : [];
+          const freshSzenen = szenenRes.status === 'fulfilled' ? (szenenRes.value || []) : [];
+
+          if (freshFig.length) {
+            // Frische, kollisionsfreie IDs (Gap-Output beginnt wieder bei fig_1).
+            // Events/Assignments referenzieren Klarnamen → von der Neu-ID unberührt;
+            // A2 unten bezieht die ergänzten Figuren über die vereinigte Liste ein.
+            let maxIdx = 0;
+            for (const f of stammFiguren) { const m = /^fig_(\d+)$/.exec(f.id || ''); if (m) maxIdx = Math.max(maxIdx, +m[1]); }
+            for (const f of freshFig) f.id = 'fig_' + (++maxIdx);
+            stammFiguren = stammFiguren.concat(freshFig);
+            log.info(`Completeness: +${freshFig.length} Figuren ergänzt (gesamt ${stammFiguren.length}).`);
           }
-          const knownOrte = passB.orte || [];
-          const freshOrte = await runCompletenessGap(ctx, {
-            label: 'Single-Pass Orte', statusText: 'job.phase.completenessOrte',
-            knownNames: knownOrte.map(o => o.name),
-            buildPrompt: (known) => prompts.buildOrteGapPrompt(bookName, known),
-            systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
-            schema: prompts.SCHEMA_KOMPLETT_ORTE_PASS,
-            extractItems: (r) => r?.orte,
-            claudeExtractCap, maxPasses: completenessPasses,
-          });
           if (freshOrte.length) {
             // Frische, kollisionsfreie ort_ids (Gap-Output beginnt wieder bei ort_1 →
             // Kollision mit dem Erst-Pass; Phase 3 Single-Pass behält explizite ids bei →
@@ -239,90 +284,65 @@ async function runPhase1(ctx) {
             passB.orte = knownOrte.concat(freshOrte);
             log.info(`Completeness: +${freshOrte.length} Orte ergänzt (gesamt ${passB.orte.length}).`);
           }
-
-          // Fakten-Gap nur wenn der Erst-Fakten-Pass (C) erfolgreich war – sonst würde der
-          // Gap-Pass die ausgefallene Faktenerfassung kaschieren, während faktenFailed den
-          // Cache-Skip beibehält (Teilstand bliebe trotzdem nicht eingefroren).
-          if (!faktenFailed) {
-            const knownFakten = passB.fakten || [];
-            const faktKey = (f) => `${f.subjekt || ''}: ${f.fakt || ''}`;
-            const freshFakten = await runCompletenessGap(ctx, {
-              label: 'Single-Pass Fakten', statusText: 'job.phase.completenessFakten',
-              knownNames: knownFakten.map(faktKey),
-              buildPrompt: (known) => prompts.buildFaktenGapPrompt(bookName, known),
-              systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FAKTEN_PASS_BLOCKS, '1h')],
-              schema: prompts.SCHEMA_KOMPLETT_FAKTEN_PASS,
-              extractItems: (r) => r?.fakten,
-              keyOf: faktKey, displayOf: faktKey, isValid: (f) => f && f.fakt,
-              claudeExtractCap, maxPasses: completenessPasses,
-            });
-            if (freshFakten.length) {
-              passB.fakten = knownFakten.concat(freshFakten);
-              log.info(`Completeness: +${freshFakten.length} Fakten ergänzt (gesamt ${passB.fakten.length}).`);
-            }
+          if (freshFakten.length) {
+            passB.fakten = knownFakten.concat(freshFakten);
+            log.info(`Completeness: +${freshFakten.length} Fakten ergänzt (gesamt ${passB.fakten.length}).`);
           }
-
-          const knownSzenen = passB.szenen || [];
-          const szeneKey = (s) => `${s.titel || ''} (${s.kapitel || ''})`;
-          const freshSzenen = await runCompletenessGap(ctx, {
-            label: 'Single-Pass Szenen', statusText: 'job.phase.completenessSzenen',
-            knownNames: knownSzenen.map(szeneKey),
-            buildPrompt: (known) => prompts.buildSzenenGapPrompt(bookName, known),
-            systemBlocks: [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
-            schema: prompts.SCHEMA_KOMPLETT_ORTE_PASS,
-            extractItems: (r) => r?.szenen,
-            keyOf: szeneKey, displayOf: szeneKey, isValid: (s) => s && s.titel,
-            claudeExtractCap, maxPasses: completenessPasses,
-          });
           if (freshSzenen.length) {
             passB.szenen = knownSzenen.concat(freshSzenen);
             log.info(`Completeness: +${freshSzenen.length} Szenen ergänzt (gesamt ${passB.szenen.length}).`);
           }
         }
 
-        // E: Lebensereignisse separat – eigener Call gegen den gecachten Buchtext-Block
-        // mit der finalen Figurenliste (post-Completeness). Volle Modell-Aufmerksamkeit
-        // auf vollständige Event-Erfassung, statt in A1 mit den Figuren-Stammdaten ums
-        // Output-Budget zu konkurrieren (analog Fakten-Pass C). Non-fatal: ein gescheiterter
-        // Events-Call verwirft die teure Figuren-/Orte-Extraktion nicht – stattdessen leere
-        // Events + Warnung; eventsFailed verhindert das Einfrieren des '__singlepass__'-
-        // Caches (sonst Phantom-leere-Events bis zur nächsten Seitenedition).
+        // E (Lebensereignisse) + A2 (Beziehungen): beide eigene Calls gegen den gecachten
+        // Buchtext-Block mit der finalen Figurenliste (post-Completeness). Volle Modell-
+        // Aufmerksamkeit pro Aspekt statt in A1 ums Output-Budget zu konkurrieren. Beide
+        // hängen nur an der finalen Figurenliste, aber NICHT voneinander → bei Claude
+        // parallel (settledAll serialisiert für lokale Provider via Mutex). Non-fatal:
+        // ein gescheiterter Call verwirft die teure Figuren-/Orte-Extraktion nicht –
+        // stattdessen leere Events bzw. beziehungslose Figuren + Warnung; events-/
+        // relationsFailed verhindert das Einfrieren des '__singlepass__'-Caches (sonst
+        // Phantom-leerer Teilstand bis zur nächsten Seitenedition).
         let assignments = [];
-        if (stammFiguren.length > 0) {
+        const runEvents = stammFiguren.length > 0;
+        const runRelations = stammFiguren.length >= 2;
+        if (runEvents || runRelations) {
           updateJob(jobId, { progress: 19, statusText: 'job.phase.extractingEvents' });
-          try {
-            const evRes = await retryOnTransientAi(() => call(jobId, tok,
+          const [evRes, bzRes] = await settledAll([
+            runEvents ? () => retryOnTransientAi(() => call(jobId, tok,
               prompts.buildExtraktionEventsPassPrompt(bookName, stammFiguren, null),
               [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_EVENTS_PASS_BLOCKS, '1h')],
-              19, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_EVENTS,
-            ), { log, label: 'Single-Pass Lebensereignisse (E)' });
-            assignments = Array.isArray(evRes?.assignments) ? evRes.assignments : [];
-            const nEv = assignments.reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0);
-            log.info(`Single-Pass Events-Pass (E) – ${nEv} Ereignisse für ${assignments.length} Figuren.`);
-          } catch (e) {
-            eventsFailed = true;
-            log.warn(`Single-Pass Events-Pass (E) fehlgeschlagen, Events leer: ${e.message}`);
-            ctx.warnings?.push({ key: 'job.warn.eventsFailed' });
-          }
-        }
-
-        // A2: Beziehungen separat – braucht die stabilen IDs aus A1.
-        if (stammFiguren.length >= 2) {
-          updateJob(jobId, { progress: 20, statusText: 'job.phase.extractingRelations' });
-          try {
-            const bzRes = await retryOnTransientAi(() => call(jobId, tok,
+              null, null, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_EVENTS,
+            ), { log, label: 'Single-Pass Lebensereignisse (E)' }) : () => null,
+            runRelations ? () => retryOnTransientAi(() => call(jobId, tok,
               prompts.buildFigurenBeziehungenExtraktionPrompt(bookName, stammFiguren, null),
               [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_FIGUREN_BLOCKS, '1h')],
-              20, 28, claudeExtractCap, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
-            ), { log, label: 'Single-Pass Beziehungen (A2)' });
-            const flatBz = Array.isArray(bzRes?.beziehungen) ? bzRes.beziehungen : [];
-            stammFiguren = mergeBeziehungenIntoFiguren(stammFiguren, flatBz);
-            log.info(`Single-Pass Beziehungs-Pass (A2) – ${flatBz.length} Beziehungen extrahiert.`);
-          } catch (e) {
-            relationsFailed = true;
-            log.warn(`Single-Pass Beziehungs-Pass (A2) fehlgeschlagen, Figuren ohne Beziehungen: ${e.message}`);
-            ctx.warnings?.push({ key: 'job.warn.relationsFailed' });
+              null, null, claudeExtractCap, 0.2, null, prompts.SCHEMA_BEZIEHUNGEN,
+            ), { log, label: 'Single-Pass Beziehungen (A2)' }) : () => null,
+          ]);
+          if (runEvents) {
+            if (evRes.status === 'fulfilled') {
+              assignments = Array.isArray(evRes.value?.assignments) ? evRes.value.assignments : [];
+              const nEv = assignments.reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0);
+              log.info(`Single-Pass Events-Pass (E) – ${nEv} Ereignisse für ${assignments.length} Figuren.`);
+            } else {
+              eventsFailed = true;
+              log.warn(`Single-Pass Events-Pass (E) fehlgeschlagen, Events leer: ${evRes.reason?.message}`);
+              ctx.warnings?.push({ key: 'job.warn.eventsFailed' });
+            }
           }
+          if (runRelations) {
+            if (bzRes.status === 'fulfilled') {
+              const flatBz = Array.isArray(bzRes.value?.beziehungen) ? bzRes.value.beziehungen : [];
+              stammFiguren = mergeBeziehungenIntoFiguren(stammFiguren, flatBz);
+              log.info(`Single-Pass Beziehungs-Pass (A2) – ${flatBz.length} Beziehungen extrahiert.`);
+            } else {
+              relationsFailed = true;
+              log.warn(`Single-Pass Beziehungs-Pass (A2) fehlgeschlagen, Figuren ohne Beziehungen: ${bzRes.reason?.message}`);
+              ctx.warnings?.push({ key: 'job.warn.relationsFailed' });
+            }
+          }
+          updateJob(jobId, { progress: 28 });
         }
         passA = { figuren: stammFiguren, assignments };
       } else {

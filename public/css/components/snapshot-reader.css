@@ -1,7 +1,9 @@
-/* Fassungs-Reader: eine Fassung (book_snapshots) nur-lesend im Vollbild-Overlay.
-   Modal-Charakter (Backdrop + Esc + Backdrop-Klick schliessen). Der Buchsatz
-   erbt vom Reading-Frame .page-content-view (page/page-view.css); hier nur das
-   Overlay-Gehaeuse, die Export-Leiste und die Kapitel-/Seiten-Gliederung.
+/* Fassungs-Reader: eine Fassung (book_snapshots) nur-lesend im Vollbild-Overlay,
+   im Look des Bucheditors (Manuskript-Stream — die .book-editor-*-Klassen kommen
+   aus editor/book/book-editor.css und werden hier read-only wiederverwendet).
+   Pro Seite ein Inline-Diff gegen den aktuellen Buchstand: gelöschte Stellen
+   durchgestrichen, seither hinzugefügte hervorgehoben.
+   Modal-Charakter (Backdrop + Esc + Backdrop-Klick schliessen).
    Markup: public/partials/snapshots.html, Logik: snapshots-card.js. */
 
 .snapshot-reader {
@@ -25,7 +27,7 @@
 .snapshot-reader__panel {
   position: relative;
   z-index: var(--z-modal-front);
-  width: min(56rem, 100%);
+  width: min(60rem, 100%);
   margin: auto 0;
   background: var(--color-bg);
   border: var(--border-thin);
@@ -64,33 +66,60 @@
 .snapshot-reader__export-label { font-weight: 600; margin-right: var(--space-xs); }
 .snapshot-reader__pdf { display: flex; align-items: center; gap: var(--space-sm); }
 
-.snapshot-reader__status {
-  padding: 0 var(--space-lg) var(--space-sm);
-  font-size: 0.9em;
+.snapshot-reader__status { padding: 0 var(--space-lg) var(--space-sm); font-size: 0.9em; }
+.snapshot-reader__hint { padding: var(--space-sm) var(--space-lg); color: var(--color-muted); font-size: 0.85em; }
+
+.snapshot-reader__body { padding: var(--space-md) var(--space-lg) var(--space-2xl); }
+
+/* Stream erbt Papier-Look + Typografie aus book-editor.css. Im Overlay zentriert
+   das Panel bereits — die Stream-Eigen-Margin auf 0. */
+.snapshot-reader__stream { margin-inline: auto; }
+
+/* Sub-Kapitel leicht einrücken (read-only, kein Sticky-Konflikt). */
+.snapshot-reader__chapter--d1 { padding-inline-start: var(--space-md); }
+.snapshot-reader__chapter--d2 { padding-inline-start: var(--space-lg); }
+
+/* Status-Badge pro Seite — eckig (Projektregel). */
+.snapshot-reader__badge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
-.snapshot-reader__hint {
-  padding: var(--space-sm) var(--space-lg);
+.snapshot-reader__badge--changed { background: var(--color-warn-bg); color: var(--color-warn-text); }
+.snapshot-reader__badge--removed { background: var(--color-err-bg); color: var(--color-err-text); }
+
+/* Geänderte/entfernte Seite: dezenter Akzent am Seitenkopf. */
+.snapshot-reader__page--changed .book-editor-page-header { border-bottom-color: var(--color-warn-text); }
+.snapshot-reader__page--removed .book-editor-page-body { opacity: 0.75; }
+
+/* Inline-Diff-Marks (eine Spalte, Lesefluss). diffWords liefert <ins>/<del>;
+   die Block-Wrapper tragen .diff-line. */
+.snapshot-reader__diff .diff-line { margin: 0 0 0.7em; }
+.snapshot-reader__diff ins.diff-add {
+  text-decoration: none;
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+  border-radius: var(--radius-sm);
+  padding: 0 2px;
+}
+.snapshot-reader__diff del.diff-del {
+  text-decoration: line-through;
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
+  border-radius: var(--radius-sm);
+  padding: 0 2px;
+}
+
+.snapshot-reader__added-since {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-sm);
+  border-top: 1px dotted var(--color-border);
   color: var(--color-muted);
   font-size: 0.85em;
-}
-
-.snapshot-reader__body { padding: var(--space-lg) var(--space-xl) var(--space-2xl); }
-
-/* Kapitel-Ueberschriften — Tiefe 0/1/2 (entspricht den Export-Heading-Stufen). */
-.snapshot-reader__chapter {
-  font-family: var(--font-serif);
-  font-weight: 700;
-  margin: var(--space-xl) 0 var(--space-sm);
-}
-.snapshot-reader__chapter--d0 { font-size: 1.6rem; }
-.snapshot-reader__chapter--d1 { font-size: 1.3rem; }
-.snapshot-reader__chapter--d2 { font-size: 1.1rem; }
-
-.snapshot-reader__page { margin: var(--space-lg) 0; }
-.snapshot-reader__page-name {
-  color: var(--color-muted);
-  font-size: 0.85em;
-  margin-bottom: var(--space-xs);
 }
 
 /* Mobile: Overlay randlos, Panel volle Breite. */
@@ -104,5 +133,5 @@
     border-radius: 0;
   }
   .snapshot-reader__header { border-radius: 0; }
-  .snapshot-reader__body { padding: var(--space-md) var(--space-md) var(--space-xl); }
+  .snapshot-reader__body { padding: var(--space-sm) var(--space-xs) var(--space-xl); }
 }

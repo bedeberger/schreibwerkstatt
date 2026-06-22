@@ -240,25 +240,40 @@
       <div class="snapshot-reader__status muted-msg--error" x-show="pdfError" x-cloak x-text="pdfError"></div>
       <p class="snapshot-reader__hint" x-text="$app.t('snapshots.reader.hint')"></p>
 
-      <!-- Body: Kapitel-Ueberschriften + Seiten im Buchsatz. -->
+      <!-- Body: Bucheditor-Look (read-only), pro Seite Inline-Diff gegen den
+           aktuellen Buchstand (gelöscht durchgestrichen, neu unterstrichen). -->
       <div class="snapshot-reader__body">
         <div x-show="readerLoading" class="muted-msg" x-text="$app.t('snapshots.reader.loading')"></div>
         <div x-show="!readerLoading && !readerSections.length" class="muted-msg"
              x-text="$app.t('snapshots.reader.empty')"></div>
-        <template x-for="s in readerSections" :key="s.key">
-          <div>
-            <template x-if="s.kind === 'chapter'">
-              <div class="snapshot-reader__chapter" :class="'snapshot-reader__chapter--d' + s.depth"
-                   x-text="s.name || $app.t('snapshots.untitled')"></div>
-            </template>
-            <template x-if="s.kind === 'page'">
-              <article class="snapshot-reader__page">
-                <div class="snapshot-reader__page-name" x-show="s.name" x-text="s.name"></div>
-                <div class="page-content-view" x-html="s.html"></div>
-              </article>
-            </template>
-          </div>
-        </template>
+
+        <div class="book-editor-stream snapshot-reader__stream" x-show="!readerLoading && readerSections.length" x-cloak>
+          <template x-for="s in readerSections" :key="s.key">
+            <div class="book-editor-row">
+              <template x-if="s.kind === 'chapter'">
+                <div class="book-editor-chapter-header" :class="'snapshot-reader__chapter--d' + s.depth">
+                  <span class="book-editor-chapter-name" x-text="s.name || $app.t('snapshots.untitled')"></span>
+                </div>
+              </template>
+              <template x-if="s.kind === 'page'">
+                <div class="book-editor-page-card snapshot-reader__page"
+                     :class="{ 'snapshot-reader__page--changed': s.status === 'changed',
+                               'snapshot-reader__page--removed': s.status === 'removed' }">
+                  <div class="book-editor-page-header">
+                    <span class="book-editor-page-name" x-text="s.name || $app.t('snapshots.untitled')"></span>
+                    <span class="snapshot-reader__badge" x-show="s.status === 'changed' || s.status === 'removed'"
+                          :class="'snapshot-reader__badge--' + s.status"
+                          x-text="$app.t('snapshots.reader.status.' + s.status)"></span>
+                  </div>
+                  <div class="book-editor-page-body snapshot-reader__diff" x-html="s.renderHtml"></div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <p class="snapshot-reader__added-since" x-show="readerAddedSince > 0" x-cloak
+             x-text="$app.t('snapshots.reader.addedSince', { n: readerAddedSince })"></p>
+        </div>
       </div>
     </div>
   </div>

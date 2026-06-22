@@ -3,7 +3,7 @@
 // damit der Test nicht von jsdiff abhaengt.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { htmlToPlainText, parseBlocks, renderSideBySide } from '../../public/js/page-revision-diff.js';
+import { htmlToPlainText, parseBlocks, renderSideBySide, renderInline } from '../../public/js/page-revision-diff.js';
 
 function mockDiffLib({ arrays = [], words = [] } = {}) {
   return {
@@ -179,4 +179,87 @@ test('renderSideBySide: eq-Block erscheint identisch in beiden Spalten', () => {
   const rightEq = (out.html.match(/diff-cell--eq diff-cell--right">eq</g) || []).length;
   assert.equal(leftEq, 1);
   assert.equal(rightEq, 1);
+});
+
+// ── renderInline (Lesefluss, eine Spalte) ───────────────────────────────────────
+
+test('renderInline: fehlende diffLib → wirft', () => {
+  assert.throws(() => renderInline('a', 'b', null), /diffLib/);
+  assert.throws(() => renderInline('a', 'b', { diffWords: () => [] }), /diffArrays/);
+});
+
+test('renderInline: identischer Inhalt → unchanged=true, html leer', () => {
+  const lib = mockDiffLib({ arrays: [{ value: ['Hallo Welt'] }] });
+  const out = renderInline('<p>Hallo Welt</p>', '<p>Hallo Welt</p>', lib);
+  assert.equal(out.unchanged, true);
+  assert.equal(out.html, '');
+});
+
+test('renderInline: gepaarter Change → eine Zeile mit del+ins inline (keine Spalten)', () => {
+  const lib = mockDiffLib({
+    arrays: [
+      { value: ['a'], removed: true },
+      { value: ['b'], added: true },
+    ],
+    words: [
+      { value: 'Hallo ' },
+      { value: 'alte', removed: true },
+      { value: 'neue', added: true },
+      { value: ' Welt' },
+    ],
+  });
+  const out = renderInline('a', 'b', lib);
+  assert.equal(out.unchanged, false);
+  assert.match(out.html, /diff-line--change/);
+  assert.match(out.html, /<del class="diff-del">alte<\/del>/);
+  assert.match(out.html, /<ins class="diff-add">neue<\/ins>/);
+  // Lesefluss: keine Side-by-Side-Zellen, eq-Wort als Plain-Text (kein span).
+  assert.doesNotMatch(out.html, /diff-cell--(left|right)/);
+  assert.match(out.html, /Hallo /);
+});
+
+test('renderInline: nur entfernt → del-Zeile', () => {
+  const lib = mockDiffLib({ arrays: [{ value: ['alles weg'], removed: true }] });
+  const out = renderInline('<p>alles weg</p>', '', lib);
+  assert.equal(out.unchanged, false);
+  assert.match(out.html, /diff-line--del/);
+  assert.match(out.html, /<del class="diff-del">alles weg<\/del>/);
+});
+
+test('renderInline: nur neu → ins-Zeile', () => {
+  const lib = mockDiffLib({ arrays: [{ value: ['alles neu'], added: true }] });
+  const out = renderInline('', '<p>alles neu</p>', lib);
+  assert.equal(out.unchanged, false);
+  assert.match(out.html, /diff-line--add/);
+  assert.match(out.html, /<ins class="diff-add">alles neu<\/ins>/);
+});
+
+test('renderInline: Heading behaelt semantisches Tag', () => {
+  const lib = mockDiffLib({
+    arrays: [
+      { value: ['Alter Titel'], removed: true },
+      { value: ['Neuer Titel'], added: true },
+    ],
+    words: [
+      { value: 'Alter', removed: true },
+      { value: 'Neuer', added: true },
+      { value: ' Titel' },
+    ],
+  });
+  const out = renderInline('<h1>Alter Titel</h1>', '<h1>Neuer Titel</h1>', lib);
+  assert.match(out.html, /<h1 class="diff-line diff-line--change">/);
+});
+
+test('renderInline: parseBlocks-Miss → Plain-Text-Fallback rendert Change', () => {
+  const lib = mockDiffLib({
+    arrays: [],
+    words: [
+      { value: 'alt', removed: true },
+      { value: 'neu', added: true },
+    ],
+  });
+  const out = renderInline('<div>alt</div>', '<div>neu</div>', lib);
+  assert.equal(out.unchanged, false);
+  assert.match(out.html, /<del class="diff-del">alt<\/del>/);
+  assert.match(out.html, /<ins class="diff-add">neu<\/ins>/);
 });

@@ -7,7 +7,7 @@
 
 import { fetchJson } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
-import { renderSideBySide } from '../page-revision-diff.js';
+import { renderSideBySide, renderInline } from '../page-revision-diff.js';
 import { diffSnapshots } from '../book-snapshot-diff.js';
 import { startPoll } from './job-helpers.js';
 
@@ -33,11 +33,12 @@ export function registerSnapshotsCard() {
     expanded: {},          // srcId -> rendered side-by-side HTML (lazy)
     expandLoading: {},     // srcId -> bool
 
-    // Reader (Fassung nur-lesend oeffnen) + Export aus dem Reader.
+    // Reader (Fassung nur-lesend oeffnen, Bucheditor-Look) + Export.
     readerOpen: false,
     readerSnap: null,      // Meta der geoeffneten Fassung
-    readerSections: [],    // [{ kind:'chapter'|'page', name, depth, html, key }]
+    readerSections: [],    // [{ kind:'chapter'|'page', name, depth, html, srcId, status, renderHtml, key }]
     readerLoading: false,
+    readerAddedSince: 0,   // Seiten, die seit der Fassung neu dazugekommen sind
     pdfProfiles: [],
     pdfProfileId: '',
     pdfExporting: false,
@@ -205,7 +206,7 @@ export function registerSnapshotsCard() {
       }
     },
 
-    // ── Reader (Fassung nur-lesend oeffnen) ─────────────────────────────────────────
+    // ── Reader (Fassung nur-lesend, Bucheditor-Look, Diff gegen aktuell) ────────────
     async openSnapshot(snap) {
       const app = window.__app;
       const bookId = app?.selectedBookId;
@@ -214,12 +215,48 @@ export function registerSnapshotsCard() {
       this.readerOpen = true;
       this.readerLoading = true;
       this.readerSections = [];
+      this.readerAddedSince = 0;
       this._resetPdfExport();
       // PDF-Profile lazy laden (fuer das Export-Menue im Reader).
       this.loadPdfProfiles();
       try {
-        const data = await fetchJson(`/snapshots/${bookId}/${snap.id}`);
-        this.readerSections = this._buildReaderSections(data?.snapshot?.content);
+        // Fassungs-Inhalt + aktueller Buchstand parallel. Letzterer liefert die
+        // Vergleichsbasis fuer den Inline-Diff (Match via srcId == page_id).
+        const [snapData, curData] = await Promise.all([
+          fetchJson(`/snapshots/${bookId}/${snap.id}`),
+          fetchJson(`/book-editor/${bookId}/contents`).catch(() => ({ pages: [] })),
+        ]);
+        const sections = this._buildReaderSections(snapData?.snapshot?.content);
+        const currentById = new Map();
+        for (const p of (curData?.pages || [])) currentById.set(p.pageId, p.html || '');
+
+        const diffLib = await loadDiff().catch(() => null);
+        const snapIds = new Set();
+        for (const s of sections) {
+          if (s.kind !== 'page') continue;
+          if (s.srcId != null) snapIds.add(s.srcId);
+          const curHtml = s.srcId != null ? currentById.get(s.srcId) : undefined;
+          if (curHtml === undefined) {
+            // In der Fassung vorhanden, im aktuellen Buch geloescht.
+            s.status = 'removed';
+            s.renderHtml = s.html;
+            continue;
+          }
+          if (!diffLib) { s.status = ''; s.renderHtml = s.html; continue; }
+          try {
+            const out = renderInline(s.html, curHtml, diffLib);
+            s.status = out.unchanged ? 'unchanged' : 'changed';
+            s.renderHtml = out.unchanged ? s.html : out.html;
+          } catch (e) {
+            console.error('[snapshots:inlineDiff]', e);
+            s.status = ''; s.renderHtml = s.html;
+          }
+        }
+        // Seiten, die seit der Fassung neu dazugekommen sind.
+        let added = 0;
+        for (const pid of currentById.keys()) if (!snapIds.has(pid)) added += 1;
+        this.readerAddedSince = added;
+        this.readerSections = sections;
       } catch (e) {
         console.error('[snapshots:open]', e);
         this.readerSections = [];
@@ -232,12 +269,13 @@ export function registerSnapshotsCard() {
       this.readerOpen = false;
       this.readerSnap = null;
       this.readerSections = [];
+      this.readerAddedSince = 0;
       this._resetPdfExport();
       this._stopPdfPoll();
     },
 
     // Snapshot-Tree (buildBookJson-Format) → flache Render-Liste: Kapitel-
-    // Ueberschriften (mit Tiefe) + Seiten (Name + inline-HTML, Lesereihenfolge).
+    // Ueberschriften (mit Tiefe) + Seiten (Name + inline-HTML + srcId).
     _buildReaderSections(content) {
       const nodes = Array.isArray(content?.tree) ? content.tree : [];
       const out = [];
@@ -252,6 +290,9 @@ export function registerSnapshotsCard() {
               kind: 'page',
               name: typeof node.name === 'string' ? node.name : '',
               html: typeof node.html === 'string' ? node.html : '',
+              srcId: Number.isFinite(node.srcId) ? node.srcId : null,
+              status: '',
+              renderHtml: typeof node.html === 'string' ? node.html : '',
               depth,
               key: 'p' + out.length,
             });

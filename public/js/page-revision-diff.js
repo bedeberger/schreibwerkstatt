@@ -230,3 +230,58 @@ export function renderSideBySide(oldHtml, newHtml, diffLib, opts) {
   const html = renderEntries(view, diffLib, opts?.skipLabel);
   return { html, unchanged: false };
 }
+
+// Rendert kombinierten Wort-Diff einer Zeile: entfernt → <del>, neu → <ins>,
+// gleich → plain. Lesefluss-Variante (eine Spalte) statt links/rechts getrennt.
+function renderWordsBoth(oldText, newText, diffLib) {
+  const parts = diffLib.diffWords(oldText, newText);
+  let html = '';
+  for (const part of parts) {
+    const safe = escHtml(part.value);
+    if (part.added) html += `<ins class="diff-add">${safe}</ins>`;
+    else if (part.removed) html += `<del class="diff-del">${safe}</del>`;
+    else html += safe;
+  }
+  return html;
+}
+
+// Public API. Einspaltiger Inline-Diff für den Lesefluss (Manuskript-Stream):
+// oldHtml (ältere Fassung) gegen newHtml (aktueller Stand). Gleiche Block-/Wort-
+// Diff-Pipeline wie renderSideBySide, aber alle Blöcke (kein collapse/skip) und
+// del+ins inline im selben Absatz. Liefert { html, unchanged }.
+export function renderInline(oldHtml, newHtml, diffLib) {
+  if (!diffLib || typeof diffLib.diffWords !== 'function' || typeof diffLib.diffArrays !== 'function') {
+    throw new Error('renderInline: diffLib.diffWords/diffArrays missing');
+  }
+  const oldBlocks = parseBlocks(oldHtml);
+  const newBlocks = parseBlocks(newHtml);
+  const parts = diffLib.diffArrays(oldBlocks.map(b => b.text), newBlocks.map(b => b.text));
+  const entries = pairChanges(attachBlocks(parts, oldBlocks, newBlocks));
+
+  if (!entries.some(e => e.kind !== 'eq')) {
+    // parseBlocks deckt nur p/h1-h6/li/blockquote/pre ab — Aenderungen in
+    // exotischen Tags rutschen durch. Plain-Text-Word-Diff als Sicherheitsnetz.
+    const oldText = htmlToPlainText(oldHtml);
+    const newText = htmlToPlainText(newHtml);
+    if (oldText === newText) return { html: '', unchanged: true };
+    return { html: `<p class="diff-line diff-line--change">${renderWordsBoth(oldText, newText, diffLib)}</p>`, unchanged: false };
+  }
+
+  let html = '';
+  for (const e of entries) {
+    if (e.kind === 'eq') {
+      const tag = cellTag(e.newBlock?.tag || e.oldBlock?.tag || 'p');
+      html += `<${tag} class="diff-line diff-line--eq">${escHtml(e.newBlock?.text ?? e.oldBlock?.text ?? '')}</${tag}>`;
+    } else if (e.kind === 'add') {
+      const tag = cellTag(e.block.tag);
+      html += `<${tag} class="diff-line diff-line--add"><ins class="diff-add">${escHtml(e.block.text)}</ins></${tag}>`;
+    } else if (e.kind === 'del') {
+      const tag = cellTag(e.block.tag);
+      html += `<${tag} class="diff-line diff-line--del"><del class="diff-del">${escHtml(e.block.text)}</del></${tag}>`;
+    } else if (e.kind === 'change') {
+      const tag = cellTag(e.to?.tag || e.from?.tag || 'p');
+      html += `<${tag} class="diff-line diff-line--change">${renderWordsBoth(e.from.text, e.to.text, diffLib)}</${tag}>`;
+    }
+  }
+  return { html, unchanged: false };
+}
