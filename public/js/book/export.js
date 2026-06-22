@@ -130,4 +130,19 @@ export const exportMethods = {
     }
     app.toggleEpubExportCard();
   },
+
+  _handoffToDocxCustom() {
+    const app = window.__app;
+    if (!app) return;
+    let preset = null;
+    if (this.exportScope === 'page' && this.exportPageId)
+      preset = { kind: 'page', id: this.exportPageId };
+    else if (this.exportScope === 'chapter' && this.exportChapterId)
+      preset = { kind: 'chapter', id: this.exportChapterId };
+    if (preset) {
+      app.__docxExportPreset = preset;
+      window.dispatchEvent(new CustomEvent('export:docx:preset', { detail: preset }));
+    }
+    app.toggleDocxExportCard();
+  },
 };

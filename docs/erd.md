@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 212, 107 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 214, 108 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -37,6 +37,7 @@ erDiagram
   books ||--o{ chat_sessions         : has
   books ||--o{ ideen                 : has
   books ||--o{ pdf_export_profile    : has
+  books ||--o{ docx_export_profile   : has
   books ||--|| book_publication      : has
   books ||--o{ user_page_usage       : has
   books ||--o{ book_access           : has
@@ -1270,6 +1271,18 @@ erDiagram
     INTEGER created_at
     INTEGER updated_at
   }
+
+  docx_export_profile {
+    INTEGER id          PK
+    TEXT    kind        "book|user_default"
+    INTEGER book_id     FK "NULL bei user_default"
+    TEXT    user_email  FK
+    TEXT    name
+    TEXT    config_json
+    INTEGER is_default
+    TEXT    created_at
+    TEXT    updated_at
+  }
   book_publication {
     INTEGER book_id           PK,FK "1:1 books"
     BLOB    cover_image
@@ -1421,9 +1434,9 @@ erDiagram
   }
   share_links {
     TEXT    token              PK "22-Zeichen base64url"
-    TEXT    kind               "page|chapter (CHECK)"
+    TEXT    kind               "page|chapter|book (CHECK)"
     INTEGER page_id            FK "FK pages(page_id) — nur bei kind='page'"
-    INTEGER chapter_id         FK "FK chapters(chapter_id) — nur bei kind='chapter'"
+    INTEGER chapter_id         FK "FK chapters(chapter_id) — nur bei kind='chapter'; bei kind='book' beide NULL"
     INTEGER book_id            FK "FK books(book_id) ON DELETE CASCADE"
     TEXT    owner_email        FK "FK app_users(email) ON DELETE CASCADE"
     TEXT    intro              "Plaintext-Vorwort fuer Reader"

@@ -1,0 +1,182 @@
+@layer components {
+/* === Kommentar-Leiste der Leseansicht ===================================
+   Verankerte Share-Link-Leser-Kommentare als Margin-Rail rechts neben dem
+   Seitentext. Split-Layout spiegelt das Lektorat-Split (editor/notebook/
+   lektorat.css): Preview links, Leiste rechts, jede Spalte scrollt eigen.
+   Aktiv, sobald .editor-body-wrap die Klasse `comments-split` trägt
+   (Root-Flag pageCommentRailOpen, gespiegelt aus editorCommentsCard). */
+.editor-body-wrap.comments-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin-top: 1rem;
+}
+
+@media (min-width: 1100px) {
+  .editor-body-wrap.comments-split {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 1rem;
+    height: 78vh;
+    min-height: 320px;
+    max-height: 900px;
+  }
+  .comments-split .editor-preview-wrap {
+    overflow-y: auto;
+    height: 100%;
+    min-width: 0;
+  }
+  .comments-split .editor-preview-wrap .page-view-wrap { height: 100%; }
+  .comments-split .editor-preview-wrap .page-content-view {
+    max-height: none;
+    height: 100%;
+    margin: 0;
+  }
+  .comment-rail { height: 100%; overflow-y: auto; }
+}
+
+@media (max-width: 1099px) {
+  /* Gestapelt: Leiste folgt unter dem Text (Kontext zuerst, anders als Lektorat). */
+  .editor-body-wrap.comments-split { display: flex; flex-direction: column; }
+  .comment-rail { margin-top: var(--space-md); }
+}
+
+.comment-rail {
+  --card-accent: var(--card-accent-share, var(--color-accent));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-10);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+.comment-rail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.comment-rail__thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.comment-rail__thread:hover { border-color: var(--card-accent); }
+.comment-rail__thread--selected {
+  border-color: var(--card-accent);
+  box-shadow: inset 0 0 0 1px var(--card-accent);
+}
+.comment-rail__thread--resolved { opacity: 0.62; }
+
+.comment-rail__anchor { display: block; }
+.comment-rail__quote {
+  font-style: italic;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.comment-rail__thread--selected .comment-rail__quote,
+.comment-rail__anchor:hover .comment-rail__quote { color: var(--card-accent); }
+
+.comment-rail__comment { font-size: 14px; }
+.comment-rail__comment--reply {
+  margin-left: var(--space-sm);
+  padding-left: var(--space-sm);
+  border-left: 2px solid var(--color-border);
+}
+.comment-rail__comment--author { border-left-color: var(--card-accent); }
+.comment-rail__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-bottom: var(--space-2xs);
+}
+.comment-rail__resolved {
+  font-size: 11px;
+  padding: var(--space-1) var(--space-6);
+  background: var(--color-tag-bg);
+  border-radius: var(--radius-sm);
+}
+.comment-rail__body { white-space: pre-wrap; }
+
+.comment-rail__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--color-border);
+}
+.comment-rail__actions { display: flex; gap: var(--space-sm); }
+.comment-rail__link {
+  padding: var(--space-2xs) var(--space-sm);
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.comment-rail__link:hover { color: var(--color-text); border-color: var(--card-accent); }
+.comment-rail__link--danger:hover { color: var(--color-err-text); border-color: var(--color-err-border); }
+.comment-rail__reply { display: flex; flex-direction: column; gap: var(--space-6); }
+.comment-rail__textarea {
+  padding: var(--pad-btn-compact);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  resize: vertical;
+  min-height: 48px;
+}
+/* Mobile: 16px verhindert iOS-Zoom beim Fokus (erbt sonst <16px via font: inherit). */
+@media (max-width: 768px) {
+  .comment-rail__textarea { font-size: var(--font-size-reading); }
+}
+
+/* Eingeklappt: schwebender Wieder-Öffnen-Chip. */
+.comment-rail-fab {
+  position: fixed;
+  right: var(--space-md);
+  bottom: var(--space-md);
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--pad-badge);
+  background: var(--card-accent-share);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.comment-rail-fab .icon { width: 16px; height: 16px; }
+
+/* Verankerte Stellen im Text: dezent alle, kräftig die selektierte.
+   CSS Custom Highlight Registry — paint-only, keine DOM-Mutation. */
+::highlight(comment-rail-anchor) {
+  background: color-mix(in srgb, var(--card-accent-share, #5a4a8e) 18%, transparent);
+  border-radius: 2px;
+}
+::highlight(comment-rail-anchor-active) {
+  background: color-mix(in srgb, var(--card-accent-share, #5a4a8e) 42%, transparent);
+  border-radius: 2px;
+}
+}

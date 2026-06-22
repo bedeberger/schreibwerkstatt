@@ -351,7 +351,7 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 
 **Modifier `.tabs--fullwidth`** für Modus-Toggles, bei denen Buttons gleichberechtigt die volle Container-Breite teilen sollen (statt inline-flex zu Content-Breite). Beispiel: Figuren-Graph-Modus ([public/partials/figuren.html](public/partials/figuren.html)).
 
-**Tab-Panels brauchen eigenes Padding (Pflicht).** `.tabs` rendert nur die Button-Reihe — **kein** umschliessender Container/Box um die Panels. Der zugehörige Panel-Container sitzt deshalb sonst bündig an Tab-Reihe und Kartenrand. Jede Karten-eigene Panel-Klasse (`.pdfx-tab-panel`, `.epubx-tab-panel`, …) bekommt darum `padding: 1rem 0.875rem 0.75rem` (Top-Abstand zur Tab-Reihe + horizontaler Innenabstand). Convention pro Karte als eigene `*-tab-panel`-Klasse in der Karten-CSS, nicht generisch in `tabs.css` (Padding ist content-abhängig). Beispiele: [public/css/book/pdf-export.css](public/css/book/pdf-export.css), [public/css/book/epub-export.css](public/css/book/epub-export.css).
+**Tab-Panels brauchen eigenes Padding (Pflicht).** `.tabs` rendert nur die Button-Reihe — **kein** umschliessender Container/Box um die Panels. Der zugehörige Panel-Container sitzt deshalb sonst bündig an Tab-Reihe und Kartenrand. Der Panel-Container bekommt darum `padding: 1rem 0.875rem 0.75rem` (Top-Abstand zur Tab-Reihe + horizontaler Innenabstand). Die drei Export-Karten teilen sich dafür `.export-tab-panel` ([public/css/book/export-shared.css](public/css/book/export-shared.css)); Karten mit content-abhängigem Padding definieren weiterhin eine eigene `*-tab-panel`-Klasse in der Karten-CSS, nicht generisch in `tabs.css`.
 
 ---
 
@@ -2050,6 +2050,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [editor/notebook/find-replace.css](public/css/editor/notebook/find-replace.css) | Notebook-Find/Replace (`.edit-find*`). |
 | [editor/notebook/findings.css](public/css/editor/notebook/findings.css) | `.finding` / `.stilbox`. |
 | [editor/notebook/lektorat.css](public/css/editor/notebook/lektorat.css) | `.lektorat-mark`, Findings-Flash, Hover-Sync. |
+| [editor/notebook/comments-rail.css](public/css/editor/notebook/comments-rail.css) | Kommentar-Leiste der Leseansicht: `.editor-body-wrap.comments-split` (Grid-Split wie Lektorat), `.comment-rail*`, schwebender `.comment-rail-fab`, `::highlight(comment-rail-anchor)` / `…-active`. |
 | [editor/notebook/entities.css](public/css/editor/notebook/entities.css) | Entity-Linking: `::highlight(entity-figure)` / `::highlight(entity-location)`, `.on-this-page-panel` (Collapsible mit drei Reihen Figuren/Szenen/Ereignisse, Stil wie `.figure-context-panel`), `.entity-popover`. |
 | [editor/synonym-menu.css](public/css/editor/synonym-menu.css) | Synonym-Kontextmenü + Picker. |
 | [editor/synonyme.css](public/css/editor/synonyme.css) | Synonyme-Karten-Stile (Listen). |
@@ -2098,9 +2099,10 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [book/plot/board.css](public/css/book/plot/board.css) | Plot-Werkstatt (Beat-Board / Kanban): Board-Layout, Spalten, Beat-Karten, Beat-Edit, Add-Beat/Akt, Vollbild + Mobile. |
 | [book/plot/widgets.css](public/css/book/plot/widgets.css) | Plot-Werkstatt-Widgets: KI-Brainstorm, Consistency-Panel, Coverage, Status-Verteilungsbalken, Akt-Farbpalette, Beat-Intensität, Spannungsbogen. Ergänzt plot/board.css. |
 | [book/plot/swimlane.css](public/css/book/plot/swimlane.css) | Plot-Werkstatt: Swimlane-Grid (Akte × Stränge) + Strang-Leiste. Ergänzt plot/board.css + plot/widgets.css. |
-| [book/export.css](public/css/book/export.css) | Buch-Export. |
-| [book/pdf-export.css](public/css/book/pdf-export.css) | PDF-Export-Profile + Tabs. |
-| [book/epub-export.css](public/css/book/epub-export.css) | EPUB-Export-Karte (Scope-Picker + Reflow-Settings). |
+| [book/export.css](public/css/book/export.css) | Buch-Export (Standard-Format-Tiles + .swbook-Migration). |
+| [book/export-shared.css](public/css/book/export-shared.css) | Geteilte Grammatik der drei Export-Karten (PDF/Word/EPUB): Scope-Picker, einzeilige Profil-Leiste + Anlege-Zeile, Tabs/Tab-Panels, Chips, Progress, Mobile. |
+| [book/pdf-export.css](public/css/book/pdf-export.css) | PDF-Export-Spezifika (Inputs, Num-Grids, Schrift-Akkordeon, Farbpicker, Cover-Vorschau). Aufbau aus export-shared.css. |
+| [book/docx-export.css](public/css/book/docx-export.css) | Word-Export-Spezifika (schmales Zahlenfeld). Aufbau aus export-shared.css. |
 
 ### book-overview/ (dichtes Tile-Grid)
 [coverage.css](public/css/book-overview/coverage.css), [domain.css](public/css/book-overview/domain.css), [kapitel.css](public/css/book-overview/kapitel.css), [presence.css](public/css/book-overview/presence.css), [recent-actions.css](public/css/book-overview/recent-actions.css), [stats.css](public/css/book-overview/stats.css), [base.css](public/css/book-overview/base.css), [review.css](public/css/book-overview/review.css), [diary.css](public/css/book-overview/diary.css) (Tagebuch-Tiles: Lücken/Konsistenz-Kennzahlen + Wochentag-Rhythmus-Balken), [rueckblick-heatmap.css](public/css/book-overview/rueckblick-heatmap.css) (Jahr×Monat-Heatmap der Rückblick-Abdeckung; Level 0..4 aus var(--color-accent), Marker als eckiger Eckpunkt) — pro Tile-Familie ein File.

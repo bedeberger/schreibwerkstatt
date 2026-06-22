@@ -1,0 +1,295 @@
+<!-- Custom-Word-Export — Profile + Konfiguration + Trigger -->
+<!--
+  Alpine.data-Sub-Komponente — public/js/cards/docx-export-card.js.
+  Profile (docx_export_profile) halten Layout/Typografie/Struktur; die Titelei-
+  Texte leben buch-weit in BookSettings → Publikation-Tab (SSoT book_publication).
+  Pattern-Konformität (DESIGN.md): Combobox/numInput statt <select>/<input number>,
+  .card-form-row, Tabs, .card-status / .card-form-saved / .card-form-error.
+-->
+<div class="card card--docxexport docx-export-card" x-data="docxExportCard" x-show="$app.showDocxExportCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('docxExport.title')"></span>
+    <div class="card-actions">
+      <div class="export-scope-picker" x-show="!exporting">
+        <div x-data="combobox({ placeholder: $app.t('export.scope.label'), compact: false })"
+             x-modelable="value" x-model="exportScope"
+             x-effect="options = exportScopeOptions()"></div>
+        <div x-show="exportScope === 'chapter'"
+             x-data="combobox({ placeholder: $app.t('export.scope.pickChapter'), compact: false })"
+             x-modelable="value" x-model="exportChapterId"
+             x-effect="options = exportChapterOptions()"></div>
+        <button type="button"
+                class="kapitel-include-subs-btn"
+                x-show="exportScope === 'chapter' && selectedChapterHasSubs()"
+                @click="exportIncludeSubchapters = !exportIncludeSubchapters"
+                :class="{ primary: exportIncludeSubchapters }"
+                :aria-pressed="exportIncludeSubchapters"
+                :data-tip="$app.t('docxExport.includeSubchaptersTip')">
+          <svg class="icon" aria-hidden="true"><use :href="exportIncludeSubchapters ? '/icons.svg?v=690#check' : '/icons.svg?v=690#chevron-down'"/></svg>
+          <span x-text="$app.t('docxExport.includeSubchapters')"></span>
+        </button>
+        <div x-show="exportScope === 'page'"
+             x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
+             x-modelable="value" x-model="exportPageId"
+             x-effect="options = exportPageOptions()"></div>
+      </div>
+      <button type="button" class="primary" x-show="!exporting"
+              :disabled="!$app.selectedBookId || !activeProfile"
+              @click="exportDocx()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+        <span x-text="$app.t('docxExport.export')"></span>
+      </button>
+      <button type="button" data-label-ok x-show="exporting" @click="cancelExport()">
+        <span class="spinner"></span>
+        <span x-text="$app.t('docxExport.cancel')"></span>
+      </button>
+    </div>
+  </div>
+
+  <p class="card-form-hint" x-text="$app.t('docxExport.hint')"></p>
+
+  <!-- Profil-Leiste -->
+  <div class="export-profile-bar">
+    <label class="card-form-label" x-text="$app.t('docxExport.profile')"></label>
+    <div class="export-profile-pick"
+         x-data="combobox({ placeholder: $app.t('docxExport.profile'), compact: false })"
+         x-modelable="value" x-model="activeProfileId"
+         x-effect="options = profiles.map(p => ({ value: p.id, label: p.name + (p.is_default ? ' (' + $app.t('docxExport.defaultMark') + ')' : '') }))"
+         @combobox-change="selectProfile(activeProfileId)"></div>
+    <button type="button" class="export-profile-btn" :data-tip="$app.t('docxExport.newProfile')"
+            @click="showCreate = !showCreate">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
+    </button>
+    <button type="button" class="export-profile-btn" x-show="activeProfile && !activeProfile.is_default"
+            :data-tip="$app.t('docxExport.makeDefault')" @click="setDefaultProfile(activeProfileId)">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#check"/></svg>
+    </button>
+    <button type="button" class="export-profile-btn" x-show="profiles.length > 1"
+            :data-tip="$app.t('docxExport.deleteProfile')" @click="deleteProfile(activeProfileId)">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+    </button>
+  </div>
+
+  <div class="export-create-row" x-show="showCreate" x-cloak>
+    <input type="text" class="card-form-input" x-model="newProfileName"
+           :placeholder="$app.t('docxExport.newProfileName')" maxlength="80"
+           @keydown.enter="createProfile()" data-spellcheck="spelling">
+    <label class="export-create-clone">
+      <span class="export-create-clone-label" x-text="$app.t('docxExport.cloneLabel')"></span>
+      <div x-data="combobox($app.t('docxExport.cloneNone'))"
+           x-modelable="value" x-model="cloneFromId"
+           x-effect="options = [{ value: '', label: $app.t('docxExport.cloneNone') }, ...profiles.map(p => ({ value: p.id, label: p.name }))]"
+></div>
+    </label>
+    <button type="button" class="primary" data-label-ok :disabled="creating || !newProfileName.trim()" @click="createProfile()"
+            x-text="$app.t('docxExport.create')"></button>
+  </div>
+
+  <!-- Konfiguration (erst wenn Profil geladen — x-if verhindert combobox-Race auf null) -->
+  <template x-if="_formMounted && activeProfile">
+    <div x-data="tabs(['layout','structure','frontmatter'])" x-modelable="value" x-model="activeTab">
+      <div class="tabs tabs--scrollable export-tabs" x-bind="tablist">
+        <template x-for="tab in tabs" :key="tab">
+          <button class="tabs-btn" x-bind="tabBtn(tab)" x-text="$app.t('docxExport.section.' + tab)"></button>
+        </template>
+      </div>
+
+      <div class="docx-body">
+        <!-- Layout / Typografie -->
+        <section class="export-tab-panel" x-bind="panel('layout')">
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.pageSize')"></label>
+            <div x-data="combobox($app.t('docxExport.field.pageSize'))"
+                 x-modelable="value" x-model="activeProfile.config.page.size"
+                 x-effect="options = pageSizeOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.fontFamily')"></label>
+            <div x-data="combobox($app.t('docxExport.field.fontFamily'))"
+                 x-modelable="value" x-model="activeProfile.config.font.family"
+                 x-effect="options = fontFamilyOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.fontSize')"></label>
+            <input type="text" class="card-form-input docx-num"
+                   x-data="numInput({ integer: true, min: 8, max: 18 })"
+                   x-modelable="value" x-model="activeProfile.config.font.sizePt">
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.lineSpacing')"></label>
+            <div x-data="combobox($app.t('docxExport.field.lineSpacing'))"
+                 x-modelable="value" x-model="activeProfile.config.font.lineSpacing"
+                 x-effect="options = lineSpacingOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.paragraphStyle')"></label>
+            <div x-data="combobox($app.t('docxExport.field.paragraphStyle'))"
+                 x-modelable="value" x-model="activeProfile.config.font.paragraphStyle"
+                 x-effect="options = paragraphStyleOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.font.justify">
+              <span x-text="$app.t('docxExport.field.justify')"></span>
+            </label>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.headerMode')"></label>
+            <div x-data="combobox($app.t('docxExport.field.headerMode'))"
+                 x-modelable="value" x-model="activeProfile.config.header.mode"
+                 x-effect="options = headerModeOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.pageNumber')"></label>
+            <div x-data="combobox($app.t('docxExport.field.pageNumber'))"
+                 x-modelable="value" x-model="activeProfile.config.header.pageNumber"
+                 x-effect="options = pageNumberOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.header.skipFirstPage">
+              <span x-text="$app.t('docxExport.field.skipFirstPage')"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Struktur (Titelseite / Inhaltsverzeichnis / Kapitel) -->
+        <section class="export-tab-panel" x-bind="panel('structure')">
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.titleMode')"></label>
+            <div x-data="combobox($app.t('docxExport.field.titleMode'))"
+                 x-modelable="value" x-model="activeProfile.config.title.mode"
+                 x-effect="options = titleModeOptions()"></div>
+          </div>
+          <div class="card-form-row" x-show="activeProfile.config.title.mode === 'generated'">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.title.wordCount">
+              <span x-text="$app.t('docxExport.field.wordCount')"></span>
+            </label>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.tocMode')"></label>
+            <div x-data="combobox($app.t('docxExport.field.tocMode'))"
+                 x-modelable="value" x-model="activeProfile.config.toc.mode"
+                 x-effect="options = tocModeOptions()"></div>
+          </div>
+          <div class="card-form-row" x-show="activeProfile.config.toc.mode !== 'none'">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.tocDepth')"></label>
+            <div x-data="combobox($app.t('docxExport.field.tocDepth'))"
+                 x-modelable="value" x-model="activeProfile.config.toc.depth"
+                 x-effect="options = tocDepthOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.numbering')"></label>
+            <div x-data="combobox($app.t('docxExport.field.numbering'))"
+                 x-modelable="value" x-model="activeProfile.config.chapter.numbering"
+                 x-effect="options = chapterNumberingOptions()"></div>
+          </div>
+          <div class="card-form-row" x-show="activeProfile.config.chapter.numbering !== 'none'">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.numberingMode')"></label>
+            <div x-data="combobox($app.t('docxExport.field.numberingMode'))"
+                 x-modelable="value" x-model="activeProfile.config.chapter.numberingMode"
+                 x-effect="options = numberingModeOptions()"></div>
+          </div>
+          <div class="card-form-row card-form-row--top" x-show="activeProfile.config.chapter.numbering !== 'none'">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.unnumberedChapters')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox({ placeholder: $app.t('docxExport.field.unnumberedPick'), multiple: true })"
+                   x-modelable="value" x-model="activeProfile.config.chapter.unnumberedChapterIds"
+                   x-effect="options = unnumberedChapterPickOptions()"></div>
+              <div class="export-chip-row" x-show="unnumberedChapterChips().length">
+                <template x-for="chip in unnumberedChapterChips()" :key="chip.id">
+                  <span class="export-chip">
+                    <span x-text="chip.label"></span>
+                    <button type="button" class="export-chip-remove" :aria-label="$app.t('common.remove')"
+                            @click="removeUnnumberedChapter(chip.id)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                  </span>
+                </template>
+              </div>
+              <p class="card-form-field-note" x-text="$app.t('docxExport.field.unnumberedHint')"></p>
+            </div>
+          </div>
+          <div class="card-form-row">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.chapter.pageBreakBefore">
+              <span x-text="$app.t('docxExport.field.pageBreakBefore')"></span>
+            </label>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.pageStructure')"></label>
+            <div x-data="combobox($app.t('docxExport.field.pageStructure'))"
+                 x-modelable="value" x-model="activeProfile.config.chapter.pageStructure"
+                 x-effect="options = pageStructureOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.sceneSep')"></label>
+            <div x-data="combobox($app.t('docxExport.field.sceneSep'))"
+                 x-modelable="value" x-model="activeProfile.config.chapter.sceneSeparator"
+                 x-effect="options = sceneSeparatorOptions()"></div>
+          </div>
+        </section>
+
+        <!-- Titelei (Inklusions-Toggles; Texte aus Publikation-Tab) -->
+        <section class="export-tab-panel" x-bind="panel('frontmatter')">
+          <p class="card-form-field-note">
+            <span x-text="$app.t('docxExport.metaHint')"></span>
+            <span class="internal-link" @click="openBookSettings()" x-text="$app.t('docxExport.metaLink')"></span>
+          </p>
+          <div class="card-form-row">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.frontmatter.dedication">
+              <span x-text="$app.t('docxExport.field.incDedication')"></span>
+            </label>
+          </div>
+          <div class="card-form-row">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.frontmatter.frontMatter">
+              <span x-text="$app.t('docxExport.field.incFrontMatter')"></span>
+            </label>
+          </div>
+          <div class="card-form-row">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.frontmatter.imprint">
+              <span x-text="$app.t('docxExport.field.incImprint')"></span>
+            </label>
+          </div>
+          <div class="card-form-row">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.frontmatter.copyright">
+              <span x-text="$app.t('docxExport.field.incCopyright')"></span>
+            </label>
+          </div>
+          <div class="card-form-row" x-show="activeProfile.config.frontmatter.imprint || activeProfile.config.frontmatter.copyright">
+            <label class="card-form-label" x-text="$app.t('docxExport.field.imprintPosition')"></label>
+            <div x-data="combobox($app.t('docxExport.field.imprintPosition'))"
+                 x-modelable="value" x-model="activeProfile.config.frontmatter.imprintPosition"
+                 x-effect="options = imprintPositionOptions()"></div>
+          </div>
+          <div class="card-form-row">
+            <label class="book-settings-option">
+              <input type="checkbox" x-model="activeProfile.config.frontmatter.authorBio">
+              <span x-text="$app.t('docxExport.field.incAuthorBio')"></span>
+            </label>
+          </div>
+        </section>
+
+        <div class="card-actions">
+          <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('docxExport.saved')"></span>
+          <button type="button" data-label-ok :disabled="saving" @click="saveProfile()">
+            <span x-show="saving" class="spinner"></span>
+            <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Progress / Errors -->
+  <div class="export-progress" x-show="exporting || (exportProgress > 0 && !exportError)">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" :style="{ '--progress': exportProgress + '%' }"></div>
+    </div>
+    <p class="card-form-field-note" x-text="exportStatus"></p>
+  </div>
+  <p class="card-form-error" x-show="exportError" x-text="exportError"></p>
+</div>

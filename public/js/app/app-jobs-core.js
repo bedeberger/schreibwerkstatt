@@ -263,6 +263,7 @@ export const appJobsCoreMethods = {
       'book-chat':             'toast.job.bookChat',
       'finetune-export':       'toast.job.finetuneExport',
       'pdf-export':            'toast.job.pdfExport',
+      'docx-export':           'toast.job.docxExport',
       'batch-check':           'toast.job.batchCheck',
       'werkstatt-brainstorm':  'toast.job.werkstattBrainstorm',
       'werkstatt-consistency': 'toast.job.werkstattConsistency',

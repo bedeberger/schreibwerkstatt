@@ -8444,6 +8444,34 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 213 abgeschlossen (share_links.kind erweitert um book).');
   }
 
+  if (version < 214) {
+    // Custom-Word-Export-Profile (Pendant zu pdf_export_profile, ohne Cover-/
+    // Druck-BLOBs — DOCX ist reflowbar). scope = (kind, book_id) analog PDF.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS docx_export_profile (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER REFERENCES books(book_id) ON DELETE CASCADE,
+        kind        TEXT    NOT NULL DEFAULT 'book' CHECK(kind IN ('book','user_default')),
+        user_email  TEXT    NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        name        TEXT    NOT NULL,
+        config_json TEXT    NOT NULL,
+        is_default  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        CHECK ((kind = 'book' AND book_id IS NOT NULL)
+            OR (kind = 'user_default' AND book_id IS NULL))
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_docx_profile_book ON docx_export_profile(book_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_docx_profile_user ON docx_export_profile(user_email)');
+    const fkErrors214 = db.pragma('foreign_key_check');
+    if (fkErrors214.length) {
+      throw new Error(`Migration 214: foreign_key_check meldet ${fkErrors214.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 214').run();
+    logger.info('DB-Migration auf Version 214 abgeschlossen (docx_export_profile angelegt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

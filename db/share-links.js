@@ -179,6 +179,49 @@ function deleteComment(commentId, ownerEmail) {
   return r.changes > 0;
 }
 
+// Vollständige Kommentare (Root + Antworten, inkl. resolved/author) über ALLE
+// Links eines Owners zu einem Buch. Gleiche Spaltenliste wie listCommentsByToken;
+// jede Zeile trägt share_token, damit Reply/Resolve/Delete den richtigen
+// Link/Thread treffen. Für die Kommentar-Leiste der Leseansicht: der Client
+// filtert per Anker auf die aktuell gerenderte Seite.
+function listCommentsByOwnerBook(ownerEmail, bookId) {
+  return db.prepare(`
+    SELECT sc.id, sc.share_token, sc.parent_id, sc.reader_name, sc.reader_token,
+           sc.author_email, u.display_name AS author_display_name,
+           sc.body, sc.created_at, sc.resolved_at,
+           sc.anchor_bid, sc.anchor_quote, sc.anchor_start, sc.anchor_end
+    FROM share_comments sc
+    JOIN share_links sl ON sl.token = sc.share_token
+    LEFT JOIN app_users u ON u.email = sc.author_email
+    WHERE sl.owner_email = ? AND sl.book_id = ?
+    ORDER BY sc.created_at ASC
+  `).all(ownerEmail, bookId);
+}
+
+// Owner-last-seen für ALLE Links eines Buchs setzen (Unread-Badges der
+// „Geteilte Links"-Karte konsistent halten, wenn die Leiste die Kommentare zeigt).
+function markOwnerSeenForBook(ownerEmail, bookId) {
+  db.prepare(`UPDATE share_links SET owner_last_seen_at = ${NOW_ISO_SQL}
+              WHERE owner_email = ? AND book_id = ?`).run(ownerEmail, bookId);
+}
+
+// Alle offenen Reviewer-Kommentare (Root, nicht erledigt, von Lesern) über alle
+// Links eines Buchs. Page-Shares tragen page_id direkt; Chapter/Book-Shares
+// verankern via anchor_bid (Page-Auflösung über den Content-Store im Route-Layer,
+// die DB kennt die Block→Seite-Zuordnung nicht). Basis für den Pro-Seite-Zähler
+// am „Teilen"-Menü.
+function openReaderCommentsForBook(ownerEmail, bookId) {
+  return db.prepare(`
+    SELECT sc.id, sc.anchor_bid, sl.kind, sl.page_id
+    FROM share_comments sc
+    JOIN share_links sl ON sl.token = sc.share_token
+    WHERE sl.book_id = ? AND sl.owner_email = ?
+      AND sc.parent_id IS NULL
+      AND sc.author_email IS NULL
+      AND sc.resolved_at IS NULL
+  `).all(bookId, ownerEmail);
+}
+
 function countRecentCommentsByTokenIp(token, ipHash, windowMs) {
   const cutoff = new Date(Date.now() - windowMs).toISOString();
   const row = db.prepare(`
@@ -204,5 +247,8 @@ module.exports = {
   setCommentResolved,
   listCommentsByToken,
   deleteComment,
+  openReaderCommentsForBook,
+  listCommentsByOwnerBook,
+  markOwnerSeenForBook,
   countRecentCommentsByTokenIp,
 };

@@ -149,14 +149,15 @@ export function registerPdfExportCard() {
         const r = await fetch('/pdf-export/profiles');
         const d = await r.json();
         this.profiles = d.profiles || [];
-        const def = this.profiles.find(p => p.is_default) || this.profiles[0] || null;
-        if (def && (!this.activeProfileId || !this.profiles.some(p => p.id === this.activeProfileId))) {
-          await this.selectProfile(def.id);
-        } else if (this.activeProfileId) {
-          await this.selectProfile(this.activeProfileId);
-        } else {
-          await this._unmountFormThen(() => { this.activeProfile = null; });
+        if (!this.profiles.length) {
+          // Erstes Öffnen: ein Standard-Profil anlegen (Server nutzt defaultConfig).
+          // Gleiches Verhalten wie die Word-Karte — kein leerer Zwischenzustand.
+          await this._createProfileNamed(window.__app.t('pdfExport.defaultProfileName'));
+          return;
         }
+        const def = this.profiles.find(p => p.is_default) || this.profiles[0];
+        const target = this.profiles.some(p => p.id === this.activeProfileId) ? this.activeProfileId : def.id;
+        await this.selectProfile(target);
       } catch (e) {
         console.error('loadProfiles', e);
       }
@@ -182,12 +183,13 @@ export function registerPdfExportCard() {
       } catch {}
     },
 
-    async createProfile() {
-      const name = (this.newProfileName || '').trim();
-      if (!name) return;
-      // Profile sind user-scoped — kein book_id im Payload.
-      const body = { name };
-      if (this.cloneFromId) body.clone_from = this.cloneFromId;
+    // Profil anlegen (optional als Klon). Profile sind user-scoped — kein
+    // book_id im Payload. Nach dem Anlegen wird genau einmal selectProfile
+    // gerufen (ein Form-Mount-Zyklus, keine Race mit laufenden Klicks).
+    async _createProfileNamed(name, cloneFromId) {
+      const body = { name: String(name || '').trim() };
+      if (!body.name) return;
+      if (cloneFromId) body.clone_from = cloneFromId;
       this.creating = true;
       try {
         const r = await fetch('/pdf-export/profiles', {
@@ -201,34 +203,39 @@ export function registerPdfExportCard() {
           return;
         }
         const profile = await r.json();
+        this.profiles.push(profile);
         this.newProfileName = '';
         this.cloneFromId = null;
         this._showCreate = false;
-        // Neues Profil als aktiv markieren, BEVOR loadProfiles läuft — dann wählt
-        // loadProfiles es direkt aus (ein einziger Form-Mount-Zyklus). Ein
-        // zusätzliches selectProfile danach würde die x-if-Form ein zweites Mal
-        // unmounten/remounten und mit laufenden Klicks racen.
-        this.activeProfileId = profile.id;
-        await this.loadProfiles();
+        await this.selectProfile(profile.id);
       } finally {
         this.creating = false;
       }
     },
 
+    async createProfile() {
+      await this._createProfileNamed(this.newProfileName, this.cloneFromId);
+    },
+
     async deleteProfile(id) {
+      if (this.profiles.length <= 1) return; // letztes Profil nicht löschen
       if (!confirm(window.__app.t('pdfExport.confirmDelete'))) return;
       const r = await fetch(`/pdf-export/profiles/${id}`, { method: 'DELETE' });
       if (!r.ok) return;
+      this.profiles = this.profiles.filter(p => p.id !== id);
       if (this.activeProfileId === id) {
-        await this._unmountFormThen(() => { this.activeProfileId = null; });
+        await this._unmountFormThen(() => { this.activeProfileId = null; this.activeProfile = null; });
+        await this.selectProfile(this.profiles[0].id);
       }
-      await this.loadProfiles();
     },
 
     async setDefault(id) {
       const r = await fetch(`/pdf-export/profiles/${id}/default`, { method: 'POST' });
       if (!r.ok) return;
-      await this.loadProfiles();
+      this.profiles.forEach(p => { p.is_default = p.id === id; });
+      // Aktives (separat geladenes) Profil mitziehen, sonst bleibt der
+      // „Als Standard"-Icon-Button sichtbar, obwohl es schon Standard ist.
+      if (this.activeProfile && this.activeProfile.id === id) this.activeProfile.is_default = true;
     },
 
     async saveActiveProfile() {

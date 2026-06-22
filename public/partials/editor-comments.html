@@ -1,0 +1,96 @@
+<!-- Kommentar-Leiste der Leseansicht (Notebook-Editor, Read-Modus).
+     Der Partial-Container in editor-notebook.html hat `display: contents`,
+     damit das <aside> direkter Grid-Nachbar von .editor-preview-wrap wird,
+     sobald .editor-body-wrap die Klasse `comments-split` trägt (gesteuert über
+     das Root-Flag pageCommentRailOpen, das die Karte spiegelt).
+     Zeigt nur verankerte Share-Link-Leser-Kommentare der offenen Seite;
+     allgemeine Kommentare bleiben der „Geteilte Links"-Karte vorbehalten. -->
+<div x-data="editorCommentsCard" class="display-contents">
+
+  <aside class="comment-rail"
+         x-show="railVisible && pageThreads.length && !$app.editMode && !$app.checkDone"
+         x-cloak
+         :aria-label="$app.t('share.rail.title')">
+    <div class="comment-rail__head">
+      <span class="comment-rail__title" x-text="$app.t('share.comments.countLabel', { count: pageThreads.length })"></span>
+      <button type="button" class="icon-btn icon-btn--ghost"
+              @click="collapseRail()"
+              :data-tip="$app.t('share.rail.collapse')" :aria-label="$app.t('share.rail.collapse')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+      </button>
+    </div>
+
+    <template x-for="thread in pageThreads" :key="thread.root.id">
+      <div class="comment-rail__thread"
+           :class="{ 'comment-rail__thread--selected': selectedRootId === thread.root.id,
+                     'comment-rail__thread--resolved': thread.root.resolved_at }">
+
+        <!-- Verankerte Stelle (Klick selektiert + hebt im Text hervor). -->
+        <div class="comment-rail__anchor internal-link"
+             role="button" tabindex="0"
+             @click="selectThread(thread.root.id)"
+             @keydown.enter.prevent="selectThread(thread.root.id)">
+          <span class="comment-rail__quote" x-text="'„' + (thread.root.anchor_quote || '') + '“'"></span>
+        </div>
+
+        <!-- Root-Kommentar des Lesers. -->
+        <div class="comment-rail__comment">
+          <div class="comment-rail__meta">
+            <span x-text="commentAuthorLabel(thread.root)"></span>
+            <span x-show="thread.root.resolved_at" class="comment-rail__resolved"
+                  x-text="$app.t('share.comments.resolved')"></span>
+          </div>
+          <div class="comment-rail__body" x-text="thread.root.body"></div>
+        </div>
+
+        <!-- Antworten (meine sind abgesetzt). -->
+        <template x-for="r in thread.replies" :key="r.id">
+          <div class="comment-rail__comment comment-rail__comment--reply"
+               :class="{ 'comment-rail__comment--author': r.author_email }">
+            <div class="comment-rail__meta">
+              <span x-text="commentAuthorLabel(r)"></span>
+            </div>
+            <div class="comment-rail__body" x-text="r.body"></div>
+            <button type="button" class="comment-rail__link"
+                    @click="deleteComment(r)"
+                    x-text="$app.t('common.delete')"></button>
+          </div>
+        </template>
+
+        <!-- Aktionen + Antwort-Box (nur am selektierten Thread, hält die Leiste ruhig). -->
+        <template x-if="selectedRootId === thread.root.id">
+          <div class="comment-rail__foot">
+            <div class="comment-rail__actions">
+              <button type="button" class="comment-rail__link"
+                      :disabled="savingResolve === thread.root.id"
+                      @click="toggleResolve(thread.root)"
+                      x-text="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')"></button>
+              <button type="button" class="comment-rail__link comment-rail__link--danger"
+                      @click="deleteComment(thread.root)"
+                      x-text="$app.t('common.delete')"></button>
+            </div>
+            <form class="comment-rail__reply" @submit.prevent="replyToRoot(thread)">
+              <textarea x-model="replyDrafts[thread.root.id]" rows="2"
+                        :placeholder="$app.t('share.comments.replyPlaceholder')"
+                        maxlength="4000" data-spellcheck="spelling"
+                        class="comment-rail__textarea"></textarea>
+              <button type="submit" class="btn-compact"
+                      :disabled="savingReply === thread.root.id || !(replyDrafts[thread.root.id] || '').trim()"
+                      x-text="$app.t('share.comments.send')"></button>
+            </form>
+          </div>
+        </template>
+      </div>
+    </template>
+  </aside>
+
+  <!-- Eingeklappt: schwebender Wieder-Öffnen-Chip mit Anzahl. -->
+  <button type="button" class="comment-rail-fab"
+          x-show="!railVisible && pageThreads.length && !$app.editMode && !$app.checkDone"
+          x-cloak
+          @click="expandRail()"
+          :aria-label="$app.t('share.rail.reopen', { n: pageThreads.length })">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#message-square"/></svg>
+    <span x-text="pageThreads.length"></span>
+  </button>
+</div>

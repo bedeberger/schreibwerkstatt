@@ -110,23 +110,8 @@ import { charOffset, locateRange } from './share-anchor.js';
     if (!quote.trim()) return null;
     return { bid: block.getAttribute('data-bid'), start, end, quote };
   }
-  // Findet die Live-Range einer gespeicherten Anmerkung (re-anchor by quote).
-  function locateRange(c) {
-    if (!c.anchor || !c.anchor.bid) return null;
-    let block;
-    try { block = article.querySelector(`[data-bid="${CSS.escape(c.anchor.bid)}"]`); } catch { block = null; }
-    if (!block) return null;
-    const txt = block.textContent;
-    let s = c.anchor.start, e = c.anchor.end;
-    const q = c.anchor.quote || '';
-    if (!(Number.isInteger(s) && Number.isInteger(e) && txt.slice(s, e) === q)) {
-      if (!q) return null;
-      const idx = txt.indexOf(q);
-      if (idx < 0) return null;
-      s = idx; e = idx + q.length;
-    }
-    return rangeFromOffsets(block, s, e);
-  }
+  // Re-Anchoring (`locateRange(rootEl, anchor)`) kommt aus share-anchor.js (SSoT,
+  // geteilt mit der Owner-Karte) — kein lokales Duplikat.
 
   // ── Highlights (CSS Custom Highlight API) ────────────────────────────────────
   function renderHighlights() {

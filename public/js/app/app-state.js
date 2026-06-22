@@ -207,7 +207,12 @@ const pageState = () => ({
   _retryingPageLoad: false,
   currentPageIdeenOpenCount: 0,
   currentPageRechercheCount: 0,
+  currentPageShareCommentCount: 0,
   currentPageChatSessionCount: 0,
+  // Kommentar-Leiste (Leseansicht): die editorCommentsCard spiegelt hierhin,
+  // ob sie für die offene Seite Threads zeigt → Grid-Klasse `comments-split`
+  // an .editor-body-wrap (analog checkDone → lektorat-split).
+  pageCommentRailOpen: false,
   renderedPageHtml: '',
   chapterFigures: [],
   showChapterFigures: false,
@@ -342,6 +347,7 @@ const cardsState = () => ({
   showExportCard: false,
   showPdfExportCard: false,
   showEpubExportCard: false,
+  showDocxExportCard: false,
   showFolderImportCard: false,
   showBookOrganizerCard: false,
   showBookEditorCard: false,
@@ -410,6 +416,9 @@ const lektoratState = () => ({
   // Map page_id → Anzahl verknüpfter Recherche-Items (buchweit geteilt).
   // Speist den Seiten-Indikator in Sidebar + Editor.
   rechercheCounts: {},
+  // Map page_id → Anzahl offener Reviewer-Kommentare aus Share-Links (Page-,
+  // Kapitel- oder Buch-Share). Speist den Badge am „Teilen"-Menü.
+  shareCommentCounts: {},
   // Scope der aktuell offenen Ideen-Karte: 'page' (neben Editor) oder
   // 'chapter' (neben Kapitelreview). ideenChapterId nur in 'chapter'-Modus
   // gesetzt. currentPageIdeenOpenCount/currentChapterIdeenOpenCount halten die

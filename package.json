@@ -8,9 +8,10 @@
     "node": ">=20 <26"
   },
   "scripts": {
-    "prestart": "node scripts/sync-version.js",
+    "prestart": "node scripts/sync-version.js && node scripts/sw-manifest.js",
     "start": "node server.js",
     "version:sync": "node scripts/sync-version.js",
+    "sw:manifest": "node scripts/sw-manifest.js",
     "test": "npm run test:unit && npm run test:integration && npm run test:e2e && npm run test:smoke",
     "test:unit": "node --test --test-concurrency=4 \"tests/unit/*.test.js\" \"tests/unit/*.test.mjs\"",
     "test:integration": "node --test \"tests/integration/*.test.js\"",
@@ -23,12 +24,12 @@
     "@playwright/test": "^1.59.1"
   },
   "dependencies": {
-    "@turbodocx/html-to-docx": "^1.20.1",
     "altcha-lib": "^2.2.0",
     "better-sqlite3": "^11.0.0",
     "better-sqlite3-session-store": "^0.1.0",
     "compression": "^1.8.1",
     "diff": "^9.0.0",
+    "docx": "^9.7.1",
     "dotenv": "^17.3.1",
     "epub-gen-memory": "^1.1.2",
     "express": "^4.18.2",

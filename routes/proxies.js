@@ -8,7 +8,7 @@ const appUsers = require('../db/app-users');
 const { getPromptConfig } = require('../lib/prompts-loader');
 const { toIntId } = require('../lib/validate');
 const appSettings = require('../lib/app-settings');
-const { getVersion } = require('../lib/version');
+const { getVersion, getShellBuild } = require('../lib/version');
 
 const router = express.Router();
 
@@ -72,6 +72,7 @@ router.get('/config', (req, res) => {
     appTimezone: appSettings.get('app.timezone') || 'Europe/Zurich',
     appName: appSettings.get('app.name') || 'Schreibwerkstatt',
     appVersion: getVersion(),
+    shellBuild: getShellBuild(),
     languagetool: {
       enabled: appSettings.get('languagetool.enabled') === true
         && !!String(appSettings.get('languagetool.url') || '').replace(/\/$/, '').replace(/\/v2$/i, '').trim(),

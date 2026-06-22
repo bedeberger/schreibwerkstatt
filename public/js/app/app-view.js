@@ -401,6 +401,7 @@ export const appViewMethods = {
       // Recherche-Count aus der buchweit geladenen Map (kein Extra-Request);
       // wird bei Link-Änderungen in der Recherche-Karte frisch gehalten.
       this.currentPageRechercheCount = (this.rechercheCounts || {})[pageId] || 0;
+      this.currentPageShareCommentCount = (this.shareCommentCounts || {})[pageId] || 0;
       this.currentPageChatSessionCount = (Array.isArray(sessions) ? sessions : []).length;
       // Tree-Indikator mit frischer Wahrheit syncen (z.B. bei Cross-Tab-Edits).
       const next = { ...(this.ideenCounts || {}) };
@@ -409,6 +410,21 @@ export const appViewMethods = {
       this.ideenCounts = next;
     } catch (e) {
       console.error('[loadPageBadgeCounts]', e);
+    }
+  },
+
+  // Pro-Seite-Map offener Reviewer-Kommentare neu laden (nach Resolve/Delete in
+  // der Share-Karte) und den Badge der offenen Seite syncen.
+  async refreshShareCommentCounts() {
+    const bookId = this.selectedBookId;
+    if (!bookId) return;
+    try {
+      const map = await fetchJson(`/share/api/page-comment-counts?book_id=${bookId}`).catch(() => null);
+      if (!map || this.selectedBookId !== bookId) return;
+      this.shareCommentCounts = map;
+      if (this.currentPage?.id) this.currentPageShareCommentCount = map[this.currentPage.id] || 0;
+    } catch (e) {
+      console.error('[refreshShareCommentCounts]', e);
     }
   },
 
@@ -585,6 +601,7 @@ export const appViewMethods = {
     this.pageLoadError = false;
     this.currentPageIdeenOpenCount = 0;
     this.currentPageRechercheCount = 0;
+    this.currentPageShareCommentCount = 0;
     this.currentPageChatSessionCount = 0;
     this.renderedPageHtml = '';
     this.chapterFigures = [];
@@ -650,7 +667,9 @@ export const appViewMethods = {
     this.ideenCounts = {};
     this.chapterIdeenCounts = {};
     this.rechercheCounts = {};
+    this.shareCommentCounts = {};
     this.currentPageRechercheCount = 0;
+    this.currentPageShareCommentCount = 0;
     this.currentChapterIdeenOpenCount = 0;
     // Chapter-Ideen-Scope verwerfen beim Buchwechsel.
     if (this.ideenScope === 'chapter') {

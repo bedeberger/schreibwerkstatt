@@ -3,18 +3,39 @@
 //  - Navigate (/, /index.html): Stale-While-Revalidate im SHELL_CACHE
 //    → 0-Latenz-Render bei Repeat-Visit; neues HTML wird parallel geladen.
 //    Deploy-Update fliesst über `skip-waiting` + controllerchange-Reload.
-//  - Shell-Assets (CSS/JS/Icons) + HTML-Partials + i18n-JSON: Cache-First im
-//    SHELL_CACHE, generationsgebunden. Eine SW-Generation bedient genau einen
-//    kohärenten Asset-Satz — neue Partials erscheinen NIE gegen alte, noch im
-//    Speicher laufende JS-Module (sonst ReferenceError auf neuen Card-Feldern).
-//    Frische Assets kommen ausschliesslich über eine neue SW-Generation
-//    (eigener SHELL_CACHE), die der Update-Banner aktiviert.
+//  - Kohärenz-kritische Shell-Assets (App-JS + Partials + App-CSS + i18n +
+//    Icon-Sprite): Liste + Content-Hash kommen aus dem generierten
+//    /sw-manifest.js (importScripts). Der Install-Handler precacht diesen Satz
+//    ATOMAR (cache.addAll). Damit hat jede SW-Generation ihren vollständigen,
+//    kohärenten Asset-Satz ab Installationszeitpunkt — ein lazy-gefetchtes
+//    Partial oder dynamisch importiertes Modul zieht NIE eine neuere Fassung
+//    vom Netz in eine laufende alte Generation (Skew → ReferenceError auf
+//    neuen Card-Feldern). Auslieferung: Cache-Only. Ein Miss (iOS evictiert
+//    Einzeleinträge) holt bewusst KEINE evtl. neuere Einzeldatei nach, sondern
+//    meldet den Clients 'shell-incoherent' → sauberer Reload in eine
+//    kohärente Generation; die Netzkopie wird nur als Notnagel ungecacht
+//    durchgereicht.
+//  - Nicht-kritische Shell-Assets (vendor/*, fonts/*): self-contained,
+//    versionsstabil → klassisch Cache-First mit Netz-Fallback (kein Skew auf
+//    App-Feldern möglich).
+//  - SHELL_CACHE-Name leitet sich aus dem Content-Hash (__SHELL_BUILD) ab:
+//    jede Asset-Änderung erzeugt automatisch eine neue Generation — kein
+//    manueller Versions-Bump mehr. Regeneriert via `npm run sw:manifest`
+//    (läuft auf prestart), Drift gegated durch sw-manifest-drift.test.mjs.
 //  - Content-GETs (/content/*): Stale-While-Revalidate im CONTENT_CACHE → Navigation + Seiteninhalt offline
 //  - Schreibende Requests (PUT/POST/DELETE): nie behandelt (method-Check am Anfang)
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
-//  - Version-Bump der Konstanten invalidiert den jeweiligen Cache
 
-const SHELL_CACHE = 'schreibwerkstatt-shell-v1400';
+// Generierte Manifest-/Build-Konstanten (self.__SHELL_BUILD, self.__SHELL_MANIFEST).
+// Wird mit der SW-Registrierung persistiert → auch beim Offline-Start verfügbar.
+// updateViaCache:'none' (Registrierung in app.js) erzwingt frische Revalidierung
+// dieser Importe beim Update-Check, sodass ein neuer Build zuverlässig erkannt wird.
+importScripts('/sw-manifest.js');
+
+const SHELL_BUILD = self.__SHELL_BUILD || 'dev';
+const SHELL_MANIFEST = Array.isArray(self.__SHELL_MANIFEST) ? self.__SHELL_MANIFEST : [];
+const MANIFEST_SET = new Set(SHELL_MANIFEST);
+const SHELL_CACHE = 'schreibwerkstatt-shell-' + SHELL_BUILD;
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
 const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
@@ -63,7 +84,17 @@ function isNeverCache(url) {
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL_CACHE);
-    // Einstiegspunkt best-effort vorcachen – scheitert bei Offline-Install lautlos
+    // Den VOLLSTÄNDIGEN kohärenz-kritischen Asset-Satz dieser Generation ATOMAR
+    // vorcachen: App-JS + Partials + App-CSS + i18n + Icon-Sprite. `addAll` ist
+    // all-or-nothing — scheitert ein Request, rejecten wir den Install und der
+    // alte SW bedient seinen eigenen, kohärenten Satz unverändert weiter (kein
+    // halb gefüllter Cache). So zieht zur Laufzeit nie ein lazy-gefetchtes Partial
+    // / dynamisch importiertes Modul eine fremde Generation vom Netz. `cache:
+    // 'reload'` umgeht den HTTP-Cache, damit der Precache wirklich diese Generation
+    // holt.
+    await cache.addAll(SHELL_MANIFEST.map(p => new Request(p, { cache: 'reload' })));
+    // Einstiegspunkt (SPA-Shell) best-effort dazu — nicht im Manifest, da
+    // index.html SWR-bedient wird; offline-Install scheitert hier lautlos.
     try { await cache.add(new Request('/', { cache: 'reload' })); } catch {}
     // Bewusst KEIN skipWaiting hier: der neue SW bleibt `waiting`, bis der
     // User das Update-Banner klickt (applyUpdate → 'skip-waiting'-Message).
@@ -108,17 +139,42 @@ async function handleNavigate(req) {
   return new Response('Offline – Shell nicht im Cache.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }
 
-// Shell-Assets (JS/CSS/Icons/Partials/i18n): Cache-First, generationsgebunden.
-// Bewusst KEINE Hintergrund-Revalidierung und KEIN Network-First: beides zöge
-// neuere Assets in eine laufende Session, deren JS-Module noch die alte
-// Generation sind → Skew (neues Partial referenziert ein Card-Feld, das das
-// alte Modul nicht kennt → ReferenceError). Frische Assets erscheinen nur mit
-// einer neuen SW-Generation: deren SHELL_CACHE ist leer, die erste Anfrage
-// füllt ihn per Netz, ab dann liefert der Cache einen kohärenten Satz.
-async function handleShellAsset(req) {
+// Meldet allen kontrollierten Tabs, dass der kohärente Asset-Satz dieser
+// Generation Lücken hat (Einzel-Eviction). Der Client triggert daraufhin den
+// regulären Update-/Reload-Pfad (Banner falls Editor dirty, sonst Reload) und
+// bootet in eine frisch precachte, kohärente Generation.
+async function notifyIncoherent(pathname) {
+  try {
+    const clients = await self.clients.matchAll({ includeUncontrolled: false });
+    for (const c of clients) c.postMessage({ type: 'shell-incoherent', path: pathname });
+  } catch {}
+}
+
+// Kohärenz-kritische Shell-Assets (App-JS/Partials/CSS/i18n/Icons): Cache-Only.
+// Der Satz wurde beim Install atomar precacht → ein Hit ist garantiert kohärent.
+// Ein Miss bedeutet Einzel-Eviction (v.a. iOS). Dann NICHT die evtl. neuere
+// Einzeldatei vom Netz nachladen (das wäre exakt der Skew, den wir verhindern),
+// sondern die Clients zum sauberen Reload anstossen. Die Netzkopie wird nur als
+// Notnagel ungecacht durchgereicht, damit der laufende Fetch nicht hängt; der
+// Reload stellt sofort wieder Kohärenz her. Offline → 503.
+//
+// Nicht-kritische Shell-Assets (vendor/*, fonts/*): self-contained und
+// versionsstabil, kein Skew auf App-Feldern möglich → klassisch Cache-First mit
+// Netz-Fallback (lazy nachladbar, auch nach Eviction).
+async function handleShellAsset(req, url) {
   const cache = await caches.open(SHELL_CACHE);
   const cached = await cache.match(req);
   if (cached) return cached;
+
+  if (MANIFEST_SET.has(url.pathname)) {
+    notifyIncoherent(url.pathname);
+    try {
+      return await fetch(req); // Notnagel, bewusst NICHT in diese Generation cachen
+    } catch {
+      return new Response('Offline', { status: 503 });
+    }
+  }
+
   try {
     const net = await fetch(req);
     if (net && net.ok) cache.put(req, net.clone());
@@ -277,6 +333,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (isShellRequest(url)) {
-    event.respondWith(handleShellAsset(req));
+    event.respondWith(handleShellAsset(req, url));
   }
 });

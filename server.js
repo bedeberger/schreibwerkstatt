@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const session = require('express-session');
 const SqliteStore = require('better-sqlite3-session-store')(session);
 const path = require('path');
+const fs = require('fs');
 const logger = require('./logger');
 const { runWithContext, setContext } = require('./lib/log-context');
 
@@ -452,6 +453,7 @@ app.use('/sync', syncRouter);
 app.use('/export', exportRouter);
 app.use('/book-migration', bookMigrationRouter);
 app.use('/pdf-export', pdfExportRouter);
+app.use('/docx-export', require('./routes/docx-export'));
 app.use('/publication', require('./routes/publication'));
 app.use('/usage', usageRouter);
 app.use('/telemetry', require('./routes/telemetry'));

@@ -1,0 +1,121 @@
+/* Geteilte Grammatik der drei Export-Karten (PDF / Word / EPUB).
+   SSoT für den gemeinsamen Aufbau: Header-Scope-Picker, Profil-Leiste,
+   Anlege-Zeile, Tab-Wrapper/-Panels, Chip-Reihen, Progress-Block + Mobile.
+   Word ist die Referenz für das Profil-Management (Combobox + Icon-Buttons,
+   einzeilig). Karten-Spezifika (Fonts, Cover, Num-Grids …) leben weiter in
+   pdf-export.css bzw. docx-export.css.
+
+   Reuse: .card-form-* (card-form.css), .book-settings-* (book-settings.css),
+   .tabs (tabs.css), .combobox-wrap (app.js), .progress-bar (base.css). */
+
+/* === Scope-Picker (Buch / Kapitel / Seite) im Karten-Header === */
+.export-scope-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.export-scope-picker > .combobox-wrap { min-width: 180px; }
+
+/* === Profil-Leiste (einzeilig) — Label + Auswahl-Combobox + Icon-Aktionen ===
+   Standard-Look des Profil-Managements für PDF + Word. Combobox zeigt das
+   aktive Profil (★ markiert den Standard); die Buttons sind Neu/Standard/Löschen. */
+.export-profile-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+  flex-wrap: wrap;
+}
+.export-profile-pick { min-width: 200px; }
+.export-profile-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xs) var(--space-xs);
+}
+
+/* === Anlege-Zeile (eingeklappt unter der Profil-Leiste) ===
+   Name + optionale Klon-Quelle + Anlegen-Button. */
+.export-create-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+.export-create-row .card-form-input { flex: 1 1 200px; }
+.export-create-clone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.export-create-clone-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.export-create-clone > .combobox-wrap { min-width: 180px; }
+
+/* === Tabs ===
+   .tabs rendert nur die Button-Reihe (kein Panel-Container) — die Panels
+   brauchen darum eigenes Padding. */
+.export-tabs { margin: 0.6rem 0 1rem; }
+.export-tab-panel { padding: 1rem 0.875rem 0.75rem; }
+
+/* Checkbox-Zeilen haben keine Label-Spalte: über beide Grid-Spalten spannen,
+   damit die volle Kartenbreite genutzt wird (statt nur die Label-Spalte). */
+.export-tab-panel .card-form-row > .book-settings-option { grid-column: 1 / -1; }
+
+/* === Chip-Reihe (Multi-Select-Auswahl als entfernbare Tags) === */
+.export-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-top: var(--space-2xs);
+}
+.export-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+.export-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.export-chip-remove:hover { color: var(--color-text); }
+
+/* === Progress-Block (Job läuft) === */
+.export-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+/* === Mobile === */
+@media (max-width: 640px) {
+  .pdf-export-card .card-actions,
+  .docx-export-card .card-actions,
+  .epub-export-card .card-actions { flex-wrap: wrap; }
+  .export-scope-picker { width: 100%; }
+  .export-scope-picker > .combobox-wrap { min-width: 0; flex: 1; }
+  .export-profile-pick { min-width: 0; flex: 1; }
+  .export-create-clone,
+  .export-create-clone > .combobox-wrap { width: 100%; min-width: 0; }
+}

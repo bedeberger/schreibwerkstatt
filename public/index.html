@@ -20,6 +20,10 @@
   <script src="js/failsafe-reveal.js"></script>
   <!-- Globaler JS-Fehler-Reporter (klassisch, vor ESM) → /telemetry/js-error -->
   <script src="js/client-error.js"></script>
+  <!-- Build-ID dieser Shell-Generation (generiert, setzt window.__SHELL_BUILD).
+       Klassisch + vor ESM, damit app.js den Wert beim Boot gegen /config#shellBuild
+       vergleichen kann (Self-Heal bei stale Shell nach Deploy). -->
+  <script src="sw-manifest.js"></script>
   <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/card-accents.css">
   <!-- layout -->
@@ -64,6 +68,7 @@
   <link rel="stylesheet" href="css/editor/notebook/find-replace.css">
   <link rel="stylesheet" href="css/editor/notebook/findings.css">
   <link rel="stylesheet" href="css/editor/notebook/lektorat.css">
+  <link rel="stylesheet" href="css/editor/notebook/comments-rail.css">
   <link rel="stylesheet" href="css/editor/notebook/entities.css">
   <link rel="stylesheet" href="css/editor/synonym-menu.css">
   <link rel="stylesheet" href="css/editor/synonyme.css">
@@ -106,8 +111,9 @@
   <link rel="stylesheet" href="css/book/plot/widgets.css">
   <link rel="stylesheet" href="css/book/plot/swimlane.css">
   <link rel="stylesheet" href="css/book/export.css">
+  <link rel="stylesheet" href="css/book/export-shared.css">
   <link rel="stylesheet" href="css/book/pdf-export.css">
-  <link rel="stylesheet" href="css/book/epub-export.css">
+  <link rel="stylesheet" href="css/book/docx-export.css">
   <!-- book-overview -->
   <link rel="stylesheet" href="css/book-overview/base.css">
   <link rel="stylesheet" href="css/book-overview/stats.css">
@@ -468,6 +474,7 @@
 <div id="partial-export"></div>
 <div id="partial-pdf-export"></div>
 <div id="partial-epub-export"></div>
+<div id="partial-docx-export"></div>
 <div id="partial-buchorganizer"></div>
 <div id="partial-book-editor"></div><div id="partial-search"></div>
 <div id="partial-folder-import"></div>

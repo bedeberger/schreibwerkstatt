@@ -192,6 +192,7 @@
                 <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="canEdit() && currentPage" :disabled="currentPageEmpty" @click="openShareLinksForPage(currentPage.id); pageActionsMenuOpen = false">
                   <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>
                   <span x-text="t('share.btn.sharePage')"></span>
+                  <span class="btn-count" x-show="currentPageShareCommentCount > 0" x-text="currentPageShareCommentCount" :data-tip="t('share.openCommentsTitle', { n: currentPageShareCommentCount })"></span>
                 </button>
               </div>
             </span>
@@ -380,12 +381,16 @@
 
   <!-- Preview + optional Befunde: Layout wird zum Split, sobald geprüft wurde.
        editMode zeigt contenteditable statt Preview (Findings bleiben rechts sichtbar). -->
-  <div class="editor-body-wrap" :class="{ 'lektorat-split': checkDone }">
+  <div class="editor-body-wrap" :class="{ 'lektorat-split': checkDone, 'comments-split': pageCommentRailOpen && !checkDone }">
     <div class="editor-preview-wrap" :class="checkDone ? 'lektorat-split-preview' : ''">
       <div id="partial-editor-body-edit"></div>
       <div id="partial-editor-body-view"></div>
     </div>
     <div id="partial-editor-findings" class="display-contents"></div>
+    <!-- Kommentar-Leiste (Leseansicht): verankerte Share-Link-Leser-Kommentare
+         rechts neben dem Text. Nur wenn die Seite Threads hat und nicht im
+         Edit-/Lektorat-Split-Modus. -->
+    <div id="partial-editor-comments" class="display-contents"></div>
   </div>
 
   <!-- Push-getriebener „Zuletzt bearbeitet auf <Gerät>"-Hint: das letzte Save

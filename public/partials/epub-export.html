@@ -10,7 +10,7 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('epubExport.title')"></span>
     <div class="card-actions">
-      <div class="epubx-scope-picker" x-show="!exporting">
+      <div class="export-scope-picker" x-show="!exporting">
         <div x-data="combobox({ placeholder: $app.t('export.scope.label'), compact: false })"
              x-modelable="value" x-model="exportScope"
              x-effect="options = exportScopeOptions()"></div>
@@ -58,7 +58,7 @@
   <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')) -->
   <div x-data="tabs(['typography','structure','metadata'])"
        x-modelable="value" x-model="activeTab">
-  <div class="tabs tabs--scrollable epubx-tabs" x-bind="tablist">
+  <div class="tabs tabs--scrollable export-tabs" x-bind="tablist">
     <template x-for="tab in tabs" :key="tab">
       <button class="tabs-btn"
               x-bind="tabBtn(tab)"
@@ -68,7 +68,7 @@
 
   <div class="epubx-body">
     <!-- Typografie -->
-    <section class="epubx-tab-panel" x-bind="panel('typography')">
+    <section class="export-tab-panel" x-bind="panel('typography')">
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('epubExport.cssStyle')"></label>
         <div x-data="combobox($app.t('epubExport.cssStyle'))"
@@ -138,7 +138,7 @@
     </section>
 
     <!-- Struktur -->
-    <section class="epubx-tab-panel" x-bind="panel('structure')">
+    <section class="export-tab-panel" x-bind="panel('structure')">
       <div class="card-form-row">
         <label class="card-form-label" x-text="$app.t('epubExport.field.titlepageMode')"></label>
         <div x-data="combobox($app.t('epubExport.field.titlepageMode'))"
@@ -205,11 +205,11 @@
           <div x-data="combobox({ placeholder: $app.t('epubExport.field.unnumberedPick'), multiple: true })"
                x-modelable="value" x-model="pub.epub_unnumbered_chapter_ids"
                x-effect="options = unnumberedChapterPickOptions()"></div>
-          <div class="epubx-chip-row" x-show="unnumberedChapterChips().length">
+          <div class="export-chip-row" x-show="unnumberedChapterChips().length">
             <template x-for="chip in unnumberedChapterChips()" :key="chip.id">
-              <span class="epubx-chip">
+              <span class="export-chip">
                 <span x-text="chip.label"></span>
-                <button type="button" class="epubx-chip-remove"
+                <button type="button" class="export-chip-remove"
                         :aria-label="$app.t('common.remove')"
                         @click="removeUnnumberedChapter(chip.id)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
               </span>
@@ -257,7 +257,7 @@
     </section>
 
     <!-- Metadaten (OPF) -->
-    <section class="epubx-tab-panel" x-bind="panel('metadata')">
+    <section class="export-tab-panel" x-bind="panel('metadata')">
       <p class="card-form-field-note" x-text="$app.t('epubExport.metadataHint')"></p>
 
       <div class="card-form-row">
@@ -309,7 +309,7 @@
     </div>
 
     <!-- Progress / Errors -->
-    <div class="epubx-progress" x-show="exporting || (exportProgress > 0 && !exportError)">
+    <div class="export-progress" x-show="exporting || (exportProgress > 0 && !exportError)">
       <div class="progress-bar-wrap">
         <div class="progress-bar" :style="{ '--progress': exportProgress + '%' }"></div>
       </div>

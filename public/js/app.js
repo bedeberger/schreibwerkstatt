@@ -55,6 +55,7 @@ import { registerFinetuneExportCard } from './cards/finetune-export-card.js';
 import { registerExportCard } from './cards/export-card.js';
 import { registerPdfExportCard } from './cards/pdf-export-card.js';
 import { registerEpubExportCard } from './cards/epub-export-card.js';
+import { registerDocxExportCard } from './cards/docx-export-card.js';
 import { registerBookOrganizerCard } from './cards/book-organizer-card.js';
 import { registerBookEditorCard } from './cards/book-editor-card.js';
 import { registerSearchCard } from './cards/search-card.js';
@@ -78,6 +79,7 @@ import { registerEditorEntitiesCard } from './cards/editor-entities-card.js';
 import { registerEditorSpellcheckCard } from './cards/editor-spellcheck-card.js';
 import { setupSpellcheckDispatch } from './cards/editor-spellcheck/dispatch.js';
 import { registerLektoratFindingsCard } from './cards/lektorat-findings-card.js';
+import { registerEditorCommentsCard } from './cards/editor-comments-card.js';
 import { registerPageHistoryCard } from './cards/page-history-card.js';
 import { registerPageRevisionsCard } from './cards/page-revisions-card.js';
 import { registerSnapshotsCard } from './cards/snapshots-card.js';
@@ -133,7 +135,11 @@ if ('serviceWorker' in navigator) {
   if (swEnabled) {
     window.addEventListener('load', async () => {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js');
+        // updateViaCache:'none' → Update-Checks revalidieren sw.js UND seine
+        // importScripts (/sw-manifest.js) immer frisch vom Netz. Ohne das nutzt
+        // der Default ('imports') den HTTP-Cache für importierte Skripte, und ein
+        // neuer Build (nur Manifest-Hash geändert) würde u.U. nicht erkannt.
+        const reg = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
         // Periodisch nach Updates fragen — ohne aktiven update()-Call wartet
         // der Browser u.U. Stunden bis Tage, bis er einen neuen SW
         // einspielt; v.a. auf Mobile (Tab im Hintergrund / SW gekillt) sieht
@@ -187,6 +193,46 @@ if ('serviceWorker' in navigator) {
             return;
           }
           location.reload();
+        });
+
+        // Reload in eine kohärente Generation — geteilt von 'shell-incoherent'
+        // (SW evictierte einen Einzeleintrag) und dem Boot-Build-Guard
+        // (Server-Build ≠ geladene Shell). Beim Editieren nur Banner (User soll
+        // erst speichern), offline aufschieben bis online. Loop-Schutz: max. ein
+        // automatischer Reload pro 30 s (sessionStorage), sonst Banner — sonst
+        // könnte eine dauerhaft evictierte Datei eine Reload-Schleife treiben.
+        const requestCoherentReload = () => {
+          const app = window.__app;
+          if (app?.editMode || app?.focusActive || app?.editDirty) {
+            if (app) app.updateAvailable = true;
+            return;
+          }
+          if (!navigator.onLine) {
+            if (app) app.updateAvailable = true;
+            window.addEventListener('online', () => location.reload(), { once: true });
+            return;
+          }
+          let last = 0;
+          try { last = Number(sessionStorage.getItem('sw-coherent-reload') || 0); } catch {}
+          const now = Date.now();
+          if (now - last < 30_000) {
+            if (app) app.updateAvailable = true;
+            return;
+          }
+          try { sessionStorage.setItem('sw-coherent-reload', String(now)); } catch {}
+          location.reload();
+        };
+        window.__requestCoherentReload = requestCoherentReload;
+
+        // Der SW meldet eine Cache-Lücke (Einzel-Eviction → er musste eine
+        // möglicherweise generationsfremde Datei durchreichen). Frischen
+        // Update-Check anstossen (ein wartender SW läuft über controllerchange)
+        // und in eine kohärente Generation reloaden.
+        navigator.serviceWorker.addEventListener('message', (e) => {
+          if (e.data?.type === 'shell-incoherent') {
+            reg.update().catch(() => {});
+            requestCoherentReload();
+          }
         });
       } catch {}
     });
@@ -292,6 +338,7 @@ document.addEventListener('alpine:init', () => {
   registerExportCard();
   registerPdfExportCard();
   registerEpubExportCard();
+  registerDocxExportCard();
   registerBookOrganizerCard();
   registerBookEditorCard();
   registerSearchCard();
@@ -322,6 +369,7 @@ document.addEventListener('alpine:init', () => {
   registerEditorEntitiesCard();
   registerEditorSpellcheckCard();
   registerLektoratFindingsCard();
+  registerEditorCommentsCard();
   registerPageHistoryCard();
   registerPageRevisionsCard();
   registerPaletteCard();
@@ -718,6 +766,16 @@ document.addEventListener('alpine:init', () => {
           if (meta) meta.setAttribute('content', cfg.appName);
         }
         if (cfg.appVersion) this.appVersion = cfg.appVersion;
+        // Build-Guard: window.__SHELL_BUILD ist der Build, mit dem DIESE Shell
+        // ausgeliefert wurde (aus dem gecachten /sw-manifest.js); cfg.shellBuild
+        // ist der aktuelle Server-Build. Weichen sie ab, ist eine neue Generation
+        // deployt, während die SPA-Shell noch die alte ist (SWR liefert sie
+        // 0-Latenz) → in eine kohärente Generation reloaden, statt auf den
+        // 60-s-Update-Timer zu warten. Greift nur online + ausserhalb Editier-/
+        // Fokusmodus (requestCoherentReload entscheidet).
+        if (cfg.shellBuild && window.__SHELL_BUILD && cfg.shellBuild !== window.__SHELL_BUILD) {
+          window.__requestCoherentReload?.();
+        }
         this.languagetoolEnabled = !!cfg.languagetool?.enabled;
         if (Number.isFinite(cfg.languagetool?.debounceMs)) {
           this.languagetoolDebounceMs = cfg.languagetool.debounceMs;

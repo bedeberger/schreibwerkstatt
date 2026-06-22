@@ -1,28 +1,19 @@
 <!-- Custom-PDF-Export — Profile + Editor + Trigger -->
 <!--
   Alpine.data-Sub-Komponente — public/js/cards/pdf-export-card.js.
-  Tabs: Layout / Schrift / Kapitel / Cover / TOC / Extras / PDF/A.
-  Pattern-Konformität (DESIGN.md):
-    - Combobox statt <select>
-    - .tabs / .tabs-btn (+ .tabs--scrollable) für Tab-Reihe
-    - Standard-Buttons (kein eigenes pdfx-btn)
-    - .card-form-row (Label links / Control rechts)
-    - .collapsible-toggle + .history-chevron für lange Sektionen
-    - .card-header > .card-actions für Speichern + Exportieren
-    - .card-status / .card-form-saved / .card-form-error
+  Aufbau identisch zu Word/EPUB (export-shared.css): Header mit Scope-Picker +
+  Export, Hint, einzeilige Profil-Leiste (Combobox + Icon-Aktionen), Anlege-
+  Zeile, Tabs, Speichern-Footer unten. Tabs: Layout / Schrift / Kapitel /
+  Cover / TOC / Extras / Druck / Norm.
+  Pattern-Konformität (DESIGN.md): Combobox statt <select>, .tabs / .tabs-btn,
+  Standard-Buttons, .card-form-row, .collapsible-toggle + .history-chevron,
+  .card-form-saved / .card-form-error.
 -->
 <div class="card card--pdfexport pdf-export-card" x-data="pdfExportCard" x-show="$app.showPdfExportCard" x-cloak>
   <div class="card-header">
     <span class="card-title" x-text="$app.t('pdfExport.title')"></span>
-    <div class="card-actions" x-show="_formMounted">
-      <button type="button" data-label-ok
-              :disabled="saving"
-              @click="saveActiveProfile()">
-        <span x-show="saving" class="spinner"></span>
-        <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
-      </button>
-      <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('pdfExport.saved')"></span>
-      <div class="pdfx-scope-picker" x-show="!exporting">
+    <div class="card-actions">
+      <div class="export-scope-picker" x-show="!exporting">
         <div x-data="combobox({ placeholder: $app.t('export.scope.label'), compact: false })"
              x-modelable="value" x-model="exportScope"
              x-effect="options = exportScopeOptions()"></div>
@@ -50,7 +41,7 @@
       <button type="button"
               class="primary"
               x-show="!exporting"
-              :disabled="!$app.selectedBookId"
+              :disabled="!$app.selectedBookId || !activeProfile"
               :data-tip="!$app.selectedBookId ? $app.t('pdfExport.export.noBookHint') : ''"
               @click="exportPdf()">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
@@ -65,72 +56,53 @@
     </div>
   </div>
 
-  <!-- Profile-Liste -->
-  <div class="pdfx-profile-bar">
-    <template x-for="p in profiles" :key="p.id">
-      <button type="button"
-              class="pdfx-profile-pill"
-              :class="{ 'is-active': activeProfileId === p.id, 'is-default': p.is_default }"
-              @click="selectProfile(p.id)">
-        <span x-text="p.name"></span>
-        <span class="pdfx-default-marker" x-show="p.is_default" x-text="$app.t('pdfExport.defaultMark')"></span>
-      </button>
-    </template>
-    <button type="button"
-            class="pdfx-profile-pill pdfx-profile-pill--new"
-            :class="{ 'is-active': _showCreate }"
-            @click="_showCreate = !_showCreate"
-            x-text="$app.t('pdfExport.newProfile')"></button>
+  <p class="card-form-hint" x-text="$app.t('pdfExport.hint')"></p>
+
+  <!-- Profil-Leiste (einzeilig): Auswahl-Combobox + Aktionen (neu/standard/löschen) -->
+  <div class="export-profile-bar">
+    <label class="card-form-label" x-text="$app.t('pdfExport.profile')"></label>
+    <div class="export-profile-pick"
+         x-data="combobox({ placeholder: $app.t('pdfExport.profile'), compact: false })"
+         x-modelable="value" x-model="activeProfileId"
+         x-effect="options = profiles.map(p => ({ value: p.id, label: p.name + (p.is_default ? ' ★' : '') }))"
+         @combobox-change="selectProfile(activeProfileId)"></div>
+    <button type="button" class="export-profile-btn" :data-tip="$app.t('pdfExport.newProfile')"
+            @click="_showCreate = !_showCreate">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
+    </button>
+    <button type="button" class="export-profile-btn" x-show="activeProfile && !activeProfile.is_default"
+            :data-tip="$app.t('pdfExport.makeDefault')" @click="setDefault(activeProfileId)">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#check"/></svg>
+    </button>
+    <button type="button" class="export-profile-btn" x-show="profiles.length > 1"
+            :data-tip="$app.t('pdfExport.deleteProfile')" @click="deleteProfile(activeProfileId)">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+    </button>
   </div>
 
   <!-- Neues Profil anlegen (eingeklappt) -->
-  <div class="pdfx-create-panel" x-show="_showCreate" x-cloak>
-    <input type="text"
-           class="pdfx-name-input"
-           x-model="newProfileName"
-           :placeholder="$app.t('pdfExport.newPlaceholder')"
-           @keydown.enter="createProfile()">
-    <label class="pdfx-create-clone">
-      <span class="pdfx-create-clone-label" x-text="$app.t('pdfExport.cloneLabel')"></span>
+  <div class="export-create-row" x-show="_showCreate" x-cloak>
+    <input type="text" class="card-form-input" x-model="newProfileName"
+           :placeholder="$app.t('pdfExport.newPlaceholder')" maxlength="80"
+           @keydown.enter="createProfile()" data-spellcheck="spelling">
+    <label class="export-create-clone">
+      <span class="export-create-clone-label" x-text="$app.t('pdfExport.cloneLabel')"></span>
       <div x-data="combobox($app.t('pdfExport.cloneNone'))"
            x-modelable="value" x-model="cloneFromId"
            x-effect="options = [{ value: '', label: $app.t('pdfExport.cloneNone') }, ...profiles.map(p => ({ value: p.id, label: p.name }))]"
 ></div>
     </label>
-    <div class="pdfx-create-actions">
-      <button type="button"
-              class="primary"
-              :disabled="creating || !newProfileName.trim()"
-              @click="createProfile()"
-              x-text="$app.t('pdfExport.create')"></button>
-      <button type="button"
-              @click="_showCreate = false; newProfileName = ''; cloneFromId = null"
-              x-text="$app.t('pdfExport.cancel')"></button>
-    </div>
+    <button type="button" class="primary" data-label-ok
+            :disabled="creating || !newProfileName.trim()"
+            @click="createProfile()"
+            x-text="$app.t('pdfExport.create')"></button>
   </div>
 
-  <div x-show="!_formMounted" class="card-status" x-text="$app.t('pdfExport.empty')"></div>
-
-  <template x-if="_formMounted">
+  <template x-if="_formMounted && activeProfile">
     <div x-data="tabs(['layout','font','chapter','cover','toc','extras','print','pdfa'])"
          x-modelable="value" x-model="activeTab">
-      <!-- Profil-Header: Name + Default-Toggle + Delete -->
-      <div class="list-header list-header--between list-header--wrap">
-        <input type="text" class="pdfx-name-input" x-model="activeProfile.name">
-        <div class="card-actions">
-          <button type="button" data-label-ok
-                  :disabled="activeProfile.is_default"
-                  @click="setDefault(activeProfile.id)"
-                  x-text="activeProfile.is_default ? $app.t('pdfExport.isDefault') : $app.t('pdfExport.setDefault')"></button>
-          <button type="button" data-label-ok
-                  class="danger"
-                  @click="deleteProfile(activeProfile.id)"
-                  x-text="$app.t('common.delete')"></button>
-        </div>
-      </div>
-
       <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')) -->
-      <div class="tabs tabs--scrollable pdfx-tabs" x-bind="tablist">
+      <div class="tabs tabs--scrollable export-tabs" x-bind="tablist">
         <template x-for="tab in tabs" :key="tab">
           <button class="tabs-btn"
                   x-bind="tabBtn(tab)"
@@ -139,7 +111,7 @@
       </div>
 
       <!-- Layout-Tab -->
-      <div class="pdfx-tab-panel" x-bind="panel('layout')">
+      <div class="export-tab-panel" x-bind="panel('layout')">
         <div class="card-form-grid">
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageSize')"></label>
@@ -308,7 +280,7 @@
       </div>
 
       <!-- Schrift-Tab -->
-      <div class="pdfx-tab-panel" x-bind="panel('font')">
+      <div class="export-tab-panel" x-bind="panel('font')">
         <template x-for="group in [
             { key: 'body',       roles: ['body','heading'] },
             { key: 'titlePages', roles: ['title','subtitle','byline','dedication','frontMatter','year'] },
@@ -434,7 +406,7 @@
       </div>
 
       <!-- Kapitel-Tab -->
-      <div class="pdfx-tab-panel" x-bind="panel('chapter')">
+      <div class="export-tab-panel" x-bind="panel('chapter')">
         <div class="card-form-grid">
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.breakBefore')"></label>
@@ -470,11 +442,11 @@
               <div x-data="combobox({ placeholder: $app.t('pdfExport.chapter.unnumberedPick'), multiple: true })"
                    x-modelable="value" x-model="activeProfile.config.chapter.unnumberedChapterIds"
                    x-effect="options = unnumberedChapterPickOptions()"></div>
-              <div class="pdfx-chip-row" x-show="unnumberedChapterChips().length">
+              <div class="export-chip-row" x-show="unnumberedChapterChips().length">
                 <template x-for="chip in unnumberedChapterChips()" :key="chip.id">
-                  <span class="pdfx-chip">
+                  <span class="export-chip">
                     <span x-text="chip.label"></span>
-                    <button type="button" class="pdfx-chip-remove"
+                    <button type="button" class="export-chip-remove"
                             :aria-label="$app.t('common.remove')"
                             @click="removeUnnumberedChapter(chip.id)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
                   </span>
@@ -489,11 +461,11 @@
               <div x-data="combobox({ placeholder: $app.t('pdfExport.chapter.skipPageCounterPick'), multiple: true })"
                    x-modelable="value" x-model="activeProfile.config.chapter.skipPageCounterChapterIds"
                    x-effect="options = skipPageCounterChapterPickOptions()"></div>
-              <div class="pdfx-chip-row" x-show="skipPageCounterChapterChips().length">
+              <div class="export-chip-row" x-show="skipPageCounterChapterChips().length">
                 <template x-for="chip in skipPageCounterChapterChips()" :key="chip.id">
-                  <span class="pdfx-chip">
+                  <span class="export-chip">
                     <span x-text="chip.label"></span>
-                    <button type="button" class="pdfx-chip-remove"
+                    <button type="button" class="export-chip-remove"
                             :aria-label="$app.t('common.remove')"
                             @click="removeSkipPageCounterChapter(chip.id)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
                   </span>
@@ -508,11 +480,11 @@
               <div x-data="combobox({ placeholder: $app.t('pdfExport.chapter.skipPageCounterPagePick'), multiple: true })"
                    x-modelable="value" x-model="activeProfile.config.chapter.skipPageCounterPageIds"
                    x-effect="options = skipPageCounterPagePickOptions()"></div>
-              <div class="pdfx-chip-row" x-show="skipPageCounterPageChips().length">
+              <div class="export-chip-row" x-show="skipPageCounterPageChips().length">
                 <template x-for="chip in skipPageCounterPageChips()" :key="chip.id">
-                  <span class="pdfx-chip">
+                  <span class="export-chip">
                     <span x-text="chip.label"></span>
-                    <button type="button" class="pdfx-chip-remove"
+                    <button type="button" class="export-chip-remove"
                             :aria-label="$app.t('common.remove')"
                             @click="removeSkipPageCounterPage(chip.id)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
                   </span>
@@ -593,7 +565,7 @@
       </div>
 
       <!-- Cover-Tab -->
-      <div class="pdfx-tab-panel" x-bind="panel('cover')">
+      <div class="export-tab-panel" x-bind="panel('cover')">
         <label class="pdfx-check pdfx-check--leading">
           <input type="checkbox" x-model="activeProfile.config.cover.enabled">
           <span x-text="$app.t('pdfExport.cover.enabled')"></span>
@@ -711,7 +683,7 @@
       </div>
 
       <!-- TOC-Tab -->
-      <div class="pdfx-tab-panel" x-bind="panel('toc')">
+      <div class="export-tab-panel" x-bind="panel('toc')">
         <label class="pdfx-check pdfx-check--leading">
           <input type="checkbox" x-model="activeProfile.config.toc.enabled">
           <span x-text="$app.t('pdfExport.toc.enabled')"></span>
@@ -848,7 +820,7 @@
       <!-- Extras-Tab: nur Render-Platzierung. Inhaltliche Titelei (ISBN, Subtitle,
            Jahr, Widmung, Impressum, Copyright, Frontmatter, Bio) + Cover/Autorfoto
            leben buch-weit unter BookSettings → Publikation (book_publication). -->
-      <div class="pdfx-tab-panel" x-bind="panel('extras')">
+      <div class="export-tab-panel" x-bind="panel('extras')">
         <p class="card-form-field-note" x-text="$app.t('pdfExport.extras.hint')"></p>
         <div class="card-form-grid">
           <div class="card-form-row">
@@ -874,7 +846,7 @@
       </div>
 
       <!-- Druck-Tab (Druckvorstufe / klassische Druckerei) -->
-      <div class="pdfx-tab-panel" x-bind="panel('print')">
+      <div class="export-tab-panel" x-bind="panel('print')">
         <p class="card-form-field-note" x-text="$app.t('pdfExport.print.hint')"></p>
         <div class="card-form-grid">
           <div class="card-form-row card-form-row--top">
@@ -924,7 +896,7 @@
       </div>
 
       <!-- Norm-Tab (PDF/A / PDF/X / kein) -->
-      <div class="pdfx-tab-panel" x-bind="panel('pdfa')">
+      <div class="export-tab-panel" x-bind="panel('pdfa')">
         <div class="card-form-grid">
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.norm.standard')"></label>
@@ -941,8 +913,17 @@
         <p class="card-form-field-note" x-show="activeProfile.config.pdfa.standard === 'none'" x-text="$app.t('pdfExport.norm.hintNone')"></p>
       </div>
 
+      <!-- Persistenter Footer: Speichern gilt für alle Tabs (Profil-Config) -->
+      <div class="card-actions">
+        <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('pdfExport.saved')"></span>
+        <button type="button" data-label-ok :disabled="saving" @click="saveActiveProfile()">
+          <span x-show="saving" class="spinner"></span>
+          <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
+        </button>
+      </div>
+
       <!-- Progress / Errors -->
-      <div class="pdfx-progress" x-show="exporting || (exportProgress > 0 && !exportError)">
+      <div class="export-progress" x-show="exporting || (exportProgress > 0 && !exportError)">
         <div class="progress-bar-wrap">
           <div class="progress-bar" :style="{ '--progress': exportProgress + '%' }"></div>
         </div>

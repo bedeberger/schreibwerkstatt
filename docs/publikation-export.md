@@ -1,6 +1,6 @@
 # Publikations-Metadaten & EPUB-Export
 
-Buch-weite Publikations-Metadaten (Cover, Titelei, Autor-Bio) leben in **`book_publication`** (1:1 zu `books`) und sind die **Single Source of Truth** für PDF- *und* EPUB-Export. Sprache bleibt SSoT in `book_settings.language` (hier nicht geführt).
+Buch-weite Publikations-Metadaten (Cover, Titelei, Autor-Bio) leben in **`book_publication`** (1:1 zu `books`) und sind die **Single Source of Truth** für PDF-, EPUB- *und* Word-Export ([docs/word-export.md](word-export.md); DOCX nutzt die Titelei-Texte, kein Cover). Sprache bleibt SSoT in `book_settings.language` (hier nicht geführt).
 
 ## Datenmodell
 

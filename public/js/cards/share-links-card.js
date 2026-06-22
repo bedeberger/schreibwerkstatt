@@ -40,6 +40,8 @@ export function registerShareLinksCard() {
     copiedToken: null,
     _copiedTimer: null,
     _lifecycle: null,
+    // Live-Poll: aktualisiert Liste + offenen Thread, während die Karte sichtbar ist
+    _pollTimer: null,
 
     shareKindOptions() {
       const app = window.__app;
@@ -54,10 +56,10 @@ export function registerShareLinksCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'shareLinks',
         showFlag: 'showShareLinksCard',
-        load: () => this.loadLinks(),
+        load: () => this._loadAndPoll(),
         onShow: () => {
           this._applyPrefill();
-          return this.loadLinks();
+          return this._loadAndPoll();
         },
         resetState: {
           links: [],
@@ -68,6 +70,7 @@ export function registerShareLinksCard() {
           createPageId: '',
           createChapterId: '',
         },
+        timerKeys: ['_pollTimer'],
         extraListeners: [
           { type: 'share:prefill', handler: (e) => {
               const d = e?.detail || {};
@@ -82,6 +85,11 @@ export function registerShareLinksCard() {
               }
           } },
         ],
+      });
+      // Poll stoppen, sobald die Karte ausgeblendet wird (Lifecycle-Watch deckt
+      // nur die steigende Flanke ab).
+      this.$watch(() => window.__app.showShareLinksCard, (visible) => {
+        if (!visible) this._stopPolling();
       });
     },
 
@@ -124,6 +132,72 @@ export function registerShareLinksCard() {
       } finally {
         this.loadingLinks = false;
       }
+    },
+
+    // ── Live-Poll ─────────────────────────────────────────────────────────────
+    // Erst-Load (mit Loading-State) plus Start des stillen Polls. Wird sowohl
+    // beim Öffnen der Karte als auch nach Buchwechsel (Lifecycle cfg.load)
+    // aufgerufen — `_startPolling` ist idempotent.
+    async _loadAndPoll() {
+      this._startPolling();
+      return this.loadLinks();
+    },
+
+    _startPolling() {
+      this._stopPolling();
+      this._pollTimer = setInterval(() => this._quietRefresh(), 5000);
+    },
+
+    _stopPolling() {
+      if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
+    },
+
+    // Stiller Refresh ohne Loading-Flicker: aktualisiert Counts/Unread in-place
+    // und lädt den offenen Thread nach. Reviewer-Kommentare (Buch/Kapitel/Seite)
+    // erscheinen so binnen ~5 s beim Owner.
+    async _quietRefresh() {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const bookId = window.__app?.selectedBookId;
+      if (!bookId) return;
+      let rows;
+      try {
+        rows = await fetchJson(`/share/api/links?book_id=${encodeURIComponent(bookId)}`);
+      } catch { return; }
+      if (!Array.isArray(rows)) return;
+      const byToken = new Map(this.links.map(l => [l.token, l]));
+      const sameSet = rows.length === this.links.length && rows.every(r => byToken.has(r.token));
+      if (sameSet) {
+        // In-place Merge → keine vollständige x-for-Neuzeichnung
+        for (const r of rows) {
+          const cur = byToken.get(r.token);
+          if (!cur) continue;
+          cur.view_count = r.view_count;
+          cur.comment_count = r.comment_count;
+          // Offener Thread gilt als gesehen — Unread lokal auf 0 halten.
+          cur.unread_count = (this.openCommentsToken === r.token) ? 0 : r.unread_count;
+        }
+      } else {
+        if (this.openCommentsToken) {
+          const open = rows.find(r => r.token === this.openCommentsToken);
+          if (open) open.unread_count = 0;
+        }
+        this.links = rows;
+      }
+      if (this.openCommentsToken) await this._quietReloadComments(this.openCommentsToken);
+    },
+
+    // Reload des offenen Threads (mark_seen=1, damit Unread bei aktiver Ansicht
+    // 0 bleibt). Nur ersetzen, wenn sich etwas geändert hat — sonst kein Reflow,
+    // der die Reply-Textareas stört.
+    async _quietReloadComments(token) {
+      let rows;
+      try {
+        rows = await fetchJson(`/share/api/links/${encodeURIComponent(token)}/comments?mark_seen=1`);
+      } catch { return; }
+      if (!Array.isArray(rows)) return;
+      const sig = (arr) => arr.map(c => `${c.id}:${c.resolved_at || ''}`).join(',');
+      if (sig(this.commentsByToken[token] || []) === sig(rows)) return;
+      this.commentsByToken[token] = rows;
     },
 
     linkUrl(token) {
@@ -405,6 +479,7 @@ export function registerShareLinksCard() {
         });
         if (!res.ok) throw new Error('resolve failed');
         comment.resolved_at = resolved ? new Date().toISOString() : null;
+        window.__app.refreshShareCommentCounts();
       } catch (e) {
         this.loadError = e.message;
       } finally {

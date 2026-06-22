@@ -75,6 +75,7 @@ export const appHashRouterMethods = {
     else if (this.showExportCard) parts.push('export');
     else if (this.showPdfExportCard) parts.push('pdf');
     else if (this.showEpubExportCard) parts.push('epub');
+    else if (this.showDocxExportCard) parts.push('docx');
     else if (this.showBookOrganizerCard) parts.push('organize');
     else if (this.showBookEditorCard) parts.push('bucheditor');
     else if (this.showShareLinksCard) parts.push('share');
@@ -147,7 +148,18 @@ export const appHashRouterMethods = {
 
   async _applyHash() {
     const hash = (location.hash || '').replace(/^#/, '');
-    if (!hash) return;
+    if (!hash) {
+      // Leerer Hash = Admin-Landing (Tile-Grid hat keinen eigenen Hash). Beim
+      // Zurück-Navigieren aus einer Admin-Karte schliessen, sonst bleibt die
+      // Karte trotz URL-Wechsel offen und der Browser-Zurück-Button wirkt tot.
+      if (this.isAdminOnly) {
+        this._applyingHash = true;
+        this._inHashApply = true;
+        try { this._closeOtherMainCards('none'); }
+        finally { this._applyingHash = false; this._inHashApply = false; }
+      }
+      return;
+    }
     const parts = hash.split('/').filter(Boolean);
 
     if (parts[0] === 'profil') {
@@ -415,6 +427,9 @@ export const appHashRouterMethods = {
         case 'epub':
           if (!this.showEpubExportCard) await this.toggleEpubExportCard();
           break;
+        case 'docx':
+          if (!this.showDocxExportCard) await this.toggleDocxExportCard();
+          break;
         case 'organize':
           if (!this.showBookOrganizerCard) await this.toggleBookOrganizerCard();
           break;
@@ -454,6 +469,7 @@ export const appHashRouterMethods = {
       'showExportCard',
       'showPdfExportCard',
       'showEpubExportCard',
+      'showDocxExportCard',
       'showBookOrganizerCard',
       'showBookEditorCard',
       'showBookOverviewCard',

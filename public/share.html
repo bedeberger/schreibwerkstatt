@@ -17,16 +17,18 @@
     </div>
   </header>
 
-  <main id="share-content" class="share-main">
-    {{intro_block}}
-    <article class="share-content" id="share-article">{{content_html}}</article>
-  </main>
+  <div class="share-layout">
+    <main id="share-content" class="share-main">
+      {{intro_block}}
+      <article class="share-content" id="share-article">{{content_html}}</article>
+    </main>
 
-  <section class="share-comments" aria-label="{{t_comments}}">
-    <h2 class="share-comments__heading">{{t_comments}}</h2>
-    <ol class="share-comments__list">{{comments_html}}</ol>
-    {{form_block}}
-  </section>
+    <aside class="share-comments" aria-label="{{t_comments}}">
+      <h2 class="share-comments__heading">{{t_comments}}</h2>
+      <ol class="share-comments__list">{{comments_html}}</ol>
+      {{form_block}}
+    </aside>
+  </div>
 
   <footer class="share-footer">
     <a class="share-footer__link" href="{{app_url}}" target="_blank" rel="noopener noreferrer">{{app_name}}</a>

@@ -1,5 +1,11 @@
 // E2E-Smoke-Test für pdfExportCard. Lädt das Harness, mockt Backend in
 // tests/server.js, klickt durch Profile-CRUD und Tab-Wechsel.
+//
+// Profil-Management ist jetzt einzeilig (export-shared.css): Auswahl-Combobox +
+// Icon-Buttons (neu/standard/löschen). Die Combobox ist im Harness gestubbt
+// (nicht interaktiv) — Anlegen läuft über das Name-Feld + Anlegen-Button der
+// Create-Zeile, Auswahl/Löschen über die Icon-Buttons; Listenstand wird über
+// den Mock-Backend-State (GET /pdf-export/profiles) geprüft.
 
 const { test, expect } = require('./_helpers/fixtures');
 
@@ -8,49 +14,51 @@ const { test, expect } = require('./_helpers/fixtures');
 // Erwartungen brechen.
 test.describe.configure({ mode: 'serial' });
 
+const BASE = 'http://localhost:8765';
+
 test.describe('pdf-export-card', () => {
   test.beforeEach(async ({ page }) => {
-    await page.request.post('http://localhost:8765/__mock/pdf-reset');
-    await page.goto('http://localhost:8765/tests/fixtures/pdf-export-harness.html', { waitUntil: 'domcontentloaded' });
+    await page.request.post(`${BASE}/__mock/pdf-reset`);
+    await page.goto(`${BASE}/tests/fixtures/pdf-export-harness.html`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.__harnessReady === true);
   });
 
-  test('Card lädt + Empty-State wird angezeigt', async ({ page }) => {
-    await expect(page.locator('.pdf-export-card')).toBeVisible();
-    await expect(page.locator('.pdf-export-card .card-status')).toBeVisible();
-  });
-
-  // Profile-Anlage liegt hinter dem "Neues Profil"-Pill: Klick öffnet das
-  // .pdfx-create-panel (Name-Input + Anlegen). createProfile() schliesst es
-  // wieder (_showCreate = false).
+  // Profil-Anlage: "+"-Icon öffnet die Create-Zeile (Name + Anlegen).
+  // createProfile() schliesst sie wieder (_showCreate = false) und selektiert
+  // das neue Profil → Editor (export-tabs) mountet.
   async function createProfile(page, name) {
-    await page.locator('.pdfx-profile-pill--new').click();
-    await page.locator('.pdfx-create-panel .pdfx-name-input').fill(name);
-    await page.locator('.pdfx-create-actions button.primary', { hasText: 'Anlegen' }).click();
+    await page.locator('.export-profile-bar button:has(use[href$="#plus"])').click();
+    await page.locator('.export-create-row .card-form-input').fill(name);
+    await page.locator('.export-create-row button.primary', { hasText: 'Anlegen' }).click();
+    await expect(page.locator('.export-tabs')).toBeVisible();
   }
 
-  test('Profil anlegen → wird Profil-Pill + Editor sichtbar', async ({ page }) => {
+  test('Card lädt + Profil-Leiste sichtbar', async ({ page }) => {
+    await expect(page.locator('.pdf-export-card')).toBeVisible();
+    await expect(page.locator('.pdf-export-card .export-profile-bar')).toBeVisible();
+  });
+
+  test('Profil anlegen → Editor mit Tabs sichtbar', async ({ page }) => {
     await createProfile(page, 'Mein Profil');
-    // Pill erscheint
-    await expect(page.locator('.pdfx-profile-pill').filter({ hasText: 'Mein Profil' })).toBeVisible();
-    // Editor mit Tabs erscheint (Tabs nutzen das DESIGN.md .tabs-Pattern)
-    await expect(page.locator('.pdfx-tabs')).toBeVisible();
-    await expect(page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Layout' })).toBeVisible();
+    await expect(page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Layout' })).toBeVisible();
+    // Backend kennt das Profil.
+    const { profiles } = await page.request.get(`${BASE}/pdf-export/profiles`).then(r => r.json());
+    expect(profiles.some(p => p.name === 'Mein Profil')).toBe(true);
   });
 
   test('Tab-Wechsel zeigt verschiedene Tab-Panels', async ({ page }) => {
     await createProfile(page, 'X');
-    const activeTab = page.locator('.pdfx-tabs .tabs-btn--active');
+    const activeTab = page.locator('.export-tabs .tabs-btn--active');
     await expect(activeTab).toHaveText(/Layout/);
-    await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Cover' }).click();
+    await page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Cover' }).click();
     await expect(activeTab).toHaveText(/Cover/);
-    await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Norm' }).click();
+    await page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Norm' }).click();
     await expect(activeTab).toHaveText(/Norm/);
   });
 
   test('Cover-Tab: Umschlag-Sektion berechnet Live-Rückenbreite', async ({ page }) => {
     await createProfile(page, 'Umschlag');
-    await page.locator('.pdfx-tabs .tabs-btn').filter({ hasText: 'Cover' }).click();
+    await page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Cover' }).click();
     // Collapsible "Separates Umschlag-PDF" öffnen.
     const spine = page.locator('.pdfx-cover-spine');
     await spine.locator('.collapsible-toggle').click();
@@ -66,13 +74,18 @@ test.describe('pdf-export-card', () => {
     await expect(spine.locator('.pdfx-cover-spine-actions button.primary')).toBeEnabled();
   });
 
-  test('Profil löschen entfernt es aus der Liste', async ({ page }) => {
+  test('Profil löschen entfernt es aus dem Backend-State', async ({ page }) => {
     page.on('dialog', d => d.accept());
+    // Zwei Profile — der Löschen-Button erscheint erst ab >1 Profil.
+    await createProfile(page, 'Behalten');
     await createProfile(page, 'Wegwerf');
-    await expect(page.locator('.pdfx-profile-pill').filter({ hasText: 'Wegwerf' })).toBeVisible();
-    // Profil-Header > .card-actions > button.danger trägt jetzt das standard
-    // Button-Pattern (DESIGN.md). Filter über sichtbaren Text "Löschen".
-    await page.locator('button.danger', { hasText: 'Löschen' }).click();
-    await expect(page.locator('.pdfx-profile-pill').filter({ hasText: 'Wegwerf' })).toHaveCount(0);
+    let { profiles } = await page.request.get(`${BASE}/pdf-export/profiles`).then(r => r.json());
+    expect(profiles.some(p => p.name === 'Wegwerf')).toBe(true);
+    // Löschen-Icon (Papierkorb) klicken — löscht das aktive Profil (Wegwerf).
+    await page.locator('.export-profile-bar button:has(use[href$="#trash"])').click();
+    await expect.poll(async () => {
+      const r = await page.request.get(`${BASE}/pdf-export/profiles`).then(r => r.json());
+      return r.profiles.some(p => p.name === 'Wegwerf');
+    }).toBe(false);
   });
 });

@@ -23,6 +23,7 @@
   .card--snapshots        { --card-accent: var(--card-accent-snapshots); }
   .card--pdfexport        { --card-accent: var(--card-accent-pdfexport); }
   .card--epubexport       { --card-accent: var(--card-accent-epubexport); }
+  .card--docxexport       { --card-accent: var(--card-accent-docxexport); }
   .card--settings         { --card-accent: var(--card-accent-settings); }
   .card--stil             { --card-accent: var(--card-accent-stil); }
   .card--export           { --card-accent: var(--card-accent-settings); }

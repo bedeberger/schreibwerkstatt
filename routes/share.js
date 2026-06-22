@@ -409,6 +409,70 @@ router.get('/api/links', requireSession, (req, res) => {
   }
 });
 
+// Pro-Seite-Zähler offener Reviewer-Kommentare über alle Links des Buchs
+// (Page-, Chapter- und Book-Shares). Befüllt den Badge am „Teilen"-Menü und
+// im Tree. Page-Shares: direkt via link.page_id. Chapter/Book-Shares: verankerte
+// Kommentare via anchor_bid → Seite (Block-Scan über den Content-Store, nur
+// einmal pro Buch und nur wenn überhaupt verankerte Kommentare vorliegen);
+// nicht-verankerte Kommentare lassen sich keiner Seite zuordnen und zählen nicht.
+router.get('/api/page-comment-counts', requireSession, async (req, res) => {
+  const ownerEmail = req.session.user.email;
+  const bookId = parseInt(req.query.book_id, 10);
+  if (!Number.isInteger(bookId) || bookId <= 0) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: bookId });
+  try {
+    const rows = shareLinks.openReaderCommentsForBook(ownerEmail, bookId);
+    const counts = {};
+    const bump = (pageId) => { if (pageId) counts[pageId] = (counts[pageId] || 0) + 1; };
+
+    // Block-IDs der noch aufzulösenden, verankerten Kommentare sammeln.
+    const pendingBids = new Set();
+    for (const r of rows) {
+      if (r.kind === 'page') bump(r.page_id);
+      else if (r.anchor_bid) pendingBids.add(String(r.anchor_bid).toLowerCase());
+    }
+
+    // Block→Seite-Map nur bauen, wenn nötig (ein Scan über die Buch-Seiten).
+    if (pendingBids.size) {
+      const bidToPage = {};
+      const pages = await contentStore.listPages(bookId);
+      for (const meta of pages) {
+        const pd = await contentStore.loadPage(meta.id);
+        const html = pd.html || '';
+        for (const bid of pendingBids) {
+          if (bidToPage[bid] === undefined && html.includes(`data-bid="${bid}"`)) bidToPage[bid] = meta.id;
+        }
+      }
+      for (const r of rows) {
+        if (r.kind !== 'page' && r.anchor_bid) bump(bidToPage[String(r.anchor_bid).toLowerCase()]);
+      }
+    }
+    res.json(counts);
+  } catch (e) {
+    logger.error('[share/api/page-comment-counts GET] ' + e.message);
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
+// Volle Kommentar-Threads über alle Links eines Owners zu einem Buch. Speist die
+// Kommentar-Leiste der Leseansicht: der Client gruppiert zu Threads und filtert
+// per Anker (data-bid/quote) auf die aktuell gerenderte Seite. Jede Zeile trägt
+// share_token → Reply/Resolve/Delete nutzen die bestehenden Owner-Endpoints.
+router.get('/api/book-comments/:book_id', requireSession, (req, res) => {
+  const ownerEmail = req.session.user.email;
+  const bookId = parseInt(req.params.book_id, 10);
+  if (!Number.isInteger(bookId) || bookId <= 0) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: bookId });
+  try {
+    const rows = shareLinks.listCommentsByOwnerBook(ownerEmail, bookId);
+    if (req.query.mark_seen === '1') shareLinks.markOwnerSeenForBook(ownerEmail, bookId);
+    res.json(rows);
+  } catch (e) {
+    logger.error('[share/api/book-comments GET] ' + e.message);
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
 router.post('/api/links', requireSession, jsonBody, async (req, res) => {
   const ownerEmail = req.session.user.email;
   const { kind, page_id, chapter_id, book_id, intro, expires_at } = req.body || {};

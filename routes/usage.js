@@ -38,6 +38,7 @@ const ALLOWED_KEYS = new Set([
   'export',
   'pdfExport',
   'epubExport',
+  'docxExport',
   'folderImport',
   'bookOrganizer',
   'bookEditor',
