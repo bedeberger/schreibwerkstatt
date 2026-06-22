@@ -85,7 +85,7 @@
 .context-menu-item--icon {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-lg);
 }
 .context-menu-item--icon .icon {
   flex-shrink: 0;
