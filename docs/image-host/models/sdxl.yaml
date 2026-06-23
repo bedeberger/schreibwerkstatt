@@ -1,11 +1,7 @@
-# SDXL — bessere Qualitaet, auf 8 GB nur knapp. Braucht CPU-Offload (low_vram)
-# und ist deutlich langsamer als SD 1.5. Nutze 1024x1024.
+# SDXL — bessere Qualitaet. Passt bei 16 GB locker bei 1024x1024 ohne CPU-Offload.
 name: sdxl
-backend: diffusers
+backend: cuda13-diffusers       # explizite CUDA-13-Variante (Blackwell/sm_120)
 f16: true
-low_vram: true                  # sequentielles CPU-Offload; entlastet 8 GB VRAM.
-                                # Falls deine LocalAI-Version den Key nicht kennt:
-                                # Zeile entfernen + auf SD 1.5 (dreamshaper) ausweichen.
 parameters:
   model: stabilityai/stable-diffusion-xl-base-1.0
 step: 28

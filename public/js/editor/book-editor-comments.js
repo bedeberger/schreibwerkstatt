@@ -37,6 +37,16 @@ const rail = createCommentRail({
     const r = range.getBoundingClientRect();
     if (r && r.height) window.scrollTo({ top: window.scrollY + r.top - 140, behavior: 'smooth' });
   },
+  // Gegenrichtung (Klick im Text → Leiste): das passende Thread-Item in der
+  // Leiste sichtbar scrollen. block:'nearest' scrollt den Leisten-Container, nicht
+  // das Fenster. rAF, damit die Auswahl-DOM-Änderung (Foot aufgeklappt) gesetzt ist.
+  scrollRailToThread: (rootId) => {
+    requestAnimationFrame(() => {
+      const sel = `.book-editor-comments .comment-rail__thread[data-root-id="${CSS.escape(String(rootId))}"]`;
+      const el = document.querySelector(sel);
+      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  },
 });
 
 export const bookEditorCommentsMethods = {
@@ -57,6 +67,15 @@ export const bookEditorCommentsMethods = {
     // ausblenden = Anker-Markierung im Stream entfernen.
     if (this.commentRailVisible) this._recomputeCommentThreads();
     else this._railClearHL();
+  },
+
+  // Klick in den Manuskript-Stream: liegt der Klick auf einer markierten
+  // Kommentarstelle, den zugehörigen Thread in der Leiste anspringen. Nur wenn die
+  // Kommentar-Leiste sichtbar ist (sonst existieren keine Highlights/Ranges).
+  onStreamCommentClick(ev) {
+    if (!this.commentRailVisible || !this.commentThreads.length) return;
+    const rootId = this._railHitTest(ev.clientX, ev.clientY);
+    if (rootId != null) this._railSelectFromText(rootId);
   },
 
   // Alias für die Card-Lifecycle/destroy (historischer Name).

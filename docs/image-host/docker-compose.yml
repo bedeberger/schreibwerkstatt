@@ -1,6 +1,6 @@
 # Bild-Generierung fuer die Schreibwerkstatt via LocalAI auf einer NVIDIA
-# RTX 3060 (8 GB). LocalAI spricht das OpenAI-Image-Protokoll
-# (POST /v1/images/generations) nativ -- kein Adapter, kein Graph-Capture.
+# RTX 5060 Ti (16 GB, Blackwell, CUDA 13). LocalAI spricht das OpenAI-Image-
+# Protokoll (POST /v1/images/generations) nativ -- kein Adapter, kein Graph-Capture.
 #
 # Im Admin-Tab "Bilder" der Schreibwerkstatt traegst du als Host
 # http://<docker-host>:8080 ein.
@@ -10,13 +10,14 @@
 
 services:
   localai:
-    image: localai/localai:latest-gpu-nvidia-cuda-12
+    # CUDA-13-Image: Blackwell (RTX 50-Serie, sm_120) braucht den cuda13-Stack.
+    image: localai/localai:latest-gpu-nvidia-cuda-13
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       - THREADS=8
-      # Auf 8 GB nur EIN Modell gleichzeitig im VRAM halten.
+      # Nur EIN Modell gleichzeitig im VRAM halten (LLM-Backend laeuft separat).
       - LOCALAI_SINGLE_ACTIVE_BACKEND=true
       # Idle-Watchdog: stoppt das Modell-Backend nach X Inaktivitaet und gibt damit
       # den VRAM wieder frei (z.B. fuer InvokeAI). Naechster Bild-Request laedt es

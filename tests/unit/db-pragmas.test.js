@@ -11,6 +11,9 @@ const fs = require('fs');
 
 const tmpDb = path.join(os.tmpdir(), `pragma-test-${process.pid}-${Date.now()}.db`);
 process.env.DB_PATH = tmpDb;
+// Dieser Sentinel prüft die PRODUKTIONS-PRAGMAs. Den Test-Fast-Path (DB_FSYNC=off,
+// gesetzt in den npm-Test-Scripts) hier ausschalten, damit synchronous=NORMAL greift.
+delete process.env.DB_FSYNC;
 
 const { db } = require('../../db/connection');
 

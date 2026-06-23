@@ -27,6 +27,21 @@ function highlightsApi() {
   return (typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight !== 'undefined') ? CSS.highlights : null;
 }
 
+// Klick-Koordinaten → (Textknoten, Offset). Highlights (CSS Custom Highlight API)
+// sind nicht klickbar — darum den Caret-Punkt unter dem Klick auflösen und gegen
+// die Kommentar-Ranges testen. Zwei Browser-APIs (Standard + WebKit-Legacy).
+function caretPosFromPoint(x, y) {
+  if (document.caretPositionFromPoint) {
+    const p = document.caretPositionFromPoint(x, y);
+    if (p) return { node: p.offsetNode, offset: p.offset };
+  }
+  if (document.caretRangeFromPoint) {
+    const r = document.caretRangeFromPoint(x, y);
+    if (r) return { node: r.startContainer, offset: r.startOffset };
+  }
+  return null;
+}
+
 // Plaintext für renderInline (block-/wort-basiert) als ein <p> verpacken;
 // HTML-Sonderzeichen escapen, damit der DOMParser sie als Text liest.
 function wrapP(text) {
@@ -195,9 +210,59 @@ export function createCommentRail(cfg) {
       cfg.scrollToRange(range, this);
     },
 
+    // Klick im Text → rootId des verankerten Threads, dessen Range den Klickpunkt
+    // enthält (oder null). „Stelle geändert"-Threads haben keine Range → übersprungen.
+    _railHitTest(clientX, clientY) {
+      const view = cfg.scopeEl();
+      if (!view) return null;
+      const pos = caretPosFromPoint(clientX, clientY);
+      if (!pos || !pos.node) return null;
+      for (const t of (this[K.threads] || [])) {
+        if (t.changed) continue;
+        const range = locateRange(view, anchorOf(t.root));
+        if (!range) continue;
+        try { if (range.isPointInRange(pos.node, pos.offset)) return t.root.id; } catch {}
+      }
+      return null;
+    },
+
+    // Auswahl ausgehend vom Text-Klick: immer selektieren (kein Toggle), Stelle
+    // hervorheben und die LEISTE zum Thread scrollen (Gegenrichtung zu _railSelect,
+    // das den Text scrollt — der User ist hier schon an der Textstelle).
+    _railSelectFromText(rootId) {
+      this[K.selectedRootId] = rootId;
+      const api = highlightsApi();
+      if (api) { try { api.delete(cfg.hlActive); } catch {} }
+      const thread = this[K.threads].find(t => t.root.id === rootId);
+      const view = cfg.scopeEl();
+      if (thread && view) {
+        const range = locateRange(view, anchorOf(thread.root));
+        if (range && api) { try { api.set(cfg.hlActive, new Highlight(range)); } catch {} }
+      }
+      cfg.scrollRailToThread?.(rootId, this);
+    },
+
     commentAuthorLabel(c) {
       if (c.author_email) return window.__app.t('share.reader.author_badge');
       return c.reader_name || window.__app.t('share.reader.anon');
+    },
+
+    // Avatar-Daten für die Meta-Zeile (Google-Docs-Optik): Label + Initialen-Pip
+    // mit deterministischer Hue pro Person (wiederverwendet die presence-pip-Optik,
+    // DESIGN.md). Leser haben keine Email → Initialen/Hue leiten sich aus dem
+    // Anzeigenamen ab; Owner-Antworten nutzen author_display_name (Fallback Badge).
+    commentAvatar(c) {
+      const app = window.__app;
+      const isAuthor = !!c.author_email;
+      const label = isAuthor
+        ? (c.author_display_name || app.t('share.reader.author_badge'))
+        : (c.reader_name || app.t('share.reader.anon'));
+      const seed = isAuthor ? (c.author_email || label) : (c.reader_name || 'anon');
+      const tokens = String(label).split(/[\s._@-]+/).filter(Boolean);
+      const initials = tokens.length
+        ? ((tokens[0][0] || '') + (tokens.length > 1 ? (tokens[1][0] || '') : '')).toUpperCase().slice(0, 2)
+        : '?';
+      return { label, initials, hue: app.userAvatarHue(seed) };
     },
 
     async _railReply(thread) {

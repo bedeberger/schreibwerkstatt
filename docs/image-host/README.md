@@ -1,4 +1,4 @@
-# Bild-Host: LocalAI auf RTX 3060 (8 GB)
+# Bild-Host: LocalAI auf RTX 5060 Ti (16 GB, Blackwell)
 
 Stellt der Schreibwerkstatt einen Bild-Endpunkt fuer das Buch-Chat-Tool
 `generate_image` bereit (siehe [../image.md](../image.md)) — über
@@ -9,27 +9,33 @@ spricht. Kein Adapter, kein Graph-Capture, kein Custom-Code:
 Schreibwerkstatt
   └─ POST /v1/images/generations
        └─ LocalAI (:8080)   ← Admin-Tab "Bilder" zeigt hierhin
-            └─ diffusers-Backend → SD/SDXL auf der RTX 3060
+            └─ cuda13-diffusers-Backend → SD/SDXL auf der RTX 5060 Ti
 ```
+
+Die Karte ist **Blackwell** (Compute Capability sm_120) mit Treiber 580.x /
+**CUDA 13** — darum durchgehend der cuda-13-Stack (Image + Backend). Ältere
+cuda-12-Builds haben keine Kernels für sm_120 und scheitern mit
+`no kernel image is available for execution on the device`.
 
 > **Verhältnis zu InvokeAI:** LocalAI ist eine eigene Engine mit eigenen
 > Modell-Dateien und bedient die App. Deine InvokeAI kannst du für manuelles
-> Arbeiten behalten — auf der einen 8-GB-Karte aber nicht gleichzeitig
-> generieren. LocalAI entlädt sein Modell nach Leerlauf selbst (Idle-Watchdog),
-> dann ist der VRAM wieder für InvokeAI frei.
+> Arbeiten behalten. `LOCALAI_SINGLE_ACTIVE_BACKEND=true` hält pro LocalAI
+> immer nur ein Modell im VRAM; nach Leerlauf entlädt der Idle-Watchdog es
+> selbst und gibt den VRAM wieder frei.
 
 ## Dateien
 
 | Datei | Zweck |
 |-------|-------|
-| [docker-compose.yml](docker-compose.yml) | LocalAI, GPU-reserviert, Single-Active-Backend + Idle-Watchdog, persistente `./backends`-Volume |
-| [models/dreamshaper.yaml](models/dreamshaper.yaml) | SD 1.5 — sicherer 8-GB-Default |
-| [models/sdxl.yaml](models/sdxl.yaml) | SDXL — bessere Qualität, knapp auf 8 GB (CPU-Offload) |
+| [docker-compose.yml](docker-compose.yml) | LocalAI (cuda-13-Image), GPU-reserviert, Single-Active-Backend + Idle-Watchdog, persistente `./backends`-Volume |
+| [models/sdxl.yaml](models/sdxl.yaml) | SDXL — empfohlener Default bei 16 GB, `1024x1024` |
+| [models/dreamshaper.yaml](models/dreamshaper.yaml) | SD 1.5 — schneller, leichter Fallback |
 
 > **Backends sind modular.** Das `latest-gpu`-Image bringt die Python-Backends
 > (u. a. `diffusers` für SD/SDXL) **nicht** mehr mit — sie liegen in einer
 > Backend-Gallery und werden einmalig installiert (Schritt 3). Ohne diesen
-> Schritt scheitert jeder Bild-Request mit `backend not found: diffusers`.
+> Schritt scheitert jeder Bild-Request mit `backend not found: diffusers`. Für
+> Blackwell ist die **`cuda13-diffusers`**-Variante zwingend.
 
 ## Einrichtung
 
@@ -39,7 +45,7 @@ Schreibwerkstatt
 sudo apt install -y nvidia-container-toolkit
 sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
-nvidia-smi   # Treiber prüft
+nvidia-smi   # Treiber + CUDA-Version prüfen — fuer Blackwell/CUDA 13: Treiber >= 580
 ```
 
 ### 2. Starten
@@ -52,29 +58,32 @@ Die Modell-YAMLs in [models/](models/) werden von LocalAI beim Start eingelesen.
 Die Gewichte zieht es **beim ersten Bild-Request** von HuggingFace (kann ein
 paar Minuten dauern) und cacht sie unter `models/`.
 
-### 3. diffusers-Backend installieren
+### 3. diffusers-Backend installieren (cuda13)
 
-Beide Modell-YAMLs nutzen `backend: diffusers`. Dieses Backend liegt in der
-Gallery und wird einmalig in die `./backends`-Volume installiert (überlebt
+Beide Modell-YAMLs nutzen `backend: cuda13-diffusers`. Dieses Backend liegt in
+der Gallery und wird einmalig in die `./backends`-Volume installiert (überlebt
 dadurch Container-Recreates und `:latest`-Pulls):
 
 ```bash
-docker compose exec localai /local-ai backends list           # diffusers in der Gallery?
-docker compose exec localai /local-ai backends install diffusers
+docker compose exec localai /local-ai backends list | grep -i diffus   # Varianten zeigen
+docker compose exec localai /local-ai backends install cuda13-diffusers
 ```
 
 Der Binary liegt im Container unter `/local-ai` (nicht im `$PATH` für
-`exec` — darum der absolute Pfad). Landet das Backend nicht unter `/backends`,
-zeigt die Install-Ausgabe den tatsächlichen Pfad; dann das Volume-Mapping in
-der [docker-compose.yml](docker-compose.yml) entsprechend anpassen.
+`exec` — darum der absolute Pfad). **Wichtig:** auf Blackwell (RTX 50-Serie)
+zwingend `cuda13-diffusers` — das generische `diffusers` löst auf einem
+cuda-12-Image zur cuda12-Variante auf, die keine sm_120-Kernels hat
+(`no kernel image …`). Landet das Backend nicht unter `/backends`, zeigt die
+Install-Ausgabe den tatsächlichen Pfad; dann das Volume-Mapping in der
+[docker-compose.yml](docker-compose.yml) entsprechend anpassen.
 
 ### 4. Modell wählen
 
-Auf 8 GB ist **SD 1.5 (`dreamshaper`) der empfohlene Default** — passt locker,
-schnell. SDXL (`sdxl`) geht nur knapp und mit CPU-Offload (langsamer). Beide
-YAMLs liegen bei; im Admin-Tab entscheidet das **Modell-Feld**, welches benutzt
-wird. Weitere Modelle: einfach eine YAML in `models/` ergänzen, oder
-`docker exec -it <container> local-ai models list` / `... install <name>`.
+Bei 16 GB ist **SDXL (`sdxl`) der empfohlene Default** — `1024x1024` passt
+locker ohne CPU-Offload. `dreamshaper` (SD 1.5) bleibt als schneller, leichter
+Fallback bei. Im Admin-Tab entscheidet das **Modell-Feld**, welches benutzt
+wird. Weitere Modelle: einfach eine YAML in `models/` ergänzen (jeweils mit
+`backend: cuda13-diffusers`).
 
 ### 5. Admin-Tab „Bilder" in der Schreibwerkstatt
 
@@ -82,8 +91,8 @@ wird. Weitere Modelle: einfach eine YAML in `models/` ergänzen, oder
 |------|------|
 | Bild-Generierung aktivieren | ✓ |
 | Host | `http://<docker-host>:8080` |
-| Modell | `dreamshaper` (oder `sdxl`) — der `name:` aus der YAML |
-| Bildgrösse | SD 1.5: `768x768` · SDXL: `1024x1024` |
+| Modell | `sdxl` (oder `dreamshaper`) — der `name:` aus der YAML |
+| Bildgrösse | SDXL: `1024x1024` · SD 1.5: `768x768` |
 | Timeout (ms) | `180000` (erster Lauf lädt das Modell in den VRAM) |
 | API-Key | leer (LocalAI lokal ohne Auth) |
 
@@ -95,36 +104,37 @@ End-to-End per curl:
 ```bash
 curl -s http://<docker-host>:8080/v1/images/generations \
   -H 'Content-Type: application/json' \
-  -d '{"model":"dreamshaper","prompt":"a lighthouse at dusk, oil painting","size":"768x768","response_format":"b64_json"}' \
+  -d '{"model":"sdxl","prompt":"a lighthouse at dusk, oil painting","size":"1024x1024","response_format":"b64_json"}' \
   | head -c 120
 # erwartet: {"created":...,"data":[{"b64_json":"iVBORw0KGgo…
 ```
 
 Danach im Buch-Chat (Provider Claude): „Zeichne mir ein Porträt von <Figur>".
 
-## VRAM-Richtwerte (RTX 3060, 8 GB, float16)
+## VRAM-Richtwerte (RTX 5060 Ti, 16 GB, float16)
 
-| Modell | 8 GB? | Hinweis |
-|--------|-------|---------|
-| SD 1.5 (512–768 px) | ✅ sicher | ~3–4 GB, schnell. Bester Start. |
-| SDXL (1024 px) | ⚠️ knapp | nur mit `low_vram: true` (CPU-Offload), langsamer |
-| Flux.1 (GGUF Q4/Q5) | ⚠️ nur quantisiert | über LocalAI-Galerie; deutlich langsamer |
-
-Faustregel auf 8 GB: SD 1.5 als Default, SDXL nur wenn die Qualität es wert ist.
+| Modell | 16 GB? | Hinweis |
+|--------|--------|---------|
+| SD 1.5 (512–768 px) | ✅ locker | ~3–4 GB, sehr schnell. |
+| SDXL (1024 px) | ✅ locker | ~8–10 GB, kein CPU-Offload nötig. Bester Default. |
+| Flux.1 (GGUF Q4/Q5) | ✅ möglich | über LocalAI-Galerie; langsamer, aber passt. |
 
 ## Troubleshooting
 
 - **`backend not found: diffusers`** (HTTP 500 auf `/v1/images/generations`) —
-  das diffusers-Backend ist nicht installiert. Schritt 3 ausführen
-  (`/local-ai backends install diffusers`). Nach einem `:latest`-Pull oder
-  `docker compose down`/Recreate ist es weg, falls die `./backends`-Volume
+  das Backend ist nicht installiert. Schritt 3 ausführen
+  (`/local-ai backends install cuda13-diffusers`). Nach einem `:latest`-Pull
+  oder `docker compose down`/Recreate ist es weg, falls die `./backends`-Volume
   fehlt — Mapping in der Compose prüfen.
-- **CUDA out of memory** — Bildgröße senken (SDXL → `768x768`, SD 1.5 → `512x512`),
-  sicherstellen dass `f16: true` (+ bei SDXL `low_vram: true`) greift, und dass
+- **`no kernel image is available for execution on the device`** (HTTP 500,
+  Backend lädt, GPU belegt, aber kein Kernel startet) — CUDA-Variante passt
+  nicht zur GPU-Architektur. Auf Blackwell (sm_120): cuda-13-Image **und**
+  `cuda13-diffusers` verwenden, nicht die cuda12-Builds. `nvidia-smi` muss
+  CUDA 13 zeigen.
+- **CUDA out of memory** — Bildgröße senken (SDXL → `768x768`, SD 1.5 →
+  `512x512`), sicherstellen dass `f16: true` greift und
   `LOCALAI_SINGLE_ACTIVE_BACKEND=true` gesetzt ist. Notfalls InvokeAI stoppen,
   solange LocalAI generiert.
-- **`low_vram`-Key wird ignoriert/abgelehnt** — versionsabhängig. Zeile aus
-  [models/sdxl.yaml](models/sdxl.yaml) entfernen und auf SD 1.5 ausweichen.
 - **Erster Request hängt lange** — LocalAI lädt das HF-Modell herunter und in
   den VRAM. Timeout im Admin-Tab hochsetzen; danach ist es gecacht.
 - **VRAM bleibt belegt** — Idle-Watchdog entlädt das Modell erst nach

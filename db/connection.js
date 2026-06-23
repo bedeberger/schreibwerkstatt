@@ -4,7 +4,10 @@ const Database = require('better-sqlite3');
 const DB_FILE = process.env.DB_PATH || path.join(__dirname, '..', 'schreibwerkstatt.db');
 const db = new Database(DB_FILE);
 db.pragma('journal_mode = WAL');
-db.pragma('synchronous = NORMAL');
+// Wegwerf-Test-DBs brauchen keine Crash-Durability. `synchronous = OFF` (DB_FSYNC=off,
+// nur in den Test-Scripts gesetzt) eliminiert jeden fsync — auf langsamem CI-Storage
+// (Ceph RBD) stallt ein einzelner Commit-fsync sonst zig Sekunden. In Prod nie gesetzt.
+db.pragma(process.env.DB_FSYNC === 'off' ? 'synchronous = OFF' : 'synchronous = NORMAL');
 db.pragma('foreign_keys = ON');
 db.pragma('cache_size = -65536');
 db.pragma('mmap_size = 268435456');
