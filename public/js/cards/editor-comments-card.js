@@ -15,6 +15,7 @@ export function registerEditorCommentsCard() {
   window.Alpine.data('editorCommentsCard', () => ({
     bookComments: [],     // Rohzeilen aller Link-Kommentare des Buchs
     pageThreads: [],      // Threads, die auf der aktuellen Seite verankert sind
+    generalThreads: [],   // allgemeine (nicht-verankerte) Kommentare von Page-Shares dieser Seite
     selectedRootId: null,
     railVisible: false,  // Default verborgen; Sichtbarkeit über Toggle-Button in den Seiten-Actions
     replyDrafts: {},

@@ -138,6 +138,7 @@ export function registerBookEditorCard() {
     // Methoden in editor/book-editor-comments.js.
     bookComments: [],
     commentThreads: [],
+    commentGeneralThreads: [],
     commentSelectedRootId: null,
     commentReplyDrafts: {},
     commentSavingReply: null,
@@ -162,7 +163,7 @@ export function registerBookEditorCard() {
           findOpen: false, findTerm: '', findReplace: '',
           findMatches: [], findIndex: -1,
           visiblePageId: null, collapsedChapters: {},
-          bookComments: [], commentThreads: [], commentSelectedRootId: null,
+          bookComments: [], commentThreads: [], commentGeneralThreads: [], commentSelectedRootId: null,
           commentReplyDrafts: {}, commentSavingReply: null, commentSavingResolve: null,
           commentRailVisible: false, _pendingGotoBid: null,
         },

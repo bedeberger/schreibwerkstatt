@@ -29,8 +29,13 @@ const rail = createCommentRail({
     comments: 'bookComments', threads: 'pageThreads', selectedRootId: 'selectedRootId',
     railVisible: 'railVisible', replyDrafts: 'replyDrafts', savingReply: 'savingReply',
     savingResolve: 'savingResolve', loadingBookId: '_loadingBookId', recomputeRaf: '_recomputeRaf',
-    pendingGotoBid: '_pendingGotoBid',
+    pendingGotoBid: '_pendingGotoBid', generalThreads: 'generalThreads',
   },
+  // Allgemeine (nicht-verankerte) Kommentare gehören in diese Seitenleiste, wenn der
+  // Link ein Page-Share genau der offenen Seite ist — Buch-/Kapitel-Share-Allgemeines
+  // hat keine eindeutige Seite und lebt im Bucheditor.
+  generalFilter: (root, app) =>
+    root.link_kind === 'page' && String(root.link_page_id) === String(app?.currentPage?.id ?? ''),
   // Rail nur im Read-Modus (kein Edit, kein Lektorat-Split). Kein App-Root → idle.
   idle: (app) => !app || app.editMode || app.checkDone,
   // Recompute verschieben, bis die Read-View gerendert ist (.page-content-view
@@ -95,6 +100,7 @@ export const editorCommentsRailMethods = {
   async _onBookChange(bookId) {
     this.bookComments = [];
     this.pageThreads = [];
+    this.generalThreads = [];
     this.selectedRootId = null;
     this.railVisible = false;
     this._pendingGotoBid = null;
@@ -135,7 +141,9 @@ export const editorCommentsRailMethods = {
   _mirrorFlag() {
     const app = window.__app;
     if (!app) return;
-    const onPage = !app.editMode && !app.checkDone ? this.pageThreads.length : 0;
+    // Verankerte + allgemeine (Page-Share dieser Seite) Threads zählen.
+    const onPage = !app.editMode && !app.checkDone
+      ? this.pageThreads.length + (this.generalThreads?.length || 0) : 0;
     app.pageCommentCount = onPage;
     app.pageCommentRailOpen = !!(this.railVisible && onPage);
   },

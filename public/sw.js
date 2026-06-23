@@ -167,6 +167,14 @@ async function handleShellAsset(req, url) {
   if (cached) return cached;
 
   if (MANIFEST_SET.has(url.pathname)) {
+    // Query-versionierte Shell-Assets (z.B. /icons.svg?v=NNN) sind unter ihrem
+    // query-losen Pfad precacht. ignoreSearch matcht die precachte Generation,
+    // statt bei jedem ?v= einen ungecachten Netz-Fetch zu erzwingen (offline →
+    // Icon-Sprite nicht ladbar → alle Icons weg). Die Generation ist trotzdem
+    // kohärent: Ändert sich der Sprite-Inhalt, verschiebt sich __SHELL_BUILD und
+    // die ganze Generation wird neu precacht.
+    const ignoreSearchHit = await cache.match(req, { ignoreSearch: true });
+    if (ignoreSearchHit) return ignoreSearchHit;
     notifyIncoherent(url.pathname);
     try {
       return await fetch(req); // Notnagel, bewusst NICHT in diese Generation cachen

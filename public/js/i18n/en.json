@@ -3447,6 +3447,7 @@
   "share.views.label": "{count} views",
   "share.unread.badge": "{count} new",
   "share.comments.label": "Comments",
+  "share.comments.show": "Show comments",
   "share.comments.countLabel": "{count} comments",
   "share.comments.empty": "No comments yet.",
   "share.comments.deleteConfirm": "Delete comment?",

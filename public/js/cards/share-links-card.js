@@ -1,18 +1,18 @@
 // Alpine.data('shareLinksCard') — Sub-Komponente "Geteilte Links".
-// Listet alle Share-Links des Users zum aktuellen Buch, zeigt Kommentare,
-// erlaubt Create/Revoke/Patch + Comment-Delete. Unread-Badge via
-// owner_last_seen_at.
+// Listet alle Share-Links des Users zum aktuellen Buch (Create/Revoke/Patch) +
+// Unread-Badge via owner_last_seen_at. Kommentare werden NICHT mehr in der Karte
+// angezeigt: „Kommentare anzeigen" wechselt in die passende Editor-Ansicht
+// (Seiten-Share → Notebook-Leseansicht, Buch-/Kapitel-Share → Bucheditor), wo die
+// Kommentar-Leiste verankerte UND allgemeine Threads zeigt und voll bedienbar ist.
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { fetchJson } from '../utils.js';
 import { copyText } from '../copy-button.js';
-import { locateRange } from '../share-anchor.js';
 
 export function registerShareLinksCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('shareLinksCard', () => ({
     links: [],
-    commentsByToken: {},
     loadingLinks: false,
     loadError: '',
     // Create-Form-State
@@ -30,19 +30,11 @@ export function registerShareLinksCard() {
     editExpiresAt: '',
     editShowToc: false,
     savingEdit: false,
-    // Comment-Liste-Toggle
-    openCommentsToken: null,
-    // Thread-Reply / Resolve
-    replyDrafts: {},
-    savingReply: null,
-    savingResolve: null,
-    // Transienter Timer fürs Jump-Highlight im Editor
-    _jumpClearTimer: null,
     // Copy-Feedback
     copiedToken: null,
     _copiedTimer: null,
     _lifecycle: null,
-    // Live-Poll: aktualisiert Liste + offenen Thread, während die Karte sichtbar ist
+    // Live-Poll: aktualisiert Counts/Unread der Links, während die Karte sichtbar ist
     _pollTimer: null,
 
     shareKindOptions() {
@@ -65,8 +57,6 @@ export function registerShareLinksCard() {
         },
         resetState: {
           links: [],
-          commentsByToken: {},
-          openCommentsToken: null,
           loadError: '',
           createError: '',
           createPageId: '',
@@ -112,8 +102,6 @@ export function registerShareLinksCard() {
 
     destroy() {
       if (this._copiedTimer) { clearTimeout(this._copiedTimer); this._copiedTimer = null; }
-      if (this._jumpClearTimer) { clearTimeout(this._jumpClearTimer); this._jumpClearTimer = null; }
-      try { if (typeof CSS !== 'undefined' && CSS.highlights) CSS.highlights.delete('share-comment-jump'); } catch {}
       this._lifecycle?.destroy();
     },
 
@@ -154,9 +142,9 @@ export function registerShareLinksCard() {
       if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
     },
 
-    // Stiller Refresh ohne Loading-Flicker: aktualisiert Counts/Unread in-place
-    // und lädt den offenen Thread nach. Reviewer-Kommentare (Buch/Kapitel/Seite)
-    // erscheinen so binnen ~5 s beim Owner.
+    // Stiller Refresh ohne Loading-Flicker: aktualisiert View-/Comment-/Unread-
+    // Counts der Links in-place. Reviewer-Kommentare (Buch/Kapitel/Seite) tauchen
+    // so binnen ~5 s als Unread-Badge beim Owner auf.
     async _quietRefresh() {
       if (typeof document !== 'undefined' && document.hidden) return;
       const bookId = window.__app?.selectedBookId;
@@ -175,31 +163,11 @@ export function registerShareLinksCard() {
           if (!cur) continue;
           cur.view_count = r.view_count;
           cur.comment_count = r.comment_count;
-          // Offener Thread gilt als gesehen — Unread lokal auf 0 halten.
-          cur.unread_count = (this.openCommentsToken === r.token) ? 0 : r.unread_count;
+          cur.unread_count = r.unread_count;
         }
       } else {
-        if (this.openCommentsToken) {
-          const open = rows.find(r => r.token === this.openCommentsToken);
-          if (open) open.unread_count = 0;
-        }
         this.links = rows;
       }
-      if (this.openCommentsToken) await this._quietReloadComments(this.openCommentsToken);
-    },
-
-    // Reload des offenen Threads (mark_seen=1, damit Unread bei aktiver Ansicht
-    // 0 bleibt). Nur ersetzen, wenn sich etwas geändert hat — sonst kein Reflow,
-    // der die Reply-Textareas stört.
-    async _quietReloadComments(token) {
-      let rows;
-      try {
-        rows = await fetchJson(`/share/api/links/${encodeURIComponent(token)}/comments?mark_seen=1`);
-      } catch { return; }
-      if (!Array.isArray(rows)) return;
-      const sig = (arr) => arr.map(c => `${c.id}:${c.resolved_at || ''}`).join(',');
-      if (sig(this.commentsByToken[token] || []) === sig(rows)) return;
-      this.commentsByToken[token] = rows;
     },
 
     linkUrl(token) {
@@ -348,184 +316,33 @@ export function registerShareLinksCard() {
       }
     },
 
-    async toggleComments(token) {
-      if (this.openCommentsToken === token) {
-        this.openCommentsToken = null;
-        return;
-      }
-      this.openCommentsToken = token;
-      try {
-        const rows = await fetchJson(`/share/api/links/${encodeURIComponent(token)}/comments?mark_seen=1`);
-        this.commentsByToken[token] = Array.isArray(rows) ? rows : [];
-        // Unread-Count lokal nullen
-        const link = this.links.find(l => l.token === token);
-        if (link) link.unread_count = 0;
-      } catch (e) {
-        this.commentsByToken[token] = [];
-        this.loadError = e.message;
-      }
-    },
-
-    // Kommentare eines Tokens als Threads gruppieren (Root + Antworten).
-    // Verankerte zuerst, dann allgemeine; innerhalb nach Zeit (neueste zuerst).
-    threadsFor(token) {
-      const rows = this.commentsByToken[token] || [];
-      const repliesByParent = {};
-      for (const c of rows) {
-        if (c.parent_id) (repliesByParent[c.parent_id] = repliesByParent[c.parent_id] || []).push(c);
-      }
-      return rows
-        .filter(c => !c.parent_id)
-        .map(root => ({
-          root,
-          replies: (repliesByParent[root.id] || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
-        }))
-        .sort((a, b) => {
-          const aa = a.root.anchor_bid ? 0 : 1;
-          const bb = b.root.anchor_bid ? 0 : 1;
-          if (aa !== bb) return aa - bb;
-          return new Date(b.root.created_at) - new Date(a.root.created_at);
-        });
-    },
-
-    commentAuthorLabel(c) {
-      if (c.author_email) return window.__app.t('share.reader.author_badge');
-      return c.reader_name || window.__app.t('share.reader.anon');
-    },
-
-    // Der Link, dessen Kommentare im Seiten-Panel angezeigt werden (oder null).
-    commentPanelLink() {
-      return this.openCommentsToken ? this.links.find(l => l.token === this.openCommentsToken) || null : null;
-    },
-
-    // ── Sprung zur kommentierten Stelle im Notebook-Editor ────────────────────
-    // Öffnet die betroffene Seite und markiert die Textstelle transient.
-    async gotoComment(link, comment) {
-      if (!comment.anchor_bid) return;
+    // „Kommentare anzeigen": in die passende Editor-Ansicht wechseln, wo die
+    // Kommentar-Leiste verankerte UND allgemeine Threads zeigt + bedienbar macht.
+    // Seiten-Share → Notebook-Leseansicht der Seite; Buch-/Kapitel-Share →
+    // Bucheditor (ganzer Manuskript-Stream). Markiert den Link zugleich als gesehen.
+    async showCommentsForLink(link) {
       const app = window.__app;
       if (!app) return;
-      // Buch-/Kapitel-Share: in den Bucheditor springen (ganzer Manuskript-Stream
-      // + Kommentar-Leiste über alle Seiten), Thread per data-bid dort öffnen.
+      // Unread für diesen Link serverseitig als gesehen markieren (fire-and-forget)
+      // + lokal nullen, damit das Badge sofort verschwindet.
+      fetch(`/share/api/links/${encodeURIComponent(link.token)}/comments?mark_seen=1`).catch(() => {});
+      link.unread_count = 0;
+      app.refreshShareCommentCounts?.();
       if (link.kind === 'chapter' || link.kind === 'book') {
         if (!app.showBookEditorCard) await app.toggleBookEditorCard?.();
-        window.dispatchEvent(new CustomEvent('book-editor:goto-comment', { detail: { bid: comment.anchor_bid } }));
+        // Ohne bid: Leiste nur öffnen (kein Sprung zu einer bestimmten Stelle).
+        window.dispatchEvent(new CustomEvent('book-editor:goto-comment'));
         return;
       }
-      // Seiten-Share: Page-View (Notebook-Read-Modus) + Stelle transient markieren.
+      // Seiten-Share: zur Seite navigieren, dann die Notebook-Leiste öffnen.
       const pageId = link.page_id;
-      if (!pageId) { this.loadError = window.__app.t('share.comments.pageGone'); return; }
+      if (!pageId) { this.loadError = app.t('share.comments.pageGone'); return; }
       app.gotoPageById(pageId);
-      this._highlightInEditor({
-        bid: comment.anchor_bid, quote: comment.anchor_quote,
-        start: comment.anchor_start, end: comment.anchor_end,
-      });
-      // Notebook-Kommentar-Leiste öffnen + Thread selektieren (Pendant zum
-      // Buch-/Kapitel-Sprung). Verzögert, damit der Seitenwechsel-Reset der Leiste
-      // (railVisible=false im currentPage-Watcher) zuerst läuft und der Goto gewinnt.
+      // Verzögert, damit der Seitenwechsel-Reset der Leiste (railVisible=false im
+      // currentPage-Watcher) zuerst läuft und das Öffnen gewinnt.
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('comments-rail:goto', { detail: { bid: comment.anchor_bid } }));
+        window.dispatchEvent(new CustomEvent('comments-rail:goto'));
       }, 0);
-    },
-
-    // Wartet, bis die Seite im Editor gerendert ist, markiert die Stelle per
-    // CSS Custom Highlight (transient) und scrollt hin.
-    _highlightInEditor(anchor) {
-      const ok = typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined';
-      let tries = 0;
-      const tick = () => {
-        // Scope auf die Read-View — im Edit-Modus steht ein leeres
-        // .page-content-view--editing früher im DOM (siehe comments-rail.js).
-        const view = document.querySelector('.page-view-wrap .page-content-view');
-        const block = view && anchor.bid
-          ? (() => { try { return view.querySelector(`[data-bid="${CSS.escape(anchor.bid)}"]`); } catch { return null; } })()
-          : null;
-        if (view && block) {
-          if (ok) {
-            const range = locateRange(view, anchor);
-            if (range) {
-              CSS.highlights.set('share-comment-jump', new Highlight(range));
-              clearTimeout(this._jumpClearTimer);
-              this._jumpClearTimer = setTimeout(() => { try { CSS.highlights.delete('share-comment-jump'); } catch {} }, 6000);
-              const r = range.getBoundingClientRect();
-              if (r && r.height) { window.scrollTo({ top: window.scrollY + r.top - 140, behavior: 'smooth' }); return; }
-            }
-          }
-          block.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          return;
-        }
-        if (tries++ < 40) setTimeout(tick, 100); // bis ~4s auf Render warten
-      };
-      setTimeout(tick, 150);
-    },
-
-    async reloadComments(token) {
-      try {
-        const rows = await fetchJson(`/share/api/links/${encodeURIComponent(token)}/comments`);
-        this.commentsByToken[token] = Array.isArray(rows) ? rows : [];
-      } catch (e) {
-        this.loadError = e.message;
-      }
-    },
-
-    async replyToComment(token, rootId) {
-      const body = (this.replyDrafts[rootId] || '').trim();
-      if (!body) return;
-      this.savingReply = rootId;
-      try {
-        const res = await fetch(`/share/api/links/${encodeURIComponent(token)}/comments`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ parent_id: rootId, body }),
-        });
-        if (!res.ok) throw new Error('reply failed');
-        const reply = await res.json();
-        this.commentsByToken[token] = [...(this.commentsByToken[token] || []), reply];
-        this.replyDrafts[rootId] = '';
-        const link = this.links.find(l => l.token === token);
-        if (link) link.comment_count = (link.comment_count || 0) + 1;
-      } catch (e) {
-        this.loadError = e.message;
-      } finally {
-        this.savingReply = null;
-      }
-    },
-
-    async toggleResolve(token, comment) {
-      const resolved = !comment.resolved_at;
-      this.savingResolve = comment.id;
-      try {
-        const res = await fetch(`/share/api/comments/${comment.id}/resolve`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ resolved }),
-        });
-        if (!res.ok) throw new Error('resolve failed');
-        comment.resolved_at = resolved ? new Date().toISOString() : null;
-        window.__app.refreshShareCommentCounts();
-      } catch (e) {
-        this.loadError = e.message;
-      } finally {
-        this.savingResolve = null;
-      }
-    },
-
-    async deleteComment(token, id) {
-      const ok = await window.__app.appConfirm({
-        message: window.__app.t('share.comments.deleteConfirm'),
-        confirmLabel: window.__app.t('common.delete'),
-        danger: true,
-      });
-      if (!ok) return;
-      try {
-        const res = await fetch(`/share/api/comments/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('delete failed');
-        // Root-Delete kascadiert Antworten serverseitig — neu laden für korrekten Stand.
-        await this.reloadComments(token);
-        const link = this.links.find(l => l.token === token);
-        if (link) link.comment_count = (this.commentsByToken[token] || []).length;
-      } catch (e) {
-        this.loadError = e.message;
-      }
     },
 
     async copyLink(token) {

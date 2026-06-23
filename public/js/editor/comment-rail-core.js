@@ -40,7 +40,13 @@ function wrapP(text) {
 //   hlAll, hlActive        → CSS-Custom-Highlight-Namen (pro Editor eindeutig)
 //   keys                   → Mapping abstrakter Felder auf die Karten-State-Namen:
 //     { comments, threads, selectedRootId, railVisible, replyDrafts,
-//       savingReply, savingResolve, loadingBookId, recomputeRaf, pendingGotoBid? }
+//       savingReply, savingResolve, loadingBookId, recomputeRaf,
+//       pendingGotoBid?, generalThreads? }
+//   generalFilter(root, app) → optional. Liefert true ⇒ dieser nicht-verankerte
+//     (allgemeine) Kommentar gehört in diese Leiste. Nur ausgewertet, wenn
+//     keys.generalThreads gesetzt ist; ohne Filter werden allgemeine Kommentare
+//     verworfen (altes Verhalten). Notebook: nur Page-Share der offenen Seite;
+//     Bucheditor: alle (ganzes Buch).
 //   idle(app)              → true ⇒ keine Threads zeigen (z.B. Notebook-Edit-Modus). Default: false
 //   shouldWait(ctx, app)   → true ⇒ Recompute verschieben (Render noch nicht da)
 //   afterRecompute(ctx)    → optionaler Hook nach Thread-Set (z.B. Root-Flags spiegeln)
@@ -94,6 +100,7 @@ export function createCommentRail(cfg) {
       const view = cfg.scopeEl();
       if (cfg.idle?.(app) || !this[K.comments]?.length || !view) {
         this[K.threads] = [];
+        if (K.generalThreads) this[K.generalThreads] = [];
         this[K.selectedRootId] = null;
         clearHL();
         cfg.afterRecompute?.(this);
@@ -104,10 +111,16 @@ export function createCommentRail(cfg) {
       view.querySelectorAll('[data-bid]').forEach((b, i) => blockIndex.set(b.getAttribute('data-bid'), i));
 
       const onView = [];
+      const general = [];
       const ranges = [];
       for (const g of groupThreads(this[K.comments])) {
         const root = g.root;
-        if (!root.anchor_bid) continue; // allgemeine Kommentare: Sache der Karte
+        if (!root.anchor_bid) {
+          // Allgemeine (nicht-verankerte) Kommentare: in den General-Bucket, wenn
+          // diese Leiste sie führt (Notebook: Page-Share der Seite; Bucheditor: alle).
+          if (K.generalThreads && cfg.generalFilter?.(root, app)) general.push({ root, replies: g.replies });
+          continue;
+        }
         const sortKey = (bi) => bi * 1e6 + (Number.isInteger(root.anchor_start) ? root.anchor_start : 0);
         const bi = blockIndex.has(String(root.anchor_bid)) ? blockIndex.get(String(root.anchor_bid)) : 1e6;
         const range = locateRange(view, anchorOf(root));
@@ -125,7 +138,13 @@ export function createCommentRail(cfg) {
       }
       onView.sort((a, b) => a._sort - b._sort);
       this[K.threads] = onView;
-      if (this[K.selectedRootId] && !onView.some(t => t.root.id === this[K.selectedRootId])) this[K.selectedRootId] = null;
+      // Allgemeine zuletzt zugefügt zuerst (neueste oben) — analog zur alten Karte.
+      if (K.generalThreads) {
+        general.sort((a, b) => new Date(b.root.created_at) - new Date(a.root.created_at));
+        this[K.generalThreads] = general;
+      }
+      const inView = (id) => onView.some(t => t.root.id === id) || general.some(t => t.root.id === id);
+      if (this[K.selectedRootId] && !inView(this[K.selectedRootId])) this[K.selectedRootId] = null;
 
       // Anker-Highlights nur bei sichtbarer Leiste — eingeklappt = Kommentare aus,
       // also auch keine markierten Stellen im Text.
@@ -165,6 +184,8 @@ export function createCommentRail(cfg) {
       const api = highlightsApi();
       if (api) { try { api.delete(cfg.hlActive); } catch {} }
       if (!this[K.selectedRootId]) return;
+      // Verankerte Threads hervorheben; allgemeine (General-Bucket, kein Anker)
+      // klappen nur ihre Aktionen auf — kein Range zum Markieren/Scrollen.
       const thread = this[K.threads].find(t => t.root.id === rootId);
       const view = cfg.scopeEl();
       if (!thread || !view) return;

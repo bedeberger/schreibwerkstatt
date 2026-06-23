@@ -22,9 +22,14 @@ Schreibwerkstatt
 
 | Datei | Zweck |
 |-------|-------|
-| [docker-compose.yml](docker-compose.yml) | LocalAI, GPU-reserviert, Single-Active-Backend + Idle-Watchdog |
+| [docker-compose.yml](docker-compose.yml) | LocalAI, GPU-reserviert, Single-Active-Backend + Idle-Watchdog, persistente `./backends`-Volume |
 | [models/dreamshaper.yaml](models/dreamshaper.yaml) | SD 1.5 — sicherer 8-GB-Default |
 | [models/sdxl.yaml](models/sdxl.yaml) | SDXL — bessere Qualität, knapp auf 8 GB (CPU-Offload) |
+
+> **Backends sind modular.** Das `latest-gpu`-Image bringt die Python-Backends
+> (u. a. `diffusers` für SD/SDXL) **nicht** mehr mit — sie liegen in einer
+> Backend-Gallery und werden einmalig installiert (Schritt 3). Ohne diesen
+> Schritt scheitert jeder Bild-Request mit `backend not found: diffusers`.
 
 ## Einrichtung
 
@@ -47,7 +52,23 @@ Die Modell-YAMLs in [models/](models/) werden von LocalAI beim Start eingelesen.
 Die Gewichte zieht es **beim ersten Bild-Request** von HuggingFace (kann ein
 paar Minuten dauern) und cacht sie unter `models/`.
 
-### 3. Modell wählen
+### 3. diffusers-Backend installieren
+
+Beide Modell-YAMLs nutzen `backend: diffusers`. Dieses Backend liegt in der
+Gallery und wird einmalig in die `./backends`-Volume installiert (überlebt
+dadurch Container-Recreates und `:latest`-Pulls):
+
+```bash
+docker compose exec localai /local-ai backends list           # diffusers in der Gallery?
+docker compose exec localai /local-ai backends install diffusers
+```
+
+Der Binary liegt im Container unter `/local-ai` (nicht im `$PATH` für
+`exec` — darum der absolute Pfad). Landet das Backend nicht unter `/backends`,
+zeigt die Install-Ausgabe den tatsächlichen Pfad; dann das Volume-Mapping in
+der [docker-compose.yml](docker-compose.yml) entsprechend anpassen.
+
+### 4. Modell wählen
 
 Auf 8 GB ist **SD 1.5 (`dreamshaper`) der empfohlene Default** — passt locker,
 schnell. SDXL (`sdxl`) geht nur knapp und mit CPU-Offload (langsamer). Beide
@@ -55,7 +76,7 @@ YAMLs liegen bei; im Admin-Tab entscheidet das **Modell-Feld**, welches benutzt
 wird. Weitere Modelle: einfach eine YAML in `models/` ergänzen, oder
 `docker exec -it <container> local-ai models list` / `... install <name>`.
 
-### 4. Admin-Tab „Bilder" in der Schreibwerkstatt
+### 5. Admin-Tab „Bilder" in der Schreibwerkstatt
 
 | Feld | Wert |
 |------|------|
@@ -66,7 +87,7 @@ wird. Weitere Modelle: einfach eine YAML in `models/` ergänzen, oder
 | Timeout (ms) | `180000` (erster Lauf lädt das Modell in den VRAM) |
 | API-Key | leer (LocalAI lokal ohne Auth) |
 
-### 5. Verifizieren
+### 6. Verifizieren
 
 Erst der Admin-Test-Button („Bild-Host prüfen" → pingt `/v1/models`). Dann
 End-to-End per curl:
@@ -93,6 +114,11 @@ Faustregel auf 8 GB: SD 1.5 als Default, SDXL nur wenn die Qualität es wert ist
 
 ## Troubleshooting
 
+- **`backend not found: diffusers`** (HTTP 500 auf `/v1/images/generations`) —
+  das diffusers-Backend ist nicht installiert. Schritt 3 ausführen
+  (`/local-ai backends install diffusers`). Nach einem `:latest`-Pull oder
+  `docker compose down`/Recreate ist es weg, falls die `./backends`-Volume
+  fehlt — Mapping in der Compose prüfen.
 - **CUDA out of memory** — Bildgröße senken (SDXL → `768x768`, SD 1.5 → `512x512`),
   sicherstellen dass `f16: true` (+ bei SDXL `low_vram: true`) greift, und dass
   `LOCALAI_SINGLE_ACTIVE_BACKEND=true` gesetzt ist. Notfalls InvokeAI stoppen,

@@ -23,7 +23,11 @@ const rail = createCommentRail({
     railVisible: 'commentRailVisible', replyDrafts: 'commentReplyDrafts', savingReply: 'commentSavingReply',
     savingResolve: 'commentSavingResolve', loadingBookId: '_commentLoadingBookId',
     recomputeRaf: '_commentRecomputeRaf', pendingGotoBid: '_pendingGotoBid',
+    generalThreads: 'commentGeneralThreads',
   },
+  // Bucheditor = ganzes Buch: alle allgemeinen (nicht-verankerten) Kommentare jedes
+  // Link-Scopes (Buch/Kapitel/Seite) gehören in diese Leiste.
+  generalFilter: () => true,
   // Bucheditor ist immer „Stream-Modus" — kein Read/Edit-Guard.
   idle: () => false,
   // Recompute, sobald der Stream gerendert ist (Blocks via x-init/x-effect

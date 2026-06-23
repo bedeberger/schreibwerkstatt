@@ -26,6 +26,10 @@ services:
     volumes:
       # Hier liegen die Modell-YAMLs (models/) + von LocalAI gezogene Gewichte.
       - ./models:/models
+      # Modulare Backends (diffusers fuer SD/SDXL) liegen NICHT im Image, sondern
+      # werden einmalig per `local-ai backends install diffusers` installiert.
+      # Diese Volume haelt sie ueber Container-Recreates + :latest-Pulls hinweg.
+      - ./backends:/backends
     deploy:
       resources:
         reservations:
