@@ -480,6 +480,40 @@ router.get('/api/page-comment-counts', requireSession, async (req, res) => {
   }
 });
 
+// Pro-Seite-Zähler aktiver Share-Links, die diese Seite enthalten. Speist den
+// `.btn-count`-Badge am „Teilen"-Eintrag des Page-Action-Menüs. Eine Seite ist
+// enthalten in: einem Page-Share auf sie selbst, einem Chapter-Share auf ihr
+// Kapitel (Direkt-Children, analog Reader-Render) und jedem Buch-Share des Buchs.
+router.get('/api/page-link-counts', requireSession, async (req, res) => {
+  const ownerEmail = req.session.user.email;
+  const bookId = parseInt(req.query.book_id, 10);
+  if (!Number.isInteger(bookId) || bookId <= 0) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: bookId });
+  try {
+    const links = shareLinks.activeLinksForOwnerBook(ownerEmail, bookId);
+    let bookCount = 0;
+    const chapterCount = {};
+    const pageCount = {};
+    for (const l of links) {
+      if (l.kind === 'book') bookCount++;
+      else if (l.kind === 'chapter' && l.chapter_id != null) chapterCount[l.chapter_id] = (chapterCount[l.chapter_id] || 0) + 1;
+      else if (l.kind === 'page' && l.page_id != null) pageCount[l.page_id] = (pageCount[l.page_id] || 0) + 1;
+    }
+    const counts = {};
+    const pages = await contentStore.listPages(bookId);
+    for (const p of pages) {
+      const n = bookCount
+        + (p.chapter_id != null ? (chapterCount[p.chapter_id] || 0) : 0)
+        + (pageCount[p.id] || 0);
+      if (n > 0) counts[p.id] = n;
+    }
+    res.json(counts);
+  } catch (e) {
+    logger.error('[share/api/page-link-counts GET] ' + e.message);
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
 // Volle Kommentar-Threads über alle Links eines Owners zu einem Buch. Speist die
 // Kommentar-Leiste der Leseansicht: der Client gruppiert zu Threads und filtert
 // per Anker (data-bid/quote) auf die aktuell gerenderte Seite. Jede Zeile trägt

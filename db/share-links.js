@@ -225,6 +225,20 @@ function openReaderCommentsForBook(ownerEmail, bookId) {
   `).all(bookId, ownerEmail);
 }
 
+// Aktive (nicht widerrufene, nicht abgelaufene) Links eines Owners zu einem
+// Buch — Rohdaten für den „Wie viele Links enthalten diese Seite?"-Zähler des
+// Page-Action-Menüs. Seiten-Zuordnung (page/chapter/book → konkrete Seiten)
+// passiert in der Route über die Content-Store-Facade.
+function activeLinksForOwnerBook(ownerEmail, bookId) {
+  return db.prepare(`
+    SELECT kind, page_id, chapter_id
+    FROM share_links
+    WHERE owner_email = ? AND book_id = ?
+      AND revoked_at IS NULL
+      AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))
+  `).all(ownerEmail, bookId);
+}
+
 function countRecentCommentsByTokenIp(token, ipHash, windowMs) {
   const cutoff = new Date(Date.now() - windowMs).toISOString();
   const row = db.prepare(`
@@ -251,6 +265,7 @@ module.exports = {
   listCommentsByToken,
   deleteComment,
   openReaderCommentsForBook,
+  activeLinksForOwnerBook,
   listCommentsByOwnerBook,
   markOwnerSeenForBook,
   countRecentCommentsByTokenIp,

@@ -283,6 +283,7 @@ export function registerShareLinksCard() {
         this.createIntro = '';
         this.createExpiresAt = '';
         this.createShowToc = false;
+        window.__app.refreshShareLinkCounts();
         copyText(this.linkUrl(j.token));
         this.copiedToken = j.token;
         if (this._copiedTimer) clearTimeout(this._copiedTimer);
@@ -305,6 +306,7 @@ export function registerShareLinksCard() {
         const res = await fetch(`/share/api/links/${encodeURIComponent(token)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('revoke failed');
         await this.loadLinks();
+        window.__app.refreshShareLinkCounts();
       } catch (e) {
         this.loadError = e.message;
       }

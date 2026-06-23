@@ -198,7 +198,7 @@
                 <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="canEdit() && currentPage" :disabled="currentPageEmpty" @click="openShareLinksForPage(currentPage.id); pageActionsMenuOpen = false">
                   <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>
                   <span x-text="t('share.btn.sharePage')"></span>
-                  <span class="btn-count" x-show="currentPageShareCommentCount > 0" x-text="currentPageShareCommentCount" :data-tip="t('share.openCommentsTitle', { n: currentPageShareCommentCount })"></span>
+                  <span class="btn-count" x-show="currentPageShareLinkCount > 0" x-text="currentPageShareLinkCount" :data-tip="t('share.pageLinkCountTitle', { n: currentPageShareLinkCount })"></span>
                 </button>
               </div>
             </span>

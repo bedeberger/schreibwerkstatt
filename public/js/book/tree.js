@@ -494,6 +494,7 @@ export const treeMethods = {
         this.chapterIdeenCounts = {};
         this.rechercheCounts = {};
         this.shareCommentCounts = {};
+        this.shareLinkCounts = {};
       }
       this._tokenEstGen++;
       // Buchwechsel: SW-CONTENT_CACHE (SWR) kann stale Listen liefern, daher fresh.
@@ -591,24 +592,27 @@ export const treeMethods = {
 
       // Gecachte Stats + Page-Ages + Ideen-Counts (Page + Chapter) + Recherche-Counts laden
       try {
-        const [statsCache, ageMap, ideenMap, chapterIdeenMap, rechercheMap, shareCommentMap] = await Promise.all([
+        const [statsCache, ageMap, ideenMap, chapterIdeenMap, rechercheMap, shareCommentMap, shareLinkMap] = await Promise.all([
           fetchJson('/history/page-stats/' + bookId, { signal }),
           fetchJson('/history/page-ages/' + bookId, { signal }),
           fetchJson('/ideen/counts?book_id=' + bookId, { signal }).catch(() => ({})),
           fetchJson('/ideen/counts?book_id=' + bookId + '&kind=chapter', { signal }).catch(() => ({})),
           fetchJson('/research/page-counts?book_id=' + bookId, { signal }).catch(() => ({})),
           fetchJson('/share/api/page-comment-counts?book_id=' + bookId, { signal }).catch(() => ({})),
+          fetchJson('/share/api/page-link-counts?book_id=' + bookId, { signal }).catch(() => ({})),
         ]);
         this.pageLastChecked = ageMap || {};
         this.ideenCounts = ideenMap || {};
         this.chapterIdeenCounts = chapterIdeenMap || {};
         this.rechercheCounts = rechercheMap || {};
         this.shareCommentCounts = shareCommentMap || {};
+        this.shareLinkCounts = shareLinkMap || {};
         // Editor-Badge der offenen Seite mit frischer Map abgleichen (Race: Seite
         // kann vor dem Counts-Fetch via restoreLastPage geöffnet worden sein).
         if (this.currentPage?.id) {
           this.currentPageRechercheCount = this.rechercheCounts[this.currentPage.id] || 0;
           this.currentPageShareCommentCount = this.shareCommentCounts[this.currentPage.id] || 0;
+          this.currentPageShareLinkCount = this.shareLinkCounts[this.currentPage.id] || 0;
         }
         // Cache-Hits in einem Rutsch zuweisen (statt Index-Assign in der Loop),
         // damit der tokEsts-$watch in app.js#init feuert und die Kapitel-Stats

@@ -3412,6 +3412,7 @@
   "share.btn.sharePage": "Share",
   "share.btn.sharePageTitle": "Share this page via link",
   "share.openCommentsTitle": "{n} open comments from reviewers",
+  "share.pageLinkCountTitle": "{n} active links include this page",
   "share.btn.shareChapter": "Share",
   "share.btn.shareChapterTitle": "Share this chapter via link",
   "share.create.title": "Create new link",

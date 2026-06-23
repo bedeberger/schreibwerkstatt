@@ -208,6 +208,9 @@ const pageState = () => ({
   currentPageIdeenOpenCount: 0,
   currentPageRechercheCount: 0,
   currentPageShareCommentCount: 0,
+  // Anzahl aktiver Share-Links, die die offene Seite enthalten (Page-/Kapitel-/
+  // Buch-Share). Speist den Badge am „Teilen"-Eintrag des Page-Action-Menüs.
+  currentPageShareLinkCount: 0,
   currentPageChatSessionCount: 0,
   // Kommentar-Leiste (Leseansicht): die editorCommentsCard spiegelt hierhin,
   // ob sie für die offene Seite Threads zeigt → Grid-Klasse `comments-split`
@@ -421,8 +424,11 @@ const lektoratState = () => ({
   // Speist den Seiten-Indikator in Sidebar + Editor.
   rechercheCounts: {},
   // Map page_id → Anzahl offener Reviewer-Kommentare aus Share-Links (Page-,
-  // Kapitel- oder Buch-Share). Speist den Badge am „Teilen"-Menü.
+  // Kapitel- oder Buch-Share).
   shareCommentCounts: {},
+  // Map page_id → Anzahl aktiver Share-Links, die diese Seite enthalten.
+  // Speist den Badge am „Teilen"-Eintrag des Page-Action-Menüs.
+  shareLinkCounts: {},
   // Scope der aktuell offenen Ideen-Karte: 'page' (neben Editor) oder
   // 'chapter' (neben Kapitelreview). ideenChapterId nur in 'chapter'-Modus
   // gesetzt. currentPageIdeenOpenCount/currentChapterIdeenOpenCount halten die

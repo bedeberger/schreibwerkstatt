@@ -402,6 +402,7 @@ export const appViewMethods = {
       // wird bei Link-Änderungen in der Recherche-Karte frisch gehalten.
       this.currentPageRechercheCount = (this.rechercheCounts || {})[pageId] || 0;
       this.currentPageShareCommentCount = (this.shareCommentCounts || {})[pageId] || 0;
+      this.currentPageShareLinkCount = (this.shareLinkCounts || {})[pageId] || 0;
       this.currentPageChatSessionCount = (Array.isArray(sessions) ? sessions : []).length;
       // Tree-Indikator mit frischer Wahrheit syncen (z.B. bei Cross-Tab-Edits).
       const next = { ...(this.ideenCounts || {}) };
@@ -425,6 +426,21 @@ export const appViewMethods = {
       if (this.currentPage?.id) this.currentPageShareCommentCount = map[this.currentPage.id] || 0;
     } catch (e) {
       console.error('[refreshShareCommentCounts]', e);
+    }
+  },
+
+  // Pro-Seite-Map aktiver Share-Links neu laden (nach Create/Revoke in der
+  // Share-Karte) und den „Teilen"-Badge der offenen Seite syncen.
+  async refreshShareLinkCounts() {
+    const bookId = this.selectedBookId;
+    if (!bookId) return;
+    try {
+      const map = await fetchJson(`/share/api/page-link-counts?book_id=${bookId}`).catch(() => null);
+      if (!map || this.selectedBookId !== bookId) return;
+      this.shareLinkCounts = map;
+      if (this.currentPage?.id) this.currentPageShareLinkCount = map[this.currentPage.id] || 0;
+    } catch (e) {
+      console.error('[refreshShareLinkCounts]', e);
     }
   },
 
@@ -602,6 +618,7 @@ export const appViewMethods = {
     this.currentPageIdeenOpenCount = 0;
     this.currentPageRechercheCount = 0;
     this.currentPageShareCommentCount = 0;
+    this.currentPageShareLinkCount = 0;
     this.currentPageChatSessionCount = 0;
     this.renderedPageHtml = '';
     this.chapterFigures = [];
@@ -668,8 +685,10 @@ export const appViewMethods = {
     this.chapterIdeenCounts = {};
     this.rechercheCounts = {};
     this.shareCommentCounts = {};
+    this.shareLinkCounts = {};
     this.currentPageRechercheCount = 0;
     this.currentPageShareCommentCount = 0;
+    this.currentPageShareLinkCount = 0;
     this.currentChapterIdeenOpenCount = 0;
     // Chapter-Ideen-Scope verwerfen beim Buchwechsel.
     if (this.ideenScope === 'chapter') {

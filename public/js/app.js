@@ -224,6 +224,49 @@ if ('serviceWorker' in navigator) {
         };
         window.__requestCoherentReload = requestCoherentReload;
 
+        // Vom Update-Banner ("Neu laden") aufgerufen. Normalfall: einen
+        // wartenden SW via 'skip-waiting' aktivieren → controllerchange-Listener
+        // oben macht den Reload in die neue Generation. Loop-Breaker: Gibt es
+        // KEINEN wartenden SW (Build-Guard-Banner ohne neuen Worker, im install
+        // gescheitertes cache.addAll, vom Mobile-Browser verworfener Worker),
+        // bringt ein reiner location.reload() nichts — der alte SW bedient die
+        // alte Shell + alte sw-manifest.js weiter, der Build-Guard feuert erneut,
+        // der Banner kommt wieder (Endlos-Loop). Dann erst einen Update-Check
+        // erzwingen; bleibt es nach dem zweiten Versuch beim Mismatch, hart
+        // heilen: Shell-Caches wegwerfen + SW abmelden + frisch laden, sodass der
+        // nächste Load garantiert die deployte Generation vom Netz zieht.
+        const applyUpdate = async () => {
+          const w = window.__pendingWorker || reg.waiting;
+          if (w) {
+            try { w.postMessage({ type: 'skip-waiting' }); } catch {}
+            setTimeout(() => location.reload(), 2000);
+            return;
+          }
+          let attempts = 0;
+          try { attempts = Number(sessionStorage.getItem('sw-update-attempts') || 0); } catch {}
+          attempts += 1;
+          try { sessionStorage.setItem('sw-update-attempts', String(attempts)); } catch {}
+          if (attempts < 2) {
+            try { await reg.update(); } catch {}
+            const fresh = reg.waiting || window.__pendingWorker;
+            if (fresh) { try { fresh.postMessage({ type: 'skip-waiting' }); } catch {} }
+            setTimeout(() => location.reload(), 2000);
+            return;
+          }
+          try {
+            if (window.caches) {
+              const keys = await caches.keys();
+              await Promise.all(
+                keys.filter(k => k.startsWith('schreibwerkstatt-shell-')).map(k => caches.delete(k))
+              );
+            }
+          } catch {}
+          try { await reg.unregister(); } catch {}
+          try { sessionStorage.removeItem('sw-update-attempts'); } catch {}
+          location.reload();
+        };
+        window.__applyUpdate = applyUpdate;
+
         // Der SW meldet eine Cache-Lücke (Einzel-Eviction → er musste eine
         // möglicherweise generationsfremde Datei durchreichen). Frischen
         // Update-Check anstossen (ein wartender SW läuft über controllerchange)
@@ -775,6 +818,9 @@ document.addEventListener('alpine:init', () => {
         // Fokusmodus (requestCoherentReload entscheidet).
         if (cfg.shellBuild && window.__SHELL_BUILD && cfg.shellBuild !== window.__SHELL_BUILD) {
           window.__requestCoherentReload?.();
+        } else if (cfg.shellBuild && window.__SHELL_BUILD) {
+          // Generation stimmt → Loop-Breaker-Zähler des Update-Banners zurücksetzen.
+          try { sessionStorage.removeItem('sw-update-attempts'); } catch {}
         }
         this.languagetoolEnabled = !!cfg.languagetool?.enabled;
         if (Number.isFinite(cfg.languagetool?.debounceMs)) {
