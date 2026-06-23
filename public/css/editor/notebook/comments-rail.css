@@ -14,7 +14,11 @@
 
 @media (min-width: 1100px) {
   .editor-body-wrap.comments-split {
-    grid-template-columns: minmax(0, 1fr) 320px;
+    /* Text-Spalte hugt ihren Inhalt (page-content-view-max-width) statt 1fr zu
+       fluten — sonst klafft zwischen rechtsbuendigem Text und Rail eine Luecke.
+       Das Paar wird als Einheit zentriert. */
+    grid-template-columns: minmax(0, max-content) 320px;
+    justify-content: center;
     gap: 1rem;
     height: 78vh;
     min-height: 320px;
@@ -244,11 +248,13 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
-  font: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
   resize: vertical;
   min-height: 48px;
 }
-/* Mobile: 16px verhindert iOS-Zoom beim Fokus (erbt sonst <16px via font: inherit). */
+/* Mobile: 16px verhindert iOS-Zoom beim Fokus. */
 @media (max-width: 768px) {
   .comment-rail__textarea { font-size: var(--font-size-reading); }
 }
