@@ -185,14 +185,17 @@ function deleteComment(commentId, ownerEmail) {
 // Vollständige Kommentare (Root + Antworten, inkl. resolved/author) über ALLE
 // Links eines Owners zu einem Buch. Gleiche Spaltenliste wie listCommentsByToken;
 // jede Zeile trägt share_token, damit Reply/Resolve/Delete den richtigen
-// Link/Thread treffen. Für die Kommentar-Leiste der Leseansicht: der Client
-// filtert per Anker auf die aktuell gerenderte Seite.
+// Link/Thread treffen. Zusätzlich der Link-Scope (`link_kind`/`link_page_id`),
+// damit die Leseansicht-Leiste allgemeine (nicht-verankerte) Kommentare der
+// richtigen Seite zuordnen kann (Page-Share → seine Seite). Verankerte
+// Kommentare filtert der Client weiterhin per data-bid auf die gerenderte Seite.
 function listCommentsByOwnerBook(ownerEmail, bookId) {
   return db.prepare(`
     SELECT sc.id, sc.share_token, sc.parent_id, sc.reader_name, sc.reader_token,
            sc.author_email, u.display_name AS author_display_name,
            sc.body, sc.created_at, sc.resolved_at,
-           sc.anchor_bid, sc.anchor_quote, sc.anchor_start, sc.anchor_end
+           sc.anchor_bid, sc.anchor_quote, sc.anchor_start, sc.anchor_end,
+           sl.kind AS link_kind, sl.page_id AS link_page_id
     FROM share_comments sc
     JOIN share_links sl ON sl.token = sc.share_token
     LEFT JOIN app_users u ON u.email = sc.author_email

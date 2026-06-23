@@ -419,6 +419,12 @@ export function registerShareLinksCard() {
         bid: comment.anchor_bid, quote: comment.anchor_quote,
         start: comment.anchor_start, end: comment.anchor_end,
       });
+      // Notebook-Kommentar-Leiste öffnen + Thread selektieren (Pendant zum
+      // Buch-/Kapitel-Sprung). Verzögert, damit der Seitenwechsel-Reset der Leiste
+      // (railVisible=false im currentPage-Watcher) zuerst läuft und der Goto gewinnt.
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('comments-rail:goto', { detail: { bid: comment.anchor_bid } }));
+      }, 0);
     },
 
     // Wartet, bis die Seite im Editor gerendert ist, markiert die Stelle per
@@ -427,7 +433,9 @@ export function registerShareLinksCard() {
       const ok = typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined';
       let tries = 0;
       const tick = () => {
-        const view = document.querySelector('.page-content-view');
+        // Scope auf die Read-View — im Edit-Modus steht ein leeres
+        // .page-content-view--editing früher im DOM (siehe comments-rail.js).
+        const view = document.querySelector('.page-view-wrap .page-content-view');
         const block = view && anchor.bid
           ? (() => { try { return view.querySelector(`[data-bid="${CSS.escape(anchor.bid)}"]`); } catch { return null; } })()
           : null;

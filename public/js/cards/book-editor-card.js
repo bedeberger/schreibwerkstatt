@@ -164,6 +164,7 @@ export function registerBookEditorCard() {
           visiblePageId: null, collapsedChapters: {},
           bookComments: [], commentThreads: [], commentSelectedRootId: null,
           commentReplyDrafts: {}, commentSavingReply: null, commentSavingResolve: null,
+          commentRailVisible: false, _pendingGotoBid: null,
         },
         load: (root) => this._load(root.selectedBookId),
       });

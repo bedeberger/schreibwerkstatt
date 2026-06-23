@@ -23,9 +23,8 @@ export function registerEditorCommentsCard() {
     // transiente Helfer (kein reaktiver State):
     _railAbort: null,
     _recomputeRaf: null,
-    _recomputeTries: 0,
-    _railActiveTimer: null,
     _loadingBookId: null,
+    _pendingGotoBid: null,
 
     ...editorCommentsRailMethods,
   }));

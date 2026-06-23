@@ -173,6 +173,43 @@ function buildTocBlock(content, lang) {
   </nav>`;
 }
 
+// Block-ID → Seite auflösen, mit Per-Buch-Memo. Verankerte Kommentare speichern
+// nur die data-bid (keine page_id — Blöcke können zwischen Seiten wandern); die
+// Zuordnung ergibt sich erst aus dem aktuellen Seiteninhalt. Da page-comment-counts
+// bei jedem Tree-Refresh läuft, wird das Ergebnis pro Buch gecacht und über eine
+// günstige Signatur (Seitenzahl + max updated_at, beides aus den Metadaten ohne
+// HTML-Load) invalidiert. Nicht gefundene Bids werden als null gecacht (Block
+// gelöscht / nie auf einer Seite); eine spätere Bearbeitung bumpt updated_at und
+// verwirft den Cache. data-bid ist buchweit eindeutig → Scope = alle Buch-Seiten.
+const _bidPageCache = new Map(); // bookId → { sig, map: { bid → pageId|null } }
+
+async function resolveBidsToPages(bookId, bids) {
+  const wanted = [...bids];
+  if (!wanted.length) return {};
+  const metas = await contentStore.listPages(bookId);
+  let maxUpdated = '';
+  for (const m of metas) { if (m.updated_at && m.updated_at > maxUpdated) maxUpdated = m.updated_at; }
+  const sig = `${metas.length}:${maxUpdated}`;
+  let entry = _bidPageCache.get(bookId);
+  if (!entry || entry.sig !== sig) { entry = { sig, map: {} }; _bidPageCache.set(bookId, entry); }
+
+  const remaining = new Set(wanted.filter(b => entry.map[b] === undefined));
+  if (remaining.size) {
+    for (const meta of metas) {
+      if (!remaining.size) break; // alle gesuchten Bids gefunden → Scan abbrechen
+      const pd = await contentStore.loadPage(meta.id);
+      const html = pd.html || '';
+      for (const b of [...remaining]) {
+        if (html.includes(`data-bid="${b}"`)) { entry.map[b] = meta.id; remaining.delete(b); }
+      }
+    }
+    for (const b of remaining) entry.map[b] = null; // nicht auffindbar
+  }
+  const out = {};
+  for (const b of wanted) out[b] = entry.map[b] ?? null;
+  return out;
+}
+
 function renderGone(req, res, kind) {
   const lang = detectLang(req);
   const html = fillTemplate(TEMPLATE_GONE, {
@@ -458,17 +495,9 @@ router.get('/api/page-comment-counts', requireSession, async (req, res) => {
       else if (r.anchor_bid) pendingBids.add(String(r.anchor_bid).toLowerCase());
     }
 
-    // Block→Seite-Map nur bauen, wenn nötig (ein Scan über die Buch-Seiten).
+    // Block→Seite-Map nur bauen, wenn nötig (gecachter Scan über die Buch-Seiten).
     if (pendingBids.size) {
-      const bidToPage = {};
-      const pages = await contentStore.listPages(bookId);
-      for (const meta of pages) {
-        const pd = await contentStore.loadPage(meta.id);
-        const html = pd.html || '';
-        for (const bid of pendingBids) {
-          if (bidToPage[bid] === undefined && html.includes(`data-bid="${bid}"`)) bidToPage[bid] = meta.id;
-        }
-      }
+      const bidToPage = await resolveBidsToPages(bookId, pendingBids);
       for (const r of rows) {
         if (r.kind !== 'page' && r.anchor_bid) bump(bidToPage[String(r.anchor_bid).toLowerCase()]);
       }
@@ -671,16 +700,10 @@ router.get('/api/links/:token/locate', requireSession, async (req, res) => {
   if (!ANCHOR_BID_RE.test(bid)) return res.status(400).json({ error_code: 'INVALID_ANCHOR' });
   if (link.kind === 'page') return res.json({ page_id: link.page_id });
   try {
-    // Chapter-Share: nur Kapitel-Seiten; Book-Share: alle Buch-Seiten.
-    const pages = await contentStore.listPages(link.book_id);
-    const candidates = link.kind === 'book'
-      ? pages
-      : pages.filter(p => p.chapter_id === link.chapter_id);
-    for (const meta of candidates) {
-      const pd = await contentStore.loadPage(meta.id);
-      if ((pd.html || '').includes(`data-bid="${bid}"`)) return res.json({ page_id: meta.id });
-    }
-    res.json({ page_id: null });
+    // data-bid ist buchweit eindeutig → gecachter Scan über alle Buch-Seiten
+    // (teilt den Cache mit page-comment-counts).
+    const map = await resolveBidsToPages(link.book_id, new Set([bid]));
+    res.json({ page_id: map[bid] || null });
   } catch (e) {
     logger.error('[share/api/links/locate GET] ' + e.message);
     res.status(500).json({ error_code: 'DB_ERROR' });
