@@ -163,8 +163,9 @@ export function createCommentRail(cfg) {
 
       // Anker-Highlights nur bei sichtbarer Leiste — eingeklappt = Kommentare aus,
       // also auch keine markierten Stellen im Text. Nur die sichtbaren (gefilterten)
-      // verankerten Threads markieren.
-      const ranges = onViewF.filter(t => !t.changed && rangeById.has(t.root.id)).map(t => rangeById.get(t.root.id));
+      // verankerten Threads markieren. Erledigte Threads bleiben in der Leiste, ihre
+      // Stelle wird aber nicht mehr im Manuskript hervorgehoben.
+      const ranges = onViewF.filter(t => !t.changed && !t.root.resolved_at && rangeById.has(t.root.id)).map(t => rangeById.get(t.root.id));
       const api = highlightsApi();
       if (api) {
         try { if (this[K.railVisible] && ranges.length) api.set(cfg.hlAll, new Highlight(...ranges)); else api.delete(cfg.hlAll); } catch {}

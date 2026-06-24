@@ -2,8 +2,9 @@
 // verankerte Share-Link-Leser-Kommentare als Margin-Rail rechts neben dem
 // Seitentext (Google-Docs-Stil): selektieren hebt die Textstelle hervor,
 // antworten/erledigt/löschen laufen über die bestehenden Owner-Endpoints in
-// routes/share.js. Nicht-verankerte (allgemeine) Kommentare bleiben der
-// „Geteilte Links"-Karte vorbehalten.
+// routes/share.js. Allgemeine (nicht-verankerte) Kommentare des Page-Shares
+// genau dieser Seite zeigt diese Leiste in einem abgesetzten Abschnitt mit
+// (generalFilter); Buch-/Kapitel-Share-Allgemeines lebt im Bucheditor.
 //
 // Verhalten (Laden, Re-Anchoring, Diff, Reply/Resolve/Delete) kommt aus dem
 // geteilten Kern public/js/editor/comment-rail-core.js (SSoT mit der Bucheditor-

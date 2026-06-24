@@ -13,9 +13,9 @@
 // Diese Datei ist die Facade + der gekoppelte Kern (State, API, Highlights,
 // Thread-Render, Live-Poll). Die selbstständigen Widgets liegen unter
 // share-reader/: dom (el/fmtDate), identity (Reader-Token + Namens-Chip/Modal),
-// menu (Optionen-⋯), theme (Farbschema), toc (Inhaltsverzeichnis), diff
-// (Quote-Diff), layout (vertikale Verankerung der Karten = Google-Docs-Modell),
-// composer (Selektions-Button + Anmerkungs-Overlay).
+// menu (Optionen-⋯), theme (Farbschema), toc (Inhaltsverzeichnis), layout
+// (vertikale Verankerung der Karten = Google-Docs-Modell), composer
+// (Selektions-Button + Anmerkungs-Overlay).
 
 import { locateRange, locateApprox, resolveCurrentQuote, caretPosFromPoint } from './share-anchor.js';
 import { groupThreads } from './editor/comment-threads.js';
@@ -29,7 +29,6 @@ import { createOptionsMenu } from './share-reader/menu.js';
 import { setupThemeSwitcher } from './share-reader/theme.js';
 import { setupToc } from './share-reader/toc.js';
 import { setupProgressBar } from './share-reader/progress.js';
-import { appendQuoteDiff } from './share-reader/diff.js';
 import { createCardLayout } from './share-reader/layout.js';
 import { setupComposer } from './share-reader/composer.js';
 
@@ -229,11 +228,16 @@ import { setupComposer } from './share-reader/composer.js';
     const changed = new Highlight();
     for (const c of comments) {
       if (c.parent_id || !c.anchor) continue;
+      // Erledigte Kommentare bleiben in der Leiste und anspringbar (anchorRanges +
+      // transientes Aktiv-Highlight beim Anklicken), werden aber nicht mehr
+      // dauerhaft im Manuskript markiert.
+      const resolved = !!c.resolved;
       const range = locateRange(article, c.anchor);
       if (range) {
         c._stale = false; c._approx = false;
         anchorRanges.push({ id: c.id, range });
-        (c.id === activeId ? active : hl).add(range);
+        if (c.id === activeId) active.add(range);
+        else if (!resolved) hl.add(range);
         continue;
       }
       // Quote nicht mehr wörtlich da (Text seither geändert), Block aber noch:
@@ -242,7 +246,7 @@ import { setupComposer } from './share-reader/composer.js';
       if (approx) {
         c._stale = false; c._approx = true;
         anchorRanges.push({ id: c.id, range: approx.range });
-        changed.add(approx.range);
+        if (!resolved) changed.add(approx.range);
         continue;
       }
       c._stale = true; c._approx = false;
@@ -424,20 +428,19 @@ import { setupComposer } from './share-reader/composer.js';
     // Anker-Zeile: getönter Quote-Snippet + Jump bzw. Stale-Hinweis.
     if (root.anchor) {
       const anchorRow = el('div', 'comment-rail__anchor');
-      // resolveCurrentQuote trennt „Block weg" (gone) von „Text geändert"
-      // (changed) — nur bei changed gibt es einen aktuellen Text zum Diffen.
+      // resolveCurrentQuote trennt „Block weg" (gone) von „Text geändert" (changed).
       const res = resolveCurrentQuote(article, root.anchor);
       if (res.status === 'changed') {
-        // Stelle seit dem Kommentar geändert: Badge + Quote→aktuell-Inline-Diff,
-        // Optik identisch zur Bucheditor-Leiste (.comment-rail__changed*,
-        // components/comment-rail.css). Kein separater Quote-Schnipsel mehr —
-        // der Diff zeigt den damaligen Wortlaut bereits als del-Knoten.
-        const changed = el('div', 'comment-rail__changed');
-        changed.appendChild(el('span', 'comment-rail__changed-badge', t('anchor_changed')));
-        appendQuoteDiff(changed, root.anchor.quote || '', res.currentText || '');
-        anchorRow.appendChild(changed);
-        // Re-Anchoring trifft den Quote nicht mehr wörtlich, aber der Fuzzy-Span
-        // markiert die ungefähre Stelle (gestrichelt) → Karte bleibt anspringbar.
+        // Stelle seit dem Kommentar geändert: getönter Quote (damaliger Wortlaut) +
+        // neutraler Hinweis, weiterhin anspringbar (Fuzzy-Span markiert die
+        // ungefähre Stelle, gestrichelt). Bewusst KEIN Wort-Diff im öffentlichen
+        // Reader: Anker-Diffing auf Live-Content ist unzuverlässig (grössere
+        // Umschreibungen landen als 'gone' ganz ohne Diff) und der Review-Loop läuft
+        // ohnehin über Autor-Antworten im Thread. Der Drift-Diff bleibt owner-only
+        // (Notebook-/Bucheditor-Leiste).
+        const quote = el('span', 'comment-rail__quote comment-rail__quote--stale', root.anchor.quote || '');
+        anchorRow.appendChild(quote);
+        anchorRow.appendChild(el('span', 'share-thread__stale', t('anchor_changed')));
         anchorRow.setAttribute('role', 'button');
         anchorRow.tabIndex = 0;
         const jump = () => scrollToAnchor(root.id);
