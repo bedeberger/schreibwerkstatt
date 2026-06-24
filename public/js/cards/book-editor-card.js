@@ -541,7 +541,14 @@ export function registerBookEditorCard() {
         }
         if (bestId != null) {
           const next = parseInt(bestId, 10);
-          if (next !== this.visiblePageId) this.visiblePageId = next;
+          if (next !== this.visiblePageId) {
+            this.visiblePageId = next;
+            // Outline-Scroll der aktiven Markierung nachführen, sobald Alpine die
+            // `--active`-Klasse gesetzt hat — sonst wandert der aktive Eintrag bei
+            // langem Buch aus dem (höhen-gedeckelten) sticky Outline-Viewport und
+            // wird unten abgeschnitten.
+            this.$nextTick(() => this._scrollOutlineToActive());
+          }
         }
       };
       const io = new IntersectionObserver((entries) => {
@@ -586,6 +593,25 @@ export function registerBookEditorCard() {
       if (!el) return;
       el.scrollIntoView({ block: 'start', behavior: 'smooth' });
       this.visiblePageId = pageId;
+    },
+
+    // Hält den aktiven Outline-Eintrag im sichtbaren Bereich des sticky, höhen-
+    // gedeckelten Inhaltsverzeichnisses — scrollt ausschliesslich den Outline-
+    // Container (nie das Fenster), sonst springt das Manuskript. `block: 'nearest'`-
+    // Äquivalent: nur scrollen, wenn der Eintrag oben/unten aus dem Viewport ragt.
+    _scrollOutlineToActive() {
+      const outline = this.$el?.querySelector?.('.book-editor-outline');
+      if (!outline) return;
+      const active = outline.querySelector('.book-editor-outline-page--active');
+      if (!active) return;
+      const cRect = outline.getBoundingClientRect();
+      const aRect = active.getBoundingClientRect();
+      const pad = 24; // etwas Kontext über/unter dem aktiven Eintrag halten
+      if (aRect.top < cRect.top + pad) {
+        outline.scrollTop -= (cRect.top + pad) - aRect.top;
+      } else if (aRect.bottom > cRect.bottom - pad) {
+        outline.scrollTop += aRect.bottom - (cRect.bottom - pad);
+      }
     },
 
     toggleChapterCollapse(chapterId) {

@@ -143,9 +143,9 @@ export const editorCommentsRailMethods = {
     await this.loadBookComments(bookId);
   },
 
-  // Im Desktop-Split scrollt .editor-preview-wrap selbst (overflow-y:auto,
-  // height:100%) — window.scrollTo greift dort nicht. Gestapelt (<1100px)
-  // scrollt das Fenster. Scroll-Container daher dynamisch wählen.
+  // Text + Rail teilen im Split den Fenster-Scroll → window.scrollTo. Falls eine
+  // Variante doch einen eigenen Preview-Scroll-Container hat (overflow), wird der
+  // bevorzugt. Scroll-Container daher dynamisch wählen.
   _scrollRangeIntoView(range) {
     const r = range.getBoundingClientRect();
     if (!r || !r.height) return;
