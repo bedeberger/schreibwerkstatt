@@ -391,6 +391,9 @@ import { setupComposer } from './share-reader/composer.js';
     // Bezug zur Textstelle behalten.
     if (list) {
       list.innerHTML = '';
+      // Frische, noch unpositionierte Karten → wieder ausblenden, bis das Layout
+      // sie platziert hat (kein „Auffliegen" der neuen Karten beim Re-Render).
+      list.classList.remove('is-positioned');
       if (!anchored.length) {
         list.appendChild(el('li', 'share-comments__empty', t('threads_empty')));
       } else {

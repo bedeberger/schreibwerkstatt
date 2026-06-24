@@ -101,6 +101,7 @@ body.share-page {
      (public/css/components/comment-rail.css): mappt die --cr-*-Schnittstelle auf
      das Share-Token-Universum. Page-weit, weil die Karten in zwei getrennten
      Bereichen leben (.share-comments = verankert, .share-general = allgemein). */
+  --cr-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --cr-surface: var(--share-surface);
   --cr-border: var(--share-border);
   --cr-border-input: var(--share-border);

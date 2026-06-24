@@ -19,6 +19,10 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  /* Rail-Chrome ist UI, kein Lesetext: erbt im SPA --font-sans (inherit), der
+     Share-Reader setzt --cr-font auf seinen Sans-Stack, statt die Georgia-Body-
+     Schrift der Leseseite zu erben — so matchen beide Leisten den Bucheditor. */
+  font-family: var(--cr-font, inherit);
   gap: var(--space-xs, 4px);
   padding: var(--space-sm, 8px) var(--space-10, 10px);
   border: 1px solid transparent;

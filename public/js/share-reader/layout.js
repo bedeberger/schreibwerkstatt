@@ -125,6 +125,10 @@ export function createCardLayout(opts) {
       if (it.el) it.el.style.setProperty('--comment-top', Math.round(it.top) + 'px');
     }
     layer.style.setProperty('--layer-height', Math.max(0, Math.round(bottom)) + 'px');
+    // Nach dem ersten Positionieren Karten einblenden + top-Transition scharf
+    // schalten (die Tops sind in diesem Frame ohne Transition gesetzt → kein
+    // „Auffliegen" beim ersten Render; spätere Layouts animieren weich).
+    layer.classList.add('is-positioned');
   }
 
   // Doppel-rAF: erstes wartet auf den DOM-Re-Render der Karten, zweites misst die

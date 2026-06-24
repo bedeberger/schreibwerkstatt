@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Share-Reader Harness</title>
+  <!-- Gleiche CSS-Kette wie public/share.html: Share-Tokens + geteilter
+       Manuskript-Stream + geteilte Kommentar-Karten-Optik. -->
+  <link rel="stylesheet" href="/css/share.css">
+  <link rel="stylesheet" href="/css/components/manuscript-stream.css">
+  <link rel="stylesheet" href="/css/components/comment-rail.css">
+</head>
+<body class="share-page">
+  <header class="share-header">
+    <div class="share-header__inner">
+      <div class="share-header__book">Buch</div>
+      <h1 class="share-header__title">Kapitel</h1>
+    </div>
+    <div class="share-header__tools">
+      <div id="share-actions" class="share-actions"></div>
+      <div id="share-theme" class="share-theme"></div>
+    </div>
+  </header>
+
+  <div class="share-layout">
+    <main id="share-content" class="share-main">
+      <article class="share-content" id="share-article">
+        <p data-bid="b1">Dies ist die anchored passage im Text und noch etwas mehr.</p>
+      </article>
+    </main>
+    <aside class="share-comments" aria-label="Kommentare">
+      <ol class="share-comments__list"></ol>
+    </aside>
+  </div>
+
+  <section class="share-general" id="share-general" aria-label="Allgemeine Kommentare">
+    <h2 class="share-general__heading">Allgemeine Kommentare</h2>
+    <ol class="share-general__list"></ol>
+  </section>
+
+  <!-- Reader-Config wie SSR (Token + i18n). Leere i18n → t() fällt auf den Key
+       zurück, reicht fürs Rendering. -->
+  <script id="share-config" type="application/json">{ "token": "TESTTOKEN", "i18n": {} }</script>
+
+  <!-- Fetch-Stub VOR dem Modul (klassisches Inline-Script läuft beim Parsen,
+       das type=module ist deferred): liefert Mock-Threads für den /threads-Call,
+       quittiert alles andere mit ok. So bootet share-reader.js ohne echtes
+       Backend. -->
+  <script>
+    window.__mockThreads = {
+      comments: [
+        // Verankerter Root (b1 ist im Artikel vorhanden) + Autor-Antwort.
+        { id: 1, parent_id: null, body: 'Toller Absatz, gefällt mir.',
+          created_at: '2026-06-20T10:00:00Z', name: 'Lena Muster',
+          mine: false, is_author: false, resolved: false,
+          anchor: { bid: 'b1', quote: 'anchored passage', start: 0, end: 0 } },
+        { id: 2, parent_id: 1, body: 'Danke für den Hinweis!',
+          created_at: '2026-06-20T11:00:00Z', name: null,
+          mine: false, is_author: true, resolved: false },
+        // Allgemeiner (nicht verankerter) Kommentar → eigene Sektion unten.
+        { id: 3, parent_id: null, body: 'Allgemeine Anmerkung zum Ganzen.',
+          created_at: '2026-06-21T09:00:00Z', name: 'Tom Beta',
+          mine: false, is_author: false, resolved: false, anchor: null },
+      ],
+    };
+    window.fetch = (url) => {
+      const u = String(url);
+      const body = u.includes('/threads') ? JSON.stringify(window.__mockThreads) : '{"ok":true}';
+      return Promise.resolve(new Response(body, {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }));
+    };
+  </script>
+  <script type="module" src="/js/share-reader.js"></script>
+</body>
+</html>
