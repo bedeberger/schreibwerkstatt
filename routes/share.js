@@ -716,6 +716,30 @@ router.post('/api/links', requireSession, jsonBody, async (req, res) => {
       expiresAt: expires_at || null,
       showToc: !!show_toc,
     });
+
+    // Verankerte Leser-Kommentare + die schwebende Kommentar-Leiste haengen an
+    // data-bid auf den Bloecken (share-anchor.js). data-bid entsteht sonst nur am
+    // Editor-Write-Chokepoint — Legacy-/Import-Seiten haben keine. Beim Anlegen des
+    // Links die betroffenen Seiten (je Scope) einmalig nachziehen: additiv, ohne
+    // updated_at-Bump/Revision. Best-effort — ein Fehler darf das Teilen nie
+    // abbrechen.
+    try {
+      let pageIds;
+      if (kind === 'page') {
+        pageIds = [pageId];
+      } else {
+        const pages = await contentStore.listPages(bookId);
+        pageIds = (kind === 'chapter' ? pages.filter(p => p.chapter_id === chapterId) : pages).map(p => p.id);
+      }
+      let n = 0;
+      for (const pid of pageIds) {
+        try { if ((await contentStore.backfillBlockIds(pid)).changed) n++; } catch { /* per-page best-effort */ }
+      }
+      if (n) logger.info(`[share/api/links POST] data-bid backfill auf ${n}/${pageIds.length} Seiten (kind=${kind} book=${bookId})`);
+    } catch (e) {
+      logger.warn('[share/api/links POST] data-bid backfill fehlgeschlagen: ' + e.message);
+    }
+
     logger.info(`[share/api/links POST] kind=${kind} book=${bookId} token=${created.token.slice(0, 8)}`);
     res.json(created);
   } catch (e) {

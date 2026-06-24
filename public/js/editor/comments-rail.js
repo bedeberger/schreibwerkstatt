@@ -77,6 +77,8 @@ export const editorCommentsRailMethods = {
     // Toggle-Button in den Seiten-Actions (Root-Scope) steuert die Sichtbarkeit
     // per Window-Event (Trampolin, da der Button nicht im Karten-Scope liegt).
     window.addEventListener('comments-rail:toggle', () => this.toggleRail(), { signal: this._railAbort.signal });
+    // Klick ausserhalb des offenen Threads (Seitentext, Chrome) schliesst ihn wieder.
+    document.addEventListener('click', (e) => this._railDeselectOutside(e), { signal: this._railAbort.signal });
     // Sprung aus der „Geteilte Links"-Karte (Seiten-Share): Leiste öffnen + Thread
     // zu diesem data-bid selektieren (Pendant zum Bucheditor-Sprung).
     window.addEventListener('comments-rail:goto', (e) => {

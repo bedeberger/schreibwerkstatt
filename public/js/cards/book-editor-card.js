@@ -201,6 +201,10 @@ export function registerBookEditorCard() {
         if (this.blocks.length) this._scheduleCommentRecompute();
       }, { signal: this._lifecycle.signal });
 
+      // Klick ausserhalb des offenen Threads (Manuskript-Stream, Chrome) schliesst
+      // ihn wieder; Klicks in der Leiste oder auf eine markierte Stelle bleiben aktiv.
+      document.addEventListener('click', (e) => this._railDeselectOutside(e), { signal: this._lifecycle.signal });
+
       // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit).
       // $root = die Karten-Wurzel (.card--bookeditor), unabhängig vom Klick-Kontext.
       attachFullscreenSync({

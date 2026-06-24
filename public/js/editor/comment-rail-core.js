@@ -242,6 +242,22 @@ export function createCommentRail(cfg) {
       cfg.scrollRailToThread?.(rootId, this);
     },
 
+    // Klick irgendwo ausserhalb des selektierten Threads → Thread schliessen
+    // (Auswahl + Reply-Box + Aktionen klappen zu, Anker-Highlight weg). Klicks in
+    // der Leiste selbst (`.comment-rail` — anderer Thread, Reply-Box, Aktionen)
+    // bleiben der Leisten-Logik überlassen; ein Klick auf eine markierte
+    // Kommentarstelle im Text selektiert dort weiter (Bucheditor) statt zu schliessen.
+    _railDeselectOutside(ev) {
+      if (!this[K.selectedRootId]) return;
+      const target = ev.target;
+      if (target?.closest?.('.comment-rail')) return;
+      if (this._railHitTest(ev.clientX, ev.clientY) != null) return;
+      this[K.selectedRootId] = null;
+      const api = highlightsApi();
+      if (api) { try { api.delete(cfg.hlActive); } catch {} }
+      cfg.afterRecompute?.(this);
+    },
+
     commentAuthorLabel(c) {
       if (c.author_email) return window.__app.t('share.reader.author_badge');
       return c.reader_name || window.__app.t('share.reader.anon');
