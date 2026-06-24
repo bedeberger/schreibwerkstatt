@@ -108,6 +108,24 @@ body.share-page {
 }
 .share-skip:focus { left: 8px; top: 8px; z-index: 100; }
 
+/* Lese-Fortschrittsbalken: ganz oben am Fensterrand, über dem Sticky-Header.
+   Breite aus --progress (von share-reader/progress.js gesetzt). */
+.share-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 20;
+  pointer-events: none;
+}
+.share-progress__bar {
+  height: 100%;
+  width: var(--progress, 0%);
+  background: var(--share-accent);
+  transition: width 80ms linear;
+}
+
 .share-header {
   position: sticky;
   top: 0;

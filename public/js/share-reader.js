@@ -25,6 +25,7 @@ import {
 import { createOptionsMenu } from './share-reader/menu.js';
 import { setupThemeSwitcher } from './share-reader/theme.js';
 import { setupToc } from './share-reader/toc.js';
+import { setupProgressBar } from './share-reader/progress.js';
 import { appendQuoteDiff } from './share-reader/diff.js';
 
 (function () {
@@ -50,6 +51,7 @@ import { appendQuoteDiff } from './share-reader/diff.js';
   setupIdentity({ t, menuSection, onNameChange: syncReaderName });
   setupThemeSwitcher({ t, menuSection });
   setupToc({ menuSection });
+  setupProgressBar();
 
   // Auto-Hide-Scrollbar an TOC + Kommentar-Leiste (≥1100px eigene Scroll-Container),
   // gleiches Pattern wie Sidebar-Tree + Bucheditor-Inhaltsverzeichnis in der SPA.
