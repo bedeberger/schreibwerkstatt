@@ -77,21 +77,27 @@ export function createCardLayout(opts) {
     const layerTop = layer.getBoundingClientRect().top;
     const activeId = getActiveId();
 
-    // 1) Anker-Y + gemessene Kartenhöhe pro Thread; Marker auf echte Anker-Höhe.
-    //    Karten ohne DOM-Element (noch nicht gerendert) fallen raus.
+    // 1) Mess-Pass (nur Reads): Anker-Y + gemessene Kartenhöhe pro Thread. Das
+    //    Schreiben der Marker ist bewusst in einen zweiten Pass getrennt — ein
+    //    Marker-Write zwischen zwei getBoundingClientRect()-Reads würde sonst pro
+    //    Karte einen Forced-Reflow erzwingen (Layout-Thrashing, O(n) Layouts bei n
+    //    Karten). Karten ohne DOM-Element (noch nicht gerendert) fallen raus.
     const items = cards.map((c) => {
       const el = layer.querySelector(`.share-thread[data-comment-id="${CSS.escape(String(c.id))}"]`);
       const marker = layer.querySelector(`.share-thread-marker[data-marker-for="${CSS.escape(String(c.id))}"]`);
       observe(el);
       const y = anchorY(c, view, layerTop);
-      if (marker) {
-        if (y == null) marker.style.removeProperty('--marker-top');
-        else marker.style.setProperty('--marker-top', Math.round(y) + 'px');
-      }
-      return { id: c.id, el, y, h: el ? el.offsetHeight : 0 };
+      return { id: c.id, el, marker, y, h: el ? el.offsetHeight : 0 };
     }).filter((it) => it.el);
 
-    // 2) Kollisions-Auflösung (Pin/greedy + Überlappungs-Sweep) im geteilten Kern
+    // 2) Marker-Write-Pass (nur Writes): Marker auf die echte Anker-Höhe setzen.
+    for (const it of items) {
+      if (!it.marker) continue;
+      if (it.y == null) it.marker.style.removeProperty('--marker-top');
+      else it.marker.style.setProperty('--marker-top', Math.round(it.y) + 'px');
+    }
+
+    // 3) Kollisions-Auflösung (Pin/greedy + Überlappungs-Sweep) im geteilten Kern
     //    (comment-card-layout.js, SSoT mit der Bucheditor-Leiste).
     const { tops, bottom } = resolveCardPositions({
       items: items.map(({ id, y, h }) => ({ id, y, h })),

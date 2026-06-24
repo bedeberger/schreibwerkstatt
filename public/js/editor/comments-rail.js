@@ -10,10 +10,16 @@
 // geteilten Kern public/js/editor/comment-rail-core.js (SSoT mit der Bucheditor-
 // Leiste). Hier bleibt nur die Notebook-spezifische Glue: Scope =
 // .page-view-wrap, Read-Modus-Guard, Root-Flag-Mirror (Grid-Split + Toggle-Badge)
-// und der Split-Pane-Scroll.
+// und der Scroll-zur-Stelle.
+//
+// Anders als der Bucheditor schweben die Karten hier NICHT auf Höhe ihrer
+// Textstelle (Google-Docs-Modell): das Blatt der Leseansicht (.page-content-view)
+// ist ein eigener Scroll-Container (max-height + overflow), kein Fenster-Scroll —
+// vertikale Verankerung gegen einen fremden Scroll-Container desynchronisiert. Die
+// Karten stapeln stattdessen normal in einer eigenen Spalte; Auswahl scrollt das
+// Blatt zur verankerten Stelle (comment-rail-layout.js wird hier nicht genutzt).
 
 import { createCommentRail } from './comment-rail-core.js';
-import { createCommentLayout } from './comment-rail-layout.js';
 
 // Read-Modus-Seitenansicht. Scope auf `.page-view-wrap`, weil der Edit-Modus
 // ein zweites, früher im DOM stehendes `.page-content-view--editing` (leerer
@@ -22,11 +28,6 @@ import { createCommentLayout } from './comment-rail-layout.js';
 function readView() {
   return document.querySelector('.page-view-wrap .page-content-view');
 }
-function layerEl() { return document.querySelector('.comment-rail__layer'); }
-
-// Unter diesem Viewport fällt das Split auf eine gestapelte Liste zurück
-// (comments-rail.css) → Flach-Modus, keine vertikale Verankerung.
-const FLAT_BELOW = '(max-width: 1099px)';
 
 const rail = createCommentRail({
   scopeEl: readView,
@@ -54,24 +55,13 @@ const rail = createCommentRail({
     const rendered = !!(readView() && app?.renderedPageHtml);
     return !idle && !rendered;
   },
-  // Nach jedem Thread-Set: Root-Flag spiegeln (Grid-Split + Badge) UND die
-  // vertikale Verankerung neu rechnen (post-render, Kartenhöhen messen).
-  afterRecompute: (ctx) => { ctx._mirrorFlag(); ctx._scheduleCommentLayout(); },
+  // Nach jedem Thread-Set: Root-Flag spiegeln (Grid-Split + Badge).
+  afterRecompute: (ctx) => { ctx._mirrorFlag(); },
   scrollToRange: (range, ctx) => ctx._scrollRangeIntoView(range),
-});
-
-// Vertikale Verankerung (Google-Docs-Modell) aus dem geteilten Kern, Scope =
-// gerenderte Leseansicht der Einzelseite. State-Felder in editorCommentsCard.
-const layout = createCommentLayout({
-  scopeEl: readView,
-  layerEl,
-  flatBelow: FLAT_BELOW,
-  keys: { threads: 'commentThreads', selectedRootId: 'commentSelectedRootId', railVisible: 'commentRailVisible', stackHeight: 'commentStackHeight' },
 });
 
 export const editorCommentsRailMethods = {
   ...rail,
-  ...layout,
 
   // Partial-erwartete Methodennamen → geteilter Kern. Die im geteilten Body-
   // Fragment (comment-thread-body.html) referenzierten Namen sind mit dem
@@ -80,10 +70,9 @@ export const editorCommentsRailMethods = {
   scheduleRecompute() { return this._railSchedule(); },
   recomputePageThreads() { return this._railRecompute(); },
   selectCommentThread(rootId) {
+    // Auswahl hebt die Stelle hervor und scrollt das Blatt dorthin (kein
+    // Karten-Layout — die Karten stehen in normaler Stapelreihenfolge).
     this._railSelect(rootId);
-    // Auswahl pinnt die aktive Karte auf ihre exakte Anker-Höhe und schiebt die
-    // übrigen darum herum → Layout neu rechnen.
-    this._scheduleCommentLayout();
   },
   replyToCommentRoot(thread) { return this._railReply(thread); },
   toggleCommentResolve(comment) { return this._railResolve(comment); },
@@ -91,8 +80,6 @@ export const editorCommentsRailMethods = {
 
   init() {
     this._railAbort = new AbortController();
-    // Vertikale Verankerung: Observer für Seiten-Reflow + Viewport-Resize.
-    this._initCommentLayout();
     // Buchwechsel: State leeren + Kommentare des neuen Buchs laden.
     this.$watch(() => window.__app?.selectedBookId, (id) => this._onBookChange(id));
     // Seitenwechsel: Leiste einklappen (Toggle ist pro Seite — sonst „folgt" der
@@ -123,7 +110,6 @@ export const editorCommentsRailMethods = {
   destroy() {
     this._railAbort?.abort();
     if (this._recomputeRaf) { cancelAnimationFrame(this._recomputeRaf); this._recomputeRaf = null; }
-    this._teardownCommentLayout();
     this._railClearHL();
     const app = window.__app;
     if (app) { app.pageCommentRailOpen = false; app.pageCommentCount = 0; }
@@ -135,7 +121,6 @@ export const editorCommentsRailMethods = {
     this.commentGeneralThreads = [];
     this.commentSelectedRootId = null;
     this.commentRailVisible = false;
-    this.commentStackHeight = 0;
     this._pendingGotoBid = null;
     this._railClearHL();
     this._mirrorFlag();
@@ -143,13 +128,15 @@ export const editorCommentsRailMethods = {
     await this.loadBookComments(bookId);
   },
 
-  // Text + Rail teilen im Split den Fenster-Scroll → window.scrollTo. Falls eine
-  // Variante doch einen eigenen Preview-Scroll-Container hat (overflow), wird der
-  // bevorzugt. Scroll-Container daher dynamisch wählen.
+  // Auswahl scrollt zur verankerten Stelle. Der eigentliche Scroll-Container ist
+  // das Blatt selbst (.page-content-view: max-height + overflow-y) — nicht das
+  // Fenster. Die Range liegt darin; relativ zur Blatt-Oberkante scrollen, damit
+  // die Stelle sichtbar wird. Nur falls das Blatt (noch) nicht scrollt (kurze
+  // Seite), aufs Fenster zurückfallen.
   _scrollRangeIntoView(range) {
     const r = range.getBoundingClientRect();
     if (!r || !r.height) return;
-    const pane = document.querySelector('.editor-preview-wrap');
+    const pane = readView();
     if (pane && pane.scrollHeight > pane.clientHeight + 1) {
       const paneRect = pane.getBoundingClientRect();
       pane.scrollTo({ top: pane.scrollTop + (r.top - paneRect.top) - 80, behavior: 'smooth' });

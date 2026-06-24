@@ -131,6 +131,33 @@ function getStream() {
   return _streamPromise;
 }
 
+// Verankerte Leser-Kommentare + die schwebende Kommentar-Leiste haengen an
+// data-bid auf den Bloecken (share-anchor.js). data-bid entsteht sonst nur am
+// Editor-Write-Chokepoint — Legacy-/Import-Seiten haben keine. Die betroffenen
+// Seiten des Link-Scopes einmalig nachziehen: additiv, ohne updated_at-Bump/
+// Revision (backfillBlockIds ist idempotent: Seiten mit data-bid sind No-op).
+// Best-effort — ein Fehler darf das Teilen/Lesen nie abbrechen. Wird sowohl beim
+// Anlegen des Links als auch lazy beim Reader-GET aufgerufen, damit auch Links,
+// die vor diesem Backfill angelegt wurden, beim ersten Aufruf repariert werden.
+async function backfillScopeBlockIds(link) {
+  try {
+    let pageIds;
+    if (link.kind === 'page') {
+      pageIds = [link.page_id];
+    } else {
+      const pages = await contentStore.listPages(link.book_id);
+      pageIds = (link.kind === 'chapter' ? pages.filter(p => p.chapter_id === link.chapter_id) : pages).map(p => p.id);
+    }
+    let n = 0;
+    for (const pid of pageIds) {
+      try { if ((await contentStore.backfillBlockIds(pid)).changed) n++; } catch { /* per-page best-effort */ }
+    }
+    if (n) logger.info(`[share/backfill] data-bid backfill auf ${n}/${pageIds.length} Seiten (kind=${link.kind} book=${link.book_id})`);
+  } catch (e) {
+    logger.warn('[share/backfill] data-bid backfill fehlgeschlagen: ' + e.message);
+  }
+}
+
 async function loadContentForLink(link) {
   if (link.kind === 'page') {
     try {
@@ -262,6 +289,10 @@ router.get('/:token', async (req, res) => {
     return renderGone(req, res, gone);
   }
   const lang = detectLang(req);
+  // Legacy-/Import-Seiten ohne data-bid einmalig nachziehen, damit verankerte
+  // Kommentare (Selektions-Button + schwebende Leiste) funktionieren — auch fuer
+  // Links, die vor dem Backfill-on-create angelegt wurden. Idempotent, additiv.
+  await backfillScopeBlockIds(link);
   const content = await loadContentForLink(link);
   if (!content) return res.status(404).type('html').send('Not found');
 
@@ -784,28 +815,8 @@ router.post('/api/links', requireSession, jsonBody, async (req, res) => {
       showToc: !!show_toc,
     });
 
-    // Verankerte Leser-Kommentare + die schwebende Kommentar-Leiste haengen an
-    // data-bid auf den Bloecken (share-anchor.js). data-bid entsteht sonst nur am
-    // Editor-Write-Chokepoint — Legacy-/Import-Seiten haben keine. Beim Anlegen des
-    // Links die betroffenen Seiten (je Scope) einmalig nachziehen: additiv, ohne
-    // updated_at-Bump/Revision. Best-effort — ein Fehler darf das Teilen nie
-    // abbrechen.
-    try {
-      let pageIds;
-      if (kind === 'page') {
-        pageIds = [pageId];
-      } else {
-        const pages = await contentStore.listPages(bookId);
-        pageIds = (kind === 'chapter' ? pages.filter(p => p.chapter_id === chapterId) : pages).map(p => p.id);
-      }
-      let n = 0;
-      for (const pid of pageIds) {
-        try { if ((await contentStore.backfillBlockIds(pid)).changed) n++; } catch { /* per-page best-effort */ }
-      }
-      if (n) logger.info(`[share/api/links POST] data-bid backfill auf ${n}/${pageIds.length} Seiten (kind=${kind} book=${bookId})`);
-    } catch (e) {
-      logger.warn('[share/api/links POST] data-bid backfill fehlgeschlagen: ' + e.message);
-    }
+    // data-bid auf den Scope-Seiten nachziehen (Detail-Begruendung am Helper).
+    await backfillScopeBlockIds(created);
 
     logger.info(`[share/api/links POST] kind=${kind} book=${bookId} token=${created.token.slice(0, 8)}`);
     res.json(created);

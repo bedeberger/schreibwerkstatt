@@ -1,32 +1,34 @@
 @layer components {
 /* === Kommentar-Leiste der Leseansicht ===================================
    Verankerte Share-Link-Leser-Kommentare als Margin-Rail rechts neben dem
-   Seitentext (Google-Docs-Modell): jede verankerte Karte schwebt auf Höhe ihrer
-   Textstelle, Text + Rail teilen den Fenster-Scroll (scroll-invariant). Aktiv,
-   sobald .editor-body-wrap die Klasse `comments-split` trägt (Root-Flag
-   pageCommentRailOpen, gespiegelt aus editorCommentsCard). Allgemeine
+   Seitentext. Aktiv, sobald .editor-body-wrap die Klasse `comments-split` trägt
+   (Root-Flag pageCommentRailOpen, gespiegelt aus editorCommentsCard). Allgemeine
    (nicht-verankerte) Kommentare landen als zentrierte Bande GANZ UNTEN unter
-   dem Text. Unter 1100px Flach-Modus (gestapelte Liste, keine Verankerung).
+   dem Text.
 
-   Die Thread-Karten-Optik (Shell, Quote, Meta/Avatar, Body, Antwort-Box,
-   Diff) lebt geteilt in components/comment-rail.css; die Verankerungs-Geometrie
-   in editor/comment-rail-layout.js (SSoT mit dem Bucheditor). Hier bleiben nur
-   Layout, Positionierungs-Ebene/Marker, Kopf, die Icon-Aktions-Buttons und die
-   Highlights. */
+   Anders als der Bucheditor schweben die Karten hier NICHT auf Höhe ihrer
+   Textstelle: das Blatt (.page-content-view) ist ein eigener Scroll-Container
+   (max-height + overflow), kein Fenster-Scroll — vertikale Verankerung gegen
+   einen fremden Scroll-Container desynchronisiert. Die Karten stapeln stattdessen
+   normal in einer eigenen, mitscrollenden Spalte; Auswahl scrollt das Blatt zur
+   verankerten Stelle (editor/comments-rail.js#_scrollRangeIntoView).
+
+   Die Thread-Karten-Optik (Shell, Quote, Meta/Avatar, Body, Antwort-Box, Diff)
+   lebt geteilt in components/comment-rail.css; hier bleiben nur Spalten-Layout,
+   Kopf, die Icon-Aktions-Buttons und die Highlights. */
 .editor-body-wrap.comments-split {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0;
   margin-top: 1rem;
 }
+/* Karten stapeln normal (Spalten-Layout in beiden Breiten gleich). */
+.comment-rail__layer { display: flex; flex-direction: column; gap: var(--space-sm); }
 
 @media (min-width: 1100px) {
   .editor-body-wrap.comments-split {
     /* Text-Spalte hugt ihren Inhalt (page-content-view-max-width); die Rail-Spalte
-       ist fix. Das Paar wird als Einheit zentriert. Text UND Rail teilen den
-       Fenster-Scroll (kein eigener Spalten-Scroll mehr) — Voraussetzung dafür,
-       dass die Karten scroll-invariant auf Höhe ihrer Textstelle schweben
-       (Google-Docs-Modell, SSoT mit dem Bucheditor: comment-rail-layout.js). */
+       ist fix. Das Paar wird als Einheit zentriert. */
     grid-template-columns: minmax(0, max-content) clamp(280px, 22vw, 340px);
     justify-content: center;
     align-items: start;
@@ -34,81 +36,34 @@
   }
   .comments-split .editor-preview-wrap { min-width: 0; }
 
-  /* Rail = nackter Positionierungs-Container (kein Karten-Chrome). Karten schweben
-     absolut auf Höhe ihrer Textstelle und scrollen mit dem Text im selben
-     Scroll-Container (Fenster) mit — darum kein eigener overflow, keine feste Höhe.
-     Überschreibt die .comment-rail-Basis (Border/Padding/BG) für die Leseansicht. */
+  /* Rail = normale gestapelte Spalte mit eigenem Scroll, auf Blatthöhe begrenzt
+     (--pcv-max-h, dieselbe Höhe wie .page-content-view), damit viele Kommentare
+     die Spalte nicht über das Blatt hinaus dehnen. Überschreibt die
+     .comment-rail-Basis-Chrome (Border/Padding/BG) für die Leseansicht. */
   .comments-split .comment-rail {
-    position: relative;
     align-self: start;
-    height: auto;
-    max-height: none;
-    overflow: visible;
+    max-height: var(--pcv-max-h, 60vh);
+    overflow-y: auto;
     padding: 0;
     border: none;
     border-radius: 0;
     background: transparent;
   }
-  /* Positionierungs-Ebene: hält die absolut platzierten Karten + Marker; ihre Höhe
-     = aufgelöster Stapel-Boden, damit die Spalte scrollbar mitwächst. */
-  .comment-rail__layer {
-    position: relative;
-    min-height: var(--comments-stack-height, 0);
-  }
-  .comment-rail__layer > .comment-rail__thread {
-    position: absolute;
-    inset-inline: 0;
-    top: var(--comment-top, 0);
-    /* Vor erster Vermessung verborgen (aber mit Layout → offsetHeight messbar),
-       damit Karten nicht für einen Frame deckungsgleich bei 0 aufblitzen.
-       Positionswechsel (--comment-top) sind hart, ohne Animation — analog Bucheditor. */
-    visibility: hidden;
-  }
-  .comment-rail__layer > .comment-rail__thread.is-positioned { visibility: visible; }
-  /* Selektierte Karte über die Nachbarn heben (Schatten + aufgeklappte Reply-Form). */
-  .comment-rail__layer > .comment-rail__thread--selected { z-index: 2; }
-
-  /* Marker im linken Spaltenrand: kurzer Tick auf der echten Anker-Höhe, reicht in
-     den Grid-Gap zwischen Text und Spalte hinein (Pendant zum Bucheditor-Marker). */
-  .comment-rail__marker {
-    position: absolute;
-    top: var(--marker-top, 0);
-    left: calc(-1 * var(--space-md));
-    width: 10px;
-    height: 18px;
-    padding: 0;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--card-accent-share, var(--color-accent)) 45%, transparent);
-    cursor: pointer;
-    transition: background var(--transition-fast), transform var(--transition-fast);
-  }
-  .comment-rail__marker:hover { background: var(--card-accent-share, var(--color-accent)); }
-  .comment-rail__marker--selected { background: var(--card-accent-share, var(--color-accent)); transform: scaleX(1.4); }
-  .comment-rail__marker--resolved { opacity: 0.45; }
-  .comment-rail__marker--changed { background: color-mix(in srgb, var(--color-warn-text) 55%, transparent); }
 
   /* Allgemeine Bande: ganze Grid-Zeile unter dem Paar, zentriert auf Lesebreite
-     der Seite → sitzt mittig unter dem Text (überschreibt die Positionierungs-
-     Overrides oben; Quelle nach .comments-split .comment-rail). */
+     der Seite → sitzt mittig unter dem Text. */
   .comments-split .comment-rail--general {
     grid-column: 1 / -1;
     justify-self: center;
-    position: static;
     width: 100%;
     max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
   }
 }
 
 @media (max-width: 1099px) {
-  /* Gestapelt: Leiste folgt unter dem Text (Kontext zuerst, anders als Lektorat).
-     Flach-Modus → keine vertikale Verankerung; Karten/Marker fallen in den
-     normalen Fluss zurück (JS überspringt das Layout via matchMedia, FLAT_BELOW). */
+  /* Gestapelt: Leiste folgt unter dem Text (Kontext zuerst, anders als Lektorat). */
   .editor-body-wrap.comments-split { display: flex; flex-direction: column; }
   .comment-rail { margin-top: var(--space-md); }
-  .comment-rail__layer { display: flex; flex-direction: column; gap: var(--space-sm); min-height: 0; }
-  .comment-rail__layer > .comment-rail__thread { position: static; visibility: visible; inset-inline: auto; }
-  .comment-rail__marker { display: none; }
 }
 
 .comment-rail {
