@@ -119,6 +119,9 @@ body.share-page {
   --cr-ok-text: var(--share-text);
   --cr-err-bg: color-mix(in srgb, #c43838 20%, transparent);
   --cr-err-text: var(--share-muted);
+  /* Vom Reviewer erledigte Kommentare treten in der Leseansicht deutlicher
+     zurueck als in den Editor-Rails (default 0.62). */
+  --cr-resolved-opacity: 0.4;
 }
 
 .share-skip {
@@ -491,8 +494,8 @@ body.share-page {
     display: block;
   }
   /* Karten bleiben unsichtbar, bis das Layout-JS sie einmal positioniert hat
-     (sonst stapeln sie für 2 rAF-Frames auf top:0 und „fliegen" via top-Transition
-     an ihren Platz). `.is-positioned` setzt das Layout nach dem ersten Pass. */
+     (sonst blitzen sie für 2 rAF-Frames auf top:0 auf, bevor sie an ihren Platz
+     springen). `.is-positioned` setzt das Layout nach dem ersten Pass. */
   .share-layout .share-comments__list > .share-thread {
     position: absolute;
     left: 0;
@@ -502,7 +505,13 @@ body.share-page {
   }
   .share-layout .share-comments__list.is-positioned > .share-thread {
     opacity: 1;
-    transition: top 0.18s ease;
+  }
+  /* Erledigte Threads bleiben auch im positionierten Margin-Note-Layout
+     zurueckgenommen: der Reveal-Schritt oben setzt opacity:1 mit hoeherer
+     Spezifitaet (unlayered) als die geteilte --resolved-Regel, darum hier
+     explizit nachziehen. */
+  .share-layout .share-comments__list.is-positioned > .share-thread.comment-rail__thread--resolved {
+    opacity: var(--cr-resolved-opacity, 0.4);
   }
   /* Marker-Tick im linken Spaltenrand auf der echten Anker-Höhe (vor Kollision) —
      hält den Bezug zur Textstelle, wenn die Karte nach unten verschoben wurde. */

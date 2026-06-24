@@ -39,7 +39,7 @@
   border-left-width: 3px;
   box-shadow: var(--cr-shadow-hover, var(--shadow-md));
 }
-.comment-rail__thread--resolved { opacity: 0.62; }
+.comment-rail__thread--resolved { opacity: var(--cr-resolved-opacity, 0.62); }
 
 .comment-rail__anchor { display: block; }
 /* Markierte Stelle als getönter Schnipsel mit Akzentbalken (statt literale
@@ -134,6 +134,12 @@
 }
 .comment-rail__author { font-weight: var(--fw-semibold, 600); color: var(--cr-text, var(--color-text)); }
 .comment-rail__time { color: var(--cr-muted, var(--color-muted)); }
+/* Phantom-Hover beim Einblenden der Aktionen unterdrücken: bis zur ersten
+   Mausbewegung nach dem Selektieren sind die frisch erscheinenden Aktions-
+   Buttons inert, damit der unter dem ruhenden Cursor materialisierte Button
+   nicht fälschlich „gehovert" (grüne Tönung) wirkt. Body-Klasse setzt der
+   geteilte Rail-Kern; sie fällt bei der ersten Zeiger-Bewegung wieder weg. */
+body.comment-rail-hover-armed .comment-rail__thread-actions { pointer-events: none; }
 .comment-rail__resolved {
   font-size: 11px;
   padding: var(--space-1, 1px) var(--space-6, 6px);
