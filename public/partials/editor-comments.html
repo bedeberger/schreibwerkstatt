@@ -43,8 +43,10 @@
           </template>
         </div>
 
-        <!-- Root-Kommentar des Lesers. -->
-        <div class="comment-rail__comment">
+        <!-- Root-Kommentar des Lesers (Klick selektiert + hebt im Text hervor). -->
+        <div class="comment-rail__comment internal-link" role="button" tabindex="0"
+             @click="selectThread(thread.root.id)"
+             @keydown.enter.prevent="selectThread(thread.root.id)">
           <div class="comment-rail__meta">
             <span class="comment-rail__avatar" aria-hidden="true"
                   :style="`--avatar-hue: ${commentAvatar(thread.root).hue}`"

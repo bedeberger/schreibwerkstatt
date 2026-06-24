@@ -9,9 +9,23 @@
 // wird re-verankert (Quote im Block suchen) — der Buchinhalt ist live, Offsets
 // driften. Findet sich der Quote nicht mehr, bleibt der Thread gelistet, aber
 // ohne Inline-Highlight ("Stelle geändert").
+//
+// Diese Datei ist die Facade + der gekoppelte Kern (State, API, Anker,
+// Highlights, Thread-Render, Composer, Live-Poll). Die selbstständigen Widgets
+// liegen unter share-reader/: dom (el/fmtDate), identity (Reader-Token +
+// Namens-Chip/Modal), menu (Optionen-⋯), theme (Farbschema), toc (Inhalts-
+// verzeichnis), diff (Quote-Diff).
 
 import { charOffset, locateRange, resolveCurrentQuote } from './share-anchor.js';
 import { bindScrollFade } from './scroll-fade.js';
+import { el, fmtDate } from './share-reader/dom.js';
+import {
+  readerToken, savedName, markNameDismissed, closeNameModal, setupIdentity,
+} from './share-reader/identity.js';
+import { createOptionsMenu } from './share-reader/menu.js';
+import { setupThemeSwitcher } from './share-reader/theme.js';
+import { setupToc } from './share-reader/toc.js';
+import { appendQuoteDiff } from './share-reader/diff.js';
 
 (function () {
   const cfgEl = document.getElementById('share-config');
@@ -28,231 +42,24 @@ import { bindScrollFade } from './scroll-fade.js';
   const emptyLi = document.querySelector('.share-comments__empty');
   const supportsHighlight = typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined';
 
-  // ── Reader-Identität (persistent pro Browser) ──────────────────────────────
-  const RT_KEY = 'sw_share_reader_token';
-  const NAME_KEY = 'sw_share_reader_name';
-  function readerToken() {
-    let v = '';
-    try { v = localStorage.getItem(RT_KEY) || ''; } catch {}
-    if (!/^[A-Za-z0-9_-]{8,64}$/.test(v)) {
-      const a = new Uint8Array(16);
-      (crypto.getRandomValues ? crypto.getRandomValues(a) : a.fill(0));
-      v = 'r' + Array.from(a, b => (b % 36).toString(36)).join('');
-      try { localStorage.setItem(RT_KEY, v); } catch {}
-    }
-    return v;
-  }
-  function savedName() { try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; } }
-  function rememberName(n) { try { if (n) localStorage.setItem(NAME_KEY, n); } catch {} }
   const RT = readerToken();
 
-  function forgetName() { try { localStorage.removeItem(NAME_KEY); } catch {} }
+  // ── Optionen-Menü (⋯) + sekundäre Cluster (Identität, Theme, TOC) ────────────
+  // Reihenfolge bestimmt die Sektions-Folge im Panel: Identität → Theme → TOC.
+  const { menuSection } = createOptionsMenu({ t });
+  setupIdentity({ t, menuSection, onNameChange: syncReaderName });
+  setupThemeSwitcher({ t, menuSection });
+  setupToc({ menuSection });
 
-  // ── Leser-Identität: globaler Chip oben rechts + Namens-Modal ──────────────
-  // Der Name wird nicht pro Formular abgefragt, sondern einmal zentral gesetzt:
-  // beim ersten Laden öffnet ein Modal („Dein Name"), danach steht „Als <Name> ·
-  // Ändern" im Optionen-Menü (⋯) oben rechts. Composer,
-  // Reply-Form und SSR-Form kommentieren mit dem hier gesetzten Namen (sonst
-  // anonym). „Überspringen"/Outside-Click merkt sich den Verzicht für die Session
-  // (sessionStorage), damit das Modal in derselben Tab-Sitzung nicht nervt.
-  const DISMISS_KEY = 'sw_share_name_dismissed';
-  function nameDismissed() { try { return sessionStorage.getItem(DISMISS_KEY) === '1'; } catch { return false; } }
-  function markNameDismissed() { try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch {} }
-
-  function closeNameModal() {
-    const ex = document.getElementById('share-name-modal');
-    if (ex) ex.remove();
-  }
-
-  function setupIdentity() {
-    const sec = menuSection();
-    const chip = el('div', 'share-identity-bar');
-    sec.appendChild(chip);
-
-    function renderChip() {
-      chip.innerHTML = '';
-      const name = savedName();
-      if (name) chip.appendChild(el('span', 'share-identity-bar__as', t('comment_as').replace('{name}', name)));
-      const btn = el('button', 'share-identity-bar__btn', name ? t('change_name') : t('set_name'));
-      btn.type = 'button';
-      btn.addEventListener('click', () => openNameModal());
-      chip.appendChild(btn);
-    }
-
-    function openNameModal() {
-      closeNameModal();
-      const overlay = el('div', 'share-composer');
-      overlay.id = 'share-name-modal';
-      const card = el('div', 'share-composer__card');
-      card.appendChild(el('h3', 'share-composer__title', t('name_modal_title')));
-      card.appendChild(el('p', 'share-name-modal__intro', t('name_modal_intro')));
-      const input = el('input', 'share-composer__name');
-      input.type = 'text';
-      input.maxLength = 80;
-      input.placeholder = t('your_name');
-      input.value = savedName();
-      const actions = el('div', 'share-composer__actions');
-      const save = el('button', 'share-composer__submit', t('name_modal_save'));
-      save.type = 'button';
-      const skip = el('button', 'share-composer__cancel', t('name_modal_skip'));
-      skip.type = 'button';
-      actions.appendChild(save);
-      actions.appendChild(skip);
-      card.appendChild(input);
-      card.appendChild(actions);
-      overlay.appendChild(card);
-      document.body.appendChild(overlay);
-      setTimeout(() => input.focus(), 30);
-
-      function commit() {
-        const n = (input.value || '').trim();
-        const prev = savedName();
-        if (n) rememberName(n); else forgetName();
-        markNameDismissed();
-        renderChip();
-        closeNameModal();
-        // Bisherige eigene Kommentare auf den neuen Namen nachziehen (Server
-        // matcht über reader_token), dann Threads neu laden.
-        if (n !== prev) syncReaderName(n);
-      }
-      save.addEventListener('click', commit);
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
-      skip.addEventListener('click', () => { markNameDismissed(); closeNameModal(); });
-      overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) { markNameDismissed(); closeNameModal(); } });
-    }
-
-    renderChip();
-    // Auto-Öffnen beim ersten Laden, solange kein Name gesetzt und nicht in
-    // dieser Session weggeklickt.
-    if (!savedName() && !nameDismissed()) openNameModal();
-  }
-
-  // ── Optionen-Menü (Meatball ⋯) oben rechts ─────────────────────────────────
-  // Bündelt alle sekundären Reader-Optionen (Identität, Farbschema, Inhalts-
-  // verzeichnis) hinter einem ⋯-Trigger, damit die Leseansicht ruhig bleibt.
-  // Standalone (kein Alpine, kein Icon-Sprite) — Trigger als inline-SVG; die
-  // Cluster montieren ihre Bedienelemente über menuSection() in die Liste.
-  const MEATBALL_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>';
-  let menuPanel = null;
-  function setupOptionsMenu() {
-    const host = document.getElementById('share-actions');
-    if (!host) return;
-    const wrap = el('div', 'share-menu');
-    const trigger = el('button', 'share-menu__trigger');
-    trigger.type = 'button';
-    trigger.setAttribute('aria-haspopup', 'true');
-    trigger.setAttribute('aria-expanded', 'false');
-    trigger.setAttribute('aria-label', t('options_label'));
-    trigger.innerHTML = MEATBALL_SVG;
-    menuPanel = el('div', 'share-menu__panel');
-    menuPanel.hidden = true;
-    menuPanel.setAttribute('role', 'menu');
-    wrap.appendChild(trigger);
-    wrap.appendChild(menuPanel);
-    host.appendChild(wrap);
-    const setOpen = (open) => {
-      menuPanel.hidden = !open;
-      trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-    };
-    trigger.addEventListener('click', (e) => { e.stopPropagation(); setOpen(menuPanel.hidden); });
-    document.addEventListener('mousedown', (e) => { if (!menuPanel.hidden && !wrap.contains(e.target)) setOpen(false); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menuPanel.hidden) setOpen(false); });
-  }
-  // Eine abgegrenzte Sektion in der Menü-Liste (optionaler Titel als Heading).
-  function menuSection(title) {
-    const sec = el('div', 'share-menu__section');
-    if (title) sec.appendChild(el('div', 'share-menu__heading', title));
-    if (menuPanel) menuPanel.appendChild(sec);
-    return sec;
-  }
-
-  setupOptionsMenu();
-  setupIdentity();
+  // Auto-Hide-Scrollbar an TOC + Kommentar-Leiste (≥1100px eigene Scroll-Container),
+  // gleiches Pattern wie Sidebar-Tree + Bucheditor-Inhaltsverzeichnis in der SPA.
+  bindScrollFade(document.querySelector('.share-toc'));
+  bindScrollFade(document.querySelector('.share-comments'));
 
   // ── State ──────────────────────────────────────────────────────────────────
   let comments = [];          // flache Liste (serverseitig serialisiert)
   const anchorRanges = [];    // { id, range } für Klick-Mapping
   let activeId = null;        // gerade fokussierter Thread
-
-  // ── DOM-Helfer ───────────────────────────────────────────────────────────────
-  function el(tag, cls, text) {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-    return e;
-  }
-
-  // ── Theme-Switcher (Auto / Hell / Dunkel) ────────────────────────────────────
-  // Progressive Enhancement: share-theme-init.js hat das Theme schon vor dem
-  // ersten Paint gesetzt (FOUC-Schutz). Hier bauen wir nur den Switcher als
-  // Sektion im Optionen-Menü (⋯). Auto = kein data-theme (CSS-Media-Query folgt
-  // System); explizit = Attribut.
-  (function setupThemeSwitcher() {
-    const sec = menuSection(t('theme_label'));
-    const KEY = 'sw_share_theme';
-    const modes = [['auto', t('theme_auto')], ['light', t('theme_light')], ['dark', t('theme_dark')]];
-    const btns = {};
-    function apply(pref, persist) {
-      if (persist) { try { localStorage.setItem(KEY, pref); } catch {} }
-      if (pref === 'light' || pref === 'dark') document.documentElement.setAttribute('data-theme', pref);
-      else document.documentElement.removeAttribute('data-theme');
-      for (const [m] of modes) {
-        const on = m === pref;
-        btns[m].classList.toggle('share-theme__btn--active', on);
-        btns[m].setAttribute('aria-pressed', on ? 'true' : 'false');
-      }
-    }
-    const group = el('div', 'share-theme__group');
-    group.setAttribute('role', 'group');
-    group.setAttribute('aria-label', t('theme_label'));
-    for (const [mode, label] of modes) {
-      const b = el('button', 'share-theme__btn', label);
-      b.type = 'button';
-      b.addEventListener('click', () => apply(mode, true));
-      btns[mode] = b;
-      group.appendChild(b);
-    }
-    sec.appendChild(group);
-    const init = window.__shareThemePref;
-    apply(init === 'light' || init === 'dark' ? init : 'auto', false);
-  })();
-
-  // jsdiff lazy laden (vendor, cache-first; nur wenn eine Stelle seit dem
-  // Kommentar geändert wurde). Bewusst minimal statt page-revision-diff.js +
-  // utils.js zu importieren — hält das anonyme Reader-Bundle schlank.
-  let _diffPromise = null;
-  function loadDiffLib() {
-    if (typeof window.Diff !== 'undefined') return Promise.resolve(window.Diff);
-    if (!_diffPromise) {
-      _diffPromise = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'vendor/diff-9.0.0.min.js';
-        s.onload = () => resolve(window.Diff);
-        s.onerror = reject;
-        document.head.appendChild(s);
-      }).catch((e) => { _diffPromise = null; throw e; });
-    }
-    return _diffPromise;
-  }
-
-  // Wort-Diff „Quote (damals) → aktueller Text" als del/ins-DOM-Knoten anhängen
-  // (textContent → kein XSS). Gleiche .diff-add/.diff-del-Optik wie der Editor.
-  function appendQuoteDiff(container, oldText, newText) {
-    loadDiffLib().then((Diff) => {
-      if (!Diff || typeof Diff.diffWords !== 'function') return;
-      const wrap = el('div', 'share-thread__diff');
-      for (const part of Diff.diffWords(oldText || '', newText || '')) {
-        if (part.added) wrap.appendChild(el('ins', 'diff-add', part.value));
-        else if (part.removed) wrap.appendChild(el('del', 'diff-del', part.value));
-        else wrap.appendChild(el('span', null, part.value));
-      }
-      container.appendChild(wrap);
-    }).catch(() => {});
-  }
-
-  function fmtDate(iso) {
-    try { return new Date(iso).toLocaleString(); } catch { return iso; }
-  }
 
   // ── API ──────────────────────────────────────────────────────────────────────
   // Leichtgewichtige Signatur über die Threads — erkennt neue/aufgelöste
@@ -625,68 +432,6 @@ import { bindScrollFade } from './scroll-fade.js';
       }
     });
   }
-
-  // ── Inhaltsverzeichnis ein-/ausblenden (Reader-seitig, persistent) ───────────
-  // Toggle-Eintrag im Optionen-Menü (⋯). Blendet das ganze TOC-Panel aus; im Grid
-  // (≥1100px) gibt die Layout-Klasse `share-toc-collapsed` die linke Spalte frei
-  // (Text rückt nach). Zustand pro Browser in localStorage. Nur aktiv, wenn
-  // überhaupt ein TOC da ist.
-  (function setupTocToggle() {
-    const layout = document.querySelector('.share-layout');
-    const toc = document.querySelector('.share-toc');
-    const heading = toc && toc.querySelector('.share-toc__heading');
-    if (!layout || !toc || !heading) return;
-    const KEY = 'sw_share_toc_collapsed';
-    const sec = menuSection();
-    const btn = el('button', 'share-action-btn');
-    btn.type = 'button';
-    btn.appendChild(el('span', 'share-action-btn__label', heading.textContent));
-    sec.appendChild(btn);
-    function apply(collapsed, persist) {
-      layout.classList.toggle('share-toc-collapsed', collapsed);
-      btn.classList.toggle('share-action-btn--active', !collapsed);
-      btn.setAttribute('aria-pressed', collapsed ? 'false' : 'true');
-      if (persist) { try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch {} }
-    }
-    let collapsed = false;
-    try { collapsed = localStorage.getItem(KEY) === '1'; } catch {}
-    apply(collapsed, false);
-    btn.addEventListener('click', () => apply(!layout.classList.contains('share-toc-collapsed'), true));
-  })();
-
-  // Auto-Hide-Scrollbar an TOC + Kommentar-Leiste (≥1100px eigene Scroll-Container),
-  // gleiches Pattern wie Sidebar-Tree + Bucheditor-Inhaltsverzeichnis in der SPA.
-  bindScrollFade(document.querySelector('.share-toc'));
-  bindScrollFade(document.querySelector('.share-comments'));
-
-  // ── Inhaltsverzeichnis → sanftes Scrollen zur Sektion ────────────────────────
-  // Native Anchor-Sprünge landen hart hinter dem Sticky-Header. Stattdessen
-  // smooth scrollen mit Header-Offset und die Ziel-Überschrift kurz aufleuchten
-  // lassen (reduced-motion respektiert → kein Smooth, nur Flash).
-  function tocHeaderOffset() {
-    const h = document.querySelector('.share-header');
-    return (h ? h.getBoundingClientRect().height : 0) + 16;
-  }
-  function flashTarget(elm) {
-    elm.classList.remove('share-flash');
-    void elm.offsetWidth; // Reflow → Animation neu starten
-    elm.classList.add('share-flash');
-    elm.addEventListener('animationend', () => elm.classList.remove('share-flash'), { once: true });
-  }
-  document.querySelectorAll('.share-toc__link').forEach((link) => {
-    link.addEventListener('click', (ev) => {
-      const id = (link.getAttribute('href') || '').replace(/^#/, '');
-      if (!id) return;
-      const target = document.getElementById(id);
-      if (!target) return;
-      ev.preventDefault();
-      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const top = window.scrollY + target.getBoundingClientRect().top - tocHeaderOffset();
-      window.scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' });
-      flashTarget(target);
-      try { history.replaceState(null, '', '#' + id); } catch {}
-    });
-  });
 
   // ── Selektions-Button + Composer ─────────────────────────────────────────────
   const selBtn = el('button', 'share-sel-btn', t('anchor_cta'));

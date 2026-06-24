@@ -240,7 +240,9 @@
             </template>
           </div>
 
-          <div class="comment-rail__comment">
+          <div class="comment-rail__comment internal-link" role="button" tabindex="0"
+               @click="selectCommentThread(thread.root.id)"
+               @keydown.enter.prevent="selectCommentThread(thread.root.id)">
             <div class="comment-rail__meta">
               <span class="comment-rail__avatar" aria-hidden="true"
                     :style="`--avatar-hue: ${commentAvatar(thread.root).hue}`"
@@ -308,10 +310,10 @@
   </div><!-- /.book-editor-layout -->
 
   <!-- Allgemeine (nicht-verankerte) Kommentare des ganzen Buchs (alle Link-Scopes).
-       Kein Textanker → eigene Vollbreiten-Bande UNTER dem ganzen Layout (kein
-       Grid-Item, damit sie nicht mit der langen Outline-Spalte kollidiert),
-       klar vom Buchtext abgesetzt. Kein Quote/Highlight; sonst identische
-       Aktionen wie die verankerten Threads. -->
+       Kein Textanker → zentrierter Block UNTER dem ganzen Layout (kein Grid-Item,
+       damit er nicht mit der langen Outline-Spalte kollidiert), auf den Lese-Frame
+       des Streams beschränkt → mittig unter dem Buchtext. Kein Quote/Highlight;
+       sonst identische Aktionen wie die verankerten Threads. -->
   <section class="book-editor-general comment-rail" x-cloak
              x-show="commentRailVisible && commentGeneralThreads.length"
              :aria-label="$app.t('share.comments.general')">
