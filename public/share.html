@@ -7,6 +7,7 @@
   <title>{{title}}</title>
   <link rel="stylesheet" href="/css/share.css">
   <link rel="stylesheet" href="/css/components/manuscript-stream.css">
+  <link rel="stylesheet" href="/css/components/comment-rail.css">
   <script src="/js/share-theme-init.js"></script>
 </head>
 <body class="share-page">
@@ -30,12 +31,20 @@
       <article class="share-content" id="share-article">{{content_html}}</article>
     </main>
 
+    <!-- Verankerte Anmerkungen: schwebende Karten auf Höhe ihrer Textstelle
+         (Google-Docs-Modell, vertikal positioniert via share-reader/layout.js).
+         .share-comments__list ist die Positionierungs-Ebene. -->
     <aside class="share-comments" aria-label="{{t_comments}}">
-      <h2 class="share-comments__heading">{{t_comments}}</h2>
-      <ol class="share-comments__list">{{comments_html}}</ol>
-      {{form_block}}
+      <ol class="share-comments__list">{{anchored_comments_html}}</ol>
     </aside>
   </div>
+
+  <!-- Allgemeine Kommentare (nicht verankert) + eigenes Formular, ganz unten. -->
+  <section class="share-general" id="share-general" aria-label="{{t_general_heading}}">
+    <h2 class="share-general__heading">{{t_general_heading}}</h2>
+    <ol class="share-general__list">{{general_comments_html}}</ol>
+    {{form_block}}
+  </section>
 
   <footer class="share-footer">
     <a class="share-footer__link" href="{{app_url}}" target="_blank" rel="noopener noreferrer">{{app_name}}</a>

@@ -4,7 +4,11 @@
    Seitentext. Split-Layout spiegelt das Lektorat-Split (editor/notebook/
    lektorat.css): Preview links, Leiste rechts, jede Spalte scrollt eigen.
    Aktiv, sobald .editor-body-wrap die Klasse `comments-split` trägt
-   (Root-Flag pageCommentRailOpen, gespiegelt aus editorCommentsCard). */
+   (Root-Flag pageCommentRailOpen, gespiegelt aus editorCommentsCard).
+
+   Die Thread-Karten-Optik (Shell, Quote, Meta/Avatar, Body, Antwort-Box,
+   Diff) lebt geteilt in components/comment-rail.css; hier bleiben nur Layout,
+   Rail-Container, Kopf/Sektion, die Icon-Aktions-Buttons und die Highlights. */
 .editor-body-wrap.comments-split {
   display: grid;
   grid-template-columns: 1fr;
@@ -85,127 +89,14 @@
   color: var(--color-muted);
 }
 
-/* Schwebende Karte (Google-Docs-Optik): Elevation statt Vollrahmen, ruhig im
-   Grundzustand, hebt sich bei Hover/Selektion. Selektiert zeigt einen
-   Akzentbalken links (statt inset-box-shadow). */
-.comment-rail__thread {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-10);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
-}
-.comment-rail__thread:hover { box-shadow: var(--shadow-md); }
-.comment-rail__thread--selected {
-  border-color: var(--card-accent);
-  border-left-width: 3px;
-  box-shadow: var(--shadow-md);
-}
-.comment-rail__thread--resolved { opacity: 0.62; }
-
-.comment-rail__anchor { display: block; }
-/* Markierte Stelle als getönter Schnipsel mit Akzentbalken — greift die
-   In-Text-Markierung (::highlight(comment-rail-anchor)) auf, statt den Text in
-   literale Anführungszeichen zu setzen. Auf 2 Zeilen gekürzt. */
-.comment-rail__quote {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  padding: 2px var(--space-6);
-  border-left: 3px solid color-mix(in srgb, var(--card-accent) 55%, transparent);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: color-mix(in srgb, var(--card-accent-share, var(--card-accent)) 10%, transparent);
-  font-size: 13px;
-  color: var(--color-muted);
-}
-.comment-rail__thread--selected .comment-rail__quote,
-.comment-rail__anchor:hover .comment-rail__quote {
-  border-left-color: var(--card-accent);
-  color: var(--color-text);
-}
-
-/* „Stelle seither geändert": Badge + Quote→aktuell-Inline-Diff. */
-.comment-rail__changed { display: flex; flex-direction: column; gap: 4px; }
-.comment-rail__changed-badge {
-  align-self: flex-start;
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--color-warn-bg);
-  color: var(--color-warn-text);
-  font-size: var(--font-size-xs);
-  font-weight: var(--fw-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-.comment-rail__quote--stale { opacity: 0.75; }
-.comment-rail-diff { font-size: 13px; line-height: 1.5; }
-.comment-rail-diff .diff-line { margin: 0; }
-.comment-rail-diff ins.diff-add {
+/* Zitat-Schnipsel + Kommentar tragen `.internal-link` nur für die Tastatur-
+   Delegation. Der globale `.internal-link:hover`-Underline ist hier unerwünscht —
+   der Hover signalisiert sich bereits über Quote-Border/Color bzw. die
+   Thread-Box-Shadow. */
+.comment-rail__anchor.internal-link:hover,
+.comment-rail__comment.internal-link:hover {
   text-decoration: none;
-  background: var(--color-ok-bg);
-  color: var(--color-ok-text);
-  border-radius: var(--radius-sm);
-  padding: 0 2px;
 }
-.comment-rail-diff del.diff-del {
-  text-decoration: line-through;
-  background: var(--color-err-bg);
-  color: var(--color-err-text);
-  border-radius: var(--radius-sm);
-  padding: 0 2px;
-}
-
-.comment-rail__comment { font-size: 14px; }
-.comment-rail__comment--reply {
-  margin-left: var(--space-sm);
-  padding-left: var(--space-sm);
-  border-left: 2px solid var(--color-border);
-}
-.comment-rail__comment--author { border-left-color: var(--card-accent); }
-.comment-rail__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  font-size: 12px;
-  color: var(--color-muted);
-  margin-bottom: var(--space-xs);
-}
-/* Initialen-Pip (spiegelt die presence-pip-Optik, DESIGN.md): eckiger Chip mit
-   deterministischer Hue pro Person über --avatar-hue. */
-.comment-rail__avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  font-size: var(--font-size-micro);
-  font-weight: var(--fw-semibold);
-  line-height: 1;
-  background: hsl(var(--avatar-hue, 220) 60% 88%);
-  color: hsl(var(--avatar-hue, 220) 60% 28%);
-  border: 1px solid hsl(var(--avatar-hue, 220) 60% 50%);
-  border-radius: var(--radius-sm);
-}
-@media (prefers-color-scheme: dark) {
-  .comment-rail__avatar {
-    background: hsl(var(--avatar-hue, 220) 40% 22%);
-    color: hsl(var(--avatar-hue, 220) 70% 78%);
-  }
-}
-.comment-rail__author {
-  font-weight: var(--fw-semibold);
-  color: var(--color-text);
-}
-.comment-rail__time { color: var(--color-muted); }
 
 /* Aktions-Cluster (Erledigen/Löschen) rechts in der Meta-Zeile, nur am
    selektierten Thread eingeblendet. Kleinere Icon-Buttons als der Rail-Header. */
@@ -225,39 +116,6 @@
 }
 /* Reply-Löschen sitzt rechts in der Antwort-Meta. */
 .comment-rail__reply-del { margin-left: auto; }
-.comment-rail__resolved {
-  font-size: 11px;
-  padding: var(--space-1) var(--space-6);
-  background: var(--color-tag-bg);
-  border-radius: var(--radius-sm);
-}
-.comment-rail__body { white-space: pre-wrap; }
-
-.comment-rail__foot {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  margin-top: var(--space-xs);
-  padding-top: var(--space-sm);
-  border-top: 1px dashed var(--color-border);
-}
-.comment-rail__reply { display: flex; flex-direction: column; gap: var(--space-6); }
-.comment-rail__textarea {
-  padding: var(--pad-btn-compact);
-  border: 1px solid var(--color-border-input);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.4;
-  resize: vertical;
-  min-height: 48px;
-}
-/* Mobile: 16px verhindert iOS-Zoom beim Fokus. */
-@media (max-width: 768px) {
-  .comment-rail__textarea { font-size: var(--font-size-reading); }
-}
 
 /* Verankerte Stellen im Text: dezent alle, kräftig die selektierte. Gepunktete
    Unterstreichung markiert die Stelle als „kommentiert", die selektierte bekommt

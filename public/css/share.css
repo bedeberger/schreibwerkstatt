@@ -31,6 +31,7 @@
   --share-radius: 8px;
   --share-radius-sm: 4px;
   --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --share-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.16);
   color-scheme: light;
 
   /* Brücke auf den geteilten Manuskript-Stream-Look
@@ -61,6 +62,7 @@ html[data-theme="dark"] {
   --share-border: rgba(255, 255, 255, 0.12);
   --share-hover: rgba(255, 255, 255, 0.06);
   --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --share-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
 
@@ -78,6 +80,7 @@ html[data-theme="dark"] {
     --share-border: rgba(255, 255, 255, 0.12);
     --share-hover: rgba(255, 255, 255, 0.06);
     --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --share-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }
 }
@@ -94,6 +97,27 @@ body.share-page {
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Theming-Brücke für die geteilten Kommentar-Karten
+     (public/css/components/comment-rail.css): mappt die --cr-*-Schnittstelle auf
+     das Share-Token-Universum. Page-weit, weil die Karten in zwei getrennten
+     Bereichen leben (.share-comments = verankert, .share-general = allgemein). */
+  --cr-surface: var(--share-surface);
+  --cr-border: var(--share-border);
+  --cr-border-input: var(--share-border);
+  --cr-accent: var(--share-accent);
+  --cr-text: var(--share-text);
+  --cr-muted: var(--share-muted);
+  --cr-radius: var(--share-radius);
+  --cr-radius-sm: var(--share-radius-sm);
+  --cr-shadow: var(--share-shadow);
+  --cr-shadow-hover: var(--share-shadow-md);
+  --cr-tag-bg: var(--share-hover);
+  --cr-warn-bg: color-mix(in srgb, var(--share-accent-2) 18%, transparent);
+  --cr-warn-text: var(--share-accent-2);
+  --cr-ok-bg: color-mix(in srgb, #3a8f3e 22%, transparent);
+  --cr-ok-text: var(--share-text);
+  --cr-err-bg: color-mix(in srgb, #c43838 20%, transparent);
+  --cr-err-text: var(--share-muted);
 }
 
 .share-skip {
@@ -449,36 +473,65 @@ body.share-page {
     align-items: start;
   }
   .share-layout .share-main { max-width: none; margin: 0; padding-right: 0; }
+  /* Kommentar-Spalte: kein eigener Scroll-Container — sie scrollt mit dem Fenster
+     mit, damit die Karten auf Höhe ihrer Textstelle schweben können (Google-Docs).
+     Beginnt in derselben Grid-Zeile wie der Artikel (align-items:start) → Abstand
+     „Textstelle → Spalten-Oberkante" ist scroll-invariant. */
   .share-layout .share-comments {
     max-width: none;
     margin: 0;
-    padding: 32px 24px 32px 0;
-    position: sticky;
-    top: 92px;
-    max-height: calc(100vh - 112px);
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
+    padding: 32px 0 32px 0;
   }
+  /* Positionierungs-Ebene: Karten liegen absolut, Höhe kommt vom Layout-JS. */
+  .share-layout .share-comments__list {
+    position: relative;
+    height: var(--layer-height, auto);
+    margin: 0;
+    display: block;
+  }
+  /* Karten bleiben unsichtbar, bis das Layout-JS sie einmal positioniert hat
+     (sonst stapeln sie für 2 rAF-Frames auf top:0 und „fliegen" via top-Transition
+     an ihren Platz). `.is-positioned` setzt das Layout nach dem ersten Pass. */
+  .share-layout .share-comments__list > .share-thread {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: var(--comment-top, 0);
+    opacity: 0;
+  }
+  .share-layout .share-comments__list.is-positioned > .share-thread {
+    opacity: 1;
+    transition: top 0.18s ease;
+  }
+  /* Marker-Tick im linken Spaltenrand auf der echten Anker-Höhe (vor Kollision) —
+     hält den Bezug zur Textstelle, wenn die Karte nach unten verschoben wurde. */
+  .share-layout .share-comments__list > .share-thread-marker {
+    display: block;
+    position: absolute;
+    left: -10px;
+    top: var(--marker-top, 0);
+    width: 3px;
+    height: 18px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--share-accent) 45%, transparent);
+    pointer-events: none;
+  }
+  .share-layout .share-comments__list > .share-thread-marker:not([style*="--marker-top"]) { display: none; }
 
-  /* Scrollbar an TOC + Kommentar-Leiste nur während des Scrollens sichtbar
-     (`.is-scrolling` von share-reader.js, Idle-Fade), Gutter via thin reserviert
-     → kein Layout-Shift. Gleiches Auto-Hide-Pattern wie in der SPA. */
-  .share-layout .share-comments.is-scrolling,
+  /* Scrollbar am TOC nur während des Scrollens sichtbar (`.is-scrolling` von
+     share-reader.js, Idle-Fade), Gutter via thin reserviert → kein Layout-Shift.
+     Gleiches Auto-Hide-Pattern wie in der SPA. */
   .share-layout--has-toc .share-toc.is-scrolling {
     scrollbar-color: var(--share-muted) transparent;
   }
-  .share-layout .share-comments::-webkit-scrollbar,
   .share-layout--has-toc .share-toc::-webkit-scrollbar {
     width: 8px;
   }
-  .share-layout .share-comments::-webkit-scrollbar-thumb,
   .share-layout--has-toc .share-toc::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: var(--share-radius-sm);
     transition: background 0.4s ease;
   }
-  .share-layout .share-comments.is-scrolling::-webkit-scrollbar-thumb,
   .share-layout--has-toc .share-toc.is-scrolling::-webkit-scrollbar-thumb {
     background: var(--share-muted);
   }
@@ -534,7 +587,14 @@ body.share-page {
     max-width: calc(82ch + 520px + 72px);
   }
 }
-.share-comments__heading {
+/* Abgesetzte Sektion ganz unten: allgemeine (nicht verankerte) Kommentare +
+   eigenes Formular. Volle Lesespalten-Breite, zentriert wie Header/Footer. */
+.share-general {
+  max-width: 70ch;
+  margin: 0 auto;
+  padding: 8px 24px 56px;
+}
+.share-general__heading {
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 16px;
@@ -542,7 +602,8 @@ body.share-page {
   border-bottom: 1px solid var(--share-border);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
-.share-comments__list {
+.share-comments__list,
+.share-general__list {
   list-style: none;
   margin: 0 0 24px;
   padding: 0;
@@ -550,6 +611,8 @@ body.share-page {
   flex-direction: column;
   gap: 12px;
 }
+/* Marker-Ticks nur im verankerten Desktop-Layout (≥1100px-Branch setzt display). */
+.share-thread-marker { display: none; }
 .share-comments__item {
   padding: 12px 14px;
   background: var(--share-surface);
@@ -788,64 +851,17 @@ body.share-page {
   color: var(--share-muted);
 }
 
-/* Thread-Karten in der Anmerkungs-Liste. */
-.share-thread { position: relative; }
-.share-thread--active {
-  border-color: var(--share-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--share-accent) 35%, transparent);
-}
-.share-thread--resolved { opacity: 0.66; }
-.share-thread__anchor {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-.share-thread__anchor--clickable { cursor: pointer; }
-.share-thread__anchor--clickable:hover .share-thread__quote { color: var(--share-accent); }
-.share-thread__anchor-label { color: var(--share-faint); text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
-.share-thread__quote { color: var(--share-muted); font-style: italic; }
+/* Thread-Karten: Optik geteilt über components/comment-rail.css (.comment-rail__*,
+   gemappt via --cr-* auf .share-comments). Hier nur die share-spezifische Chrome,
+   die der Reader (kein Icon-/Button-System, kein Alpine) abweichend braucht:
+   Anker-Stale-Pille, Text-Aktions-Buttons und der Fokus-Ring der geteilten
+   Antwort-Textarea. */
 .share-thread__stale {
   color: var(--share-muted);
   background: var(--share-hover);
   border-radius: var(--share-radius-sm);
   padding: 1px 6px;
   font-size: 11px;
-}
-/* „Stelle seither geändert": Quote→aktuell-Wortdiff unter der Anker-Zeile. */
-.share-thread__diff {
-  margin: 4px 0 2px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--share-muted);
-}
-.share-thread__diff ins.diff-add {
-  text-decoration: none;
-  background: color-mix(in srgb, #3a8f3e 22%, transparent);
-  color: var(--share-text);
-  border-radius: var(--share-radius-sm);
-  padding: 0 2px;
-}
-.share-thread__diff del.diff-del {
-  text-decoration: line-through;
-  background: color-mix(in srgb, #c43838 20%, transparent);
-  color: var(--share-muted);
-  border-radius: var(--share-radius-sm);
-  padding: 0 2px;
-}
-
-.share-comment__who--author { color: var(--share-accent-2); font-weight: 600; }
-.share-thread__resolved-badge {
-  display: inline-block;
-  margin-bottom: 6px;
-  padding: 1px 8px;
-  background: color-mix(in srgb, var(--share-accent) 16%, transparent);
-  color: var(--share-accent);
-  border-radius: var(--share-radius-sm);
-  font-size: 11px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 /* Self-Service-Aktionen am eigenen Kommentar (Erledigt / Löschen). Dezente
    Text-Buttons, damit sie die Lese-Anmerkung nicht dominieren. */
@@ -868,33 +884,8 @@ body.share-page {
 .share-thread__action:hover { color: var(--share-accent); text-decoration: underline; }
 .share-thread__action--danger:hover { color: #c43838; }
 .share-thread__action:disabled { opacity: 0.6; cursor: not-allowed; text-decoration: none; }
-.share-thread__replies {
-  margin-top: 10px;
-  padding-left: 12px;
-  border-left: 2px solid var(--share-border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.share-thread__reply-item--author .share-comment__who { color: var(--share-accent-2); }
-.share-thread__reply {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
-}
-.share-thread__reply textarea {
-  border: 1px solid var(--share-border);
-  background: var(--share-bg);
-  color: var(--share-text);
-  border-radius: var(--share-radius-sm);
-  padding: 8px 10px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 15px;
-  resize: vertical;
-}
-.share-thread__reply textarea:focus { outline: 2px solid var(--share-accent); outline-offset: -1px; }
 .share-thread__reply-actions { display: flex; align-items: center; gap: 8px; }
+.share-page .comment-rail__textarea:focus { outline: 2px solid var(--share-accent); outline-offset: -1px; }
 
 .share-footer {
   max-width: 70ch;
@@ -924,6 +915,7 @@ body.share-page {
   .share-header__inner { padding: 12px 18px; }
   .share-header__title { font-size: 22px; }
   .share-main { padding: 24px 18px 36px; }
-  .share-comments { padding: 0 18px 36px; }
+  .share-comments { padding: 0 18px 24px; }
+  .share-general { padding: 8px 18px 44px; }
   .share-comments__form { padding: 12px; }
 }

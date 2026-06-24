@@ -26,7 +26,7 @@ function loadDiffLib() {
 export function appendQuoteDiff(container, oldText, newText) {
   loadDiffLib().then((Diff) => {
     if (!Diff || typeof Diff.diffWords !== 'function') return;
-    const wrap = el('div', 'share-thread__diff');
+    const wrap = el('div', 'comment-rail-diff');
     for (const part of Diff.diffWords(oldText || '', newText || '')) {
       if (part.added) wrap.appendChild(el('ins', 'diff-add', part.value));
       else if (part.removed) wrap.appendChild(el('del', 'diff-del', part.value));

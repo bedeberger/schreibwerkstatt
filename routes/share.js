@@ -253,11 +253,13 @@ router.get('/:token', async (req, res) => {
   const tocBlock = link.show_toc ? buildTocBlock(content, lang) : '';
   const layoutClass = tocBlock ? 'share-layout--has-toc' : '';
 
-  // SSR-Fallback zeigt nur allgemeine Anmerkungen (kein Anker, kein Reply) —
-  // verankerte Threads werden client-seitig via /threads hydriert (share-reader.js).
+  // SSR-Fallback zeigt nur allgemeine Anmerkungen (kein Anker, kein Reply) in der
+  // unteren Sektion. Verankerte Threads werden client-seitig via /threads in die
+  // schwebende Leiste hydriert (share-reader.js) — ohne JS nicht positionierbar,
+  // daher SSR-Rail leer.
   const comments = shareLinks.listCommentsByToken(token, { order: 'desc' })
     .filter(c => !c.parent_id && !c.anchor_bid);
-  const commentsHtml = comments.length
+  const generalCommentsHtml = comments.length
     ? comments.map(c => `<li class="share-comments__item">
         <div class="share-comments__meta">${escHtml(c.reader_name || tServer('share.reader.anon', lang))} · ${escHtml(c.created_at)}</div>
         <div class="share-comments__body">${escHtml(c.body)}</div>
@@ -300,10 +302,10 @@ router.get('/:token', async (req, res) => {
   // "application/json"> — `<` escapen, damit kein `</script>`-Breakout moeglich.
   const readerKeys = ['anchor_cta', 'composer_title', 'composer_general_title', 'reply',
     'reply_placeholder', 'send', 'cancel', 'you_badge', 'author_badge', 'resolved_badge',
-    'jump_to_text', 'anchor_stale', 'anchor_changed', 'threads_heading', 'threads_empty', 'quote_label',
+    'jump_to_text', 'anchor_stale', 'anchor_changed', 'threads_heading', 'threads_empty',
     'your_name', 'comment_as', 'change_name', 'set_name', 'name_modal_title', 'name_modal_intro',
     'name_modal_save', 'name_modal_skip', 'anon', 'comment_form_body', 'comment_form_submit',
-    'comment_submitted', 'comment_rate_limited', 'form_empty', 'form_error',
+    'comment_submitted', 'comment_rate_limited', 'form_empty', 'form_error', 'comments_empty',
     'options_label', 'theme_label', 'theme_auto', 'theme_light', 'theme_dark',
     'delete', 'delete_confirm', 'mark_done', 'reopen', 'delete_has_replies'];
   const readerI18n = {};
@@ -324,10 +326,12 @@ router.get('/:token', async (req, res) => {
     t_by: escHtml(tServer('share.reader.by', lang)),
     t_skip: escHtml(tServer('share.reader.skip_to_content', lang)),
     t_comments: escHtml(tServer('share.reader.comments_heading', lang)),
+    t_general_heading: escHtml(tServer('share.reader.general_heading', lang)),
     intro_block: introBlock,
     toc_block: tocBlock,
     content_html: content.html,
-    comments_html: commentsHtml,
+    anchored_comments_html: '',
+    general_comments_html: generalCommentsHtml,
     form_block: formBlock,
     app_name: 'Schreibwerkstatt',
     app_url: escHtml((appSettings.get('app.public_url') || '').replace(/\/$/, '') || '/'),
