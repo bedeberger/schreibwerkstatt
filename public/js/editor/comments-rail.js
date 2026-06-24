@@ -26,10 +26,10 @@ const rail = createCommentRail({
   hlAll: 'comment-rail-anchor',
   hlActive: 'comment-rail-anchor-active',
   keys: {
-    comments: 'bookComments', threads: 'pageThreads', selectedRootId: 'selectedRootId',
-    railVisible: 'railVisible', replyDrafts: 'replyDrafts', savingReply: 'savingReply',
-    savingResolve: 'savingResolve', loadingBookId: '_loadingBookId', recomputeRaf: '_recomputeRaf',
-    pendingGotoBid: '_pendingGotoBid', generalThreads: 'generalThreads',
+    comments: 'bookComments', threads: 'commentThreads', selectedRootId: 'commentSelectedRootId',
+    railVisible: 'commentRailVisible', replyDrafts: 'commentReplyDrafts', savingReply: 'commentSavingReply',
+    savingResolve: 'commentSavingResolve', loadingBookId: '_loadingBookId', recomputeRaf: '_recomputeRaf',
+    pendingGotoBid: '_pendingGotoBid', generalThreads: 'commentGeneralThreads',
   },
   // Allgemeine (nicht-verankerte) Kommentare gehören in diese Seitenleiste, wenn der
   // Link ein Page-Share genau der offenen Seite ist — Buch-/Kapitel-Share-Allgemeines
@@ -53,14 +53,16 @@ const rail = createCommentRail({
 export const editorCommentsRailMethods = {
   ...rail,
 
-  // Partial-erwartete Methodennamen → geteilter Kern.
+  // Partial-erwartete Methodennamen → geteilter Kern. Die im geteilten Body-
+  // Fragment (comment-thread-body.html) referenzierten Namen sind mit dem
+  // Bucheditor vereinheitlicht (comment*-Präfix).
   loadBookComments(bookId) { return this._railLoad(bookId); },
   scheduleRecompute() { return this._railSchedule(); },
   recomputePageThreads() { return this._railRecompute(); },
-  selectThread(rootId) { return this._railSelect(rootId); },
-  replyToRoot(thread) { return this._railReply(thread); },
-  toggleResolve(comment) { return this._railResolve(comment); },
-  deleteComment(comment) { return this._railDelete(comment); },
+  selectCommentThread(rootId) { return this._railSelect(rootId); },
+  replyToCommentRoot(thread) { return this._railReply(thread); },
+  toggleCommentResolve(comment) { return this._railResolve(comment); },
+  deleteBookComment(comment) { return this._railDelete(comment); },
 
   init() {
     this._railAbort = new AbortController();
@@ -69,7 +71,7 @@ export const editorCommentsRailMethods = {
     // Seitenwechsel: Leiste einklappen (Toggle ist pro Seite — sonst „folgt" der
     // offene Zustand auf die nächste Seite, die zufällig Kommentare hat) + neu
     // auflösen. Edit↔Read / frisch gerendertes Seiten-HTML nur neu auflösen.
-    this.$watch(() => window.__app?.currentPage?.id, () => { this.railVisible = false; this.scheduleRecompute(); });
+    this.$watch(() => window.__app?.currentPage?.id, () => { this.commentRailVisible = false; this.scheduleRecompute(); });
     this.$watch(() => window.__app?.editMode, () => this.scheduleRecompute());
     this.$watch(() => window.__app?.checkDone, () => this.scheduleRecompute());
     this.$watch(() => window.__app?.renderedPageHtml, () => this.scheduleRecompute());
@@ -82,7 +84,7 @@ export const editorCommentsRailMethods = {
     // Sprung aus der „Geteilte Links"-Karte (Seiten-Share): Leiste öffnen + Thread
     // zu diesem data-bid selektieren (Pendant zum Bucheditor-Sprung).
     window.addEventListener('comments-rail:goto', (e) => {
-      this.railVisible = true;
+      this.commentRailVisible = true;
       this._pendingGotoBid = e.detail?.bid || null;
       this.scheduleRecompute();
     }, { signal: this._railAbort.signal });
@@ -101,10 +103,10 @@ export const editorCommentsRailMethods = {
 
   async _onBookChange(bookId) {
     this.bookComments = [];
-    this.pageThreads = [];
-    this.generalThreads = [];
-    this.selectedRootId = null;
-    this.railVisible = false;
+    this.commentThreads = [];
+    this.commentGeneralThreads = [];
+    this.commentSelectedRootId = null;
+    this.commentRailVisible = false;
     this._pendingGotoBid = null;
     this._railClearHL();
     this._mirrorFlag();
@@ -127,12 +129,12 @@ export const editorCommentsRailMethods = {
     window.scrollTo({ top: window.scrollY + r.top - 140, behavior: 'smooth' });
   },
 
-  collapseRail() { this.railVisible = false; this._railClearHL(); this._mirrorFlag(); },
+  collapseRail() { this.commentRailVisible = false; this._railClearHL(); this._mirrorFlag(); },
   toggleRail() {
-    this.railVisible = !this.railVisible;
+    this.commentRailVisible = !this.commentRailVisible;
     // Highlights folgen der Sichtbarkeit: einblenden = neu lokalisieren+markieren,
     // ausblenden = Anker-Markierung im Seitentext entfernen.
-    if (this.railVisible) this.recomputePageThreads();
+    if (this.commentRailVisible) this.recomputePageThreads();
     else { this._railClearHL(); this._mirrorFlag(); }
   },
 
@@ -145,8 +147,8 @@ export const editorCommentsRailMethods = {
     if (!app) return;
     // Verankerte + allgemeine (Page-Share dieser Seite) Threads zählen.
     const onPage = !app.editMode && !app.checkDone
-      ? this.pageThreads.length + (this.generalThreads?.length || 0) : 0;
+      ? this.commentThreads.length + (this.commentGeneralThreads?.length || 0) : 0;
     app.pageCommentCount = onPage;
-    app.pageCommentRailOpen = !!(this.railVisible && onPage);
+    app.pageCommentRailOpen = !!(this.commentRailVisible && onPage);
   },
 };

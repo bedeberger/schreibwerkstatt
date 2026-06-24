@@ -338,8 +338,8 @@ export function registerShareLinksCard() {
       const pageId = link.page_id;
       if (!pageId) { this.loadError = app.t('share.comments.pageGone'); return; }
       app.gotoPageById(pageId);
-      // Verzögert, damit der Seitenwechsel-Reset der Leiste (railVisible=false im
-      // currentPage-Watcher) zuerst läuft und das Öffnen gewinnt.
+      // Verzögert, damit der Seitenwechsel-Reset der Leiste (commentRailVisible=false
+      // im currentPage-Watcher) zuerst läuft und das Öffnen gewinnt.
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('comments-rail:goto'));
       }, 0);

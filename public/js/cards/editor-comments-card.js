@@ -13,14 +13,14 @@ import { editorCommentsRailMethods } from '../editor/comments-rail.js';
 export function registerEditorCommentsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('editorCommentsCard', () => ({
-    bookComments: [],     // Rohzeilen aller Link-Kommentare des Buchs
-    pageThreads: [],      // Threads, die auf der aktuellen Seite verankert sind
-    generalThreads: [],   // allgemeine (nicht-verankerte) Kommentare von Page-Shares dieser Seite
-    selectedRootId: null,
-    railVisible: false,  // Default verborgen; Sichtbarkeit über Toggle-Button in den Seiten-Actions
-    replyDrafts: {},
-    savingReply: null,
-    savingResolve: null,
+    bookComments: [],          // Rohzeilen aller Link-Kommentare des Buchs
+    commentThreads: [],        // Threads, die auf der aktuellen Seite verankert sind
+    commentGeneralThreads: [], // allgemeine (nicht-verankerte) Kommentare von Page-Shares dieser Seite
+    commentSelectedRootId: null,
+    commentRailVisible: false, // Default verborgen; Sichtbarkeit über Toggle-Button in den Seiten-Actions
+    commentReplyDrafts: {},
+    commentSavingReply: null,
+    commentSavingResolve: null,
     // transiente Helfer (kein reaktiver State):
     _railAbort: null,
     _recomputeRaf: null,
