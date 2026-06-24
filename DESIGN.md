@@ -1041,6 +1041,10 @@ CSS in [public/css/layout/utilities.css](public/css/layout/utilities.css). Mobil
 
 ## Layout
 
+### Regel: Karten-Inhalt nutzt die volle Breite
+
+Listen, Zeilen und Card-Inhalte spannen **immer** die volle verfügbare Card-Breite. Keine `max-width`-Klammer und keine künstliche Lese-Breite, die auf breiten Screens (1440 px+) eine leere Spalte rechts hinterlässt — das wirkt wie ein Bug, nicht wie Absicht. Gestreckte Zeilen (Name links, Aktion/Badge rechts) sind erwünscht; sie werden über Flex/Grid-Spaltenstruktur sauber ausgerichtet, **nicht** über eine Breitenbegrenzung gebändigt. Gilt insbesondere für Figuren-Liste (`.figur-item`) und Buchorganizer (`.organizer-page`).
+
 ### Zwei-Spalten (Sidebar + Main)
 
 **Use:** Haupt-Editor-Layout (Tree links, Editor mittig, optional Chat rechts).

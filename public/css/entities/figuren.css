@@ -216,7 +216,6 @@
   margin-top: var(--space-lg);
   border-top: 0.5px solid var(--color-border);
   padding-top: var(--space-14);
-  max-width: var(--measure-list);
 }
 .figur-list-header {
   display: flex;
