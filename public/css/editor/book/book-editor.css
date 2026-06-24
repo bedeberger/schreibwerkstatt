@@ -53,9 +53,11 @@
     inset-inline: 0;
     top: var(--comment-top, 0);
     /* Vor erster Vermessung verborgen (aber mit Layout → offsetHeight messbar),
-       damit Karten nicht für einen Frame deckungsgleich bei 0 aufblitzen. */
+       damit Karten nicht für einen Frame deckungsgleich bei 0 aufblitzen.
+       Positionswechsel (--comment-top) sind hart, ohne Animation — analog zur
+       Share-Reader-Leiste (share.css), damit beide Leisten gleich wirken. */
     visibility: hidden;
-    transition: top var(--transition-base) ease, box-shadow var(--transition-fast), border-color var(--transition-fast);
+    transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
   }
   .book-editor-comments__layer > .comment-rail__thread.is-positioned { visibility: visible; }
   /* Selektierte Karte über die Nachbarn heben (z-index), damit ihr Schatten +

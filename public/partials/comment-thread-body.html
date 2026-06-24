@@ -21,7 +21,7 @@
     <span class="comment-rail__time" x-text="$app.formatRelativeShort(thread.root.created_at)"></span>
     <span x-show="thread.root.resolved_at" class="comment-rail__resolved"
           x-text="$app.t('share.comments.resolved')"></span>
-    <span class="comment-rail__thread-actions" x-show="commentSelectedRootId === thread.root.id">
+    <span class="comment-rail__thread-actions">
       <button type="button" class="icon-btn icon-btn--ghost"
               :class="{ 'icon-btn--success': !thread.root.resolved_at }"
               :disabled="commentSavingResolve === thread.root.id"

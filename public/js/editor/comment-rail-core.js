@@ -27,24 +27,6 @@ function highlightsApi() {
   return (typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight !== 'undefined') ? CSS.highlights : null;
 }
 
-// Phantom-Hover-Schutz: die Aktions-Buttons (Erledigen/Löschen) erscheinen per
-// x-show genau dort, wo der Klick-Cursor noch ruht. Der Browser wertet :hover
-// sofort gegen die aktuelle Cursor-Position aus, sodass der frisch
-// eingeblendete Button „gehovert" wirkt (grüne Tönung bei Erledigen), ohne dass
-// der User die Maus bewegt hat. Bis zur ersten echten Zeiger-Bewegung die
-// Aktionen via Body-Klasse hover-/klick-inert schalten (CSS: pointer-events:none).
-function armCommentActionHover() {
-  const cls = 'comment-rail-hover-armed';
-  document.body.classList.add(cls);
-  const clear = () => {
-    document.body.classList.remove(cls);
-    window.removeEventListener('pointermove', clear);
-    window.removeEventListener('pointerdown', clear);
-  };
-  window.addEventListener('pointermove', clear, { once: true });
-  window.addEventListener('pointerdown', clear, { once: true });
-}
-
 // Klick-Koordinaten → (Textknoten, Offset). Highlights (CSS Custom Highlight API)
 // sind nicht klickbar — darum den Caret-Punkt unter dem Klick auflösen und gegen
 // die Kommentar-Ranges testen. Zwei Browser-APIs (Standard + WebKit-Legacy).
@@ -217,8 +199,6 @@ export function createCommentRail(cfg) {
       const api = highlightsApi();
       if (api) { try { api.delete(cfg.hlActive); } catch {} }
       if (!this[K.selectedRootId]) return;
-      // Aktionen erscheinen jetzt unter dem ruhenden Cursor → Phantom-Hover sperren.
-      armCommentActionHover();
       // Verankerte Threads hervorheben; allgemeine (General-Bucket, kein Anker)
       // klappen nur ihre Aktionen auf — kein Range zum Markieren/Scrollen.
       const thread = this[K.threads].find(t => t.root.id === rootId);

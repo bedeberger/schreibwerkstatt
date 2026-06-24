@@ -12,6 +12,7 @@
 // aktive Karte auf ihre exakte Anker-Höhe gepinnt, die übrigen darum herum gelegt.
 
 import { locateRange } from '../share-anchor.js';
+import { resolveCardPositions } from '../comment-card-layout.js';
 
 const CARD_GAP = 10;
 // Unter diesem Viewport fällt die Leiste auf eine statische Stapel-Liste zurück
@@ -77,6 +78,7 @@ export function createCardLayout(opts) {
     const activeId = getActiveId();
 
     // 1) Anker-Y + gemessene Kartenhöhe pro Thread; Marker auf echte Anker-Höhe.
+    //    Karten ohne DOM-Element (noch nicht gerendert) fallen raus.
     const items = cards.map((c) => {
       const el = layer.querySelector(`.share-thread[data-comment-id="${CSS.escape(String(c.id))}"]`);
       const marker = layer.querySelector(`.share-thread-marker[data-marker-for="${CSS.escape(String(c.id))}"]`);
@@ -86,45 +88,18 @@ export function createCardLayout(opts) {
         if (y == null) marker.style.removeProperty('--marker-top');
         else marker.style.setProperty('--marker-top', Math.round(y) + 'px');
       }
-      return { c, el, marker, y, h: el ? el.offsetHeight : 0 };
+      return { id: c.id, el, y, h: el ? el.offsetHeight : 0 };
+    }).filter((it) => it.el);
+
+    // 2) Kollisions-Auflösung (Pin/greedy + Überlappungs-Sweep) im geteilten Kern
+    //    (comment-card-layout.js, SSoT mit der Bucheditor-Leiste).
+    const { tops, bottom } = resolveCardPositions({
+      items: items.map(({ id, y, h }) => ({ id, y, h })),
+      activeId,
+      gap: CARD_GAP,
     });
-
-    const located = items.filter((it) => it.y != null && it.el).sort((a, b) => a.y - b.y);
-    const floating = items.filter((it) => it.y == null && it.el);
-
-    // 2) Kollisions-Auflösung → Wunsch-Tops. Bei Auswahl die aktive Karte auf ihre
-    //    echte Höhe pinnen und die übrigen darum legen; sonst greedy top-down.
-    const pin = located.find((it) => it.c.id === activeId);
-    if (pin) {
-      const pi = located.indexOf(pin);
-      pin.top = Math.max(0, pin.y);
-      let cur = pin.top + pin.h + CARD_GAP;
-      for (const it of located.slice(pi + 1)) { const top = Math.max(it.y, cur); it.top = top; cur = top + it.h + CARD_GAP; }
-      let curBottom = pin.top - CARD_GAP;
-      for (const it of located.slice(0, pi).reverse()) {
-        let top = Math.min(it.y, curBottom - it.h);
-        if (top < 0) top = 0;
-        it.top = top; curBottom = top - CARD_GAP;
-      }
-    } else {
-      let cur = 0;
-      for (const it of located) { const top = Math.max(it.y, cur); it.top = top; cur = top + it.h + CARD_GAP; }
-    }
-
-    // 2b) Finaler Vorwärts-Sweep erzwingt Überlappungsfreiheit (der Pin-Aufwärts-
-    //     zweig kann mehrere Karten auf top:0 klemmen). Reicht der Platz → No-op.
-    located.sort((a, b) => a.top - b.top);
-    let prevBottom = -Infinity;
-    for (const it of located) { const top = Math.max(it.top, prevBottom + CARD_GAP, 0); it.top = top; prevBottom = top + it.h; }
-
-    // 3) Nicht lokalisierbare (Block gelöscht) unten anhängen.
-    let bottom = located.reduce((m, it) => Math.max(m, it.top + it.h), 0);
-    for (const it of floating) { it.top = bottom + CARD_GAP; bottom = it.top + it.h; }
-
-    for (const it of [...located, ...floating]) {
-      if (it.el) it.el.style.setProperty('--comment-top', Math.round(it.top) + 'px');
-    }
-    layer.style.setProperty('--layer-height', Math.max(0, Math.round(bottom)) + 'px');
+    for (const it of items) it.el.style.setProperty('--comment-top', Math.round(tops.get(it.id)) + 'px');
+    layer.style.setProperty('--layer-height', bottom + 'px');
     // Nach dem ersten Positionieren Karten einblenden (vorher unsichtbar, damit sie
     // nicht für 2 rAF-Frames auf top:0 aufblitzen). Positionswechsel sind hart, ohne
     // Scroll-Animation.

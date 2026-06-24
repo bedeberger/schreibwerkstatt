@@ -12,6 +12,7 @@
 
 import { createCommentRail } from './comment-rail-core.js';
 import { locateRange } from '../share-anchor.js';
+import { resolveCardPositions } from '../comment-card-layout.js';
 
 function streamEl() { return document.querySelector('.book-editor-stream'); }
 function layerEl() { return document.querySelector('.book-editor-comments__layer'); }
@@ -183,58 +184,20 @@ export const bookEditorCommentsMethods = {
     if (!threads.length) { this.commentStackHeight = 0; return; }
     const layerTop = layer.getBoundingClientRect().top;
 
-    // 1) Anker-Y + gemessene Kartenhöhe pro Thread.
+    // 1) Anker-Y + gemessene Kartenhöhe pro Thread; Marker auf echte Anker-Höhe.
     const items = threads.map((t) => {
       const y = this._commentAnchorY(t, view, layerTop);
       t._anchorY = y; // SSoT für Marker-Position (echte Stelle, vor Kollision)
       const el = layer.querySelector(`.comment-rail__thread[data-root-id="${CSS.escape(String(t.root.id))}"]`);
       this._observeForLayout(el);
-      return { t, y, h: el ? el.offsetHeight : 0 };
+      return { id: t.root.id, y, h: el ? el.offsetHeight : 0 };
     });
 
-    const located = items.filter((it) => it.y != null).sort((a, b) => a.y - b.y);
-    const floating = items.filter((it) => it.y == null);
-
-    // 2) Kollisions-Auflösung → Wunsch-Positionen. Bei Auswahl die aktive Karte
-    //    auf ihre echte Höhe pinnen und die übrigen darum herum legen; sonst
-    //    greedy top-down. Beide Zweige liefern nur Wunsch-Tops; die garantierte
-    //    Überlappungsfreiheit erzwingt der Vorwärts-Sweep darunter.
-    const pin = located.find((it) => it.t.root.id === this.commentSelectedRootId);
-    if (pin) {
-      const pi = located.indexOf(pin);
-      pin.t._railTop = Math.max(0, pin.y);
-      let cur = pin.t._railTop + pin.h + CARD_GAP;
-      for (const it of located.slice(pi + 1)) {
-        const top = Math.max(it.y, cur); it.t._railTop = top; cur = top + it.h + CARD_GAP;
-      }
-      let curBottom = pin.t._railTop - CARD_GAP;
-      for (const it of located.slice(0, pi).reverse()) {
-        let top = Math.min(it.y, curBottom - it.h);
-        if (top < 0) top = 0;
-        it.t._railTop = top; curBottom = top - CARD_GAP;
-      }
-    } else {
-      let cur = 0;
-      for (const it of located) { const top = Math.max(it.y, cur); it.t._railTop = top; cur = top + it.h + CARD_GAP; }
-    }
-
-    // 2b) Finaler Vorwärts-Sweep über die Wunsch-Tops erzwingt
-    //     Überlappungsfreiheit. Nötig, weil der Pin-Aufwärtszweig bei zu wenig
-    //     Platz oberhalb der gepinnten Karte mehrere Karten auf top:0 klemmt —
-    //     die würden sich sonst gegenseitig überdecken. Reicht der Platz, ist der
-    //     Sweep ein No-op (die Karten enden bereits >= CARD_GAP voneinander, der
-    //     Pin bleibt auf seiner Ankerhöhe).
-    located.sort((a, b) => a.t._railTop - b.t._railTop);
-    let prevBottom = -Infinity;
-    for (const it of located) {
-      const top = Math.max(it.t._railTop, prevBottom + CARD_GAP, 0);
-      it.t._railTop = top; prevBottom = top + it.h;
-    }
-
-    // 3) Nicht lokalisierbare (Fallback, in der Praxis leer) unten anhängen.
-    let bottom = located.reduce((m, it) => Math.max(m, it.t._railTop + it.h), 0);
-    for (const it of floating) { it.t._railTop = bottom + CARD_GAP; bottom = it.t._railTop + it.h; }
-
-    this.commentStackHeight = Math.max(0, Math.round(bottom));
+    // 2) Kollisions-Auflösung (Pin/greedy + Überlappungs-Sweep) im geteilten Kern
+    //    (comment-card-layout.js, SSoT mit der Share-Reader-Leiste). Tops zurück
+    //    auf die reaktiven Thread-Felder spiegeln (treibt `--comment-top` im Markup).
+    const { tops, bottom } = resolveCardPositions({ items, activeId: this.commentSelectedRootId, gap: CARD_GAP });
+    for (const t of threads) t._railTop = tops.get(t.root.id) ?? null;
+    this.commentStackHeight = bottom;
   },
 };

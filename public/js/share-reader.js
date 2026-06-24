@@ -325,25 +325,26 @@ import { setupComposer } from './share-reader/composer.js';
     // Anker-Zeile: getönter Quote-Snippet + Jump bzw. Stale-Hinweis.
     if (root.anchor) {
       const anchorRow = el('div', 'comment-rail__anchor');
-      const quote = el('span', 'comment-rail__quote', root.anchor.quote || '');
-      anchorRow.appendChild(quote);
       // resolveCurrentQuote trennt „Block weg" (gone) von „Text geändert"
       // (changed) — nur bei changed gibt es einen aktuellen Text zum Diffen.
       const res = resolveCurrentQuote(article, root.anchor);
       if (res.status === 'changed') {
-        quote.classList.add('comment-rail__quote--stale');
-        anchorRow.appendChild(el('span', 'share-thread__stale', t('anchor_changed')));
+        // Stelle seit dem Kommentar geändert: Badge + Quote→aktuell-Inline-Diff,
+        // Optik identisch zur Bucheditor-Leiste (.comment-rail__changed*,
+        // components/comment-rail.css). Kein separater Quote-Schnipsel mehr —
+        // der Diff zeigt den damaligen Wortlaut bereits als del-Knoten.
+        const changed = el('div', 'comment-rail__changed');
+        changed.appendChild(el('span', 'comment-rail__changed-badge', t('anchor_changed')));
+        appendQuoteDiff(changed, root.anchor.quote || '', res.currentText || '');
+        anchorRow.appendChild(changed);
         li.appendChild(anchorRow);
-        // Platzhalter direkt unter der Anker-Zeile, damit der async geladene
-        // Diff an der richtigen Stelle landet (nicht ans li-Ende).
-        const diffBox = el('div');
-        li.appendChild(diffBox);
-        appendQuoteDiff(diffBox, root.anchor.quote || '', res.currentText || '');
       } else if (root._stale || res.status === 'gone') {
-        quote.classList.add('comment-rail__quote--stale');
+        const quote = el('span', 'comment-rail__quote comment-rail__quote--stale', root.anchor.quote || '');
+        anchorRow.appendChild(quote);
         anchorRow.appendChild(el('span', 'share-thread__stale', t('anchor_stale')));
         li.appendChild(anchorRow);
       } else {
+        anchorRow.appendChild(el('span', 'comment-rail__quote', root.anchor.quote || ''));
         anchorRow.setAttribute('role', 'button');
         anchorRow.tabIndex = 0;
         const jump = () => scrollToAnchor(root.id);
