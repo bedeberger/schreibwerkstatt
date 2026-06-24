@@ -24,6 +24,9 @@
            :data-tip="$app.t('editor.revisions.viewer.openTitle')">
         <span class="history-date" x-text="$app.formatDate(rev.created_at)"></span>
         <span class="badge badge-ok" x-text="sourceLabel(rev.source)"></span>
+        <span class="tag" x-show="rev.client"
+              :data-tip="$app.t('editor.revisions.clientTitle')"
+              x-text="rev.client"></span>
         <span class="user-chip"
               x-show="rev.user_email && $app.bookSharedFlags?.[$app.selectedBookId]"
               :class="{ 'user-chip--self': isOwnRevision(rev) }"
@@ -87,6 +90,9 @@
                     x-text="isOwnRevision(viewerRev) ? $app.t('editor.revisions.byYou') : $app.userDisplayName(viewerRev.user_email)"></span>
             </span>
             <span class="tag" x-text="formatChars(viewerRev.chars) + ' ' + $app.t('editor.revisions.chars')"></span>
+            <span class="tag" x-show="viewerRev.client"
+                  :data-tip="$app.t('editor.revisions.clientTitle')"
+                  x-text="viewerRev.client"></span>
           </div>
           <button type="button"
                   class="revision-viewer__close"

@@ -1912,6 +1912,7 @@
   "editor.revisions.count": "{n} Versionen",
   "editor.revisions.chars": "Zeichen",
   "editor.revisions.deltaTitle": "Veränderung gegenüber vorheriger Version",
+  "editor.revisions.clientTitle": "Bearbeitet mit",
   "editor.revisions.byYou": "Du",
   "collab.toast.currentPage": "{user} hat diese Seite aktualisiert.",
   "collab.toast.otherPage": "{user} hat \"{page}\" aktualisiert.",

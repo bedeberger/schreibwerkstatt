@@ -38,10 +38,10 @@ function _statsFromHtml(html) {
 const _insertStmt = db.prepare(`
   INSERT INTO page_revisions
     (page_id, book_id, body_html, chars, words, tok,
-     source, user_email, summary, created_at)
+     source, user_email, client, summary, created_at)
   VALUES
     (@page_id, @book_id, @body_html, @chars, @words, @tok,
-     @source, @user_email, @summary, ${NOW_ISO_SQL})
+     @source, @user_email, @client, @summary, ${NOW_ISO_SQL})
 `);
 
 const _lastBodyStmt = db.prepare(`
@@ -58,7 +58,7 @@ const _lastBodyStmt = db.prepare(`
 // HTML-Aenderungen (trailing NBSP, Attribut-Reorder, idempotenter Cleaner-
 // Output), die sonst Revision-Rows mit irrefuehrendem chars-Delta erzeugen
 // und im Side-by-Side-Diff als „unchanged" landen.
-function insert({ pageId, bookId, bodyHtml, source, userEmail = null, summary = null }) {
+function insert({ pageId, bookId, bodyHtml, source, userEmail = null, client = null, summary = null }) {
   if (!Number.isInteger(pageId) || pageId <= 0) throw new Error('page-revisions.insert: pageId required');
   if (!Number.isInteger(bookId) || bookId <= 0) throw new Error('page-revisions.insert: bookId required');
   if (typeof bodyHtml !== 'string') throw new Error('page-revisions.insert: bodyHtml required');
@@ -76,6 +76,7 @@ function insert({ pageId, bookId, bodyHtml, source, userEmail = null, summary = 
     chars, words, tok,
     source,
     user_email: userEmail,
+    client: typeof client === 'string' && client ? client.slice(0, 160) : null,
     summary,
   });
   return result.lastInsertRowid;
@@ -83,7 +84,7 @@ function insert({ pageId, bookId, bodyHtml, source, userEmail = null, summary = 
 
 const _listForPageStmt = db.prepare(`
   SELECT id, page_id, book_id, chars, words, tok,
-         source, user_email, created_at, summary
+         source, user_email, client, created_at, summary
     FROM page_revisions
    WHERE page_id = ?
    ORDER BY created_at DESC, id DESC
@@ -96,7 +97,7 @@ function listForPage(pageId, limit = 100) {
 
 const _getStmt = db.prepare(`
   SELECT id, page_id, book_id, body_html, chars, words, tok,
-         source, user_email, created_at, summary
+         source, user_email, client, created_at, summary
     FROM page_revisions
    WHERE id = ?
 `);

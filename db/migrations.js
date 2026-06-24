@@ -8535,6 +8535,25 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 217 abgeschlossen (share_comments.reader_email + edited_at).');
   }
 
+  if (version < 218) {
+    // page_revisions.client: womit wurde der Save gemacht — Browser+OS
+    // ("Chrome · macOS", via User-Agent) bzw. nativer macOS-Client
+    // (Geraetename + Plattform aus dem Device-Token). NULL fuer server-seitige
+    // Schreiber ohne Request-Kontext (Cron/Jobs). Zeigt die Revisionsliste neben
+    // Quelle/Autor an. Additiv: nullable Spalte ohne FK, kein Recreate noetig.
+    const prCols218 = db.pragma('table_info(page_revisions)').map(c => c.name);
+    if (!prCols218.includes('client')) {
+      db.exec('ALTER TABLE page_revisions ADD COLUMN client TEXT');
+    }
+
+    const fkErrors218 = db.pragma('foreign_key_check');
+    if (fkErrors218.length) {
+      throw new Error(`Migration 218: foreign_key_check meldet ${fkErrors218.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 218').run();
+    logger.info('DB-Migration auf Version 218 abgeschlossen (page_revisions.client — Browser/OS bzw. nativer Client pro Revision).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

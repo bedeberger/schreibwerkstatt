@@ -394,48 +394,51 @@
   </div>
 </div>
 
-<!-- Bücherliste & Seitenauswahl -->
-<div class="card card--book-selector" x-show="currentUser && showBookCard && !isAdminOnly && books.length > 0" x-cloak>
-  <label x-text="t('book.label')"></label>
-  <div class="row book-selector-row">
-    <div x-data="combobox({ placeholder: () => t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
+<!-- Buchwahl + Kontext-Leiste: Einzeile, immer sichtbar (sobald ein Buch
+     gewählt ist). Buchwahl links, Kategorie-Filter, breiter Palette-Trigger
+     (⌘K) füllt die restliche Zeilenbreite — alle in einer Reihe, Umbruch nur
+     bei schmalem Viewport. -->
+<div class="card card--book-selector"
+     x-show="currentUser && showBookCard && !isAdminOnly && books.length > 0"
+     x-cloak>
+  <div class="book-selector-bar">
+    <div class="book-selector-combo"
+         x-data="combobox({ placeholder: () => t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
          x-modelable="value" x-model="selectedBookId"
          x-effect="options = filteredBooks().map(b => ({value: String(b.id), label: b.name}))"
          @combobox-change="resetView();"></div>
-  </div>
 
-  <!-- Filter-Pills (Kategorie). Reines Frontend-Filter -->
-  <div class="book-filter-row" x-show="bookFilterCategoryPool.length" x-cloak>
-    <template x-for="cat in bookFilterCategoryPool" :key="cat.id">
+    <!-- Filter-Pills (Kategorie). Reines Frontend-Filter -->
+    <div class="book-filter-row" x-show="bookFilterCategoryPool.length" x-cloak>
+      <template x-for="cat in bookFilterCategoryPool" :key="cat.id">
+        <button type="button"
+                class="book-filter-pill"
+                :class="{ 'is-active': String(bookFilterCategoryId) === String(cat.id) }"
+                @click="bookFilterCategoryId = String(bookFilterCategoryId) === String(cat.id) ? '' : String(cat.id)">
+          <span x-text="cat.name"></span>
+          <span class="btn-count" x-text="bookCountForCategory(cat.id)"></span>
+        </button>
+      </template>
       <button type="button"
-              class="book-filter-pill"
-              :class="{ 'is-active': String(bookFilterCategoryId) === String(cat.id) }"
-              @click="bookFilterCategoryId = String(bookFilterCategoryId) === String(cat.id) ? '' : String(cat.id)">
-        <span x-text="cat.name"></span>
-        <span class="btn-count" x-text="bookCountForCategory(cat.id)"></span>
-      </button>
-    </template>
+              class="book-filter-clear"
+              x-show="bookFilterCategoryId"
+              @click="clearBookFilters()"
+              x-text="t('book.filter.clear')"></button>
+    </div>
+
+    <!-- Palette-Trigger (⌘K / Strg+K): breite Such-Bar, Power-User-Eintritt zu allen Features. -->
     <button type="button"
-            class="book-filter-clear"
-            x-show="bookFilterCategoryId"
-            @click="clearBookFilters()"
-            x-text="t('book.filter.clear')"></button>
+            class="palette-hero"
+            x-show="selectedBookId"
+            x-cloak
+            @click="openPalette()"
+            :data-tip="t('palette.openHint')"
+            :aria-label="t('palette.openHint')">
+      <span class="palette-hero-icon" aria-hidden="true" x-text="isMac ? '⌘' : 'Ctrl'"></span>
+      <span class="palette-hero-text" x-text="t('palette.hero.text')"></span>
+      <kbd class="palette-hero-kbd" x-text="isMac ? '⌘K' : 'Ctrl+K'"></kbd>
+    </button>
   </div>
-
-  <!-- Hero-Palette-Trigger: Power-User-Eintritt zu allen Features (⌘K / Strg+K). -->
-  <button type="button"
-          class="palette-hero"
-          x-show="selectedBookId"
-          x-cloak
-          @click="openPalette()"
-          :data-tip="t('palette.openHint')"
-          :aria-label="t('palette.openHint')">
-    <span class="palette-hero-icon" aria-hidden="true" x-text="isMac ? '⌘' : 'Ctrl'"></span>
-    <span class="palette-hero-text" x-text="t('palette.hero.text')"></span>
-    <kbd class="palette-hero-kbd" x-text="isMac ? '⌘K' : 'Ctrl+K'"></kbd>
-  </button>
-
-
 </div>
 
 <div class="layout" :class="{ 'layout--no-sidebar': isAdminOnly }">
