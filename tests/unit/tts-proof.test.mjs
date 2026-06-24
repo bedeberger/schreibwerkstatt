@@ -106,6 +106,64 @@ test('eine einzelne Range bleibt unveraendert', () => {
   assert.deepEqual(coalesce(ranges, text, 60), ranges);
 });
 
+// ── Lang-Satz-Splitting (Stall-/„Absturz"-Schutz bei Monster-Saetzen) ──────
+const splitLong = (range, text, maxLen) =>
+  ttsProofMethods._splitLongRange(range, text, maxLen);
+const chunk = (ranges, text, minLen, maxLen) =>
+  ttsProofMethods._chunkTtsRanges(ranges, text, minLen, maxLen);
+
+test('zu langer Satz wird an Klauselgrenzen unter maxLen zerlegt', () => {
+  const text = 'Er schmollte jeweils und bestrafte Sandra, indem er ihre Verabredungen platzen liess; er interagierte mehr mit seinen Kollegen, die heimlich litten - was aber niemand benennen konnte.';
+  const parts = splitLong([0, text.length], text, 60);
+  assert.ok(parts.length >= 3, 'lange Range muss mehrfach geteilt werden');
+  for (const r of parts) {
+    assert.ok(text.slice(...r).trim().length <= 60, `Teilstueck zu lang: ${text.slice(...r)}`);
+  }
+  // contiguous + verlustfrei
+  for (let i = 1; i < parts.length; i++) assert.equal(parts[i][0], parts[i - 1][1]);
+  assert.equal(parts.map(r => text.slice(...r)).join(''), text);
+});
+
+test('Intra-Wort-Bindestriche werden nicht als Klauselgrenze genutzt', () => {
+  // „Midlife-Krise"/„Usego-Gebäude" duerfen nicht mitten im Wort getrennt werden;
+  // nur freistehende Striche ( - ) zaehlen. Ueber maxLen erzwingt das einen Split.
+  const text = 'Das Usego-Gebäude und die Midlife-Krise und der Hebammen-Job des Mannes blieben unbenannt im Raum.';
+  const parts = splitLong([0, text.length], text, 50);
+  for (const r of parts) {
+    const t = text.slice(...r);
+    assert.ok(!/\w-$/.test(t.trim()), `Schnitt mitten im Bindestrich-Wort: ${JSON.stringify(t)}`);
+  }
+  assert.equal(parts.map(r => text.slice(...r)).join(''), text);
+});
+
+test('_chunkTtsRanges deckelt lange UND buendelt kurze Saetze', () => {
+  const long = 'Er schmollte jeweils und bestrafte Sandra, indem er ihre Verabredungen platzen liess; er interagierte mehr mit den Kollegen, die heimlich litten, was niemand benennen konnte.';
+  const text = `Ja. ${long}`;
+  const ranges = split(text, 'de');
+  const chunks = chunk(ranges, text, 60, 80);
+  for (const r of chunks) {
+    assert.ok(text.slice(...r).trim().length <= 80, `Chunk ueber maxLen: ${text.slice(...r)}`);
+  }
+  // verlustfrei + monoton
+  for (let i = 1; i < chunks.length; i++) assert.ok(chunks[i][0] >= chunks[i - 1][1]);
+  assert.equal(
+    chunks.map(r => text.slice(...r)).join('').replace(/\s/g, ''),
+    text.replace(/\s/g, ''),
+  );
+});
+
+test('_coalesceTtsRanges mit maxLen buendelt nie ueber die Grenze', () => {
+  const a = 'Am Morgen ging sie los.';
+  const b = 'Der Brunnen war still.';
+  const c = 'Ja.';
+  const text = `${a} ${b} ${c}`;
+  // ohne maxLen wuerde „Ja." an b angehaengt; mit knappem maxLen darf das nicht passieren
+  const chunks = ttsProofMethods._coalesceTtsRanges(split(text, 'de'), text, 60, 25);
+  for (const r of chunks) {
+    assert.ok(text.slice(...r).trim().length <= 25, `ueber maxLen: ${text.slice(...r)}`);
+  }
+});
+
 test('Satzzeichen bleiben im gesendeten Chunk erhalten (Betonung)', () => {
   const text = 'Ja! Was nun? Er ging. Am Ende blieb nur die Stille des Abends zurück.';
   const ranges = split(text, 'de');

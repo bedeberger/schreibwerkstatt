@@ -30,6 +30,15 @@ const TTS_PREFETCH_AHEAD = 1;   // wie viele Saetze im Voraus synthetisiert werd
 // einzeln, der Highlight also satzgenau. Piper braucht das nicht, schadet aber
 // nicht; das Frontend kennt die Engine nicht (`/config` liefert nur `enabled`).
 const TTS_MIN_CHUNK_CHARS = 60;
+// Hoechst-Zeichenzahl pro Synthese-Chunk. Sehr lange Saetze (viele Nebensaetze,
+// Semikolon-Ketten, Aufzaehlungen) ergaeben sonst EINEN riesigen Request: die
+// Synthese braucht zweistellige Sekunden (naehert sich dem 20s-Server-Timeout
+// in routes/tts.js -> 408 -> Skip) und das Resultat ist ein halbminuetiger,
+// monoton heruntergelesener Audio-Block. Fuer den Hoerer wirkt das wie ein
+// Absturz mitten im Vorlesen. Darum werden zu lange Saetze an Klausel-Grenzen
+// (; : , und freistehende Gedankenstriche) in Teilstuecke <= dieser Laenge
+// zerlegt — Gegenstueck zur Kurz-Satz-Buendelung (TTS_MIN_CHUNK_CHARS).
+const TTS_MAX_CHUNK_CHARS = 220;
 // Default-Atempause (ms) zwischen den vorgelesenen Fragmenten: statt nahtlos ins
 // naechste Fragment ueberzugehen, gibt eine kurze Stille dem Ohr Luft — naeher
 // am natuerlichen Vorlesen. An Absatzgrenzen (Block-Wechsel) etwas laenger.
@@ -102,21 +111,68 @@ export const ttsProofMethods = {
   // Schwelle erreicht; ein zu kurzer Rest am Ende wird in den Vorgaenger
   // gezogen (sonst bliebe genau das problematische Kurz-Fragment uebrig).
   // Ranges bleiben innerhalb eines Blocks (der Aufrufer ruft pro Block). Pure.
-  _coalesceTtsRanges(ranges, text, minLen = TTS_MIN_CHUNK_CHARS) {
+  // `maxLen` deckelt das Anwachsen: ein Chunk wird nie ueber diese Laenge
+  // hinaus verlaengert (Default Infinity = kein Deckel, alte Semantik). So
+  // kollidiert die Buendelung nicht mit dem Lang-Satz-Splitting (_splitLongRange).
+  _coalesceTtsRanges(ranges, text, minLen = TTS_MIN_CHUNK_CHARS, maxLen = Infinity) {
     if (!Array.isArray(ranges) || ranges.length <= 1) return ranges || [];
     const len = ([s, e]) => text.slice(s, e).trim().length;
+    const fits = (s, e) => text.slice(s, e).trim().length <= maxLen;
     const merged = [];
     let cur = null;
     for (const [s, e] of ranges) {
       if (!cur) { cur = [s, e]; continue; }
-      if (len(cur) < minLen) { cur[1] = e; }      // Chunk noch zu kurz -> anhaengen
-      else { merged.push(cur); cur = [s, e]; }     // Chunk lang genug -> abschliessen
+      if (len(cur) < minLen && fits(cur[0], e)) { cur[1] = e; } // zu kurz + passt -> anhaengen
+      else { merged.push(cur); cur = [s, e]; }                  // lang genug / wuerde sprengen -> abschliessen
     }
     if (cur) {
-      if (len(cur) < minLen && merged.length) merged[merged.length - 1][1] = cur[1];
+      const prev = merged[merged.length - 1];
+      if (len(cur) < minLen && prev && fits(prev[0], cur[1])) prev[1] = cur[1];
       else merged.push(cur);
     }
     return merged;
+  },
+
+  // Eine zu lange Satz-Range an Klausel-/Wortgrenzen in Teilstuecke <= maxLen
+  // zerlegen (siehe TTS_MAX_CHUNK_CHARS — warum ueberlange Saetze sonst wie ein
+  // Absturz wirken). Bevorzugt wird nach dem LETZTEN Klausel-Zeichen im Fenster
+  // getrennt (; : , oder freistehender Gedankenstrich - – —), sonst am letzten
+  // Leerzeichen, im Notfall hart bei maxLen. Intra-Wort-Bindestriche
+  // („Midlife-Krise") bleiben unangetastet (nur freistehende Striche zaehlen).
+  // Teilstuecke sind contiguous und decken [s,e] vollstaendig ab. Pure.
+  _splitLongRange([s, e], text, maxLen = TTS_MAX_CHUNK_CHARS) {
+    const out = [];
+    let start = s;
+    while (e - start > maxLen) {
+      const win = text.slice(start, start + maxLen);
+      // Position NACH der letzten Klauselgrenze im Fenster.
+      let cut = -1;
+      const clause = /[;:,](?=\s|$)|\s[-–—]\s/g;
+      let m;
+      while ((m = clause.exec(win)) !== null) cut = m.index + m[0].length;
+      if (cut <= 0) {
+        const sp = win.lastIndexOf(' ');
+        cut = sp > 0 ? sp + 1 : maxLen; // kein Trennpunkt -> harter Schnitt
+      }
+      out.push([start, start + cut]);
+      start += cut;
+    }
+    if (start < e) out.push([start, e]);
+    return out;
+  },
+
+  // Satz-Ranges eines Blocks in synthese-taugliche Chunks bringen: erst zu lange
+  // Saetze splitten (_splitLongRange), dann zu kurze buendeln (_coalesceTtsRanges
+  // mit maxLen-Deckel, damit das Buendeln die Split-Stuecke nicht wieder ueber
+  // die Grenze zusammenzieht). Pure.
+  _chunkTtsRanges(ranges, text, minLen = TTS_MIN_CHUNK_CHARS, maxLen = TTS_MAX_CHUNK_CHARS) {
+    if (!Array.isArray(ranges) || !ranges.length) return ranges || [];
+    const split = [];
+    for (const r of ranges) {
+      if (text.slice(r[0], r[1]).trim().length > maxLen) split.push(...this._splitLongRange(r, text, maxLen));
+      else split.push(r);
+    }
+    return this._coalesceTtsRanges(split, text, minLen, maxLen);
   },
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -163,7 +219,7 @@ export const ttsProofMethods = {
       if (!text.trim()) continue;
       const ranges = this._computeTtsSentences(text, locale);
       const base = ranges.length ? ranges : [[0, text.length]];
-      const list = this._coalesceTtsRanges(base, text);
+      const list = this._chunkTtsRanges(base, text);
       for (const [s, e] of list) {
         const t = text.slice(s, e).trim();
         if (t) segs.push({ text: t, block, startOff: s, endOff: e });
