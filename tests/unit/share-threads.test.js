@@ -80,6 +80,46 @@ test('CASCADE: Root-Delete entfernt seine Antworten', () => {
   assert.equal(sl.listCommentsByToken(link.token).length, 0, 'Reply kaskadiert mit Root');
 });
 
+test('Reader-Self-Service: eigenen Root erledigt-markieren/wieder-öffnen (nur via reader_token)', () => {
+  const link = seedLink();
+  const RT = 'r12345678mine';
+  const root = sl.insertComment({ token: link.token, readerToken: RT, body: 'meine Anmerkung', ipHash: 'h' });
+
+  assert.equal(sl.setReaderCommentResolved(root.id, link.token, RT, true), true);
+  assert.ok(sl.getCommentById(root.id).resolved_at, 'resolved gesetzt');
+  assert.equal(sl.setReaderCommentResolved(root.id, link.token, RT, false), true);
+  assert.equal(sl.getCommentById(root.id).resolved_at, null, 'wieder geöffnet');
+
+  // Fremdes reader_token greift nicht; Owner-Reply (author_email gesetzt) auch nicht.
+  assert.equal(sl.setReaderCommentResolved(root.id, link.token, 'r_fremd_xxxxx', true), false);
+  const reply = sl.insertOwnerReply({ token: link.token, parentId: root.id, authorEmail: OWNER, body: 'x' });
+  assert.equal(sl.setReaderCommentResolved(reply.id, link.token, RT, true), false, 'Owner-Reply ist nicht mein Root');
+});
+
+test('Reader-Self-Service: eigenen Kommentar löschen, Fremd-/Owner-Beitrag nicht', () => {
+  const link = seedLink();
+  const RT = 'r12345678mine';
+  const own = sl.insertComment({ token: link.token, readerToken: RT, body: 'lösch mich', ipHash: 'h' });
+  const other = sl.insertComment({ token: link.token, readerToken: 'r_other_xxxxx', body: 'fremd', ipHash: 'h' });
+
+  assert.ok(sl.getReaderComment(own.id, link.token, RT), 'eigener Beitrag erkannt');
+  assert.equal(sl.getReaderComment(other.id, link.token, RT), undefined, 'fremder Beitrag nicht meiner');
+  assert.equal(sl.commentHasReplies(own.id), false);
+
+  assert.equal(sl.deleteReaderComment(own.id, link.token, RT), true);
+  assert.equal(sl.deleteReaderComment(other.id, link.token, RT), false, 'fremder Beitrag bleibt');
+  assert.equal(sl.getCommentById(other.id).body, 'fremd');
+});
+
+test('Reader-Self-Service: commentHasReplies blockt Cascade-Löschen', () => {
+  const link = seedLink();
+  const RT = 'r12345678mine';
+  const root = sl.insertComment({ token: link.token, readerToken: RT, body: 'root', ipHash: 'h' });
+  sl.insertOwnerReply({ token: link.token, parentId: root.id, authorEmail: OWNER, body: 'autor-antwort' });
+  // Die Route blockt bei Antworten — hier verifizieren wir nur das Prädikat.
+  assert.equal(sl.commentHasReplies(root.id), true, 'Root mit Owner-Reply hat Antworten');
+});
+
 test('Mail-Template share-comment-owner rendert Quote + Subject (de/en)', () => {
   const de = renderTemplate('share-comment-owner', {
     targetName: 'Seite A', bookName: 'Testbuch', readerName: 'Bea',

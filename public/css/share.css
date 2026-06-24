@@ -8,20 +8,29 @@
    prefers-color-scheme-Media-Query greift (auch komplett ohne JS). */
 
 :root {
-  --share-bg: #f7f3ec;
-  --share-surface: #fffdf8;
-  --share-text: #221c18;
-  --share-muted: #6e6257;
+  /* Palette gespiegelt aus der App (SSoT: public/css/tokens/colors.css). Der
+     Reader ist standalone (lädt tokens.css nicht), hält die Werte aber
+     deckungsgleich zur Paper/Ink-Palette, damit die Leseansicht konsistent zur
+     App wirkt. Akzent = Marken-Blau (Buchrücken), zweiter Ton = Feder-Gold.
+     Bei Palette-Änderung in colors.css hier nachziehen. */
+  --share-bg: #faf7f2;
+  --share-surface: #ffffff;
+  --share-text: #1f1c18;
+  --share-muted: #6b6258;
   --share-faint: #b8aea2;
-  --share-accent: #9a3b34;
-  /* Zweiter, ruhigerer Ton (Sepia): markiert Autor-Antworten, damit der Reviewer
-     Leser-Kommentar vs. Autor-Stimme auf einen Blick unterscheidet. */
-  --share-accent-2: #7a6a4f;
-  --share-border: rgba(60, 40, 30, 0.14);
-  --share-hover: rgba(120, 70, 50, 0.06);
+  /* Akzent = Marken-Blau — interaktive Elemente (Links, Buttons, Anker). */
+  --share-accent: #1d4b73;
+  /* Zweiter Ton = Feder-Gold (Autor-Stimme): markiert Autor-Antworten, damit der
+     Reviewer Leser-Kommentar vs. Autor-Stimme auf einen Blick unterscheidet. */
+  --share-accent-2: #8a6a20;
+  /* Text auf gefüllter Akzent-Fläche (Buttons). Light: weiss auf dunklem Blau.
+     Dark (s.u.): dunkle Tinte auf hellem Blau — analog --color-on-primary. */
+  --share-on-accent: #fff;
+  --share-border: rgba(0, 0, 0, 0.12);
+  --share-hover: rgba(0, 0, 0, 0.05);
   --share-radius: 8px;
   --share-radius-sm: 4px;
-  --share-shadow: 0 1px 3px rgba(60, 40, 30, 0.1);
+  --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   color-scheme: light;
 
   /* Brücke auf den geteilten Manuskript-Stream-Look
@@ -41,32 +50,34 @@
 
 /* Explizite Dunkel-Wahl (Switcher). */
 html[data-theme="dark"] {
-  --share-bg: #1a1714;
-  --share-surface: #262019;
-  --share-text: #e8e2d7;
+  --share-bg: #1a1816;
+  --share-surface: #2a2722;
+  --share-text: #e6e2d9;
   --share-muted: #9a948a;
   --share-faint: #524d46;
-  --share-accent: #d98a7e;
-  --share-accent-2: #c0a978;
-  --share-border: rgba(255, 240, 225, 0.13);
-  --share-hover: rgba(255, 220, 190, 0.07);
-  --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --share-accent: #7aa3ca;
+  --share-accent-2: #e0c070;
+  --share-on-accent: #1a1816;
+  --share-border: rgba(255, 255, 255, 0.12);
+  --share-hover: rgba(255, 255, 255, 0.06);
+  --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
 }
 
 /* Auto (kein data-theme): Systempräferenz. Greift auch ohne JS. */
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) {
-    --share-bg: #1a1714;
-    --share-surface: #262019;
-    --share-text: #e8e2d7;
+    --share-bg: #1a1816;
+    --share-surface: #2a2722;
+    --share-text: #e6e2d9;
     --share-muted: #9a948a;
     --share-faint: #524d46;
-    --share-accent: #d98a7e;
-    --share-accent-2: #c0a978;
-    --share-border: rgba(255, 240, 225, 0.13);
-    --share-hover: rgba(255, 220, 190, 0.07);
-    --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --share-accent: #7aa3ca;
+    --share-accent-2: #e0c070;
+    --share-on-accent: #1a1816;
+    --share-border: rgba(255, 255, 255, 0.12);
+    --share-hover: rgba(255, 255, 255, 0.06);
+    --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }
 }
@@ -90,7 +101,7 @@ body.share-page {
   left: -9999px;
   top: 0;
   background: var(--share-accent);
-  color: #fff;
+  color: var(--share-on-accent);
   padding: 6px 12px;
   text-decoration: none;
   border-radius: var(--share-radius-sm);
@@ -218,7 +229,7 @@ body.share-page {
 .share-action-btn--active {
   background: var(--share-accent);
   border-color: var(--share-accent);
-  color: #fff;
+  color: var(--share-on-accent);
 }
 
 /* Theme-Switcher (Auto / Hell / Dunkel) als segmentierte Zeile im Menü.
@@ -247,7 +258,7 @@ body.share-page {
 .share-theme__btn:hover:not(.share-theme__btn--active) { background: var(--share-hover); }
 .share-theme__btn--active {
   background: var(--share-accent);
-  color: #fff;
+  color: var(--share-on-accent);
 }
 
 @media (min-width: 601px) {
@@ -613,11 +624,10 @@ body.share-page {
   z-index: 50;
   padding: 6px 14px;
   background: var(--share-accent);
-  color: #fff;
+  color: var(--share-on-accent);
   border: 0;
   border-radius: var(--share-radius-sm);
   box-shadow: var(--share-shadow);
-  font: inherit;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
   font-weight: 500;
@@ -688,7 +698,7 @@ body.share-page {
 .share-comments__form button[type=submit] {
   padding: 8px 18px;
   background: var(--share-accent);
-  color: #fff;
+  color: var(--share-on-accent);
   border: 0;
   border-radius: var(--share-radius-sm);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -788,14 +798,14 @@ body.share-page {
 }
 .share-thread__diff ins.diff-add {
   text-decoration: none;
-  background: color-mix(in srgb, #2e7d32 22%, transparent);
+  background: color-mix(in srgb, #3a8f3e 22%, transparent);
   color: var(--share-text);
   border-radius: var(--share-radius-sm);
   padding: 0 2px;
 }
 .share-thread__diff del.diff-del {
   text-decoration: line-through;
-  background: color-mix(in srgb, #c62828 20%, transparent);
+  background: color-mix(in srgb, #c43838 20%, transparent);
   color: var(--share-muted);
   border-radius: var(--share-radius-sm);
   padding: 0 2px;
@@ -831,7 +841,7 @@ body.share-page {
   cursor: pointer;
 }
 .share-thread__action:hover { color: var(--share-accent); text-decoration: underline; }
-.share-thread__action--danger:hover { color: #c62828; }
+.share-thread__action--danger:hover { color: #c43838; }
 .share-thread__action:disabled { opacity: 0.6; cursor: not-allowed; text-decoration: none; }
 .share-thread__replies {
   margin-top: 10px;

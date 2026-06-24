@@ -87,6 +87,58 @@ test('Devmode-Seed: vollstaendiger Seed bei allen Guards + leerer DB', () => {
   }
 });
 
+test('Devmode-Seed: Share-Links + Kommentare (verankert, allgemein, Reply, resolved, changed)', () => {
+  const ctx = _isolatedDb();
+  try {
+    process.env.LOCAL_DEV_MODE = 'true';
+    const r = ctx.devSeed.runDevSeedIfNeeded();
+    assert.ok(r);
+    assert.equal(r.links, 3);
+    assert.ok(r.comments >= 8, `erwartet >=8 Kommentare, war ${r.comments}`);
+
+    // Owner muss als app_user existieren (FK-Ziel) + FK-Integritaet sauber.
+    assert.ok(ctx.db.prepare('SELECT 1 FROM app_users WHERE email = ?').get('dev@local'));
+    assert.equal(ctx.db.pragma('foreign_key_check').length, 0);
+
+    const links = ctx.db.prepare('SELECT kind FROM share_links WHERE book_id = ? ORDER BY kind').all(r.bookId);
+    assert.deepEqual(links.map((l) => l.kind), ['book', 'chapter', 'page']);
+
+    const comments = ctx.db.prepare(`
+      SELECT id, parent_id, reader_name, author_email, anchor_bid, anchor_quote, anchor_start, anchor_end, resolved_at
+        FROM share_comments ORDER BY id
+    `).all();
+    assert.equal(comments.length, r.comments);
+
+    // Mindestens je ein verankerter, allgemeiner, Owner-Reply-, resolved- und changed-Kommentar.
+    const anchored = comments.filter((c) => c.anchor_bid && c.anchor_start != null);
+    const general = comments.filter((c) => !c.anchor_bid && !c.parent_id);
+    const ownerReply = comments.filter((c) => c.parent_id && c.author_email === 'dev@local');
+    const resolved = comments.filter((c) => c.resolved_at);
+    const changed = comments.filter((c) => c.anchor_bid && c.anchor_start == null);
+    assert.ok(anchored.length >= 3, 'verankerte Kommentare');
+    assert.ok(general.length >= 1, 'allgemeine Kommentare');
+    assert.ok(ownerReply.length >= 1, 'Owner-Reply');
+    assert.ok(resolved.length >= 1, 'resolved');
+    assert.equal(changed.length, 1, 'genau ein „Stelle geändert"-Fall');
+
+    // Anker-Offsets müssen den Block-Text exakt treffen (sonst kein Highlight).
+    const bidText = {};
+    for (const p of ctx.db.prepare('SELECT body_html FROM pages WHERE book_id = ?').all(r.bookId)) {
+      const re = /<p data-bid="([0-9a-f]+)">([\s\S]*?)<\/p>/g; let m;
+      while ((m = re.exec(p.body_html))) bidText[m[1]] = m[2];
+    }
+    for (const c of anchored) {
+      assert.equal(bidText[c.anchor_bid].slice(c.anchor_start, c.anchor_end), c.anchor_quote,
+        `Anker-Offset trifft Quote nicht: ${JSON.stringify(c.anchor_quote)}`);
+    }
+    // changed-Quote darf gerade NICHT im Block stehen (sonst kein Diff-Pfad).
+    assert.ok(!bidText[changed[0].anchor_bid].includes(changed[0].anchor_quote));
+  } finally {
+    delete process.env.LOCAL_DEV_MODE;
+    ctx.cleanup();
+  }
+});
+
 test('Devmode-Seed: idempotent (zweiter Call no-op)', () => {
   const ctx = _isolatedDb();
   try {
