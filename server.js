@@ -292,6 +292,17 @@ const PUBLIC_ASSETS = new Set([
   '/favicon.ico',
   '/js/admin/admin-login.js',
   '/js/share-reader.js',
+  // share-reader.js importiert charOffset/locateRange/resolveCurrentQuote als
+  // ES-Modul aus share-anchor.js (SSoT mit der Owner-Karte). Der Import-Request
+  // muss ebenfalls pre-auth durchgehen, sonst kommt er als HTML zurueck und der
+  // Browser verweigert das Modul wegen falschem MIME-Type.
+  '/js/share-anchor.js',
+  // FOUC-Schutz der Reader-View: share.html/share.gone.html laden dieses Script
+  // blockierend im <head>, bevor der Leser eingeloggt ist. Ohne Freigabe landet
+  // es im Auth-Guard, kommt als HTML zurueck und der Browser verweigert die
+  // Ausfuehrung (nosniff) → kein Theme vor dem ersten Paint, gespeicherte Wahl
+  // wird ignoriert.
+  '/js/share-theme-init.js',
   // Skripte der Pre-Auth-Seiten (register.html + admin-login). Ohne Freigabe
   // landet ihr Request im Auth-Guard und kommt als HTML (`/login?returnTo=...`)
   // zurück → Browser verweigert die Ausführung wegen falschem MIME-Type.

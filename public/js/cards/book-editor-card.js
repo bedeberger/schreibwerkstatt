@@ -144,8 +144,13 @@ export function registerBookEditorCard() {
     commentSavingReply: null,
     commentSavingResolve: null,
     commentRailVisible: false,
+    commentStackHeight: 0,   // Höhe des verankerten Karten-Stapels (px), treibt --comments-stack-height
     _commentLoadingBookId: null,
     _commentRecomputeRaf: null,
+    _commentLayoutRaf: null,
+    _commentResizeObs: null,
+    _commentObserved: null,
+    _commentResizeHandler: null,
     _pendingGotoBid: null,
 
     _lifecycle: null,
@@ -165,10 +170,14 @@ export function registerBookEditorCard() {
           visiblePageId: null, collapsedChapters: {},
           bookComments: [], commentThreads: [], commentGeneralThreads: [], commentSelectedRootId: null,
           commentReplyDrafts: {}, commentSavingReply: null, commentSavingResolve: null,
-          commentRailVisible: false, _pendingGotoBid: null,
+          commentRailVisible: false, commentStackHeight: 0, _pendingGotoBid: null,
         },
         load: (root) => this._load(root.selectedBookId),
       });
+
+      // Vertikale Verankerung der Kommentar-Karten: Observer für Stream-Reflow +
+      // Viewport-Resize (Re-Layout). Methoden in editor/book-editor-comments.js.
+      this._initCommentLayout();
 
       this._beforeUnloadHandler = (e) => {
         if (this.dirtyCount > 0 || this.savingCount > 0) {
@@ -208,6 +217,7 @@ export function registerBookEditorCard() {
       this._autosaveMaxTimers.clear();
       this._teardownOutlineObserver();
       if (this._commentRecomputeRaf) { cancelAnimationFrame(this._commentRecomputeRaf); this._commentRecomputeRaf = null; }
+      this._teardownCommentLayout();
       this._clearCommentHL();
       clearHighlights();
       this._lifecycle?.destroy();
@@ -230,8 +240,12 @@ export function registerBookEditorCard() {
           const app = window.__app;
           app?.setStatus?.(app.t('bookEditor.missingPages', { n: data.missing }), false, 5000);
         }
-        // Outline-IntersectionObserver nach Render bauen.
-        this.$nextTick(() => this._initOutlineObserver());
+        // Outline-IntersectionObserver nach Render bauen + Scroll-Fade-Scrollbar
+        // am Inhaltsverzeichnis (gleiches Auto-Hide-Pattern wie der Sidebar-Tree).
+        this.$nextTick(() => {
+          this._initOutlineObserver();
+          window.__app?._bindScrollFade?.(this.$el.querySelector('.book-editor-outline'));
+        });
         // Verankerte Leser-Kommentare des Buchs laden + über den Stream auflösen.
         this._loadBookComments();
       } catch (e) {

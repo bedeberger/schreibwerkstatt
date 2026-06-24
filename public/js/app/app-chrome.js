@@ -1,6 +1,8 @@
 // App-Chrome: Theme-Umschaltung, Logout, Sidebar-Resize und Confirm-Dialog.
 // UI-Bereiche, die ausserhalb der normalen Buch-/Seiten-Flows leben und keine
 // Querabhängigkeiten zu Job-Queue oder Hash-Router haben.
+import { bindScrollFade } from '../scroll-fade.js';
+
 export const appChromeMethods = {
   // ── Theme (Hell/Dunkel/Auto) ─────────────────────────────────────────────
   _applyTheme() {
@@ -136,15 +138,13 @@ export const appChromeMethods = {
   // Scrollens und fadet nach kurzer Idle-Zeit wieder aus. CSS reserviert den
   // Gutter dauerhaft (kein Layout-Shift), JS toggelt nur `.is-scrolling`.
   _initSidebarScrollFade() {
-    const tree = document.querySelector('.layout-sidebar > #partial-sidebar');
-    if (!tree || tree._scrollFadeBound) return;
-    tree._scrollFadeBound = true;
-    let idleTimer = null;
-    tree.addEventListener('scroll', () => {
-      tree.classList.add('is-scrolling');
-      if (idleTimer) clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => tree.classList.remove('is-scrolling'), 800);
-    }, { passive: true });
+    this._bindScrollFade(document.querySelector('.layout-sidebar > #partial-sidebar'));
+  },
+
+  // Dünner Wrapper um die geteilte scroll-fade.js#bindScrollFade — als Methode am
+  // Root verfügbar für Sub-Komponenten (z.B. Bucheditor-Inhaltsverzeichnis).
+  _bindScrollFade(el) {
+    bindScrollFade(el);
   },
 
   _avatarInitials() {

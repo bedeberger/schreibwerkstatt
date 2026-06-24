@@ -39,6 +39,7 @@ export function comboboxData(cfg = {}) {
       _transient: !!cfg.transient,
       _footer: (cfg.footer && typeof cfg.footer.action === 'function') ? cfg.footer : null,
       _onOutside: null,
+      _onScroll: null,
       _rootEl: null,
       // Nur noch die BREITE wird an den Trigger angeglichen (damit das Dropdown
       // wie ein <select> mindestens trigger-breit ist). POSITION + Flip +
@@ -214,6 +215,19 @@ export function comboboxData(cfg = {}) {
 
         this._onOutside = (e) => { if (!this._rootEl.contains(e.target)) this.close(); };
         document.addEventListener('mousedown', this._onOutside);
+        // Beim Scrollen des restlichen Screens das Dropdown schliessen (wie ein
+        // natives <select>). Das fixed-positionierte, am Trigger verankerte
+        // Dropdown wuerde sonst bei jedem Scroll-Frame nachgerechnet und flackert
+        // sichtbar hinter dem Trigger her. Scrollen INNERHALB des Dropdowns
+        // (Options-Liste) laesst es offen — Capture-Phase, um window-Scroll zu
+        // sehen, target-Check schliesst Eigen-Scroll aus.
+        this._onScroll = (e) => {
+          if (!this.open) return;
+          const dd = this._rootEl.querySelector('.combobox-dropdown');
+          if (dd && (e.target === dd || dd.contains(e.target))) return;
+          this.close();
+        };
+        window.addEventListener('scroll', this._onScroll, { capture: true, passive: true });
         this._rootEl.addEventListener('keydown', (e) => this.onKeydown(e));
 
         this._rootEl.setAttribute('role', 'combobox');
@@ -270,6 +284,10 @@ export function comboboxData(cfg = {}) {
         if (this._onOutside) {
           document.removeEventListener('mousedown', this._onOutside);
           this._onOutside = null;
+        }
+        if (this._onScroll) {
+          window.removeEventListener('scroll', this._onScroll, { capture: true });
+          this._onScroll = null;
         }
       },
     };

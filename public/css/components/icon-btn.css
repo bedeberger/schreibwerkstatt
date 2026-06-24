@@ -63,9 +63,15 @@
 }
 .icon-btn--ghost.is-active,
 .icon-btn--ghost[aria-pressed="true"] {
-  background: var(--icon-ghost-fill-hover);
-  border-color: var(--color-border);
-  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.icon-btn--ghost.is-active:hover:not(:disabled),
+.icon-btn--ghost[aria-pressed="true"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-primary) 24%, transparent);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 /* Success-Variante: grüner Akzent für Bestätigungsaktionen (Speichern,

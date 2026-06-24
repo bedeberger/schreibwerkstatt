@@ -68,7 +68,7 @@
 
   <div class="book-editor-layout"
        :class="{ 'book-editor-layout--no-outline': !outlineOpen,
-                 'book-editor-layout--comments': commentRailVisible && (commentThreads.length + commentGeneralThreads.length) }"
+                 'book-editor-layout--comments': commentRailVisible && commentThreads.length }"
        x-show="!loading && blocks.length > 0">
 
     <!-- Outline / Inhaltsverzeichnis -->
@@ -196,21 +196,34 @@
     <!-- Kommentar-Leiste: verankerte Leser-Kommentare des ganzen Buchs (reuse
          .comment-rail*-Optik). Methoden in editor/book-editor-comments.js. -->
     <aside class="comment-rail book-editor-comments"
-           x-show="commentRailVisible && (commentThreads.length + commentGeneralThreads.length)" x-cloak
+           x-show="commentRailVisible && commentThreads.length" x-cloak
            :aria-label="$app.t('share.rail.title')">
-      <div class="comment-rail__head">
-        <span class="comment-rail__title" x-text="$app.t('share.comments.countLabel', { count: commentThreads.length + commentGeneralThreads.length })"></span>
-        <button type="button" class="icon-btn icon-btn--ghost" @click="toggleCommentRail()"
-                :data-tip="$app.t('share.rail.collapse')" :aria-label="$app.t('share.rail.collapse')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
-        </button>
-      </div>
+
+      <!-- Verankerte Threads schweben vertikal auf Höhe ihrer Textstelle
+           (Kollisions-aufgelöst, _railTop). Marker im linken Rand zeigen die
+           echte Stelle (_anchorY). Layout in editor/book-editor-comments.js. -->
+      <div class="book-editor-comments__layer"
+           :style="{ '--comments-stack-height': commentStackHeight + 'px' }">
+
+        <template x-for="thread in commentThreads" :key="'marker-' + thread.root.id">
+          <button type="button" class="book-editor-comment-marker"
+                  x-show="thread._anchorY != null" x-cloak
+                  :style="{ '--marker-top': (thread._anchorY || 0) + 'px' }"
+                  :class="{ 'book-editor-comment-marker--selected': commentSelectedRootId === thread.root.id,
+                            'book-editor-comment-marker--resolved': thread.root.resolved_at,
+                            'book-editor-comment-marker--changed': thread.changed }"
+                  @click="selectCommentThread(thread.root.id)"
+                  :data-tip="$app.t('share.rail.markerTip', { author: commentAvatar(thread.root).label })"
+                  :aria-label="$app.t('share.rail.markerTip', { author: commentAvatar(thread.root).label })"></button>
+        </template>
 
       <template x-for="thread in commentThreads" :key="thread.root.id">
         <div class="comment-rail__thread"
              :data-root-id="thread.root.id"
+             :style="{ '--comment-top': (thread._railTop || 0) + 'px' }"
              :class="{ 'comment-rail__thread--selected': commentSelectedRootId === thread.root.id,
-                       'comment-rail__thread--resolved': thread.root.resolved_at }">
+                       'comment-rail__thread--resolved': thread.root.resolved_at,
+                       'is-positioned': thread._railTop != null }">
 
           <div class="comment-rail__anchor internal-link" role="button" tabindex="0"
                @click="selectCommentThread(thread.root.id)"
@@ -290,85 +303,91 @@
           </template>
         </div>
       </template>
+      </div><!-- /.book-editor-comments__layer -->
+    </aside>
+  </div><!-- /.book-editor-layout -->
 
-      <!-- Allgemeine (nicht-verankerte) Kommentare des ganzen Buchs (alle Link-Scopes).
-           Kein Textanker → keine Quote-Zeile/Highlight; sonst identische Aktionen. -->
-      <template x-if="commentGeneralThreads.length">
-        <div class="comment-rail__section">
-          <div class="comment-rail__section-title" x-text="$app.t('share.comments.general')"></div>
-          <template x-for="thread in commentGeneralThreads" :key="thread.root.id">
-            <div class="comment-rail__thread comment-rail__thread--general"
-                 :class="{ 'comment-rail__thread--selected': commentSelectedRootId === thread.root.id,
-                           'comment-rail__thread--resolved': thread.root.resolved_at }">
-              <div class="comment-rail__comment internal-link" role="button" tabindex="0"
-                   @click="selectCommentThread(thread.root.id)"
-                   @keydown.enter.prevent="selectCommentThread(thread.root.id)">
+  <!-- Allgemeine (nicht-verankerte) Kommentare des ganzen Buchs (alle Link-Scopes).
+       Kein Textanker → eigene Vollbreiten-Bande UNTER dem ganzen Layout (kein
+       Grid-Item, damit sie nicht mit der langen Outline-Spalte kollidiert),
+       klar vom Buchtext abgesetzt. Kein Quote/Highlight; sonst identische
+       Aktionen wie die verankerten Threads. -->
+  <section class="book-editor-general comment-rail" x-cloak
+             x-show="commentRailVisible && commentGeneralThreads.length"
+             :aria-label="$app.t('share.comments.general')">
+      <div class="book-editor-general__title" x-text="$app.t('share.comments.general')"></div>
+      <div class="book-editor-general__grid">
+        <template x-for="thread in commentGeneralThreads" :key="thread.root.id">
+          <div class="comment-rail__thread comment-rail__thread--general"
+               :class="{ 'comment-rail__thread--selected': commentSelectedRootId === thread.root.id,
+                         'comment-rail__thread--resolved': thread.root.resolved_at }">
+            <div class="comment-rail__comment internal-link" role="button" tabindex="0"
+                 @click="selectCommentThread(thread.root.id)"
+                 @keydown.enter.prevent="selectCommentThread(thread.root.id)">
+              <div class="comment-rail__meta">
+                <span class="comment-rail__avatar" aria-hidden="true"
+                      :style="`--avatar-hue: ${commentAvatar(thread.root).hue}`"
+                      x-text="commentAvatar(thread.root).initials"></span>
+                <span class="comment-rail__author" x-text="commentAvatar(thread.root).label"></span>
+                <span class="comment-rail__time" x-text="$app.formatRelativeShort(thread.root.created_at)"></span>
+                <span x-show="thread.root.resolved_at" class="comment-rail__resolved"
+                      x-text="$app.t('share.comments.resolved')"></span>
+                <span class="comment-rail__thread-actions" x-show="commentSelectedRootId === thread.root.id">
+                  <button type="button" class="icon-btn icon-btn--ghost"
+                          :class="{ 'icon-btn--success': !thread.root.resolved_at }"
+                          :disabled="commentSavingResolve === thread.root.id"
+                          @click.stop="toggleCommentResolve(thread.root)"
+                          :data-tip="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')"
+                          :aria-label="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')">
+                    <svg class="icon" aria-hidden="true" x-show="!thread.root.resolved_at"><use href="/icons.svg?v=693#check"/></svg>
+                    <svg class="icon" aria-hidden="true" x-show="thread.root.resolved_at"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn--ghost comment-rail__del"
+                          @click.stop="deleteBookComment(thread.root)"
+                          :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+                  </button>
+                </span>
+              </div>
+              <div class="comment-rail__body" x-text="thread.root.body"></div>
+            </div>
+
+            <template x-for="r in thread.replies" :key="r.id">
+              <div class="comment-rail__comment comment-rail__comment--reply"
+                   :class="{ 'comment-rail__comment--author': r.author_email }">
                 <div class="comment-rail__meta">
                   <span class="comment-rail__avatar" aria-hidden="true"
-                        :style="`--avatar-hue: ${commentAvatar(thread.root).hue}`"
-                        x-text="commentAvatar(thread.root).initials"></span>
-                  <span class="comment-rail__author" x-text="commentAvatar(thread.root).label"></span>
-                  <span class="comment-rail__time" x-text="$app.formatRelativeShort(thread.root.created_at)"></span>
-                  <span x-show="thread.root.resolved_at" class="comment-rail__resolved"
-                        x-text="$app.t('share.comments.resolved')"></span>
-                  <span class="comment-rail__thread-actions" x-show="commentSelectedRootId === thread.root.id">
-                    <button type="button" class="icon-btn icon-btn--ghost"
-                            :class="{ 'icon-btn--success': !thread.root.resolved_at }"
-                            :disabled="commentSavingResolve === thread.root.id"
-                            @click.stop="toggleCommentResolve(thread.root)"
-                            :data-tip="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')"
-                            :aria-label="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')">
-                      <svg class="icon" aria-hidden="true" x-show="!thread.root.resolved_at"><use href="/icons.svg?v=693#check"/></svg>
-                      <svg class="icon" aria-hidden="true" x-show="thread.root.resolved_at"><use href="/icons.svg?v=693#rotate-cw"/></svg>
-                    </button>
-                    <button type="button" class="icon-btn icon-btn--ghost comment-rail__del"
-                            @click.stop="deleteBookComment(thread.root)"
-                            :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
-                    </button>
-                  </span>
+                        :style="`--avatar-hue: ${commentAvatar(r).hue}`"
+                        x-text="commentAvatar(r).initials"></span>
+                  <span class="comment-rail__author" x-text="commentAvatar(r).label"></span>
+                  <span class="comment-rail__time" x-text="$app.formatRelativeShort(r.created_at)"></span>
+                  <button type="button" class="icon-btn icon-btn--ghost comment-rail__del comment-rail__reply-del"
+                          @click="deleteBookComment(r)"
+                          :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+                  </button>
                 </div>
-                <div class="comment-rail__body" x-text="thread.root.body"></div>
+                <div class="comment-rail__body" x-text="r.body"></div>
               </div>
+            </template>
 
-              <template x-for="r in thread.replies" :key="r.id">
-                <div class="comment-rail__comment comment-rail__comment--reply"
-                     :class="{ 'comment-rail__comment--author': r.author_email }">
-                  <div class="comment-rail__meta">
-                    <span class="comment-rail__avatar" aria-hidden="true"
-                          :style="`--avatar-hue: ${commentAvatar(r).hue}`"
-                          x-text="commentAvatar(r).initials"></span>
-                    <span class="comment-rail__author" x-text="commentAvatar(r).label"></span>
-                    <span class="comment-rail__time" x-text="$app.formatRelativeShort(r.created_at)"></span>
-                    <button type="button" class="icon-btn icon-btn--ghost comment-rail__del comment-rail__reply-del"
-                            @click="deleteBookComment(r)"
-                            :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
-                    </button>
-                  </div>
-                  <div class="comment-rail__body" x-text="r.body"></div>
-                </div>
-              </template>
-
-              <template x-if="commentSelectedRootId === thread.root.id">
-                <div class="comment-rail__foot">
-                  <form class="comment-rail__reply" @submit.prevent="replyToCommentRoot(thread)">
-                    <textarea x-model="commentReplyDrafts[thread.root.id]" rows="2"
-                              :placeholder="$app.t('share.comments.replyPlaceholder')"
-                              maxlength="4000" data-spellcheck="spelling"
-                              class="comment-rail__textarea"></textarea>
-                    <button type="submit" class="btn-compact"
-                            :disabled="commentSavingReply === thread.root.id || !(commentReplyDrafts[thread.root.id] || '').trim()"
-                            x-text="$app.t('share.comments.send')"></button>
-                  </form>
-                </div>
-              </template>
-            </div>
-          </template>
-        </div>
-      </template>
-    </aside>
-  </div>
+            <template x-if="commentSelectedRootId === thread.root.id">
+              <div class="comment-rail__foot">
+                <form class="comment-rail__reply" @submit.prevent="replyToCommentRoot(thread)">
+                  <textarea x-model="commentReplyDrafts[thread.root.id]" rows="2"
+                            :placeholder="$app.t('share.comments.replyPlaceholder')"
+                            maxlength="4000" data-spellcheck="spelling"
+                            class="comment-rail__textarea"></textarea>
+                  <button type="submit" class="btn-compact"
+                          :disabled="commentSavingReply === thread.root.id || !(commentReplyDrafts[thread.root.id] || '').trim()"
+                          x-text="$app.t('share.comments.send')"></button>
+                </form>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </section>
 
   <div x-show="!loading && blocks.length === 0 && !loadError" class="card-status"
        x-text="$app.t('bookEditor.empty')"></div>

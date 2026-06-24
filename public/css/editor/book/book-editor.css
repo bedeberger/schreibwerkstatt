@@ -24,13 +24,101 @@
   .book-editor-layout--comments.book-editor-layout--no-outline {
     grid-template-columns: minmax(0, 1fr) clamp(280px, 22vw, 340px);
   }
-  .book-editor-comments {
-    position: sticky;
-    top: var(--space-sm);
+  /* Kommentar-Spalte: nackter Positionierungs-Container (kein Karten-Chrome).
+     Karten schweben absolut auf Höhe ihrer Textstelle und scrollen mit dem
+     Stream im selben Scroll-Container mit (Fenster bzw. Karte im Vollbild) —
+     darum NICHT sticky und KEIN eigener overflow. Überschreibt die .comment-rail-
+     Basis (Border/Padding/Flex), die für die Notebook-Leseansicht gilt. */
+  .book-editor-comments.comment-rail {
+    display: block;
+    position: relative;
+    top: auto;
     align-self: start;
-    max-height: calc(100dvh - 120px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    max-height: none;
+    overflow: visible;
+    gap: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+  /* Positionierungs-Ebene: hält die absolut platzierten Karten + Marker; ihre
+     Höhe = aufgelöster Stapel-Boden, damit die Spalte scrollbar mitwächst. */
+  .book-editor-comments__layer {
+    position: relative;
+    min-height: var(--comments-stack-height, 0);
+  }
+  .book-editor-comments__layer > .comment-rail__thread {
+    position: absolute;
+    inset-inline: 0;
+    top: var(--comment-top, 0);
+    /* Vor erster Vermessung verborgen (aber mit Layout → offsetHeight messbar),
+       damit Karten nicht für einen Frame deckungsgleich bei 0 aufblitzen. */
+    visibility: hidden;
+    transition: top var(--transition-base) ease, box-shadow var(--transition-fast), border-color var(--transition-fast);
+  }
+  .book-editor-comments__layer > .comment-rail__thread.is-positioned { visibility: visible; }
+  /* Selektierte Karte über die Nachbarn heben (z-index), damit ihr Schatten +
+     aufgeklappte Reply-Form nicht von der Folgekarte überdeckt werden. */
+  .book-editor-comments__layer > .comment-rail__thread--selected { z-index: 2; }
+
+  /* Marker im linken Rand der Spalte: kurzer Tick auf der echten Anker-Höhe.
+     Reicht in den Grid-Gap zwischen Stream und Spalte hinein. */
+  .book-editor-comment-marker {
+    position: absolute;
+    top: var(--marker-top, 0);
+    left: calc(-1 * var(--space-md));
+    width: 10px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--card-accent-share, var(--color-accent)) 45%, transparent);
+    cursor: pointer;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+  }
+  .book-editor-comment-marker:hover { background: var(--card-accent-share, var(--color-accent)); }
+  .book-editor-comment-marker--selected {
+    background: var(--card-accent-share, var(--color-accent));
+    transform: scaleX(1.4);
+  }
+  .book-editor-comment-marker--resolved { opacity: 0.45; }
+  .book-editor-comment-marker--changed {
+    background: color-mix(in srgb, var(--color-warn-text) 55%, transparent);
+  }
+
+  /* Allgemeine (nicht-verankerte) Kommentare: Vollbreiten-Bande UNTER dem
+     gesamten Layout (Sibling von .book-editor-layout, KEIN Grid-Item — sonst
+     kollidiert die neue Grid-Zeile mit der langen, sticky Outline-Spalte).
+     Liegt auf dem App-Hintergrund → klar vom Paper-Stream abgesetzt. Karten in
+     einem responsiven Raster, damit die volle Breite genutzt wird. */
+  .book-editor-general.comment-rail {
+    display: block;
+    --card-accent: var(--card-accent-share, var(--color-accent));
+    margin-block-start: var(--space-xl);
+    padding: var(--space-lg) 0 0;
+    border: none;
+    border-top: 2px solid var(--color-border);
+    border-radius: 0;
+    background: transparent;
+    /* .comment-rail-Basis (Leseansicht, ≥1100px) setzt height/overflow für den
+       eigenen Scroll-Kontext — hier nicht: die Bande wächst im Seitenfluss. */
+    height: auto;
+    overflow: visible;
+  }
+  .book-editor-general__title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
+    margin-block-end: var(--space-md);
+  }
+  .book-editor-general__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+    gap: var(--space-md);
+    align-items: start;
   }
 
   .book-editor-outline {
@@ -46,10 +134,30 @@
     max-height: calc(100dvh - 120px);
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* Scrollbar initial unsichtbar (Thumb transparent), erscheint erst während des
+       Scrollens (`.is-scrolling`, von app-chrome.js gesetzt, mit Idle-Fade) — gleiches
+       Pattern wie der Sidebar-Tree. Gutter bleibt via `scrollbar-width: thin`
+       reserviert → kein Layout-Shift beim Ein-/Ausblenden. */
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
     padding-block: var(--space-sm);
     border-right: 1px solid var(--color-border);
     padding-inline-end: var(--space-md);
     font-family: var(--font-sans);
+  }
+  .book-editor-outline.is-scrolling {
+    scrollbar-color: var(--color-muted) transparent;
+  }
+  .book-editor-outline::-webkit-scrollbar {
+    width: 8px;
+  }
+  .book-editor-outline::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-slow);
+  }
+  .book-editor-outline.is-scrolling::-webkit-scrollbar-thumb {
+    background: var(--color-muted);
   }
   .book-editor-outline-title {
     font-size: var(--font-size-xs);
@@ -359,12 +467,21 @@
     color: var(--color-text);
   }
 
-  /* Verankerte Leser-Kommentar-Stellen (Kommentar-Leiste). */
+  /* Verankerte Leser-Kommentar-Stellen (Kommentar-Leiste). Dezenter Hintergrund +
+     gepunktete Unterstreichung markiert die Stelle als „kommentiert" (statt bloss
+     getönt); die selektierte Stelle bekommt kräftigen Hintergrund + durchgezogene
+     Linie. ::highlight unterstützt text-decoration → kein DOM-Eingriff nötig. */
   ::highlight(book-editor-comment-anchor) {
-    background: color-mix(in srgb, var(--card-accent, currentColor) 16%, transparent);
+    background: color-mix(in srgb, var(--card-accent, currentColor) 14%, transparent);
+    text-decoration: underline dotted color-mix(in srgb, var(--card-accent, currentColor) 60%, transparent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
   }
   ::highlight(book-editor-comment-anchor-active) {
     background: color-mix(in srgb, var(--card-accent, currentColor) 42%, transparent);
+    text-decoration: underline solid var(--card-accent, currentColor);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
   }
 
   /* Konflikt-Banner — Marginalie, dünner Rail. */
@@ -511,13 +628,28 @@
   .book-editor-layout,
   .book-editor-layout--comments,
   .book-editor-layout--comments.book-editor-layout--no-outline { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
-  .book-editor-comments {
+  /* Flach-Modus: Spalte stapelt sich unter dem Stream, eigener Scroll-Kontext
+     existiert nicht mehr → vertikale Verankerung deaktivieren, Karten/Marker in
+     normalen Fluss zurück. JS überspringt das Layout (matchMedia, FLAT_BELOW). */
+  .book-editor-comments.comment-rail {
     position: static;
     max-height: none;
     margin-block-start: var(--space-md);
     border-block-start: 1px solid var(--color-border);
     padding-block-start: var(--space-md);
   }
+  .book-editor-comments__layer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-height: 0;
+  }
+  .book-editor-comments__layer > .comment-rail__thread {
+    position: static;
+    visibility: visible;
+    inset-inline: auto;
+  }
+  .book-editor-comment-marker { display: none; }
   .book-editor-outline {
     position: static;
     max-height: 200px;

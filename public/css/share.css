@@ -1,20 +1,27 @@
 /* Reader-View für geteilte Seiten/Kapitel.
-   Standalone (kein Alpine, kein SPA-Shell). Light/Dark via prefers-color-scheme.
-   Importiert tokens implizit nicht — eigene Mini-Palette, damit der Reader
-   unabhängig vom Haupt-Bundle ist und ohne JS funktioniert. */
+   Standalone (kein Alpine, kein SPA-Shell). Eigene Mini-Palette, damit der Reader
+   unabhängig vom Haupt-Bundle ist und ohne JS funktioniert.
+
+   Theme-Auflösung: Default ist Light (:root). Der Leser-Switcher setzt für eine
+   explizite Wahl `data-theme="light|dark"` am <html> (share-theme-init.js, vor
+   dem ersten Paint). Für die Wahl "Auto" wird KEIN Attribut gesetzt → die
+   prefers-color-scheme-Media-Query greift (auch komplett ohne JS). */
 
 :root {
-  --share-bg: #faf7f2;
-  --share-surface: #ffffff;
-  --share-text: #1f1c18;
-  --share-muted: #6b6258;
+  --share-bg: #f7f3ec;
+  --share-surface: #fffdf8;
+  --share-text: #221c18;
+  --share-muted: #6e6257;
   --share-faint: #b8aea2;
-  --share-accent: #5a4a8e;
-  --share-border: rgba(0, 0, 0, 0.12);
-  --share-hover: rgba(0, 0, 0, 0.05);
+  --share-accent: #9a3b34;
+  /* Zweiter, ruhigerer Ton (Sepia): markiert Autor-Antworten, damit der Reviewer
+     Leser-Kommentar vs. Autor-Stimme auf einen Blick unterscheidet. */
+  --share-accent-2: #7a6a4f;
+  --share-border: rgba(60, 40, 30, 0.14);
+  --share-hover: rgba(120, 70, 50, 0.06);
   --share-radius: 8px;
   --share-radius-sm: 4px;
-  --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --share-shadow: 0 1px 3px rgba(60, 40, 30, 0.1);
   color-scheme: light;
 
   /* Brücke auf den geteilten Manuskript-Stream-Look
@@ -32,16 +39,33 @@
   --ms-space-lg: 28px;
 }
 
+/* Explizite Dunkel-Wahl (Switcher). */
+html[data-theme="dark"] {
+  --share-bg: #1a1714;
+  --share-surface: #262019;
+  --share-text: #e8e2d7;
+  --share-muted: #9a948a;
+  --share-faint: #524d46;
+  --share-accent: #d98a7e;
+  --share-accent-2: #c0a978;
+  --share-border: rgba(255, 240, 225, 0.13);
+  --share-hover: rgba(255, 220, 190, 0.07);
+  --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+/* Auto (kein data-theme): Systempräferenz. Greift auch ohne JS. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --share-bg: #1a1816;
-    --share-surface: #2a2722;
-    --share-text: #e6e2d9;
+  html:not([data-theme]) {
+    --share-bg: #1a1714;
+    --share-surface: #262019;
+    --share-text: #e8e2d7;
     --share-muted: #9a948a;
     --share-faint: #524d46;
-    --share-accent: #998ac6;
-    --share-border: rgba(255, 255, 255, 0.12);
-    --share-hover: rgba(255, 255, 255, 0.06);
+    --share-accent: #d98a7e;
+    --share-accent-2: #c0a978;
+    --share-border: rgba(255, 240, 225, 0.13);
+    --share-hover: rgba(255, 220, 190, 0.07);
     --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     color-scheme: dark;
   }
@@ -105,6 +129,136 @@ body.share-page {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* Werkzeug-Cluster oben rechts: Optionen-Menü (⋯). Mobile-first im Header-Fluss
+   rechtsbündig; ab Tablet absolut oben rechts. */
+.share-header__tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 24px 12px;
+}
+/* #share-theme bleibt als leerer Template-Knoten zurück (Cluster montieren ins
+   Menü) — nicht als Flex-Item Platz beanspruchen lassen. */
+.share-theme:empty { display: none; }
+.share-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Optionen-Menü (Meatball ⋯): ein Trigger oben rechts öffnet ein Dropdown mit
+   allen sekundären Reader-Optionen (Identität, Farbschema, Inhaltsverzeichnis).
+   Standalone von share-reader.js gebaut — kein Alpine-Context-Menu. */
+.share-menu { position: relative; }
+.share-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--share-surface);
+  color: var(--share-muted);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  cursor: pointer;
+}
+.share-menu__trigger:hover { background: var(--share-hover); }
+.share-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: var(--share-surface);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius);
+  box-shadow: var(--share-shadow);
+  z-index: 20;
+  overflow: hidden;
+}
+.share-menu__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--share-border);
+}
+.share-menu__section:last-child { border-bottom: 0; }
+.share-menu__heading {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--share-faint);
+}
+
+/* Identitäts-Zeile im Menü: „Als <Name>" links, Ändern-Button rechts. */
+.share-menu__section .share-identity-bar {
+  justify-content: space-between;
+  width: 100%;
+}
+.share-menu__section .share-identity-bar__as { max-width: 16ch; }
+
+/* Aktions-Button (TOC-Toggle) als volle Menü-Zeile; aktiv = Akzent-Hintergrund. */
+.share-action-btn {
+  padding: 6px 12px;
+  background: var(--share-surface);
+  color: var(--share-muted);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+.share-action-btn:hover:not(.share-action-btn--active) { background: var(--share-hover); }
+.share-action-btn--active {
+  background: var(--share-accent);
+  border-color: var(--share-accent);
+  color: #fff;
+}
+
+/* Theme-Switcher (Auto / Hell / Dunkel) als segmentierte Zeile im Menü.
+   Progressive Enhancement — ohne JS folgt der Reader der Systempräferenz. */
+.share-theme__group {
+  display: flex;
+  background: var(--share-surface);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  overflow: hidden;
+}
+.share-theme__btn {
+  flex: 1;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--share-muted);
+  border: 0;
+  border-left: 1px solid var(--share-border);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+.share-theme__btn:first-child { border-left: 0; }
+.share-theme__btn:hover:not(.share-theme__btn--active) { background: var(--share-hover); }
+.share-theme__btn--active {
+  background: var(--share-accent);
+  color: #fff;
+}
+
+@media (min-width: 601px) {
+  .share-header__tools {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    padding: 0;
+  }
+}
+
 .share-main {
   max-width: 70ch;
   margin: 0 auto;
@@ -114,14 +268,23 @@ body.share-page {
 .share-intro {
   margin: 0 0 32px;
   padding: 14px 18px;
+  border: 1px solid var(--share-border);
   border-left: 4px solid var(--share-accent);
   background: var(--share-hover);
   border-radius: 0 var(--share-radius) var(--share-radius) 0;
-  font-style: italic;
   color: var(--share-muted);
 }
-.share-intro p { margin: 0 0 8px; }
-.share-intro p:last-child { margin: 0; }
+.share-intro__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--share-accent);
+  margin: 0 0 8px;
+}
+.share-intro__body { font-style: italic; }
+.share-intro__body p { margin: 0 0 8px; }
+.share-intro__body p:last-child { margin: 0; }
 
 .share-content h1, .share-content h2, .share-content h3 {
   font-family: inherit;
@@ -131,6 +294,21 @@ body.share-page {
 }
 .share-content h1 { font-size: 26px; }
 .share-content h2 { font-size: 22px; }
+
+/* TOC-Sprungziele: Offset für den Sticky-Header + kurzes Aufleuchten beim
+   Anspringen (JS setzt .share-flash, share-reader.js#flashTarget). */
+.share-content [id^="sec"] { scroll-margin-top: 88px; }
+.share-flash {
+  animation: shareFlash 1.3s ease-out;
+  border-radius: var(--share-radius-sm);
+}
+@keyframes shareFlash {
+  0% { background: color-mix(in srgb, var(--share-accent) 20%, transparent); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .share-flash { animation-duration: 0.01ms; }
+}
 .share-content h3 { font-size: 19px; }
 .share-content p { margin: 0 0 1em; hyphens: auto; }
 .share-content blockquote {
@@ -160,9 +338,16 @@ body.share-page {
    .ms-page__body) kommen aus dem geteilten manuscript-stream.css; die
    Body-Typografie liefert .share-content (oben). */
 
-/* Inhaltsverzeichnis (optional, bei Buch-/Kapitel-Shares). */
+/* Inhaltsverzeichnis (optional, bei Buch-/Kapitel-Shares). Pendant zur
+   Bucheditor-Outline: im Grid (≥1100px) linke sticky Leiste, gestapelt (mobil)
+   als gerahmte Box über dem Inhalt. */
 .share-toc {
-  margin: 0 0 32px;
+  max-width: 70ch;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.share-toc__inner {
   padding: 16px 20px;
   border: 1px solid var(--share-border);
   border-radius: var(--share-radius);
@@ -170,12 +355,15 @@ body.share-page {
 }
 .share-toc__heading {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--share-muted);
 }
+/* Toggle (Aktions-Button oben rechts) blendet das ganze TOC-Panel aus. Im Grid
+   gibt die Layout-Klasse zusätzlich die linke Spalte frei (siehe ≥1100px). */
+.share-toc-collapsed .share-toc { display: none; }
 .share-toc__list {
   list-style: none;
   margin: 0;
@@ -186,11 +374,12 @@ body.share-page {
 .share-toc__item--l1:first-child { margin-top: 0; }
 .share-toc__item--l2 { padding-left: 18px; font-weight: 400; }
 .share-toc__link {
-  display: inline-block;
+  display: block;
   padding: 3px 0;
   color: var(--share-accent);
   text-decoration: none;
   line-height: 1.4;
+  font-size: 14px;
 }
 .share-toc__link:hover { text-decoration: underline; }
 
@@ -216,10 +405,11 @@ body.share-page {
 @media (min-width: 1100px) {
   .share-layout {
     display: grid;
-    grid-template-columns: minmax(0, 72ch) minmax(280px, 360px);
-    gap: 40px;
-    max-width: calc(72ch + 360px + 40px);
+    grid-template-columns: minmax(0, 78ch) minmax(320px, 440px);
+    gap: 56px;
+    max-width: calc(78ch + 440px + 56px);
     margin: 0 auto;
+    padding: 0 32px;
     align-items: start;
   }
   .share-layout .share-main { max-width: none; margin: 0; padding-right: 0; }
@@ -231,6 +421,81 @@ body.share-page {
     top: 92px;
     max-height: calc(100vh - 112px);
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  /* Scrollbar an TOC + Kommentar-Leiste nur während des Scrollens sichtbar
+     (`.is-scrolling` von share-reader.js, Idle-Fade), Gutter via thin reserviert
+     → kein Layout-Shift. Gleiches Auto-Hide-Pattern wie in der SPA. */
+  .share-layout .share-comments.is-scrolling,
+  .share-layout--has-toc .share-toc.is-scrolling {
+    scrollbar-color: var(--share-muted) transparent;
+  }
+  .share-layout .share-comments::-webkit-scrollbar,
+  .share-layout--has-toc .share-toc::-webkit-scrollbar {
+    width: 8px;
+  }
+  .share-layout .share-comments::-webkit-scrollbar-thumb,
+  .share-layout--has-toc .share-toc::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: var(--share-radius-sm);
+    transition: background 0.4s ease;
+  }
+  .share-layout .share-comments.is-scrolling::-webkit-scrollbar-thumb,
+  .share-layout--has-toc .share-toc.is-scrolling::-webkit-scrollbar-thumb {
+    background: var(--share-muted);
+  }
+
+  /* Mit Inhaltsverzeichnis: linke Leiste | Text | Kommentare. */
+  .share-layout--has-toc {
+    grid-template-columns: minmax(200px, 280px) minmax(0, 74ch) minmax(300px, 420px);
+    gap: 48px;
+    max-width: calc(280px + 74ch + 420px + 96px);
+  }
+  .share-layout--has-toc .share-main { padding-left: 0; }
+  .share-layout--has-toc .share-toc {
+    max-width: none;
+    margin: 0;
+    padding: 32px 0 32px 24px;
+    position: sticky;
+    top: 92px;
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .share-layout--has-toc .share-toc__inner {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  /* TOC ausgeblendet → zurück aufs 2-Spalten-Raster (Text | Kommentare). */
+  .share-layout--has-toc.share-toc-collapsed {
+    grid-template-columns: minmax(0, 78ch) minmax(320px, 440px);
+    gap: 56px;
+    max-width: calc(78ch + 440px + 56px);
+  }
+}
+
+/* Sehr breite Displays: Spalten weiter öffnen, damit der Reader den Platz nutzt
+   statt mit grossen Aussenrändern zentriert zu „kleben". Lesespalte bleibt aus
+   Lesbarkeitsgründen gedeckelt; der Zugewinn geht an TOC + Kommentar-Leiste. */
+@media (min-width: 1700px) {
+  .share-layout {
+    grid-template-columns: minmax(0, 82ch) minmax(380px, 520px);
+    gap: 72px;
+    max-width: calc(82ch + 520px + 72px);
+  }
+  .share-layout--has-toc {
+    grid-template-columns: minmax(240px, 320px) minmax(0, 80ch) minmax(360px, 500px);
+    gap: 64px;
+    max-width: calc(320px + 80ch + 500px + 128px);
+  }
+  .share-layout--has-toc.share-toc-collapsed {
+    grid-template-columns: minmax(0, 82ch) minmax(380px, 520px);
+    gap: 72px;
+    max-width: calc(82ch + 520px + 72px);
   }
 }
 .share-comments__heading {
@@ -319,19 +584,6 @@ body.share-page {
   align-items: center;
   gap: 12px;
 }
-.share-comments__form button[type=submit] {
-  padding: 8px 18px;
-  background: var(--share-accent);
-  color: #fff;
-  border: 0;
-  border-radius: var(--share-radius-sm);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.share-comments__form button[type=submit]:hover { filter: brightness(1.08); }
-.share-comments__form button[type=submit]:disabled { opacity: 0.6; cursor: not-allowed; }
 .share-comments__status {
   font-size: 13px;
   color: var(--share-muted);
@@ -428,28 +680,77 @@ body.share-page {
   outline-offset: -1px;
 }
 .share-composer__actions { display: flex; align-items: center; gap: 10px; }
-.share-composer__submit {
+/* Geteilte Kommentar-Aktions-Buttons (Composer-Modal, Inline-Reply, SSR-Form).
+   Primär = gefüllt, Ghost = Rahmen — gleiche Metrik/Schrift, damit alle Senden/
+   Abbrechen-Paare einheitlich aussehen. */
+.share-composer__submit,
+.share-thread__reply-actions button,
+.share-comments__form button[type=submit] {
   padding: 8px 18px;
   background: var(--share-accent);
   color: #fff;
   border: 0;
   border-radius: var(--share-radius-sm);
-  font: inherit;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
 }
-.share-composer__submit:hover { filter: brightness(1.08); }
-.share-composer__submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.share-composer__submit:hover,
+.share-thread__reply-actions button:hover,
+.share-comments__form button[type=submit]:hover { filter: brightness(1.08); }
+.share-composer__submit:disabled,
+.share-thread__reply-actions button:disabled,
+.share-comments__form button[type=submit]:disabled { opacity: 0.6; cursor: not-allowed; }
 .share-composer__cancel {
-  padding: 8px 14px;
+  padding: 8px 18px;
   background: transparent;
   color: var(--share-muted);
   border: 1px solid var(--share-border);
   border-radius: var(--share-radius-sm);
-  font: inherit;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
+}
+.share-composer__cancel:hover { background: var(--share-hover); }
+
+/* Globaler Identitäts-Chip oben rechts (bei den Optionen, im #share-theme-
+   Cluster injiziert): zeigt "Als <Name>" + Ändern bzw. "Name setzen". */
+.share-identity-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.share-identity-bar__as {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  color: var(--share-muted);
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.share-identity-bar__btn {
+  padding: 5px 12px;
+  background: var(--share-surface);
+  color: var(--share-muted);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.share-identity-bar__btn:hover { background: var(--share-hover); }
+
+/* Intro-Text im Namens-Modal (nutzt sonst die .share-composer-Overlay-Optik). */
+.share-name-modal__intro {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--share-muted);
 }
 
 /* Thread-Karten in der Anmerkungs-Liste. */
@@ -500,7 +801,7 @@ body.share-page {
   padding: 0 2px;
 }
 
-.share-comment__who--author { color: var(--share-accent); font-weight: 600; }
+.share-comment__who--author { color: var(--share-accent-2); font-weight: 600; }
 .share-thread__resolved-badge {
   display: inline-block;
   margin-bottom: 6px;
@@ -511,6 +812,27 @@ body.share-page {
   font-size: 11px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+/* Self-Service-Aktionen am eigenen Kommentar (Erledigt / Löschen). Dezente
+   Text-Buttons, damit sie die Lese-Anmerkung nicht dominieren. */
+.share-thread__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.share-thread__action {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--share-muted);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+}
+.share-thread__action:hover { color: var(--share-accent); text-decoration: underline; }
+.share-thread__action--danger:hover { color: #c62828; }
+.share-thread__action:disabled { opacity: 0.6; cursor: not-allowed; text-decoration: none; }
 .share-thread__replies {
   margin-top: 10px;
   padding-left: 12px;
@@ -519,7 +841,7 @@ body.share-page {
   flex-direction: column;
   gap: 8px;
 }
-.share-thread__reply-item--author .share-comment__who { color: var(--share-accent); }
+.share-thread__reply-item--author .share-comment__who { color: var(--share-accent-2); }
 .share-thread__reply {
   display: flex;
   flex-direction: column;
@@ -531,25 +853,13 @@ body.share-page {
   background: var(--share-bg);
   color: var(--share-text);
   border-radius: var(--share-radius-sm);
-  padding: 6px 8px;
-  font: inherit;
-  font-size: 14px;
+  padding: 8px 10px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
   resize: vertical;
 }
 .share-thread__reply textarea:focus { outline: 2px solid var(--share-accent); outline-offset: -1px; }
 .share-thread__reply-actions { display: flex; align-items: center; gap: 8px; }
-.share-thread__reply-actions button {
-  padding: 5px 14px;
-  background: var(--share-accent);
-  color: #fff;
-  border: 0;
-  border-radius: var(--share-radius-sm);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.share-thread__reply-actions button:hover { filter: brightness(1.08); }
-.share-thread__reply-actions button:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .share-footer {
   max-width: 70ch;

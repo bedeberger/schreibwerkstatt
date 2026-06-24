@@ -259,14 +259,20 @@
   .comment-rail__textarea { font-size: var(--font-size-reading); }
 }
 
-/* Verankerte Stellen im Text: dezent alle, kräftig die selektierte.
-   CSS Custom Highlight Registry — paint-only, keine DOM-Mutation. */
+/* Verankerte Stellen im Text: dezent alle, kräftig die selektierte. Gepunktete
+   Unterstreichung markiert die Stelle als „kommentiert", die selektierte bekommt
+   eine durchgezogene Linie. CSS Custom Highlight Registry — paint-only, keine
+   DOM-Mutation. */
 ::highlight(comment-rail-anchor) {
-  background: color-mix(in srgb, var(--card-accent-share, #5a4a8e) 18%, transparent);
-  border-radius: 2px;
+  background: color-mix(in srgb, var(--card-accent-share, #5a4a8e) 16%, transparent);
+  text-decoration: underline dotted color-mix(in srgb, var(--card-accent-share, #5a4a8e) 60%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 ::highlight(comment-rail-anchor-active) {
   background: color-mix(in srgb, var(--card-accent-share, #5a4a8e) 42%, transparent);
-  border-radius: 2px;
+  text-decoration: underline solid var(--card-accent-share, #5a4a8e);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 }

@@ -173,12 +173,63 @@ function listCommentsByToken(token, { order = 'desc' } = {}) {
   return db.prepare(sql).all(token);
 }
 
+// Alle Reader-Kommentare dieses Tokens (Self-Identität via reader_token)
+// auf einen neuen Anzeigenamen ziehen. Greift nur auf eigene Reader-Beiträge
+// (author_email IS NULL); Owner-Antworten bleiben unberührt.
+function renameReaderComments(token, readerToken, newName) {
+  const r = db.prepare(`
+    UPDATE share_comments
+    SET reader_name = ?
+    WHERE share_token = ? AND reader_token = ? AND author_email IS NULL
+  `).run(newName, token, readerToken);
+  return r.changes;
+}
+
 function deleteComment(commentId, ownerEmail) {
   const r = db.prepare(`
     DELETE FROM share_comments
     WHERE id = ?
       AND share_token IN (SELECT token FROM share_links WHERE owner_email = ?)
   `).run(commentId, ownerEmail);
+  return r.changes > 0;
+}
+
+// Eigener Reader-Kommentar (Self-Identität via reader_token, author_email IS NULL)
+// unter genau diesem Link. Liefert {id, parent_id} oder undefined — Basis für die
+// Route, um „nicht gefunden / nicht meiner" von „hat Antworten" zu trennen.
+function getReaderComment(commentId, token, readerToken) {
+  return db.prepare(`
+    SELECT id, parent_id FROM share_comments
+    WHERE id = ? AND share_token = ? AND reader_token = ? AND author_email IS NULL
+  `).get(commentId, token, readerToken);
+}
+
+function commentHasReplies(commentId) {
+  return !!db.prepare('SELECT 1 FROM share_comments WHERE parent_id = ? LIMIT 1').get(commentId);
+}
+
+// Leser löscht einen eigenen Kommentar. Match über reader_token (kein Auth) +
+// author_email IS NULL, damit nie ein Owner-/Fremd-Beitrag getroffen wird. Die
+// „keine Antworten"-Vorbedingung prüft die Route (commentHasReplies) — Owner-
+// Antworten dürfen nicht still per CASCADE mitgelöscht werden.
+function deleteReaderComment(commentId, token, readerToken) {
+  const r = db.prepare(`
+    DELETE FROM share_comments
+    WHERE id = ? AND share_token = ? AND reader_token = ? AND author_email IS NULL
+  `).run(commentId, token, readerToken);
+  return r.changes > 0;
+}
+
+// Leser markiert einen eigenen Root-Thread als erledigt / öffnet ihn wieder.
+// Teilt sich die resolved_at-Spalte mit dem Owner-Resolve (eine Wahrheit pro
+// Thread); Self-Identität via reader_token, nur eigene Roots (parent_id IS NULL).
+function setReaderCommentResolved(commentId, token, readerToken, resolved) {
+  const r = db.prepare(`
+    UPDATE share_comments
+    SET resolved_at = ${resolved ? NOW_ISO_SQL : 'NULL'}
+    WHERE id = ? AND share_token = ? AND reader_token = ?
+      AND author_email IS NULL AND parent_id IS NULL
+  `).run(commentId, token, readerToken);
   return r.changes > 0;
 }
 
@@ -266,7 +317,12 @@ module.exports = {
   getCommentById,
   setCommentResolved,
   listCommentsByToken,
+  renameReaderComments,
   deleteComment,
+  getReaderComment,
+  commentHasReplies,
+  deleteReaderComment,
+  setReaderCommentResolved,
   openReaderCommentsForBook,
   activeLinksForOwnerBook,
   listCommentsByOwnerBook,

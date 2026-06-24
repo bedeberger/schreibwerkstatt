@@ -6,7 +6,7 @@
 // Kommentar-Leiste verankerte UND allgemeine Threads zeigt und voll bedienbar ist.
 
 import { setupCardLifecycle } from './card-lifecycle.js';
-import { fetchJson } from '../utils.js';
+import { fetchJson, tzOpts } from '../utils.js';
 import { copyText } from '../copy-button.js';
 
 export function registerShareLinksCard() {
@@ -356,12 +356,46 @@ export function registerShareLinksCard() {
       if (!iso) return '';
       try {
         const d = new Date(iso);
-        return d.toLocaleString(window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH', {
-          timeZone: window.__app?.appTimezone || 'Europe/Zurich',
+        return d.toLocaleString(window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH', tzOpts({
           dateStyle: 'medium',
           timeStyle: 'short',
-        });
+        }));
       } catch { return iso; }
+    },
+
+    // Erstellungs-Datum (gleiches Format wie formatExpires).
+    formatCreated(iso) {
+      return this.formatExpires(iso);
+    },
+
+    // Restgültigkeit als ein lesbarer Satz pro Link-Zustand:
+    //  - widerrufen → '' (Status-Badge zeigt es bereits)
+    //  - kein Ablauf → „Unbegrenzt gültig"
+    //  - abgelaufen → „Abgelaufen am {date}"
+    //  - aktiv mit Ablauf → „Läuft {rel} ab ({date})", rel = lokalisierte Restzeit
+    validityLabel(link) {
+      const app = window.__app;
+      if (!app) return '';
+      if (link.revoked_at) return '';
+      if (!link.expires_at) return app.t('share.expires.unlimited');
+      const exp = new Date(link.expires_at);
+      const date = this.formatExpires(link.expires_at);
+      if (isNaN(exp.getTime())) return '';
+      if (exp <= new Date()) return app.t('share.expires.expiredAt', { date });
+      return app.t('share.expires.remaining', { rel: this._relFuture(exp), date });
+    },
+
+    // Lokalisierte Restzeit in die Zukunft („in 3 Tagen"/„in 5 Stunden") via
+    // Intl.RelativeTimeFormat. Unter 1 Minute auf 1 geklemmt, damit nie
+    // „in 0 Minuten" erscheint.
+    _relFuture(d) {
+      const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const rtf = new Intl.RelativeTimeFormat(tag, { numeric: 'auto' });
+      const diffMin = Math.round((d.getTime() - Date.now()) / 60000);
+      if (diffMin < 60) return rtf.format(Math.max(diffMin, 1), 'minute');
+      const diffH = Math.round(diffMin / 60);
+      if (diffH < 24) return rtf.format(diffH, 'hour');
+      return rtf.format(Math.round(diffH / 24), 'day');
     },
   }));
 }

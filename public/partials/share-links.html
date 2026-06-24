@@ -111,9 +111,13 @@
           <template x-if="link.intro && editingToken !== link.token">
             <div class="share-row__intro" x-text="link.intro"></div>
           </template>
-          <template x-if="link.expires_at && editingToken !== link.token">
-            <div class="share-row__expires">
-              <span x-text="$app.t('share.expires.at', { date: formatExpires(link.expires_at) })"></span>
+          <template x-if="editingToken !== link.token">
+            <div class="share-row__dates">
+              <span class="share-row__created"
+                    x-text="$app.t('share.created.at', { date: formatCreated(link.created_at) })"></span>
+              <template x-if="validityLabel(link)">
+                <span class="share-row__validity" x-text="validityLabel(link)"></span>
+              </template>
             </div>
           </template>
         </div>

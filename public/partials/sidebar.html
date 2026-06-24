@@ -11,6 +11,11 @@
               :data-tip="t('tile.bookOrganizer.title')" :aria-label="t('tile.bookOrganizer')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
       </button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="toggleBookEditorCard()" :disabled="!pages.length"
+              :class="{ 'is-active': showBookEditorCard }"
+              :data-tip="t('tile.bookEditor.title')" :aria-label="t('tile.bookEditor')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scroll"/></svg>
+      </button>
       <button type="button" class="icon-btn icon-btn--ghost" @click="batchCheck()" :disabled="!pages.length"
               :data-tip="t('sidebar.checkAllTitle')" :aria-label="t('sidebar.checkAll')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#spell-check"/></svg>

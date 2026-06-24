@@ -165,10 +165,13 @@
   color: var(--color-muted);
   white-space: pre-wrap;
 }
-.share-row__expires {
+.share-row__dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6) var(--space-md);
+  margin-top: var(--space-xs);
   font-size: 13px;
   color: var(--color-muted);
-  margin-top: var(--space-xs);
 }
 
 .share-row__edit {

@@ -7,6 +7,7 @@
   <title>{{title}}</title>
   <link rel="stylesheet" href="/css/share.css">
   <link rel="stylesheet" href="/css/components/manuscript-stream.css">
+  <script src="/js/share-theme-init.js"></script>
 </head>
 <body class="share-page">
   <a class="share-skip" href="#share-content">{{t_skip}}</a>
@@ -16,12 +17,16 @@
       <h1 class="share-header__title">{{target_name}}</h1>
       <div class="share-header__author">{{t_by}} {{author_name}}</div>
     </div>
+    <div class="share-header__tools">
+      <div id="share-actions" class="share-actions"></div>
+      <div id="share-theme" class="share-theme"></div>
+    </div>
   </header>
 
-  <div class="share-layout">
+  <div class="share-layout {{layout_class}}">
+    {{toc_block}}
     <main id="share-content" class="share-main">
       {{intro_block}}
-      {{toc_block}}
       <article class="share-content" id="share-article">{{content_html}}</article>
     </main>
 

@@ -15,7 +15,7 @@ const shareLinks = require('../db/share-links');
 const rateLimit = require('../lib/share-ratelimit');
 const { requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
 const { setContext } = require('../lib/log-context');
-const { tServer } = require('../lib/i18n-server');
+const { tServer, tServerParams } = require('../lib/i18n-server');
 const appSettings = require('../lib/app-settings');
 const notify = require('../lib/notify');
 const logger = require('../logger');
@@ -159,18 +159,22 @@ async function loadContentForLink(link) {
   }
 }
 
-// Inhaltsverzeichnis-Block fuer Buch-/Kapitel-Shares (nur wenn show_toc aktiv
-// und mehr als ein Eintrag vorhanden — ein Single-Eintrag-TOC bringt nichts).
+// Inhaltsverzeichnis fuer Buch-/Kapitel-Shares (nur wenn show_toc aktiv und
+// mehr als ein Eintrag vorhanden — ein Single-Eintrag-TOC bringt nichts).
+// Gerendert als linke Leiste (Pendant zur Bucheditor-Outline): im Grid sticky
+// links, gestapelt (mobil) als Box ueber dem Inhalt.
 function buildTocBlock(content, lang) {
   if (!content?.toc || content.toc.length < 2) return '';
   const items = content.toc.map(e =>
     `<li class="share-toc__item share-toc__item--l${e.level}"><a class="share-toc__link" href="#${escHtml(e.anchor)}">${escHtml(e.label)}</a></li>`
   ).join('');
   const heading = escHtml(tServer('share.reader.toc_heading', lang));
-  return `<nav class="share-toc" aria-label="${heading}">
-    <h2 class="share-toc__heading">${heading}</h2>
-    <ol class="share-toc__list">${items}</ol>
-  </nav>`;
+  return `<aside class="share-toc">
+    <nav class="share-toc__inner" aria-label="${heading}">
+      <h2 class="share-toc__heading">${heading}</h2>
+      <ol class="share-toc__list">${items}</ol>
+    </nav>
+  </aside>`;
 }
 
 // Block-ID → Seite auflösen, mit Per-Buch-Memo. Verankerte Kommentare speichern
@@ -237,11 +241,17 @@ router.get('/:token', async (req, res) => {
   const content = await loadContentForLink(link);
   if (!content) return res.status(404).type('html').send('Not found');
 
+  const introAuthor = link.owner_display_name || tServer('share.reader.anon_author', lang);
+  const introLabel = tServerParams('share.reader.intro_label', { name: introAuthor }, lang);
   const introBlock = link.intro
-    ? `<blockquote class="share-intro">${paragraphifyIntro(link.intro)}</blockquote>`
+    ? `<aside class="share-intro" aria-label="${escHtml(introLabel)}">
+      <div class="share-intro__label">${escHtml(introLabel)}</div>
+      <div class="share-intro__body">${paragraphifyIntro(link.intro)}</div>
+    </aside>`
     : '';
 
   const tocBlock = link.show_toc ? buildTocBlock(content, lang) : '';
+  const layoutClass = tocBlock ? 'share-layout--has-toc' : '';
 
   // SSR-Fallback zeigt nur allgemeine Anmerkungen (kein Anker, kein Reply) —
   // verankerte Threads werden client-seitig via /threads hydriert (share-reader.js).
@@ -291,8 +301,11 @@ router.get('/:token', async (req, res) => {
   const readerKeys = ['anchor_cta', 'composer_title', 'composer_general_title', 'reply',
     'reply_placeholder', 'send', 'cancel', 'you_badge', 'author_badge', 'resolved_badge',
     'jump_to_text', 'anchor_stale', 'anchor_changed', 'threads_heading', 'threads_empty', 'quote_label',
-    'your_name', 'anon', 'comment_form_body', 'comment_form_submit', 'comment_submitted',
-    'comment_rate_limited', 'form_empty', 'form_error'];
+    'your_name', 'comment_as', 'change_name', 'set_name', 'name_modal_title', 'name_modal_intro',
+    'name_modal_save', 'name_modal_skip', 'anon', 'comment_form_body', 'comment_form_submit',
+    'comment_submitted', 'comment_rate_limited', 'form_empty', 'form_error',
+    'options_label', 'theme_label', 'theme_auto', 'theme_light', 'theme_dark',
+    'delete', 'delete_confirm', 'mark_done', 'reopen', 'delete_has_replies'];
   const readerI18n = {};
   for (const k of readerKeys) readerI18n[k] = tServer(`share.reader.${k}`, lang);
   const configJson = JSON.stringify({ token, lang, i18n: readerI18n }).replace(/</g, '\\u003c');
@@ -303,6 +316,7 @@ router.get('/:token', async (req, res) => {
   const html = fillTemplate(TEMPLATE_OK, {
     lang,
     config_json: configJson,
+    layout_class: layoutClass,
     title: escHtml(isBook ? content.title : `${content.title} · ${link.book_name}`),
     book_name: escHtml(isBook ? '' : (link.book_name || '')),
     target_name: escHtml(content.title),
@@ -446,6 +460,91 @@ router.get('/:token/threads', (req, res) => {
     res.json({ comments: rows.map(r => serializeCommentForReader(r, readerToken)) });
   } catch (e) {
     logger.error('[share/threads GET] ' + e.message);
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
+// ── Public: Reader-Namen nachträglich ändern ────────────────────────────────
+// Setzt der Leser oben rechts einen neuen (oder leeren) Namen, ziehen ALLE
+// seiner bisherigen Kommentare unter diesem Link auf den neuen Namen nach —
+// Zuordnung über sein Browser-reader_token (kein Auth, Self-Identität). Leerer
+// Name → anonymisiert (reader_name = NULL).
+router.post('/:token/reader-name', commentBody, (req, res) => {
+  const token = String(req.params.token || '');
+  if (!/^[A-Za-z0-9_-]{16,32}$/.test(token)) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  const link = shareLinks.getShareLinkByToken(token);
+  if (!link) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  setContext({ book: link.book_id });
+  if (isExpired(link)) return res.status(410).json({ error_code: 'GONE' });
+
+  const rtRaw = String(req.body?.reader_token || '').trim();
+  if (!READER_TOKEN_RE.test(rtRaw)) return res.status(400).json({ error_code: 'INVALID_TOKEN' });
+  const newName = String(req.body?.reader_name || '').trim();
+  if (newName.length > READER_NAME_MAX) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
+
+  try {
+    const changed = shareLinks.renameReaderComments(token, rtRaw, newName || null);
+    res.json({ ok: true, updated: changed });
+  } catch (e) {
+    logger.error('[share/reader-name POST] ' + e.message);
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
+// ── Public: eigenen Kommentar als erledigt markieren / wieder öffnen ─────────
+// Leser-Self-Service über sein Browser-reader_token (kein Auth). Nur eigene
+// Root-Threads; teilt die resolved_at-Spalte mit dem Owner-Resolve.
+router.patch('/:token/comment/:id/resolve', commentBody, (req, res) => {
+  const token = String(req.params.token || '');
+  if (!/^[A-Za-z0-9_-]{16,32}$/.test(token)) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  const link = shareLinks.getShareLinkByToken(token);
+  if (!link) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  setContext({ book: link.book_id });
+  if (isExpired(link)) return res.status(410).json({ error_code: 'GONE' });
+
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const rtRaw = String(req.body?.reader_token || '').trim();
+  if (!READER_TOKEN_RE.test(rtRaw)) return res.status(400).json({ error_code: 'INVALID_TOKEN' });
+  const resolved = req.body?.resolved !== false;
+
+  try {
+    const ok = shareLinks.setReaderCommentResolved(id, token, rtRaw, resolved);
+    if (!ok) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    res.json({ ok: true, resolved });
+  } catch (e) {
+    logger.error('[share/comment resolve PATCH] ' + e.message);
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
+// ── Public: eigenen Kommentar löschen ───────────────────────────────────────
+// Self-Service via reader_token. Hart löschen nur, wenn der Beitrag KEINE
+// Antworten hat — sonst würde der Owner-Reply per CASCADE still verschwinden
+// (→ 409 HAS_REPLIES, Frontend bietet dann nur „Erledigt" an).
+router.delete('/:token/comment/:id', commentBody, (req, res) => {
+  const token = String(req.params.token || '');
+  if (!/^[A-Za-z0-9_-]{16,32}$/.test(token)) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  const link = shareLinks.getShareLinkByToken(token);
+  if (!link) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  setContext({ book: link.book_id });
+  if (isExpired(link)) return res.status(410).json({ error_code: 'GONE' });
+
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const rtRaw = String(req.body?.reader_token || '').trim();
+  if (!READER_TOKEN_RE.test(rtRaw)) return res.status(400).json({ error_code: 'INVALID_TOKEN' });
+
+  try {
+    const own = shareLinks.getReaderComment(id, token, rtRaw);
+    if (!own) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    if (shareLinks.commentHasReplies(id)) return res.status(409).json({ error_code: 'HAS_REPLIES' });
+    const ok = shareLinks.deleteReaderComment(id, token, rtRaw);
+    if (!ok) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    logger.info(`[share/comment DELETE] token=${token.slice(0, 8)} book=${link.book_id} id=${id}`);
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error('[share/comment DELETE] ' + e.message);
     res.status(500).json({ error_code: 'DB_ERROR' });
   }
 });
