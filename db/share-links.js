@@ -114,19 +114,32 @@ function markOwnerSeen(token, ownerEmail) {
 }
 
 // Leser-Kommentar: anonym (author_email bleibt NULL). Optional verankert
-// (anchor_*) und/oder Antwort auf einen Root-Kommentar (parentId).
+// (anchor_*) und/oder Antwort auf einen Root-Kommentar (parentId). Optionale
+// reader_email erlaubt die Reply-Benachrichtigung (Reader hat keinen Account).
 function insertComment({
-  token, readerName = null, readerToken = null, body, ipHash = null,
+  token, readerName = null, readerEmail = null, readerToken = null, body, ipHash = null,
   parentId = null, anchorBid = null, anchorQuote = null, anchorStart = null, anchorEnd = null,
 }) {
   const r = db.prepare(`
     INSERT INTO share_comments
-      (share_token, reader_name, reader_token, body, ip_hash, parent_id,
+      (share_token, reader_name, reader_email, reader_token, body, ip_hash, parent_id,
        anchor_bid, anchor_quote, anchor_start, anchor_end, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})
-  `).run(token, readerName, readerToken, body, ipHash, parentId,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})
+  `).run(token, readerName, readerEmail, readerToken, body, ipHash, parentId,
          anchorBid, anchorQuote, anchorStart, anchorEnd);
   return getCommentById(r.lastInsertRowid);
+}
+
+// Root-Thread-ID zu einem (Reply- oder Root-)Kommentar dieses Links auflösen.
+// Threads bleiben flach (eine Ebene): eine Antwort auf eine Antwort wird unter
+// denselben Root gehängt. Liefert die Root-ID oder null (Kommentar gehört nicht
+// zu diesem Link / existiert nicht).
+function resolveThreadRootId(commentId, token) {
+  const row = db.prepare(`
+    SELECT id, parent_id FROM share_comments WHERE id = ? AND share_token = ?
+  `).get(commentId, token);
+  if (!row) return null;
+  return row.parent_id || row.id;
 }
 
 // Owner-Antwort auf einen Root-Kommentar: author_email gesetzt, kein Anker
@@ -162,9 +175,9 @@ function setCommentResolved(id, ownerEmail, resolved) {
 }
 
 function listCommentsByToken(token, { order = 'desc' } = {}) {
-  const sql = `SELECT sc.id, sc.share_token, sc.parent_id, sc.reader_name, sc.reader_token,
+  const sql = `SELECT sc.id, sc.share_token, sc.parent_id, sc.reader_name, sc.reader_email, sc.reader_token,
                       sc.author_email, u.display_name AS author_display_name,
-                      sc.body, sc.created_at, sc.resolved_at,
+                      sc.body, sc.created_at, sc.edited_at, sc.resolved_at,
                       sc.anchor_bid, sc.anchor_quote, sc.anchor_start, sc.anchor_end
                FROM share_comments sc
                LEFT JOIN app_users u ON u.email = sc.author_email
@@ -173,16 +186,29 @@ function listCommentsByToken(token, { order = 'desc' } = {}) {
   return db.prepare(sql).all(token);
 }
 
-// Alle Reader-Kommentare dieses Tokens (Self-Identität via reader_token)
-// auf einen neuen Anzeigenamen ziehen. Greift nur auf eigene Reader-Beiträge
-// (author_email IS NULL); Owner-Antworten bleiben unberührt.
-function renameReaderComments(token, readerToken, newName) {
+// Identität (Anzeigename + optionale Mail) aller eigenen Reader-Kommentare dieses
+// Tokens nachziehen (Self-Identität via reader_token). Greift nur auf eigene
+// Reader-Beiträge (author_email IS NULL); Owner-Antworten bleiben unberührt.
+// name/email = null → entsprechendes Feld leeren (anonymisieren / Mail entfernen).
+function updateReaderIdentity(token, readerToken, newName, newEmail) {
   const r = db.prepare(`
     UPDATE share_comments
-    SET reader_name = ?
+    SET reader_name = ?, reader_email = ?
     WHERE share_token = ? AND reader_token = ? AND author_email IS NULL
-  `).run(newName, token, readerToken);
+  `).run(newName, newEmail, token, readerToken);
   return r.changes;
+}
+
+// Leser bearbeitet einen eigenen Kommentar (Body). Self-Identität via
+// reader_token + author_email IS NULL (nie ein Owner-/Fremd-Beitrag). Setzt
+// edited_at als „bearbeitet"-Marker.
+function editReaderComment(commentId, token, readerToken, body) {
+  const r = db.prepare(`
+    UPDATE share_comments
+    SET body = ?, edited_at = ${NOW_ISO_SQL}
+    WHERE id = ? AND share_token = ? AND reader_token = ? AND author_email IS NULL
+  `).run(body, commentId, token, readerToken);
+  return r.changes > 0;
 }
 
 function deleteComment(commentId, ownerEmail) {
@@ -244,7 +270,7 @@ function listCommentsByOwnerBook(ownerEmail, bookId) {
   return db.prepare(`
     SELECT sc.id, sc.share_token, sc.parent_id, sc.reader_name, sc.reader_token,
            sc.author_email, u.display_name AS author_display_name,
-           sc.body, sc.created_at, sc.resolved_at,
+           sc.body, sc.created_at, sc.edited_at, sc.resolved_at,
            sc.anchor_bid, sc.anchor_quote, sc.anchor_start, sc.anchor_end,
            sl.kind AS link_kind, sl.page_id AS link_page_id
     FROM share_comments sc
@@ -314,10 +340,12 @@ module.exports = {
   markOwnerSeen,
   insertComment,
   insertOwnerReply,
+  resolveThreadRootId,
   getCommentById,
   setCommentResolved,
   listCommentsByToken,
-  renameReaderComments,
+  updateReaderIdentity,
+  editReaderComment,
   deleteComment,
   getReaderComment,
   commentHasReplies,

@@ -311,6 +311,11 @@
                @change="adminSettingsForm['mail.notify.owner_on_share_comment'] = $event.target.checked">
         <span>mail.notify.owner_on_share_comment</span>
       </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.reader_on_owner_reply'] === true || adminSettingsForm['mail.notify.reader_on_owner_reply'] === 'true'"
+               @change="adminSettingsForm['mail.notify.reader_on_owner_reply'] = $event.target.checked">
+        <span>mail.notify.reader_on_owner_reply</span>
+      </label>
       <label>mail.notify.job_fail_throttle_min
         <input type="text" x-data="numInput({ integer: true, min: 0, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['mail.notify.job_fail_throttle_min']">
       </label>

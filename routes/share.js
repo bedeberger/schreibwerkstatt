@@ -12,6 +12,7 @@ const { pathToFileURL } = require('url');
 const contentStore = require('../lib/content-store');
 const { loadContents } = require('../lib/load-contents');
 const shareLinks = require('../db/share-links');
+const { getBookSettings } = require('../db/schema');
 const rateLimit = require('../lib/share-ratelimit');
 const { requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
 const { setContext } = require('../lib/log-context');
@@ -32,12 +33,31 @@ const commentBody = (req, res, next) => {
 const TEMPLATE_OK   = fs.readFileSync(path.join(__dirname, '..', 'public', 'share.html'), 'utf8');
 const TEMPLATE_GONE = fs.readFileSync(path.join(__dirname, '..', 'public', 'share.gone.html'), 'utf8');
 
+// Buchtypen, die als Sach-/Web-Text gelesen werden: Absatz-Modell bleibt der
+// Web-Artikel-Stil (Leerzeile zwischen Absätzen, kein Einzug). Alle übrigen Typen
+// (Roman, Krimi, Erzählung …) sowie null/„andere" sind Prosa → Buch-Stil mit
+// Erstzeilen-Einzug (Klasse share-content--prose). Lyrik bleibt Web-Stil, weil
+// Verse über das .poem-Markup eigene Formatierung tragen.
+const NON_PROSE_BUCHTYPEN = new Set(['blog', 'sachbuch', 'essay', 'lyrik']);
+function articleStyleClass(bookId) {
+  try {
+    const { buchtyp } = getBookSettings(bookId);
+    return NON_PROSE_BUCHTYPEN.has(buchtyp) ? '' : 'share-content--prose';
+  } catch {
+    return 'share-content--prose';
+  }
+}
+
 const READER_NAME_MAX = 80;
+const READER_EMAIL_MAX = 200;
 const BODY_MAX = 4000;
 const INTRO_MAX = 2000;
 const ANCHOR_QUOTE_MAX = 600;
 const ANCHOR_BID_RE = /^[0-9a-f]{6,32}$/i;
 const READER_TOKEN_RE = /^[A-Za-z0-9_-]{8,64}$/;
+// Pragmatische Mail-Validierung (kein RFC-Vollparser): nicht-leer, ein @,
+// kein Whitespace. Leere Eingabe = Mail entfernen (kein Fehler).
+const READER_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Leser-sichere Serialisierung eines share_comments-Rows. Gibt NIE author_email,
 // reader_token oder ip_hash preis; `mine` wird gegen den Token des anfragenden
@@ -52,7 +72,11 @@ function serializeCommentForReader(row, readerToken) {
     mine: !isAuthor && !!readerToken && row.reader_token === readerToken,
     body: row.body,
     created_at: row.created_at,
+    edited_at: row.edited_at || null,
     resolved: !!row.resolved_at,
+    // Nur für eigene Beiträge: ob eine Mail hinterlegt ist (→ Reply-
+    // Benachrichtigung aktiv). Fremde Mailadressen werden NIE preisgegeben.
+    email_set: !isAuthor && !!readerToken && row.reader_token === readerToken ? !!row.reader_email : undefined,
     anchor: row.anchor_bid
       ? { bid: row.anchor_bid, quote: row.anchor_quote || '', start: row.anchor_start, end: row.anchor_end }
       : null,
@@ -307,7 +331,9 @@ router.get('/:token', async (req, res) => {
     'name_modal_save', 'name_modal_skip', 'anon', 'comment_form_body', 'comment_form_submit',
     'comment_submitted', 'comment_rate_limited', 'form_empty', 'form_error', 'comments_empty',
     'options_label', 'theme_label', 'theme_auto', 'theme_light', 'theme_dark',
-    'delete', 'delete_confirm', 'mark_done', 'reopen', 'delete_has_replies'];
+    'delete', 'delete_confirm', 'mark_done', 'reopen', 'delete_has_replies',
+    'email_optional_hint', 'email_notice_on', 'name_modal_email',
+    'edit', 'edit_save', 'edited_badge', 'new_reply_badge'];
   const readerI18n = {};
   for (const k of readerKeys) readerI18n[k] = tServer(`share.reader.${k}`, lang);
   const configJson = JSON.stringify({ token, lang, i18n: readerI18n }).replace(/</g, '\\u003c');
@@ -319,6 +345,7 @@ router.get('/:token', async (req, res) => {
     lang,
     config_json: configJson,
     layout_class: layoutClass,
+    article_class: articleStyleClass(link.book_id),
     title: escHtml(isBook ? content.title : `${content.title} · ${link.book_name}`),
     book_name: escHtml(isBook ? '' : (link.book_name || '')),
     target_name: escHtml(content.title),
@@ -371,6 +398,7 @@ router.post('/:token/comment', commentBody, (req, res) => {
 
   const body = String((req.body?.body || '')).trim();
   const readerName = String((req.body?.reader_name || '')).trim();
+  const readerEmailRaw = String((req.body?.reader_email || '')).trim();
   const hp = String((req.body?._hp || '')).trim();
   if (hp) {
     logger.warn(`[share/comment] honeypot triggered token=${token.slice(0, 8)}`);
@@ -379,6 +407,11 @@ router.post('/:token/comment', commentBody, (req, res) => {
   if (!body) return respond(400, 'BODY_REQUIRED');
   if (body.length > BODY_MAX) return respond(400, 'BODY_TOO_LONG');
   if (readerName.length > READER_NAME_MAX) return respond(400, 'NAME_TOO_LONG');
+  // Mail optional: leer = keine; gesetzt = formal valide + Längenlimit.
+  if (readerEmailRaw && (readerEmailRaw.length > READER_EMAIL_MAX || !READER_EMAIL_RE.test(readerEmailRaw))) {
+    return respond(400, 'INVALID_EMAIL');
+  }
+  const readerEmail = readerEmailRaw || null;
 
   // Optionale Anker-/Thread-/Identitaets-Felder (nur JSON-Pfad; No-JS-Form
   // schickt sie nicht → allgemeine Anmerkung). Defensiv validiert.
@@ -392,13 +425,13 @@ router.post('/:token/comment', commentBody, (req, res) => {
   let anchorEnd = null;
 
   if (req.body?.parent_id != null && req.body.parent_id !== '') {
-    parentId = parseInt(req.body.parent_id, 10);
-    if (!Number.isInteger(parentId)) return respond(400, 'INVALID_PARENT');
-    const parent = shareLinks.getCommentById(parentId);
-    // Antwort nur auf einen Root-Kommentar DIESES Links (Threads eine Ebene tief).
-    if (!parent || parent.share_token !== token || parent.parent_id) {
-      return respond(400, 'INVALID_PARENT');
-    }
+    const target = parseInt(req.body.parent_id, 10);
+    if (!Number.isInteger(target)) return respond(400, 'INVALID_PARENT');
+    // Antwort auf einen beliebigen Kommentar DIESES Links — der Thread bleibt
+    // flach (eine Ebene): eine Antwort auf eine Antwort hängt unter denselben
+    // Root. resolveThreadRootId normalisiert auf die Root-ID.
+    parentId = shareLinks.resolveThreadRootId(target, token);
+    if (!parentId) return respond(400, 'INVALID_PARENT');
     // Anker wird vom Root geerbt — eingehende Anker-Felder bei Replies ignoriert.
   } else if (req.body?.anchor_bid != null && req.body.anchor_bid !== '') {
     anchorBid = String(req.body.anchor_bid).trim().toLowerCase();
@@ -425,6 +458,7 @@ router.post('/:token/comment', commentBody, (req, res) => {
     const comment = shareLinks.insertComment({
       token,
       readerName: readerName || null,
+      readerEmail,
       readerToken,
       body,
       ipHash,
@@ -485,12 +519,16 @@ router.post('/:token/reader-name', commentBody, (req, res) => {
   if (!READER_TOKEN_RE.test(rtRaw)) return res.status(400).json({ error_code: 'INVALID_TOKEN' });
   const newName = String(req.body?.reader_name || '').trim();
   if (newName.length > READER_NAME_MAX) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
+  const newEmailRaw = String(req.body?.reader_email || '').trim();
+  if (newEmailRaw && (newEmailRaw.length > READER_EMAIL_MAX || !READER_EMAIL_RE.test(newEmailRaw))) {
+    return res.status(400).json({ error_code: 'INVALID_EMAIL' });
+  }
 
   try {
-    const changed = shareLinks.renameReaderComments(token, rtRaw, newName || null);
+    const changed = shareLinks.updateReaderIdentity(token, rtRaw, newName || null, newEmailRaw || null);
     res.json({ ok: true, updated: changed });
   } catch (e) {
-    logger.error('[share/reader-name POST] ' + e.message);
+    logger.error('[share/reader-identity POST] ' + e.message);
     res.status(500).json({ error_code: 'DB_ERROR' });
   }
 });
@@ -518,6 +556,35 @@ router.patch('/:token/comment/:id/resolve', commentBody, (req, res) => {
     res.json({ ok: true, resolved });
   } catch (e) {
     logger.error('[share/comment resolve PATCH] ' + e.message);
+    res.status(500).json({ error_code: 'DB_ERROR' });
+  }
+});
+
+// ── Public: eigenen Kommentar bearbeiten ────────────────────────────────────
+// Self-Service via reader_token (kein Auth). Nur eigene Reader-Beiträge
+// (author_email IS NULL); setzt edited_at als „bearbeitet"-Marker.
+router.patch('/:token/comment/:id', commentBody, (req, res) => {
+  const token = String(req.params.token || '');
+  if (!/^[A-Za-z0-9_-]{16,32}$/.test(token)) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  const link = shareLinks.getShareLinkByToken(token);
+  if (!link) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  setContext({ book: link.book_id });
+  if (isExpired(link)) return res.status(410).json({ error_code: 'GONE' });
+
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const rtRaw = String(req.body?.reader_token || '').trim();
+  if (!READER_TOKEN_RE.test(rtRaw)) return res.status(400).json({ error_code: 'INVALID_TOKEN' });
+  const body = String(req.body?.body || '').trim();
+  if (!body) return res.status(400).json({ error_code: 'BODY_REQUIRED' });
+  if (body.length > BODY_MAX) return res.status(400).json({ error_code: 'BODY_TOO_LONG' });
+
+  try {
+    const ok = shareLinks.editReaderComment(id, token, rtRaw, body);
+    if (!ok) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    res.json({ ok: true, comment: serializeCommentForReader(shareLinks.getCommentById(id), rtRaw) });
+  } catch (e) {
+    logger.error('[share/comment edit PATCH] ' + e.message);
     res.status(500).json({ error_code: 'DB_ERROR' });
   }
 });
@@ -847,13 +914,18 @@ router.post('/api/links/:token/comments', requireSession, jsonBody, (req, res) =
   const body = String((req.body?.body || '')).trim();
   if (!body) return res.status(400).json({ error_code: 'BODY_REQUIRED' });
   if (body.length > BODY_MAX) return res.status(400).json({ error_code: 'BODY_TOO_LONG' });
-  const parentId = parseInt(req.body?.parent_id, 10);
-  if (!Number.isInteger(parentId)) return res.status(400).json({ error_code: 'INVALID_PARENT' });
-  const parent = shareLinks.getCommentById(parentId);
-  if (!parent || parent.share_token !== token || parent.parent_id) return res.status(400).json({ error_code: 'INVALID_PARENT' });
+  const target = parseInt(req.body?.parent_id, 10);
+  if (!Number.isInteger(target)) return res.status(400).json({ error_code: 'INVALID_PARENT' });
+  // Flacher Thread: Antwort auf eine Antwort hängt unter denselben Root.
+  const parentId = shareLinks.resolveThreadRootId(target, token);
+  if (!parentId) return res.status(400).json({ error_code: 'INVALID_PARENT' });
   try {
     const reply = shareLinks.insertOwnerReply({ token, parentId, authorEmail: ownerEmail, body });
     logger.info(`[share/api/reply] token=${token.slice(0, 8)} book=${link.book_id} parent=${parentId}`);
+    // Reviewer per Mail zurueckholen, wenn er beim Root eine Adresse hinterlegt
+    // hat (fire-and-forget, gedrosselt, opt-out). Kein Leak: Mail nur an den
+    // Root-Verfasser dieses Threads.
+    notify.maybeNotifyReaderReply(link, reply, shareLinks.getCommentById(parentId)).catch(() => {});
     res.json(reply);
   } catch (e) {
     logger.error('[share/api/reply POST] ' + e.message);

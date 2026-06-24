@@ -12,6 +12,7 @@
 // und der Split-Pane-Scroll.
 
 import { createCommentRail } from './comment-rail-core.js';
+import { createCommentLayout } from './comment-rail-layout.js';
 
 // Read-Modus-Seitenansicht. Scope auf `.page-view-wrap`, weil der Edit-Modus
 // ein zweites, früher im DOM stehendes `.page-content-view--editing` (leerer
@@ -20,6 +21,11 @@ import { createCommentRail } from './comment-rail-core.js';
 function readView() {
   return document.querySelector('.page-view-wrap .page-content-view');
 }
+function layerEl() { return document.querySelector('.comment-rail__layer'); }
+
+// Unter diesem Viewport fällt das Split auf eine gestapelte Liste zurück
+// (comments-rail.css) → Flach-Modus, keine vertikale Verankerung.
+const FLAT_BELOW = '(max-width: 1099px)';
 
 const rail = createCommentRail({
   scopeEl: readView,
@@ -30,6 +36,7 @@ const rail = createCommentRail({
     railVisible: 'commentRailVisible', replyDrafts: 'commentReplyDrafts', savingReply: 'commentSavingReply',
     savingResolve: 'commentSavingResolve', loadingBookId: '_loadingBookId', recomputeRaf: '_recomputeRaf',
     pendingGotoBid: '_pendingGotoBid', generalThreads: 'commentGeneralThreads',
+    filterStatus: 'commentFilterStatus', filterReviewer: 'commentFilterReviewer',
   },
   // Allgemeine (nicht-verankerte) Kommentare gehören in diese Seitenleiste, wenn der
   // Link ein Page-Share genau der offenen Seite ist — Buch-/Kapitel-Share-Allgemeines
@@ -46,12 +53,24 @@ const rail = createCommentRail({
     const rendered = !!(readView() && app?.renderedPageHtml);
     return !idle && !rendered;
   },
-  afterRecompute: (ctx) => ctx._mirrorFlag(),
+  // Nach jedem Thread-Set: Root-Flag spiegeln (Grid-Split + Badge) UND die
+  // vertikale Verankerung neu rechnen (post-render, Kartenhöhen messen).
+  afterRecompute: (ctx) => { ctx._mirrorFlag(); ctx._scheduleCommentLayout(); },
   scrollToRange: (range, ctx) => ctx._scrollRangeIntoView(range),
+});
+
+// Vertikale Verankerung (Google-Docs-Modell) aus dem geteilten Kern, Scope =
+// gerenderte Leseansicht der Einzelseite. State-Felder in editorCommentsCard.
+const layout = createCommentLayout({
+  scopeEl: readView,
+  layerEl,
+  flatBelow: FLAT_BELOW,
+  keys: { threads: 'commentThreads', selectedRootId: 'commentSelectedRootId', railVisible: 'commentRailVisible', stackHeight: 'commentStackHeight' },
 });
 
 export const editorCommentsRailMethods = {
   ...rail,
+  ...layout,
 
   // Partial-erwartete Methodennamen → geteilter Kern. Die im geteilten Body-
   // Fragment (comment-thread-body.html) referenzierten Namen sind mit dem
@@ -59,13 +78,20 @@ export const editorCommentsRailMethods = {
   loadBookComments(bookId) { return this._railLoad(bookId); },
   scheduleRecompute() { return this._railSchedule(); },
   recomputePageThreads() { return this._railRecompute(); },
-  selectCommentThread(rootId) { return this._railSelect(rootId); },
+  selectCommentThread(rootId) {
+    this._railSelect(rootId);
+    // Auswahl pinnt die aktive Karte auf ihre exakte Anker-Höhe und schiebt die
+    // übrigen darum herum → Layout neu rechnen.
+    this._scheduleCommentLayout();
+  },
   replyToCommentRoot(thread) { return this._railReply(thread); },
   toggleCommentResolve(comment) { return this._railResolve(comment); },
   deleteBookComment(comment) { return this._railDelete(comment); },
 
   init() {
     this._railAbort = new AbortController();
+    // Vertikale Verankerung: Observer für Seiten-Reflow + Viewport-Resize.
+    this._initCommentLayout();
     // Buchwechsel: State leeren + Kommentare des neuen Buchs laden.
     this.$watch(() => window.__app?.selectedBookId, (id) => this._onBookChange(id));
     // Seitenwechsel: Leiste einklappen (Toggle ist pro Seite — sonst „folgt" der
@@ -96,6 +122,7 @@ export const editorCommentsRailMethods = {
   destroy() {
     this._railAbort?.abort();
     if (this._recomputeRaf) { cancelAnimationFrame(this._recomputeRaf); this._recomputeRaf = null; }
+    this._teardownCommentLayout();
     this._railClearHL();
     const app = window.__app;
     if (app) { app.pageCommentRailOpen = false; app.pageCommentCount = 0; }
@@ -107,6 +134,7 @@ export const editorCommentsRailMethods = {
     this.commentGeneralThreads = [];
     this.commentSelectedRootId = null;
     this.commentRailVisible = false;
+    this.commentStackHeight = 0;
     this._pendingGotoBid = null;
     this._railClearHL();
     this._mirrorFlag();

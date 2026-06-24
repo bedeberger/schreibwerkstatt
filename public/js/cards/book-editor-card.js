@@ -144,6 +144,9 @@ export function registerBookEditorCard() {
     commentSavingReply: null,
     commentSavingResolve: null,
     commentRailVisible: false,
+    // Triage-Filter (#5): 'all' | 'open' | 'resolved' + Reviewer-Name ('' = alle).
+    commentFilterStatus: 'all',
+    commentFilterReviewer: '',
     commentStackHeight: 0,   // Höhe des verankerten Karten-Stapels (px), treibt --comments-stack-height
     _commentLoadingBookId: null,
     _commentRecomputeRaf: null,
@@ -170,6 +173,7 @@ export function registerBookEditorCard() {
           visiblePageId: null, collapsedChapters: {},
           bookComments: [], commentThreads: [], commentGeneralThreads: [], commentSelectedRootId: null,
           commentReplyDrafts: {}, commentSavingReply: null, commentSavingResolve: null,
+          commentFilterStatus: 'all', commentFilterReviewer: '',
           commentRailVisible: false, commentStackHeight: 0, _pendingGotoBid: null,
         },
         load: (root) => this._load(root.selectedBookId),

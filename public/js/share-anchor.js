@@ -73,6 +73,24 @@ export function resolveCurrentQuote(rootEl, anchor) {
   return { status: 'changed', currentText };
 }
 
+// Klick-Koordinaten → (Textknoten, Offset). Highlights (CSS Custom Highlight API)
+// sind nicht klickbar — darum den Caret-Punkt unter dem Klick auflösen und ihn
+// gegen die Kommentar-Ranges testen (range.isPointInRange(node, offset)). Zwei
+// Browser-APIs: Standard (caretPositionFromPoint) zuerst, WebKit-Legacy
+// (caretRangeFromPoint) als Fallback. SSoT für die Klick-→-Thread-Zuordnung in
+// der Owner-Leiste (comment-rail-core) und der Share-Reader-Leiste.
+export function caretPosFromPoint(x, y) {
+  if (document.caretPositionFromPoint) {
+    const p = document.caretPositionFromPoint(x, y);
+    if (p) return { node: p.offsetNode, offset: p.offset };
+  }
+  if (document.caretRangeFromPoint) {
+    const r = document.caretRangeFromPoint(x, y);
+    if (r) return { node: r.startContainer, offset: r.startOffset };
+  }
+  return null;
+}
+
 // Live-Range einer gespeicherten Anmerkung in `rootEl` finden (re-anchor by quote).
 export function locateRange(rootEl, anchor) {
   if (!rootEl || !anchor || !anchor.bid) return null;
@@ -89,4 +107,68 @@ export function locateRange(rootEl, anchor) {
     s = idx; e = idx + q.length;
   }
   return rangeFromOffsets(block, s, e);
+}
+
+// Längster gemeinsamer Teilstring (zusammenhängend) von a und b. Liefert Länge +
+// Startposition in beiden. Space-optimiertes DP (zwei Zeilen). O(|a|·|b|) — die
+// Aufrufer begrenzen |b| auf ein Fenster um die alten Offsets.
+function longestCommonSubstr(a, b) {
+  const n = a.length, m = b.length;
+  if (!n || !m) return { len: 0, aPos: 0, bPos: 0 };
+  let prev = new Int32Array(m + 1);
+  let curr = new Int32Array(m + 1);
+  let best = 0, aEnd = 0, bEnd = 0;
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        curr[j] = prev[j - 1] + 1;
+        if (curr[j] > best) { best = curr[j]; aEnd = i; bEnd = j; }
+      } else {
+        curr[j] = 0;
+      }
+    }
+    const tmp = prev; prev = curr; curr = tmp; curr.fill(0);
+  }
+  return { len: best, aPos: aEnd - best, bPos: bEnd - best };
+}
+
+// Fuzzy-Anker: der Block (data-bid) existiert noch, aber der Quote ist nicht mehr
+// wörtlich da (resolveCurrentQuote → 'changed'). Statt gar nichts zu markieren,
+// den längsten überlebenden Quote-Fragment im Block finden und die Spanne um die
+// ursprüngliche Quote-Länge nach links/rechts strecken → ungefährer Span. Die
+// Suche ist auf ein Fenster um die alten Offsets begrenzt (begrenzt das DP +
+// verhindert Treffer an einer zufällig gleichen Stelle weit weg). Gibt
+// `{ range, approx: true }` oder null (zu wenig überlebt → Aufrufer markiert stale).
+export function locateApprox(rootEl, anchor) {
+  if (!rootEl || !anchor || !anchor.bid) return null;
+  let block;
+  try { block = rootEl.querySelector(`[data-bid="${CSS.escape(anchor.bid)}"]`); } catch { block = null; }
+  if (!block) return null;
+  const txt = block.textContent || '';
+  const q = anchor.quote || '';
+  if (!q || !txt) return null;
+
+  const s = Number.isInteger(anchor.start) ? anchor.start : 0;
+  const e = Number.isInteger(anchor.end) ? anchor.end : txt.length;
+  const pad = Math.max(q.length, 40);
+  const winStart = Math.max(0, Math.min(s, e) - pad);
+  const winEnd = Math.min(txt.length, Math.max(s, e) + pad);
+  const win = txt.slice(winStart, winEnd);
+
+  const lcs = longestCommonSubstr(q, win);
+  // Zu wenig zusammenhängender Text überlebt → kein verlässlicher Span.
+  if (lcs.len < Math.max(4, Math.round(q.length * 0.25))) return null;
+
+  // Überlebender Kern in txt; um den ursprünglich davor/danach stehenden
+  // Quote-Anteil strecken (1:1-Annahme), auf Fenster + Block clampen.
+  const coreStart = winStart + lcs.bPos;
+  const coreEnd = coreStart + lcs.len;
+  let start = Math.max(winStart, coreStart - lcs.aPos);
+  let end = Math.min(winEnd, coreEnd + (q.length - (lcs.aPos + lcs.len)));
+  start = Math.max(0, start);
+  end = Math.min(txt.length, end);
+  if (end <= start) return null;
+
+  const range = rangeFromOffsets(block, start, end);
+  return range ? { range, approx: true } : null;
 }

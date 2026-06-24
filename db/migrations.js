@@ -8512,6 +8512,29 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 216 abgeschlossen (chat_images angelegt).');
   }
 
+  if (version < 217) {
+    // Bessere Reviewer↔Autor-Zusammenarbeit auf Share-Links:
+    //  - reader_email: optionale Leser-Mailadresse (Reader hat keinen Account),
+    //    damit der Autor per Mail antworten-Benachrichtigung den Reviewer
+    //    zurueckholen kann. Nullable, kein FK (Leser ist kein app_user).
+    //  - edited_at: gesetzt, wenn der Leser seinen eigenen Kommentar nachtraeglich
+    //    bearbeitet hat (Transparenz „bearbeitet"-Hinweis).
+    // Additiv (kein Recreate), Default NULL — bestehendes Verhalten unveraendert.
+    const scCols217 = db.pragma('table_info(share_comments)').map(c => c.name);
+    if (!scCols217.includes('reader_email')) {
+      db.exec('ALTER TABLE share_comments ADD COLUMN reader_email TEXT');
+    }
+    if (!scCols217.includes('edited_at')) {
+      db.exec('ALTER TABLE share_comments ADD COLUMN edited_at TEXT');
+    }
+    const fkErrors217 = db.pragma('foreign_key_check');
+    if (fkErrors217.length) {
+      throw new Error(`Migration 217: foreign_key_check meldet ${fkErrors217.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 217').run();
+    logger.info('DB-Migration auf Version 217 abgeschlossen (share_comments.reader_email + edited_at).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

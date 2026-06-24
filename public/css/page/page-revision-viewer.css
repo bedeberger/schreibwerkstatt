@@ -22,6 +22,12 @@
   background: rgba(0, 0, 0, 0.5);
 }
 
+/* Hintergrund-Scroll sperren, solange der Viewer offen ist — nur der
+   Text-Pane (.revision-viewer__body) scrollt, nicht body/background. */
+html:has(.revision-viewer[open]) {
+  overflow: hidden;
+}
+
 .revision-viewer__inner {
   display: flex;
   flex-direction: column;

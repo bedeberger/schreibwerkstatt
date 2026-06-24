@@ -11,22 +11,23 @@
 // Methoden werden in bookEditorCard gespreadet; State-Felder sind dort deklariert.
 
 import { createCommentRail } from './comment-rail-core.js';
-import { locateRange } from '../share-anchor.js';
-import { resolveCardPositions } from '../comment-card-layout.js';
+import { createCommentLayout } from './comment-rail-layout.js';
 
 function streamEl() { return document.querySelector('.book-editor-stream'); }
 function layerEl() { return document.querySelector('.book-editor-comments__layer'); }
-function anchorOf(root) {
-  return { bid: root.anchor_bid, quote: root.anchor_quote, start: root.anchor_start, end: root.anchor_end };
-}
 
-// Lückenabstand zwischen kollidierenden Karten (px). Vertikales Verankern
-// folgt dem Google-Docs-Modell: jede Karte will auf der Höhe ihrer Textstelle
-// schweben; überlappende Karten werden nach unten weggeschoben.
-const CARD_GAP = 10;
 // Unter diesem Viewport die Leiste flach (statische Liste) rendern — die
 // dritte Spalte stapelt sich dann unter den Stream (siehe book-editor.css).
 const FLAT_BELOW = '(max-width: 800px)';
+
+// Vertikale Verankerung (Google-Docs-Modell) aus dem geteilten Kern, Scope =
+// ganzer Stream. State-Felder sind in bookEditorCard deklariert.
+const layout = createCommentLayout({
+  scopeEl: streamEl,
+  layerEl,
+  flatBelow: FLAT_BELOW,
+  keys: { threads: 'commentThreads', selectedRootId: 'commentSelectedRootId', railVisible: 'commentRailVisible', stackHeight: 'commentStackHeight' },
+});
 
 const rail = createCommentRail({
   scopeEl: streamEl,
@@ -38,6 +39,7 @@ const rail = createCommentRail({
     savingResolve: 'commentSavingResolve', loadingBookId: '_commentLoadingBookId',
     recomputeRaf: '_commentRecomputeRaf', pendingGotoBid: '_pendingGotoBid',
     generalThreads: 'commentGeneralThreads',
+    filterStatus: 'commentFilterStatus', filterReviewer: 'commentFilterReviewer',
   },
   // Bucheditor = ganzes Buch: alle allgemeinen (nicht-verankerten) Kommentare jedes
   // Link-Scopes (Buch/Kapitel/Seite) gehören in diese Leiste.
@@ -68,6 +70,7 @@ const rail = createCommentRail({
 
 export const bookEditorCommentsMethods = {
   ...rail,
+  ...layout,
 
   // Partial-/Card-erwartete Methodennamen → geteilter Kern.
   _loadBookComments(bookId) { return this._railLoad(bookId); },
@@ -103,101 +106,7 @@ export const bookEditorCommentsMethods = {
   // Alias für die Card-Lifecycle/destroy (historischer Name).
   _clearCommentHL() { return this._railClearHL(); },
 
-  // ── Vertikale Verankerung (Google-Docs-Modell) ───────────────────────────
-  // Stream und Kommentar-Spalte teilen denselben Scroll-Container (Fenster bzw.
-  // Karte im Vollbild) und beginnen in derselben Grid-Zeile auf gleicher Höhe.
-  // Der Abstand „Textstelle → Spalten-Oberkante" ist deshalb scroll-invariant —
-  // wir messen ihn nur bei Layout-Änderungen (Render, Resize, Edit, Auswahl),
-  // NICHT bei jedem Scroll.
-
-  // Observer einrichten (aus Card-init). Re-Layout bei Stream-Reflow (Edits,
-  // Font-Load) via ResizeObserver + bei Viewport-Resize.
-  _initCommentLayout() {
-    // Ein Observer für Stream UND Karten: Stream-Reflow (Edits/Font) und
-    // Karten-Höhenwachstum (async geladener „Stelle geändert"-Diff, aufgeklappte
-    // Reply-Form) lösen beide ein Re-Layout aus. Loop-sicher, weil das Layout nur
-    // `top` setzt, nie die Höhe der beobachteten Elemente.
-    if (typeof ResizeObserver !== 'undefined') {
-      this._commentResizeObs = new ResizeObserver(() => this._scheduleCommentLayout());
-    }
-    this._commentObserved = new Set();
-    this._commentResizeHandler = () => this._scheduleCommentLayout();
-    window.addEventListener('resize', this._commentResizeHandler);
-  },
-  // Element einmalig beobachten (Set verhindert das Re-Fire bei erneutem observe).
-  _observeForLayout(el) {
-    if (!el || !this._commentResizeObs || this._commentObserved.has(el)) return;
-    try { this._commentResizeObs.observe(el); this._commentObserved.add(el); } catch {}
-  },
-  _teardownCommentLayout() {
-    try { this._commentResizeObs?.disconnect(); } catch {}
-    this._commentResizeObs = null;
-    this._commentObserved = null;
-    if (this._commentResizeHandler) window.removeEventListener('resize', this._commentResizeHandler);
-    this._commentResizeHandler = null;
-    if (this._commentLayoutRaf) { cancelAnimationFrame(this._commentLayoutRaf); this._commentLayoutRaf = null; }
-  },
-
-  _scheduleCommentLayout() {
-    if (this._commentLayoutRaf) cancelAnimationFrame(this._commentLayoutRaf);
-    // Doppel-rAF: erstes wartet auf Alpines x-for-Render der Threads, zweites
-    // misst die dann existierenden Karten.
-    this._commentLayoutRaf = requestAnimationFrame(() => {
-      this._commentLayoutRaf = requestAnimationFrame(() => {
-        this._commentLayoutRaf = null;
-        this._layoutCommentCards();
-      });
-    });
-  },
-
-  // Anker-Y einer Karte relativ zur Layer-Oberkante. Verankerte Threads über die
-  // lokalisierte Range; „Stelle geändert"-Threads (kein Range) über die
-  // Block-Oberkante; sonst null.
-  _commentAnchorY(thread, view, layerTop) {
-    if (!thread.changed) {
-      const range = locateRange(view, anchorOf(thread.root));
-      if (range) { const r = range.getBoundingClientRect(); if (r.height || r.width) return r.top - layerTop; }
-    }
-    const bid = thread.root.anchor_bid;
-    if (bid) {
-      let blk = null;
-      try { blk = view.querySelector(`[data-bid="${CSS.escape(String(bid))}"]`); } catch {}
-      if (blk) return blk.getBoundingClientRect().top - layerTop;
-    }
-    return null;
-  },
-
-  _layoutCommentCards() {
-    if (!this.commentRailVisible) return;
-    // Flach-Modus (Mobile): Karten stapeln statisch, keine Verankerung.
-    if (typeof window !== 'undefined' && window.matchMedia?.(FLAT_BELOW).matches) {
-      this.commentStackHeight = 0;
-      for (const t of this.commentThreads) { t._anchorY = null; t._railTop = null; }
-      return;
-    }
-    const layer = layerEl();
-    const view = streamEl();
-    if (!layer || !view) return;
-    this._observeForLayout(view);
-
-    const threads = this.commentThreads;
-    if (!threads.length) { this.commentStackHeight = 0; return; }
-    const layerTop = layer.getBoundingClientRect().top;
-
-    // 1) Anker-Y + gemessene Kartenhöhe pro Thread; Marker auf echte Anker-Höhe.
-    const items = threads.map((t) => {
-      const y = this._commentAnchorY(t, view, layerTop);
-      t._anchorY = y; // SSoT für Marker-Position (echte Stelle, vor Kollision)
-      const el = layer.querySelector(`.comment-rail__thread[data-root-id="${CSS.escape(String(t.root.id))}"]`);
-      this._observeForLayout(el);
-      return { id: t.root.id, y, h: el ? el.offsetHeight : 0 };
-    });
-
-    // 2) Kollisions-Auflösung (Pin/greedy + Überlappungs-Sweep) im geteilten Kern
-    //    (comment-card-layout.js, SSoT mit der Share-Reader-Leiste). Tops zurück
-    //    auf die reaktiven Thread-Felder spiegeln (treibt `--comment-top` im Markup).
-    const { tops, bottom } = resolveCardPositions({ items, activeId: this.commentSelectedRootId, gap: CARD_GAP });
-    for (const t of threads) t._railTop = tops.get(t.root.id) ?? null;
-    this.commentStackHeight = bottom;
-  },
+  // Vertikale Verankerung (_initCommentLayout/_scheduleCommentLayout/
+  // _layoutCommentCards/_teardownCommentLayout) kommt aus dem geteilten
+  // createCommentLayout-Bündel oben (...layout).
 };

@@ -391,9 +391,32 @@ body.share-page {
   font-size: 14px;
 }
 
+/* Prosa-Absatzmodell (Belletristik): Absätze (<p>) durch eine Leerzeile getrennt,
+   harte Umbrüche (<br>, Shift-Enter) ohne Zusatzabstand — so bleibt im Lesefluss
+   sichtbar, was ein neuer Absatz ist und was nur ein Zeilenumbruch. Aktiviert via
+   share-content--prose (für alle erzählenden Buchtypen; Sach-/Web-Text nutzt das
+   identische margin-Modell oben — siehe NON_PROSE_BUCHTYPEN in routes/share.js). */
+.share-content--prose p { margin: 0 0 1em; }
+/* Szenentrenner: <hr> als zentrierter Asterismus (* * *) statt technischer Rule —
+   in Prosa markiert ein <hr> fast immer einen Szenenwechsel. */
+.share-content--prose hr {
+  border: 0;
+  height: auto;
+  text-align: center;
+  margin: 1.8em 0;
+}
+.share-content--prose hr::before {
+  content: "* * *";
+  color: var(--share-muted);
+  letter-spacing: 0.5em;
+}
+
 /* Manuskript-Stream-Blöcke (.ms-chapter / .ms-page / .ms-page__title /
    .ms-page__body) kommen aus dem geteilten manuscript-stream.css; die
-   Body-Typografie liefert .share-content (oben). */
+   Body-Typografie liefert .share-content (oben). Im Manuskript-Stream stehen
+   die Absätze dichter beieinander als im Body-Default (1.7), damit Seiten- und
+   Kapitelübergänge den Lesefluss tragen statt der reine Zeilenabstand. */
+.share-content .ms-page__body p { line-height: 1.55; }
 
 /* Inhaltsverzeichnis (optional, bei Buch-/Kapitel-Shares). Pendant zur
    Bucheditor-Outline: im Grid (≥1100px) linke sticky Leiste, gestapelt (mobil)
@@ -467,16 +490,28 @@ body.share-page {
 /* Ab ≥1100px: Text links, Kommentare als sticky Seitenleiste rechts
    (Google-Docs-Stil). Darunter bleibt es gestapelt (mobile-first). */
 @media (min-width: 1100px) {
+  /* Default ≥1100px: einspaltige, zentrierte Lesespalte. Die Kommentar-Leiste
+     wird erst eingeblendet, wenn verankerte Anmerkungen existieren (share-reader.js
+     setzt .share-has-comments). Ohne JS / ohne Anmerkungen bleibt der Text mittig
+     statt links neben einer leeren Spalte zu kleben. */
   .share-layout {
     display: grid;
-    grid-template-columns: minmax(0, 78ch) minmax(320px, 440px);
-    gap: 56px;
-    max-width: calc(78ch + 440px + 56px);
+    grid-template-columns: minmax(0, 78ch);
+    max-width: calc(78ch + 64px);
     margin: 0 auto;
     padding: 0 32px;
     align-items: start;
   }
   .share-layout .share-main { max-width: none; margin: 0; padding-right: 0; }
+  /* Leere Kommentar-Leiste (keine verankerten Anmerkungen) nimmt keinen Platz. */
+  .share-layout:not(.share-has-comments) .share-comments { display: none; }
+
+  /* Mit verankerten Anmerkungen: Text links, Kommentare als sticky Seitenleiste. */
+  .share-layout.share-has-comments {
+    grid-template-columns: minmax(0, 78ch) minmax(320px, 440px);
+    gap: 56px;
+    max-width: calc(78ch + 440px + 56px);
+  }
   /* Kommentar-Spalte: kein eigener Scroll-Container — sie scrollt mit dem Fenster
      mit, damit die Karten auf Höhe ihrer Textstelle schweben können (Google-Docs).
      Beginnt in derselben Grid-Zeile wie der Artikel (align-items:start) → Abstand
@@ -546,8 +581,14 @@ body.share-page {
     background: var(--share-muted);
   }
 
-  /* Mit Inhaltsverzeichnis: linke Leiste | Text | Kommentare. */
+  /* Mit Inhaltsverzeichnis: linke Leiste | Text (zentriert im Rest). Die
+     Kommentar-Spalte kommt erst mit .share-has-comments dazu. */
   .share-layout--has-toc {
+    grid-template-columns: minmax(200px, 280px) minmax(0, 74ch);
+    gap: 48px;
+    max-width: calc(280px + 74ch + 48px + 64px);
+  }
+  .share-layout--has-toc.share-has-comments {
     grid-template-columns: minmax(200px, 280px) minmax(0, 74ch) minmax(300px, 420px);
     gap: 48px;
     max-width: calc(280px + 74ch + 420px + 96px);
@@ -569,8 +610,14 @@ body.share-page {
     border: 0;
     background: none;
   }
-  /* TOC ausgeblendet → zurück aufs 2-Spalten-Raster (Text | Kommentare). */
+  /* TOC ausgeblendet → zurück aufs Basis-Raster (zentrierte Lesespalte; mit
+     Anmerkungen Text | Kommentare). */
   .share-layout--has-toc.share-toc-collapsed {
+    grid-template-columns: minmax(0, 78ch);
+    gap: 0;
+    max-width: calc(78ch + 64px);
+  }
+  .share-layout--has-toc.share-toc-collapsed.share-has-comments {
     grid-template-columns: minmax(0, 78ch) minmax(320px, 440px);
     gap: 56px;
     max-width: calc(78ch + 440px + 56px);
@@ -582,16 +629,29 @@ body.share-page {
    Lesbarkeitsgründen gedeckelt; der Zugewinn geht an TOC + Kommentar-Leiste. */
 @media (min-width: 1700px) {
   .share-layout {
+    grid-template-columns: minmax(0, 82ch);
+    max-width: calc(82ch + 64px);
+  }
+  .share-layout.share-has-comments {
     grid-template-columns: minmax(0, 82ch) minmax(380px, 520px);
     gap: 72px;
     max-width: calc(82ch + 520px + 72px);
   }
   .share-layout--has-toc {
+    grid-template-columns: minmax(240px, 320px) minmax(0, 80ch);
+    gap: 64px;
+    max-width: calc(320px + 80ch + 64px + 64px);
+  }
+  .share-layout--has-toc.share-has-comments {
     grid-template-columns: minmax(240px, 320px) minmax(0, 80ch) minmax(360px, 500px);
     gap: 64px;
     max-width: calc(320px + 80ch + 500px + 128px);
   }
   .share-layout--has-toc.share-toc-collapsed {
+    grid-template-columns: minmax(0, 82ch);
+    max-width: calc(82ch + 64px);
+  }
+  .share-layout--has-toc.share-toc-collapsed.share-has-comments {
     grid-template-columns: minmax(0, 82ch) minmax(380px, 520px);
     gap: 72px;
     max-width: calc(82ch + 520px + 72px);
@@ -712,6 +772,15 @@ body.share-page {
   background: color-mix(in srgb, var(--share-accent) 38%, transparent);
   text-decoration: underline;
   text-decoration-color: var(--share-accent);
+}
+/* Verankerung, deren Originaltext sich seither geändert hat: ungefährer
+   Fuzzy-Span, bewusst gedämpft + gestrichelt (≠ exakter Treffer). */
+::highlight(share-anchor-changed) {
+  background: color-mix(in srgb, var(--share-accent) 10%, transparent);
+  text-decoration: underline;
+  text-decoration-color: var(--share-accent);
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
 }
 .share-content [data-bid] { cursor: text; }
 
@@ -860,6 +929,39 @@ body.share-page {
   line-height: 1.5;
   color: var(--share-muted);
 }
+/* Hinweis unter dem optionalen Mail-Feld im Identitäts-Modal (#1). */
+.share-name-modal__hint {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--share-muted);
+}
+/* „Benachrichtigung aktiv"-Pille am Identitäts-Chip, wenn eine Mail hinterlegt ist (#1). */
+.share-identity-bar__bell {
+  font-size: 11px;
+  color: var(--share-muted);
+  white-space: nowrap;
+}
+/* Ungelesen-Badge an einem Thread mit neuen fremden Antworten (#2). */
+.share-thread__unread {
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--share-accent, #5a4a8e);
+  background: var(--share-hover);
+  border-radius: var(--share-radius-sm);
+}
+/* Inline-Editor für den eigenen Kommentar (#4). */
+.share-thread__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
 
 /* Thread-Karten: Optik geteilt über components/comment-rail.css (.comment-rail__*,
    gemappt via --cr-* auf .share-comments). Hier nur die share-spezifische Chrome,
@@ -895,6 +997,8 @@ body.share-page {
 .share-thread__action--danger:hover { color: #c43838; }
 .share-thread__action:disabled { opacity: 0.6; cursor: not-allowed; text-decoration: none; }
 .share-thread__reply-actions { display: flex; align-items: center; gap: 8px; }
+.share-thread__edit { display: flex; flex-direction: column; gap: 8px; }
+.share-thread__edit .comment-rail__textarea { width: 100%; box-sizing: border-box; }
 .share-page .comment-rail__textarea:focus { outline: 2px solid var(--share-accent); outline-offset: -1px; }
 
 .share-footer {

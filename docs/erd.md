@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 216, 109 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 217, 109 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -1462,9 +1462,11 @@ erDiagram
     TEXT    share_token  FK "FK share_links(token) ON DELETE CASCADE"
     INTEGER parent_id    FK "Self-FK share_comments(id) ON DELETE CASCADE — NULL=Root, sonst Reply"
     TEXT    reader_name  "max 80 Zeichen, nullable (Leser)"
+    TEXT    reader_email "optionale Leser-Mail (kein Account), nullable — Reply-Benachrichtigung"
     TEXT    reader_token "opaker Per-Browser-Token (Self-Erkennung), nullable"
     TEXT    author_email FK "FK app_users(email) ON DELETE SET NULL — gesetzt bei Owner-Antwort"
     TEXT    body         "max 4000 Zeichen"
+    TEXT    edited_at    "gesetzt, wenn Leser den eigenen Kommentar nachtraeglich bearbeitet hat"
     TEXT    anchor_bid   "data-bid des verankerten Blocks, NULL=allgemein"
     TEXT    anchor_quote "markierter Text (Re-Anchor + Anzeige)"
     INTEGER anchor_start "Offset-Hinweis im Block"

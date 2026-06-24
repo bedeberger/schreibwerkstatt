@@ -196,8 +196,28 @@
     <!-- Kommentar-Leiste: verankerte Leser-Kommentare des ganzen Buchs (reuse
          .comment-rail*-Optik). Methoden in editor/book-editor-comments.js. -->
     <aside class="comment-rail book-editor-comments"
-           x-show="commentRailVisible && commentThreads.length" x-cloak
+           x-show="commentRailVisible && (commentThreads.length || commentFilterStatus !== 'all' || commentFilterReviewer)" x-cloak
            :aria-label="$app.t('share.rail.title')">
+
+      <!-- Triage-Filter (#5): Status-Segment + optionaler Reviewer-Filter. -->
+      <div class="comment-rail__filters" x-show="bookComments.length">
+        <div class="seg-toggle comment-rail__filter-status">
+          <button type="button" :class="{ 'seg-toggle--active': commentFilterStatus === 'all' }"
+                  @click="_railSetFilter({ status: 'all' })" x-text="$app.t('share.comments.filter.all')"></button>
+          <button type="button" :class="{ 'seg-toggle--active': commentFilterStatus === 'open' }"
+                  @click="_railSetFilter({ status: 'open' })" x-text="$app.t('share.comments.filter.open')"></button>
+          <button type="button" :class="{ 'seg-toggle--active': commentFilterStatus === 'resolved' }"
+                  @click="_railSetFilter({ status: 'resolved' })" x-text="$app.t('share.comments.filter.resolved')"></button>
+        </div>
+        <div class="comment-rail__filter-reviewer" x-show="_railReviewerNames().length > 1"
+             x-data="combobox($app.t('share.comments.filter.reviewerAll'), $app.t('share.comments.filter.reviewerAll'))"
+             x-modelable="value" x-model="commentFilterReviewer"
+             x-effect="options = _railReviewerNames().map(n => ({ value: n, label: n }))"
+             @combobox-change="_railSetFilter({})"></div>
+      </div>
+
+      <div class="comment-rail__filter-empty muted-msg" x-show="!commentThreads.length && !commentGeneralThreads.length"
+           x-text="$app.t('share.comments.filterEmpty')"></div>
 
       <!-- Verankerte Threads schweben vertikal auf Höhe ihrer Textstelle
            (Kollisions-aufgelöst, _railTop). Marker im linken Rand zeigen die

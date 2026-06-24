@@ -17,11 +17,13 @@
 // (Quote-Diff), layout (vertikale Verankerung der Karten = Google-Docs-Modell),
 // composer (Selektions-Button + Anmerkungs-Overlay).
 
-import { locateRange, resolveCurrentQuote } from './share-anchor.js';
+import { locateRange, locateApprox, resolveCurrentQuote, caretPosFromPoint } from './share-anchor.js';
+import { groupThreads } from './editor/comment-threads.js';
+import { avatarHue, avatarInitials } from './avatar.js';
 import { bindScrollFade } from './scroll-fade.js';
 import { el, fmtDate } from './share-reader/dom.js';
 import {
-  readerToken, savedName, markNameDismissed, closeNameModal, setupIdentity,
+  readerToken, savedName, savedEmail, markNameDismissed, closeNameModal, setupIdentity,
 } from './share-reader/identity.js';
 import { createOptionsMenu } from './share-reader/menu.js';
 import { setupThemeSwitcher } from './share-reader/theme.js';
@@ -47,6 +49,10 @@ import { setupComposer } from './share-reader/composer.js';
   // abgesetzten Sektion unten (.share-general__list) mit eigener Form.
   const list = document.querySelector('.share-comments__list');
   const generalList = document.querySelector('.share-general__list');
+  // Layout-Wurzel: bekommt .share-has-comments nur, wenn verankerte Anmerkungen
+  // existieren. Sonst bleibt im Desktop-Grid die Kommentar-Spalte ungenutzt und
+  // der Text säße links daneben statt mittig (siehe share.css ≥1100px).
+  const layoutEl = document.querySelector('.share-layout');
   const supportsHighlight = typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined';
 
   const RT = readerToken();
@@ -54,7 +60,7 @@ import { setupComposer } from './share-reader/composer.js';
   // ── Optionen-Menü (⋯) + sekundäre Cluster (Identität, Theme, TOC) ────────────
   // Reihenfolge bestimmt die Sektions-Folge im Panel: Identität → Theme → TOC.
   const { menuSection } = createOptionsMenu({ t });
-  setupIdentity({ t, menuSection, onNameChange: syncReaderName });
+  setupIdentity({ t, menuSection, onIdentityChange: syncReaderIdentity });
   setupThemeSwitcher({ t, menuSection });
   setupToc({ menuSection });
   setupProgressBar();
@@ -69,6 +75,35 @@ import { setupComposer } from './share-reader/composer.js';
   let comments = [];          // flache Liste (serverseitig serialisiert)
   const anchorRanges = [];    // { id, range } für Klick-Mapping
   let activeId = null;        // gerade fokussierter Thread
+
+  // Ungelesen-Tracking (#2): welche Kommentar-IDs hat dieser Browser schon
+  // gesehen? Rein clientseitig (Leser hat keinen Account), pro Link-Token in
+  // localStorage. Ein Thread mit fremden (nicht eigenen) Antworten, deren ID hier
+  // fehlt, gilt als „neu beantwortet" → Badge. Wird beim Öffnen des Threads
+  // (setActive) als gesehen markiert.
+  const SEEN_KEY = 'sw_share_seen_' + TOKEN;
+  function loadSeen() {
+    try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); }
+  }
+  let seen = loadSeen();
+  function saveSeen() { try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-1000))); } catch {} }
+  // Ungelesene fremde Antworten eines Threads (Autor- oder andere Leser-Beiträge,
+  // die dieser Browser noch nicht gesehen hat). Eigene Beiträge zählen nie.
+  function unseenReplies(node) {
+    return node.replies.filter(r => !r.mine && !seen.has(r.id));
+  }
+  function markThreadSeen(node) {
+    if (!node) return false;
+    let changed = false;
+    for (const c of [node.root, ...node.replies]) {
+      if (!seen.has(c.id)) { seen.add(c.id); changed = true; }
+    }
+    if (changed) saveSeen();
+    return changed;
+  }
+  function threadById(id) {
+    return groupThreads(comments).find(n => n.root.id === id) || null;
+  }
 
   // Vertikale Verankerung der schwebenden Karten (Google-Docs-Modell).
   const cardLayout = createCardLayout({
@@ -108,7 +143,8 @@ import { setupComposer } from './share-reader/composer.js';
     const res = await fetch(`/share/${encodeURIComponent(TOKEN)}/comment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, reader_token: RT }),
+      // reader_email aus dem Identitäts-Chip mitschicken → Reply-Benachrichtigung.
+      body: JSON.stringify({ reader_email: savedEmail(), ...payload, reader_token: RT }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -117,6 +153,21 @@ import { setupComposer } from './share-reader/composer.js';
       throw err;
     }
     return j.comment;
+  }
+
+  // Eigenen Kommentar bearbeiten (Self-Identität via reader_token).
+  async function editOwnComment(id, body) {
+    const res = await fetch(`/share/${encodeURIComponent(TOKEN)}/comment/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reader_token: RT, body }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      const err = new Error(j.error_code || 'ERR');
+      err.status = res.status;
+      throw err;
+    }
   }
 
   // Eigenen Kommentar löschen (Self-Identität via reader_token). 409 HAS_REPLIES
@@ -150,15 +201,15 @@ import { setupComposer } from './share-reader/composer.js';
     }
   }
 
-  // Namensänderung am Identitäts-Chip auf die bisherigen eigenen Kommentare
-  // dieses Browsers (reader_token) übertragen und die Threads neu laden, damit
-  // der neue Name sofort sichtbar wird.
-  async function syncReaderName(name) {
+  // Identitäts-Änderung (Name + optionale Mail) am Chip auf die bisherigen eigenen
+  // Kommentare dieses Browsers (reader_token) übertragen und die Threads neu laden,
+  // damit Name/Benachrichtigungs-Status sofort konsistent sind.
+  async function syncReaderIdentity(name, email) {
     try {
       await fetch(`/share/${encodeURIComponent(TOKEN)}/reader-name`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reader_token: RT, reader_name: name }),
+        body: JSON.stringify({ reader_token: RT, reader_name: name, reader_email: email }),
       });
     } catch {}
     lastSig = null; // Re-Render erzwingen (Body-Signatur ändert sich nicht)
@@ -175,30 +226,35 @@ import { setupComposer } from './share-reader/composer.js';
     if (!supportsHighlight) return;
     const hl = new Highlight();
     const active = new Highlight();
+    const changed = new Highlight();
     for (const c of comments) {
       if (c.parent_id || !c.anchor) continue;
       const range = locateRange(article, c.anchor);
-      if (!range) { c._stale = true; continue; }
-      c._stale = false;
-      anchorRanges.push({ id: c.id, range });
-      (c.id === activeId ? active : hl).add(range);
+      if (range) {
+        c._stale = false; c._approx = false;
+        anchorRanges.push({ id: c.id, range });
+        (c.id === activeId ? active : hl).add(range);
+        continue;
+      }
+      // Quote nicht mehr wörtlich da (Text seither geändert), Block aber noch:
+      // ungefähren Fuzzy-Span markieren statt gar nichts.
+      const approx = locateApprox(article, c.anchor);
+      if (approx) {
+        c._stale = false; c._approx = true;
+        anchorRanges.push({ id: c.id, range: approx.range });
+        changed.add(approx.range);
+        continue;
+      }
+      c._stale = true; c._approx = false;
     }
     CSS.highlights.set('share-anchor', hl);
     CSS.highlights.set('share-anchor-active', active);
+    CSS.highlights.set('share-anchor-changed', changed);
   }
 
   // ── Thread-Aufbau + Rendering ────────────────────────────────────────────────
-  function buildTree() {
-    const roots = [];
-    const repliesByParent = {};
-    for (const c of comments) {
-      if (c.parent_id) (repliesByParent[c.parent_id] = repliesByParent[c.parent_id] || []).push(c);
-    }
-    for (const c of comments) {
-      if (!c.parent_id) roots.push({ root: c, replies: repliesByParent[c.id] || [] });
-    }
-    return roots;
-  }
+  // Gruppierung kommt aus dem geteilten pure Kern (editor/comment-threads.js,
+  // SSoT mit der Owner-Leiste) — Roots + chronologisch sortierte Antworten.
 
   function authorName(c) {
     if (c.is_author) return t('author_badge');
@@ -206,26 +262,14 @@ import { setupComposer } from './share-reader/composer.js';
     return c.name || t('anon');
   }
 
-  // Hue-Hash identisch zu app.userAvatarHue (public/js/app/app-ui.js), damit
-  // dieselbe Person in Reader und SPA stabil dieselbe Pip-Farbe bekommt.
-  function avatarHue(seed) {
-    const s = String(seed || '').toLowerCase();
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-    return Math.abs(h) % 360;
-  }
-
-  // Avatar-Daten (Label + Initialen-Pip + deterministische Hue), analog zur
-  // SPA-Leiste (comment-rail-core commentAvatar). Leser haben keine Email →
-  // Seed/Initialen aus dem Anzeigenamen; der Autor bekommt einen festen Seed.
+  // Avatar-Daten (Label + Initialen-Pip + deterministische Hue) aus den geteilten
+  // pure Primitiven (public/js/avatar.js, SSoT mit app.userAvatarHue + der
+  // SPA-Leiste). Leser haben keine Email → Seed/Initialen aus dem Anzeigenamen;
+  // der Autor bekommt einen festen Seed.
   function commentAvatar(c) {
     const label = authorName(c);
     const seed = c.is_author ? 'author' : (c.name || 'anon');
-    const tokens = String(label).split(/[\s._@-]+/).filter(Boolean);
-    const initials = tokens.length
-      ? ((tokens[0][0] || '') + (tokens.length > 1 ? (tokens[1][0] || '') : '')).toUpperCase().slice(0, 2)
-      : '?';
-    return { label, initials, hue: avatarHue(seed) };
+    return { label, initials: avatarInitials(label), hue: avatarHue(seed) };
   }
 
   function renderMeta(c) {
@@ -237,6 +281,7 @@ import { setupComposer } from './share-reader/composer.js';
     meta.appendChild(avatar);
     meta.appendChild(el('span', 'comment-rail__author', av.label));
     meta.appendChild(el('span', 'comment-rail__time', fmtDate(c.created_at)));
+    if (c.edited_at) meta.appendChild(el('span', 'comment-rail__edited', t('edited_badge')));
     if (c.resolved) meta.appendChild(el('span', 'comment-rail__resolved', t('resolved_badge')));
     return meta;
   }
@@ -272,11 +317,41 @@ import { setupComposer } from './share-reader/composer.js';
     return form;
   }
 
+  // Body-Element durch einen Inline-Editor ersetzen (#4). Bei Speichern lädt
+  // fetchThreads die Liste neu (rebaut die Karte); bei Abbruch wird der Body
+  // unverändert wiederhergestellt.
+  function startEditInline(c, bodyEl, status) {
+    const editor = el('div', 'share-thread__edit');
+    const ta = el('textarea', 'comment-rail__textarea');
+    ta.rows = 3;
+    ta.maxLength = 4000;
+    ta.value = c.body || '';
+    const acts = el('div', 'share-thread__reply-actions');
+    const save = el('button', null, t('edit_save'));
+    save.type = 'button';
+    const cancel = el('button', 'share-thread__action', t('cancel'));
+    cancel.type = 'button';
+    acts.appendChild(save);
+    acts.appendChild(cancel);
+    editor.appendChild(ta);
+    editor.appendChild(acts);
+    bodyEl.replaceWith(editor);
+    setTimeout(() => ta.focus(), 20);
+    cancel.addEventListener('click', () => editor.replaceWith(bodyEl));
+    save.addEventListener('click', async () => {
+      const val = (ta.value || '').trim();
+      if (!val) { status.textContent = t('form_empty'); return; }
+      save.disabled = true;
+      try { await editOwnComment(c.id, val); await fetchThreads(); }
+      catch (e) { status.textContent = t('form_error'); save.disabled = false; }
+    });
+  }
+
   // Self-Service-Aktionen für eigene Kommentare (mine). Root: Erledigt-Toggle +
-  // Löschen (nur ohne Antworten); Antwort-Beiträge: nur Löschen. Buttons als
-  // dezente Text-Aktionen unter dem Body. Bei Fehlern erscheint ein Status-Text;
-  // bei Erfolg lädt fetchThreads die Liste neu.
-  function renderOwnActions(c, { isRoot, hasReplies }) {
+  // Bearbeiten + Löschen (nur ohne Antworten); Antwort-Beiträge: Bearbeiten +
+  // Löschen. Buttons als dezente Text-Aktionen unter dem Body. Bei Fehlern
+  // erscheint ein Status-Text; bei Erfolg lädt fetchThreads die Liste neu.
+  function renderOwnActions(c, { isRoot, hasReplies, bodyEl }) {
     const actions = el('div', 'share-thread__actions');
     const status = el('span', 'share-comments__status');
 
@@ -289,6 +364,14 @@ import { setupComposer } from './share-reader/composer.js';
         catch (e) { status.textContent = t('form_error'); toggle.disabled = false; }
       });
       actions.appendChild(toggle);
+    }
+
+    // Bearbeiten (#4): eigenen Beitrag inline editieren.
+    if (bodyEl) {
+      const edit = el('button', 'share-thread__action', t('edit'));
+      edit.type = 'button';
+      edit.addEventListener('click', () => startEditInline(c, bodyEl, status));
+      actions.appendChild(edit);
     }
 
     // Antworten (Replies) sind Blätter → immer löschbar. Root nur ohne Antworten
@@ -322,6 +405,22 @@ import { setupComposer } from './share-reader/composer.js';
     if (root.resolved) li.classList.add('comment-rail__thread--resolved');
     if (root.id === activeId) li.classList.add('comment-rail__thread--selected');
 
+    // Ungelesen-Badge (#2): es gibt fremde Antworten, die dieser Browser noch
+    // nicht gesehen hat (typisch: der Autor hat geantwortet). Verschwindet beim
+    // Öffnen des Threads (setActive markiert ihn als gesehen).
+    const unseen = unseenReplies(node);
+    if (unseen.length) {
+      const label = unseen.length > 1 ? `${t('new_reply_badge')} (${unseen.length})` : t('new_reply_badge');
+      const badge = el('span', 'share-thread__unread', label);
+      li.appendChild(badge);
+      // Erste Interaktion mit der Karte (Klick irgendwo) markiert die neuen
+      // Antworten als gesehen → Badge weg. Deckt auch allgemeine Threads ab, die
+      // nicht über setActive laufen.
+      li.addEventListener('click', () => {
+        if (markThreadSeen(node)) badge.remove();
+      }, { once: true });
+    }
+
     // Anker-Zeile: getönter Quote-Snippet + Jump bzw. Stale-Hinweis.
     if (root.anchor) {
       const anchorRow = el('div', 'comment-rail__anchor');
@@ -337,6 +436,13 @@ import { setupComposer } from './share-reader/composer.js';
         changed.appendChild(el('span', 'comment-rail__changed-badge', t('anchor_changed')));
         appendQuoteDiff(changed, root.anchor.quote || '', res.currentText || '');
         anchorRow.appendChild(changed);
+        // Re-Anchoring trifft den Quote nicht mehr wörtlich, aber der Fuzzy-Span
+        // markiert die ungefähre Stelle (gestrichelt) → Karte bleibt anspringbar.
+        anchorRow.setAttribute('role', 'button');
+        anchorRow.tabIndex = 0;
+        const jump = () => scrollToAnchor(root.id);
+        anchorRow.addEventListener('click', jump);
+        anchorRow.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
         li.appendChild(anchorRow);
       } else if (root._stale || res.status === 'gone') {
         const quote = el('span', 'comment-rail__quote comment-rail__quote--stale', root.anchor.quote || '');
@@ -357,8 +463,9 @@ import { setupComposer } from './share-reader/composer.js';
     // Root-Kommentar (Meta + Body + Self-Service-Aktionen).
     const rootComment = el('div', 'comment-rail__comment');
     rootComment.appendChild(renderMeta(root));
-    rootComment.appendChild(el('div', 'comment-rail__body', root.body));
-    if (root.mine) rootComment.appendChild(renderOwnActions(root, { isRoot: true, hasReplies: replies.length > 0 }));
+    const rootBody = el('div', 'comment-rail__body', root.body);
+    rootComment.appendChild(rootBody);
+    if (root.mine) rootComment.appendChild(renderOwnActions(root, { isRoot: true, hasReplies: replies.length > 0, bodyEl: rootBody }));
     li.appendChild(rootComment);
 
     // Antworten (abgesetzt; Autor-Antworten mit Akzentbalken).
@@ -366,8 +473,9 @@ import { setupComposer } from './share-reader/composer.js';
       const rEl = el('div', 'comment-rail__comment comment-rail__comment--reply');
       if (r.is_author) rEl.classList.add('comment-rail__comment--author');
       rEl.appendChild(renderMeta(r));
-      rEl.appendChild(el('div', 'comment-rail__body', r.body));
-      if (r.mine) rEl.appendChild(renderOwnActions(r, { isRoot: false, hasReplies: false }));
+      const rBody = el('div', 'comment-rail__body', r.body);
+      rEl.appendChild(rBody);
+      if (r.mine) rEl.appendChild(renderOwnActions(r, { isRoot: false, hasReplies: false, bodyEl: rBody }));
       li.appendChild(rEl);
     }
 
@@ -383,9 +491,13 @@ import { setupComposer } from './share-reader/composer.js';
   const byTime = (a, b) => new Date(a.root.created_at) - new Date(b.root.created_at);
 
   function render() {
-    const tree = buildTree();
+    const tree = groupThreads(comments);
     const anchored = tree.filter(n => n.root.anchor).sort(byTime);
     const general = tree.filter(n => !n.root.anchor).sort(byTime);
+
+    // Kommentar-Leiste (und ihre Grid-Spalte) nur einblenden, wenn es verankerte
+    // Anmerkungen gibt — sonst zentriert die Lesespalte.
+    if (layoutEl) layoutEl.classList.toggle('share-has-comments', anchored.length > 0);
 
     // Verankerte Anmerkungen → schwebende Leiste rechts. Pro Karte ein Marker-Tick
     // (echte Anker-Höhe, vom Layout positioniert), damit verschobene Karten ihren
@@ -435,6 +547,11 @@ import { setupComposer } from './share-reader/composer.js';
   function setActive(id) {
     activeId = id;
     renderHighlights();
+    // Öffnen markiert neue Antworten dieses Threads als gesehen (#2).
+    if (markThreadSeen(threadById(id))) {
+      const badge = list && list.querySelector(`.share-thread[data-comment-id="${id}"] .share-thread__unread`);
+      if (badge) badge.remove();
+    }
     document.querySelectorAll('.comment-rail__thread--selected').forEach(e => e.classList.remove('comment-rail__thread--selected'));
     const card = list && list.querySelector(`.share-thread[data-comment-id="${id}"]`);
     if (card) {
@@ -453,16 +570,11 @@ import { setupComposer } from './share-reader/composer.js';
   if (article) {
     article.addEventListener('click', (ev) => {
       if (!anchorRanges.length) return;
-      let caret = null;
-      if (document.caretRangeFromPoint) caret = document.caretRangeFromPoint(ev.clientX, ev.clientY);
-      else if (document.caretPositionFromPoint) {
-        const p = document.caretPositionFromPoint(ev.clientX, ev.clientY);
-        if (p) { caret = document.createRange(); caret.setStart(p.offsetNode, p.offset); caret.collapse(true); }
-      }
-      if (!caret) return;
+      const pos = caretPosFromPoint(ev.clientX, ev.clientY);
+      if (!pos || !pos.node) return;
       for (const a of anchorRanges) {
         try {
-          if (a.range.isPointInRange(caret.startContainer, caret.startOffset)) { setActive(a.id); return; }
+          if (a.range.isPointInRange(pos.node, pos.offset)) { setActive(a.id); return; }
         } catch {}
       }
     });

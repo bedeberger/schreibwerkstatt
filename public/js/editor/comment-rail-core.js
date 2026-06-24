@@ -16,8 +16,9 @@
 import { fetchJson } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
 import { renderInline } from '../page-revision-diff.js';
-import { locateRange, resolveCurrentQuote } from '../share-anchor.js';
+import { locateRange, resolveCurrentQuote, caretPosFromPoint } from '../share-anchor.js';
 import { groupThreads } from './comment-threads.js';
+import { avatarInitials } from '../avatar.js';
 
 function anchorOf(root) {
   return { bid: root.anchor_bid, quote: root.anchor_quote, start: root.anchor_start, end: root.anchor_end };
@@ -25,21 +26,6 @@ function anchorOf(root) {
 
 function highlightsApi() {
   return (typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight !== 'undefined') ? CSS.highlights : null;
-}
-
-// Klick-Koordinaten → (Textknoten, Offset). Highlights (CSS Custom Highlight API)
-// sind nicht klickbar — darum den Caret-Punkt unter dem Klick auflösen und gegen
-// die Kommentar-Ranges testen. Zwei Browser-APIs (Standard + WebKit-Legacy).
-function caretPosFromPoint(x, y) {
-  if (document.caretPositionFromPoint) {
-    const p = document.caretPositionFromPoint(x, y);
-    if (p) return { node: p.offsetNode, offset: p.offset };
-  }
-  if (document.caretRangeFromPoint) {
-    const r = document.caretRangeFromPoint(x, y);
-    if (r) return { node: r.startContainer, offset: r.startOffset };
-  }
-  return null;
 }
 
 // Plaintext für renderInline (block-/wort-basiert) als ein <p> verpacken;
@@ -127,7 +113,7 @@ export function createCommentRail(cfg) {
 
       const onView = [];
       const general = [];
-      const ranges = [];
+      const rangeById = new Map(); // root.id → Range (lokal, NIE in reaktiven State)
       for (const g of groupThreads(this[K.comments])) {
         const root = g.root;
         if (!root.anchor_bid) {
@@ -141,7 +127,7 @@ export function createCommentRail(cfg) {
         const range = locateRange(view, anchorOf(root));
         if (range) {
           onView.push({ root, replies: g.replies, changed: false, currentText: '', _diffHtml: '', _sort: sortKey(bi) });
-          ranges.push(range);
+          rangeById.set(root.id, range);
           continue;
         }
         // Kein Range: Block da, Quote weg → „Stelle geändert"; Block ganz weg →
@@ -152,17 +138,33 @@ export function createCommentRail(cfg) {
         // kein Highlight (Stelle nicht mehr lokalisierbar)
       }
       onView.sort((a, b) => a._sort - b._sort);
-      this[K.threads] = onView;
+      // Triage-Filter (#5): Status (offen/erledigt) + Reviewer-Name. Nur wenn die
+      // Karte die Filter-State-Keys deklariert; ohne Keys bleibt alles sichtbar.
+      const fStatus = K.filterStatus ? (this[K.filterStatus] || 'all') : 'all';
+      const fReviewer = K.filterReviewer ? (this[K.filterReviewer] || '') : '';
+      const unfiltered = fStatus === 'all' && !fReviewer;
+      const passes = (root) => {
+        if (fStatus === 'open' && root.resolved_at) return false;
+        if (fStatus === 'resolved' && !root.resolved_at) return false;
+        if (fReviewer && (root.reader_name || '') !== fReviewer) return false;
+        return true;
+      };
+      const onViewF = unfiltered ? onView : onView.filter(t => passes(t.root));
+      this[K.threads] = onViewF;
       // Allgemeine zuletzt zugefügt zuerst (neueste oben) — analog zur alten Karte.
+      let generalF = general;
       if (K.generalThreads) {
         general.sort((a, b) => new Date(b.root.created_at) - new Date(a.root.created_at));
-        this[K.generalThreads] = general;
+        generalF = unfiltered ? general : general.filter(t => passes(t.root));
+        this[K.generalThreads] = generalF;
       }
-      const inView = (id) => onView.some(t => t.root.id === id) || general.some(t => t.root.id === id);
+      const inView = (id) => onViewF.some(t => t.root.id === id) || generalF.some(t => t.root.id === id);
       if (this[K.selectedRootId] && !inView(this[K.selectedRootId])) this[K.selectedRootId] = null;
 
       // Anker-Highlights nur bei sichtbarer Leiste — eingeklappt = Kommentare aus,
-      // also auch keine markierten Stellen im Text.
+      // also auch keine markierten Stellen im Text. Nur die sichtbaren (gefilterten)
+      // verankerten Threads markieren.
+      const ranges = onViewF.filter(t => !t.changed && rangeById.has(t.root.id)).map(t => rangeById.get(t.root.id));
       const api = highlightsApi();
       if (api) {
         try { if (this[K.railVisible] && ranges.length) api.set(cfg.hlAll, new Highlight(...ranges)); else api.delete(cfg.hlAll); } catch {}
@@ -174,7 +176,7 @@ export function createCommentRail(cfg) {
       if (K.pendingGotoBid && this[K.pendingGotoBid]) {
         const bid = this[K.pendingGotoBid];
         this[K.pendingGotoBid] = null;
-        const t = onView.find(x => String(x.root.anchor_bid) === String(bid));
+        const t = onViewF.find(x => String(x.root.anchor_bid) === String(bid));
         if (t) this._railSelect(t.root.id);
       }
     },
@@ -263,6 +265,26 @@ export function createCommentRail(cfg) {
       return c.reader_name || window.__app.t('share.reader.anon');
     },
 
+    // Distinct Reviewer-Namen (Root-Kommentare von Lesern) der geladenen
+    // Kommentare — speist die Reviewer-Combobox des Triage-Filters (#5).
+    // Owner-Antworten (author_email) und Replies zählen nicht.
+    _railReviewerNames() {
+      const set = new Set();
+      for (const c of (this[K.comments] || [])) {
+        if (!c.author_email && !c.parent_id && c.reader_name) set.add(c.reader_name);
+      }
+      return [...set].sort((a, b) => a.localeCompare(b));
+    },
+
+    // Triage-Filter setzen + neu auflösen (#5). status: 'all'|'open'|'resolved',
+    // reviewer: Name oder '' (alle). Schliesst eine ggf. offene Auswahl, die der
+    // Filter ausblendet (Recompute nullt selectedRootId, wenn nicht mehr sichtbar).
+    _railSetFilter({ status, reviewer } = {}) {
+      if (K.filterStatus && status !== undefined) this[K.filterStatus] = status;
+      if (K.filterReviewer && reviewer !== undefined) this[K.filterReviewer] = reviewer;
+      this._railRecompute();
+    },
+
     // Avatar-Daten für die Meta-Zeile (Google-Docs-Optik): Label + Initialen-Pip
     // mit deterministischer Hue pro Person (wiederverwendet die presence-pip-Optik,
     // DESIGN.md). Leser haben keine Email → Initialen/Hue leiten sich aus dem
@@ -274,11 +296,7 @@ export function createCommentRail(cfg) {
         ? (c.author_display_name || app.t('share.reader.author_badge'))
         : (c.reader_name || app.t('share.reader.anon'));
       const seed = isAuthor ? (c.author_email || label) : (c.reader_name || 'anon');
-      const tokens = String(label).split(/[\s._@-]+/).filter(Boolean);
-      const initials = tokens.length
-        ? ((tokens[0][0] || '') + (tokens.length > 1 ? (tokens[1][0] || '') : '')).toUpperCase().slice(0, 2)
-        : '?';
-      return { label, initials, hue: app.userAvatarHue(seed) };
+      return { label, initials: avatarInitials(label), hue: app.userAvatarHue(seed) };
     },
 
     async _railReply(thread) {

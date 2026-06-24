@@ -120,6 +120,86 @@ test('Reader-Self-Service: commentHasReplies blockt Cascade-Löschen', () => {
   assert.equal(sl.commentHasReplies(root.id), true, 'Root mit Owner-Reply hat Antworten');
 });
 
+test('reader_email wird gespeichert + von updateReaderIdentity nachgezogen', () => {
+  const link = seedLink();
+  const RT = 'r12345678mail';
+  const c = sl.insertComment({ token: link.token, readerToken: RT, readerName: 'Bea', readerEmail: 'bea@leser.test', body: 'a', ipHash: 'h' });
+  assert.equal(sl.getCommentById(c.id).reader_email, 'bea@leser.test');
+  // Zweiter Beitrag ohne Mail; Identity-Update zieht Name + Mail über reader_token.
+  const c2 = sl.insertComment({ token: link.token, readerToken: RT, body: 'b', ipHash: 'h' });
+  const changed = sl.updateReaderIdentity(link.token, RT, 'Beatrix', 'neu@leser.test');
+  assert.equal(changed, 2, 'beide eigenen Beiträge aktualisiert');
+  assert.equal(sl.getCommentById(c2.id).reader_email, 'neu@leser.test');
+  assert.equal(sl.getCommentById(c2.id).reader_name, 'Beatrix');
+  // Leeren entfernt die Mail wieder.
+  sl.updateReaderIdentity(link.token, RT, 'Beatrix', null);
+  assert.equal(sl.getCommentById(c.id).reader_email, null);
+});
+
+test('editReaderComment setzt Body + edited_at, nur für eigenen Beitrag', () => {
+  const link = seedLink();
+  const RT = 'r12345678edit';
+  const own = sl.insertComment({ token: link.token, readerToken: RT, body: 'tippfehlre', ipHash: 'h' });
+  assert.equal(sl.getCommentById(own.id).edited_at, null);
+  assert.equal(sl.editReaderComment(own.id, link.token, RT, 'tippfehler korrigiert'), true);
+  const edited = sl.getCommentById(own.id);
+  assert.equal(edited.body, 'tippfehler korrigiert');
+  assert.ok(edited.edited_at, 'edited_at gesetzt');
+  // Fremdes Token / Owner-Beitrag nicht editierbar.
+  assert.equal(sl.editReaderComment(own.id, link.token, 'r_fremd_xxxxx', 'hack'), false);
+  const reply = sl.insertOwnerReply({ token: link.token, parentId: own.id, authorEmail: OWNER, body: 'autor' });
+  assert.equal(sl.editReaderComment(reply.id, link.token, RT, 'hack'), false, 'Owner-Reply nicht über reader_token editierbar');
+});
+
+test('resolveThreadRootId: Reply-auf-Reply hängt unter denselben Root (flacher Thread)', () => {
+  const link = seedLink();
+  const root = sl.insertComment({ token: link.token, body: 'root', ipHash: 'h' });
+  const reply = sl.insertOwnerReply({ token: link.token, parentId: root.id, authorEmail: OWNER, body: 'r1' });
+  assert.equal(sl.resolveThreadRootId(root.id, link.token), root.id, 'Root → sich selbst');
+  assert.equal(sl.resolveThreadRootId(reply.id, link.token), root.id, 'Reply → Root');
+  assert.equal(sl.resolveThreadRootId(999999, link.token), null, 'unbekannt → null');
+  assert.equal(sl.resolveThreadRootId(root.id, 'falschestoken12345'), null, 'falscher Link → null');
+});
+
+test('Reader-Reply-Mail: nur bei hinterlegter Mail + Owner-Antwort', async () => {
+  const notify = require('../../lib/notify');
+  notify._resetThrottleForTests();
+  const sent = [];
+  const mailer = require('../../lib/mailer');
+  const origSend = mailer.send;
+  mailer.send = async (opts) => { sent.push(opts); };
+  try {
+    const link = sl.getShareLinkByToken(seedLink().token);
+    const root = sl.insertComment({ token: link.token, readerToken: 'r12345678rr', readerEmail: 'leser@x.test', body: 'frage', ipHash: 'h' });
+    const reply = sl.insertOwnerReply({ token: link.token, parentId: root.id, authorEmail: OWNER, body: 'antwort' });
+    await notify.maybeNotifyReaderReply(link, reply, sl.getCommentById(root.id));
+    assert.equal(sent.length, 1, 'eine Mail an den Leser');
+    assert.equal(sent[0].to, 'leser@x.test');
+    assert.equal(sent[0].template, 'share-reply-reader');
+    // Ohne hinterlegte Mail: keine Benachrichtigung.
+    notify._resetThrottleForTests();
+    sent.length = 0;
+    const root2 = sl.insertComment({ token: link.token, body: 'ohne mail', ipHash: 'h' });
+    const reply2 = sl.insertOwnerReply({ token: link.token, parentId: root2.id, authorEmail: OWNER, body: 'x' });
+    await notify.maybeNotifyReaderReply(link, reply2, sl.getCommentById(root2.id));
+    assert.equal(sent.length, 0, 'keine Mail ohne Adresse');
+  } finally {
+    mailer.send = origSend;
+  }
+});
+
+test('Mail-Template share-reply-reader rendert Reply + Subject (de/en)', () => {
+  const de = renderTemplate('share-reply-reader', {
+    targetName: 'Seite A', bookName: 'Testbuch', authorName: 'Owner Olga',
+    snippet: 'Danke fürs Feedback', anchorQuote: 'der Dialog', appUrl: 'https://x.de/share/abc',
+  }, 'de');
+  assert.match(de.subject, /Seite A/);
+  assert.ok(de.html.includes('Danke fürs Feedback'));
+  assert.ok(de.html.includes('https://x.de/share/abc'));
+  const en = renderTemplate('share-reply-reader', { targetName: 'Page A', bookName: 'Book', snippet: 'x' }, 'en');
+  assert.match(en.subject, /Page A/);
+});
+
 test('Mail-Template share-comment-owner rendert Quote + Subject (de/en)', () => {
   const de = renderTemplate('share-comment-owner', {
     targetName: 'Seite A', bookName: 'Testbuch', readerName: 'Bea',

@@ -1,4 +1,5 @@
 import { escPreserveStrong, fetchText, tzOpts, formatRelativeShort } from '../utils.js';
+import { avatarHue } from '../avatar.js';
 
 // Pure Filter-Logik für die Szenen-Liste. Getrennt von Alpine-Getter, damit
 // Unit-Tests den Kapitel-Filter direkt gegen Fixtures prüfen können.
@@ -139,12 +140,10 @@ export const appUiMethods = {
   // Deterministische Akzentfarbe pro Email, damit zwei verschiedene User in
   // einer Liste visuell auseinanderzuhalten sind. Hash → Hue → HSL, Sat/L
   // an Theme-Tokens halten. Konsistent ueber Reloads (kein Random).
+  // Deterministische Pip-Farbe pro User (SSoT: public/js/avatar.js — geteilt mit
+  // der Share-Reader-Leiste, damit dieselbe Person stabil dieselbe Hue bekommt).
   userAvatarHue(email) {
-    if (!email) return 0;
-    const s = String(email).toLowerCase();
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-    return Math.abs(h) % 360;
+    return avatarHue(email);
   },
 
   async _loadUsersLight() {

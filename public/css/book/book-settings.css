@@ -453,7 +453,9 @@
   transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base);
 }
 .seg-toggle button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.seg-toggle button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left-width: 0; }
+.seg-toggle button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+/* Innere Nähte zusammenlegen (gilt für 2 und 3+ Segmente). */
+.seg-toggle button:not(:first-child) { border-left-width: 0; }
 .seg-toggle button.seg-toggle--active {
   background: var(--color-tag-bg);
   border-color: var(--color-accent);

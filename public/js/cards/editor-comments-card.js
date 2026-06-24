@@ -18,14 +18,23 @@ export function registerEditorCommentsCard() {
     commentGeneralThreads: [], // allgemeine (nicht-verankerte) Kommentare von Page-Shares dieser Seite
     commentSelectedRootId: null,
     commentRailVisible: false, // Default verborgen; Sichtbarkeit über Toggle-Button in den Seiten-Actions
+    commentStackHeight: 0,      // Höhe des verankerten Karten-Stapels (px), treibt --comments-stack-height
     commentReplyDrafts: {},
     commentSavingReply: null,
     commentSavingResolve: null,
+    // Triage-Filter (#5): 'all' | 'open' | 'resolved' + Reviewer-Name ('' = alle).
+    commentFilterStatus: 'all',
+    commentFilterReviewer: '',
     // transiente Helfer (kein reaktiver State):
     _railAbort: null,
     _recomputeRaf: null,
     _loadingBookId: null,
     _pendingGotoBid: null,
+    // vertikale Verankerung (createCommentLayout):
+    _commentLayoutRaf: null,
+    _commentResizeObs: null,
+    _commentObserved: null,
+    _commentResizeHandler: null,
 
     ...editorCommentsRailMethods,
   }));
