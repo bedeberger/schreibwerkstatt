@@ -347,15 +347,32 @@ textarea:disabled,
   color: var(--color-muted);
   font-style: italic;
 }
-/* Nicht auswählbarer Gruppen-Header (opt.group) zwischen den Optionen. */
+/* Nicht auswählbarer Gruppen-Header (opt.group) zwischen den Optionen.
+   Liest als eigenständige Section-Bande: subtiler --color-bg gegen die weisse
+   Dropdown-Fläche (--color-surface) + Hairline-Trenner + Uppercase/Letterspacing.
+   sticky, damit der Header beim Scrollen innerhalb seiner Gruppe oben stehen
+   bleibt. Horizontal-Padding = Options-Kante (10px), damit das Kategorie-Label
+   bündig über den Buchtiteln startet statt 2px weiter links. */
 .combobox-group {
   list-style: none;
-  padding: var(--space-6) var(--space-8) var(--space-3);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-6) var(--space-10) var(--space-5);
+  background: var(--color-bg);
+  border-bottom: var(--border-thin) solid var(--color-border);
   font-size: var(--size-compact-font-size);
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
   color: var(--color-muted);
-  letter-spacing: .02em;
   cursor: default;
+}
+/* Compact-Comboboxen: Options-Kante ist 8px (siehe .combobox-wrap--compact
+   .combobox-option), Header dort bündig nachziehen. */
+.combobox-wrap--compact .combobox-group {
+  padding-left: var(--space-sm);
+  padding-right: var(--space-sm);
 }
 .combobox-wrap--disabled .combobox-trigger {
   opacity: var(--opacity-hint);

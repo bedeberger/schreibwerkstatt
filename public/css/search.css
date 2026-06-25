@@ -25,46 +25,6 @@
   margin-bottom: 0;
 }
 
-/* Filter-Pills fuer Buchliste. Eigene Zeile unter der Buchwahl/Palette-Zeile. */
-.book-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-6);
-  align-items: center;
-  margin-top: var(--space-sm);
-}
-.book-filter-pill {
-  padding: var(--space-3) 10px;
-  border: 0.5px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  cursor: pointer;
-  transition: background var(--transition-base), color var(--transition-base), border-color var(--transition-base);
-}
-.book-filter-pill:hover { background: var(--color-hover); color: var(--color-text); }
-.book-filter-pill.is-active {
-  background: var(--color-primary);
-  color: var(--color-surface);
-  border-color: var(--color-primary);
-}
-.book-filter-pill.is-active .btn-count {
-  background: rgba(255, 255, 255, 0.25);
-  color: var(--color-surface);
-}
-.book-filter-clear {
-  margin-left: auto;
-  padding: var(--space-3) 8px;
-  border: none;
-  background: transparent;
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  cursor: pointer;
-  text-decoration: underline;
-}
-.book-filter-clear:hover { color: var(--color-text); }
-
 /* Karte mit Combobox-Dropdown muss über spätere .card-Geschwister liegen —
    absolut positionierte Dropdown-Listen werden sonst von transform-animierten
    Folgekarten verdeckt (jede .card ist eigener Stacking-Context). */

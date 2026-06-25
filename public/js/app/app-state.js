@@ -128,10 +128,9 @@ const navigationState = () => ({
   // Erst nach dem ersten loadBooks() true. Gate fuer den Welcome-Empty-State
   // (books.length === 0), damit der nicht waehrend des initialen Ladens blitzt.
   booksLoaded: false,
-  // Buchliste-Filter (UI-only, persistiert nicht; reines Frontend-Filter
-  // ueber das per /content/books gelieferte category_id-Feld).
-  bookFilterCategoryId: '',
-  // Pool fuer Filter-Pills in der Buchliste — wird beim Login einmal geladen.
+  // Kategorie-Pool (global, beim Login einmal geladen). Liefert die Gruppen-Namen
+  // fuer die Buchwahl-Combobox (Bücher gruppiert nach Kategorie, siehe
+  // tree.js#bookComboOptions). Wird nur befuellt, wenn Bücher Kategorien haben.
   bookFilterCategoryPool: [],
   selectedBookId: '',
   // Per-Buch ACL-Rolle aus /books/:id/access. `currentBookRole` ist die Rolle

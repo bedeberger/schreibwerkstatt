@@ -358,12 +358,12 @@
     </div>
     <!-- Heute-Ring im Header: Donut links neben Avatar. Pulsiert bei aktivem
          Schreibtag, fuellt sich gegen book_settings.daily_goal_chars (per Buch).
-         Klick oeffnet Buch-Overview. -->
+         Klick oeffnet Meine Statistik. -->
     <template x-if="currentUser && !isAdminOnly && selectedBookId && dailyProgressBookId == selectedBookId && !dailyProgressIsFinished">
       <button type="button"
               class="header-today-ring"
               :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached, 'header-today-ring--empty': !headerTodayRing().active }"
-              @click="toggleBookOverviewCard()"
+              @click="toggleMyStatsCard()"
               :data-tip="headerTodayRing().active
                 ? t('overview.today.meta', { chars: headerTodayRing().chars.toLocaleString(uiLocale === 'de' ? 'de-CH' : 'en-US'), goal: headerTodayRing().goal.toLocaleString(uiLocale === 'de' ? 'de-CH' : 'en-US') })
                 : t('overview.today.idle')"
@@ -394,9 +394,10 @@
   </div>
 </div>
 
-<!-- Buchwahl + Kontext-Leiste: obere Zeile = Buchwahl links + breiter
-     Palette-Trigger (⌘K) füllt die restliche Breite; Kategorie-Filter in
-     eigener Zeile darunter. Umbruch der oberen Zeile nur bei schmalem
+<!-- Buchwahl + Kontext-Leiste: eine Zeile = Buchwahl links + breiter
+     Palette-Trigger (⌘K) füllt die restliche Breite. Existieren Kategorien,
+     gruppiert die Combobox die Bücher nach Kategorie (Header-Sektionen im
+     Dropdown) statt einer separaten Filter-Zeile. Umbruch nur bei schmalem
      Viewport. -->
 <div class="card card--book-selector"
      x-show="currentUser && showBookCard && !isAdminOnly && books.length > 0"
@@ -405,7 +406,7 @@
     <div class="book-selector-combo"
          x-data="combobox({ placeholder: () => t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
          x-modelable="value" x-model="selectedBookId"
-         x-effect="options = filteredBooks().map(b => ({value: String(b.id), label: b.name}))"
+         x-effect="options = bookComboOptions()"
          @combobox-change="resetView();"></div>
 
     <!-- Palette-Trigger (⌘K / Strg+K): breite Such-Bar, Power-User-Eintritt zu allen Features. -->
@@ -420,24 +421,6 @@
       <span class="palette-hero-text" x-text="t('palette.hero.text')"></span>
       <kbd class="palette-hero-kbd" x-text="isMac ? '⌘K' : 'Ctrl+K'"></kbd>
     </button>
-  </div>
-
-  <!-- Filter-Pills (Kategorie) in eigener Zeile. Reines Frontend-Filter -->
-  <div class="book-filter-row" x-show="bookFilterCategoryPool.length" x-cloak>
-    <template x-for="cat in bookFilterCategoryPool" :key="cat.id">
-      <button type="button"
-              class="book-filter-pill"
-              :class="{ 'is-active': String(bookFilterCategoryId) === String(cat.id) }"
-              @click="bookFilterCategoryId = String(bookFilterCategoryId) === String(cat.id) ? '' : String(cat.id)">
-        <span x-text="cat.name"></span>
-        <span class="btn-count" x-text="bookCountForCategory(cat.id)"></span>
-      </button>
-    </template>
-    <button type="button"
-            class="book-filter-clear"
-            x-show="bookFilterCategoryId"
-            @click="clearBookFilters()"
-            x-text="t('book.filter.clear')"></button>
   </div>
 </div>
 

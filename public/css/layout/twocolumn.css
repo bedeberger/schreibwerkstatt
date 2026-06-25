@@ -67,7 +67,11 @@
     overflow-y: auto;
     /* Scrollbar initial unsichtbar (Thumb transparent), erscheint erst während
        des Scrollens (`.is-scrolling`, von app-chrome.js gesetzt, mit Idle-Fade).
-       Gutter bleibt reserviert → kein Layout-Shift beim Ein-/Ausblenden. */
+       `scrollbar-gutter: stable` reserviert den Scrollbar-Platz dauerhaft → die
+       nutzbare Breite bleibt gleich, egal ob der Tree überläuft. Ohne das rückt
+       beim Buchwechsel zwischen überlaufendem und nicht-überlaufendem Tree die
+       rechtsbündige Action-Group/Card-Actions um die Scrollbar-Breite hin und her. */
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
   }

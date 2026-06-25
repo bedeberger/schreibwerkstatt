@@ -285,13 +285,6 @@ export const treeMethods = {
           if (r.ok) this.bookFilterCategoryPool = (await r.json()).categories || [];
         } catch (_) {}
       }
-      // Filter aus localStorage restoren (per-User). Nur valide IDs (im Pool und mit Büchern) übernehmen.
-      if (!this.bookFilterCategoryId) {
-        try {
-          const stored = localStorage.getItem(`sw:bookFilterCategoryId:${this.currentUser?.email || ''}`);
-          if (stored && catIds.has(Number(stored))) this.bookFilterCategoryId = String(stored);
-        } catch (_) {}
-      }
       if (!this.selectedBookId || !this.books.some(b => String(b.id) === String(this.selectedBookId))) {
         let restored = '';
         try {
@@ -299,14 +292,7 @@ export const treeMethods = {
           const stored = localStorage.getItem(key);
           if (stored && this.books.some(b => String(b.id) === String(stored))) restored = String(stored);
         } catch (_) {}
-        // Filter aktiv → erstes Buch aus gefilterter Liste bevorzugen (z.B. nach deleteBook).
-        let filteredFallback = '';
-        if (this.bookFilterCategoryId) {
-          const filtered = this.filteredBooks();
-          filteredFallback = String(filtered[0]?.id || '');
-          if (restored && !filtered.some(b => String(b.id) === restored)) restored = '';
-        }
-        this.selectedBookId = restored || filteredFallback || String(this.books[0]?.id || '');
+        this.selectedBookId = restored || String(this.books[0]?.id || '');
       }
       this.showBookCard = true;
       this.booksLoaded = true;
@@ -319,23 +305,28 @@ export const treeMethods = {
     }
   },
 
-  // Filter-Logik fuer Buchliste. Leere Filter = kein Filter.
-  filteredBooks() {
-    const cat = this.bookFilterCategoryId;
-    if (!cat) return this.books;
-    return this.books.filter(b => String(b.category_id) === String(cat));
-  },
-
-  bookCountForCategory(catId) {
-    if (!catId) return 0;
-    const key = String(catId);
-    let n = 0;
-    for (const b of this.books) if (String(b.category_id) === key) n++;
-    return n;
-  },
-
-  clearBookFilters() {
-    this.bookFilterCategoryId = '';
+  // Optionen fuer die Buchwahl-Combobox. Existieren Kategorien, kriegt jedes Buch
+  // ein `group`-Feld (= Kategoriename) → die Combobox rendert Gruppen-Header
+  // (siehe combobox.js#groupedRows). Reihenfolge: kategorisierte Buecher zuerst
+  // (alphabetisch nach Kategorie, dann Titel), unkategorisierte unter einer
+  // eigenen "Ohne Kategorie"-Gruppe am Ende. Hat kein Buch eine Kategorie, bleibt
+  // `group` leer → flache Liste (byte-gleich zum ungruppierten Verhalten).
+  // Liest this.books + this.bookFilterCategoryPool im x-effect → reaktiv getrackt.
+  bookComboOptions() {
+    const names = new Map(this.bookFilterCategoryPool.map(c => [String(c.id), c.name]));
+    const hasCategories = this.books.some(b => b.category_id && names.has(String(b.category_id)));
+    const uncategorized = hasCategories ? this.t('book.filter.uncategorized') : '';
+    const opts = this.books.map(b => {
+      const cat = b.category_id ? names.get(String(b.category_id)) : null;
+      return { value: String(b.id), label: b.name, group: cat || uncategorized };
+    });
+    if (!hasCategories) return opts;
+    return opts.sort((a, b) => {
+      const au = a.group === uncategorized, bu = b.group === uncategorized;
+      if (au !== bu) return au ? 1 : -1; // Unkategorisierte ans Ende
+      if (a.group !== b.group) return a.group.localeCompare(b.group);
+      return a.label.localeCompare(b.label);
+    });
   },
 
   // Entity-Linking-Toggle pro Buch laden — Spiegel von
