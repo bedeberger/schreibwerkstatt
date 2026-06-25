@@ -431,17 +431,24 @@ export const appViewMethods = {
     }
   },
 
-  // Pro-Seite-Map verknüpfter Plot-Beats neu laden (nach Kapitel-/Verwerfen-/
+  // Page- + Chapter-Map verknüpfter Plot-Beats neu laden (nach Kapitel-/Verwerfen-/
   // Lösch-Änderung in der Plot-Karte) und den Editor-Badge der offenen Seite
-  // syncen. Beats hängen am Kapitel → Count ist kapitelweit projiziert.
+  // syncen. Beats hängen am Kapitel → Page-Count ist kapitelweit projiziert,
+  // die Kapitelansicht liest chapterPlotBeatCounts direkt.
   async refreshPlotBeatCounts() {
     const bookId = this.selectedBookId;
     if (!bookId) return;
     try {
-      const map = await fetchJson(`/plot/page-beat-counts?book_id=${bookId}`).catch(() => null);
-      if (!map || this.selectedBookId !== bookId) return;
-      this.plotBeatCounts = map;
-      if (this.currentPage?.id) this.currentPagePlotBeatCount = map[this.currentPage.id] || 0;
+      const [pageMap, chapterMap] = await Promise.all([
+        fetchJson(`/plot/page-beat-counts?book_id=${bookId}`).catch(() => null),
+        fetchJson(`/plot/chapter-beat-counts?book_id=${bookId}`).catch(() => null),
+      ]);
+      if (this.selectedBookId !== bookId) return;
+      if (pageMap) {
+        this.plotBeatCounts = pageMap;
+        if (this.currentPage?.id) this.currentPagePlotBeatCount = pageMap[this.currentPage.id] || 0;
+      }
+      if (chapterMap) this.chapterPlotBeatCounts = chapterMap;
     } catch (e) {
       console.error('[refreshPlotBeatCounts]', e);
     }
@@ -545,9 +552,23 @@ export const appViewMethods = {
     }
     this._scrollToCardByKey('recherche');
   },
-  // Sprung vom Plot-Indikator im Page-Action-Menü: Plot-Werkstatt öffnen. Das
-  // Board ist buchweit (kein Seiten-Filter) → reines Öffnen, kein Toggle.
-  async openPlotForPage() {
+  // Sprung vom Kapitel-Indikator im Pagetree: Recherche-Karte öffnen und auf die
+  // mit diesem Kapitel verknüpften Schnipsel filtern (analog openRechercheForPage).
+  async openRechercheForChapter(chapterId) {
+    const cid = parseInt(chapterId, 10);
+    if (!cid) return;
+    await this._ensurePartial('recherche');
+    window.dispatchEvent(new CustomEvent('recherche:filter-chapter', { detail: { chapterId: cid } }));
+    if (!this.showRechercheCard) {
+      this._closeOtherMainCards('recherche');
+      this.showRechercheCard = true;
+    }
+    this._scrollToCardByKey('recherche');
+  },
+  // Sprung vom Plot-Indikator (Editor-Action-Menü + Kapitelansicht): Plot-
+  // Werkstatt öffnen. Das Board ist buchweit (kein Seiten-/Kapitel-Filter) →
+  // reines Öffnen, kein Toggle.
+  async openPlotBoard() {
     await this._ensurePartial('plot');
     if (!this.showPlotCard) {
       this._closeOtherMainCards('plot');
@@ -712,9 +733,13 @@ export const appViewMethods = {
     this.ideenCounts = {};
     this.chapterIdeenCounts = {};
     this.rechercheCounts = {};
+    this.chapterRechercheCounts = {};
+    this.plotBeatCounts = {};
+    this.chapterPlotBeatCounts = {};
     this.shareCommentCounts = {};
     this.shareLinkCounts = {};
     this.currentPageRechercheCount = 0;
+    this.currentPagePlotBeatCount = 0;
     this.currentPageShareCommentCount = 0;
     this.currentPageShareLinkCount = 0;
     this.currentChapterIdeenOpenCount = 0;

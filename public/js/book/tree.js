@@ -484,6 +484,9 @@ export const treeMethods = {
         this.ideenCounts = {};
         this.chapterIdeenCounts = {};
         this.rechercheCounts = {};
+        this.chapterRechercheCounts = {};
+        this.plotBeatCounts = {};
+        this.chapterPlotBeatCounts = {};
         this.shareCommentCounts = {};
         this.shareLinkCounts = {};
       }
@@ -583,23 +586,27 @@ export const treeMethods = {
 
       // Gecachte Stats + Page-Ages + Ideen-Counts (Page + Chapter) + Recherche-Counts laden
       try {
-        const [statsCache, ageMap, ideenMap, chapterIdeenMap, rechercheMap, shareCommentMap, shareLinkMap, plotBeatMap] = await Promise.all([
+        const [statsCache, ageMap, ideenMap, chapterIdeenMap, rechercheMap, chapterRechercheMap, shareCommentMap, shareLinkMap, plotBeatMap, chapterPlotBeatMap] = await Promise.all([
           fetchJson('/history/page-stats/' + bookId, { signal }),
           fetchJson('/history/page-ages/' + bookId, { signal }),
           fetchJson('/ideen/counts?book_id=' + bookId, { signal }).catch(() => ({})),
           fetchJson('/ideen/counts?book_id=' + bookId + '&kind=chapter', { signal }).catch(() => ({})),
           fetchJson('/research/page-counts?book_id=' + bookId, { signal }).catch(() => ({})),
+          fetchJson('/research/chapter-counts?book_id=' + bookId, { signal }).catch(() => ({})),
           fetchJson('/share/api/page-comment-counts?book_id=' + bookId, { signal }).catch(() => ({})),
           fetchJson('/share/api/page-link-counts?book_id=' + bookId, { signal }).catch(() => ({})),
           fetchJson('/plot/page-beat-counts?book_id=' + bookId, { signal }).catch(() => ({})),
+          fetchJson('/plot/chapter-beat-counts?book_id=' + bookId, { signal }).catch(() => ({})),
         ]);
         this.pageLastChecked = ageMap || {};
         this.ideenCounts = ideenMap || {};
         this.chapterIdeenCounts = chapterIdeenMap || {};
         this.rechercheCounts = rechercheMap || {};
+        this.chapterRechercheCounts = chapterRechercheMap || {};
         this.shareCommentCounts = shareCommentMap || {};
         this.shareLinkCounts = shareLinkMap || {};
         this.plotBeatCounts = plotBeatMap || {};
+        this.chapterPlotBeatCounts = chapterPlotBeatMap || {};
         // Editor-Badge der offenen Seite mit frischer Map abgleichen (Race: Seite
         // kann vor dem Counts-Fetch via restoreLastPage geöffnet worden sein).
         if (this.currentPage?.id) {

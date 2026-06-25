@@ -12,7 +12,7 @@ const KINDS = ['note', 'link', 'quote', 'fact', 'image', 'document'];
 const LINK_KINDS = ['figure', 'location', 'scene', 'beat', 'thread', 'chapter', 'page'];
 
 function _emptyDraft() {
-  return { kind: 'note', title: '', body: '', url: '', source: '', tags: '' };
+  return { kind: 'note', title: '', body: '', url: '', source: '', tags: '', fileName: '' };
 }
 
 export const rechercheMethods = {
@@ -155,33 +155,77 @@ export const rechercheMethods = {
     if (window.__app?.showRechercheCard) this.loadRecherche();
   },
 
+  // Sprung vom Kapitel-Indikator: alle Filter zurücksetzen und nur die mit diesem
+  // Kapitel verknüpften Schnipsel zeigen (analog filterToPage).
+  filterToChapter(chapterId) {
+    const cid = parseInt(chapterId, 10);
+    if (!cid) return;
+    this.filterKind = '';
+    this.filterTag = '';
+    this.filterText = '';
+    this.showArchived = false;
+    this.filterLinkedKind = 'chapter';
+    this.filterLinkedTargetId = String(cid);
+    this.filterLinked = `chapter:${cid}`;
+    if (window.__app?.showRechercheCard) this.loadRecherche();
+  },
+
   // ── Anlegen ────────────────────────────────────────────────────────────────
   startCreate() {
     this.creating = true;
     this.draft = _emptyDraft();
     this.editingId = null;
+    this.clearCreateFile();
   },
-  cancelCreate() { this.creating = false; this.draft = _emptyDraft(); },
+  cancelCreate() { this.creating = false; this.draft = _emptyDraft(); this.clearCreateFile(); },
+
+  // Datei-Auswahl beim Anlegen: File NICHT in reaktivem State halten (ein Alpine-
+  // Proxy bricht File.arrayBuffer mit „Illegal invocation"), nur den Anzeige-Namen.
+  // Das echte File wird beim Speichern via x-ref aus dem Input gelesen.
+  onCreateFilePick(ev) {
+    const file = ev?.target?.files?.[0];
+    if (!file) { this.draft.fileName = ''; return; }
+    this.draft.fileName = file.name;
+    if ((file.type || '').startsWith('image/')) this.draft.kind = 'image';
+    else if (file.type === 'application/pdf') this.draft.kind = 'document';
+  },
+  clearCreateFile() {
+    this.draft.fileName = '';
+    if (this.$refs?.createFile) this.$refs.createFile.value = '';
+  },
 
   async createItem() {
     const app = window.__app;
     const bookId = app?.selectedBookId;
     if (!bookId) return;
     const d = this.draft;
-    if (!(d.title || '').trim() && !(d.body || '').trim() && !(d.url || '').trim()) {
+    const file = this.$refs?.createFile?.files?.[0] || null;
+    const hasText = !!((d.title || '').trim() || (d.body || '').trim() || (d.url || '').trim());
+    if (!hasText && !file) {
       this.errorMessage = app.t('recherche.error.empty');
       return;
     }
     this.busy = true;
     try {
+      const payload = this._draftBody(d);
+      // Reiner Datei-Eintrag ohne Text: Server verlangt ein nicht-leeres Feld →
+      // Dateiname als Titel, damit das Item benannt ist (kind setzt der Upload).
+      if (!hasText && file && !payload.title) payload.title = file.name.slice(0, 300);
       const row = await fetchJson('/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: bookId, ...this._draftBody(d) }),
+        body: JSON.stringify({ book_id: bookId, ...payload }),
       });
       this.items = [row, ...this.items];
+      // Datei nachladen (image/* → Bild, application/pdf → Dokument); uploadXxx
+      // ersetzt das eben eingefügte Item per id und setzt kind serverseitig.
+      if (file) {
+        if ((file.type || '').startsWith('image/')) await this.uploadImage(row, file);
+        else if (file.type === 'application/pdf') await this.uploadDoc(row, file);
+      }
       this.creating = false;
       this.draft = _emptyDraft();
+      this.clearCreateFile();
       this.errorMessage = '';
       this._loadTags();
     } catch (e) {
@@ -256,8 +300,9 @@ export const rechercheMethods = {
       // Bei aktivem „nur aktive"-Filter verschwindet das Item aus der Liste.
       if (!this.showArchived) this.items = this.items.filter(i => i.id !== item.id);
       else { item.archived = item.archived ? 0 : 1; }
-      // Archivierte Items zählen nicht im Seiten-Indikator.
+      // Archivierte Items zählen nicht im Seiten-/Kapitel-Indikator.
       if ((item.links || []).some(l => l.target_kind === 'page')) this._refreshRecherchePageCounts();
+      if ((item.links || []).some(l => l.target_kind === 'chapter')) this._refreshRechercheChapterCounts();
     } catch { this.errorMessage = window.__app.t('recherche.error.save'); }
     this.menuOpenId = null;
   },
@@ -273,6 +318,7 @@ export const rechercheMethods = {
       this.items = this.items.filter(i => i.id !== item.id);
       this._loadTags();
       if ((item.links || []).some(l => l.target_kind === 'page')) this._refreshRecherchePageCounts();
+      if ((item.links || []).some(l => l.target_kind === 'chapter')) this._refreshRechercheChapterCounts();
     } catch { this.errorMessage = app.t('recherche.error.delete'); }
     this.menuOpenId = null;
   },
@@ -303,6 +349,7 @@ export const rechercheMethods = {
       this.linkPickerItemId = null;
       this.linkPickerTargetId = '';
       if (targetKind === 'page') this._refreshRecherchePageCounts();
+      if (targetKind === 'chapter') this._refreshRechercheChapterCounts();
     } catch { this.errorMessage = app.t('recherche.error.link'); }
   },
 
@@ -316,6 +363,7 @@ export const rechercheMethods = {
       const row = await fetchJson(`/research/${item.id}/links/${link.link_id}`, { method: 'DELETE' });
       this._replaceItem(row);
       if (link.target_kind === 'page') this._refreshRecherchePageCounts();
+      if (link.target_kind === 'chapter') this._refreshRechercheChapterCounts();
     } catch { this.errorMessage = window.__app.t('recherche.error.link'); }
   },
 
@@ -442,6 +490,17 @@ export const rechercheMethods = {
       const map = await fetchJson(`/research/page-counts?book_id=${bookId}`);
       app.rechercheCounts = map || {};
       if (app.currentPage?.id) app.currentPageRechercheCount = (map || {})[app.currentPage.id] || 0;
+    } catch { /* Indikator-Refresh ist best-effort */ }
+  },
+  // Kapitel-Indikator-Map (Sidebar) nach Link-/Archiv-/Lösch-Änderungen frisch
+  // ziehen. Buchweit geteilt, analog zu _refreshRecherchePageCounts.
+  async _refreshRechercheChapterCounts() {
+    const app = window.__app;
+    const bookId = app?.selectedBookId;
+    if (!bookId) return;
+    try {
+      const map = await fetchJson(`/research/chapter-counts?book_id=${bookId}`);
+      app.chapterRechercheCounts = map || {};
     } catch { /* Indikator-Refresh ist best-effort */ }
   },
   _sortItems(arr) {

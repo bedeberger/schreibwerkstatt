@@ -425,9 +425,15 @@ const lektoratState = () => ({
   // Map page_id → Anzahl verknüpfter Recherche-Items (buchweit geteilt).
   // Speist den Seiten-Indikator in Sidebar + Editor.
   rechercheCounts: {},
+  // Map chapter_id → Anzahl verknüpfter Recherche-Items (buchweit geteilt).
+  // Speist den Kapitel-Indikator in der Sidebar.
+  chapterRechercheCounts: {},
   // Map page_id → Anzahl nicht-verworfener Plot-Beats im Kapitel der Seite.
   // Speist den Plot-Verknüpfungs-Indikator im Editor (Beats hängen am Kapitel).
   plotBeatCounts: {},
+  // Map chapter_id → Anzahl nicht-verworfener Plot-Beats im Kapitel.
+  // Speist den Plot-Verknüpfungs-Indikator in der Kapitelansicht.
+  chapterPlotBeatCounts: {},
   // Map page_id → Anzahl offener Reviewer-Kommentare aus Share-Links (Page-,
   // Kapitel- oder Buch-Share).
   shareCommentCounts: {},

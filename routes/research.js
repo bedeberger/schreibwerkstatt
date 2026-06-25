@@ -289,6 +289,26 @@ router.get('/page-counts', (req, res) => {
   res.json(map);
 });
 
+// Map chapter_id → Anzahl verknüpfter, nicht-archivierter Recherche-Items eines
+// Buchs. Speist den Kapitel-Indikator in der Sidebar (analog /page-counts).
+// Buchweit geteilt → kein user_email-Filter (anders als Ideen).
+router.get('/chapter-counts', (req, res) => {
+  const bookId = toIntId(req.query.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId, 'editor')) return;
+  const rows = db.prepare(
+    `SELECT l.chapter_id AS chapter_id, COUNT(DISTINCT l.item_id) AS n
+       FROM research_item_links l
+       JOIN research_items ri ON ri.id = l.item_id
+      WHERE ri.book_id = ? AND ri.archived = 0
+        AND l.target_kind = 'chapter' AND l.chapter_id IS NOT NULL
+      GROUP BY l.chapter_id`
+  ).all(bookId);
+  const map = {};
+  for (const r of rows) map[r.chapter_id] = r.n;
+  res.json(map);
+});
+
 // ── Anlegen ──────────────────────────────────────────────────────────────
 router.post('/', jsonBody, (req, res) => {
   const userEmail = userEmailOrNull(req);

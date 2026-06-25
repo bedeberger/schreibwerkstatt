@@ -70,6 +70,20 @@
 }
 textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 
+.recherche-attach {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+.recherche-attach-btn { cursor: pointer; }
+.recherche-attach-btn input[type="file"] { display: none; }
+.recherche-attach-name {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
 .recherche-form-actions { display: flex; gap: var(--space-xs); }
 
 .recherche-primary {

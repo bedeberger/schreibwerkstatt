@@ -86,6 +86,16 @@
     </div>
     <input type="text" class="recherche-input" x-model="draft.tags"
            :placeholder="$app.t('recherche.field.tags')" :aria-label="$app.t('recherche.field.tags')">
+    <div class="recherche-attach">
+      <label class="btn-compact recherche-attach-btn">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg>
+        <span x-text="$app.t('recherche.field.attach')"></span>
+        <input type="file" accept="image/*,application/pdf" x-ref="createFile" @change="onCreateFilePick($event)">
+      </label>
+      <span class="recherche-attach-name" x-show="draft.fileName" x-text="draft.fileName"></span>
+      <button type="button" class="icon-btn" x-show="draft.fileName" @click="clearCreateFile()"
+              :data-tip="$app.t('recherche.field.attachClear')" :aria-label="$app.t('recherche.field.attachClear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+    </div>
     <div class="recherche-form-actions">
       <button type="button" class="btn-compact recherche-primary" @click="createItem()" :disabled="busy" x-text="$app.t('recherche.save')"></button>
       <button type="button" class="btn-compact" @click="cancelCreate()" :disabled="busy" x-text="$app.t('recherche.cancel')"></button>

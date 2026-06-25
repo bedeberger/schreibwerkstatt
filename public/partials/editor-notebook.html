@@ -195,7 +195,7 @@
                   <span x-text="t('recherche.title')"></span>
                   <span class="btn-count" x-text="currentPageRechercheCount"></span>
                 </button>
-                <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="currentPagePlotBeatCount > 0" @click="openPlotForPage(); pageActionsMenuOpen = false">
+                <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="currentPagePlotBeatCount > 0" @click="openPlotBoard(); pageActionsMenuOpen = false">
                   <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
                   <span x-text="t('plot.title')"></span>
                   <span class="btn-count" x-text="currentPagePlotBeatCount" :data-tip="t('plot.pageBeatsCountTitle', { n: currentPagePlotBeatCount })"></span>

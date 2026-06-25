@@ -92,6 +92,17 @@ router.get('/page-beat-counts', (req, res) => {
   res.json(plotDb.pageBeatCounts(bookId, userEmail));
 });
 
+// Map chapter_id → Anzahl nicht-verworfener Beats im Kapitel. Speist den
+// Plot-Verknüpfungs-Indikator in der Kapitelansicht.
+router.get('/chapter-beat-counts', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const bookId = toIntId(req.query.book_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId)) return;
+  res.json(plotDb.chapterBeatCounts(bookId, userEmail));
+});
+
 // ── Akte ─────────────────────────────────────────────────────────────────────
 router.post('/acts', jsonBody, (req, res) => {
   const userEmail = userEmailOrNull(req);

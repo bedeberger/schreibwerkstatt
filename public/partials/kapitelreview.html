@@ -78,6 +78,13 @@
               <span class="btn-count" x-show="($app.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$app.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+                    x-show="($app.chapterPlotBeatCounts[$app.kapitelReviewChapterId] || 0) > 0"
+                    @click="$app.openPlotBoard(); kapitelReviewMenuOpen = false">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
+              <span x-text="$app.t('plot.title')"></span>
+              <span class="btn-count" x-text="$app.chapterPlotBeatCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('plot.chapterBeatsCountTitle', { n: $app.chapterPlotBeatCounts[$app.kapitelReviewChapterId] })"></span>
+            </button>
+            <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="$app.canEdit() && $app.kapitelReviewChapterId"
                     @click="$app.openShareLinksForChapter($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>

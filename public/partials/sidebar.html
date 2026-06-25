@@ -112,6 +112,12 @@
                 class="ideen-count-badge"
                 x-text="chapterIdeenCounts[item.id]"
                 :data-tip="t('ideen.openCountTitle', { n: chapterIdeenCounts[item.id] })"></span>
+          <span x-show="!item.solo && chapterRechercheCounts[item.id] > 0"
+                class="recherche-count-badge internal-link"
+                @click.stop="openRechercheForChapter(item.id)"
+                x-text="chapterRechercheCounts[item.id]"
+                :data-tip="t('recherche.openCountTitle', { n: chapterRechercheCounts[item.id] })"
+                :aria-label="t('recherche.openCountTitle', { n: chapterRechercheCounts[item.id] })"></span>
         </span>
       </div>
       <div x-show="item.solo || item.open" class="tree-chapter-pages">

@@ -6,7 +6,7 @@ import { attachFullscreenSync } from '../fullscreen.js';
 import { rechercheMethods } from '../book/recherche.js';
 
 function _emptyDraft() {
-  return { kind: 'note', title: '', body: '', url: '', source: '', tags: '' };
+  return { kind: 'note', title: '', body: '', url: '', source: '', tags: '', fileName: '' };
 }
 
 export function registerRechercheCard() {
@@ -61,6 +61,7 @@ export function registerRechercheCard() {
         load: () => this.loadRecherche(),
         extraListeners: [
           { type: 'recherche:filter-page', handler: (e) => this.filterToPage(e.detail?.pageId) },
+          { type: 'recherche:filter-chapter', handler: (e) => this.filterToChapter(e.detail?.chapterId) },
         ],
         onBookChanged: (e, ctx, root) => {
           this.resetRecherche();
