@@ -206,6 +206,9 @@ const pageState = () => ({
   _retryingPageLoad: false,
   currentPageIdeenOpenCount: 0,
   currentPageRechercheCount: 0,
+  // Anzahl nicht-verworfener Plot-Beats im Kapitel der offenen Seite. Speist den
+  // Plot-Verknüpfungs-Eintrag im Page-Action-Menü (Beats hängen am Kapitel).
+  currentPagePlotBeatCount: 0,
   currentPageShareCommentCount: 0,
   // Anzahl aktiver Share-Links, die die offene Seite enthalten (Page-/Kapitel-/
   // Buch-Share). Speist den Badge am „Teilen"-Eintrag des Page-Action-Menüs.
@@ -422,6 +425,9 @@ const lektoratState = () => ({
   // Map page_id → Anzahl verknüpfter Recherche-Items (buchweit geteilt).
   // Speist den Seiten-Indikator in Sidebar + Editor.
   rechercheCounts: {},
+  // Map page_id → Anzahl nicht-verworfener Plot-Beats im Kapitel der Seite.
+  // Speist den Plot-Verknüpfungs-Indikator im Editor (Beats hängen am Kapitel).
+  plotBeatCounts: {},
   // Map page_id → Anzahl offener Reviewer-Kommentare aus Share-Links (Page-,
   // Kapitel- oder Buch-Share).
   shareCommentCounts: {},

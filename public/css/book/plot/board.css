@@ -384,6 +384,10 @@
     cursor: pointer;
   }
   .plot-add-beat-btn:hover { border-color: var(--card-accent); color: var(--color-text); }
+  /* Während eines Beat-Drags (body.plot-dnd-active, dnd.js) keine Pointer-Events auf
+     den Add-Buttons: sonst zieht der Pointer über dem „+" dessen :hover-Akzent-Border
+     und der gestrichelt umrandete Button liest sich fälschlich als Drop-Zone. */
+  body.plot-dnd-active .plot-add-beat-btn { pointer-events: none; }
   .plot-add-beat-btn .icon { width: 14px; height: 14px; }
 
   /* ── Neuer Akt ─────────────────────────────────────────────────────────── */

@@ -757,6 +757,7 @@
   "tile.plot": "Plot-Werkstatt",
   "tile.plot.desc": "Handlung in Akten & Handlungsbögen planen",
   "plot.title": "Plot-Werkstatt",
+  "plot.pageBeatsCountTitle": "{n} Plot-Beat(s) im Kapitel dieser Seite",
   "plot.loading": "Board wird geladen…",
   "plot.stats": "{total} Handlungsbögen",
   "plot.empty.hint": "Skizziere deine Handlung: Akte als Spalten, Handlungsbögen als Karten. Lege zuerst einen Akt an.",

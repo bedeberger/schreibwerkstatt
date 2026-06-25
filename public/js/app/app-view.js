@@ -401,6 +401,8 @@ export const appViewMethods = {
       // Recherche-Count aus der buchweit geladenen Map (kein Extra-Request);
       // wird bei Link-Änderungen in der Recherche-Karte frisch gehalten.
       this.currentPageRechercheCount = (this.rechercheCounts || {})[pageId] || 0;
+      // Plot-Beat-Count ebenfalls aus der buchweit geladenen Map (kein Extra-Request).
+      this.currentPagePlotBeatCount = (this.plotBeatCounts || {})[pageId] || 0;
       this.currentPageShareCommentCount = (this.shareCommentCounts || {})[pageId] || 0;
       this.currentPageShareLinkCount = (this.shareLinkCounts || {})[pageId] || 0;
       this.currentPageChatSessionCount = (Array.isArray(sessions) ? sessions : []).length;
@@ -426,6 +428,22 @@ export const appViewMethods = {
       if (this.currentPage?.id) this.currentPageShareCommentCount = map[this.currentPage.id] || 0;
     } catch (e) {
       console.error('[refreshShareCommentCounts]', e);
+    }
+  },
+
+  // Pro-Seite-Map verknüpfter Plot-Beats neu laden (nach Kapitel-/Verwerfen-/
+  // Lösch-Änderung in der Plot-Karte) und den Editor-Badge der offenen Seite
+  // syncen. Beats hängen am Kapitel → Count ist kapitelweit projiziert.
+  async refreshPlotBeatCounts() {
+    const bookId = this.selectedBookId;
+    if (!bookId) return;
+    try {
+      const map = await fetchJson(`/plot/page-beat-counts?book_id=${bookId}`).catch(() => null);
+      if (!map || this.selectedBookId !== bookId) return;
+      this.plotBeatCounts = map;
+      if (this.currentPage?.id) this.currentPagePlotBeatCount = map[this.currentPage.id] || 0;
+    } catch (e) {
+      console.error('[refreshPlotBeatCounts]', e);
     }
   },
 
@@ -526,6 +544,16 @@ export const appViewMethods = {
       this.showRechercheCard = true;
     }
     this._scrollToCardByKey('recherche');
+  },
+  // Sprung vom Plot-Indikator im Page-Action-Menü: Plot-Werkstatt öffnen. Das
+  // Board ist buchweit (kein Seiten-Filter) → reines Öffnen, kein Toggle.
+  async openPlotForPage() {
+    await this._ensurePartial('plot');
+    if (!this.showPlotCard) {
+      this._closeOtherMainCards('plot');
+      this.showPlotCard = true;
+    }
+    this._scrollToCardByKey('plot');
   },
   // Sprung vom Ideen-Indikator im Pagetree: Seite öffnen (Page-Ideen sitzen im
   // Editor-Slot) und die Ideen-Karte aufklappen. Kein Toggle — ist sie schon

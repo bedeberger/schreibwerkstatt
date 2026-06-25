@@ -331,6 +331,24 @@ function getBeat(id) {
   return _beatRow(id);
 }
 
+// Map page_id → Anzahl nicht-verworfener Beats, die mit dem Kapitel der Seite
+// verknüpft sind. Beats hängen über chapter_id am Kapitel (kein page_id), darum
+// wird der Kapitel-Count auf jede Seite des Kapitels projiziert. Speist den
+// Plot-Verknüpfungs-Indikator im Notebook-Editor (analog /research/page-counts).
+function pageBeatCounts(bookId, userEmail) {
+  const rows = db.prepare(`
+    SELECT p.page_id AS page_id, COUNT(*) AS n
+      FROM plot_beats b
+      JOIN pages p ON p.chapter_id = b.chapter_id
+     WHERE b.book_id = ? AND b.user_email = ? AND b.verworfen = 0
+       AND b.chapter_id IS NOT NULL
+     GROUP BY p.page_id
+  `).all(parseInt(bookId), userEmail);
+  const map = {};
+  for (const r of rows) map[r.page_id] = r.n;
+  return map;
+}
+
 function deleteBeat(id) {
   _stmtDeleteBeat.run(parseInt(id));
 }
@@ -557,7 +575,7 @@ module.exports = {
   listActs, getAct, createAct, updateAct, deleteAct, reorderActs,
   threadHasOwnActs, forkThreadActs, unforkThreadActs,
   listThreads, getThread, createThread, updateThread, deleteThread, reorderThreads, _validThreadId,
-  listBeats, getBeat, createBeat, updateBeat, deleteBeat, reorderBeats,
+  listBeats, getBeat, createBeat, updateBeat, deleteBeat, reorderBeats, pageBeatCounts,
   resolveFigureIds, resolveDraftFigureIds,
   insertPlotConsistencyRun, listPlotConsistencyRuns, getPlotConsistencyRun, deletePlotConsistencyRun,
   insertPlotBrainstormRun, listPlotBrainstormRuns, getPlotBrainstormRun, deletePlotBrainstormRun,

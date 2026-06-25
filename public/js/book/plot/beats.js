@@ -209,6 +209,8 @@ export const beatsMethods = {
       this.editingBeatId = null;
       if (window.__app) window.__app.plotBeatId = null;
       this.errorMessage = '';
+      // Kapitel-Zuweisung kann sich geändert haben → Editor-Indikator syncen.
+      app.refreshPlotBeatCounts?.();
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');
     } finally { this.busy = false; }
@@ -225,6 +227,8 @@ export const beatsMethods = {
         body: JSON.stringify({ verworfen: beat.verworfen ? 0 : 1 }),
       });
       this._replaceBeat(updated);
+      // Verwerfen ändert, ob der Beat in den Page-Count zählt → Indikator syncen.
+      app.refreshPlotBeatCounts?.();
     } catch (e) { this.errorMessage = app.t('plot.error.save'); }
   },
 
@@ -242,6 +246,8 @@ export const beatsMethods = {
       this._memos = {};
       if (this.editingBeatId === beat.id) { this.editingBeatId = null; if (window.__app) window.__app.plotBeatId = null; }
       this.errorMessage = '';
+      // Gelöschter Beat kann ein Kapitel-Count gewesen sein → Indikator syncen.
+      app.refreshPlotBeatCounts?.();
     } catch (e) {
       this.errorMessage = app.t('plot.error.delete');
     } finally { this.busy = false; }

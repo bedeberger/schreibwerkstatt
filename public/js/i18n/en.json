@@ -757,6 +757,7 @@
   "tile.plot": "Plot Workshop",
   "tile.plot.desc": "Plan the plot as a beat board",
   "plot.title": "Plot Workshop",
+  "plot.pageBeatsCountTitle": "{n} plot beat(s) in this page's chapter",
   "plot.loading": "Loading board…",
   "plot.stats": "{total} beats",
   "plot.empty.hint": "Sketch your plot as a beat board: acts as columns, plot points as cards. Start by adding an act.",

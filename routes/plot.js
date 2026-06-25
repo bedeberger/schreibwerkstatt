@@ -80,6 +80,18 @@ router.get('/', (req, res) => {
   });
 });
 
+// Map page_id → Anzahl nicht-verworfener Beats im Kapitel der Seite. Speist den
+// Plot-Verknüpfungs-Indikator im Notebook-Editor (wie /ideen/counts,
+// /research/page-counts). Pro Buch + User skopiert.
+router.get('/page-beat-counts', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const bookId = toIntId(req.query.book_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId)) return;
+  res.json(plotDb.pageBeatCounts(bookId, userEmail));
+});
+
 // ── Akte ─────────────────────────────────────────────────────────────────────
 router.post('/acts', jsonBody, (req, res) => {
   const userEmail = userEmailOrNull(req);

@@ -169,7 +169,7 @@
                 <div class="plot-swim-lane-edit">
                   <input type="text" class="plot-thread-name-input" x-model="threadDraft.name"
                          data-spellcheck="spelling" :placeholder="$app.t('plot.thread.namePlaceholder')"
-                         @keydown.enter="saveEditThread(row.lane.thread)" @keydown.escape="cancelEditThread()">
+                         @keydown.enter.prevent="saveEditThread(row.lane.thread)" @keydown.escape="cancelEditThread()">
                   <label class="plot-edit-label" x-show="$app.figuren.length" x-text="$app.t('plot.thread.bindFigure')"></label>
                   <div x-show="$app.figuren.length"
                        x-data="combobox({ placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure') })"
@@ -186,9 +186,13 @@
                   <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
                        x-modelable="value" x-model="threadDraft.chapter_id"
                        x-effect="options = $app.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
-                  <div class="plot-add-beat-actions">
-                    <button type="button" class="btn-compact" @click="saveEditThread(row.lane.thread)" :disabled="busy" x-text="$app.t('common.save')"></button>
-                    <button type="button" class="btn-compact btn-compact--ghost" @click="cancelEditThread()" x-text="$app.t('common.cancel')"></button>
+                  <div class="plot-beat-edit-actions">
+                    <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditThread(row.lane.thread)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+                    </button>
+                    <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="cancelEditThread()" :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+                    </button>
                   </div>
                 </div>
               </template>
