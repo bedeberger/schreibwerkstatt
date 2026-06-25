@@ -3,9 +3,10 @@
 /* Alpine.js – verhindert Flash of unstyled content */
 [x-cloak] { display: none !important; }
 
-/* Kontext-Leiste der Buch-Übersicht: Combobox + Kategorie-Filter + kompakter
-   Palette-Trigger in einer Zeile. Card liefert das Padding, darum kein eigener
-   Außenabstand. Umbruch erlaubt (viele Kategorien / schmaler Viewport). */
+/* Kontext-Leiste der Buch-Übersicht: obere Zeile = Combobox + kompakter
+   Palette-Trigger; Kategorie-Filter folgt in eigener Zeile darunter. Card
+   liefert das Padding, darum kein eigener Außenabstand. Umbruch erlaubt
+   (schmaler Viewport). */
 .book-selector-bar {
   display: flex;
   align-items: center;
@@ -24,12 +25,13 @@
   margin-bottom: 0;
 }
 
-/* Filter-Pills fuer Buchliste. Inline in der Kontext-Leiste. */
+/* Filter-Pills fuer Buchliste. Eigene Zeile unter der Buchwahl/Palette-Zeile. */
 .book-filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-6);
   align-items: center;
+  margin-top: var(--space-sm);
 }
 .book-filter-pill {
   padding: var(--space-3) 10px;

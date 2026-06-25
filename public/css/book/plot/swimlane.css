@@ -48,8 +48,13 @@
 
   /* ── Grid-Container ─────────────────────────────────────────────────────── */
   .plot-swimlane {
+    /* Linker Innenrand = Gutter zwischen Scroll-Container-Rand und der sticky
+       Strang-Spalte. Die sticky Spalte deckt genau diesen Streifen wieder ab
+       (box-shadow unten), damit beim H-Scroll keine farbigen Beat-Ränder links
+       neben der Strang-Leiste durchlecken. */
+    --swim-gutter: var(--space-sm);
     overflow-x: auto;
-    padding: var(--space-sm) var(--space-2xs) var(--space-lg);
+    padding: var(--space-sm) var(--space-2xs) var(--space-lg) var(--swim-gutter);
   }
   .plot-swim {
     --lane-w: 180px;
@@ -93,6 +98,11 @@
     /* Eigene Compositor-Ebene: Border wird einmal gerastert + nur komponiert,
        statt beim H-Scroll pro Frame neu (sub-pixel) gezeichnet → kein Border-Flackern. */
     will-change: transform;
+    /* Opakes Surface-Rechteck (Breite = --swim-gutter) links neben der Spalte:
+       übermalt den Gutter-Streifen im padding-left, durch den sonst die farbigen
+       Beat-/Strang-Ränder beim H-Scroll durchscheinen. Reine Übermalung auf der
+       Sticky-Ebene (z-sticky) → keine Layout-Verschiebung. */
+    box-shadow: calc(-1 * var(--swim-gutter)) 0 0 var(--color-surface);
   }
   .plot-swim-corner {
     display: flex;

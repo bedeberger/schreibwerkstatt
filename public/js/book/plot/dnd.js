@@ -68,6 +68,21 @@ export const dndMethods = {
         document.body.style.removeProperty('--plot-drag-h');
       }
     };
+    // Im Native-Vollbild rendert nur der Teilbaum des Fullscreen-Elements (Top-
+    // Layer). SortableJS hängt den `position:fixed`-Fallback-Ghost (forceFallback)
+    // aber an `document.body` — ausserhalb des Top-Layers, also unsichtbar hinter
+    // dem Vollbild-Element. Folge: der User zieht im Vollbild blind, verfehlt die
+    // Ziel-Zellen und muss mehrfach loslassen. Fix: den frisch erzeugten Ghost
+    // (`Sortable.ghost`, existiert ab onStart) in das Fullscreen-Element umhängen.
+    // `position:fixed` bleibt viewport-relativ (die Plot-Karte stellt keinen
+    // Containing-Block via transform/filter), die Optik ändert sich also nicht —
+    // der Ghost wird nur sichtbar. SortableJS räumt ihn via `parentNode` auf,
+    // das Umhängen ist also cleanup-sicher.
+    const relocateGhostForFullscreen = () => {
+      const fsEl = document.fullscreenElement;
+      const ghost = Sortable.ghost;
+      if (fsEl && ghost && !fsEl.contains(ghost)) fsEl.appendChild(ghost);
+    };
     // Geteiltes Präzisions-Tuning aus BASE_SORTABLE_OPTS (forceFallback-Ghost,
     // swapThreshold gegen Nachbar-Flackern, invertSwap für stabile Backward-Drops,
     // revertOnSpill gegen Item-Loss). `handle` = der Drag-Griff (.plot-beat-grip,
@@ -91,7 +106,7 @@ export const dndMethods = {
       dragClass: 'plot-beat-drag-active',
       onChoose: markDragIgnore,
       onUnchoose: unmarkDragIgnore,
-      onStart: (evt) => setDragging(true, evt.item),
+      onStart: (evt) => { setDragging(true, evt.item); relocateGhostForFullscreen(); },
       onEnd: (evt) => { setDragging(false); unmarkDragIgnore(evt); this.onBeatSortEnd(evt); },
     };
     // Eine Sortable-Instanz pro Beat-Zelle (.plot-beats[data-plot-cell]). Flaches

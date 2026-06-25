@@ -394,10 +394,10 @@
   </div>
 </div>
 
-<!-- Buchwahl + Kontext-Leiste: Einzeile, immer sichtbar (sobald ein Buch
-     gewählt ist). Buchwahl links, Kategorie-Filter, breiter Palette-Trigger
-     (⌘K) füllt die restliche Zeilenbreite — alle in einer Reihe, Umbruch nur
-     bei schmalem Viewport. -->
+<!-- Buchwahl + Kontext-Leiste: obere Zeile = Buchwahl links + breiter
+     Palette-Trigger (⌘K) füllt die restliche Breite; Kategorie-Filter in
+     eigener Zeile darunter. Umbruch der oberen Zeile nur bei schmalem
+     Viewport. -->
 <div class="card card--book-selector"
      x-show="currentUser && showBookCard && !isAdminOnly && books.length > 0"
      x-cloak>
@@ -407,24 +407,6 @@
          x-modelable="value" x-model="selectedBookId"
          x-effect="options = filteredBooks().map(b => ({value: String(b.id), label: b.name}))"
          @combobox-change="resetView();"></div>
-
-    <!-- Filter-Pills (Kategorie). Reines Frontend-Filter -->
-    <div class="book-filter-row" x-show="bookFilterCategoryPool.length" x-cloak>
-      <template x-for="cat in bookFilterCategoryPool" :key="cat.id">
-        <button type="button"
-                class="book-filter-pill"
-                :class="{ 'is-active': String(bookFilterCategoryId) === String(cat.id) }"
-                @click="bookFilterCategoryId = String(bookFilterCategoryId) === String(cat.id) ? '' : String(cat.id)">
-          <span x-text="cat.name"></span>
-          <span class="btn-count" x-text="bookCountForCategory(cat.id)"></span>
-        </button>
-      </template>
-      <button type="button"
-              class="book-filter-clear"
-              x-show="bookFilterCategoryId"
-              @click="clearBookFilters()"
-              x-text="t('book.filter.clear')"></button>
-    </div>
 
     <!-- Palette-Trigger (⌘K / Strg+K): breite Such-Bar, Power-User-Eintritt zu allen Features. -->
     <button type="button"
@@ -438,6 +420,24 @@
       <span class="palette-hero-text" x-text="t('palette.hero.text')"></span>
       <kbd class="palette-hero-kbd" x-text="isMac ? '⌘K' : 'Ctrl+K'"></kbd>
     </button>
+  </div>
+
+  <!-- Filter-Pills (Kategorie) in eigener Zeile. Reines Frontend-Filter -->
+  <div class="book-filter-row" x-show="bookFilterCategoryPool.length" x-cloak>
+    <template x-for="cat in bookFilterCategoryPool" :key="cat.id">
+      <button type="button"
+              class="book-filter-pill"
+              :class="{ 'is-active': String(bookFilterCategoryId) === String(cat.id) }"
+              @click="bookFilterCategoryId = String(bookFilterCategoryId) === String(cat.id) ? '' : String(cat.id)">
+        <span x-text="cat.name"></span>
+        <span class="btn-count" x-text="bookCountForCategory(cat.id)"></span>
+      </button>
+    </template>
+    <button type="button"
+            class="book-filter-clear"
+            x-show="bookFilterCategoryId"
+            @click="clearBookFilters()"
+            x-text="t('book.filter.clear')"></button>
   </div>
 </div>
 
