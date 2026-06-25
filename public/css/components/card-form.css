@@ -312,6 +312,10 @@ textarea:disabled,
   padding: 0;
   max-height: 220px;
   overflow-y: auto;
+  /* Scroll-Chaining ans Fenster kappen: sonst scrollt am oberen/unteren Listen-
+     Ende (oder bei kurzer, nicht scrollbarer Liste) das ganze Fenster weiter,
+     was den window-Scroll-Listener triggert und das Dropdown ungewollt schliesst. */
+  overscroll-behavior: contain;
 }
 .combobox-option {
   padding: var(--pad-btn-compact);
