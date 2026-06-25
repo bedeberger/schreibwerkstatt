@@ -147,6 +147,14 @@ export const beatsMethods = {
   },
   cancelEditBeat() { this.editingBeatId = null; if (window.__app) window.__app.plotBeatId = null; },
 
+  // Klick ausserhalb des Edit-Panels: Änderungen committen (wie Save) und dann
+  // schliessen. Leerer Titel → nichts Sinnvolles zu speichern, einfach verwerfen
+  // (saveEditBeat würde sonst mit Fehler offen bleiben).
+  async commitEditBeat(beat) {
+    if (!(this.beatDraft.titel || '').trim()) { this.cancelEditBeat(); return; }
+    await this.saveEditBeat(beat);
+  },
+
   // Deep-Link-Ziel öffnen: Beat suchen → Edit + zentriert ins Bild. Noch nicht
   // geladenes Board → ID merken, loadBoard() ruft uns danach erneut auf.
   _focusBeatById(rawId) {

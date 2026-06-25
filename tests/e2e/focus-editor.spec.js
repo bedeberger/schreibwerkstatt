@@ -492,6 +492,102 @@ test('Blur des Editors entfernt aktive Markierung', async ({ page }) => {
   expect(await page.locator('.focus-paragraph-active').count()).toBe(0);
 });
 
+test('Transienter null-Tick (Caret auf Container + kein sichtbarer Block) behält Markierung', async ({ page }) => {
+  // Reproduziert den intermittierenden „Hervorhebung verschwindet"-Report:
+  // nach Merge/Voll-Löschen sitzt der Caret kurz direkt auf dem Container
+  // (findBlockFromNode=null) UND der Viewport-Center-Fallback findet nichts
+  // (alle getrackten Blöcke transient Höhe 0). Ohne Schutz clear't
+  // setActiveBlock(null) die Markierung → alles dimmt kurz weg. Mit der
+  // _lastBlock-Beibehaltung in _focusUpdateActive bleibt der vorige aktive
+  // Absatz markiert, bis der nächste echte Tick reconciliiert.
+  await enter(page);
+  await placeCaretInParagraph(page, 5);
+  await page.evaluate(() => window.harness._focusUpdateActive(false));
+  await page.waitForTimeout(60);
+  expect(await page.locator('.focus-paragraph-active').count()).toBe(1);
+  const beforeText = await page.evaluate(() =>
+    document.querySelector('#editor-card .focus-editor__content .focus-paragraph-active')?.textContent);
+
+  // Null-Tick erzwingen: ALLE Absätze unsichtbar (Höhe 0 → auch der QSA-
+  // Fallback liefert null) + Caret direkt auf den Container.
+  await page.evaluate(() => {
+    const el = document.querySelector('#editor-card .focus-editor__content');
+    el.querySelectorAll('p').forEach(p => { p.style.display = 'none'; });
+    const range = document.createRange();
+    range.setStart(el, 0);
+    range.collapse(true);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    window.harness._focusUpdateActive(false);
+  });
+  await page.waitForTimeout(60);
+
+  // Markierung NICHT verloren: weiterhin genau ein aktiver Absatz, derselbe.
+  expect(await page.locator('.focus-paragraph-active').count()).toBe(1);
+  const afterText = await page.evaluate(() =>
+    document.querySelector('#editor-card .focus-editor__content .focus-paragraph-active')?.textContent);
+  expect(afterText).toBe(beforeText);
+});
+
+test('Scroll (preferCenter) ohne auffindbaren Center-Block verliert Hervorhebung nicht', async ({ page }) => {
+  // Direkter User-Report: „alles wird dunkel beim Scrollen". Manueller Scroll
+  // geht über onScroll → _focusUpdateActive(false, { preferCenter: true }), der
+  // den Caret IGNORIERT und block ausschliesslich aus findBlockAtViewportCenter
+  // zieht. Findet der (z.B. weil das IO-Set transient nur Höhe-0-Einträge hält
+  // und auch der QSA-Scan nichts Sichtbares liefert) keinen Block, dimmte früher
+  // alles weg. _lastBlock-Schutz behält den vorigen aktiven Absatz.
+  await enter(page);
+  await placeCaretInParagraph(page, 8);
+  await page.evaluate(() => window.harness._focusUpdateActive(false));
+  await page.waitForTimeout(60);
+  expect(await page.locator('.focus-paragraph-active').count()).toBe(1);
+  const beforeText = await page.evaluate(() =>
+    document.querySelector('#editor-card .focus-editor__content .focus-paragraph-active')?.textContent);
+
+  // Worst case erzwingen: alle Absätze Höhe 0 (auch QSA liefert null) + IO-Set
+  // leeren, dann echten User-Scroll auslösen (expectedScroll=0 → kein prog-Scroll).
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    el.querySelectorAll('p').forEach(p => { p.style.display = 'none'; });
+    window.harness._focusVisibleBlocks.clear();
+    if (window.harness._focusListeners) window.harness._focusListeners.expectedScroll = 0;
+    el.dispatchEvent(new Event('scroll'));
+  }, EDITOR);
+  await page.waitForTimeout(80);
+
+  // Hervorhebung NICHT verloren: weiterhin genau ein aktiver Absatz, derselbe.
+  expect(await page.locator('.focus-paragraph-active').count()).toBe(1);
+  const afterText = await page.evaluate(() =>
+    document.querySelector('#editor-card .focus-editor__content .focus-paragraph-active')?.textContent);
+  expect(afterText).toBe(beforeText);
+});
+
+test('Blur leert auch mit _lastBlock-Schutz (absichtlicher Clear bleibt)', async ({ page }) => {
+  // Gegenprobe zur Beibehaltung: onBlur setzt ctx._lastBlock=null und clear't
+  // bewusst. Der Schutz darf den absichtlichen Blur-Clear NICHT wiederbeleben —
+  // ein Folge-Tick ohne Caret-Block muss leer bleiben (kein _lastBlock da).
+  await enter(page);
+  await placeCaretInParagraph(page, 5);
+  await page.waitForTimeout(50);
+  expect(await page.locator('.focus-paragraph-active').count()).toBe(1);
+
+  await page.evaluate(() => {
+    const el = document.querySelector('#editor-card .focus-editor__content');
+    el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+    // Folge-Tick mit Caret auf Container → block=null, _lastBlock ist bereits
+    // null → kein Wiederbeleben.
+    const range = document.createRange();
+    range.setStart(el, 0);
+    range.collapse(true);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    el.querySelectorAll('p').forEach(p => { p.style.display = 'none'; });
+    window.harness._focusUpdateActive(false);
+  });
+  await page.waitForTimeout(60);
+  expect(await page.locator('.focus-paragraph-active').count()).toBe(0);
+});
+
 test('Chromium-Split: zwei .focus-paragraph-active → setActiveBlock räumt ab', async ({ page }) => {
   await enter(page);
   await placeCaretInParagraph(page, 5);

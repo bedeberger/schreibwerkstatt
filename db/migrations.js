@@ -8554,6 +8554,28 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 218 abgeschlossen (page_revisions.client — Browser/OS bzw. nativer Client pro Revision).');
   }
 
+  if (version < 219) {
+    // figures.stale: 1 = im letzten Komplettanalyse-Lauf NICHT mehr erkannt.
+    // saveFigurenToDb reconciled Figuren jetzt in-place (UPDATE statt DELETE+INSERT),
+    // damit figures.id stabil bleibt und FK-Referenzen (plot_beat_figures,
+    // research_item_links, figure_events mit manually_edited=1 etc.) Re-Analysen
+    // ueberleben. Verschwundene Figuren werden statt geloescht als stale markiert
+    // (Referenzen bleiben erhalten); ihre fig_id wird auf 'orphan_<id>' umgeschrieben,
+    // damit der 'fig_N'-Namespace fuer den naechsten Lauf kollisionsfrei bleibt.
+    // Additiv: nicht-nullable Spalte mit Default, kein Recreate noetig.
+    const figCols219 = db.pragma('table_info(figures)').map(c => c.name);
+    if (!figCols219.includes('stale')) {
+      db.exec('ALTER TABLE figures ADD COLUMN stale INTEGER NOT NULL DEFAULT 0');
+    }
+
+    const fkErrors219 = db.pragma('foreign_key_check');
+    if (fkErrors219.length) {
+      throw new Error(`Migration 219: foreign_key_check meldet ${fkErrors219.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 219').run();
+    logger.info('DB-Migration auf Version 219 abgeschlossen (figures.stale — Reconcile-Markierung verschwundener Figuren).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

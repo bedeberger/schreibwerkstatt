@@ -11,7 +11,7 @@ import { DEFAULT_FONT, TIER_COLOR } from './constants.js';
 //   Keine Physics, keine Zufälligkeit – jede Position ist aus den Daten ableitbar.
 export const figurengraphMethods = {
   _renderFigurengraph(container) {
-    const figuren = window.__app.figuren;
+    const figuren = this._graphFiguren();
     const chapterOrder = this.figurenKapitelListe();
     const N = chapterOrder.length;
     const chapIdx = {};

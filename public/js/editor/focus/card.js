@@ -525,6 +525,20 @@ export const focusCardMethods = {
         if (!block) block = findBlockAtViewportCenter(container, ctx.visibleBlocks);
 
         const granularity = editorHost()?.focusGranularity || 'paragraph';
+
+        // Defensive gegen den transienten null-Tick: Caret sitzt nach Merge/
+        // Voll-Löschen kurz direkt auf dem Container (findBlockFromNode=null) UND
+        // der Viewport-Center-Fallback findet (noch) nichts. Ohne Schutz würde
+        // setActiveBlock(null) die Hervorhebung killen → sichtbares „alles dimmt
+        // kurz weg". Stattdessen den vorigen aktiven Block beibehalten, solange er
+        // noch im Container hängt; der nächste echte Tick reconciliiert. onBlur
+        // setzt ctx._lastBlock=null und clear't bewusst — der absichtliche Blur-
+        // Clear bleibt also erhalten (kein _lastBlock zum Wiederbeleben).
+        if (!block && granularity !== 'typewriter-only'
+            && ctx._lastBlock && container.contains(ctx._lastBlock)) {
+          block = ctx._lastBlock;
+        }
+
         const blockChanged = block !== ctx._lastBlock;
         const granularityChanged = granularity !== ctx._lastGranularity;
 

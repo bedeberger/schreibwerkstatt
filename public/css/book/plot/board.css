@@ -159,7 +159,11 @@
   .plot-beat-grip:active { cursor: grabbing; }
   .plot-beat-grip .icon { width: 16px; height: 16px; }
   .plot-beat--geplant   { border-left-color: var(--color-muted); }
-  .plot-beat--im_buch   { border-left-color: var(--color-ok-border); }
+  /* „Im Buch" = erledigt → tritt zurück (gedämpft, nicht weg). Bei Hover/Edit
+     volle Deckkraft, damit der Inhalt lesbar bleibt, wenn man hinschaut. */
+  .plot-beat--im_buch   { border-left-color: var(--color-ok-border); opacity: 0.72; }
+  .plot-beat--im_buch:hover,
+  .plot-beat--im_buch.plot-beat--editing { opacity: 1; }
   .plot-beat--verworfen { border-left-color: var(--color-border); opacity: 0.6; }
   /* Karte im Edit-Modus nicht ziehen (Textauswahl/Inputs) — SortableJS filtert
      .plot-beat--editing; Cursor zurück auf default als Signal. */
@@ -448,5 +452,7 @@
     .plot-column { width: 100%; }
     .plot-column--add { min-width: 0; }
     .plot-column-header { position: static; }
+    .plot-icon-btn { width: 20px; height: 20px; }
+    .plot-icon-btn .icon { width: 13px; height: 13px; }
   }
 }

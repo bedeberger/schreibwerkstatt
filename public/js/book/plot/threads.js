@@ -82,6 +82,12 @@ export const threadsMethods = {
     this.threadColorPickerId = this.threadColorPickerId === threadId ? null : threadId;
   },
 
+  // Mobile-Kebab: Lane-Aktionen auf-/zuklappen (Single-Select). Desktop blendet
+  // den Toggle aus und zeigt die Aktionen permanent (CSS).
+  toggleThreadActions(threadId) {
+    this.threadActionsOpenId = this.threadActionsOpenId === threadId ? null : threadId;
+  },
+
   async setThreadColor(thread, key) {
     const app = window.__app;
     this.threadColorPickerId = null;

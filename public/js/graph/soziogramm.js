@@ -5,7 +5,7 @@ import { DEFAULT_FONT, SCHICHT_COLOR, SCHICHT_LEVEL } from './constants.js';
 // innerHTML mit escHtml() — Escape-Invariante eingehalten.
 export const soziogrammMethods = {
   _renderSoziogramm(container) {
-    const figuren = window.__app.figuren;
+    const figuren = this._graphFiguren();
     // Guard: noch keine Sozialschichten vorhanden → Placeholder statt leerem Graph
     const hasSchicht = figuren.some(f => f.sozialschicht && f.sozialschicht !== 'andere');
     if (!hasSchicht) {

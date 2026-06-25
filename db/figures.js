@@ -117,7 +117,160 @@ function _arcToFlat(arc) {
   return parts.join(' → ');
 }
 
-function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
+// Namens-Normalisierung fürs Cross-Run-Matching. Synchron mit
+// routes/jobs/komplett/figuren-merge.js#_normalizeName (dort kanonisch für den
+// Intra-Run-Dedup). Hier lokal dupliziert, um keine Layering-Inversion
+// (db/ → routes/) einzuführen.
+const _TITLE_PREFIX_RE = /^(?:dr\.?|doktor|prof\.?|professor|herrn?|hr\.?|frau|fr\.?|fräulein)\s+/;
+const _NAME_STOPWORDS = new Set(['von', 'zu', 'van', 'der', 'die', 'das', 'den', 'dem', 'de', 'la']);
+function _normName(s) {
+  let r = (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+  while (_TITLE_PREFIX_RE.test(r)) r = r.replace(_TITLE_PREFIX_RE, '');
+  return r;
+}
+function _nameTok(name) {
+  return _normName(name).split(/[\s\-\.]+/).filter(t => t.length > 1 && !_NAME_STOPWORDS.has(t));
+}
+
+// Indizien-Score zwischen einer Bestands-Figur (DB) und einer neuen Analyse-Figur.
+// Nur lauf-stabile Signale (Beruf/Geburtstag/Geschlecht/Typ/gemeinsames Kapitel) —
+// die Beziehungs-Refs aus figuren-merge sind cross-run nicht vergleichbar (fig_ids
+// werden pro Lauf neu vergeben).
+function _crossRunScore(ex, inc) {
+  let score = 0;
+  const ba = (ex.beruf || '').toLowerCase().trim();
+  const bb = (inc.beruf || '').toLowerCase().trim();
+  if (ba && bb && ba === bb) score += 1;
+  if (ex.geburtstag && inc.geburtstag && ex.geburtstag === inc.geburtstag) score += 2;
+  const ga = (ex.geschlecht || '').toLowerCase();
+  const gb = (inc.geschlecht || '').toLowerCase();
+  if (ga && gb && ga !== 'unbekannt' && gb !== 'unbekannt' && ga === gb) score += 1;
+  if (ex.typ && inc.typ && ex.typ === inc.typ && ex.typ !== 'andere') score += 1;
+  const incKap = new Set((inc.kapitel || []).map(k => _cleanRefName(k.name)).filter(Boolean));
+  for (const c of ex.chapters) if (incKap.has(c)) { score += 1; break; }
+  return score;
+}
+
+// Cross-Run-Matching: ordnet jede neue Analyse-Figur einer bestehenden DB-Figur zu
+// (oder null = Neuanlage). Greedy, jede Bestands-Figur wird höchstens einmal vergeben.
+//   Stufe 1: exakter normalisierter Name.
+//   Stufe 2: Token-Teilmenge + Indizien-Score ≥ 2.
+//   Stufe 3 (Rename-Fallback): Name völlig anders, aber Indizien-Score ≥ 3 — fängt
+//            im Buch umbenannte Figuren ab, deren Referenzen sonst brechen würden.
+// existingRows: [{ id, fig_id, name, kurzname, beruf, geburtstag, geschlecht, typ, chapters:Set }]
+// Gibt Map(incomingIndex → existingId) zurück.
+function _matchFiguren(existingRows, incoming) {
+  const matchOf = new Map();      // incomingIndex → existingId
+  const usedExisting = new Set(); // existingId
+  const exByNorm = new Map();
+  for (const ex of existingRows) {
+    const k = _normName(ex.name);
+    if (k && !exByNorm.has(k)) exByNorm.set(k, ex);
+  }
+
+  // Stufe 1: exakter Name.
+  for (let i = 0; i < incoming.length; i++) {
+    const ex = exByNorm.get(_normName(incoming[i].name));
+    if (ex && !usedExisting.has(ex.id)) { matchOf.set(i, ex.id); usedExisting.add(ex.id); }
+  }
+
+  // Stufe 2: Token-Teilmenge + Indizien.
+  for (let i = 0; i < incoming.length; i++) {
+    if (matchOf.has(i)) continue;
+    const ti = _nameTok(incoming[i].name);
+    if (!ti.length) continue;
+    let best = null, bestScore = 1;
+    for (const ex of existingRows) {
+      if (usedExisting.has(ex.id)) continue;
+      const te = _nameTok(ex.name);
+      if (!te.length) continue;
+      const sub = ti.every(t => te.includes(t)) || te.every(t => ti.includes(t));
+      if (!sub) continue;
+      const sc = _crossRunScore(ex, incoming[i]);
+      if (sc >= 2 && sc > bestScore) { best = ex; bestScore = sc; }
+    }
+    if (best) { matchOf.set(i, best.id); usedExisting.add(best.id); }
+  }
+
+  // Stufe 3: Rename-Fallback (Name verschieden, starke Indizien).
+  for (let i = 0; i < incoming.length; i++) {
+    if (matchOf.has(i)) continue;
+    let best = null, bestScore = 2;
+    for (const ex of existingRows) {
+      if (usedExisting.has(ex.id)) continue;
+      const sc = _crossRunScore(ex, incoming[i]);
+      if (sc >= 3 && sc > bestScore) { best = ex; bestScore = sc; }
+    }
+    if (best) { matchOf.set(i, best.id); usedExisting.add(best.id); }
+  }
+
+  return matchOf;
+}
+
+// Pure-Compute der persistierbaren Figur-Felder (geteilt zwischen INSERT/UPDATE).
+function _figFields(f, idMaps) {
+  const zitate = Array.isArray(f.schluesselzitate) && f.schluesselzitate.length
+    ? JSON.stringify(f.schluesselzitate.filter(Boolean).slice(0, 5))
+    : null;
+  // erste_erwaehnung ist Freitext (kann Kapitel- ODER Seitenname sein).
+  // Auflösen: zuerst in den Kapiteln der Figur (figure_appearances) suchen,
+  // dann globaler Unambiguous-Match. Kein Name → null.
+  const ersteErwaehnung = _cleanRefName(f.erste_erwaehnung);
+  const erstPageId = resolveErstePageId(ersteErwaehnung, f.kapitel, idMaps);
+  const arcJson = (f.arc && typeof f.arc === 'object') ? JSON.stringify(f.arc)
+    : (typeof f.arc === 'string' && f.arc ? f.arc : null);
+  const entwicklungFlat = f.entwicklung || _arcToFlat(f.arc) || null;
+  return { zitate, ersteErwaehnung, erstPageId, arcJson, entwicklungFlat };
+}
+
+// Schreibt Tags + Kapitel-Vorkommen einer Figur (Caller löscht vorab bei Re-Write).
+function _writeFigChildren(insTag, insApp, fid, f, idMaps) {
+  for (const tag of (f.eigenschaften || [])) insTag.run(fid, tag);
+  for (const app of (f.kapitel || [])) {
+    const chapId = idMaps?.chNameToId?.[_cleanRefName(app.name)] ?? null;
+    if (chapId != null) insApp.run(fid, chapId, app.haeufigkeit || 1);
+  }
+}
+
+// Sammelt die Beziehungen einer Figur als {from, to, typ, ...}-Liste (fig_id-basiert).
+function _collectRelations(f, idMaps, out) {
+  for (const bz of (f.beziehungen || [])) {
+    const belegeArr = Array.isArray(bz.belege)
+      ? bz.belege.filter(b => b && (b.kapitel || b.seite))
+          .slice(0, 5)
+          .map(b => enrichBelegWithIds(b, idMaps))
+          .filter(b => b.kapitel || b.seite)
+      : [];
+    out.push({
+      from: f.id, to: bz.figur_id, typ: bz.typ,
+      beschreibung: bz.beschreibung || null,
+      machtverhaltnis: bz.machtverhaltnis ?? null,
+      belege: belegeArr.length ? JSON.stringify(belegeArr) : null,
+    });
+  }
+}
+
+/** Persistiert Figuren eines Buchs/Users. Gemeinsames Ziel aller Reconcile-Modi:
+ *  `figures.id` über Schreibvorgänge stabil halten, damit FK-Referenzen
+ *  (`plot_beat_figures`, `research_item_links`, manually_edited `figure_events` …)
+ *  erhalten bleiben — ein DELETE+INSERT kaskadiert sie weg.
+ *  Modi:
+ *   - **Reconcile identity** (`{ reconcile: true }`; Komplettanalyse): matcht per
+ *     Name/Indizien, weil die `fig_id` pro Analyse-Lauf frisch vergeben und NICHT
+ *     identitätsstabil ist. Matched → `stale=0` (re-detektiert). Verschwundene →
+ *     `stale=1` statt Löschen (`onMissing: 'stale'`).
+ *   - **Reconcile figId** (`{ reconcile: true, matchBy: 'figId', onMissing: 'delete' }`;
+ *     Manual-Edit-CRUD `PUT /figures/:book_id`): matcht per exakter `fig_id` (round-trippt
+ *     stabil durch GET→PUT), behaltene Figuren behalten `id` + ihren stale-Stand;
+ *     im Katalog entfernte werden gelöscht (User autoritativ).
+ *   - **Legacy Full-Replace** (Default, kein `reconcile`; Buch-Import): löscht alle
+ *     Figuren + Beziehungen und legt sie neu an. Korrekt für frische Bücher, wo es
+ *     nichts zu reconcilen gibt. */
+function saveFigurenToDb(bookId, figuren, userEmail, idMaps, opts = {}) {
+  const em = userEmail || null;
+  if (opts.reconcile === true) {
+    return _reconcileFiguren(bookId, figuren, em, idMaps, opts);
+  }
   db.transaction(() => {
     if (userEmail) {
       db.prepare('DELETE FROM figures WHERE book_id = ? AND user_email = ?').run(bookId, userEmail);
@@ -143,52 +296,167 @@ function saveFigurenToDb(bookId, figuren, userEmail, idMaps) {
 
     for (let i = 0; i < figuren.length; i++) {
       const f = figuren[i];
-      const zitate = Array.isArray(f.schluesselzitate) && f.schluesselzitate.length
-        ? JSON.stringify(f.schluesselzitate.filter(Boolean).slice(0, 5))
-        : null;
-      // erste_erwaehnung ist Freitext (kann Kapitel- ODER Seitenname sein).
-      // Auflösen: zuerst in den Kapiteln der Figur (figure_appearances) suchen,
-      // dann globaler Unambiguous-Match. Kein Name → null.
-      const ersteErwaehnung = _cleanRefName(f.erste_erwaehnung);
-      const erstPageId = resolveErstePageId(ersteErwaehnung, f.kapitel, idMaps);
-      const arcJson = (f.arc && typeof f.arc === 'object') ? JSON.stringify(f.arc)
-        : (typeof f.arc === 'string' && f.arc ? f.arc : null);
-      const entwicklungFlat = f.entwicklung || _arcToFlat(f.arc) || null;
+      const v = _figFields(f, idMaps);
       const { lastInsertRowid: fid } = insFig.run(
         bookId, f.id, f.name, f.kurzname || null, f.typ || null,
         f.geburtstag || null, f.geschlecht || null, f.beruf || null,
         f.wohnadresse || null, f.aeusseres || null, f.stimme || null, f.hintergrund || null,
         f.beschreibung || null, f.sozialschicht || null,
         f.praesenz || null, f.rolle || null, f.motivation || null, f.konflikt || null,
-        entwicklungFlat, arcJson, ersteErwaehnung, erstPageId, zitate,
-        i, userEmail || null
+        v.entwicklungFlat, v.arcJson, v.ersteErwaehnung, v.erstPageId, v.zitate,
+        i, em
       );
       figIdToRowId[f.id] = fid;
-      for (const tag of (f.eigenschaften || [])) insTag.run(fid, tag);
-      for (const app of (f.kapitel || [])) {
-        const chapId = idMaps?.chNameToId?.[_cleanRefName(app.name)] ?? null;
-        if (chapId != null) insApp.run(fid, chapId, app.haeufigkeit || 1);
-      }
-      for (const bz of (f.beziehungen || [])) {
-        const belegeArr = Array.isArray(bz.belege)
-          ? bz.belege.filter(b => b && (b.kapitel || b.seite))
-              .slice(0, 5)
-              .map(b => enrichBelegWithIds(b, idMaps))
-              .filter(b => b.kapitel || b.seite)
-          : [];
-        allRelations.push({
-          from: f.id, to: bz.figur_id, typ: bz.typ,
-          beschreibung: bz.beschreibung || null,
-          machtverhaltnis: bz.machtverhaltnis ?? null,
-          belege: belegeArr.length ? JSON.stringify(belegeArr) : null,
-        });
-      }
+      _writeFigChildren(insTag, insApp, fid, f, idMaps);
+      _collectRelations(f, idMaps, allRelations);
     }
     for (const r of dedupRelations(allRelations, validIds)) {
       const fromId = figIdToRowId[r.from];
       const toId   = figIdToRowId[r.to];
       if (fromId == null || toId == null) continue;
-      insRel.run(bookId, fromId, toId, r.typ, r.beschreibung, r.machtverhaltnis, r.belege, userEmail || null);
+      insRel.run(bookId, fromId, toId, r.typ, r.beschreibung, r.machtverhaltnis, r.belege, em);
+    }
+  })();
+}
+
+// fig_id-basiertes Matching (Manual-Edit-CRUD): die `fig_id` round-trippt stabil
+// durch GET→PUT, ist hier also die autoritative Identität. Greedy, jede Bestands-
+// Figur höchstens einmal. Gibt Map(incomingIndex → existingId) zurück.
+function _matchFigurenByFigId(existingRows, incoming) {
+  const byFigId = new Map(existingRows.map(ex => [ex.fig_id, ex.id]));
+  const matchOf = new Map();
+  const used = new Set();
+  for (let i = 0; i < incoming.length; i++) {
+    const exId = byFigId.get(incoming[i].id);
+    if (exId != null && !used.has(exId)) { matchOf.set(i, exId); used.add(exId); }
+  }
+  return matchOf;
+}
+
+// Reconcile-Pfad: siehe saveFigurenToDb-Doku.
+//   matchBy 'identity' (Default, Komplettanalyse): Name/Indizien-Match; matched →
+//     stale=0 (re-detektiert = aktiv); fig_id wird auf den frischen Lauf-Wert gesetzt.
+//   matchBy 'figId' (Manual-Edit): exakter fig_id-Match; matched behält seinen
+//     stale-Stand (User kuratiert, kein Re-Detektions-Signal).
+function _reconcileFiguren(bookId, figuren, em, idMaps, opts) {
+  const onMissing = opts.onMissing === 'stale' ? 'stale' : 'delete';
+  const matchBy = opts.matchBy === 'figId' ? 'figId' : 'identity';
+  const keepStale = matchBy === 'figId';
+  db.transaction(() => {
+    // 1. Bestand laden (inkl. Match-Felder + Kapitelnamen). Auch stale-Figuren sind
+    //    Match-Kandidaten — eine wiederaufgetauchte Figur soll revived werden.
+    const existingRows = db.prepare(
+      'SELECT id, fig_id, name, kurzname, beruf, geburtstag, geschlecht, typ FROM figures WHERE book_id = ? AND user_email IS ?'
+    ).all(bookId, em);
+    const chapRows = db.prepare(`
+      SELECT fa.figure_id AS fid, c.chapter_name AS cname
+      FROM figure_appearances fa
+      JOIN figures f ON f.id = fa.figure_id
+      JOIN chapters c ON c.chapter_id = fa.chapter_id
+      WHERE f.book_id = ? AND f.user_email IS ?`).all(bookId, em);
+    const chaptersByFig = new Map();
+    for (const r of chapRows) {
+      if (!chaptersByFig.has(r.fid)) chaptersByFig.set(r.fid, new Set());
+      chaptersByFig.get(r.fid).add(r.cname);
+    }
+    for (const ex of existingRows) ex.chapters = chaptersByFig.get(ex.id) || new Set();
+
+    // 2. Match neue → bestehende.
+    const matchOf = matchBy === 'figId'
+      ? _matchFigurenByFigId(existingRows, figuren)
+      : _matchFiguren(existingRows, figuren);
+    const matchedExisting = new Set([...matchOf.values()]);
+
+    // 3. Verschwundene (nicht wiedergefundene) Bestands-Figuren behandeln.
+    const missing = existingRows.filter(ex => !matchedExisting.has(ex.id));
+    if (onMissing === 'stale') {
+      // Markieren + fig_id aus dem 'fig_N'-Namespace ziehen (kollisionsfrei mit
+      // den frisch vergebenen Lauf-IDs). 'orphan_<id>' ist stabil & eindeutig.
+      const markStale = db.prepare("UPDATE figures SET stale = 1, fig_id = 'orphan_' || id WHERE id = ?");
+      for (const ex of missing) markStale.run(ex.id);
+    } else {
+      const delFig = db.prepare('DELETE FROM figures WHERE id = ?');
+      for (const ex of missing) delFig.run(ex.id);
+    }
+
+    // 4. Matched-Figuren transient auf 'tmp_<id>' umbenennen, damit das finale
+    //    Umnummerieren auf die Lauf-fig_ids nicht in UNIQUE(book_id,fig_id,user_email)
+    //    läuft (zwei Figuren tauschen ihre fig_ids).
+    const tmpRename = db.prepare("UPDATE figures SET fig_id = 'tmp_' || id WHERE id = ?");
+    for (const exId of matchedExisting) tmpRename.run(exId);
+
+    // 5. Reine Analyse-Beziehungen komplett neu aufbauen (keine externen FKs darauf).
+    db.prepare('DELETE FROM figure_relations WHERE book_id = ? AND user_email IS ?').run(bookId, em);
+
+    const insFig = db.prepare(`
+      INSERT INTO figures
+        (book_id, fig_id, name, kurzname, typ, geburtstag, geschlecht, beruf, wohnadresse, aeusseres, stimme, hintergrund,
+         beschreibung, sozialschicht, praesenz, rolle, motivation, konflikt, entwicklung, arc,
+         erste_erwaehnung, erste_erwaehnung_page_id, schluesselzitate, sort_order, user_email, stale, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ${NOW_ISO_SQL})`);
+    // Zwei UPDATE-Varianten: identity-Match setzt stale=0 (re-detektiert), figId-Match
+    // lässt stale unangetastet (User kuratiert; eine orphan-Figur bleibt orphan).
+    const _updCols = `
+        fig_id = ?, name = ?, kurzname = ?, typ = ?, geburtstag = ?, geschlecht = ?, beruf = ?,
+        wohnadresse = ?, aeusseres = ?, stimme = ?, hintergrund = ?, beschreibung = ?, sozialschicht = ?,
+        praesenz = ?, rolle = ?, motivation = ?, konflikt = ?, entwicklung = ?, arc = ?,
+        erste_erwaehnung = ?, erste_erwaehnung_page_id = ?, schluesselzitate = ?, sort_order = ?`;
+    const updFigResetStale = db.prepare(`UPDATE figures SET ${_updCols}, stale = 0, updated_at = ${NOW_ISO_SQL} WHERE id = ?`);
+    const updFigKeepStale  = db.prepare(`UPDATE figures SET ${_updCols}, updated_at = ${NOW_ISO_SQL} WHERE id = ?`);
+    const updFig = keepStale ? updFigKeepStale : updFigResetStale;
+    const delTag = db.prepare('DELETE FROM figure_tags WHERE figure_id = ?');
+    const delApp = db.prepare('DELETE FROM figure_appearances WHERE figure_id = ?');
+    const insTag = db.prepare('INSERT OR IGNORE INTO figure_tags (figure_id, tag) VALUES (?, ?)');
+    const insApp = db.prepare('INSERT OR IGNORE INTO figure_appearances (figure_id, chapter_id, haeufigkeit) VALUES (?, ?, ?)');
+    const insRel = db.prepare('INSERT INTO figure_relations (book_id, from_fig_id, to_fig_id, typ, beschreibung, machtverhaltnis, belege, user_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+
+    const validIds = new Set(figuren.map(f => f.id));
+    const allRelations = [];
+    const figIdToRowId = {};
+
+    for (let i = 0; i < figuren.length; i++) {
+      const f = figuren[i];
+      const v = _figFields(f, idMaps);
+      const existingId = matchOf.get(i);
+      let fid;
+      if (existingId != null) {
+        updFig.run(
+          f.id, f.name, f.kurzname || null, f.typ || null,
+          f.geburtstag || null, f.geschlecht || null, f.beruf || null,
+          f.wohnadresse || null, f.aeusseres || null, f.stimme || null, f.hintergrund || null,
+          f.beschreibung || null, f.sozialschicht || null,
+          f.praesenz || null, f.rolle || null, f.motivation || null, f.konflikt || null,
+          v.entwicklungFlat, v.arcJson, v.ersteErwaehnung, v.erstPageId, v.zitate,
+          i, existingId
+        );
+        fid = existingId;
+        // Analyse-Kinder neu schreiben (CASCADE-Kinder ohne externe Refs). Kapitel-
+        // Vorkommen nur clearen, wenn wir sie auch neu auflösen können (idMaps.chNameToId);
+        // im Manual-Edit-Pfad ohne idMaps bleiben die bestehenden appearances erhalten,
+        // statt die Kapitel-Badges still zu verlieren.
+        delTag.run(fid);
+        if (idMaps?.chNameToId) delApp.run(fid);
+      } else {
+        const r = insFig.run(
+          bookId, f.id, f.name, f.kurzname || null, f.typ || null,
+          f.geburtstag || null, f.geschlecht || null, f.beruf || null,
+          f.wohnadresse || null, f.aeusseres || null, f.stimme || null, f.hintergrund || null,
+          f.beschreibung || null, f.sozialschicht || null,
+          f.praesenz || null, f.rolle || null, f.motivation || null, f.konflikt || null,
+          v.entwicklungFlat, v.arcJson, v.ersteErwaehnung, v.erstPageId, v.zitate,
+          i, em
+        );
+        fid = r.lastInsertRowid;
+      }
+      figIdToRowId[f.id] = fid;
+      _writeFigChildren(insTag, insApp, fid, f, idMaps);
+      _collectRelations(f, idMaps, allRelations);
+    }
+    for (const r of dedupRelations(allRelations, validIds)) {
+      const fromId = figIdToRowId[r.from];
+      const toId   = figIdToRowId[r.to];
+      if (fromId == null || toId == null) continue;
+      insRel.run(bookId, fromId, toId, r.typ, r.beschreibung, r.machtverhaltnis, r.belege, em);
     }
   })();
 }

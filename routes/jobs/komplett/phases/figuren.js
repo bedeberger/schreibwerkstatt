@@ -77,8 +77,12 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
   if (backfilled > 0) log.info(`${backfilled} Figur(en) aus Szenen/Events nachgetragen (Phase-1-Recall-Lücke).`);
   const reassignedIds = ensureUniqueFigIds(figuren, log);
   if (reassignedIds > 0) log.warn(`${reassignedIds} kollidierende/leere Figuren-IDs neu vergeben (Schutz vor UNIQUE-Verletzung beim Speichern).`);
-  saveFigurenToDb(bookIdInt, figuren, email, idMaps);
-  log.info(`${figuren.length} Figuren gespeichert.`);
+  // Reconcile statt Full-Replace: bestehende figures.id per Name/Indizien-Match
+  // beibehalten, damit FK-Referenzen (Plot-Beats, Recherche, manuell editierte
+  // Events …) die Re-Analyse überleben. Verschwundene Figuren werden stale-markiert,
+  // nicht gelöscht.
+  saveFigurenToDb(bookIdInt, figuren, email, idMaps, { reconcile: true, onMissing: 'stale' });
+  log.info(`${figuren.length} Figuren gespeichert (reconciled, id-stabil).`);
   try {
     const { figures: figCount, pagesProcessed } = recomputeBookFigureMentions(bookIdInt, email);
     log.info(`Figuren-Mentions aktualisiert (${figCount} Figuren × ${pagesProcessed} Seiten).`);

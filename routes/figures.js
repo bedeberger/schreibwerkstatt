@@ -426,6 +426,7 @@ router.get('/:book_id', (req, res) => {
     }
     return {
       id: f.fig_id,
+      stale: !!f.stale,
       name: f.name,
       kurzname: f.kurzname,
       typ: f.typ,
@@ -468,7 +469,10 @@ router.put('/:book_id', jsonBody, (req, res) => {
   const userEmail = req.session?.user?.email || null;
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
-  saveFigurenToDb(bookId, req.body.figuren || [], userEmail);
+  // Reconcile per fig_id (round-trippt stabil durch GET→PUT): behaltene Figuren
+  // behalten ihre figures.id → externe Referenzen (Plot/Recherche/Events) überleben
+  // den manuellen Save. Im Katalog entfernte Figuren werden gelöscht (User autoritativ).
+  saveFigurenToDb(bookId, req.body.figuren || [], userEmail, null, { reconcile: true, matchBy: 'figId', onMissing: 'delete' });
   // Response sofort – Mentions-Neuberechnung läuft im Hintergrund. Auf grossen Büchern
   // (>500 Seiten × >50 Figuren) braucht der Regex-Scan mehrere Sekunden.
   res.json({ ok: true });

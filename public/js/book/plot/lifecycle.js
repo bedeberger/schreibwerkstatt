@@ -76,6 +76,7 @@ export const lifecycleMethods = {
     this.addingThread = false;
     this.newThreadName = '';
     this.threadColorPickerId = null;
+    this.threadActionsOpenId = null;
     this._dragBeatId = null;
     this.brainstormResult = null;
     this.brainstormActId = null;

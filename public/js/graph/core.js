@@ -13,7 +13,7 @@ export const coreMethods = {
   },
 
   figurenHasFamilyEdges() {
-    for (const f of (window.__app.figuren || [])) {
+    for (const f of this._graphFiguren()) {
       for (const bz of (f.beziehungen || [])) {
         if (['elternteil', 'kind', 'geschwister'].includes(bz.typ)) return true;
       }
@@ -40,7 +40,7 @@ export const coreMethods = {
   async renderFigurGraph() {
     const container = document.getElementById('figuren-graph');
     if (!container) return;
-    const figuren = window.__app.figuren;
+    const figuren = this._graphFiguren();
 
     // .Network statt nur window.vis prüfen: erst wenn das vis-network-Bundle
     // wirklich geladen ist, lässt sich `new vis.Network` aufrufen.

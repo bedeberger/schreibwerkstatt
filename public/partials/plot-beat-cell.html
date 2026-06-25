@@ -56,9 +56,15 @@
 
 <!-- Bearbeiten -->
 <template x-if="editingBeatId === beat.id">
-  <div class="plot-beat-edit">
+  <!-- Klick ausserhalb speichert den Beat und schliesst ihn. Guard editingBeatId
+       === beat.id: beim Wechsel auf einen anderen Beat hat dessen startEditBeat
+       den Wert schon umgesetzt, sodass dieser alte Handler nicht gegen-speichert.
+       (Escape verwirft weiterhin via cancelEditBeat.) -->
+  <div class="plot-beat-edit"
+       @click.outside="editingBeatId === beat.id && commitEditBeat(beat)">
     <input type="text" class="plot-beat-edit-titel" x-model="beatDraft.titel"
            data-spellcheck="spelling" :placeholder="$app.t('plot.beat.titelPlaceholder')"
+           @keydown.enter.prevent="commitEditBeat(beat)"
            @keydown.escape="cancelEditBeat()">
     <textarea class="plot-beat-edit-desc" x-model="beatDraft.beschreibung" rows="3"
               data-spellcheck="spelling" :placeholder="$app.t('plot.beat.descPlaceholder')"></textarea>

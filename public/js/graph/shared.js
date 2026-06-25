@@ -13,6 +13,14 @@ import {
 // Gemeinsame Methoden: Typ-Color, Node-Basis, Edge-Bau, Tooltip, Kapitel-Filter.
 // Werden in graphMethods gespreaded und nutzen `this`-Refs aus Card.
 export const sharedMethods = {
+  // Figuren-Quelle für alle Graph-Ansichten: verwaiste (stale) Figuren werden
+  // ausgeblendet. Sie stehen nicht mehr im Text und würden sonst als
+  // beziehungslose Geister-Knoten den Graph verschmutzen (ihre kapitel-Belege
+  // bleiben erhalten). Im Figuren-Katalog bleiben sie — mit Badge — sichtbar.
+  _graphFiguren() {
+    return (window.__app.figuren || []).filter(f => !f.stale);
+  },
+
   _figTypColor(typ) {
     return TYP_COLOR[typ] || TYP_COLOR.andere;
   },
@@ -36,7 +44,7 @@ export const sharedMethods = {
     this.figurenGraphKapitel = ch;
     if (!this._figurenNodes || !this._figurenEdges) return;
 
-    const figuren = window.__app.figuren;
+    const figuren = this._graphFiguren();
     const existingIds = new Set(this._figurenNodes.getIds());
     const activeIds = new Set(
       ch ? figuren.filter(f => (f.kapitel || []).some(k => k.name === ch)).map(f => f.id)
@@ -77,7 +85,7 @@ export const sharedMethods = {
   },
 
   _buildEdges(soziogrammModus) {
-    const figuren = window.__app.figuren;
+    const figuren = this._graphFiguren();
     // id→Figur einmal indizieren (String-Keys: bz.figur_id und f.id sind beide der
     // TEXT-fig_id, die Normalisierung deckt Alt-Daten mit Zahl-IDs mit ab).
     const byId = new Map(figuren.map(f => [String(f.id), f]));
@@ -138,7 +146,7 @@ export const sharedMethods = {
     const tip = document.getElementById('figur-tooltip');
     if (!tip) return;
     // id→Figur einmal pro Render indizieren (Hover-Handler statt O(F)-find).
-    const byId = new Map((window.__app.figuren || []).map(f => [f.id, f]));
+    const byId = new Map(this._graphFiguren().map(f => [f.id, f]));
 
     const showTipAt = (html, clientX, clientY) => {
       tip.innerHTML = html;

@@ -141,6 +141,15 @@ test('pickCenterBlock: leere Liste → null', () => {
   assert.equal(pickCenterBlock({ top: 0, bottom: 100, height: 100 }, []), null);
 });
 
+test('pickCenterBlock: Pool nicht leer, ALLE Höhe 0 → null', () => {
+  // Genau der transiente Fall hinter „Hervorhebung weg": das IO-Set enthält
+  // Einträge, die gerade abgehängt / collapsed sind (Höhe 0). Alle werden
+  // übersprungen → kein Treffer.
+  const containerRect = { top: 0, bottom: 100, height: 100 };
+  const blocks = [mkRectEl(10, 10), mkRectEl(50, 50), mkRectEl(90, 90)];
+  assert.equal(pickCenterBlock(containerRect, blocks), null);
+});
+
 test('pickCenterBlock: Tie → erster Fund (stable)', () => {
   const containerRect = { top: 0, bottom: 100, height: 100 }; // Mitte = 50
   const a = mkRectEl(40, 60);
@@ -171,6 +180,32 @@ test('findBlockAtViewportCenter: visibleBlocks bevorzugt', () => {
   };
   const got = findBlockAtViewportCenter(container, visible);
   assert.equal(got, [...visible][0]);
+});
+
+test('findBlockAtViewportCenter: visibleBlocks alle Höhe 0 → QSA-Fallback statt null', () => {
+  // Regression gegen den intermittierenden „Hervorhebung weg"-Bug: das IO-Set
+  // ist nicht leer, hält aber nur Höhe-0-Einträge (transiente Mutation / nicht
+  // ge-unobserve'te removed Node). Früher gab pickCenterBlock null zurück und
+  // es gab KEINEN QSA-Fallback → block===null → setActiveBlock clear't alles.
+  // Jetzt muss der vollständige QSA-Scan den sichtbaren Absatz liefern.
+  const onScreen = mkRectEl(40, 60);
+  const visibleAllZero = new Set([mkRectEl(50, 50), mkRectEl(70, 70)]);
+  const container = {
+    getBoundingClientRect: () => ({ top: 0, bottom: 100, height: 100 }),
+    querySelectorAll: () => [onScreen],
+  };
+  assert.equal(findBlockAtViewportCenter(container, visibleAllZero), onScreen);
+});
+
+test('findBlockAtViewportCenter: visibleBlocks Höhe 0 UND QSA leer → null', () => {
+  // Kein sichtbarer Block irgendwo → legitimes null (z.B. komplett leerer
+  // Container). Der Fallback rettet nichts, was nicht da ist.
+  const visibleAllZero = new Set([mkRectEl(50, 50)]);
+  const container = {
+    getBoundingClientRect: () => ({ top: 0, bottom: 100, height: 100 }),
+    querySelectorAll: () => [],
+  };
+  assert.equal(findBlockAtViewportCenter(container, visibleAllZero), null);
 });
 
 // --- computeTypewriterDelta -------------------------------------------------

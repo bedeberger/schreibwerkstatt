@@ -133,7 +133,14 @@
                           x-text="threadFigureLabel(row.lane.thread)"></span>
                     <span class="plot-swim-lane-ownacts" x-show="threadHasOwnActs(row.lane.id)" x-text="$app.t('plot.thread.ownActs')"></span>
                   </div>
-                  <div class="plot-swim-lane-actions">
+                  <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-swim-lane-toggle"
+                          :class="{ 'plot-icon-btn--on': threadActionsOpenId === row.lane.id }"
+                          @click="toggleThreadActions(row.lane.id)"
+                          :aria-expanded="threadActionsOpenId === row.lane.id"
+                          :data-tip="$app.t('plot.thread.actions')" :aria-label="$app.t('plot.thread.actions')">
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#more-horizontal"/></svg>
+                  </button>
+                  <div class="plot-swim-lane-actions" :class="{ 'plot-swim-lane-actions--open': threadActionsOpenId === row.lane.id }">
                     <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveThread(row.lane.thread, -1)" :data-tip="$app.t('plot.thread.moveUp')" :aria-label="$app.t('plot.thread.moveUp')">
                       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-up"/></svg>
                     </button>

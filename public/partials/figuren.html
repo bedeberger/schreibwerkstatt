@@ -142,9 +142,10 @@
 
     <template x-for="f in filteredFiguren()" :key="f.id">
       <div>
-        <div class="figur-item" :data-figid="f.id" @click="$app.selectedFigurId = $app.selectedFigurId === f.id ? null : f.id;">
+        <div class="figur-item" :class="{ 'figur-item--stale': f.stale }" :data-figid="f.id" @click="$app.selectedFigurId = $app.selectedFigurId === f.id ? null : f.id;">
           <span class="figur-typ-dot" :class="'figur-typ-dot--' + (f.typ || 'unknown')"></span>
           <span class="figur-name" x-text="f.name"></span>
+          <span x-show="f.stale" class="tag tag--stale" :data-tip="$app.t('figuren.staleHint')" x-text="$app.t('figuren.staleBadge')"></span>
           <span class="tag" x-text="$app.t('figuren.type.' + f.typ)"></span>
           <span x-show="$app.figurJahrLabel(f)" class="tag" x-text="$app.figurJahrLabel(f)"></span>
           <span x-show="f.geburtstag" class="tag" x-text="'* ' + f.geburtstag"></span>

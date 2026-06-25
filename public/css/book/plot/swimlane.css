@@ -168,6 +168,12 @@
   .plot-swim-lane-chapter { font-size: var(--font-size-micro); color: var(--color-muted); cursor: pointer; }
   .plot-swim-lane-chapter:hover { color: var(--color-text); }
   .plot-swim-lane-actions { display: flex; flex-wrap: wrap; flex: 1 0 100%; justify-content: flex-start; margin-top: var(--space-2xs); }
+  /* Mobile-Kebab: auf Desktop blenden wir den Toggle aus und zeigen die Aktionen
+     permanent. Auf engen Spalten (Media-Query unten) klappt er sie hinter ein
+     einzelnes „⋯", damit die Lane nicht zwei Icon-Reihen hoch wird.
+     Selektor mit `.plot-swim-lane-view` davor (0,2,0): schlägt `.icon-btn--ghost`
+     (0,1,0, gleiche Layer) sicher — unabhängig von der Link-Reihenfolge. */
+  .plot-swim-lane-view .plot-swim-lane-toggle { display: none; flex: 0 0 auto; }
   .plot-swim-lane-edit { display: flex; flex-direction: column; gap: var(--space-xs); width: 100%; }
   .plot-thread-name-input {
     width: 100%;
@@ -277,6 +283,13 @@
 
   /* ── Mobile: engere Spuren, Grid bleibt horizontal scrollbar (2D-Struktur) ─ */
   @media (max-width: 600px) {
-    .plot-swim { --lane-w: 132px; --cell-w: 220px; }
+    /* Lane + eine Zelle (108 + 200) passen so in eine typische Telefonbreite. */
+    .plot-swim { --lane-w: 108px; --cell-w: 200px; }
+    /* Lane-Aktionen hinter den Kebab klappen: standardmässig versteckt, nur die
+       aktiv aufgeklappte Lane (threadActionsOpenId) zeigt sie. Spart die zweite
+       Icon-Reihe pro Strang. */
+    .plot-swim-lane-view .plot-swim-lane-toggle { display: inline-flex; }
+    .plot-swim-lane-actions { display: none; }
+    .plot-swim-lane-actions--open { display: flex; }
   }
 }

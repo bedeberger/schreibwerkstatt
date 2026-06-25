@@ -4,7 +4,7 @@ import { escHtml } from '../utils.js';
 // innerHTML mit escHtml() — Escape-Invariante aus harten Regeln eingehalten.
 export const familiengraphMethods = {
   _renderFamiliengraph(container) {
-    const figuren = window.__app.figuren;
+    const figuren = this._graphFiguren();
     const { edgeList } = this._buildEdges(/* soziogrammModus */ false);
     const familyEdges = edgeList.filter(e => ['elternteil', 'kind', 'geschwister'].includes(e.typ));
     if (!familyEdges.length) {

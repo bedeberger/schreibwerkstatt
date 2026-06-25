@@ -96,10 +96,18 @@ export function pickCenterBlock(containerRect, blocks) {
 
 export function findBlockAtViewportCenter(container, visibleBlocks, blockSel = BLOCK_SEL) {
   if (!container) return null;
-  const pool = (visibleBlocks && visibleBlocks.size > 0)
-    ? visibleBlocks
-    : container.querySelectorAll(blockSel);
-  return pickCenterBlock(container.getBoundingClientRect(), pool);
+  const containerRect = container.getBoundingClientRect();
+  // Bevorzugt das IO-getrackte Set (günstig, keine QSA). ABER: das Set kann
+  // transient nur Höhe-0/abgehängte Einträge halten (Mutation vor IO-Callback,
+  // oder eine entfernte Node, die noch nicht ge-unobserve't wurde) — dann liefert
+  // pickCenterBlock null, obwohl on-screen valide Blöcke existieren. In dem Fall
+  // auf den vollständigen QSA-Scan zurückfallen, statt die Hervorhebung zu
+  // verlieren (block===null → setActiveBlock clear't alles).
+  if (visibleBlocks && visibleBlocks.size > 0) {
+    const fromVisible = pickCenterBlock(containerRect, visibleBlocks);
+    if (fromVisible) return fromVisible;
+  }
+  return pickCenterBlock(containerRect, container.querySelectorAll(blockSel));
 }
 
 // Räumt defensiv ALLE Active-Markierungen ab und setzt – falls gewünscht –
