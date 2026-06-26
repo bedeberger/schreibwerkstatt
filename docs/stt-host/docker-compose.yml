@@ -1,14 +1,28 @@
 # Self-hosted Speech-to-Text-Backend fuer das STT-Diktat-Feature
 # (siehe docs/stt.md). speaches (frueher faster-whisper-server) ist ein
 # OpenAI-kompatibler /v1/audio/transcriptions-Shim auf Basis von faster-whisper
-# (CTranslate2). Top-Modell fuer DE/EN: Systran/faster-whisper-large-v3.
+# (CTranslate2).
+#
+# Modell: deepdml/faster-whisper-large-v3-turbo-ct2 — fuer Kurzdiktat die beste
+# Wahl: ~4-8x schneller als large-v3 bei nahezu gleicher DE/EN-Qualitaet, passt
+# bequem auf eine mittlere GPU und ueberlebt GPU-Contention (z. B. paralleler
+# Bild-/TTS-Host). Maximale Qualitaet ohne Zeitdruck: Systran/faster-whisper-
+# large-v3 (langsamer, ~3 GB) — dann WHISPER__MODEL + PRELOAD_MODELS unten
+# umstellen.
+#
+# Zuverlaessigkeit (war das Hauptproblem auf Produktion):
+#   - PRELOAD_MODELS laedt das Modell beim Container-Start in die GPU.
+#   - WHISPER__TTL=-1 haelt es dort dauerhaft (KEIN Idle-Unload, Default 300 s).
+# Zusammen eliminiert das den Cold-Start: ohne diese beiden Settings entlaedt
+# speaches das Modell nach 5 Min Pause, und der naechste Diktat-Request laeuft
+# in den App-Timeout (Modell-Reload dauert Sekunden) → Segment verloren.
 #
 # Voraussetzung am Host: NVIDIA-Container-Toolkit (Test:
 #   docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi)
 #
 # Port 8001 (Host) -> 8000 (Container), damit der TTS-Host (docs/tts-host,
-# Port 8000) parallel laufen kann. Modelle werden beim ersten Request automatisch
-# nach hf-hub-cache geladen (large-v3 ~3 GB) und danach von dort bedient.
+# Port 8000) parallel laufen kann. Modelle werden in den hf-hub-cache geladen
+# (turbo ~1.6 GB) und danach von dort bedient.
 
 services:
   stt:
@@ -16,9 +30,26 @@ services:
     container_name: speaches
     ports:
       - "8001:8000"
+    environment:
+      # Standardmodell + Vorladen beim Start (kein Cold-Start beim ersten Diktat).
+      WHISPER__MODEL: deepdml/faster-whisper-large-v3-turbo-ct2
+      PRELOAD_MODELS: '["deepdml/faster-whisper-large-v3-turbo-ct2"]'
+      # Modell NIE entladen (Default 300 s Idle-Unload → Cold-Start-Timeouts).
+      WHISPER__TTL: "-1"
+      # int8_float16 spart VRAM bei minimalem Qualitaetsverlust; auf reichlich
+      # ausgestatteter GPU float16 setzen.
+      WHISPER__COMPUTE_TYPE: int8_float16
     volumes:
       - hf-hub-cache:/home/ubuntu/.cache/huggingface/hub
     restart: unless-stopped
+    # Health: Container gilt erst als "healthy", wenn der Modell-Endpunkt
+    # antwortet (Start-Phase deckt das initiale Modell-Laden ab).
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
     deploy:
       resources:
         reservations:

@@ -444,6 +444,11 @@
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.temperature.help')"></small>
       </label>
       <label>
+        <span x-text="$app.t('admin.settings.stt.upstreamTimeoutMs.label')"></span>
+        <input type="text" x-data="numInput({ integer: true, min: 5000, max: 120000 })" x-modelable="value" x-model="adminSettingsForm['stt.upstream_timeout_ms']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.upstreamTimeoutMs.help')"></small>
+      </label>
+      <label>
         <span x-text="$app.t('admin.settings.stt.vadSilenceMs.label')"></span>
         <input type="text" x-data="numInput({ integer: true, min: 200, max: 5000 })" x-modelable="value" x-model="adminSettingsForm['stt.vad.silence_ms']">
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.vadSilenceMs.help')"></small>

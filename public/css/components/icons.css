@@ -3,43 +3,52 @@
    Stroke/Fill werden hier auf dem konsumierenden <svg> deklariert; <use>
    creates a shadow tree that inherits via cascade. */
 
-.icon {
-  width: 1em;
-  height: 1em;
-  display: inline-block;
-  vertical-align: -0.125em;
-  flex-shrink: 0;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  pointer-events: none;
-}
+/* In @layer components wie jede andere components/*.css — sonst sind diese Regeln
+   unlayered und schlagen JEDE layered Komponentenregel (unlayered > jeder Layer,
+   unabhaengig von Spezifitaet). Insbesondere `button:has(> .icon)` wuerde sonst
+   jeden layered `display`-Override auf Icon-Buttons aushebeln (z.B. ein gezieltes
+   `display:none` zum Verstecken). Custom-Props bleiben unten unlayered (global). */
+@layer components {
 
-/* Groessen-Varianten (analog Lucide-Defaults). Optional —
-   meist genuegt font-size am Parent, .icon skaliert via 1em. */
-.icon--sm { font-size: 14px; stroke-width: 2.25; }
-.icon--md { font-size: 18px; }
-.icon--lg { font-size: 22px; stroke-width: 1.75; }
+  .icon {
+    width: 1em;
+    height: 1em;
+    display: inline-block;
+    vertical-align: -0.125em;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
 
-/* Button mit Icon + Text: inline-flex sorgt fuer konsistenten Gap und vertikale Achse. */
-button:has(> .icon) {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
-}
+  /* Groessen-Varianten (analog Lucide-Defaults). Optional —
+     meist genuegt font-size am Parent, .icon skaliert via 1em. */
+  .icon--sm { font-size: 14px; stroke-width: 2.25; }
+  .icon--md { font-size: 18px; }
+  .icon--lg { font-size: 22px; stroke-width: 1.75; }
 
-/* CSS-Pseudo-Icon: nutzt mask-image, damit currentColor weiterhin greift
-   (z.B. fuer .history-chevron, die rotieren).
-   Konsument setzt --icon: url("data:image/svg+xml,…"). */
-.icon-mask {
-  display: inline-block;
-  width: 1em;
-  height: 1em;
-  background-color: currentColor;
-  -webkit-mask: var(--icon) center / contain no-repeat;
-          mask: var(--icon) center / contain no-repeat;
+  /* Button mit Icon + Text: inline-flex sorgt fuer konsistenten Gap und vertikale Achse. */
+  button:has(> .icon) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+  }
+
+  /* CSS-Pseudo-Icon: nutzt mask-image, damit currentColor weiterhin greift
+     (z.B. fuer .history-chevron, die rotieren).
+     Konsument setzt --icon: url("data:image/svg+xml,…"). */
+  .icon-mask {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    background-color: currentColor;
+    -webkit-mask: var(--icon) center / contain no-repeat;
+            mask: var(--icon) center / contain no-repeat;
+  }
+
 }
 
 /* Reusable mask data URLs (Lucide-Pfade, ISC). Konsumieren via:

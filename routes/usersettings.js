@@ -98,7 +98,7 @@ router.get('/profile-stats', (req, res) => {
     .filter(r => r.role === 'owner')
     .map(r => r.book_id);
   const goalMin = getUser(email)?.daily_goal_minutes ?? null;
-  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0, today_writing_seconds: 0, daily_goal_minutes: goalMin, by_hour: [] };
+  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0, today_writing_seconds: 0, daily_goal_minutes: goalMin, by_hour: [], books_detail: [] };
   if (!owned.length) return res.json(empty);
   try {
     const ph = owned.map(() => '?').join(',');
@@ -141,6 +141,38 @@ router.get('/profile-stats', (req, res) => {
       FROM writing_hour WHERE user_email = ? AND book_id IN (${ph})
       GROUP BY hour ORDER BY hour ASC
     `).all(email, ...owned);
+    // Pro-Buch-Detail fuer die Ziel-Uebersicht: live geschriebener Umfang aus
+    // page_stats (Cache-Tabelle, kein Content-Store-Verstoss) + die drei
+    // Ziel-Felder aus book_settings (Settings, kein Buchinhalt). Buchnamen kommen
+    // im Frontend aus der Root-Buchliste (Content-Store-Regel). Es erscheinen
+    // ALLE eigenen Buecher (auch ohne Ziel / ohne Inhalt) — Left-Join-Semantik
+    // ueber `owned`, damit der Ueberblick vollstaendig ist.
+    const perBookRows = db.prepare(`
+      SELECT book_id,
+             COALESCE(SUM(chars), 0) AS chars,
+             COALESCE(SUM(words), 0) AS words,
+             COUNT(*)                AS pages
+      FROM page_stats WHERE book_id IN (${ph}) GROUP BY book_id
+    `).all(...owned);
+    const goalRows = db.prepare(`
+      SELECT book_id, daily_goal_chars, goal_target_chars, goal_deadline
+      FROM book_settings WHERE book_id IN (${ph})
+    `).all(...owned);
+    const perBookMap = new Map(perBookRows.map(r => [r.book_id, r]));
+    const goalMap = new Map(goalRows.map(r => [r.book_id, r]));
+    const booksDetail = owned.map((bid) => {
+      const c = perBookMap.get(bid) || {};
+      const g = goalMap.get(bid) || {};
+      return {
+        book_id: bid,
+        chars: c.chars || 0,
+        words: c.words || 0,
+        pages: c.pages || 0,
+        daily_goal_chars: g.daily_goal_chars ?? null,
+        goal_target_chars: g.goal_target_chars ?? null,
+        goal_deadline: g.goal_deadline ?? null,
+      };
+    });
     res.json({
       books:            owned.length,
       chapters:         snap?.chapters || 0,
@@ -154,6 +186,7 @@ router.get('/profile-stats', (req, res) => {
       today_writing_seconds: todayWt?.s || 0,
       daily_goal_minutes: goalMin,
       by_hour:          byHour,
+      books_detail:     booksDetail,
     });
   } catch (e) {
     logger.error('[me/profile-stats] DB-Fehler: ' + e.message, { user: email });

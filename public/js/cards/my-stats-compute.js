@@ -391,6 +391,73 @@ export function computeGoalAttainment(writingRows, goalMinutes, todaySeconds = n
   };
 }
 
+// Differenz b - a in Kalendertagen (ISO YYYY-MM-DD), TZ-frei via UTC.
+function isoDayDiff(aIso, bIso) {
+  const [ay, am, ad] = aIso.split('-').map(Number);
+  const [by, bm, bd] = bIso.split('-').map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
+
+// Pro-Buch-Ziel-Uebersicht: „auf welchem Buch wie viel geschrieben + Ziel erreicht?".
+// Quelle ist `books_detail` aus /me/profile-stats: pro eigenem Buch der live
+// geschriebene Umfang (chars/words/pages) + die Ziel-Felder aus book_settings
+// (goal_target_chars = Gesamtziel, goal_deadline = Frist, daily_goal_chars =
+// Tagesziel). Es zaehlt nur, was Inhalt ODER ein gesetztes Ziel hat — leere
+// Buecher ohne Ziel sind kein Ueberblick-Signal. Status pro Buch:
+//   'reached'  Gesamtziel erfuellt (chars >= Ziel)
+//   'overdue'  Frist abgelaufen, Ziel nicht erreicht
+//   'due'      Frist laeuft noch (daysRemaining >= 0)
+//   'open'     Ziel gesetzt, keine Frist
+//   'none'     kein Gesamtziel gesetzt
+// Namen werden im Card via _bookName aufgeloest (Content-Store-Regel).
+export function computeBookGoals(booksDetail, todayLocal = new Date()) {
+  const isoToday = localIsoDate(todayLocal);
+  const rows = (booksDetail || []).map((b) => {
+    const chars = Number(b.chars) || 0;
+    const goal = Number(b.goal_target_chars) || 0;
+    const hasGoal = goal > 0;
+    const deadline = b.goal_deadline || null;
+    const reached = hasGoal && chars >= goal;
+    const daysRemaining = deadline ? isoDayDiff(isoToday, deadline) : null;
+
+    let status;
+    if (!hasGoal) status = 'none';
+    else if (reached) status = 'reached';
+    else if (deadline && daysRemaining < 0) status = 'overdue';
+    else if (deadline) status = 'due';
+    else status = 'open';
+
+    return {
+      book_id: b.book_id,
+      chars,
+      words: Number(b.words) || 0,
+      pages: Number(b.pages) || 0,
+      normpages: Math.round(chars / 1500),
+      goal: hasGoal ? goal : null,
+      goalNormpages: hasGoal ? Math.round(goal / 1500) : null,
+      hasGoal,
+      reached,
+      remainingChars: hasGoal ? Math.max(0, goal - chars) : null,
+      // Fortschritt fuer den Balken auf 100 gedeckelt; pctRaw fuer die Zahl.
+      pct: hasGoal ? Math.min(100, Math.round((chars / goal) * 100)) : null,
+      pctRaw: hasGoal ? Math.round((chars / goal) * 100) : null,
+      dailyGoalChars: Number(b.daily_goal_chars) || null,
+      deadline,
+      daysRemaining,
+      status,
+    };
+  }).filter(r => r.chars > 0 || r.hasGoal);
+
+  // Default: Buecher mit Ziel zuerst (nach Fortschritt absteigend), dann der
+  // Rest nach Umfang. sortableTable kann im UI umsortieren.
+  rows.sort((a, b) => {
+    if (a.hasGoal !== b.hasGoal) return a.hasGoal ? -1 : 1;
+    if (a.hasGoal) return (b.pctRaw || 0) - (a.pctRaw || 0);
+    return b.chars - a.chars;
+  });
+  return rows;
+}
+
 // Aufwands-Aufteilung Schreiben vs. Ueberarbeiten (Sekunden → Prozent).
 export function computeEffortSplit(writingSeconds, lektoratSeconds) {
   const w = Math.max(0, Number(writingSeconds) || 0);

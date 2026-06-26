@@ -8,7 +8,8 @@ import { loadChart } from '../lazy-libs.js';
 import { tzOpts, localIsoDate, localIsoDaysAgo } from '../utils.js';
 import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones,
          computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
-         computeVolumeDelta, computeHourPattern, computeGoalAttainment, filterByWindow } from './my-stats-compute.js';
+         computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
+         filterByWindow } from './my-stats-compute.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -282,6 +283,29 @@ export function registerMyStatsCard() {
                                     this.myStatsData?.today_writing_seconds));
     },
     get myStatsHasGoal() { return this.myStatsGoal().active; },
+
+    // ── Pro-Buch-Ziele: geschriebener Umfang + Gesamtziel-Erreichung ─────────
+    // Lifetime-Bestand (kein Zeitraum-Filter): zeigt den aktuellen Stand pro
+    // Buch gegen das gesetzte Gesamtziel, daher aus dem Live-books_detail.
+    myStatsBookGoals() {
+      return this._memo('bookGoals', [this.myStatsData?.books_detail], () =>
+        computeBookGoals(this.myStatsData?.books_detail)
+          .map(r => ({ ...r, name: this._bookName(r.book_id) })));
+    },
+    get myStatsHasBookGoals() { return this.myStatsBookGoals().length > 0; },
+
+    // Frist lesbar (oder Gedankenstrich, wenn keine gesetzt).
+    myStatsDeadlineLabel(iso) { return iso ? this.myStatsDateLabel(iso) : '–'; },
+
+    // Status-Klartext pro Buch (erreicht / überfällig / Tage übrig / offen / kein Ziel).
+    myStatsGoalStatusLabel(row) {
+      const t = window.__app.t;
+      if (row.status === 'reached') return t('mystats.bookGoals.reached');
+      if (row.status === 'overdue') return t('mystats.bookGoals.overdue');
+      if (row.status === 'due')     return t('mystats.bookGoals.due', { n: row.daysRemaining });
+      if (row.status === 'open')    return t('mystats.bookGoals.open');
+      return t('mystats.bookGoals.none');
+    },
 
     // Zahl mit einer Nachkommastelle (Lesbarkeitswerte), Locale-aware.
     myStatsDec(n) {

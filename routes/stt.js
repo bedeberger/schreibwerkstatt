@@ -28,7 +28,18 @@ const { getBookLocale } = require('../db/schema');
 
 const router = express.Router();
 const AUDIO_MAX = 5 * 1024 * 1024; // 5 MB — kurze VAD-Segmente
-const UPSTREAM_TIMEOUT_MS = 15_000;
+const UPSTREAM_TIMEOUT_DEFAULT_MS = 30_000;
+const UPSTREAM_TIMEOUT_MIN_MS = 5_000;
+const UPSTREAM_TIMEOUT_MAX_MS = 120_000;
+
+// Upstream-Timeout aus App-Setting (self-hosted tunebar). Grosszuegig genug,
+// damit ein GPU-Cold-Start (Modell-Reload nach Idle) nicht als Timeout das
+// Segment verliert. Geclampt gegen Fehlkonfiguration.
+function upstreamTimeoutMs() {
+  const v = Number(appSettings.get('stt.upstream_timeout_ms'));
+  if (!Number.isFinite(v)) return UPSTREAM_TIMEOUT_DEFAULT_MS;
+  return Math.min(Math.max(v, UPSTREAM_TIMEOUT_MIN_MS), UPSTREAM_TIMEOUT_MAX_MS);
+}
 
 // Whitelist erlaubter Audio-Mimes → Datei-Extension fuer den Forward. Der
 // ffmpeg-basierte Whisper-Endpunkt dekodiert anhand der Extension/Mime.
@@ -96,7 +107,7 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
   const apiKey = String(appSettings.get('stt.api_key') || '').trim();
 
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), UPSTREAM_TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), upstreamTimeoutMs());
   const t0 = Date.now();
   try {
     const form = new FormData();

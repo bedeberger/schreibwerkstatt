@@ -174,8 +174,10 @@
 
 /* ── Tageszeit-Muster: 24 Balken statt 7 ─────────────────────────────────── */
 /* Erbt die .overview-weekday-*-Atome; nur das Spaltenraster + der dichtere
-   Abstand sind tageszeit-spezifisch. */
-.mystats-hour-bars {
+   Abstand sind tageszeit-spezifisch. Kompound-Selektor, damit das 24-Spalten-
+   Raster die 7-Spalten-Basis aus diary.css schlägt (gleiche Layer + Spezifität,
+   diary.css lädt später → würde sonst per Quell-Reihenfolge gewinnen). */
+.overview-weekday-bars.mystats-hour-bars {
   grid-template-columns: repeat(24, 1fr);
   gap: 2px;
 }
@@ -216,11 +218,69 @@
   margin: 0;
 }
 
+/* ── Pro-Buch-Ziele: Tabelle geschrieben vs. Gesamtziel ──────────────────── */
+/* Markup: public/partials/my-stats-book-goals.html. Status-Farben: erreicht =
+   --color-success, überfällig = --color-schwach (etablierter „schlecht"-Rot),
+   sonst gedämpft. Reuse: .progress-bar(-wrap) + .progress-bar--reached aus
+   book-overview/stats.css (global geladen). */
+.mystats-goals-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+.mystats-goals-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-muted);
+  padding: var(--space-2xs) var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+.mystats-goals-table td {
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+.mystats-goals-table tbody tr:last-child td { border-bottom: none; }
+.mystats-goals-num { text-align: right; white-space: nowrap; }
+.mystats-goals-table th.mystats-goals-num { text-align: right; }
+.mystats-goals-book { font-weight: 500; color: var(--color-text); }
+.mystats-goals-sub {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.mystats-goals-muted { color: var(--color-muted); }
+
+/* Fortschrittszelle: Balken + Prozentzahl nebeneinander. */
+.mystats-goals-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 140px;
+}
+.mystats-goals-progress .progress-bar-wrap { flex: 1; }
+.mystats-goals-pct {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.progress-bar--overdue { background: var(--color-schwach); }
+
+/* Status-Klartext pro Buch. */
+.mystats-goals-status { font-weight: 500; }
+.mystats-goals-status--reached { color: var(--color-success); }
+.mystats-goals-status--overdue { color: var(--color-schwach); }
+.mystats-goals-status--due,
+.mystats-goals-status--open { color: var(--color-text); }
+.mystats-goals-status--none { color: var(--color-muted); font-weight: 400; }
+
 @media (max-width: 600px) {
   .mystats-chart-wrap {
     height: 200px;
   }
   /* iOS: >= 16px verhindert Zoom-in beim Fokus der Datumsfelder. */
   .mystats-date-input { font-size: var(--font-size-reading); }
+  /* Tabelle scrollt horizontal (.table-scroll) statt zu quetschen. */
+  .mystats-goals-progress { min-width: 110px; }
 }
 }

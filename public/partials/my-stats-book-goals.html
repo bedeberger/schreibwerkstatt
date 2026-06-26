@@ -1,0 +1,74 @@
+<!-- Pro-Buch-Ziele: „auf welchem Buch wie viel geschrieben + Gesamtziel erreicht?".
+     Ausgelagert aus my-stats.html (250-LOC-Limit). display:contents-Wrapper
+     (.card--mystats .overview-grid > [id^="partial-my-stats-"]) → das Tile bleibt
+     direktes Grid-Child. Daten: myStatsBookGoals() (computeBookGoals). Logik +
+     Helfer in public/js/cards/my-stats-card.js / my-stats-compute.js. -->
+<template x-if="myStatsHasBookGoals">
+  <div class="overview-tile overview-tile--wide">
+    <div class="overview-tile-label" x-text="$app.t('mystats.bookGoals.title')"></div>
+    <div class="table-scroll">
+      <table class="mystats-goals-table"
+             x-data="sortableTable({
+               rows: () => myStatsBookGoals(),
+               defaultKey: 'pctRaw',
+               defaultDir: 'desc',
+               persistKey: 'mystats.bookGoals',
+               types: { chars: 'number', goal: 'number', pctRaw: 'number', daysRemaining: 'number' },
+             })">
+        <thead>
+          <tr>
+            <th class="sortable-th" :class="sortClass('name')" :aria-sort="ariaSort('name')"
+                @click="sortBy('name')" x-text="$app.t('mystats.bookGoals.book')"></th>
+            <th class="sortable-th mystats-goals-num" :class="sortClass('chars')" :aria-sort="ariaSort('chars')"
+                @click="sortBy('chars')" x-text="$app.t('mystats.bookGoals.written')"></th>
+            <th class="sortable-th mystats-goals-num" :class="sortClass('goal')" :aria-sort="ariaSort('goal')"
+                @click="sortBy('goal')" x-text="$app.t('mystats.bookGoals.goal')"></th>
+            <th class="sortable-th" :class="sortClass('pctRaw')" :aria-sort="ariaSort('pctRaw')"
+                @click="sortBy('pctRaw')" x-text="$app.t('mystats.bookGoals.progress')"></th>
+            <th class="sortable-th" :class="sortClass('daysRemaining')" :aria-sort="ariaSort('daysRemaining')"
+                @click="sortBy('daysRemaining')" x-text="$app.t('mystats.bookGoals.status')"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="row in sorted" :key="row.book_id">
+            <tr>
+              <td class="mystats-goals-book" x-text="row.name"></td>
+              <td class="mystats-goals-num">
+                <span x-text="_myStatsFmt(row.chars)"></span>
+                <span class="mystats-goals-sub" x-text="$app.t('mystats.bookGoals.normpages', { n: _myStatsFmt(row.normpages) })"></span>
+              </td>
+              <td class="mystats-goals-num">
+                <template x-if="row.hasGoal">
+                  <span>
+                    <span x-text="_myStatsFmt(row.goal)"></span>
+                    <span class="mystats-goals-sub" x-text="$app.t('mystats.bookGoals.normpages', { n: _myStatsFmt(row.goalNormpages) })"></span>
+                  </span>
+                </template>
+                <span x-show="!row.hasGoal" class="mystats-goals-muted">–</span>
+              </td>
+              <td>
+                <template x-if="row.hasGoal">
+                  <div class="mystats-goals-progress">
+                    <div class="progress-bar-wrap">
+                      <div class="progress-bar"
+                           :class="row.reached ? 'progress-bar--reached' : (row.status === 'overdue' ? 'progress-bar--overdue' : '')"
+                           :style="{ '--progress': row.pct + '%' }"></div>
+                    </div>
+                    <span class="mystats-goals-pct" x-text="row.pctRaw + '%'"></span>
+                  </div>
+                </template>
+                <span x-show="!row.hasGoal" class="mystats-goals-muted">–</span>
+              </td>
+              <td>
+                <span class="mystats-goals-status" :class="'mystats-goals-status--' + row.status"
+                      x-text="myStatsGoalStatusLabel(row)"></span>
+                <span class="mystats-goals-sub" x-show="row.deadline"
+                      x-text="myStatsDeadlineLabel(row.deadline)"></span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>

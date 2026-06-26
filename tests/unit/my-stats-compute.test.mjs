@@ -8,7 +8,8 @@ globalThis.window = { __app: { uiLocale: 'de' } };
 
 const { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones, secondsByDate,
         computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
-        computeVolumeDelta, computeHourPattern, computeGoalAttainment, filterByWindow } =
+        computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
+        filterByWindow } =
   await import('../../public/js/cards/my-stats-compute.js');
 
 import { localIsoDaysAgo } from '../../public/js/utils.js';
@@ -305,4 +306,73 @@ test('computeGoalAttainment: heute erreicht zaehlt in die Serie', () => {
   assert.equal(r.reachedToday, true);
   assert.equal(r.currentStreak, 2);
   assert.equal(r.progressPct, 100);
+});
+
+// ── computeBookGoals (Pro-Buch-Ziel-Übersicht) ──────────────────────────────
+test('computeBookGoals: Fortschritt, erreicht, gedeckelter Balken', () => {
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 60000, words: 9000, pages: 40, goal_target_chars: 50000, goal_deadline: null, daily_goal_chars: null },
+  ]);
+  assert.equal(rows.length, 1);
+  const r = rows[0];
+  assert.equal(r.hasGoal, true);
+  assert.equal(r.reached, true);
+  assert.equal(r.pctRaw, 120);   // ungedeckelt für die Zahl
+  assert.equal(r.pct, 100);      // gedeckelt für den Balken
+  assert.equal(r.remainingChars, 0);
+  assert.equal(r.status, 'reached');
+});
+
+test('computeBookGoals: Frist in der Zukunft → due mit daysRemaining', () => {
+  const today = new Date('2026-06-26T12:00:00');
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 10000, goal_target_chars: 50000, goal_deadline: '2026-07-06' },
+  ], today);
+  const r = rows[0];
+  assert.equal(r.status, 'due');
+  assert.equal(r.daysRemaining, 10);
+  assert.equal(r.remainingChars, 40000);
+  assert.equal(r.pctRaw, 20);
+});
+
+test('computeBookGoals: abgelaufene Frist + Ziel verfehlt → overdue', () => {
+  const today = new Date('2026-06-26T12:00:00');
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 10000, goal_target_chars: 50000, goal_deadline: '2026-06-20' },
+  ], today);
+  assert.equal(rows[0].status, 'overdue');
+  assert.equal(rows[0].daysRemaining, -6);
+});
+
+test('computeBookGoals: Ziel ohne Frist → open; Ziel erreicht schlägt Frist', () => {
+  const today = new Date('2026-06-26T12:00:00');
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 10000, goal_target_chars: 50000, goal_deadline: null },
+    { book_id: 2, chars: 60000, goal_target_chars: 50000, goal_deadline: '2026-06-20' },
+  ], today);
+  const byId = Object.fromEntries(rows.map(r => [r.book_id, r]));
+  assert.equal(byId[1].status, 'open');
+  assert.equal(byId[2].status, 'reached'); // erreicht, obwohl Frist abgelaufen
+});
+
+test('computeBookGoals: ohne Ziel → none, kein Fortschritt', () => {
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 12000, goal_target_chars: null, goal_deadline: null },
+  ]);
+  const r = rows[0];
+  assert.equal(r.hasGoal, false);
+  assert.equal(r.status, 'none');
+  assert.equal(r.pct, null);
+  assert.equal(r.goal, null);
+  assert.equal(r.normpages, 8); // 12000 / 1500
+});
+
+test('computeBookGoals: leere Bücher ohne Ziel fallen raus, Ziel-Bücher zuerst', () => {
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 0, goal_target_chars: null, goal_deadline: null },          // leer, kein Ziel → raus
+    { book_id: 2, chars: 30000, goal_target_chars: null, goal_deadline: null },      // Inhalt, kein Ziel
+    { book_id: 3, chars: 10000, goal_target_chars: 50000, goal_deadline: null },     // Ziel 20%
+    { book_id: 4, chars: 40000, goal_target_chars: 50000, goal_deadline: null },     // Ziel 80%
+  ]);
+  assert.deepEqual(rows.map(r => r.book_id), [4, 3, 2]); // Ziele zuerst (nach %), dann Rest
 });

@@ -30,11 +30,15 @@ const STT_CALIB_MS = 350;
 // Absatz-Erkennung: ist die Gesamt-Sprechpause >= silenceMs * Faktor, gilt die
 // Segmentgrenze als Absatzgrenze (neuer `<p>`) statt nur als Satzgrenze.
 const STT_PARAGRAPH_FACTOR = 2.5;
-// Segment-Retry: transiente Upstream-Fehler einmal wiederholen, bevor der
-// Fehler-Toast kommt (kein verlorener Satz bei kurzem Haenger).
-const STT_MAX_RETRY = 1;
-const STT_RETRY_DELAY_MS = 600;
-const STT_RETRYABLE_STATUS = new Set([408, 500, 502, 503]);
+// Segment-Retry: transiente Upstream-Fehler mehrfach mit exponentiellem Backoff
+// wiederholen, bevor der Fehler-Toast kommt — ein GPU-Cold-Start (Modell-Reload
+// nach Idle) oder kurzzeitige Backend-Last kostet so keinen Satz. Die Retries
+// laufen INNERHALB der insertChain (siehe _sttSendSegment) → Sprechreihenfolge
+// bleibt erhalten, spaetere Segmente warten nur mit dem Einfuegen.
+const STT_MAX_RETRY = 3;
+const STT_RETRY_DELAY_MS = 800; // Basis; Backoff = base * 2^attempt, gedeckelt
+const STT_RETRY_MAX_DELAY_MS = 6000;
+const STT_RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 // Bekannte Whisper-Halluzinationen bei stillen/unverstaendlichen Segmenten.
 // EXACT trifft nur, wenn das ganze (normalisierte) Segment der Phrase gleicht;
@@ -546,7 +550,7 @@ export const sttDictationMethods = {
     } catch (e) {
       if (signal?.aborted || e?.name === 'AbortError') return null; // Stop -> kein Toast/Retry
       if (attempt < STT_MAX_RETRY) {
-        await this._sttDelay(STT_RETRY_DELAY_MS, signal);
+        await this._sttDelay(this._sttRetryDelay(attempt), signal);
         return this._sttFetchTranscript(blob, mime, attempt + 1, signal);
       }
       this._sttToastFailed();
@@ -560,7 +564,7 @@ export const sttDictationMethods = {
     if (res.status === 401) { this._sttStop(); return null; }
     if (!res.ok) {
       if (STT_RETRYABLE_STATUS.has(res.status) && attempt < STT_MAX_RETRY) {
-        await this._sttDelay(STT_RETRY_DELAY_MS, signal);
+        await this._sttDelay(this._sttRetryDelay(attempt), signal);
         return this._sttFetchTranscript(blob, mime, attempt + 1, signal);
       }
       this._sttToastFailed();
@@ -575,6 +579,12 @@ export const sttDictationMethods = {
       this._sttToastFailed();
       return null;
     }
+  },
+
+  // Exponentieller Backoff fuer den Retry-Wait: base * 2^attempt, gedeckelt.
+  // Gibt dem Backend bei Last/Cold-Start zunehmend Zeit, statt es zu hetzen.
+  _sttRetryDelay(attempt) {
+    return Math.min(STT_RETRY_DELAY_MS * (2 ** attempt), STT_RETRY_MAX_DELAY_MS);
   },
 
   // Verzoegerung fuer Retry-Waits; loest beim Abort der Session sofort auf, damit
