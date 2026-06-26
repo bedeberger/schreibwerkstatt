@@ -327,7 +327,7 @@ test('computeBookGoals: Frist in der Zukunft → due mit daysRemaining', () => {
   const today = new Date('2026-06-26T12:00:00');
   const rows = computeBookGoals([
     { book_id: 1, chars: 10000, goal_target_chars: 50000, goal_deadline: '2026-07-06' },
-  ], today);
+  ], [], today);
   const r = rows[0];
   assert.equal(r.status, 'due');
   assert.equal(r.daysRemaining, 10);
@@ -339,7 +339,7 @@ test('computeBookGoals: abgelaufene Frist + Ziel verfehlt → overdue', () => {
   const today = new Date('2026-06-26T12:00:00');
   const rows = computeBookGoals([
     { book_id: 1, chars: 10000, goal_target_chars: 50000, goal_deadline: '2026-06-20' },
-  ], today);
+  ], [], today);
   assert.equal(rows[0].status, 'overdue');
   assert.equal(rows[0].daysRemaining, -6);
 });
@@ -349,10 +349,69 @@ test('computeBookGoals: Ziel ohne Frist → open; Ziel erreicht schlägt Frist',
   const rows = computeBookGoals([
     { book_id: 1, chars: 10000, goal_target_chars: 50000, goal_deadline: null },
     { book_id: 2, chars: 60000, goal_target_chars: 50000, goal_deadline: '2026-06-20' },
-  ], today);
+  ], [], today);
   const byId = Object.fromEntries(rows.map(r => [r.book_id, r]));
   assert.equal(byId[1].status, 'open');
   assert.equal(byId[2].status, 'reached'); // erreicht, obwohl Frist abgelaufen
+});
+
+test('computeBookGoals: Tagesziel = Live-Stand minus Vortags-Snapshot, geklemmt', () => {
+  const today = new Date('2026-06-26T12:00:00');
+  const history = [
+    { book_id: 1, recorded_at: '2026-06-24', chars: 11000 }, // älter
+    { book_id: 1, recorded_at: '2026-06-25', chars: 12000 }, // letzter Snapshot vor heute
+  ];
+  // Live 13500 − Vortags-Snapshot 12000 = 1500 heute geschrieben, Tagesziel 2000.
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 13500, goal_target_chars: 50000, daily_goal_chars: 2000 },
+  ], history, today);
+  const r = rows[0];
+  assert.equal(r.charsToday, 1500);
+  assert.equal(r.hasDailyGoal, true);
+  assert.equal(r.dailyGoalChars, 2000);
+  assert.equal(r.dailyReached, false);
+  assert.equal(r.dailyPct, 75);
+});
+
+test('computeBookGoals: Tagesziel erreicht', () => {
+  const today = new Date('2026-06-26T12:00:00');
+  const history = [{ book_id: 1, recorded_at: '2026-06-25', chars: 12000 }];
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 15000, daily_goal_chars: 2000 },
+  ], history, today);
+  assert.equal(rows[0].charsToday, 3000);
+  assert.equal(rows[0].dailyReached, true);
+  assert.equal(rows[0].dailyPct, 100);
+});
+
+test('computeBookGoals: ohne Vortags-Snapshot → charsToday 0 (nicht optimistisch)', () => {
+  const today = new Date('2026-06-26T12:00:00');
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 15000, daily_goal_chars: 2000 },
+  ], [], today);
+  assert.equal(rows[0].charsToday, 0);
+  assert.equal(rows[0].dailyReached, false);
+});
+
+test('computeBookGoals: Lösch-Edit heute → charsToday auf 0 geklemmt', () => {
+  const today = new Date('2026-06-26T12:00:00');
+  const history = [{ book_id: 1, recorded_at: '2026-06-25', chars: 12000 }];
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 11000, daily_goal_chars: 2000 }, // live < Vortag
+  ], history, today);
+  assert.equal(rows[0].charsToday, 0);
+});
+
+test('computeBookGoals: kein Tagesziel → hasDailyGoal false, charsToday trotzdem berechnet', () => {
+  const today = new Date('2026-06-26T12:00:00');
+  const history = [{ book_id: 1, recorded_at: '2026-06-25', chars: 12000 }];
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 12800, goal_target_chars: 50000, daily_goal_chars: null },
+  ], history, today);
+  assert.equal(rows[0].hasDailyGoal, false);
+  assert.equal(rows[0].dailyGoalChars, null);
+  assert.equal(rows[0].dailyPct, null);
+  assert.equal(rows[0].charsToday, 800); // informativ auch ohne Tagesziel
 });
 
 test('computeBookGoals: ohne Ziel → none, kein Fortschritt', () => {

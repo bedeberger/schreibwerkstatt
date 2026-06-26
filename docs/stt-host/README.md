@@ -41,15 +41,7 @@ Dann **„Whisper-Host prüfen"** (pingt `/v1/models`) → **„Diktat aktiv"**.
 
 ## Reverse-Proxy (NGINX vor der App)
 
-Audiosegmente gehen als rohes Binary an `/stt/transcribe`. Der NGINX-Default `client_max_body_size` (1 MB) kann längere Segmente **vor** der App mit `413` abweisen → intermittierende Ausfälle. Im App-Server-Block großzügig setzen (passend zum App-Cap von 5 MB):
-
-```nginx
-location /stt/ {
-    client_max_body_size 8m;
-    proxy_read_timeout   60s;   # > App-Upstream-Timeout (30 s)
-    # ... übrige proxy_pass-Direktiven
-}
-```
+Audiosegmente gehen als rohes Binary an `/stt/transcribe`. Der NGINX-Default `client_max_body_size` (1 MB) würde längere Segmente **vor** der App mit `413` abweisen → intermittierende Ausfälle. Die Standard-Konfiguration [deploy/nginx.conf](../../deploy/nginx.conf) deckt das bereits ab (globales `client_max_body_size 32m` ≫ App-Cap von 5 MB, `proxy_read_timeout 300s` ≫ App-Upstream-Timeout von 30 s) — kein eigener `/stt/`-Block nötig. Eine selbstgebaute Config muss das Limit entsprechend großzügig setzen.
 
 ## Schnelltest
 

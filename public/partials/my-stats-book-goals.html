@@ -13,7 +13,7 @@
                defaultKey: 'pctRaw',
                defaultDir: 'desc',
                persistKey: 'mystats.bookGoals',
-               types: { chars: 'number', goal: 'number', pctRaw: 'number', daysRemaining: 'number' },
+               types: { chars: 'number', goal: 'number', pctRaw: 'number', daysRemaining: 'number', charsToday: 'number' },
              })">
         <thead>
           <tr>
@@ -27,6 +27,8 @@
                 @click="sortBy('pctRaw')" x-text="$app.t('mystats.bookGoals.progress')"></th>
             <th class="sortable-th" :class="sortClass('daysRemaining')" :aria-sort="ariaSort('daysRemaining')"
                 @click="sortBy('daysRemaining')" x-text="$app.t('mystats.bookGoals.status')"></th>
+            <th class="sortable-th mystats-goals-num" :class="sortClass('charsToday')" :aria-sort="ariaSort('charsToday')"
+                @click="sortBy('charsToday')" x-text="$app.t('mystats.bookGoals.today')"></th>
           </tr>
         </thead>
         <tbody>
@@ -64,6 +66,18 @@
                       x-text="myStatsGoalStatusLabel(row)"></span>
                 <span class="mystats-goals-sub" x-show="row.deadline"
                       x-text="myStatsDeadlineLabel(row.deadline)"></span>
+              </td>
+              <td class="mystats-goals-num">
+                <template x-if="row.hasDailyGoal">
+                  <span :class="row.dailyReached ? 'mystats-goals-status--reached' : ''">
+                    <span x-text="$app.t('mystats.bookGoals.todayOf', { n: _myStatsFmt(row.charsToday), goal: _myStatsFmt(row.dailyGoalChars) })"></span>
+                    <span class="mystats-goals-sub" x-text="row.dailyPct + '%'"></span>
+                  </span>
+                </template>
+                <template x-if="!row.hasDailyGoal">
+                  <span :class="row.charsToday > 0 ? '' : 'mystats-goals-muted'"
+                        x-text="row.charsToday > 0 ? _myStatsFmt(row.charsToday) : '–'"></span>
+                </template>
               </td>
             </tr>
           </template>

@@ -90,14 +90,11 @@ Einmalige Prod-Anpassungen (Dateisystem-Cleanup, chown-Fixes, sqlite3-Touches) g
 
 ### Reverse-Proxy
 
-SSE braucht ungepufferte Verbindungen:
+Fertige, kommentierte NGINX-Konfiguration: [deploy/nginx.conf](deploy/nginx.conf) (TLS-Terminierung, HTTP→HTTPS-Redirect, ungepufferte SSE-Streams, ZIP-Import bis 200 MB, STT-Audio, Long-Cache für Vendor/Fonts). `<DOMAIN>` + Zertifikatspfade ersetzen, nach `/etc/nginx/sites-available/` kopieren, symlinken, `nginx -t && systemctl reload nginx`.
 
-```nginx
-proxy_buffering    off;
-proxy_cache        off;
-proxy_read_timeout 300s;
-proxy_send_timeout 300s;
-```
+Wer **NPMplus / Nginx Proxy Manager** nutzt: [deploy/nginx-npmplus.conf](deploy/nginx-npmplus.conf) — die UI-Feldwerte (Forward `http://…:3737`, Cache/HSTS aus) plus den Override-Block für den „Advanced"-Tab des Proxy-Hosts.
+
+Wesentlich: Die App lauscht auf `127.0.0.1:3737`, terminiert kein TLS und liest `X-Forwarded-Proto` (`trust proxy`). SSE braucht ungepufferte Verbindungen (`proxy_buffering off`), und die Kompression macht die App selbst — NGINX-gzip daher aus.
 
 ### Optional: veraPDF (PDF/A-Validierung)
 

@@ -288,8 +288,8 @@ export function registerMyStatsCard() {
     // Lifetime-Bestand (kein Zeitraum-Filter): zeigt den aktuellen Stand pro
     // Buch gegen das gesetzte Gesamtziel, daher aus dem Live-books_detail.
     myStatsBookGoals() {
-      return this._memo('bookGoals', [this.myStatsData?.books_detail], () =>
-        computeBookGoals(this.myStatsData?.books_detail)
+      return this._memo('bookGoals', [this.myStatsData?.books_detail, this.myStatsHistory], () =>
+        computeBookGoals(this.myStatsData?.books_detail, this.myStatsHistory)
           .map(r => ({ ...r, name: this._bookName(r.book_id) })));
     },
     get myStatsHasBookGoals() { return this.myStatsBookGoals().length > 0; },

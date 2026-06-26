@@ -2177,6 +2177,8 @@
   "mystats.bookGoals.due": "{n} days left",
   "mystats.bookGoals.open": "Goal set",
   "mystats.bookGoals.none": "no goal",
+  "mystats.bookGoals.today": "Today",
+  "mystats.bookGoals.todayOf": "{n} / {goal}",
   "mystats.thisWeek": "this week",
   "mystats.lastWeek": "last week: {n}",
   "mystats.readability": "Readability",

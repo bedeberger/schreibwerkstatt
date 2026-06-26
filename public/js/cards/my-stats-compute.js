@@ -399,19 +399,29 @@ function isoDayDiff(aIso, bIso) {
 }
 
 // Pro-Buch-Ziel-Uebersicht: „auf welchem Buch wie viel geschrieben + Ziel erreicht?".
-// Quelle ist `books_detail` aus /me/profile-stats: pro eigenem Buch der live
-// geschriebene Umfang (chars/words/pages) + die Ziel-Felder aus book_settings
+// `booksDetail` (aus /me/profile-stats): pro eigenem Buch der live geschriebene
+// Umfang (chars/words/pages) + die Ziel-Felder aus book_settings
 // (goal_target_chars = Gesamtziel, goal_deadline = Frist, daily_goal_chars =
-// Tagesziel). Es zaehlt nur, was Inhalt ODER ein gesetztes Ziel hat — leere
-// Buecher ohne Ziel sind kein Ueberblick-Signal. Status pro Buch:
+// Tagesziel). `historyRows` (book_stats_history, aus /me/profile-stats-history)
+// liefert die Vortags-Snapshots fuer den Tagesziel-Fortschritt: heute
+// geschrieben = Live-Stand minus letzter Snapshot strikt vor heute, auf >= 0
+// geklemmt (gleiche Regel wie der Heute-Ring der Buch-Uebersicht, today-ring.js).
+// Es zaehlt nur, was Inhalt ODER ein gesetztes Gesamtziel hat — leere Buecher
+// ohne Ziel sind kein Ueberblick-Signal. Gesamtziel-Status pro Buch:
 //   'reached'  Gesamtziel erfuellt (chars >= Ziel)
 //   'overdue'  Frist abgelaufen, Ziel nicht erreicht
 //   'due'      Frist laeuft noch (daysRemaining >= 0)
 //   'open'     Ziel gesetzt, keine Frist
 //   'none'     kein Gesamtziel gesetzt
 // Namen werden im Card via _bookName aufgeloest (Content-Store-Regel).
-export function computeBookGoals(booksDetail, todayLocal = new Date()) {
+export function computeBookGoals(booksDetail, historyRows = [], todayLocal = new Date()) {
   const isoToday = localIsoDate(todayLocal);
+  // Basis-Snapshot je Buch = letzter Snapshot strikt vor heute (= on-or-before
+  // gestern). Aelter-als-gestern ist okay (verkraftet Luecken/Wochenenden),
+  // analog computeCharsTodayDelta.
+  const isoYesterday = localIsoDaysAgo(1, todayLocal);
+  const baseSnap = snapshotPerBookOnOrBefore(historyRows, isoYesterday);
+
   const rows = (booksDetail || []).map((b) => {
     const chars = Number(b.chars) || 0;
     const goal = Number(b.goal_target_chars) || 0;
@@ -427,6 +437,14 @@ export function computeBookGoals(booksDetail, todayLocal = new Date()) {
     else if (deadline) status = 'due';
     else status = 'open';
 
+    // Tagesziel: heute geschriebene Zeichen vs. daily_goal_chars.
+    const dailyGoal = Number(b.daily_goal_chars) || 0;
+    const hasDailyGoal = dailyGoal > 0;
+    const prevChars = baseSnap.has(b.book_id) ? (Number(baseSnap.get(b.book_id).chars) || 0) : null;
+    // Ohne Vortags-Snapshot kein verlaesslicher Tagesstand → 0 (nicht optimistisch
+    // den vollen Bestand als „heute" zaehlen), analog today-ring.js.
+    const charsToday = prevChars == null ? 0 : Math.max(0, chars - prevChars);
+
     return {
       book_id: b.book_id,
       chars,
@@ -441,10 +459,15 @@ export function computeBookGoals(booksDetail, todayLocal = new Date()) {
       // Fortschritt fuer den Balken auf 100 gedeckelt; pctRaw fuer die Zahl.
       pct: hasGoal ? Math.min(100, Math.round((chars / goal) * 100)) : null,
       pctRaw: hasGoal ? Math.round((chars / goal) * 100) : null,
-      dailyGoalChars: Number(b.daily_goal_chars) || null,
       deadline,
       daysRemaining,
       status,
+      // Tagesziel-Block.
+      charsToday,
+      dailyGoalChars: hasDailyGoal ? dailyGoal : null,
+      hasDailyGoal,
+      dailyReached: hasDailyGoal && charsToday >= dailyGoal,
+      dailyPct: hasDailyGoal ? Math.min(100, Math.round((charsToday / dailyGoal) * 100)) : null,
     };
   }).filter(r => r.chars > 0 || r.hasGoal);
 
