@@ -226,6 +226,34 @@
       </div>
     </div>
 
+    <!-- Android-App-Download (schreibwerkstatt-mobile) -->
+    <div class="card-form-row card-form-row--devices" x-show="androidRelease.available" x-cloak x-data="collapsible()">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+        <span x-text="$app.t('profile.androidApp.title')"></span>
+        <span class="lt-dict-count" x-text="androidRelease.version"></span>
+      </button>
+      <div class="device-tokens-body" x-bind="panel" x-cloak>
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('profile.androidApp.intro')"></p>
+
+        <div class="mac-app-meta muted-msg muted-msg--sm">
+          <span x-text="$app.t('profile.androidApp.version') + ': ' + androidRelease.version"></span>
+          <span x-show="androidReleaseSizeMb()" x-text="' · ' + androidReleaseSizeMb() + ' MB'"></span>
+          <span x-show="androidRelease.publishedAt"
+                x-text="' · ' + new Date(androidRelease.publishedAt).toLocaleDateString($app.uiLocale, $app.tzOpts ? $app.tzOpts() : {})"></span>
+        </div>
+
+        <p x-show="androidRelease.notes" class="mac-app-notes muted-msg muted-msg--sm" x-text="androidRelease.notes"></p>
+
+        <div class="mac-app-download">
+          <a class="btn-compact" :href="androidRelease.apk?.downloadUrl" :download="androidRelease.apk?.name"
+             x-text="$app.t('profile.androidApp.download')"></a>
+          <span x-show="!androidReleaseIsAndroidPlatform()" class="muted-msg muted-msg--sm"
+                x-text="$app.t('profile.androidApp.forAndroidOnly')"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- App-Version (SSoT: VERSION-Datei, vom Server via /config) -->
     <div class="card-form-row" x-show="$app.appVersion" x-cloak>
       <p class="muted-msg muted-msg--sm">

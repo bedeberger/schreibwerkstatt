@@ -30,6 +30,8 @@ export function registerUserSettingsCard() {
     deviceTokensJustCreated: null,
     // macOS-App-Download (schreibwerkstatt-focuseditor)
     macRelease: { available: false },
+    // Android-App-Download (schreibwerkstatt-mobile)
+    androidRelease: { available: false },
     _savedAtTimer: null,
 
     get dictEntriesFiltered() {
@@ -47,6 +49,7 @@ export function registerUserSettingsCard() {
         await this.loadDictEntries();
         await this.loadDeviceTokens();
         await this.loadMacRelease();
+        await this.loadAndroidRelease();
       });
 
       this._onViewReset = () => {

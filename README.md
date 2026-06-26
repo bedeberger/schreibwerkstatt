@@ -6,20 +6,22 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 
 ### Schreiben & Editor
 - **Bearbeitungsmodus** (Notebook-Editor) – Seiten direkt bearbeiten. Auto-Save (Idle 60 s / Max 120 s), lokaler Draft (localStorage), Offline-Modus mit Retry, Block-Level-Merge bei parallelen Edits mit Konflikt-Auflösung.
-- **Fokusmodus** (Cmd/Ctrl+Shift+E) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Live-Zeichen-/Wortzähler, Mobile-/IME-Support. Auch als nativer **macOS-Client** (offline-first, lokaler SQLite-Store + Sync) verfügbar: [schreibwerkstatt-focuseditor](https://github.com/bedeberger/schreibwerkstatt-focuseditor).
+- **Fokusmodus** (Cmd/Ctrl+Shift+E) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Live-Zeichen-/Wortzähler, Mobile-/IME-Support. Auch als native Clients (offline-first, lokaler SQLite-Store + Sync) verfügbar: **macOS** [schreibwerkstatt-focuseditor](https://github.com/bedeberger/schreibwerkstatt-focuseditor), **Android** [schreibwerkstatt-mobile](https://github.com/bedeberger/schreibwerkstatt-mobile).
 - **Bucheditor** – Ganzes Buch als scrollbarer Stream mit Kapitel-Trennern und Outline. Inline-Edit pro Seite, Save-All sequenziell. Buchweite Suche & Ersetzen (Case/Whole-Word, Treffer-Navigation, Replace-All).
 - **Live-Rechtschreibung** – Optionale LanguageTool-Integration (self-hosted, regelbasiert) auf allen drei Editoren und Prosa-Formularfeldern, mit eigenem Wörterbuch.
-- **Diktat** – Speech-to-Text im Notebook-Editor über einen self-hosted Whisper-Endpunkt (browserseitige Sprachpausen-Erkennung, Text verbatim am Cursor).
+- **Diktat** – Speech-to-Text im Notebook-Editor über einen self-hosted Whisper-Endpunkt (browserseitige Sprachpausen-Erkennung, Text verbatim am Cursor). [docs/stt.md](docs/stt.md).
+- **Vorlesen** – Text-to-Speech / Proof-Listening in der Notebook-Leseansicht über einen self-hosted Speech-Endpunkt (satzweise, aktueller Satz hervorgehoben, schwebender Vorlese-Dock). [docs/tts.md](docs/tts.md).
 - **Volltextsuche** – FTS5-Index über alle Seiten, Filterung nach Kapitel/Buch.
 - **Buchorganizer** – Kapitel & Seiten per Drag&Drop ordnen, anlegen, umbenennen, löschen. Kapitel-Hierarchie bis 3 Ebenen.
 - **Ordner-Import** – Tagebuch-Archive (ZIP mit Jahr/Monat/Tag-Struktur, Formate docx/doc/odt/abw) mit regelbasierter Datumserkennung + KI-Fallback.
 - **Seiten-Verlauf** – Revisionen pro Seite mit Vergleich + Restore.
+- **Fassungen** – Ganze-Buch-Snapshots als Manuskript-Meilensteine: Capture, Liste, Side-by-Side-Diff und (destruktiver) Restore ins selbe Buch. [docs/fassungen.md](docs/fassungen.md).
 
 ### KI-Lektorat & Chat
 - **Seitenlektorat** – Rechtschreib-, Grammatik- und Stilprüfung mit selektiver Korrekturübernahme.
 - **Synonym-Finder** – Wort markieren → Rechtsklick → Vorschläge aus [OpenThesaurus](https://www.openthesaurus.de/) + KI mit Satzkontext.
 - **Seiten-Chat** – KI-Dialog zu einer Seite. Änderungsvorschläge übernehmbar.
-- **Buch-Chat** – KI-Dialog über das ganze Buch mit Werkzeugen (Pronomen-Zählung, Figurenverteilung, Volltextsuche, Seitenabruf) auf vorberechnetem Index.
+- **Buch-Chat** – Agentischer KI-Dialog über das ganze Buch mit Werkzeugen (Pronomen-Zählung, Figurenverteilung, Volltextsuche, Seitenabruf) auf vorberechnetem Index; optional Bild-Generierung (`generate_image`) über einen self-hosted, OpenAI-kompatiblen Bild-Endpunkt zur Welt-/Chat-Visualisierung (nie in den Manuskript-Text). [docs/image.md](docs/image.md).
 - **Buchbewertung / Kapitelbewertung** – Stärken, Schwächen, Empfehlungen.
 - **Lektorat-Verlauf** – Frühere Korrekturen als Inline-Highlights, selektiv nachträglich übernehmbar.
 
@@ -54,6 +56,7 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 - **Buch-Export** – PDF, HTML, Markdown, Plaintext, EPUB mit Timestamp-Filename.
 - **Custom-PDF-Export** – Eigener pdfkit-Renderer mit druckfertiger PDF/A-2B- bzw. PDF/X-3-Konformität, freier Schriftwahl aus Google Fonts (30-Tage-Cache), Cover (inkl. Umschlagbogen mit Rücken/EAN-13), TOC, Profile pro Buch+User. Optional Server-Validierung via veraPDF.
 - **EPUB-Export** – Reflow-fähiges E-Book mit eigenem Builder (Cover, Frontmatter, TOC, Blocksatz). Optionale Validierung via EPUBCheck.
+- **Custom-Word-Export** – Lektorats-/Verlags-Manuskript als DOCX über die programmatische `docx`-Lib (Shunn-Kopfzeile mit Seitenzahl, echtes Word-TOC-Feld, benannte Heading-Styles, Titelei aus den Publikations-Metadaten), Profile pro Buch+User wie beim PDF. [docs/word-export.md](docs/word-export.md).
 - **Publikations-Metadaten** – Zentrale Pflege (Titel, Autor, ISBN, Impressum, Widmung …) als gemeinsame Quelle für PDF- und EPUB-Export. [docs/publikation-export.md](docs/publikation-export.md).
 - **Buch-Migration** – Verlustfreier Buch-Round-Trip zwischen Instanzen als `.swbook`-Bundle (Export + Import-Job). [docs/book-migration.md](docs/book-migration.md).
 - **Bucheinstellungen** – Sprache, Buchtyp, Erzählperspektive, Erzählzeit, Freitext-Kontext fliessen in alle Prompts.
@@ -66,7 +69,7 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 
 ## Voraussetzungen
 
-- Node.js v20–24 (Node 26 noch nicht unterstützt: better-sqlite3 11.x baut nicht gegen das V8 in Node 26 — Bump auf 12.x ausstehend). Empfohlen: `.nvmrc` (Node 24).
+- Node.js v20–25 (`engines: >=20 <26`; Node 26 noch nicht unterstützt: better-sqlite3 11.x baut nicht gegen das V8 in Node 26 — Bump auf 12.x ausstehend). Empfohlen: `.nvmrc` (Node 24).
 - Öffentliche HTTPS-URL (Reverse-Proxy mit TLS) für Produktion.
 - Login-Pfad: **Admin-Bootstrap** (Email+Passwort via ENV) und/oder **Google OAuth2** (Callback `https://<domain>/auth/callback`). Mindestens einer muss konfiguriert sein.
 
@@ -190,7 +193,7 @@ Schriftdateien in [public/fonts/](public/fonts/), Lizenz [public/fonts/OFL.txt](
 
 ### Server-Dependencies
 
-Vollständige Liste in [package.json](package.json) – durchgehend OSI-genehmigte permissive Lizenzen (MIT/Apache-2.0/BSD/ISC). Auswahl: Express, better-sqlite3, pdfkit, sharp, linkedom, jsonrepair, winston, helmet, openid-client, node-cron, xmlbuilder2, epub-gen-memory, @turbodocx/html-to-docx.
+Vollständige Liste in [package.json](package.json) – durchgehend OSI-genehmigte permissive Lizenzen (MIT/Apache-2.0/BSD/ISC). Auswahl: Express, better-sqlite3, pdfkit, sharp, linkedom, jsonrepair, winston, helmet, openid-client, node-cron, xmlbuilder2, epub-gen-memory, docx.
 
 ## Lizenz
 

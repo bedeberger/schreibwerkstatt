@@ -95,6 +95,10 @@ function _renderLanding(req, res) {
     macDesc:       t('landing.macDesc'),
     macLinkLabel:  t('landing.macLinkLabel'),
     macUrl:        'https://github.com/bedeberger/schreibwerkstatt-focuseditor/releases/latest',
+    androidTitle:     t('landing.androidTitle'),
+    androidDesc:      t('landing.androidDesc'),
+    androidLinkLabel: t('landing.androidLinkLabel'),
+    androidUrl:       'https://github.com/bedeberger/schreibwerkstatt-mobile/releases/latest',
   }));
 }
 

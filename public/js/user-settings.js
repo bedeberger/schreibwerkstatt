@@ -185,4 +185,29 @@ export const userSettingsMethods = {
   macReleaseIsMacPlatform() {
     return /Mac/i.test(navigator.platform || navigator.userAgent || '');
   },
+
+  // ── Android-App-Download (schreibwerkstatt-mobile) ──────────────────────────
+  // latest-Release-Metadaten vom Server (GitHub-Public-API-Proxy). Wirft nie;
+  // bei { available:false } wird der Abschnitt schlicht nicht gerendert.
+  async loadAndroidRelease() {
+    try {
+      const data = await fetchJson('/content/android/release.json');
+      this.androidRelease = data && data.available ? data : { available: false };
+    } catch (e) {
+      console.error('[user-settings] Android-Release laden fehlgeschlagen:', e);
+      this.androidRelease = { available: false };
+    }
+  },
+
+  /** Dateigröße des .apk in MB, locale-formatiert. */
+  androidReleaseSizeMb() {
+    const bytes = this.androidRelease?.apk?.sizeBytes || 0;
+    if (!bytes) return '';
+    return (bytes / 1048576).toLocaleString(window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
+  },
+
+  /** Dezent erkennen, ob der Besucher auf Android ist (nur für einen Hinweis). */
+  androidReleaseIsAndroidPlatform() {
+    return /Android/i.test(navigator.userAgent || '');
+  },
 };
