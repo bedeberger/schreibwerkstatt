@@ -318,6 +318,49 @@ test('layoutBandItems: Höhe gedeckelt — oberste Zelle wird +N-Chip, kein Date
   assert.ok(Number.isInteger(more[0].id), 'Chip-id = Listen-Index des ersten überzähligen Events (Klick-Ziel)');
 });
 
+test('layoutBandItems: ohne bandWidthPx bleiben +N-Chips ungemerged (Default)', () => {
+  // Zwei dicht benachbarte Jahre, beide übervoll → zwei „more"-Chips. Ohne
+  // gemessene Breite (Tests / erster Paint) findet keine Kollisionsauflösung
+  // statt: das Layout bleibt bit-identisch zum bisherigen Verhalten.
+  const events = [
+    ...Array.from({ length: 8 }, (_, i) => ({ datum_year: 1994, ereignis: 'A' + i })),
+    ...Array.from({ length: 8 }, (_, i) => ({ datum_year: 1995, ereignis: 'B' + i })),
+  ];
+  const more = layoutBandItems(buildTimelineItems(events), { maxLanes: 3 })
+    .markers.filter(m => m.kind === 'more');
+  assert.equal(more.length, 2, 'zwei separate Chips ohne Breiteninfo');
+});
+
+test('layoutBandItems: kollidierende +N-Chips werden bei schmaler Breite gemerged', () => {
+  // Dieselben zwei dichten Nachbarjahre (1994/1995, ~50 % vs ~100 % über eine
+  // 1958..1995-Spanne ⇒ ~3 % Abstand). Bei schmaler Track-Breite überlappen die
+  // Chip-Boxen → ein Sammel-Chip, Counts addiert, kein Datenverlust.
+  const events = [
+    { datum_year: 1958, ereignis: 'Anker' },
+    ...Array.from({ length: 8 }, (_, i) => ({ datum_year: 1994, ereignis: 'A' + i })),
+    ...Array.from({ length: 8 }, (_, i) => ({ datum_year: 1995, ereignis: 'B' + i })),
+  ];
+  const items = buildTimelineItems(events);
+  const baseMore = layoutBandItems(items, { maxLanes: 3 }).markers.filter(m => m.kind === 'more');
+  const merged = layoutBandItems(items, { maxLanes: 3, bandWidthPx: 300 }).markers.filter(m => m.kind === 'more');
+  assert.equal(baseMore.length, 2, 'ungemerged zwei Chips');
+  assert.equal(merged.length, 1, 'gemerged zu einem Chip');
+  assert.equal(merged[0].count, baseMore.reduce((s, m) => s + m.count, 0), 'Counts addiert, kein Verlust');
+  assert.ok(Number.isInteger(merged[0].id), 'Klick-Ziel bleibt ein Listen-Index');
+});
+
+test('layoutBandItems: weit getrennte +N-Chips bleiben getrennt', () => {
+  // 1960 vs 2000 über dieselbe Spanne ⇒ ~100 % Abstand: auch bei schmaler
+  // Breite kein Merge.
+  const events = [
+    ...Array.from({ length: 8 }, (_, i) => ({ datum_year: 1960, ereignis: 'A' + i })),
+    ...Array.from({ length: 8 }, (_, i) => ({ datum_year: 2000, ereignis: 'B' + i })),
+  ];
+  const merged = layoutBandItems(buildTimelineItems(events), { maxLanes: 3, bandWidthPx: 300 })
+    .markers.filter(m => m.kind === 'more');
+  assert.equal(merged.length, 2, 'zwei getrennte Chips trotz schmaler Breite');
+});
+
 test('layoutBandItems: Punkte stapeln je Säule von der Baseline (Spur 0) aufwärts', () => {
   // Zwei Events im selben Jahr stapeln in einer Säule (gleiches x, Spuren 0/1);
   // ein drittes in einem fernen Jahr steht für sich auf Spur 0.

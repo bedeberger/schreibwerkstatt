@@ -114,39 +114,53 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
 // → Fallback auf die Gesamtspanne.
 // null, wenn die Zeitlinie aus ist, keine datierten Ereignisse vorliegen oder es nichts
 // Prüfbares gibt → der Prompt-Builder lässt die Anachronismus-Prüfung dann ganz weg.
-// Lesepfad-sicher in beiden Aufrufern: figure_events (saveSzenenAndEvents), songs
-// (runPhase3Songs) und world_facts (saveFaktenToDb) sind vor P8 bereits persistiert.
+// Jahres-Spannen kommen kanonisch aus dem konsolidierten zeitstrahl_events (Fallback
+// figure_events, wenn noch nicht konsolidiert). Lesepfad-sicher in beiden Aufrufern: der
+// Komplett-Job ruft erst nach der Zeitstrahl-Konsolidierung (P6) auf, der Standalone-
+// Kontinuitätscheck gegen einen früher konsolidierten Zeitstrahl; songs (runPhase3Songs)
+// und world_facts (saveFaktenToDb) sind vor P8 ebenfalls persistiert.
 function buildAnachronismusData(bookIdInt, email) {
   const { zeitlinie_real } = getBookSettings(bookIdInt, email);
   if (!zeitlinie_real) return null;
-  // Globale Spanne (Header + Fallback) aus ALLEN datierten Ereignissen – auch ohne Kapitel-Link.
-  const yearRow = db.prepare(`
-    SELECT MIN(datum_year) AS minY, MAX(COALESCE(datum_ende_year, datum_year)) AS maxY FROM (
-      SELECT fe.datum_year AS datum_year, fe.datum_ende_year AS datum_ende_year
-        FROM figure_events fe JOIN figures f ON f.id = fe.figure_id
-        WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0 AND fe.datum_year IS NOT NULL
-      UNION ALL
-      SELECT datum_year, datum_ende_year FROM zeitstrahl_events
-        WHERE book_id = ? AND user_email IS ? AND datum_unsicher = 0 AND datum_year IS NOT NULL
-    )
-  `).get(bookIdInt, email, bookIdInt, email);
+  // Kanonische Quelle ist der konsolidierte Zeitstrahl (zeitstrahl_events) — dieselbe
+  // Menge, aus der Ereignisse-Karte und Figuren-Jahr ableiten. Nur wenn (noch) kein
+  // Zeitstrahl konsolidiert wurde, Fallback auf die rohen figure_events, damit ein reiner
+  // Kontinuitäts-Lauf ohne vorherige Komplettanalyse nicht leer ausgeht.
+  const hasZeitstrahl = !!db.prepare(
+    'SELECT 1 FROM zeitstrahl_events WHERE book_id = ? AND user_email IS ? LIMIT 1'
+  ).get(bookIdInt, email);
+  // Globale Spanne (Header + Fallback) aus allen datierten Ereignissen – auch ohne Kapitel-Link.
+  const yearRow = hasZeitstrahl
+    ? db.prepare(`
+        SELECT MIN(datum_year) AS minY, MAX(COALESCE(datum_ende_year, datum_year)) AS maxY
+          FROM zeitstrahl_events
+         WHERE book_id = ? AND user_email IS ? AND datum_unsicher = 0 AND datum_year IS NOT NULL
+      `).get(bookIdInt, email)
+    : db.prepare(`
+        SELECT MIN(fe.datum_year) AS minY, MAX(COALESCE(fe.datum_ende_year, fe.datum_year)) AS maxY
+          FROM figure_events fe JOIN figures f ON f.id = fe.figure_id
+         WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0 AND fe.datum_year IS NOT NULL
+      `).get(bookIdInt, email);
   if (!yearRow || yearRow.minY == null) return null;
   const minYear = yearRow.minY, maxYear = yearRow.maxY;
   // Kapitel → {minY, maxY} aus den datierten Ereignissen dieses Kapitels (Per-Eintrag-Jahr).
-  const chapterRows = db.prepare(`
-    SELECT chapter_id, MIN(y) AS minY, MAX(ey) AS maxY FROM (
-      SELECT fe.chapter_id AS chapter_id, fe.datum_year AS y,
-             COALESCE(fe.datum_ende_year, fe.datum_year) AS ey
-        FROM figure_events fe JOIN figures f ON f.id = fe.figure_id
-        WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0
-          AND fe.datum_year IS NOT NULL AND fe.chapter_id IS NOT NULL
-      UNION ALL
-      SELECT zec.chapter_id, ze.datum_year, COALESCE(ze.datum_ende_year, ze.datum_year)
-        FROM zeitstrahl_events ze JOIN zeitstrahl_event_chapters zec ON zec.event_id = ze.id
-        WHERE ze.book_id = ? AND ze.user_email IS ? AND ze.datum_unsicher = 0
-          AND ze.datum_year IS NOT NULL AND zec.chapter_id IS NOT NULL
-    ) GROUP BY chapter_id
-  `).all(bookIdInt, email, bookIdInt, email);
+  const chapterRows = hasZeitstrahl
+    ? db.prepare(`
+        SELECT zec.chapter_id AS chapter_id, MIN(ze.datum_year) AS minY,
+               MAX(COALESCE(ze.datum_ende_year, ze.datum_year)) AS maxY
+          FROM zeitstrahl_events ze JOIN zeitstrahl_event_chapters zec ON zec.event_id = ze.id
+         WHERE ze.book_id = ? AND ze.user_email IS ? AND ze.datum_unsicher = 0
+           AND ze.datum_year IS NOT NULL AND zec.chapter_id IS NOT NULL
+         GROUP BY zec.chapter_id
+      `).all(bookIdInt, email)
+    : db.prepare(`
+        SELECT fe.chapter_id AS chapter_id, MIN(fe.datum_year) AS minY,
+               MAX(COALESCE(fe.datum_ende_year, fe.datum_year)) AS maxY
+          FROM figure_events fe JOIN figures f ON f.id = fe.figure_id
+         WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0
+           AND fe.datum_year IS NOT NULL AND fe.chapter_id IS NOT NULL
+         GROUP BY fe.chapter_id
+      `).all(bookIdInt, email);
   const chMap = new Map(chapterRows.map(r => [r.chapter_id, { minY: r.minY, maxY: r.maxY }]));
 
   // Erzähljahr-Spanne über eine Menge Kapitel-IDs → "1985" | "1985–1986" | null.

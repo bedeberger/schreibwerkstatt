@@ -91,7 +91,7 @@
     <div class="gz-band" x-show="timelineItemCount > 0" role="group"
          :aria-label="$app.t('events.timelineNav')"
          :style="{ '--gz-band-lanes': bandModel().lanes }">
-      <div class="gz-band-track">
+      <div class="gz-band-track" x-ref="bandTrack">
         <!-- Achse: Jahres-Ticks (Gridline + Label) -->
         <template x-for="tick in bandModel().ticks" :key="'t' + tick.year">
           <div class="gz-band-tick" :style="{ left: tick.x.toFixed(3) + '%' }">

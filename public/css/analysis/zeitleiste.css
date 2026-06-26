@@ -394,9 +394,11 @@
   font-size: var(--font-size-micro);
   font-weight: 700;
   line-height: 1;
+  white-space: nowrap;        /* "+N" nie umbrechen */
   color: var(--color-muted);
   background: var(--color-tag-bg);
   border-color: var(--color-border);
+  z-index: 2;                 /* Zahl liegt über benachbarten Punkt-Markern */
 }
 
 .gz-band-marker--more:hover {

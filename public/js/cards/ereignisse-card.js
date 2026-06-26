@@ -42,7 +42,7 @@ const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapite
 // der gefilterten Liste — filteredEreignisse() liefert dieselbe Array-Referenz
 // solange Daten/Filter unverändert, also rechnet das Layout nur bei echtem
 // Wechsel neu (Template ruft bandModel() mehrfach pro Render).
-const _memoBandModel = () => memoizeByIdentity(([events]) => buildBandModel(events));
+const _memoBandModel = () => memoizeByIdentity(([events, bandWidthPx]) => buildBandModel(events, bandWidthPx));
 
 // Baut ein Date aus den strukturierten Jahr/Monat/Tag-Feldern. setFullYear
 // (statt new Date(year,…)) vermeidet das 0–99-Jahr-Mapping auf 1900+year und
@@ -127,7 +127,16 @@ function _yearToMs(year) {
 //
 // `lane`/`x`/`widthPct` werden vom Template in CSS-Custom-Props übersetzt.
 // Extrahiert für Tests (ereignisse-card-filter.test.mjs).
-export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 6 } = {}) {
+//
+// `bandWidthPx` = real gerenderte Track-Breite (vom ResizeObserver der Karte):
+// nötig, weil die „+N"-Chips Text tragen und damit breiter sind als ein
+// Punkt-Marker. In dichten Spannen (viele Jahre → schmale Spalten) bleiben die
+// Chip-Boxen benachbarter Säulen sonst nicht auf Distanz und ihre Zahlen
+// überlappen sich („+10-10"). Mit bekannter Pixelbreite lässt sich die Chip-
+// Breite in Prozent umrechnen und kollidierende Chips werden links→rechts zu
+// einem Sammel-Chip verschmolzen (Counts addiert, Klick springt zum ersten).
+// `bandWidthPx = 0` (Tests, erster Paint vor der Messung) ⇒ kein Merge.
+export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 6, bandWidthPx = 0 } = {}) {
   const bounds = timelineBounds(items);
   if (!bounds) return { lanes: 0, markers: [], bounds: null };
   const spanMs = Math.max(1, bounds.max - bounds.min);
@@ -136,7 +145,7 @@ export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 6 } = {}) 
   const sorted = [...(items || [])].sort((a, b) => (+new Date(a.start)) - (+new Date(b.start)));
   const ranges = sorted.filter(it => it.type === 'range' && it.end != null);
   const points = sorted.filter(it => !(it.type === 'range' && it.end != null));
-  const markers = [];
+  let markers = [];
   let usedLanes = 0;
 
   // 1) Spannen: greedy unter sich lane-packen → liegen als Balken auf den
@@ -193,6 +202,39 @@ export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 6 } = {}) 
     }
   }
 
+  // 3) „+N"-Chips kollisionsfrei machen: bei bekannter Pixelbreite benachbarte
+  //    Chips, deren Text-Boxen überlappen würden, links→rechts zu einem Sammel-
+  //    Chip verschmelzen (Count addiert, Lane = oberste der Gruppe, x = Mitte,
+  //    Klick-id = erster). Konservativ (Anker = rechter Rand der Gruppe), errt
+  //    Richtung „eher mergen" — nie überlappen.
+  if (bandWidthPx > 0) {
+    const more = markers.filter(m => m.kind === 'more').sort((a, b) => a.x - b.x);
+    if (more.length > 1) {
+      const halfPct = (count) => {
+        // grobe Chip-Breite: min-width + Padding + ~Zeichenbreite des Labels.
+        const px = Math.max(11, 14 + 6.5 * String('+' + count).length);
+        return (px / 2) / bandWidthPx * 100;
+      };
+      const gapPct = 3 / bandWidthPx * 100;       // Mindestabstand zwischen Chips
+      const groups = [];
+      let cur = null;
+      for (const m of more) {
+        if (cur && (m.x - cur.xRight) < halfPct(cur.count) + halfPct(m.count) + gapPct) {
+          cur.count += m.count;
+          cur.xRight = m.x;
+          cur.lane = Math.max(cur.lane, m.lane);
+          continue;
+        }
+        cur = { kind: 'more', id: m.id, xLeft: m.x, xRight: m.x, lane: m.lane, count: m.count };
+        groups.push(cur);
+      }
+      const mergedMore = groups.map(g => ({
+        kind: 'more', id: g.id, x: (g.xLeft + g.xRight) / 2, lane: g.lane, count: g.count,
+      }));
+      markers = markers.filter(m => m.kind !== 'more').concat(mergedMore);
+    }
+  }
+
   return { lanes: Math.min(usedLanes, maxLanes), markers, bounds };
 }
 
@@ -220,9 +262,9 @@ export function bandAxisTicks(bounds, { targetTicks = 6 } = {}) {
 // Liste. itemCount = Anzahl datierter Items (achsen-fähig; undatierte bleiben nur
 // in der Liste), lanes/markers fürs Layout, ticks für die Achse. Extrahiert für
 // Tests; in der Karte via memoizeByIdentity über die gefilterte Liste gecacht.
-export function buildBandModel(events) {
+export function buildBandModel(events, bandWidthPx = 0) {
   const items = buildTimelineItems(events);
-  const { lanes, markers, bounds } = layoutBandItems(items);
+  const { lanes, markers, bounds } = layoutBandItems(items, { bandWidthPx });
   return { itemCount: items.length, lanes, markers, ticks: bandAxisTicks(bounds), bounds };
 }
 
@@ -312,6 +354,10 @@ export function registerEreignisseCard() {
     _lifecycle: null,
     _memoFiltered: _memoEreignisse(),
     _memoBand: _memoBandModel(),
+    _bandRO: null,
+    // Gerenderte Track-Breite (px, auf 16er gerundet gegen Resize-Thrashing).
+    // Speist die Chip-Kollisionsauflösung in bandModel(); 0 = noch nicht gemessen.
+    _bandWidth: 0,
     // Listen-Index des aktuell hervorgehobenen Events (Klick auf Marker oder
     // Listen-Datum). Markiert den passenden Band-Marker und scrollt ihn ins Bild.
     selectedEventIndex: null,
@@ -336,9 +382,27 @@ export function registerEreignisseCard() {
       // Das Jahres-Band rendert deklarativ aus bandModel() (reaktiv über
       // filteredEreignisse) — kein imperativer Render-Pfad, kein Lazy-Lib-Load,
       // kein asynchrones Layout. Damit gibt es keinen Einklapp-/Expandier-Effekt.
+      //
+      // Track-Breite beobachten: die „+N"-Chip-Kollisionsauflösung
+      // (layoutBandItems) braucht die echte Pixelbreite, um Chip-Breiten in
+      // Prozent umzurechnen. ResizeObserver schreibt _bandWidth → bandModel()
+      // rechnet reaktiv neu. Auf 16px gerundet, damit Sub-Pixel-Resizes nicht
+      // jedes Frame ein Re-Layout auslösen.
+      if (typeof ResizeObserver !== 'undefined') {
+        this._bandRO = new ResizeObserver((entries) => {
+          const raw = entries[0]?.contentRect?.width || 0;
+          const w = Math.round(raw / 16) * 16;
+          if (w && w !== this._bandWidth) this._bandWidth = w;
+        });
+        this.$nextTick(() => {
+          if (this.$refs.bandTrack) this._bandRO.observe(this.$refs.bandTrack);
+        });
+      }
     },
 
     destroy() {
+      this._bandRO?.disconnect();
+      this._bandRO = null;
       this._lifecycle?.destroy();
     },
 
@@ -459,7 +523,7 @@ export function registerEreignisseCard() {
     // Identität der gefilterten Liste. Das Template ruft bandModel() mehrfach
     // pro Render (Höhe, Tick-Loop, Marker-Loop) — Memo hält das Layout stabil.
     bandModel() {
-      return this._memoBand([this.filteredEreignisse()]);
+      return this._memoBand([this.filteredEreignisse(), this._bandWidth]);
     },
 
     // Anzahl datierter Events (auf der Achse). Treibt die Sichtbarkeit des Bands
