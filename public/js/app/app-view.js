@@ -1023,6 +1023,10 @@ export const appViewMethods = {
         return;
       }
     }
+    if (this.selectedBookId && !this.showEditorCard && !this.showBookStatsCard) {
+      await this.toggleBookStatsCard();
+      return;
+    }
     await this._maybeOpenBookOverview();
   },
 
