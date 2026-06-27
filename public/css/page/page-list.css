@@ -41,7 +41,7 @@
   width: 3px;
   height: 60%;
   transform: translateY(-50%);
-  background: var(--color-warn, var(--color-accent));
+  background: var(--color-warn-text, var(--color-accent));
   border-radius: var(--radius-sm);
 }
 

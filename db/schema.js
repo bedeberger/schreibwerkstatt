@@ -240,12 +240,15 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
 }
 
 // ── Orte ──────────────────────────────────────────────────────────────────────
-// UPSERT by loc_id statt Delete+Re-Insert, damit bestehende scene_locations-Einträge
-// (ON DELETE CASCADE) erhalten bleiben.
+// Reconcile statt Delete+Re-Insert, damit locations.id (und FK-Refs darauf:
+// research_item_links.location_id, scene_locations …) ueber Re-Analysen stabil bleibt.
 // chNameToId: optionaler Map Kapitelname → chapter_id. Wird er nicht übergeben,
 // wird er aus der chapters-Tabelle aufgebaut (für UI-Endpunkt ohne Job-Kontext).
 // pageNameToIdByChapter: optional. Fehlt er, wird er aus der pages-Tabelle
 // aufgebaut — kapitel-scoped gegen Namenskollisionen zwischen Kapiteln.
+// opts.matchBy 'name' (Komplettanalyse) | 'locId' (Default, Manual-Edit);
+// opts.onMissing 'stale' (markieren) | 'delete' (Default).
+const _normLocName = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
 function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdByChapter = null, opts = {}) {
   if (chNameToId == null) {
     const rows = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(bookId);
@@ -279,14 +282,21 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
   };
   const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
   const emailVal  = userEmail ? [userEmail] : [];
+  // Reconcile-Modus (siehe figures.js): matchBy 'name' (Komplettanalyse) matcht per
+  // normalisiertem Namen, weil die loc_id pro Lauf frisch vergeben wird (ort_N, NICHT
+  // identitaetsstabil) → re-detektiert behaelt seine locations.id (FK-Refs ueberleben),
+  // re-detektiert → stale=0, verschwunden → stale=1 statt Loeschen. matchBy 'locId'
+  // (Default, Manual-Edit-CRUD) matcht per loc_id (round-trippt stabil durch GET→PUT),
+  // verschwundene werden geloescht (User autoritativ).
+  const matchByName = opts.matchBy === 'name';
+  const onMissingStale = opts.onMissing === 'stale';
   let droppedFigRefs = 0;
 
   db.transaction(() => {
     const existing = db.prepare(
       `SELECT id, loc_id, name, lat, lng FROM locations WHERE book_id = ? AND ${emailCond}`
     ).all(bookId, ...emailVal);
-    const existingMap = Object.fromEntries(existing.map(r => [r.loc_id, r.id]));
-    const prevByLocId = Object.fromEntries(existing.map(r => [r.loc_id, r]));
+    const prevById = Object.fromEntries(existing.map(r => [r.id, r]));
 
     // Komplettanalyse liefert keine Geo-Daten (AI extrahiert kein lat/lng) und
     // wuerde manuell gepinnte/gegeocodete Koordinaten beim Full-Replace mit NULL
@@ -320,23 +330,58 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
       }
     }
 
-    const newLocIds = new Set(orte.map(o => o.id));
-
-    // Entfernte Orte löschen (CASCADE entfernt location_figures, location_chapters, scene_locations)
-    for (const { id, loc_id } of existing) {
-      if (!newLocIds.has(loc_id)) {
-        db.prepare('DELETE FROM locations WHERE id = ?').run(id);
+    // Match neue Orte → bestehende (greedy, jede Bestands-Row hoechstens einmal).
+    const matchOf = new Map();       // incomingIndex → existingId
+    const usedExisting = new Set();
+    if (matchByName) {
+      // Auch stale-Orte sind Match-Kandidaten — ein wiederaufgetauchter Ort wird revived.
+      const exByNorm = new Map();
+      for (const ex of existing) {
+        const k = _normLocName(ex.name);
+        if (k && !exByNorm.has(k)) exByNorm.set(k, ex);
+      }
+      for (let i = 0; i < orte.length; i++) {
+        const ex = exByNorm.get(_normLocName(orte[i].name));
+        if (ex && !usedExisting.has(ex.id)) { matchOf.set(i, ex.id); usedExisting.add(ex.id); }
+      }
+    } else {
+      const byLocId = new Map(existing.map(ex => [ex.loc_id, ex.id]));
+      for (let i = 0; i < orte.length; i++) {
+        const exId = byLocId.get(orte[i].id);
+        if (exId != null && !usedExisting.has(exId)) { matchOf.set(i, exId); usedExisting.add(exId); }
       }
     }
 
+    // Verschwundene (nicht wiedergefundene) Bestands-Orte behandeln.
+    const missing = existing.filter(ex => !usedExisting.has(ex.id));
+    if (onMissingStale) {
+      // stale=1 statt Loeschen → FK-Refs (research_item_links.location_id, scene_locations)
+      // ueberleben. loc_id auf 'orphan_<id>' ziehen, damit der 'ort_N'-Namespace fuer den
+      // naechsten Lauf kollisionsfrei (UNIQUE(book_id, loc_id, user_email)) bleibt.
+      const markStale = db.prepare("UPDATE locations SET stale = 1, loc_id = 'orphan_' || id WHERE id = ?");
+      for (const ex of missing) markStale.run(ex.id);
+    } else {
+      // CASCADE entfernt location_figures, location_chapters, scene_locations.
+      const delLoc = db.prepare('DELETE FROM locations WHERE id = ?');
+      for (const ex of missing) delLoc.run(ex.id);
+    }
+
+    // Beim Name-Match werden die loc_ids auf die frischen Lauf-Werte umgebogen — matched
+    // Rows zuerst transient auf 'tmp_<id>' setzen, sonst kollidieren zwei Orte, die ihre
+    // loc_ids tauschen, in UNIQUE(book_id, loc_id, user_email).
+    if (matchByName) {
+      const tmpRename = db.prepare("UPDATE locations SET loc_id = 'tmp_' || id WHERE id = ?");
+      for (const exId of usedExisting) tmpRename.run(exId);
+    }
+
     const upd = db.prepare(`
-      UPDATE locations SET name=?, typ=?, beschreibung=?, erste_erwaehnung=?, erste_erwaehnung_page_id=?, stimmung=?,
-        land=?, lat=?, lng=?, sort_order=?, updated_at=${NOW_ISO_SQL}
+      UPDATE locations SET loc_id=?, name=?, typ=?, beschreibung=?, erste_erwaehnung=?, erste_erwaehnung_page_id=?, stimmung=?,
+        land=?, lat=?, lng=?, sort_order=?, ${matchByName ? 'stale=0, ' : ''}updated_at=${NOW_ISO_SQL}
       WHERE id=?`);
     const ins = db.prepare(`
       INSERT INTO locations (book_id, loc_id, name, typ, beschreibung, erste_erwaehnung, erste_erwaehnung_page_id, stimmung,
-        land, lat, lng, sort_order, user_email, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
+        land, lat, lng, sort_order, user_email, stale, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ${NOW_ISO_SQL})`);
     const delLf = db.prepare('DELETE FROM location_figures WHERE location_id = ?');
     const delLc = db.prepare('DELETE FROM location_chapters WHERE location_id = ?');
     // Geocode-Resolve-Cache: bei Umbenennung nullen (Toponym-Aufloesung ist dann
@@ -359,10 +404,12 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
       const lng = _clampCoord(o.lng, 180);
       // land normalisiert auf ISO-3166-1-alpha-2 lowercase; alles andere → NULL.
       const land = /^[A-Za-z]{2}$/.test(String(o.land || '').trim()) ? String(o.land).trim().toLowerCase() : null;
-      let locDbId = existingMap[o.id];
-      if (locDbId !== undefined) {
-        // integer id (und scene_locations) bleibt erhalten
-        upd.run(o.name, o.typ || null, o.beschreibung || null,
+      const existingId = matchOf.get(i);
+      let locDbId = existingId;
+      if (existingId != null) {
+        // integer id (und scene_locations) bleibt erhalten; loc_id wird auf den
+        // frischen Lauf-Wert gesetzt (matched-Rows wurden vorab auf 'tmp_<id>' geparkt).
+        upd.run(o.id, o.name, o.typ || null, o.beschreibung || null,
           o.erste_erwaehnung || null, erstPageId, o.stimmung || null,
           land, lat, lng, i, locDbId);
         delLf.run(locDbId);
@@ -372,7 +419,7 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
         // ist sein «nochmal von vorn»-Signal, dann soll auch die KI neu aufloesen.
         // Komplett-Reextraktion (preserveExistingCoords) reattacht Coords und faellt
         // hier nicht durch.
-        const prev = prevByLocId[o.id];
+        const prev = prevById[existingId];
         const renamed = String(prev?.name ?? '') !== String(o.name ?? '');
         const clearedCoords = !opts.preserveExistingCoords
           && prev && prev.lat != null && prev.lng != null && (lat == null || lng == null);
@@ -485,7 +532,7 @@ function backfillLocationChaptersFromScenes(bookId, userEmail) {
     SELECT sl.location_id, fs.chapter_id, COUNT(*)
     FROM scene_locations sl
     JOIN figure_scenes fs ON fs.id = sl.scene_id
-    WHERE fs.book_id = ? AND ${emailCond} AND fs.chapter_id IS NOT NULL
+    WHERE fs.book_id = ? AND ${emailCond} AND fs.chapter_id IS NOT NULL AND fs.stale = 0
     GROUP BY sl.location_id, fs.chapter_id
   `).run(bookId, ...emailVal);
 }

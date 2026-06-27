@@ -8717,6 +8717,31 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 223 abgeschlossen (research_item_urls — mehrere URLs je Recherche-Eintrag, url-Spalte entfernt).');
   }
 
+  if (version < 224) {
+    // locations.stale / figure_scenes.stale: 1 = im letzten Komplettanalyse-Lauf
+    // NICHT mehr erkannt. saveOrteToDb / saveSzenenAndEvents reconcilen jetzt
+    // in-place (Match per Name bzw. Kapitel+Titel, UPDATE statt DELETE+INSERT),
+    // damit locations.id / figure_scenes.id stabil bleiben und FK-Referenzen
+    // (research_item_links.location_id/scene_id, scene_locations, location_figures)
+    // Re-Analysen ueberleben. Verschwundene Eintraege werden als stale=1 markiert
+    // statt geloescht (Referenzen bleiben erhalten). Spiegelt figures.stale (Mig 219).
+    // Additiv: nicht-nullable Spalte mit Default, kein Recreate noetig.
+    const locCols224 = db.pragma('table_info(locations)').map(c => c.name);
+    if (!locCols224.includes('stale')) {
+      db.exec('ALTER TABLE locations ADD COLUMN stale INTEGER NOT NULL DEFAULT 0');
+    }
+    const fsCols224 = db.pragma('table_info(figure_scenes)').map(c => c.name);
+    if (!fsCols224.includes('stale')) {
+      db.exec('ALTER TABLE figure_scenes ADD COLUMN stale INTEGER NOT NULL DEFAULT 0');
+    }
+    const fkErrors224 = db.pragma('foreign_key_check');
+    if (fkErrors224.length) {
+      throw new Error(`Migration 224: foreign_key_check meldet ${fkErrors224.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 224').run();
+    logger.info('DB-Migration auf Version 224 abgeschlossen (locations.stale + figure_scenes.stale — Reconcile-Markierung verschwundener Orte/Szenen).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -371,7 +371,7 @@
   align-self: flex-end;
   margin-right: var(--space-sm);
   margin-top: calc(-1 * (36px + var(--space-sm)));
-  z-index: var(--z-overlay-spellcheck, 9);
+  z-index: var(--z-spellcheck, 9);
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -486,7 +486,7 @@
   align-self: flex-start;
   margin-left: var(--space-sm);
   margin-top: calc(-1 * (36px + var(--space-sm)));
-  z-index: var(--z-overlay-spellcheck, 9);
+  z-index: var(--z-spellcheck, 9);
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -634,7 +634,7 @@
 .page-content-view .mention,
 .page-content-view .channel {
   display: inline-block;
-  padding: 0 var(--space-4, 4px);
+  padding: 0 var(--space-xs, 4px);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--font-em-90);

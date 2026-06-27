@@ -79,7 +79,7 @@
   cursor: pointer;
   border-radius: var(--radius-sm);
 }
-.search-clear--icon:hover { color: var(--color-text); background: var(--color-bg-soft); }
+.search-clear--icon:hover { color: var(--color-text); background: var(--color-hover); }
 .search-clear--icon > .icon { width: 14px; height: 14px; }
 .btn-group.sidebar-action-group {
   display: inline-flex;

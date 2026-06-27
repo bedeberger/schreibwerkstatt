@@ -39,13 +39,13 @@
   .card--organizer        { --card-accent: var(--card-accent-organize); }
   .card--werkstatt        { --card-accent: var(--card-accent-werkstatt); }
   .card--plot             { --card-accent: var(--card-accent-plot); }
-  .card--admin-usage      { --card-accent: var(--card-accent-admin-usage, var(--color-accent)); }
-  .card--admin-users      { --card-accent: var(--card-accent-admin-users, var(--color-accent)); }
-  .card--admin-settings   { --card-accent: var(--card-accent-admin-settings, var(--color-accent)); }
-  .card--admin-categories { --card-accent: var(--card-accent-admin-users, var(--color-primary)); }
-  .card--admin-logs       { --card-accent: var(--card-accent-admin-logs, var(--color-running)); }
-  .card--admin-parse-fails { --card-accent: var(--card-accent-admin-parse-fails, var(--color-err-border)); }
-  .card--admin-js-errors  { --card-accent: var(--card-accent-admin-js-errors, var(--color-err-border)); }
-  .card--admin-devices    { --card-accent: var(--card-accent-admin-devices, var(--color-accent)); }
+  .card--admin-usage      { --card-accent: var(--color-accent); }
+  .card--admin-users      { --card-accent: var(--color-accent); }
+  .card--admin-settings   { --card-accent: var(--color-accent); }
+  .card--admin-categories { --card-accent: var(--color-primary); }
+  .card--admin-logs       { --card-accent: var(--color-running); }
+  .card--admin-parse-fails { --card-accent: var(--color-err-border); }
+  .card--admin-js-errors  { --card-accent: var(--color-err-border); }
+  .card--admin-devices    { --card-accent: var(--color-accent); }
   .card--share            { --card-accent: var(--card-accent-share); }
 }

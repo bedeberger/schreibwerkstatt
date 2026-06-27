@@ -2,12 +2,12 @@
    Mobile via Container-Query (Karte lebt im Admin-Slot). */
 
 @layer components {
-  .card--admin-logs { --card-accent: var(--card-accent-admin-logs, var(--color-running)); container-type: inline-size; }
+  .card--admin-logs { --card-accent: var(--color-running); container-type: inline-size; }
 
   .admin-logs-filter {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: var(--space-2);
+    gap: var(--space-2xs);
     margin-block: var(--space-3);
     align-items: end;
   }
@@ -15,7 +15,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-    font-size: var(--font-sm);
+    font-size: var(--font-size-sm);
     color: var(--color-muted);
     min-width: 0;
   }
@@ -38,7 +38,7 @@
   }
   .admin-logs-filter-actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-2xs);
     align-items: stretch;
   }
   .admin-logs-filter-actions button {
@@ -73,10 +73,10 @@
 
   .log-list {
     font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-    font-size: var(--font-sm);
+    font-size: var(--font-size-sm);
     line-height: 1.4;
     border-top: 1px solid var(--color-border);
-    margin-top: var(--space-2);
+    margin-top: var(--space-2xs);
     overflow-x: auto;
   }
 
@@ -85,7 +85,7 @@
     grid-template-columns: 180px 64px 80px 260px 110px minmax(400px, 1fr) auto;
     column-gap: var(--space-3);
     row-gap: var(--space-1);
-    padding: var(--space-2);
+    padding: var(--space-2xs);
     border-bottom: 1px solid var(--color-border);
     align-items: baseline;
     border-left: 3px solid transparent;
@@ -106,7 +106,7 @@
     display: inline-block;
     padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
-    font-size: var(--font-xs);
+    font-size: var(--font-size-xs);
     font-weight: 600;
     letter-spacing: 0.04em;
     text-align: center;
@@ -132,10 +132,10 @@
   .log-stack {
     grid-column: 1 / -1;
     margin: var(--space-1) 0 0;
-    padding: var(--space-2);
+    padding: var(--space-2xs);
     background: var(--color-hover);
     border-radius: var(--radius-sm);
-    font-size: var(--font-xs);
+    font-size: var(--font-size-xs);
     white-space: pre-wrap;
     word-break: break-word;
     color: var(--color-muted);
@@ -147,13 +147,13 @@
     align-items: center;
     gap: var(--space-3);
     margin-top: var(--space-3);
-    padding-top: var(--space-2);
+    padding-top: var(--space-2xs);
     border-top: 1px solid var(--color-border);
   }
   .admin-logs-downloads {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-2xs);
     align-items: center;
   }
   .admin-logs-download-btn {
@@ -174,7 +174,7 @@
         "user user user user"
         "book book book book"
         "msg msg msg msg";
-      column-gap: var(--space-2);
+      column-gap: var(--space-2xs);
       min-width: 0;
     }
     .log-row-ts    { grid-area: ts; }
@@ -196,7 +196,7 @@
     .admin-logs-footer { flex-direction: column; align-items: stretch; }
     .admin-logs-downloads { flex-direction: column; align-items: stretch; }
     .admin-logs-download-btn { justify-content: flex-start; }
-    .log-row { padding: var(--space-1) var(--space-2); }
-    .log-row-ts { font-size: var(--font-xs); }
+    .log-row { padding: var(--space-1) var(--space-2xs); }
+    .log-row-ts { font-size: var(--font-size-xs); }
   }
 }

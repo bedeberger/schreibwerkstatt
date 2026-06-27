@@ -183,18 +183,18 @@
     grid-template-columns: max-content 1fr;
     gap: var(--space-sm);
     padding: 2px 0;
-    border-bottom: 1px solid var(--color-border-subtle, transparent);
+    border-bottom: 1px solid var(--color-border, transparent);
   }
 
   .folder-import-log-line:last-child { border-bottom: none; }
 
   .folder-import-log-line time {
-    color: var(--color-text-muted);
+    color: var(--color-muted);
     white-space: nowrap;
   }
 
   .folder-import-log-line.is-warn span {
-    color: var(--color-warn, #c66);
+    color: var(--color-warn-text, #c66);
   }
 
   @media (max-width: 640px) {

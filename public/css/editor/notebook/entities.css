@@ -167,7 +167,7 @@
     width: 36px;
     height: 36px;
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--color-accent-figure) 22%, var(--color-bg-subtle));
+    background: color-mix(in srgb, var(--color-accent-figure) 22%, var(--color-neutral-bg));
     color: var(--color-accent-figure-fg);
     display: inline-flex;
     align-items: center;
@@ -178,17 +178,17 @@
   }
 
   .entity-popover--location .entity-popover-avatar {
-    background: color-mix(in srgb, var(--color-accent-location) 22%, var(--color-bg-subtle));
+    background: color-mix(in srgb, var(--color-accent-location) 22%, var(--color-neutral-bg));
     color: var(--color-accent-location-fg);
   }
 
   .entity-popover--scene .entity-popover-avatar {
-    background: color-mix(in srgb, var(--card-accent-szenen) 22%, var(--color-bg-subtle));
+    background: color-mix(in srgb, var(--card-accent-szenen) 22%, var(--color-neutral-bg));
     color: var(--card-accent-szenen);
   }
 
   .entity-popover--event .entity-popover-avatar {
-    background: color-mix(in srgb, var(--card-accent-ereignisse) 22%, var(--color-bg-subtle));
+    background: color-mix(in srgb, var(--card-accent-ereignisse) 22%, var(--color-neutral-bg));
     color: var(--card-accent-ereignisse);
   }
 
@@ -203,7 +203,7 @@
   .entity-popover-name {
     font-weight: 600;
     font-size: 1.0em;
-    color: var(--color-fg);
+    color: var(--color-text);
     line-height: 1.25;
     word-break: break-word;
   }
@@ -244,7 +244,7 @@
     font-size: 0.7em;
     padding: var(--space-1) var(--space-6);
     border-radius: var(--radius-sm);
-    background: var(--color-bg-subtle);
+    background: var(--color-neutral-bg);
     color: var(--color-subtle);
     text-transform: lowercase;
   }
@@ -265,14 +265,14 @@
   }
 
   .entity-popover-close:hover {
-    background: var(--color-bg-subtle);
-    color: var(--color-fg);
+    background: var(--color-neutral-bg);
+    color: var(--color-text);
   }
 
   .entity-popover-body {
     padding: var(--space-10) var(--space-md) var(--space-md) var(--space-lg);
     font-size: 0.9em;
-    color: var(--color-fg);
+    color: var(--color-text);
     display: flex;
     flex-direction: column;
     gap: var(--space-10);
@@ -285,7 +285,7 @@
   .entity-popover-desc {
     margin: 0;
     line-height: 1.45;
-    color: var(--color-fg);
+    color: var(--color-text);
   }
 
   .entity-popover-meta-grid {
@@ -311,7 +311,7 @@
 
   .entity-popover-meta-row dd {
     margin: 0;
-    color: var(--color-fg);
+    color: var(--color-text);
     word-break: break-word;
   }
 
@@ -321,7 +321,7 @@
     justify-content: flex-end;
     padding: var(--space-sm) var(--space-md) var(--space-10);
     border-top: 1px solid var(--color-border);
-    background: var(--color-bg-subtle);
+    background: var(--color-neutral-bg);
   }
 
   .entity-popover-link {

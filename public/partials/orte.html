@@ -82,9 +82,10 @@
   <div x-show="$app.orte.length > 0 && viewMode === 'list'" class="entity-list entity-list--accented ort-list">
     <template x-for="o in $app.orteFiltered" :key="o.id">
       <div>
-        <div class="entity-row" :data-ortid="o.id" @click="$app.selectedOrtId = $app.selectedOrtId === o.id ? null : o.id">
+        <div class="entity-row" :class="{ 'entity-row--stale': o.stale }" :data-ortid="o.id" @click="$app.selectedOrtId = $app.selectedOrtId === o.id ? null : o.id">
           <span class="tag entity-typ-tag" x-text="o.typ || $app.t('orte.typAndere')"></span>
           <span class="entity-row-title" x-text="o.name"></span>
+          <span x-show="o.stale" class="tag tag--stale" :data-tip="$app.t('orte.staleHint')" x-text="$app.t('orte.staleBadge')"></span>
           <span x-show="o.land" class="tag ort-land-tag" x-text="landLabel(o.land)"></span>
           <span x-show="o.stimmung" class="ort-stimmung" x-text="o.stimmung"></span>
           <template x-if="o.kapitel?.length">

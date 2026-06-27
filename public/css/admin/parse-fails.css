@@ -3,7 +3,7 @@
 
 @layer components {
   .card--admin-parse-fails {
-    --card-accent: var(--card-accent-admin-parse-fails, var(--color-err-border));
+    --card-accent: var(--color-err-border);
     container-type: inline-size;
   }
 
@@ -25,25 +25,25 @@
   .parse-fails-row-head {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2);
+    gap: var(--space-2xs);
+    padding: var(--space-2xs);
     min-width: 0;
   }
 
   .parse-fails-ts {
-    font-size: var(--font-sm);
+    font-size: var(--font-size-sm);
     color: var(--color-text);
     white-space: nowrap;
   }
 
   .parse-fails-size {
-    font-size: var(--font-xs);
+    font-size: var(--font-size-xs);
     color: var(--color-muted);
     white-space: nowrap;
   }
 
   .parse-fails-name {
-    font-size: var(--font-xs);
+    font-size: var(--font-size-xs);
     color: var(--color-muted);
     font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
     overflow: hidden;
@@ -68,11 +68,11 @@
 
   .parse-fails-content {
     margin: 0;
-    padding: var(--space-2);
+    padding: var(--space-2xs);
     border-top: 0.5px solid var(--color-border);
     background: var(--color-hover);
     font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-    font-size: var(--font-xs);
+    font-size: var(--font-size-xs);
     white-space: pre-wrap;
     word-break: break-word;
     color: var(--color-text);

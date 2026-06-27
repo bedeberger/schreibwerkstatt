@@ -160,7 +160,7 @@
  * Tooltip-Hover; nicht klickbar (Status-Info nur). */
 .lt-badge {
   position: absolute;
-  z-index: var(--z-overlay-spellcheck, 9);
+  z-index: var(--z-spellcheck, 9);
   transform: translateX(-100%);
   display: inline-flex;
   align-items: center;

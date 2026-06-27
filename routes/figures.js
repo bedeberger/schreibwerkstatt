@@ -306,7 +306,7 @@ router.get('/scenes/:book_id', (req, res) => {
 
   const rows = db.prepare(`
     SELECT fs.id, c.chapter_name AS kapitel, p.page_name AS seite,
-           fs.titel, fs.wertung, fs.kommentar, fs.chapter_id, fs.page_id, fs.updated_at
+           fs.titel, fs.wertung, fs.kommentar, fs.chapter_id, fs.page_id, fs.stale, fs.updated_at
     FROM figure_scenes fs
     LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
     LEFT JOIN pages    p ON p.page_id    = fs.page_id
@@ -335,6 +335,7 @@ router.get('/scenes/:book_id', (req, res) => {
 
   const szenen = rows.map(s => ({
     id:         s.id,
+    stale:      !!s.stale,
     kapitel:    s.kapitel,
     seite:      s.seite,
     titel:      s.titel,

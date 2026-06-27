@@ -135,7 +135,11 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
       orte = orteResultRaw.orte.map((o, i) => ({ ...o, id: o.id || ('ort_' + (i + 1)) }));
     }
   }
-  saveOrteToDb(bookIdInt, orte, email, idMaps.chNameToId, idMaps.pageNameToIdByChapter, { preserveExistingCoords: true });
+  // Name-Match + stale: locations.id bleibt ueber Re-Analysen stabil (FK-Refs wie
+  // research_item_links.location_id ueberleben); verschwundene Orte werden als stale
+  // markiert statt geloescht (kein CASCADE auf die Verknuepfungen).
+  saveOrteToDb(bookIdInt, orte, email, idMaps.chNameToId, idMaps.pageNameToIdByChapter,
+    { preserveExistingCoords: true, matchBy: 'name', onMissing: 'stale' });
   log.info(`${orte.length} Schauplätze gespeichert.`);
 
   const ortNameToId = {}, ortNameToIdLower = {};

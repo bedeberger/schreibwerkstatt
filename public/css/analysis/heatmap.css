@@ -53,7 +53,7 @@
   white-space: nowrap;
 }
 .heatmap-table thead th {
-  background: var(--color-surface-alt, var(--color-surface));
+  background: var(--color-surface);
   color: var(--color-muted);
   font-weight: 500;
   text-align: right;
@@ -67,7 +67,7 @@
   font-size: var(--font-size-xs, 11px);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--color-fg-muted, var(--color-muted));
+  color: var(--color-muted);
   border-bottom: 0.5px solid var(--color-border);
   padding-bottom: var(--space-2xs);
 }
@@ -100,7 +100,7 @@
 }
 .heatmap-rowhead-main {
   display: block;
-  color: var(--color-fg);
+  color: var(--color-text);
 }
 .heatmap-rowhead-sub {
   display: block;
@@ -191,7 +191,7 @@
   padding: var(--space-10) 12px;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-alt, var(--color-surface));
+  background: var(--color-surface);
 }
 .heatmap-detail-header {
   display: flex;

@@ -17,7 +17,7 @@ router.get('/:book_id', (req, res) => {
 
   const rows = db.prepare(`
     SELECT id, loc_id, name, typ, beschreibung, erste_erwaehnung, erste_erwaehnung_page_id, stimmung,
-           land, lat, lng, geo_query, geo_land, updated_at
+           land, lat, lng, geo_query, geo_land, stale, updated_at
     FROM locations
     WHERE book_id = ? AND user_email = ?
     ORDER BY sort_order, id
@@ -49,6 +49,7 @@ router.get('/:book_id', (req, res) => {
 
   const orte = rows.map(r => ({
     id:                       r.loc_id,
+    stale:                    !!r.stale,
     name:                     r.name,
     typ:                      r.typ,
     beschreibung:             r.beschreibung,

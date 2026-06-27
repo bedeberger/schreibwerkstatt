@@ -107,10 +107,49 @@ function remapAssignments(chAssignments, figNameToId, figNameToIdLower, chNameTo
 /** Speichert Szenen und Figuren-Events in die DB. Gibt { szenenCount, eventsCount } zurück. */
 function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId, idMaps, log, jobId) {
   db.transaction(() => {
-    db.prepare('DELETE FROM figure_scenes WHERE book_id = ? AND user_email = ?').run(bookIdInt, email);
+    // Reconcile statt DELETE+INSERT, damit figure_scenes.id (und FK-Refs darauf:
+    // research_item_links.scene_id, scene_locations) ueber Re-Analysen stabil bleibt.
+    // figure_scenes hat keinen lauf-stabilen Identifier → Match per (chapter_id +
+    // normalisierter Titel); re-detektiert behaelt id + stale=0, verschwundene → stale=1
+    // statt Loeschen. Spiegelt das figures-/locations-Reconcile-Netz.
+    const _normTitel = (t) => (t || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    // Eingehende Szenen vorab auf chapter_id/page_id aufloesen (fuer Match-Key + Save).
+    const resolved = szenen.map(s => {
+      const chapterId = idMaps.chNameToId[s.kapitel] ?? null;
+      const pageId = s.seite
+        ? (idMaps.pageNameToIdByChapter[chapterId ?? 0]?.[s.seite] ?? null)
+        : null;
+      return { ...s, chapterId, pageId };
+    });
+
+    const existing = db.prepare(
+      'SELECT id, chapter_id, titel FROM figure_scenes WHERE book_id = ? AND user_email IS ?'
+    ).all(bookIdInt, email);
+    const exByKey = new Map();   // 'chapterId::titel' → [existingId, …]
+    for (const ex of existing) {
+      const k = (ex.chapter_id ?? 0) + '::' + _normTitel(ex.titel);
+      if (!exByKey.has(k)) exByKey.set(k, []);
+      exByKey.get(k).push(ex.id);
+    }
+    const matchOf = new Map();   // resolvedIndex → existingId
+    const usedExisting = new Set();
+    for (let i = 0; i < resolved.length; i++) {
+      const bucket = exByKey.get((resolved[i].chapterId ?? 0) + '::' + _normTitel(resolved[i].titel));
+      const exId = bucket && bucket.find(id => !usedExisting.has(id));
+      if (exId != null) { matchOf.set(i, exId); usedExisting.add(exId); }
+    }
+    // Verschwundene → stale=1 (Refs bleiben), statt Loeschen.
+    const markStale = db.prepare('UPDATE figure_scenes SET stale = 1 WHERE id = ?');
+    for (const ex of existing) if (!usedExisting.has(ex.id)) markStale.run(ex.id);
+
     const ins = db.prepare(`INSERT INTO figure_scenes
-      (book_id, user_email, titel, wertung, kommentar, chapter_id, page_id, sort_order, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
+      (book_id, user_email, titel, wertung, kommentar, chapter_id, page_id, sort_order, stale, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ${NOW_ISO_SQL})`);
+    const upd = db.prepare(`UPDATE figure_scenes
+      SET titel=?, wertung=?, kommentar=?, chapter_id=?, page_id=?, sort_order=?, stale=0, updated_at=${NOW_ISO_SQL}
+      WHERE id=?`);
+    const delSf = db.prepare('DELETE FROM scene_figures WHERE scene_id = ?');
+    const delSl = db.prepare('DELETE FROM scene_locations WHERE scene_id = ?');
     // scene_figures.figure_id ist INTEGER (figures.id) seit Mig 73 — Lookup TEXT → INT.
     const figRows = db.prepare(
       'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email IS ?'
@@ -118,17 +157,25 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
     const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
     const insSf = db.prepare('INSERT OR IGNORE INTO scene_figures (scene_id, figure_id) VALUES (?, ?)');
     const insSl = db.prepare('INSERT OR IGNORE INTO scene_locations (scene_id, location_id) VALUES (?, ?)');
-    for (const s of szenen) {
-      const chapterId = idMaps.chNameToId[s.kapitel] ?? null;
-      const pageId = s.seite
-        ? (idMaps.pageNameToIdByChapter[chapterId ?? 0]?.[s.seite] ?? null)
-        : null;
-      const { lastInsertRowid: sceneId } = ins.run(
-        bookIdInt, email,
-        s.titel, s.wertung, s.kommentar,
-        chapterId, pageId,
-        s.sort_order,
-      );
+    for (let i = 0; i < resolved.length; i++) {
+      const s = resolved[i];
+      const existingId = matchOf.get(i);
+      let sceneId;
+      if (existingId != null) {
+        upd.run(s.titel, s.wertung, s.kommentar, s.chapterId, s.pageId, s.sort_order, existingId);
+        sceneId = existingId;
+        // Analyse-Bridges neu schreiben (CASCADE-Kinder ohne externe Refs).
+        delSf.run(sceneId);
+        delSl.run(sceneId);
+      } else {
+        const r = ins.run(
+          bookIdInt, email,
+          s.titel, s.wertung, s.kommentar,
+          s.chapterId, s.pageId,
+          s.sort_order,
+        );
+        sceneId = r.lastInsertRowid;
+      }
       for (const fid of s.fig_ids) {
         const rowId = figIdToRowId[fid];
         if (rowId != null) insSf.run(sceneId, rowId);

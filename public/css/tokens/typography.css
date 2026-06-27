@@ -5,6 +5,7 @@
   /* === Font-Family === */
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-serif: 'Source Serif 4', 'Iowan Old Style', 'Palatino', Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* Code, Logs, Tokens, Pfade */
 
   /* === Font-Size-Scale ===
      Editorial-Skala, 4-Stufen modular: xs/sm/base/md (UI),

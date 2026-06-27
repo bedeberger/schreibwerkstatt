@@ -67,6 +67,11 @@
 }
 .entity-row:hover { background: var(--color-hover); }
 .entity-row--selected { background: var(--color-hover); }
+/* In der letzten Komplettanalyse nicht mehr erkannt — wegen externer Verknuepfungen
+   (Recherche/Plot/Szenen) bewusst erhalten statt geloescht, gedaempft dargestellt
+   (spiegelt .figur-item--stale). */
+.entity-row--stale { opacity: 0.6; }
+.entity-row--stale .entity-row-title { font-style: italic; }
 
 /* Anchor-Bar: 3px farbiger Linksrand am Row + Detail.
    Sichtbar nur, wenn .entity-list--accented gesetzt + --card-accent vorhanden.

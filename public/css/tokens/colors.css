@@ -81,6 +81,7 @@
   --color-shadow: rgba(0, 0, 0, 0.12);
   --color-shadow-med: rgba(0, 0, 0, 0.15);
   --color-shadow-strong: rgba(0, 0, 0, 0.3);
+  --color-overlay: rgba(0, 0, 0, 0.45); /* Modal-/Dialog-Scrim, theme-unabhängig */
 
   /* Hover-Abstufungen */
   --color-hover-light: rgba(0, 0, 0, 0.03);

@@ -25,8 +25,8 @@
     color: var(--color-text);
   }
   .figur-bz-typ          { color: var(--rel-hue); }
-  .figur-sozialschicht-badge { color: var(--sch-hue); }
-  .figur-praesenz-badge  { color: var(--pres-hue); }
+  .figur-sozialschicht-badge { color: var(--badge-hue); }
+  .figur-praesenz-badge  { color: var(--badge-hue); }
   .gz-figur-badge        { color: var(--fig-hue); }
 
   /* Legenden-Punkt (10x10) – Hue direkt als Fläche */
