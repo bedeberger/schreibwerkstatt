@@ -26,10 +26,13 @@ const NOW = '2026-01-01T00:00:00.000Z';
 // Seed: Buch + ein Recherche-Item.
 db.prepare("INSERT INTO books (book_id, name, created_at, updated_at) VALUES (?, 'Testbuch', ?, ?)").run(BOOK_ID, NOW, NOW);
 const itemRes = db.prepare(
-  `INSERT INTO research_items (book_id, user_email, kind, title, body, url, source, created_at, updated_at)
-   VALUES (?, ?, 'note', 'Bronzezeit', 'Notiz über Bronzezeit-Grabungen', '', 'Wikipedia', ?, ?)`
+  `INSERT INTO research_items (book_id, user_email, kind, title, body, source, created_at, updated_at)
+   VALUES (?, ?, 'note', 'Bronzezeit', 'Notiz über Bronzezeit-Grabungen', 'Wikipedia', ?, ?)`
 ).run(BOOK_ID, USER, NOW, NOW);
 const ITEM_ID = itemRes.lastInsertRowid;
+db.prepare(
+  `INSERT INTO research_item_urls (item_id, url, label, position, created_at) VALUES (?, ?, ?, 0, ?)`
+).run(ITEM_ID, 'https://de.wikipedia.org/wiki/Bronzezeit', 'Bronzezeit – Wikipedia', NOW);
 
 const mkCtx = () => ({ bookId: BOOK_ID, userEmail: USER, proposals: [], logger: { warn() {}, info() {} } });
 
@@ -41,11 +44,15 @@ test('list_research_items liefert vorhandene Einträge', async () => {
   assert.equal(out.items[0].kind, 'note');
 });
 
-test('read_research_item liefert Volltext', async () => {
+test('read_research_item liefert Volltext inkl. URLs', async () => {
   const out = await executeResearchTool('read_research_item', { id: ITEM_ID }, mkCtx());
   assert.equal(out.id, ITEM_ID);
   assert.match(out.body, /Bronzezeit-Grabungen/);
   assert.equal(out.source, 'Wikipedia');
+  assert.ok(Array.isArray(out.urls));
+  assert.equal(out.urls.length, 1);
+  assert.equal(out.urls[0].url, 'https://de.wikipedia.org/wiki/Bronzezeit');
+  assert.equal(out.urls[0].label, 'Bronzezeit – Wikipedia');
 });
 
 test('read_research_item: unbekannte id → error', async () => {
@@ -73,10 +80,28 @@ test('propose_research_item: gültige Notiz wird in ctx.proposals gesammelt (NIC
   assert.equal(after, before);
 });
 
-test('propose_research_item: nicht-http(s)-URL wird abgelehnt', async () => {
+test('propose_research_item: mehrere URLs (mit Label) werden gesammelt', async () => {
+  const ctx = mkCtx();
+  const out = await executeResearchTool('propose_research_item', {
+    kind: 'link', title: 'Mehrere Quellen',
+    urls: [
+      { url: 'https://example.org/a', label: 'A' },
+      { url: 'https://example.org/b' },
+      'https://example.org/a', // Duplikat → verworfen
+    ],
+  }, ctx);
+  assert.equal(out.ok, true);
+  assert.equal(ctx.proposals.length, 1);
+  assert.equal(ctx.proposals[0].urls.length, 2);
+  assert.equal(ctx.proposals[0].urls[0].url, 'https://example.org/a');
+  assert.equal(ctx.proposals[0].urls[0].label, 'A');
+  assert.equal(ctx.proposals[0].urls[1].label, '');
+});
+
+test('propose_research_item: nicht-http(s)-URL ohne gültige URL wird abgelehnt', async () => {
   const ctx = mkCtx();
   const out = await executeResearchTool('propose_research_item',
-    { kind: 'link', title: 'Böse', url: 'javascript:alert(1)' }, ctx);
+    { kind: 'link', title: 'Böse', urls: [{ url: 'javascript:alert(1)' }] }, ctx);
   assert.equal(out.ok, false);
   assert.equal(ctx.proposals.length, 0);
 });

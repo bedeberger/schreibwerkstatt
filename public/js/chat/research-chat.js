@@ -151,7 +151,7 @@ export const researchChatMethods = {
           kind: proposal.kind || 'note',
           title: proposal.title || '',
           body: proposal.body || '',
-          url: proposal.url || '',
+          urls: Array.isArray(proposal.urls) ? proposal.urls : [],
           source: proposal.source || '',
           tags: Array.isArray(proposal.tags) ? proposal.tags : [],
         }),

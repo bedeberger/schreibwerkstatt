@@ -653,9 +653,12 @@ test('plot prompts: System-Prompt verbietet Fliesstext + erzwingt JSON (Claude-M
 const { plotMethods } = await import('../../public/js/book/plot.js');
 
 // Minimaler Karten-Kontext: plotMethods auf ein Plain-Object gemappt, `this`=ctx.
-function makeCtx({ beats = [], acts = [], verworfenOpen = {} } = {}) {
+function makeCtx({ beats = [], acts = [], threads = [], verworfenOpen = {}, plotFilters } = {}) {
   return Object.assign(
-    { _memos: {}, beats, acts, verworfenOpen, plotFilters: { kapitel: '', figurId: '', draftFigurId: '' } },
+    {
+      _memos: {}, beats, acts, threads, verworfenOpen,
+      plotFilters: plotFilters || { kapitel: '', figurId: '', draftFigurId: '', status: '', text: '' },
+    },
     plotMethods,
   );
 }
@@ -725,4 +728,44 @@ test('plotMethods.visibleBeatsForAct: verworfen versteckt bis aufgeklappt', () =
   ctx.verworfenOpen = { 1: true };
   ctx._memos = {};
   assert.deepEqual(ctx.visibleBeatsForAct(1).map(b => b.id), [1, 2]);
+});
+
+test('plotMethods.effectiveChapterNameForBeat: eigenes Kapitel hat Vorrang, sonst vom Strang geerbt', () => {
+  const threads = [{ id: 7, chapter_name: 'Kap 5' }];
+  const ctx = makeCtx({ threads });
+  // Beat ohne eigenes Kapitel, in der Strang-Lane → erbt das Strang-Kapitel
+  assert.equal(ctx.effectiveChapterNameForBeat({ thread_id: 7, chapter_name: null }), 'Kap 5');
+  // Beat mit eigenem Kapitel → eigenes gewinnt
+  assert.equal(ctx.effectiveChapterNameForBeat({ thread_id: 7, chapter_id: 99, chapter_name: 'Kap 2' }), 'Kap 2');
+  // Kein Strang, kein eigenes Kapitel → leer
+  assert.equal(ctx.effectiveChapterNameForBeat({ thread_id: null, chapter_name: null }), '');
+  // Strang ohne gebundenes Kapitel → leer
+  const ctx2 = makeCtx({ threads: [{ id: 8, chapter_name: null }] });
+  assert.equal(ctx2.effectiveChapterNameForBeat({ thread_id: 8, chapter_name: null }), '');
+});
+
+test('plotMethods.plotCoverage: geerbtes Strang-Kapitel zählt als abgedeckt + nicht als kapitelloser Beat', () => {
+  const prevWin = globalThis.window;
+  globalThis.window = {
+    __app: { tree: [{ type: 'chapter', name: 'Kap 5' }, { type: 'chapter', name: 'Kap 6' }] },
+  };
+  try {
+    const threads = [{ id: 7, chapter_name: 'Kap 5' }];
+    // Beat ohne eigenes Kapitel, aber in der an Kap 5 gebundenen Strang-Lane
+    const beats = [{ id: 1, act_id: 1, thread_id: 7, chapter_name: null, verworfen: 0 }];
+    const cov = makeCtx({ beats, threads }).plotCoverage();
+    assert.deepEqual(cov.uncovered, ['Kap 6']); // Kap 5 gilt via Vererbung als abgedeckt
+    assert.equal(cov.beatsNoChapter, 0);        // der Beat hat effektiv ein Kapitel
+  } finally {
+    if (prevWin === undefined) delete globalThis.window; else globalThis.window = prevWin;
+  }
+});
+
+test('plotMethods._beatMatchesFilter: Kapitel-Filter trifft auch geerbte Kapitel', () => {
+  const threads = [{ id: 7, chapter_name: 'Kap 5' }];
+  const beats = [{ id: 1, act_id: 1, thread_id: 7, chapter_name: null, fig_ids: [], draft_fig_ids: [] }];
+  const ctx = makeCtx({ beats, threads, plotFilters: { kapitel: 'Kap 5', figurId: '', draftFigurId: '', status: '', text: '' } });
+  assert.equal(ctx._beatMatchesFilter(beats[0]), true);
+  ctx.plotFilters.kapitel = 'Kap 6';
+  assert.equal(ctx._beatMatchesFilter(beats[0]), false);
 });

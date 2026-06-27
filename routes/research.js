@@ -30,6 +30,8 @@ const KINDS = new Set(['note', 'link', 'quote', 'fact', 'image']);
 const TITLE_MAX = 300;
 const BODY_MAX = 20000;
 const URL_MAX = 2000;
+const URL_LABEL_MAX = 300;
+const MAX_URLS = 20;
 const SOURCE_MAX = 1000;
 const TAG_MAX = 60;
 const MAX_TAGS = 20;
@@ -92,6 +94,16 @@ function _attachRelations(items) {
     tagsByItem.get(r.item_id).push(r.tag);
   }
 
+  const urlRows = db.prepare(
+    `SELECT id AS url_id, item_id, url, label FROM research_item_urls
+      WHERE item_id IN (${ph}) ORDER BY item_id, position, id`
+  ).all(...ids);
+  const urlsByItem = new Map();
+  for (const r of urlRows) {
+    if (!urlsByItem.has(r.item_id)) urlsByItem.set(r.item_id, []);
+    urlsByItem.get(r.item_id).push({ url_id: r.url_id, url: r.url, label: r.label || '' });
+  }
+
   // Links inkl. Display-Label per target_kind-spezifischem JOIN (ein Pass je Kind).
   const linksByItem = new Map();
   for (const [kind, t] of Object.entries(LINK_TARGETS)) {
@@ -111,6 +123,7 @@ function _attachRelations(items) {
 
   for (const it of items) {
     it.tags = tagsByItem.get(it.id) || [];
+    it.urls = urlsByItem.get(it.id) || [];
     it.links = linksByItem.get(it.id) || [];
     it.has_image = !!it.image_mime;
     it.has_doc = !!it.doc_mime;
@@ -122,13 +135,33 @@ function _attachRelations(items) {
 
 function _emitItem(id) {
   const row = db.prepare(
-    `SELECT id, book_id, user_email, kind, title, body, url, source, image_mime,
+    `SELECT id, book_id, user_email, kind, title, body, source, image_mime,
             doc_mime, doc_name, doc_pages, pinned, archived, created_at, updated_at
        FROM research_items WHERE id = ?`
   ).get(id);
   if (!row) return null;
   _attachRelations([row]);
   return row;
+}
+
+// urls: Array von { url, label? } (oder reinen URL-Strings) → geordnete Kind-Tabelle.
+// Nur http(s) (XSS-/Schema-Schutz beim späteren :href-Binding), je URL einmal.
+function _replaceUrls(itemId, urls) {
+  db.prepare('DELETE FROM research_item_urls WHERE item_id = ?').run(itemId);
+  if (!Array.isArray(urls)) return;
+  const ins = db.prepare(
+    `INSERT INTO research_item_urls (item_id, url, label, position, created_at)
+     VALUES (?, ?, ?, ?, ${NOW_ISO_SQL})`
+  );
+  const seen = new Set();
+  let pos = 0;
+  for (const raw of urls.slice(0, MAX_URLS)) {
+    const url = _clean(typeof raw === 'string' ? raw : raw?.url, URL_MAX);
+    if (!url || !/^https?:\/\//i.test(url) || seen.has(url)) continue;
+    seen.add(url);
+    const label = typeof raw === 'object' ? _clean(raw?.label, URL_LABEL_MAX) : null;
+    ins.run(itemId, url, label, pos++);
+  }
 }
 
 function _replaceTags(itemId, tags) {
@@ -212,7 +245,7 @@ router.get('/', (req, res) => {
   }
 
   const rows = db.prepare(
-    `SELECT ri.id, ri.book_id, ri.user_email, ri.kind, ri.title, ri.body, ri.url,
+    `SELECT ri.id, ri.book_id, ri.user_email, ri.kind, ri.title, ri.body,
             ri.source, ri.image_mime, ri.doc_mime, ri.doc_name, ri.doc_pages,
             ri.pinned, ri.archived, ri.created_at, ri.updated_at${selectExtra}
        FROM research_items ri
@@ -320,15 +353,17 @@ router.post('/', jsonBody, (req, res) => {
   const kind = KINDS.has(req.body?.kind) ? req.body.kind : 'note';
   const title = _clean(req.body?.title, TITLE_MAX);
   const body = _clean(req.body?.body, BODY_MAX);
-  const url = _clean(req.body?.url, URL_MAX);
   const source = _clean(req.body?.source, SOURCE_MAX);
-  if (!title && !body && !url) return res.status(400).json({ error_code: 'EMPTY' });
+  const urls = Array.isArray(req.body?.urls) ? req.body.urls : [];
+  const hasUrl = urls.some(u => /^https?:\/\//i.test(String(typeof u === 'string' ? u : u?.url || '').trim()));
+  if (!title && !body && !hasUrl) return res.status(400).json({ error_code: 'EMPTY' });
 
   const result = db.prepare(
-    `INSERT INTO research_items (book_id, user_email, kind, title, body, url, source, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})`
-  ).run(bookId, userEmail, kind, title, body, url, source);
+    `INSERT INTO research_items (book_id, user_email, kind, title, body, source, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})`
+  ).run(bookId, userEmail, kind, title, body, source);
   const id = result.lastInsertRowid;
+  _replaceUrls(id, urls);
   _replaceTags(id, req.body?.tags);
   searchIndex.upsertResearch(id);
   logger.info(`[research] create id=${id} kind=${kind}`);
@@ -354,19 +389,21 @@ router.patch('/:id', jsonBody, (req, res) => {
   }
   if (typeof b.title !== 'undefined')  { sets.push('title = ?');  vals.push(_clean(b.title, TITLE_MAX)); }
   if (typeof b.body !== 'undefined')   { sets.push('body = ?');   vals.push(_clean(b.body, BODY_MAX)); }
-  if (typeof b.url !== 'undefined')    { sets.push('url = ?');    vals.push(_clean(b.url, URL_MAX)); }
   if (typeof b.source !== 'undefined') { sets.push('source = ?'); vals.push(_clean(b.source, SOURCE_MAX)); }
   if (typeof b.pinned !== 'undefined')   { sets.push('pinned = ?');   vals.push(b.pinned ? 1 : 0); }
   if (typeof b.archived !== 'undefined') { sets.push('archived = ?'); vals.push(b.archived ? 1 : 0); }
 
   const hasTags = typeof b.tags !== 'undefined';
-  if (!sets.length && !hasTags) return res.status(400).json({ error_code: 'NO_FIELDS' });
+  const hasUrls = typeof b.urls !== 'undefined';
+  if (!sets.length && !hasTags && !hasUrls) return res.status(400).json({ error_code: 'NO_FIELDS' });
 
-  if (sets.length) {
+  // urls sind Kerninhalt → updated_at auch dann bumpen, wenn nur sie sich ändern.
+  if (sets.length || hasUrls) {
     sets.push(`updated_at = ${NOW_ISO_SQL}`);
     vals.push(id);
     db.prepare(`UPDATE research_items SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   }
+  if (hasUrls) _replaceUrls(id, b.urls);
   if (hasTags) _replaceTags(id, b.tags);
   searchIndex.upsertResearch(id);
   res.json(_emitItem(id));

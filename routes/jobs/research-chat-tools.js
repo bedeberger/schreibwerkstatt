@@ -20,6 +20,8 @@ const DOC_TEXT_MAX = 8000;
 const PROPOSAL_TITLE_MAX = 300;
 const PROPOSAL_BODY_MAX = 20000;
 const PROPOSAL_URL_MAX = 2000;
+const PROPOSAL_URL_LABEL_MAX = 300;
+const PROPOSAL_MAX_URLS = 20;
 const PROPOSAL_SOURCE_MAX = 1000;
 const MAX_PROPOSALS = 12;
 
@@ -46,7 +48,7 @@ function tool_list_research_items(input, ctx) {
   }
 
   const rows = db.prepare(
-    `SELECT ri.id, ri.kind, ri.title, ri.body, ri.url, ri.source, ri.doc_name,
+    `SELECT ri.id, ri.kind, ri.title, ri.body, ri.source, ri.doc_name,
             (ri.doc_mime IS NOT NULL) AS has_doc
        FROM research_items ri
       WHERE ${where.join(' AND ')}
@@ -54,22 +56,32 @@ function tool_list_research_items(input, ctx) {
       LIMIT ${ITEM_LIST_MAX}`
   ).all(...vals);
 
+  const idPh = rows.length ? rows.map(() => '?').join(',') : '';
   const tagRows = rows.length
-    ? db.prepare(`SELECT item_id, tag FROM research_item_tags WHERE item_id IN (${rows.map(() => '?').join(',')})`)
-        .all(...rows.map(r => r.id))
+    ? db.prepare(`SELECT item_id, tag FROM research_item_tags WHERE item_id IN (${idPh})`).all(...rows.map(r => r.id))
     : [];
   const tagsBy = new Map();
   for (const t of tagRows) { if (!tagsBy.has(t.item_id)) tagsBy.set(t.item_id, []); tagsBy.get(t.item_id).push(t.tag); }
 
-  const items = rows.map(r => ({
-    id: r.id,
-    kind: r.kind,
-    title: r.title || '',
-    snippet: _snip(r.body || r.url || r.source, SNIPPET_MAX),
-    tags: tagsBy.get(r.id) || [],
-    has_doc: !!r.has_doc,
-    ...(r.doc_name ? { doc_name: r.doc_name } : {}),
-  }));
+  const urlRows = rows.length
+    ? db.prepare(`SELECT item_id, url FROM research_item_urls WHERE item_id IN (${idPh}) ORDER BY item_id, position, id`).all(...rows.map(r => r.id))
+    : [];
+  const urlsBy = new Map();
+  for (const u of urlRows) { if (!urlsBy.has(u.item_id)) urlsBy.set(u.item_id, []); urlsBy.get(u.item_id).push(u.url); }
+
+  const items = rows.map(r => {
+    const urls = urlsBy.get(r.id) || [];
+    return {
+      id: r.id,
+      kind: r.kind,
+      title: r.title || '',
+      snippet: _snip(r.body || urls[0] || r.source, SNIPPET_MAX),
+      tags: tagsBy.get(r.id) || [],
+      url_count: urls.length,
+      has_doc: !!r.has_doc,
+      ...(r.doc_name ? { doc_name: r.doc_name } : {}),
+    };
+  });
   return { items, count: items.length };
 }
 
@@ -78,17 +90,19 @@ function tool_read_research_item(input, ctx) {
   const id = parseInt(input.id, 10);
   if (!id) return { error: 'id fehlt oder ungültig.' };
   const row = db.prepare(
-    `SELECT id, kind, title, body, url, source, doc_name, doc_text
+    `SELECT id, kind, title, body, source, doc_name, doc_text
        FROM research_items WHERE id = ? AND book_id = ?`
   ).get(id, ctx.bookId);
   if (!row) return { error: 'Eintrag nicht gefunden.' };
   const tags = db.prepare('SELECT tag FROM research_item_tags WHERE item_id = ? ORDER BY tag').all(id).map(t => t.tag);
+  const urls = db.prepare('SELECT url, label FROM research_item_urls WHERE item_id = ? ORDER BY position, id')
+    .all(id).map(u => ({ url: u.url, label: u.label || '' }));
   return {
     id: row.id,
     kind: row.kind,
     title: row.title || '',
     body: row.body || '',
-    url: row.url || '',
+    urls,
     source: row.source || '',
     tags,
     ...(row.doc_name ? { doc_name: row.doc_name } : {}),
@@ -135,22 +149,38 @@ function tool_propose_research_item(input, ctx) {
   const kind = KINDS.has(input.kind) ? input.kind : 'note';
   const title = _snip(input.title, PROPOSAL_TITLE_MAX);
   const body = String(input.body || '').trim().slice(0, PROPOSAL_BODY_MAX);
-  const url = _snip(input.url, PROPOSAL_URL_MAX);
   const source = _snip(input.source, PROPOSAL_SOURCE_MAX);
   const tags = Array.isArray(input.tags)
     ? input.tags.map(t => _snip(t, 60)).filter(Boolean).slice(0, 20)
     : [];
 
-  if (!title && !body && !url) return { ok: false, error: 'Vorschlag braucht mindestens Titel, Inhalt oder URL.' };
-  // http(s)-only für link-URLs (XSS/Schema-Schutz, analog routes/research.js-Plan).
-  if (url && !/^https?:\/\//i.test(url)) return { ok: false, error: 'URL muss mit http:// oder https:// beginnen.' };
+  // urls: Array von { url, label? } (oder reine URL-Strings). http(s)-only
+  // (XSS/Schema-Schutz beim späteren :href-Binding), je URL einmal.
+  const seenUrls = new Set();
+  const urls = [];
+  let hadBadUrl = false;
+  for (const raw of (Array.isArray(input.urls) ? input.urls : [])) {
+    const u = _snip(typeof raw === 'string' ? raw : raw?.url, PROPOSAL_URL_MAX);
+    if (!u) continue;
+    if (!/^https?:\/\//i.test(u)) { hadBadUrl = true; continue; }
+    if (seenUrls.has(u)) continue;
+    seenUrls.add(u);
+    const label = typeof raw === 'object' ? _snip(raw?.label, PROPOSAL_URL_LABEL_MAX) : '';
+    urls.push({ url: u, label });
+    if (urls.length >= PROPOSAL_MAX_URLS) break;
+  }
+
+  if (!title && !body && !urls.length) {
+    return { ok: false, error: 'Vorschlag braucht mindestens Titel, Inhalt oder eine URL.' };
+  }
+  if (hadBadUrl && !urls.length) return { ok: false, error: 'URLs müssen mit http:// oder https:// beginnen.' };
 
   if ((ctx.proposals?.length || 0) >= MAX_PROPOSALS) {
     return { ok: false, error: `Maximal ${MAX_PROPOSALS} Vorschläge pro Antwort.` };
   }
-  const proposal = { kind, title, body, url, source, tags };
+  const proposal = { kind, title, body, urls, source, tags };
   ctx.proposals.push(proposal);
-  return { ok: true, accepted_as_proposal: true, kind, title: title || url || _snip(body, 60) };
+  return { ok: true, accepted_as_proposal: true, kind, title: title || urls[0]?.url || _snip(body, 60) };
 }
 
 // ── Dispatcher ───────────────────────────────────────────────────────────────

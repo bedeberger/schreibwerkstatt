@@ -12,7 +12,7 @@ const KINDS = ['note', 'link', 'quote', 'fact', 'image', 'document'];
 const LINK_KINDS = ['figure', 'location', 'scene', 'beat', 'thread', 'chapter', 'page'];
 
 function _emptyDraft() {
-  return { kind: 'note', title: '', body: '', url: '', source: '', tags: '', fileName: '' };
+  return { kind: 'note', title: '', body: '', urls: [], source: '', tags: '', fileName: '' };
 }
 
 export const rechercheMethods = {
@@ -200,7 +200,7 @@ export const rechercheMethods = {
     if (!bookId) return;
     const d = this.draft;
     const file = this.$refs?.createFile?.files?.[0] || null;
-    const hasText = !!((d.title || '').trim() || (d.body || '').trim() || (d.url || '').trim());
+    const hasText = !!((d.title || '').trim() || (d.body || '').trim() || (d.urls || []).some(u => (u.url || '').trim()));
     if (!hasText && !file) {
       this.errorMessage = app.t('recherche.error.empty');
       return;
@@ -243,12 +243,16 @@ export const rechercheMethods = {
       kind: item.kind || 'note',
       title: item.title || '',
       body: item.body || '',
-      url: item.url || '',
+      urls: (item.urls || []).map(u => ({ url: u.url || '', label: u.label || '' })),
       source: item.source || '',
       tags: (item.tags || []).join(', '),
     };
   },
   cancelEdit() { this.editingId = null; this.editDraft = _emptyDraft(); },
+
+  // URL-Zeilen im Anlegen-/Bearbeiten-Formular (geteilt über draft/editDraft).
+  addUrlRow(draft) { if (!Array.isArray(draft.urls)) draft.urls = []; draft.urls.push({ url: '', label: '' }); },
+  removeUrlRow(draft, i) { (draft.urls || []).splice(i, 1); },
 
   // Klick auf den Eintrag öffnet den Edit-Modus — ausser auf interaktiven
   // Elementen (Aktions-Buttons, Links, Datei-Inputs, Tag-/Link-Chips), die
@@ -282,9 +286,12 @@ export const rechercheMethods = {
 
   _draftBody(d) {
     const tags = (d.tags || '').split(',').map(s => s.trim()).filter(Boolean);
+    const urls = (d.urls || [])
+      .map(u => ({ url: (u.url || '').trim(), label: (u.label || '').trim() }))
+      .filter(u => u.url);
     return {
       kind: d.kind, title: d.title.trim(), body: d.body.trim(),
-      url: d.url.trim(), source: d.source.trim(), tags,
+      urls, source: d.source.trim(), tags,
     };
   },
 

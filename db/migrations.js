@@ -8653,6 +8653,70 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 222 abgeschlossen (chat_sessions.title — KI-Titel für History-Einträge).');
   }
 
+  if (version < 223) {
+    // Recherche-Board: mehrere URLs pro Eintrag (je mit optionalem Label) statt
+    // der einzelnen url-Spalte. Neue Kind-Tabelle research_item_urls (analog
+    // research_item_tags/_links). Bestehende Einzel-URLs wandern als position=0
+    // ein, danach faellt die url-Spalte via Recreate-Pattern weg (eine Wahrheit).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS research_item_urls (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id     INTEGER NOT NULL REFERENCES research_items(id) ON DELETE CASCADE,
+        url         TEXT    NOT NULL,
+        label       TEXT,
+        position    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_urls_item ON research_item_urls(item_id)');
+    db.exec(`INSERT INTO research_item_urls (item_id, url, position, created_at)
+               SELECT id, trim(url), 0, created_at FROM research_items
+                WHERE url IS NOT NULL AND trim(url) != ''`);
+
+    // url-Spalte droppen → Recreate-Pattern. Die FK-Kinder (research_item_tags/
+    // _links/_urls) referenzieren research_items(id) und bleiben ueber den
+    // id-erhaltenden Recreate intakt.
+    db.pragma('foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS research_items_new');
+    db.exec(`
+      CREATE TABLE research_items_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        kind        TEXT    NOT NULL DEFAULT 'note'
+                      CHECK(kind IN ('note','link','quote','fact','image','document')),
+        title       TEXT,
+        body        TEXT,
+        source      TEXT,
+        image       BLOB,
+        image_mime  TEXT,
+        doc         BLOB,
+        doc_mime    TEXT,
+        doc_name    TEXT,
+        doc_text    TEXT,
+        doc_pages   INTEGER,
+        pinned      INTEGER NOT NULL DEFAULT 0,
+        archived    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+    `);
+    db.exec(`INSERT INTO research_items_new
+        (id, book_id, user_email, kind, title, body, source, image, image_mime, doc, doc_mime, doc_name, doc_text, doc_pages, pinned, archived, created_at, updated_at)
+        SELECT id, book_id, user_email, kind, title, body, source, image, image_mime, doc, doc_mime, doc_name, doc_text, doc_pages, pinned, archived, created_at, updated_at
+          FROM research_items`);
+    db.exec('DROP TABLE research_items');
+    db.exec('ALTER TABLE research_items_new RENAME TO research_items');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_research_items_book ON research_items(book_id)');
+    db.pragma('foreign_keys = ON');
+    const fkErrors223 = db.pragma('foreign_key_check');
+    if (fkErrors223.length) {
+      throw new Error(`Migration 223: foreign_key_check meldet ${fkErrors223.length} Verstoesse: ${JSON.stringify(fkErrors223.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 223').run();
+    logger.info('DB-Migration auf Version 223 abgeschlossen (research_item_urls — mehrere URLs je Recherche-Eintrag, url-Spalte entfernt).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

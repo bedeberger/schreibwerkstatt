@@ -232,6 +232,14 @@ export const derivedMethods = {
     return (t && t.chapter_name) ? t.chapter_name : '';
   },
 
+  // Effektiver Kapitelname eines Beats: eigenes hat Vorrang, sonst das vom Strang
+  // geerbte. SSoT für alle Aggregationen (Coverage, Filter), die mit „dem Kapitel
+  // des Beats" arbeiten — sonst widerspricht das gezeigte geerbte Badge dem, was
+  // Coverage/Filter melden.
+  effectiveChapterNameForBeat(beat) {
+    return beat.chapter_name || this.inheritedChapterForBeat(beat) || '';
+  },
+
   // ── Akt-Farben (Derived) ───────────────────────────────────────────────────
   actPalette() { return ACT_PALETTE; },
 
@@ -357,15 +365,16 @@ export const derivedMethods = {
 
   // ── Kapitel-Coverage (lokales Aggregat, kein KI-Job) ────────────────────────
   // Welche Buch-Kapitel haben (noch) keinen Beat, und wie viele nicht-verworfenen
-  // Beats hängen an keinem Kapitel. Match über chapter_name (Anzeige-Join), Quelle
-  // sind die $app.tree-Kapitel.
+  // Beats hängen an keinem Kapitel. Match über das effektive Kapitel (eigenes oder
+  // vom Strang geerbt), Quelle sind die $app.tree-Kapitel. Deps inkl. threads, weil
+  // das geerbte Kapitel an der Strang-Bindung hängt.
   plotCoverage() {
     const tree = window.__app.tree || [];
-    return this._memo('coverage', [this.beats, tree], () => {
+    return this._memo('coverage', [this.beats, this.threads, tree], () => {
       const chapters = tree.filter(it => it.type === 'chapter');
-      const covered = new Set((this.beats || []).map(b => b.chapter_name).filter(Boolean));
+      const covered = new Set((this.beats || []).map(b => this.effectiveChapterNameForBeat(b)).filter(Boolean));
       const uncovered = chapters.filter(c => !covered.has(c.name)).map(c => c.name);
-      const beatsNoChapter = (this.beats || []).filter(b => !b.chapter_name && !b.verworfen).length;
+      const beatsNoChapter = (this.beats || []).filter(b => !this.effectiveChapterNameForBeat(b) && !b.verworfen).length;
       return { uncovered, beatsNoChapter, totalChapters: chapters.length };
     });
   },
@@ -381,7 +390,7 @@ export const derivedMethods = {
   // Kapitel-Optionen aus den Beats ableiten (buchgeordnet via Root-Helper),
   // damit nur Kapitel angeboten werden, die im Board überhaupt vorkommen.
   plotKapitelListe() {
-    return window.__app._deriveKapitel(this.beats, b => b.chapter_name);
+    return window.__app._deriveKapitel(this.beats, b => this.effectiveChapterNameForBeat(b));
   },
 
   plotFilterActive() {
@@ -395,7 +404,7 @@ export const derivedMethods = {
     // draftFigurId kommt aus der Combobox als Roh-Value (INTEGER) — String-
     // koerziert vergleichen, da draft_fig_ids INTEGER sind.
     return (!txt || (b.titel || '').toLowerCase().includes(txt) || (b.beschreibung || '').toLowerCase().includes(txt)) &&
-           (!f.kapitel || b.chapter_name === f.kapitel) &&
+           (!f.kapitel || this.effectiveChapterNameForBeat(b) === f.kapitel) &&
            (!f.status || b.status === f.status) &&
            (!f.figurId || (b.fig_ids || []).includes(f.figurId)) &&
            (!f.draftFigurId || (b.draft_fig_ids || []).map(String).includes(String(f.draftFigurId)));

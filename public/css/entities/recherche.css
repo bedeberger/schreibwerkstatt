@@ -54,6 +54,22 @@
 .recherche-kind-combo { min-width: 9rem; }
 .recherche-title-input { flex: 2; }
 
+/* Mehrere URLs je Eintrag: eine Zeile pro URL (URL + optionales Label + Entfernen). */
+.recherche-urls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.recherche-url-row {
+  display: flex;
+  gap: var(--space-6);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.recherche-url-row > .recherche-url-input { flex: 2; min-width: 10rem; }
+.recherche-url-row > .recherche-url-label-input { flex: 1; min-width: 8rem; }
+.recherche-url-add { align-self: flex-start; }
+
 .recherche-input {
   width: 100%;
   padding: var(--space-5) var(--space-sm);
@@ -123,7 +139,7 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 .research-item--pinned { background: var(--color-bg); }
 .research-item--archived { opacity: 0.6; }
 
-.research-item-body { display: flex; flex-direction: column; gap: var(--space-3); }
+.research-item-body { display: flex; flex-direction: column; gap: var(--space-4); }
 .research-item-body--clickable { cursor: pointer; }
 
 .research-item-head {
@@ -174,7 +190,9 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 }
 
 .research-item-text {
-  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--lh-base);
+  color: color-mix(in srgb, var(--color-text) 85%, var(--color-muted));
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -185,6 +203,11 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   color: var(--color-muted);
 }
 
+.research-item-urls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
 .research-item-url {
   display: inline-flex;
   align-items: center;
@@ -212,7 +235,7 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 .research-item-doc-meta { color: var(--color-muted); flex-shrink: 0; }
 
 .research-item-source {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
 
@@ -374,8 +397,16 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 .research-chat-proposal {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-xs);
+  gap: var(--space-md);
   padding: var(--space-2xs) 0;
+}
+/* Button als eigene rechte Spalte: feste Breite, oben ausgerichtet, schrumpft
+   nicht — der Vorschlagstext bricht davor um (saubere zweispaltige Optik). */
+.research-chat-proposal > .btn-compact,
+.research-chat-proposal > .research-chat-proposal-saved {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-left: auto;
 }
 .research-chat-proposal--saved { opacity: 0.6; }
 .research-chat-proposal-body {
@@ -395,6 +426,7 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   -webkit-box-orient: vertical;
 }
 .research-chat-proposal-url {
+  display: block;
   font-size: var(--text-sm);
   color: var(--card-accent);
   word-break: break-all;

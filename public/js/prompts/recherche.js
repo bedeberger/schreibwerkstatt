@@ -49,7 +49,10 @@ export function buildResearchLinkPrompt(snippet, candidates) {
   const docPart = snippet.doc_text
     ? `\nAngehängtes Dokument${snippet.doc_name ? ` (${snippet.doc_name})` : ''}:\n${String(snippet.doc_text).slice(0, 6000)}`
     : '';
-  const snip = ([snippet.title, snippet.body, snippet.source, snippet.url]
+  const urlText = Array.isArray(snippet.urls)
+    ? snippet.urls.map(u => [u.label, u.url].filter(Boolean).join(': ')).join('\n')
+    : '';
+  const snip = ([snippet.title, snippet.body, snippet.source, urlText]
     .filter(Boolean).join('\n').slice(0, 4000)) + docPart;
   return `Recherche-Schnipsel:
 """
@@ -151,15 +154,26 @@ export const RESEARCH_CHAT_TOOLS = [
   },
   {
     name: 'propose_research_item',
-    description: 'Schlägt dem User EINEN neuen Recherche-Eintrag zum Speichern vor. Wird NICHT automatisch gespeichert — der User bestätigt jeden Vorschlag mit einem Klick. Nutze es für konkrete Fundstücke (eine Web-Quelle, ein Fakt, ein Zitat). Bei Web-Funden die URL als source angeben. Mehrere Vorschläge = mehrere Aufrufe.',
+    description: 'Schlägt dem User EINEN neuen Recherche-Eintrag zum Speichern vor. Wird NICHT automatisch gespeichert — der User bestätigt jeden Vorschlag mit einem Klick. Nutze es für konkrete Fundstücke (eine oder mehrere Web-Quellen, ein Fakt, ein Zitat). Hänge alle belegenden Web-Quellen als urls an. Mehrere Vorschläge = mehrere Aufrufe.',
     input_schema: {
       type: 'object',
       properties: {
         kind: { type: 'string', enum: ['note', 'link', 'quote', 'fact'], description: 'Eintragstyp: note=Notiz, link=Web-Link, quote=Zitat, fact=Faktensplitter.' },
         title: { type: 'string', description: 'Kurzer, prägnanter Titel.' },
-        body: { type: 'string', description: 'Inhalt / Notiztext / Zitatwortlaut (Pflicht außer bei reinem link mit url).' },
-        url: { type: 'string', description: 'Bei kind=link die URL. Nur http(s).' },
-        source: { type: 'string', description: 'Quelle (z.B. Web-URL, Buchtitel, Datenbank), worauf der Inhalt sich stützt.' },
+        body: { type: 'string', description: 'Inhalt / Notiztext / Zitatwortlaut (Pflicht außer bei reinem link mit urls).' },
+        urls: {
+          type: 'array',
+          description: 'Eine oder mehrere belegende Web-Quellen. Bei kind=link mindestens eine. Nur http(s).',
+          items: {
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'Die URL (http/https).' },
+              label: { type: 'string', description: 'Optionaler Anzeigetext (z.B. Seitentitel).' },
+            },
+            required: ['url'],
+          },
+        },
+        source: { type: 'string', description: 'Quelle (z.B. Buchtitel, Datenbank, Archiv), worauf der Inhalt sich stützt — als Freitext-Nachweis.' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Optionale Schlagworte.' },
       },
       required: ['kind', 'title'],

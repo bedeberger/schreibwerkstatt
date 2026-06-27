@@ -109,3 +109,15 @@ test('Tag-Löschung beim Item-Delete (item CASCADE)', () => {
   db.prepare('DELETE FROM research_items WHERE id = ?').run(itemId);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM research_item_tags').get().n, 0);
 });
+
+test('research_item_urls: Item-Löschung kaskadiert auf die URLs', () => {
+  const db = freshDb();
+  const { itemId } = seedBook(db);
+  db.prepare('INSERT INTO research_item_urls(item_id, url, label, position, created_at) VALUES(?,?,?,?,?)')
+    .run(itemId, 'https://example.org', 'Beispiel', 0, T);
+  db.prepare('INSERT INTO research_item_urls(item_id, url, position, created_at) VALUES(?,?,?,?)')
+    .run(itemId, 'https://example.org/2', 1, T);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM research_item_urls WHERE item_id = ?').get(itemId).n, 2);
+  db.prepare('DELETE FROM research_items WHERE id = ?').run(itemId);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM research_item_urls').get().n, 0);
+});

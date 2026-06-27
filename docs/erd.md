@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 222, 109 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 223, 110 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -366,7 +366,6 @@ erDiagram
     TEXT    kind        "note|link|quote|fact|image|document"
     TEXT    title
     TEXT    body        "Plain-Text"
-    TEXT    url         "bei kind=link"
     TEXT    source      "Quellen-/Zitatnachweis"
     BLOB    image       "bei kind=image, sharp-normalisiert"
     TEXT    image_mime
@@ -383,6 +382,14 @@ erDiagram
   research_item_tags {
     INTEGER item_id PK,FK "ON DELETE CASCADE"
     TEXT    tag     PK
+  }
+  research_item_urls {
+    INTEGER id        PK
+    INTEGER item_id   FK "ON DELETE CASCADE"
+    TEXT    url       "http/https"
+    TEXT    label     "optionaler Anzeigetext"
+    INTEGER position  "Reihenfolge"
+    TEXT    created_at
   }
   research_item_links {
     INTEGER id          PK
@@ -403,6 +410,7 @@ erDiagram
   books     ||--o{ name_guard_ignores : has
   books             ||--o{ research_items      : has
   research_items    ||--o{ research_item_tags  : tagged
+  research_items    ||--o{ research_item_urls  : urls
   research_items    ||--o{ research_item_links : links
   chapters          ||--o{ research_item_links : "linked (chapter)"
   pages             ||--o{ research_item_links : "linked (page)"

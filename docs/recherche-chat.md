@@ -27,6 +27,8 @@ Keine neue Tabelle — die Sessions leben in `chat_sessions` mit **`kind='resear
 
 `propose_research_item` schreibt **nichts** — der Vorschlag landet in `context_info.proposals`. Das Frontend ([public/js/chat/research-chat.js](../public/js/chat/research-chat.js) `saveResearchProposal`) rendert pro Vorschlag einen „Speichern"-Button; **erst der Klick** ruft `POST /research` und fügt das Item ins Board ein (analog zu den KI-Verknüpfungsvorschlägen). Spiegelt das `generate_image`→`ctx.images`-Sammelmuster des Buch-Chats.
 
+Ein Vorschlag (und ein Recherche-Item generell) trägt **mehrere URLs** als `urls: [{ url, label }]` (http(s)-only, Tabelle `research_item_urls`, FK CASCADE — analog `research_item_tags`). Das Modell hängt alle belegenden Web-Quellen an einen `propose_research_item`-Aufruf; beim Speichern persistiert `POST /research` sie über `_replaceUrls`. Die alte Einzel-`url`-Spalte am `research_items` existiert nicht mehr (Migration 223).
+
 ## Loop ([routes/jobs/research-chat.js](../routes/jobs/research-chat.js))
 
 Klon des agentischen Buch-Chat-Loops (`runBookChatJobAgent`), aber ohne Seiten-Vorladen und ohne Zitat-Validierung: `callAIWithTools` → Custom-Tools ausführen → `final_answer`/Prosa terminiert; bei erschöpften Iterationen erzwungener Synthese-Turn mit nur `final_answer`. Cap `jobs.research_chat.max_tool_iter` (Default 6).
