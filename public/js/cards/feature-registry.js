@@ -90,6 +90,10 @@ export const FEATURES = [
     aliases: ['suche','search','volltext','fulltext','find','finden','fts','grep'] },
   { key: 'shareLinks',     kind: 'toggle', group: 'tools',  labelKey: 'tile.shareLinks',     descKey: 'tile.shareLinks.desc',     flag: 'showShareLinksCard',    toggle: 'toggleShareLinksCard',     requiresBook: true, minRole: 'editor',
     aliases: ['share','teilen','link','readonly','beta','feedback','public','offentlich','geteilt'] },
+  // Hilfe — buch-unabhaengig, fuer jeden Auth-User. Funktionsueberblick fuer
+  // den Einstieg (kein requiresBook/Pages, minRole viewer → immer sichtbar).
+  { key: 'help',           kind: 'toggle', group: 'tools',  labelKey: 'tile.help',           descKey: 'tile.help.desc',           flag: 'showHelpCard',          toggle: 'toggleHelpCard',           minRole: 'viewer',
+    aliases: ['hilfe','help','funktionen','features','anleitung','guide','einstieg','onboarding','intro','ueberblick','overview','start','getting-started','faq'] },
 ];
 
 // Globale Aktionen (kind:'action'). Eigene Sektion in der Palette.
@@ -217,6 +221,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'bookEditor',     flag: 'showBookEditorCard',     toggle: 'toggleBookEditorCard',     onReclick: 'refresh', requiresBook: true, partial: 'book-editor' },
   { key: 'search',         flag: 'showSearchCard',         toggle: 'toggleSearchCard',         onReclick: 'refresh', partial: 'search' },
   { key: 'shareLinks',     flag: 'showShareLinksCard',     toggle: 'toggleShareLinksCard',     onReclick: 'refresh', requiresBook: true, partial: 'share-links' },
+  { key: 'help',           flag: 'showHelpCard',           toggle: 'toggleHelpCard',           onReclick: 'close', partial: 'help' },
 ];
 
 export const FEATURE_GROUPS = ['review', 'world', 'tools', 'app'];

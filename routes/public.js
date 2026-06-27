@@ -91,6 +91,7 @@ function _renderLanding(req, res) {
     feat6Title:    t('landing.feat6Title'), feat6Desc: t('landing.feat6Desc'),
     feat7Title:    t('landing.feat7Title'), feat7Desc: t('landing.feat7Desc'),
     feat8Title:    t('landing.feat8Title'), feat8Desc: t('landing.feat8Desc'),
+    feat9Title:    t('landing.feat9Title'), feat9Desc: t('landing.feat9Desc'),
     macTitle:      t('landing.macTitle'),
     macDesc:       t('landing.macDesc'),
     macLinkLabel:  t('landing.macLinkLabel'),

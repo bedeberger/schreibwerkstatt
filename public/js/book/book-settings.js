@@ -111,7 +111,21 @@ export const bookSettingsMethods = {
   // Tagesziel in den anderen Tabs). Beide laufen parallel; die Header-Status-
   // Getter aggregieren über beide. Methoden (keine Getter) — bookSettingsMethods
   // wird gespreadet, Getter würden beim Spread eval't statt durchgereicht.
-  async saveActiveTab() { await Promise.all([this.saveBookSettings(), this.savePublication()]); },
+  // Pflichtfelder beim Speichern: Buchtyp immer (alle KI-Jobs ziehen den Genre-
+  // Kontext via getBookPrompts), Kategorie nur wenn der globale Pool nicht leer
+  // ist (sonst gäbe es nichts auszuwählen → Save-Blockade). Liefert den i18n-Key
+  // des ersten verletzten Felds oder null.
+  _taxonomyError() {
+    if (!this.bookSettingsBuchtyp) return 'book.settings.buchtypRequired';
+    if ((this.categoryPool || []).length > 0 && !this.bookCategoryId) return 'book.category.required';
+    return null;
+  },
+
+  async saveActiveTab() {
+    const taxErr = this._taxonomyError();
+    if (taxErr) { this.bookSettingsError = window.__app.t(taxErr); return; }
+    await Promise.all([this.saveBookSettings(), this.savePublication()]);
+  },
   headerSaving()   { return this.bookSettingsSaving || this.pubSaving; },
   headerError()    { return this.bookSettingsError || this.pubError; },
   headerSaved()    { return (this.bookSettingsSaved || this.pubSaved) && !this.headerError(); },

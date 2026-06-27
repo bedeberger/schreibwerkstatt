@@ -33,9 +33,9 @@ test('hasMinRole respektiert Hierarchie owner > editor > lektor > viewer', () =>
   assert.equal(hasMinRole('viewer', null),     true);
 });
 
-test('featuresVisibleFor(viewer): nur overview/export/pdfExport/epubExport/docxExport/bookEditor/search', () => {
+test('featuresVisibleFor(viewer): nur overview/export/pdfExport/epubExport/docxExport/bookEditor/search/help', () => {
   const visible = featuresVisibleFor(FEATURES, 'viewer').map(f => f.key).sort();
-  assert.deepEqual(visible, ['bookEditor', 'docxExport', 'epubExport', 'export', 'overview', 'pdfExport', 'search'].sort());
+  assert.deepEqual(visible, ['bookEditor', 'docxExport', 'epubExport', 'export', 'help', 'overview', 'pdfExport', 'search'].sort());
 });
 
 test('featuresVisibleFor(lektor): viewer-Set (lektor hat keine zusätzlichen FEATURES)', () => {

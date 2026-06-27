@@ -1,0 +1,78 @@
+/* Hilfe & Funktionen — statischer Funktionsueberblick (Karte `.card--help`).
+   Feature-Grid spiegelt das Landing-Page-Layout (public-feature-grid), bleibt
+   aber in der SPA-Karten-Optik. Akzent = globaler var(--color-accent), wie in
+   „Meine Statistik". Markup: public/partials/help.html. */
+
+.help-intro {
+  margin: 0 0 var(--space-lg);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+  max-width: 60ch;
+}
+
+.help-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+
+.help-feature {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.help-feature-title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.help-feature-desc {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+}
+
+.help-palette-hint {
+  margin: var(--space-lg) 0 0;
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+}
+
+/* Header-„?"-Button: aktiver Zustand, wenn die Hilfe-Karte offen ist. */
+.header-help-btn[aria-pressed="true"] {
+  color: var(--color-accent);
+}
+
+/* Welcome-Empty-State: dezenter Textlink unter dem Primaer-CTA. */
+.welcome-help-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--font-size-mini);
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.welcome-help-link:hover {
+  color: var(--color-text);
+}
+
+@media (max-width: 640px) {
+  .help-features { grid-template-columns: 1fr; }
+  .help-feature { padding: var(--space-md); }
+}

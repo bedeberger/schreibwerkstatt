@@ -290,6 +290,15 @@
   .plot-tension-axis--high { top: 0; }
   .plot-tension-axis--low { bottom: 0; }
 
+  /* ── Figur-Fokus (Figurenbogen über die Spannungskurve) ───────────────────── */
+  .plot-tension-focus { margin: 0 var(--space-sm) var(--space-2xs); display: flex; }
+  /* Fokus-Kurve: nur die Beats der gewählten Figur, kräftiger als die Grundkurve. */
+  .plot-tension-svg--focus polyline { stroke: var(--card-accent); stroke-width: 3; opacity: 1; }
+  /* Bei aktivem Fokus die Grund-/Strang-Kurven dämpfen, Punkte je nach Treffer. */
+  .plot-tension-chart--focused .plot-tension-svg:not(.plot-tension-svg--focus) polyline { opacity: 0.2; }
+  .plot-tension-dot--dim { opacity: 0.22; }
+  .plot-tension-dot--focus { box-shadow: 0 0 0 2px var(--card-accent); z-index: 1; }
+
   /* ── Mobile ────────────────────────────────────────────────────────────── */
   @media (max-width: 600px) {
     .plot-tension-chart { height: 88px; }

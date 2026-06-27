@@ -90,6 +90,7 @@ export const lifecycleMethods = {
     this._pendingFocusBeatId = null;
     if (window.__app) window.__app.plotBeatId = null;
     this.plotFilters = { kapitel: '', figurId: '', draftFigurId: '', status: '', text: '' };
+    this.tensionFocusFigur = '';
     this.verworfenOpen = {};
     this.actColorPickerId = null;
     this.errorMessage = '';

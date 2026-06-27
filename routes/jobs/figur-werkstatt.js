@@ -15,6 +15,7 @@ const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { db } = require('../../db/connection');
 const { getDraftFigure, insertWerkstattRun } = require('../../db/draft-figures');
+const plotDb = require('../../db/plot');
 const { getUser } = require('../../db/app-users');
 const { resolveI18n, resolveI18nTree } = require('../../lib/i18n-server');
 
@@ -113,6 +114,24 @@ function _loadFigurAuftritte(figureId, bookId, userEmail) {
   return { szenen, ereignisse };
 }
 
+// Cross-Feature: geplante Handlung dieser Figur aus der Plot-Werkstatt (Beats, an
+// denen sie beteiligt ist — direkt verlinkt oder als Strang-Hauptfigur). Erdet den
+// Brainstorm (Bogen/Konflikt-Knoten passend zur geplanten Handlung) und den
+// Consistency-Check (Figurenbogen vs. tatsächlich geplante Beats). Best-effort:
+// Plot ist eine optionale Nebenquelle — ein Fehler hier darf den Werkstatt-Job
+// (Kern = Mindmap) nicht failen, also leeres Ergebnis statt Wurf.
+function _loadFigurPlotBeats(draft, userEmail, logger) {
+  try {
+    return plotDb.figurePlotUsage(draft.book_id, userEmail, {
+      draftFigureId: draft.id,
+      sourceFigureId: draft.source_figure_id,
+    }).beats;
+  } catch (e) {
+    logger?.warn?.(`Plot-Beats-Kontext fehlgeschlagen draft=${draft.id}: ${e.message}`);
+    return [];
+  }
+}
+
 // ── Brainstorm-Job ──────────────────────────────────────────────────────────
 
 async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
@@ -144,13 +163,14 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
       .filter(f => (f.name || '').trim().toLowerCase() !== draftNameNorm);
     const orte = _loadBookOrte(draft.book_id, userEmail);
     const beziehungen = _loadBookBeziehungen(draft.book_id, userEmail);
+    const plotBeats = _loadFigurPlotBeats(draft, userEmail, logger);
 
-    logger.info(`Brainstorm Start: draft=${draftId} knoten="${knotenPfad}" figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} kinder=${existingChildren.length}`);
+    logger.info(`Brainstorm Start: draft=${draftId} knoten="${knotenPfad}" figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} kinder=${existingChildren.length} plotBeats=${plotBeats.length}`);
     updateJob(jobId, { statusText: 'job.werkstatt.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, mindmapResolved, BUCH_KONTEXT, figuren, orte, existingChildren, beziehungen),
+      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, mindmapResolved, BUCH_KONTEXT, figuren, orte, existingChildren, beziehungen, plotBeats),
       SYSTEM_FIGUREN,
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_BRAINSTORM,
     );
@@ -204,13 +224,15 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     const beziehungen = _loadBookBeziehungen(draft.book_id, userEmail);
     // Abgleich gegen die geschriebene Realität der Quell-Figur (nur wenn importiert).
     const eigeneAuftritte = _loadFigurAuftritte(draft.source_figure_id, draft.book_id, userEmail);
+    // Cross-Feature: geplante Handlung der Figur (Plot-Beats) für den Bogen-Abgleich.
+    const plotBeats = _loadFigurPlotBeats(draft, userEmail, logger);
 
-    logger.info(`Consistency Start: draft=${draftId} figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} szenen=${eigeneAuftritte.szenen.length} ereignisse=${eigeneAuftritte.ereignisse.length}`);
+    logger.info(`Consistency Start: draft=${draftId} figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} szenen=${eigeneAuftritte.szenen.length} ereignisse=${eigeneAuftritte.ereignisse.length} plotBeats=${plotBeats.length}`);
     updateJob(jobId, { statusText: 'job.werkstatt.consistency.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte, beziehungen, eigeneAuftritte),
+      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte, beziehungen, eigeneAuftritte, plotBeats),
       SYSTEM_FIGUREN,
       10, 95, 2500, 0.3, 3000, undefined, SCHEMA_CONSISTENCY,
     );

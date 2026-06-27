@@ -17,6 +17,7 @@ const { getContextConfigFor, resolveProvider } = require('../../lib/ai');
 const { db } = require('../../db/connection');
 const plotDb = require('../../db/plot');
 const draftFiguresDb = require('../../db/draft-figures');
+const { extractPsychologie } = require('../../lib/draft-mindmap-extract');
 const { getLatestContinuityCheck } = require('../../db/schema');
 
 const plotRouter = express.Router();
@@ -123,6 +124,55 @@ function _kontinuitaetContext(bookId, userEmail) {
   }
 }
 
+// Verknüpfte Recherche-Fundstücke: alle (nicht archivierten) Recherche-Items, die
+// der Autor an einen Plot-Beat ODER Handlungsstrang geknüpft hat — mit aufgelösten
+// Beat-Titeln / Strang-Namen für die Prompt-Annotation. research_*/plot_* sind keine
+// pages/chapters/books → Direkt-SQL erlaubt. Ein Item kann an mehrere Beats/Stränge
+// hängen (M:N), darum gruppiert pro Item. body fällt auf doc_text zurück (Dokument
+// ohne eigenen Notiztext). Kein Link/keine Recherche → regulär []; echter DB-Fehler
+// failt den Job (statt der KI stillschweigend das gesammelte Material zu unterschlagen).
+function _rechercheContext(bookId, userEmail) {
+  try {
+    const rows = db.prepare(`
+      SELECT ri.id, ri.title, ri.body, ri.source, ri.doc_text,
+             ril.target_kind, ril.beat_id, ril.thread_id,
+             pb.titel AS beat_titel, pt.name AS thread_name
+        FROM research_item_links ril
+        JOIN research_items ri ON ri.id = ril.item_id
+        LEFT JOIN plot_beats   pb ON pb.id = ril.beat_id
+        LEFT JOIN plot_threads pt ON pt.id = ril.thread_id
+       WHERE ri.book_id = ? AND ri.user_email = ?
+         AND ri.archived = 0
+         AND ril.target_kind IN ('beat', 'thread')
+       ORDER BY ri.pinned DESC, ri.updated_at DESC, ri.id
+    `).all(parseInt(bookId), userEmail);
+    const byItem = new Map();
+    for (const r of rows) {
+      let it = byItem.get(r.id);
+      if (!it) {
+        it = {
+          id: r.id,
+          title: r.title || null,
+          body: (r.body && r.body.trim()) ? r.body : (r.doc_text || null),
+          source: r.source || null,
+          beats: [], beatIds: [], threads: [], threadIds: [],
+        };
+        byItem.set(r.id, it);
+      }
+      if (r.target_kind === 'beat' && r.beat_id != null) {
+        it.beatIds.push(r.beat_id);
+        if (r.beat_titel) it.beats.push(r.beat_titel);
+      } else if (r.target_kind === 'thread' && r.thread_id != null) {
+        it.threadIds.push(r.thread_id);
+        if (r.thread_name) it.threads.push(r.thread_name);
+      }
+    }
+    return [...byItem.values()];
+  } catch (e) {
+    throw _plotContextError('recherche', e);
+  }
+}
+
 // Adaptives Kontext-Budget: kleine (lokale) Modelle bekommen knappere Listen,
 // damit der Plot-Prompt das Eingabe-Budget nicht sprengt (Truncation-Schutz);
 // Claude (200k+) bekommt den vollen Kontext. Schwelle grob am Input-Budget in
@@ -133,12 +183,12 @@ function _ctxLimits(userEmail) {
     budgetChars = getContextConfigFor(resolveProvider({ userEmail })).inputBudgetChars || budgetChars;
   } catch { /* Default = grosszügig */ }
   if (budgetChars < 80000) {
-    return { figuren: 25, relPerFig: 4, evtPerFig: 0, kapitel: 40, szenen: 30, orte: 15, zeitstrahl: 0, kontinuitaet: 8 };
+    return { figuren: 25, relPerFig: 4, evtPerFig: 0, kapitel: 40, szenen: 30, orte: 15, zeitstrahl: 0, kontinuitaet: 8, recherche: 8 };
   }
   if (budgetChars < 250000) {
-    return { figuren: 45, relPerFig: 6, evtPerFig: 4, kapitel: 80, szenen: 70, orte: 30, zeitstrahl: 60, kontinuitaet: 15 };
+    return { figuren: 45, relPerFig: 6, evtPerFig: 4, kapitel: 80, szenen: 70, orte: 30, zeitstrahl: 60, kontinuitaet: 15, recherche: 25 };
   }
-  return { figuren: 120, relPerFig: 12, evtPerFig: 10, kapitel: 200, szenen: 150, orte: 60, zeitstrahl: 200, kontinuitaet: 40 };
+  return { figuren: 120, relPerFig: 12, evtPerFig: 10, kapitel: 200, szenen: 150, orte: 60, zeitstrahl: 200, kontinuitaet: 40, recherche: 60 };
 }
 
 // Wendet die Figuren-Limits an: Figurenzahl kappen, Beziehungen/Ereignisse pro
@@ -151,15 +201,18 @@ function _trimFiguren(figuren, limits) {
   }));
 }
 
-// Werkstatt-Figuren (Figuren-Werkstatt-Drafts, Name + Archetyp): vorwärts-
-// entwickelte Figuren, evtl. noch nicht im Manuskript. Brainstorm kann sie als
-// Beat-Figuren vorschlagen; Consistency darf sie als legitime Beat-Referenz
-// erkennen statt sie als „unbekannte Figur" zu beanstanden. Echter DB-Fehler →
-// Job failen (nicht stillschweigend ohne Werkstatt-Figuren weiterlaufen).
+// Werkstatt-Figuren (Figuren-Werkstatt-Drafts): vorwärts-entwickelte Figuren,
+// evtl. noch nicht im Manuskript. Brainstorm kann sie als Beat-Figuren vorschlagen;
+// Consistency darf sie als legitime Beat-Referenz erkennen statt sie als
+// „unbekannte Figur" zu beanstanden. Angereichert um die psychologischen Kerne der
+// Mindmap (Want/Need/Wound/Lie + Bogen + Konflikt) — so kann der Plot Beats
+// vorschlagen/prüfen, die den inneren Konflikt der Figur bedienen, statt nur ihren
+// Namen zu kennen. Echter DB-Fehler → Job failen (nicht stillschweigend ohne
+// Werkstatt-Figuren weiterlaufen).
 function _werkstattFigurenContext(bookId, userEmail) {
   try {
     return draftFiguresDb.listDraftFigures(bookId, userEmail)
-      .map(d => ({ name: d.name, archetype: d.archetype || null }));
+      .map(d => ({ name: d.name, archetype: d.archetype || null, psychologie: extractPsychologie(d.mindmap) }));
   } catch (e) {
     throw _plotContextError('werkstattFiguren', e);
   }
@@ -253,13 +306,21 @@ async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
     const zeitstrahl = limits.zeitstrahl ? _zeitstrahlContext(bookId, userEmail).slice(0, limits.zeitstrahl) : [];
     const threads = _threadContext(bookId, userEmail);
     const threadInfo = threadId != null ? (threads.find(t => t.id === threadId) || null) : null;
+    // Recherche nur für die Zielzelle: Material, das an einen Beat dieses Akts ODER
+    // an den Ziel-Strang geknüpft ist — so erden neue Beats auf bereits gesammelte
+    // Fakten/Quellen genau zu diesem Abschnitt, ohne fremde Akte einzuschleppen.
+    const actBeatIds = new Set(beats.filter(b => b.act_id === actId).map(b => b.id));
+    const recherche = _rechercheContext(bookId, userEmail)
+      .filter(r => r.beatIds.some(id => actBeatIds.has(id))
+        || (threadId != null && r.threadIds.includes(threadId)))
+      .slice(0, limits.recherche);
 
-    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}"${threadInfo ? ` strang="${threadInfo.name}"` : ''} beats=${beats.length} figuren=${figuren.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} werkstatt=${werkstattFiguren.length}`);
+    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}"${threadInfo ? ` strang="${threadInfo.name}"` : ''} beats=${beats.length} figuren=${figuren.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} werkstatt=${werkstattFiguren.length} recherche=${recherche.length}`);
     updateJob(jobId, { statusText: 'job.plot.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren, threads, threadInfo, orte, zeitstrahl),
+      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren, threads, threadInfo, orte, zeitstrahl, recherche),
       buildPlotSystemPrompt(),
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_PLOT_BRAINSTORM,
     );
@@ -317,8 +378,11 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     const zeitstrahl = limits.zeitstrahl ? _zeitstrahlContext(bookId, userEmail).slice(0, limits.zeitstrahl) : [];
     const kontinuitaet = _kontinuitaetContext(bookId, userEmail).slice(0, limits.kontinuitaet);
     const threads = _threadContext(bookId, userEmail);
+    // Buchweiter Check: alles an Beats/Stränge geknüpfte Recherche-Material, damit
+    // die Prüfung Beats gegen das gesammelte Material abgleichen kann.
+    const recherche = _rechercheContext(bookId, userEmail).slice(0, limits.recherche);
 
-    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length}`);
+    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length} recherche=${recherche.length}`);
     updateJob(jobId, { statusText: 'job.plot.consistency.aiReply', progress: 10 });
 
     // maxTokens grosszuegig: ein schonungsloser Check ueber alle Beats/Szenen/
@@ -326,7 +390,7 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     // 3000 schnitt die JSON-Antwort regelmaessig mitten im Array ab → Truncation.
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet),
+      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet, recherche),
       buildPlotSystemPrompt(),
       10, 95, 6000, 0.3, 12000, undefined, SCHEMA_PLOT_CONSISTENCY,
     );

@@ -43,6 +43,16 @@
   opacity: var(--opacity-hint);
   cursor: not-allowed;
 }
+.book-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.book-create-label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-muted);
+}
 .book-create-error {
   font-size: var(--font-size-sm);
   color: var(--color-err-text);

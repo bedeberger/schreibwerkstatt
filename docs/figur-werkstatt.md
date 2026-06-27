@@ -112,6 +112,15 @@ Sub-Komponente `figurWerkstattCard` ([public/js/cards/figur-werkstatt-card.js](.
 
 **Save-Vor-Job:** `runBrainstorm`/`runConsistency` rufen zuerst `saveDraft()`, sonst sieht KI alte Mindmap.
 
+## Cross-Feature: Plot-Werkstatt
+
+Beide Jobs grundieren zusätzlich mit der **geplanten Handlung der Figur** aus der [Plot-Werkstatt](plot.md): `_loadFigurPlotBeats(draft, userEmail)` → `plotDb.figurePlotUsage(book_id, userEmail, { draftFigureId, sourceFigureId })` liefert die Beats, an denen die Figur beteiligt ist — direkt verlinkt (`plot_beat_draft_figures` bzw. via `source_figure_id` über `plot_beat_figures`) **oder** implizit als Strang-Hauptfigur (Live-Vererbung). **Best-effort:** Plot ist eine optionale Nebenquelle, ein Fehler hier failt den Werkstatt-Job (Kern = Mindmap) nicht, sondern liefert `[]`. Prompt-Block `GEPLANTE HANDLUNG DIESER FIGUR` (in [public/js/prompts/figur-werkstatt.js](../public/js/prompts/figur-werkstatt.js)#`_plotBeatsLines`):
+
+- **Consistency** bekommt zwei zusätzliche Prüfpunkte (nur wenn Beats existieren): *Figurenbogen vs. geplante Handlung* (deckt sich der Mindmap-Bogen bzw. Want/Need/Wound/Lie mit den Beats? Wird der innere Wandel eingelöst?) und *zentral aber flach / tief aber unverankert* (viele Beats ohne Tiefe ↔ ausgearbeitet ohne jeden Beat).
+- **Brainstorm** richtet besonders Bogen-/Konflikt-/Subtext-Knoten an der geplanten Handlung aus (Zusatz-Bullet).
+
+**Navigation Werkstatt → Plot (Badge):** `loadPlotUsage()` (in [crud.js](../public/js/figur-werkstatt/crud.js), nach `selectDraft`) holt `GET /plot/figure-usage?book_id=&draft_id=` → `{ beatCount, activeBeatCount, threads }`. Das klickbare Badge `.badge--plot` im Detail-Header (`plotUsageVisible/Label/Tip`) öffnet via `$app.openPlotForDraftFigure(draftId)` das Beat-Board, gefiltert auf diese Figur (`plot:filter-draft-figure`-Event). State `plotUsage` wird bei Draft-Wechsel/Reset/Delete genullt.
+
 ## Run-Historie
 
 `werkstatt_runs` listet alle KI-Läufe pro Draft. Frontend rendert zwei klappbare Sektionen (brainstorm + consistency) mit `created_at DESC`. Re-Open lädt `result_json`; bei Brainstorm prüft Apply client-seitig, ob `knoten_id` noch existiert (Mindmap kann sich seit dem Lauf geändert haben).

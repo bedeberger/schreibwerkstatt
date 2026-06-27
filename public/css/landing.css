@@ -91,6 +91,10 @@ html, body {
   gap: var(--space-md);
 }
 
+.public-feature:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .public-feature {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -123,6 +127,7 @@ html, body {
 .public-feature--pdfexport    { --card-accent: var(--card-accent-pdfexport); }
 .public-feature--plot         { --card-accent: var(--card-accent-plot); }
 .public-feature--recherche    { --card-accent: var(--card-accent-recherche); }
+.public-feature--blog         { --card-accent: var(--card-accent-blog); }
 
 .public-macclient {
   display: flex;

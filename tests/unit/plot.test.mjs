@@ -484,6 +484,33 @@ test('plot prompts: Board-Outline kennzeichnet geteilte vs. strang-eigene Akte +
   assert.ok(out.includes('HYBRID-AKTE'));
 });
 
+test('plot DB: figurePlotUsage — direkt verlinkt + via Strang + via Quell-Figur', () => {
+  const mm = { meta: {}, format: 'node_tree', data: { id: 'root', topic: 'Held', children: [] } };
+  const draft = draftFigures.createDraftFigure(BOOK, USER, { name: 'Held-Draft', mindmap: mm });
+  const catId = seedFigur(BOOK, USER, 'figUsage', 'Quell-Held');
+
+  const act = plot.createAct(BOOK, USER, { name: 'Usage-Akt' });
+  // a) direkt verlinkte Werkstatt-Figur
+  plot.createBeat(BOOK, act.id, USER, { titel: 'Direkt-Beat', draftFigureIds: [draft.id] });
+  // b) via Strang (Werkstatt-Hauptfigur) — Beat ohne expliziten Figur-Link
+  const thread = plot.createThread(BOOK, USER, { name: 'Held-Strang', draftFigureId: draft.id });
+  plot.createBeat(BOOK, act.id, USER, { titel: 'Strang-Beat', threadId: thread.id });
+  // c) via Quell-Katalog-Figur
+  plot.createBeat(BOOK, act.id, USER, { titel: 'Quell-Beat', figureIds: [catId] });
+  // Nicht beteiligter Beat (Kontrolle)
+  plot.createBeat(BOOK, act.id, USER, { titel: 'Fremd-Beat' });
+
+  const u = plot.figurePlotUsage(BOOK, USER, { draftFigureId: draft.id, sourceFigureId: catId });
+  const titel = u.beats.map(b => b.titel).sort();
+  assert.deepEqual(titel, ['Direkt-Beat', 'Quell-Beat', 'Strang-Beat']);
+  assert.deepEqual(u.threads.map(t => t.name), ['Held-Strang']);
+  assert.ok(!titel.includes('Fremd-Beat'));
+
+  // Ohne Quell-Figur fällt der Katalog-Pfad weg.
+  const u2 = plot.figurePlotUsage(BOOK, USER, { draftFigureId: draft.id });
+  assert.deepEqual(u2.beats.map(b => b.titel).sort(), ['Direkt-Beat', 'Strang-Beat']);
+});
+
 test('plot prompts: Brainstorm nennt Ziel-Akt + listet Board + Werkstatt-Figuren + verlangt JSON', () => {
   const acts = [{ id: 1, name: 'Akt 1' }, { id: 2, name: 'Akt 2' }];
   const beats = [{ id: 9, act_id: 1, titel: 'Auftakt', status: 'geplant', chapter_name: null }];
@@ -501,6 +528,20 @@ test('plot prompts: Brainstorm nennt Ziel-Akt + listet Board + Werkstatt-Figuren
 test('plot prompts: Brainstorm ohne Werkstatt-Figuren lässt den Block weg', () => {
   const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', [], []);
   assert.ok(!out.includes('FIGUREN-WERKSTATT'));
+});
+
+test('plot prompts: Werkstatt-Figur rendert Psychologie (Will/Braucht/Wunde/Lüge/Bogen)', () => {
+  const wf = [{ name: 'Mara', archetype: 'mentor', psychologie: {
+    want: ['Macht'], need: ['Vertrauen'], wound: ['Verrat'], lie: ['Niemand bleibt'],
+    bogen: ['hart', 'verletzlich'], konflikt: ['Pflicht vs. Liebe'],
+  } }];
+  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', [], [], wf);
+  assert.ok(out.includes('Will: Macht'));
+  assert.ok(out.includes('Braucht: Vertrauen'));
+  assert.ok(out.includes('Wunde: Verrat'));
+  assert.ok(out.includes('Lüge: Niemand bleibt'));
+  assert.ok(out.includes('Bogen: hart → verletzlich'));
+  assert.ok(out.includes('inneren Konflikt'));
 });
 
 test('plot prompts: Brainstorm rendert reichen Katalog-Figuren-Kontext (Kurzname/Meta/Beschreibung/Tags)', () => {
@@ -633,6 +674,34 @@ test('plot prompts: neue Kontext-Blöcke entfallen ohne Daten (Abwärtskompat)',
   assert.ok(!cons.includes('ZEITSTRAHL'));
   assert.ok(!cons.includes('BEKANNTE KONTINUITÄTS-BEFUNDE'));
   assert.ok(!/Chronologie gegen Zeitstrahl/i.test(cons));
+  assert.ok(!bs.includes('VERKNÜPFTE RECHERCHE'));
+  assert.ok(!cons.includes('VERKNÜPFTE RECHERCHE'));
+  assert.ok(!/Recherche-Abgleich/i.test(cons));
+});
+
+test('plot prompts: Brainstorm rendert verknüpfte Recherche (Titel/Inhalt/Quelle + Beat-Anker)', () => {
+  const recherche = [{
+    title: 'Münzprägung 1640', body: 'Taler wurden mit Wasserkraft geprägt.',
+    source: 'Stadtarchiv', beats: ['Der Raub'], threads: [],
+  }];
+  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '',
+    [], [], [], [], null, [], [], recherche);
+  assert.ok(out.includes('VERKNÜPFTE RECHERCHE'));
+  assert.ok(out.includes('Münzprägung 1640'));
+  assert.ok(out.includes('Taler wurden mit Wasserkraft geprägt.'));
+  assert.ok(out.includes('Quelle: Stadtarchiv'));
+  assert.ok(out.includes('{zu: Der Raub}'));
+});
+
+test('plot prompts: Consistency rendert verknüpfte Recherche + Recherche-Abgleich-Prüfpunkt', () => {
+  const acts = [{ id: 1, name: 'Akt 1' }];
+  const beats = [{ id: 9, act_id: 1, titel: 'Der Raub', status: 'geplant', chapter_name: null }];
+  const recherche = [{ title: 'Wachablösung', body: 'Posten wechselten zur vollen Stunde.', source: null, beats: [], threads: ['Heist-Strang'] }];
+  const out = prompts.buildPlotConsistencyPrompt(acts, beats, [], [], [], '', [], [], [], [], [], recherche);
+  assert.ok(out.includes('VERKNÜPFTE RECHERCHE'));
+  assert.ok(out.includes('Wachablösung'));
+  assert.ok(out.includes('{zu: Heist-Strang}'));
+  assert.ok(/Recherche-Abgleich/i.test(out));
 });
 
 test('plot prompts: Schemas haben die erwartete Form', () => {

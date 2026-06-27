@@ -19,8 +19,96 @@ router.use(requireAdmin);
 
 function _normEmail(e) { return (e || '').toString().trim().toLowerCase(); }
 
+// --- DB-Groesse pro Buch (Naeherung) ---------------------------------------
+// Summiert die UTF-8-Bytegroesse (LENGTH(CAST(col AS BLOB))) ALLER Spalten jeder
+// Tabelle mit book_id-Spalte, plus der nur indirekt (ueber chat_sessions) am Buch
+// haengenden Chat-Tabellen (chat_messages, chat_images mit BLOBs). Die Tabellen-
+// und Spaltenliste wird dynamisch aus sqlite_master/pragma_table_info gebaut, damit
+// neue buch-skopierte Tabellen/Spalten automatisch mitzaehlen (kein manuelles
+// Nachpflegen). Dazu kommt der FTS5-Volltextindex (_addFtsBytes): dessen
+// Backing-Tabellen (Content-Kopie + Invertindex) sind nicht direkt pro Buch
+// trennbar und werden daher proportional zum indexierten Textanteil jedes Buchs
+// verteilt. Rest-Overhead (B-Tree-Indizes, Page-Fragmentierung, WAL, freelist)
+// ist nicht enthalten — die Summe liegt daher unter der echten Dateigroesse.
+const _IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function _sumColsExpr(cols, alias) {
+  return cols.map(c => `COALESCE(LENGTH(CAST(${alias}."${c}" AS BLOB)),0)`).join(' + ') || '0';
+}
+
+function _colsOf(table) {
+  return db.prepare(`SELECT name FROM pragma_table_info('${table}')`).all().map(c => c.name);
+}
+
+let _bookBytesSql = null;
+function _bookSizeSql() {
+  if (_bookBytesSql) return _bookBytesSql;
+
+  // Direkt buch-skopierte Tabellen (book_id-Spalte), ohne FTS5-Virtual-Tables.
+  const direct = db.prepare(`
+    SELECT m.name FROM sqlite_master m
+     WHERE m.type = 'table'
+       AND m.name NOT LIKE 'sqlite_%'
+       AND m.sql NOT LIKE 'CREATE VIRTUAL%'
+       AND EXISTS (SELECT 1 FROM pragma_table_info(m.name) ti WHERE ti.name = 'book_id')
+  `).all().map(r => r.name).filter(n => _IDENT.test(n));
+
+  const parts = direct.map(t =>
+    `COALESCE((SELECT SUM(${_sumColsExpr(_colsOf(t), 's')}) FROM "${t}" s WHERE s.book_id = b.book_id), 0)`);
+
+  // Indirekt ueber chat_sessions.book_id haengend (keine eigene book_id-Spalte).
+  for (const { table, fk } of [{ table: 'chat_messages', fk: 'session_id' },
+                               { table: 'chat_images', fk: 'session_id' }]) {
+    parts.push(`COALESCE((SELECT SUM(${_sumColsExpr(_colsOf(table), 'x')})
+                            FROM "${table}" x JOIN chat_sessions cs ON cs.id = x.${fk}
+                           WHERE cs.book_id = b.book_id), 0)`);
+  }
+
+  _bookBytesSql = parts.join('\n          + ');
+  return _bookBytesSql;
+}
+
+// Verteilt den Footprint EINES FTS5-Index proportional auf die Buecher.
+// vtab: Virtual-Table-Name; weightExpr: indexierte Spalten als Gewicht pro Buch.
+// Liefert Map book_id -> zugeteilte Bytes (Summe == realer Index-Footprint).
+function _ftsPairBytes(vtab, weightExpr) {
+  if (!_IDENT.test(vtab)) return new Map();
+  const present = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(vtab);
+  if (!present) return new Map();
+
+  // Footprint = Bytegroesse aller Backing-Tabellen (<vtab>_data/_idx/_content/_docsize/_config).
+  const backing = db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE ? ESCAPE '\\'`)
+    .all(vtab.replace(/_/g, '\\_') + '\\_%').map(r => r.name).filter(n => _IDENT.test(n));
+  let total = 0;
+  for (const t of backing) {
+    total += db.prepare(`SELECT COALESCE(SUM(${_sumColsExpr(_colsOf(t), 't')}), 0) AS s FROM "${t}" t`).get().s;
+  }
+  if (!total) return new Map();
+
+  const weights = db.prepare(
+    `SELECT book_id AS bid, COALESCE(SUM(${weightExpr}), 0) AS w FROM "${vtab}" GROUP BY book_id`).all();
+  const weightTotal = weights.reduce((a, r) => a + (r.w || 0), 0);
+  const out = new Map();
+  if (!weightTotal) return out;
+  for (const r of weights) {
+    if (r.bid != null && r.w) out.set(r.bid, total * r.w / weightTotal);
+  }
+  return out;
+}
+
+// Addiert die proportional verteilten FTS-Index-Bytes auf row.bytes (in place).
+function _addFtsBytes(rows) {
+  const idx = _ftsPairBytes('search_index', 'LENGTH(CAST(title AS BLOB)) + LENGTH(CAST(body AS BLOB))');
+  const tri = _ftsPairBytes('search_trigram', 'LENGTH(CAST(title AS BLOB))');
+  for (const r of rows) {
+    r.bytes += Math.round((idx.get(r.book_id) || 0) + (tri.get(r.book_id) || 0));
+  }
+}
+
 // GET /admin/books — Liste aller Buecher mit Owner-Info + ACL-Count + Umfang +
-// DB-Grosse-Naeherung (pages.body_html + page_revisions.body_html).
+// DB-Grosse-Naeherung ueber alle buch-skopierten Tabellen + FTS-Index (s.o.).
 router.get('/', (req, res) => {
   const rows = db.prepare(`
     SELECT b.book_id, b.name, b.owner_email,
@@ -28,13 +116,11 @@ router.get('/', (req, res) => {
            (SELECT COUNT(*) FROM chapters c WHERE c.book_id = b.book_id) AS chapter_count,
            (SELECT COUNT(*) FROM pages p WHERE p.book_id = b.book_id) AS page_count,
            COALESCE((SELECT SUM(chars) FROM page_stats ps WHERE ps.book_id = b.book_id), 0) AS chars,
-           (COALESCE((SELECT COALESCE(SUM(LENGTH(body_html)),0)
-                        FROM pages p WHERE p.book_id = b.book_id), 0)
-            + COALESCE((SELECT COALESCE(SUM(LENGTH(body_html)),0)
-                        FROM page_revisions pr WHERE pr.book_id = b.book_id), 0)) AS bytes
+           (${_bookSizeSql()}) AS bytes
       FROM books b
      ORDER BY b.name COLLATE NOCASE
   `).all();
+  _addFtsBytes(rows);
   res.json({ books: rows });
 });
 

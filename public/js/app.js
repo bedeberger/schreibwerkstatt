@@ -42,6 +42,7 @@ import { registerTagebuchRueckblickCard } from './cards/tagebuch-rueckblick-card
 import { registerBookSettingsCard } from './cards/book-settings-card.js';
 import { registerUserSettingsCard } from './cards/user-settings-card.js';
 import { registerMyStatsCard } from './cards/my-stats-card.js';
+import { registerHelpCard } from './cards/help-card.js';
 import { registerAdminUsersCard } from './cards/admin-users-card.js';
 import { registerAdminSettingsCard } from './cards/admin-settings-card.js';
 import { registerAdminUsageCard } from './cards/admin-usage-card.js';
@@ -367,6 +368,7 @@ document.addEventListener('alpine:init', () => {
   registerBookSettingsCard();
   registerUserSettingsCard();
   registerMyStatsCard();
+  registerHelpCard();
   registerAdminUsersCard();
   registerAdminSettingsCard();
   registerAdminUsageCard();

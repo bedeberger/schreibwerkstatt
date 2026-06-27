@@ -153,11 +153,42 @@ function _kontinuitaetLines(issues) {
     .join('\n');
 }
 
+// Verknüpfte Recherche-Fundstücke: Titel + gekürzter Inhalt + Quelle + an welche
+// Beats/Stränge sie der Autor geknüpft hat. Erdet Brainstorm/Consistency auf das
+// gesammelte Material (Fakten, Quellen) — rückwärtsgewandt, NIE generativ: der
+// Inhalt darf weder zitiert noch als Prosa in einen Beat übernommen werden.
+function _rechercheLines(recherche) {
+  return (recherche || []).slice(0, 60)
+    .map(r => {
+      const anchor = [...(r.beats || []), ...(r.threads || [])];
+      const an = anchor.length ? ` {zu: ${anchor.join(', ')}}` : '';
+      const head = (r.title || '').trim() || '(ohne Titel)';
+      const body = r.body ? `: ${_trunc(r.body, 240)}` : '';
+      const src = r.source ? ` (Quelle: ${_trunc(r.source, 80)})` : '';
+      return `- ${head}${body}${src}${an}`;
+    })
+    .join('\n');
+}
+
 // Werkstatt-Figuren (Figuren-Werkstatt-Drafts): in Entwicklung, evtl. noch nicht
-// im Manuskript. Name + optionaler Archetyp.
+// im Manuskript. Name + optionaler Archetyp + — sofern in der Mindmap ausgearbeitet
+// — die psychologischen Kerne (Want/Need/Wound/Lie + Bogen + Konflikt). So kann der
+// Plot Beats auf den inneren Konflikt der Figur zuschneiden, statt nur auf den Namen.
 function _werkstattFigurenLines(figuren) {
   return (figuren || []).slice(0, 60)
-    .map(f => `- ${f.name}${f.archetype ? ` [${f.archetype}]` : ''}`)
+    .map(f => {
+      const head = `- ${f.name}${f.archetype ? ` [${f.archetype}]` : ''}`;
+      const p = f.psychologie;
+      if (!p) return head;
+      const parts = [];
+      if ((p.want || []).length)     parts.push(`Will: ${_trunc(p.want.join('; '), 160)}`);
+      if ((p.need || []).length)     parts.push(`Braucht: ${_trunc(p.need.join('; '), 160)}`);
+      if ((p.wound || []).length)    parts.push(`Wunde: ${_trunc(p.wound.join('; '), 160)}`);
+      if ((p.lie || []).length)      parts.push(`Lüge: ${_trunc(p.lie.join('; '), 160)}`);
+      if ((p.bogen || []).length)    parts.push(`Bogen: ${_trunc(p.bogen.join(' → '), 200)}`);
+      if ((p.konflikt || []).length) parts.push(`Konflikt: ${_trunc(p.konflikt.join('; '), 160)}`);
+      return parts.length ? `${head}\n  ${parts.join(' · ')}` : head;
+    })
     .join('\n');
 }
 
@@ -191,18 +222,20 @@ WICHTIG: Du planst und prüfst nur die STRUKTUR. Du schreibst NIEMALS Fliesstext
 // Schlägt 3–7 Beats für einen bestimmten Akt vor, passend zum bisherigen Board,
 // Buchkontext und Figuren-Ensemble.
 
-export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = [], werkstattFiguren = [], threads = [], threadInfo = null, orte = [], zeitstrahl = []) {
+export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, figuren = [], kapitel = [], werkstattFiguren = [], threads = [], threadInfo = null, orte = [], zeitstrahl = [], recherche = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const figLines = _figurenLinesDetail(figuren);
   const figSeg = figLines ? `\nFIGUREN-ENSEMBLE:\n${figLines}\n` : '';
   const wfLines = _werkstattFigurenLines(werkstattFiguren);
-  const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (in Entwicklung, evtl. noch nicht im Manuskript — als Beat-Figuren nutzbar):\n${wfLines}\n` : '';
+  const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (in Entwicklung, evtl. noch nicht im Manuskript — als Beat-Figuren nutzbar; wo vorhanden mit innerem Konflikt Will/Braucht/Wunde/Lüge + Bogen):\n${wfLines}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nVORHANDENE KAPITEL (chronologisch):\n${kapLines}\n` : '';
   const orteLines = _orteLines(orte);
   const orteSeg = orteLines ? `\nSCHAUPLÄTZE (Orte des Buchs):\n${orteLines}\n` : '';
   const zeitLines = _zeitstrahlLines(zeitstrahl);
   const zeitSeg = zeitLines ? `\nZEITSTRAHL (chronologische Ereignisse der Figuren):\n${zeitLines}\n` : '';
+  const rechLines = _rechercheLines(recherche);
+  const rechSeg = rechLines ? `\nVERKNÜPFTE RECHERCHE (vom Autor zu diesem Akt gesammeltes Material — Fakten/Quellen, die die Beats erden sollen; verwende sie als Hintergrund, übernimm sie NICHT als Prosa und zitiere sie nicht):\n${rechLines}\n` : '';
   const strLines = _straengeLines(threads);
   const inheritNote = _hasThreadInheritance(threads)
     ? '\nVERERBUNG: Ein Beat in einem Strang beteiligt IMPLIZIT dessen Hauptfigur; hat er kein eigenes Kapitel, gilt das Kapitel des Strangs. Behandle das als gesetzt, auch wenn es nicht pro Beat wiederholt wird.\n'
@@ -227,13 +260,14 @@ export function buildPlotBrainstormPrompt(aktName, acts, beats, buchKontext, fig
 
 AKTUELLES BOARD:
 ${_boardOutline(acts, beats, _threadInfoMap(threads))}
-${ctxSeg}${figSeg}${wfSeg}${kapSeg}${orteSeg}${zeitSeg}${strSeg}${threadGoal}${existSeg}
+${ctxSeg}${figSeg}${wfSeg}${kapSeg}${orteSeg}${zeitSeg}${rechSeg}${strSeg}${threadGoal}${existSeg}
 ZIEL-AKT: "${aktName}"
 
 Liefere 3–7 konkrete, voneinander unterscheidbare Beat-Vorschläge für diesen Akt${threadInfo ? ' + Strang' : ''}. Jeder Beat:
 - 3–10 Wörter im Label (kurz, dramaturgisch konkret: Wendepunkt, Konflikt, Entscheidung, Enthüllung — kein vager Themen-Begriff)
 - Knappe Begründung (1 Satz), warum der Beat an dieser Stelle die Handlung trägt und zum Ensemble passt
 - Baut auf den vorhandenen Beats auf und treibt die Spannungskurve voran
+- Bedient ein Beat eine beteiligte Werkstatt-Figur, soll er ihren inneren Konflikt (Will/Braucht/Wunde/Lüge) oder Bogen vorantreiben — nicht nur äusserlich funktionieren
 - Keine Wiederholung bestehender Beats
 - Keine ausformulierte Prosa — nur die strukturelle Idee
 
@@ -256,7 +290,7 @@ export const SCHEMA_PLOT_BRAINSTORM = _obj({
 // Prüft den geplanten Plot gegen die Buchrealität: extrahierte Szenen + Kapitel +
 // Figuren. Findet Brüche, Lücken und „geplant vs. schon geschrieben"-Drift.
 
-export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = [], orte = [], zeitstrahl = [], kontinuitaet = []) {
+export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = [], orte = [], zeitstrahl = [], kontinuitaet = [], recherche = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nKAPITEL DES BUCHS (chronologisch):\n${kapLines}\n` : '';
@@ -272,6 +306,8 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   const zeitSeg = zeitLines ? `\nZEITSTRAHL (chronologische Ereignisse der Figuren, = Buchrealität):\n${zeitLines}\n` : '';
   const kontiLines = _kontinuitaetLines(kontinuitaet);
   const kontiSeg = kontiLines ? `\nBEKANNTE KONTINUITÄTS-BEFUNDE (offen, aus dem letzten Continuity-Check — beziehe sie ein, dopple sie aber nicht):\n${kontiLines}\n` : '';
+  const rechLines = _rechercheLines(recherche);
+  const rechSeg = rechLines ? `\nVERKNÜPFTE RECHERCHE (vom Autor zu Beats/Strängen gesammeltes Material — Fakten/Quellen als Realitätsanker):\n${rechLines}\n` : '';
   const wfLines = _werkstattFigurenLines(werkstattFiguren);
   const wfSeg = wfLines ? `\nFIGUREN-WERKSTATT (geplante/in Entwicklung befindliche Figuren — Beats dürfen sie referenzieren, ohne dass sie schon im Manuskript stehen müssen):\n${wfLines}\n` : '';
   const strLines = _straengeLines(threads);
@@ -294,12 +330,17 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
 - Strang-Balance: Wird ein Strang über lange Strecken (Akte) gar nicht bedient, während ein anderer dominiert? POV-/Aufmerksamkeits-Lücken benennen.
 - Verweben: Treffen/kreuzen sich die Stränge an sinnvollen Stellen, oder laufen sie beziehungslos nebeneinander her?`
     : '';
+  // Recherche-Abgleich nur, wenn verknüpftes Recherche-Material vorliegt.
+  const rechChecks = rechLines
+    ? `
+- Recherche-Abgleich: Widerspricht ein Beat dem verknüpften Recherche-Material (Fakten/Quellen)? Oder wurde zu einem Beat/Strang Recherche gesammelt, die der geplante Beat noch gar nicht aufgreift (ungenutztes Material)?`
+    : '';
 
   return `Du prüfst die GEPLANTE Handlung (Beat-Board) der Autorin auf Stimmigkeit — in sich und gegen die tatsächliche Buchrealität (Kapitel + analysierte Szenen). Sei schonungslos, aber konstruktiv.
 
 GEPLANTES BEAT-BOARD:
 ${_boardOutline(acts, beats, _threadInfoMap(threads))}
-${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${orteSeg}${zeitSeg}${kontiSeg}${strSeg}${hybridNote}
+${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${orteSeg}${zeitSeg}${kontiSeg}${rechSeg}${strSeg}${hybridNote}
 Status-Legende der Beats: geplant (Idee, noch nicht eingearbeitet) · im Buch (laut Plan schon geschrieben). Zusätzlich kann ein Beat als "verworfen" markiert sein (ausgemustert, soll nicht mehr ins Buch).
 
 Prüfe auf:
@@ -308,7 +349,7 @@ Prüfe auf:
 - Chronologie-Brüche: die Reihenfolge der Beats (Akte → Beats) passt nicht zur Reihenfolge der verknüpften Kapitel
 - Logische Brüche / Widersprüche innerhalb der Handlung (Kausalität, Motivation, Figurenlogik)
 - Lücken: Kapitel mit Szenen, für die es keinen Beat gibt — oder dramaturgische Leerstellen (fehlender Wendepunkt, fehlende Auflösung eines Konflikts)
-- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${zeitChecks}${strChecks}
+- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${zeitChecks}${strChecks}${rechChecks}
 
 Schwere-Skala:
 - "kritisch": logischer Bruch oder Plan-Realität-Widerspruch, der die Handlung zerstört

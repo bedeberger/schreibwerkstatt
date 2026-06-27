@@ -15,6 +15,7 @@ export const appHashRouterMethods = {
   _computeHash() {
     if (this.showUserSettingsCard) return '#profil';
     if (this.showMyStatsCard) return '#meine-statistik';
+    if (this.showHelpCard) return '#hilfe';
     // Volltextsuche ist book-unabhaengig — eigener Top-Level-Hash.
     if (this.showSearchCard) return '#search';
     // Folder-Import ist book-unabhaengig (new-book oder merge).
@@ -87,6 +88,7 @@ export const appHashRouterMethods = {
     const parts = hash.replace(/^#/, '').split('/').filter(Boolean);
     if (parts[0] === 'profil') return 'profil';
     if (parts[0] === 'meine-statistik') return 'meine-statistik';
+    if (parts[0] === 'hilfe') return 'hilfe';
     if (parts[0] === 'search') return 'search';
     if (parts[0] === 'admin') return 'admin:' + (parts[1] || '');
     if (parts[0] !== 'book' || !parts[1]) return null;
@@ -179,6 +181,18 @@ export const appHashRouterMethods = {
       this._inHashApply = true;
       try {
         if (!this.showMyStatsCard) await this.toggleMyStatsCard();
+      } finally {
+        this._applyingHash = false;
+        this._inHashApply = false;
+      }
+      return;
+    }
+
+    if (parts[0] === 'hilfe') {
+      this._applyingHash = true;
+      this._inHashApply = true;
+      try {
+        if (!this.showHelpCard) await this.toggleHelpCard();
       } finally {
         this._applyingHash = false;
         this._inHashApply = false;
@@ -460,7 +474,7 @@ export const appHashRouterMethods = {
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'werkstattDraftId', 'plotBeatId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
-      'showBookSettingsCard', 'showUserSettingsCard', 'showMyStatsCard',
+      'showBookSettingsCard', 'showUserSettingsCard', 'showMyStatsCard', 'showHelpCard',
       'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
       'showAdminCategoriesCard', 'showAdminBooksCard', 'showAdminLogsCard', 'showAdminParseFailsCard',
       'showAdminJsErrorsCard', 'showAdminDevicesCard',

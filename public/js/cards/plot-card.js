@@ -81,6 +81,11 @@ export function registerPlotCard() {
     // Eingeklappte „verworfen"-Beats pro Akt ({ [actId]: true }).
     verworfenOpen: {},
 
+    // Spannungsbogen-Figur-Fokus (Feature: Figurenbogen über die Kurve). Encodierter
+    // Wert `c:<figId>` (Katalog) bzw. `w:<draftId>` (Werkstatt), '' = kein Fokus.
+    // Hebt die Beats dieser Figur auf der Kurve hervor (Rest gedämpft).
+    tensionFocusFigur: '',
+
     // Native-Fullscreen-Status (gespiegelt vom fullscreenchange-Listener) — mehr
     // horizontaler Platz fürs Akt-Board. Toggle in plotMethods.togglePlotFullscreen.
     plotFullscreen: false,
@@ -163,6 +168,12 @@ export function registerPlotCard() {
       // _focusBeatById fokussiert den Beat (bzw. merkt ihn bis zum Board-Load vor).
       window.addEventListener('plot:focus-beat', (e) => {
         this._focusBeatById(e.detail?.beatId);
+      }, { signal: this._lifecycle.signal });
+
+      // Cross-Feature: Navigation Werkstatt → Plot. Setzt den Werkstatt-Figur-Filter
+      // (plotFilters überlebt den Board-Load, daher kein Parking nötig).
+      window.addEventListener('plot:filter-draft-figure', (e) => {
+        this.applyDraftFigureFilter(e.detail?.draftId);
       }, { signal: this._lifecycle.signal });
     },
 

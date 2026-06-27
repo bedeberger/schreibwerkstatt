@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "02e3f823e885425d";
+self.__SHELL_BUILD = "89d9c8c71b0ef6b3";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -51,6 +51,7 @@ self.__SHELL_MANIFEST = [
   "/css/components/feature-tiles.css",
   "/css/components/file-drop.css",
   "/css/components/folder-import.css",
+  "/css/components/help.css",
   "/css/components/icon-btn.css",
   "/css/components/icons.css",
   "/css/components/job-toast.css",
@@ -235,6 +236,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/figuren-card.js",
   "/js/cards/finetune-export-card.js",
   "/js/cards/folder-import-card.js",
+  "/js/cards/help-card.js",
   "/js/cards/hubspot-sync-card.js",
   "/js/cards/ideen-card.js",
   "/js/cards/job-feature-card.js",
@@ -456,6 +458,7 @@ self.__SHELL_MANIFEST = [
   "/partials/figuren.html",
   "/partials/finetune-export.html",
   "/partials/folder-import.html",
+  "/partials/help.html",
   "/partials/ideen.html",
   "/partials/job-toast.html",
   "/partials/kapitelreview.html",

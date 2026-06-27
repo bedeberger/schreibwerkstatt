@@ -1,0 +1,22 @@
+<!-- Hilfe & Funktionen: statischer Funktionsueberblick fuer den Einstieg.
+     Alpine.data-Sub-Komponente — siehe public/js/cards/help-card.js.
+     Buch-unabhaengig. Feature-Texte sind die Landing-Page-Bloecke
+     (landing.featNTitle/Desc) — SSoT mit der oeffentlichen Landing. -->
+<div class="card card--help" x-data="helpCard" x-show="$app.showHelpCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('help.title')"></span>
+  </div>
+
+  <p class="help-intro" x-text="$app.t('help.intro')"></p>
+
+  <ul class="help-features">
+    <template x-for="f in helpFeatures" :key="f.titleKey">
+      <li class="help-feature">
+        <h3 class="help-feature-title" x-text="$app.t(f.titleKey)"></h3>
+        <p class="help-feature-desc" x-text="$app.t(f.descKey)"></p>
+      </li>
+    </template>
+  </ul>
+
+  <p class="help-palette-hint" x-text="$app.t('help.paletteHint')"></p>
+</div>

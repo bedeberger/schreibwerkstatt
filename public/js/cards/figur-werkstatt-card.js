@@ -41,6 +41,9 @@ export function registerFigurWerkstattCard() {
     runs: { brainstorm: [], consistency: [] },
     runsLoadedDraftId: null,
     runsLoading: false,
+    // Cross-Feature: Plot-Beteiligung der ausgewählten Figur ({ beatCount,
+    // activeBeatCount, threads }) fürs „in N Beats geplant"-Badge → Navigation Plot.
+    plotUsage: null,
     selectedRunId: null,
     selectedKonfliktIdx: null,
     _runsLoadDraftId: null,
@@ -101,7 +104,7 @@ export function registerFigurWerkstattCard() {
         name: 'figurWerkstatt',
         showFlag: 'showFigurWerkstattCard',
         timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer'],
-        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, importing: false, importables: [], selectedImportFigureId: '', runs: { brainstorm: [], consistency: [] }, runsLoadedDraftId: null, selectedRunId: null, selectedKonfliktIdx: null, _mindmapDirty: false, _pendingDraftId: null, _pendingKnotenId: null},
+        resetState: { drafts: [], selectedDraftId: null, selectedKnotenId: null, creating: false, newName: '', editName: '', editArchetype: '', editNotes: '', errorMessage: '', brainstormResult: null, consistencyResult: null, brainstormLoading: false, consistencyLoading: false, mindmapFullscreen: false, contextMenuOpen: false, contextMenuNodeId: null, importing: false, importables: [], selectedImportFigureId: '', runs: { brainstorm: [], consistency: [] }, runsLoadedDraftId: null, plotUsage: null, selectedRunId: null, selectedKonfliktIdx: null, _mindmapDirty: false, _pendingDraftId: null, _pendingKnotenId: null},
         load: () => this.loadDrafts(),
         onCardRefresh: async () => {
           if (this.isDirty()) {

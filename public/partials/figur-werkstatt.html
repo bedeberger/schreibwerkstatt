@@ -136,6 +136,12 @@
                 class="badge badge-source"
                 :data-tip="$app.t('werkstatt.importedFrom.tip')"
                 x-text="$app.t('werkstatt.importedFrom', { name: importedFromName() })"></span>
+          <!-- Cross-Feature: Plot-Beteiligung → Klick öffnet das gefilterte Beat-Board -->
+          <span x-show="plotUsageVisible()" x-cloak
+                class="badge badge--plot internal-link"
+                @click="$app.openPlotForDraftFigure(selectedDraftId)"
+                :data-tip="plotUsageTip()"
+                x-text="plotUsageLabel()"></span>
         </div>
         <div class="card-actions">
           <button type="button" class="icon-btn icon-btn--ghost icon-btn--success"

@@ -39,6 +39,7 @@
   <link rel="stylesheet" href="css/components/tabs.css">
   <link rel="stylesheet" href="css/components/device-tokens.css">
   <link rel="stylesheet" href="css/components/my-stats.css">
+  <link rel="stylesheet" href="css/components/help.css">
   <link rel="stylesheet" href="css/components/confirm-dialog.css">
   <link rel="stylesheet" href="css/components/job-toast.css">
   <link rel="stylesheet" href="css/components/user-chip.css">
@@ -379,6 +380,16 @@
         </svg>
       </button>
     </template>
+    <button type="button"
+            class="icon-btn icon-btn--ghost header-help-btn"
+            x-show="currentUser && !isAdminOnly"
+            x-cloak
+            :aria-pressed="showHelpCard"
+            @click="toggleHelpCard()"
+            :data-tip="t('help.openHint')"
+            :aria-label="t('help.openHint')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#circle-help"/></svg>
+    </button>
     <div id="partial-avatar-menu"></div>
   </div>
 </div>
@@ -391,6 +402,7 @@
     <p class="card-empty-text" x-text="t('welcome.title')"></p>
     <p class="card-empty-hint" x-text="t('welcome.hint')"></p>
     <button class="primary" @click="openCreateBook()" x-text="t('welcome.cta')"></button>
+    <button type="button" class="welcome-help-link internal-link" @click="toggleHelpCard()" x-text="t('welcome.helpLink')"></button>
   </div>
 </div>
 
@@ -468,6 +480,7 @@
 <div id="partial-share-links"></div>
 <div id="partial-user-settings"></div>
 <div id="partial-my-stats"></div>
+<div id="partial-help"></div>
 <div id="partial-admin-users"></div>
 <div id="partial-admin-settings"></div>
 <div id="partial-admin-usage"></div>
@@ -562,6 +575,18 @@
          :aria-label="t('book.create.nameLabel')"
          :disabled="bookCreateBusy"
          @keydown.enter.prevent="submitCreateBook()">
+  <div class="book-create-field">
+    <label class="book-create-label" x-text="t('book.create.buchtypLabel')"></label>
+    <div x-data="combobox(t('book.create.buchtypLabel'))"
+         x-modelable="value" x-model="bookCreateBuchtyp"
+         x-effect="options = bookCreateBuchtypOptions()"></div>
+  </div>
+  <div class="book-create-field" x-show="bookCreateCategoryPool.length > 0" x-cloak>
+    <label class="book-create-label" x-text="t('book.create.categoryLabel')"></label>
+    <div x-data="combobox(t('book.create.categoryLabel'))"
+         x-modelable="value" x-model="bookCreateCategoryId"
+         x-effect="options = bookCreateCategoryOptions()"></div>
+  </div>
   <div class="book-create-error" x-show="bookCreateError" x-cloak x-text="bookCreateError"></div>
   <div class="book-create-actions">
     <button type="button" class="book-create-btn book-create-btn--cancel"

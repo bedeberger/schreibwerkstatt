@@ -7,7 +7,7 @@
 // (routes/jobs/plot.js), nicht hier.
 
 const express = require('express');
-const { db } = require('../db/schema');
+const { db, getDraftFigure } = require('../db/schema');
 const plotDb = require('../db/plot');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
@@ -90,6 +90,33 @@ router.get('/page-beat-counts', (req, res) => {
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
   if (!_guard(req, res, bookId)) return;
   res.json(plotDb.pageBeatCounts(bookId, userEmail));
+});
+
+// Plot-Beteiligung einer Werkstatt-Figur: Anzahl Beats (gesamt + aktiv) + die
+// Stränge, an die die Figur als Hauptfigur gebunden ist. Speist das „in N Beats
+// geplant"-Badge in der Figuren-Werkstatt (Navigation Werkstatt → Plot). draft_id
+// Pflicht; die Katalog-Quellfigur (source_figure_id) wird serverseitig aus dem
+// Owner-geprüften Draft gezogen, nicht vom Client geliefert (kein Cross-Figur-Leak).
+router.get('/figure-usage', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const bookId = toIntId(req.query.book_id);
+  const draftId = toIntId(req.query.draft_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!draftId)   return res.status(400).json({ error_code: 'DRAFT_ID_REQ' });
+  if (!_guard(req, res, bookId)) return;
+  const draft = getDraftFigure(draftId);
+  if (!draft || draft.user_email !== userEmail || draft.book_id !== bookId) {
+    return res.json({ beatCount: 0, activeBeatCount: 0, threads: [] });
+  }
+  const usage = plotDb.figurePlotUsage(bookId, userEmail, {
+    draftFigureId: draft.id, sourceFigureId: draft.source_figure_id,
+  });
+  res.json({
+    beatCount: usage.beats.length,
+    activeBeatCount: usage.beats.filter(b => !b.verworfen).length,
+    threads: usage.threads,
+  });
 });
 
 // Map chapter_id → Anzahl nicht-verworfener Beats im Kapitel. Speist den

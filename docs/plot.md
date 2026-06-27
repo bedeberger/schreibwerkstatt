@@ -45,6 +45,7 @@ Alle unter `/plot` ([routes/plot.js](../routes/plot.js)), ACL via `requireBookAc
 | Methode | Pfad | Zweck |
 |---------|------|-------|
 | `GET`    | `/?book_id=X`      | Board laden → `{ acts, threads, beats }`. Beats inkl. `chapter_name` (LEFT JOIN) + `thread_id` + `fig_ids[]`. Threads inkl. `fig_id` (TEXT, via JOIN) + `draft_figure_id` + `chapter_id` + `chapter_name` (LEFT JOIN) |
+| `GET`    | `/figure-usage?book_id=X&draft_id=Y` | Plot-Beteiligung einer Werkstatt-Figur → `{ beatCount, activeBeatCount, threads }` (via `figurePlotUsage`; `source_figure_id` serverseitig aus dem Owner-geprüften Draft). Speist das Cross-Feature-Badge in der [Figuren-Werkstatt](figur-werkstatt.md) |
 | `POST`   | `/acts`            | `{ book_id, name, farbe?, thread_id? }` — neuer Akt ans Spaltenende (gesetzter `thread_id` → strang-eigener Akt, Hybrid; sonst geteilt) |
 | `PATCH`  | `/acts/:id`        | `{ name?, farbe? }` umbenennen/umfärben |
 | `DELETE` | `/acts/:id`        | Akt löschen — `plot_beats` hängen via CASCADE dran |
@@ -88,7 +89,7 @@ Beide via Job-Queue ([routes/jobs/plot.js](../routes/jobs/plot.js), gemountet in
 
 **Kontext-Loader** (beide Jobs grundieren mit Buch-Realität):
 - `_figurenContext` — Katalog-Figuren-Ensemble (Name + Typ) aus `getFiguren`.
-- `_werkstattFigurenContext` — Werkstatt-Figuren-Ensemble (Name + Archetyp) aus `listDraftFigures` (Direkt-Require von `db/draft-figures`, kein pages/chapters/books). Best-effort: bei Fehler `[]`. Fliesst als eigener Prompt-Block `FIGUREN-WERKSTATT (in Entwicklung …)`. So kennt Brainstorm geplante Figuren als Beat-Material, und Consistency beanstandet einen Beat, der eine Werkstatt-Figur referenziert, nicht als „unbekannte Figur".
+- `_werkstattFigurenContext` — Werkstatt-Figuren-Ensemble aus `listDraftFigures` (Direkt-Require von `db/draft-figures`, kein pages/chapters/books). Best-effort: bei Fehler `[]`. Fliesst als eigener Prompt-Block `FIGUREN-WERKSTATT (in Entwicklung …)`. So kennt Brainstorm geplante Figuren als Beat-Material, und Consistency beanstandet einen Beat, der eine Werkstatt-Figur referenziert, nicht als „unbekannte Figur". **Angereichert um die psychologischen Kerne der Mindmap** (Want/Need/Wound/Lie + Bogen + Konflikt) via `extractPsychologie` aus [lib/draft-mindmap-extract.js](../lib/draft-mindmap-extract.js) (liest die stabilen Default-Container-IDs `want/need/wound/lie`, `steckbrief>bogen`, `steckbrief>konflikt`); `_werkstattFigurenLines` rendert sie kompakt. So kann der Plot Beats auf den **inneren Konflikt** der Figur zuschneiden statt nur auf den Namen — Brainstorm hat dafür eine eigene Regel-Bullet.
 - `_kapitelContext` — Kapitelnamen in echter Buchorganizer-Reihenfolge **über die Content-Store-Facade** (`loadOrderedBookContents`, kein Direkt-SQL auf `chapters`). Best-effort: bei Fehler `[]`.
 - `_szenenContext` (nur Consistency) — extrahierte Szenen mit Kapitel + beteiligten Figuren aus `figure_scenes`/`scene_figures` (Direkt-SQL erlaubt — keine pages/chapters/books; `chapter_name` via JOIN, LIMIT 150).
 - `_threadContext` (beide Jobs) — Handlungsstränge mit aufgelöster Hauptfigur + gebundenem Kapitel (`{ id, name, figur, kapitel }`). Katalog-Bindung über TEXT-`fig_id` → Name (Direkt-SQL auf `figures`), Werkstatt-Bindung über `draft_figures.id` → Name, Kapitel über `chapter_name` (aus `listThreads`-JOIN). Best-effort. Speist im Prompt den `HANDLUNGSSTRÄNGE`-Block (Name + Hauptfigur + Kapitel) + die `{Strang: …}`-Annotation pro Beat im Board-Outline + den Vererbungs-Hinweis. Im Board-Outline erbt ein Beat ohne eigenes Kapitel das Strang-Kapitel (`→ Kapitel: … (vom Strang)`); die Strang-Hauptfigur gilt laut Regel-Hinweis implizit als beteiligt.
@@ -158,6 +159,16 @@ Sub-Komponente `plotCard` ([public/js/cards/plot-card.js](../public/js/cards/plo
 ## i18n
 
 Alle Keys unter `plot.*` (Titel, Stats, Status-Labels, Severity, Brainstorm-/Consistency-UI inkl. Historie `plot.consistency.runs|konfliktCount|confirmDeleteRun` + `plot.brainstorm.runs|vorschlagCount|confirmDeleteRun|actDeleted`, Strang `plot.thread.*`, Fehler inkl. `plot.error.runLoad|runDelete`) in [public/js/i18n/de.json](../public/js/i18n/de.json) / [en.json](../public/js/i18n/en.json). Server-Status-Keys: `job.plot.brainstorm.aiReply`, `job.plot.consistency.aiReply`. Fehler: `job.error.plot.{actMissing|vorschlaegeMissing|boardEmpty|konflikteMissing|fazitMissing}`. Job-Labels: `job.label.plotBrainstorm|plotConsistency`.
+
+## Cross-Feature: Figuren-Werkstatt
+
+Plot und [Figuren-Werkstatt](figur-werkstatt.md) befruchten sich gegenseitig — beide rein planend, nie generativ:
+
+- **Psychologie im KI-Kontext** (s.o.): die Werkstatt-Mindmaps (Want/Need/Wound/Lie + Bogen + Konflikt) fliessen in Brainstorm + Consistency, damit Beats den inneren Konflikt der Figur bedienen.
+- **`figurePlotUsage(bookId, userEmail, { draftFigureId, sourceFigureId })`** ([db/plot.js](../db/plot.js)) — Beats, an denen eine (Werkstatt-)Figur beteiligt ist (direkt verlinkt **oder** als Strang-Hauptfigur, Live-Vererbung) + die gebundenen Stränge. Lesefertig angereichert (Akt, Strang, effektives Kapitel, Status, Intensität). Speist die Werkstatt-Jobs (umgekehrte Richtung: „Figurenbogen ↔ geplante Handlung") **und** die `/figure-usage`-Route.
+- **Figur-Filter mit Vererbung:** `_beatMatchesFilter` (Katalog **und** Werkstatt) trifft auch Beats, deren Strang die Figur als Hauptfigur bindet (`_beatInvolvesCatalog`/`_beatInvolvesDraft`) — dieselbe Beat-Menge wie das Badge. `applyDraftFigureFilter(draftId)` (Event `plot:filter-draft-figure`) ist der Landepunkt der Navigation Werkstatt → Plot.
+- **Figuren-Coverage** (`figureCoverage`/`figureCoverageRelevant` in [derived.js](../public/js/book/plot/derived.js), lokales Aggregat, kein KI-Job): klappbares Panel unter der Kapitel-Coverage. Zwei Lücken — *ausgearbeitete Werkstatt-Figur ohne jeden Beat* (`developedNoPlot`) und *im Plot beteiligte Figur ohne ausgearbeiteten Bogen/Subtext* (`inPlotNoArc`). `_draftHasArc` ist das Client-Pendant zu `extractPsychologie` (gleiche stabile Container-IDs); Chips → `openWerkstattDraftById`.
+- **Spannungsbogen-Figur-Fokus** (`tensionFigurOptions`/`beatHasTensionFigur`/`tensionFocusLine`): Combobox im Tension-Panel hebt die Beats einer Figur (Katalog `c:<figId>` / Werkstatt `w:<draftId>`, inkl. Strang-Vererbung) auf der Kurve hervor (Rest gedämpft); im strang-losen Modus zusätzlich eine eigene Fokus-Polyline (die „emotionale Reise" der Figur). State `tensionFocusFigur`.
 
 ## Buch-Chat-Integration
 

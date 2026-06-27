@@ -44,6 +44,7 @@ const ALLOWED_KEYS = new Set([
   'bookEditor',
   'search',
   'shareLinks',
+  'help',
 ]);
 
 function userEmailOrNull(req) {

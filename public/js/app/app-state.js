@@ -346,6 +346,7 @@ const cardsState = () => ({
   showBookSettingsCard: false,
   showUserSettingsCard: false,
   showMyStatsCard: false,
+  showHelpCard: false,
   showAdminUsersCard: false,
   showAdminSettingsCard: false,
   showAdminUsageCard: false,
@@ -637,6 +638,9 @@ const collabState = () => ({
 // Exklusivitaet braucht — Modal liegt ueber allem (natives <dialog>).
 const bookCreateState = () => ({
   bookCreateName: '',
+  bookCreateBuchtyp: '',
+  bookCreateCategoryId: '',
+  bookCreateCategoryPool: [],
   bookCreateBusy: false,
   bookCreateError: '',
 });

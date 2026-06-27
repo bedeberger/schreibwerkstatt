@@ -75,6 +75,7 @@ export const crudMethods = {
     this.selectedImportFigureId = '';
     this.runs = { brainstorm: [], consistency: [] };
     this.runsLoadedDraftId = null;
+    this.plotUsage = null;
     this.selectedRunId = null;
     this.selectedKonfliktIdx = null;
     this._mindmapDirty = false;
@@ -124,7 +125,49 @@ export const crudMethods = {
     this.selectedKonfliktIdx = null;
     this._mindmapDirty = false;
     this.loadRuns?.();
+    this.loadPlotUsage?.();
     this._reattachActiveJobs?.(id);
+  },
+
+  // Cross-Feature: Plot-Beteiligung der ausgewählten Werkstatt-Figur laden (Anzahl
+  // Beats + gebundene Stränge) → „in N Beats geplant"-Badge (Navigation → Plot).
+  // Best-effort: Plot ist optional; ein Fehler hier lässt das Badge nur weg.
+  async loadPlotUsage() {
+    const app = window.__app;
+    const bookId = app?.selectedBookId;
+    const draftId = this.selectedDraftId;
+    this.plotUsage = null;
+    if (!bookId || !draftId) return;
+    try {
+      const u = await fetchJson(`/plot/figure-usage?book_id=${bookId}&draft_id=${draftId}`);
+      if (this.selectedDraftId !== draftId) return; // Stale (Draft inzwischen gewechselt)
+      this.plotUsage = u || null;
+    } catch { this.plotUsage = null; }
+  },
+
+  // Badge nur, wenn die Figur überhaupt im Plot vorkommt (Beats ODER Strang-Bindung).
+  plotUsageVisible() {
+    const u = this.plotUsage;
+    return !!(u && (u.activeBeatCount > 0 || (u.threads && u.threads.length)));
+  },
+
+  plotUsageLabel() {
+    const u = this.plotUsage;
+    if (!u) return '';
+    const app = window.__app;
+    if (u.activeBeatCount > 0) return app.t('werkstatt.plotUsage.badge', { n: u.activeBeatCount });
+    if (u.threads && u.threads.length) return app.t('werkstatt.plotUsage.threadBadge');
+    return '';
+  },
+
+  plotUsageTip() {
+    const u = this.plotUsage;
+    const app = window.__app;
+    if (!u) return '';
+    const names = (u.threads || []).map(t => t.name).filter(Boolean);
+    return names.length
+      ? app.t('werkstatt.plotUsage.threadTip', { names: names.join(', ') })
+      : app.t('werkstatt.plotUsage.tip');
   },
 
   selectedDraft() {
@@ -234,6 +277,7 @@ export const crudMethods = {
         this.consistencyResult = null;
         this.runs = { brainstorm: [], consistency: [] };
         this.runsLoadedDraftId = null;
+        this.plotUsage = null;
         this.selectedRunId = null;
         this.selectedKonfliktIdx = null;
         if (this.drafts.length > 0) this.selectDraft(this.drafts[0].id);

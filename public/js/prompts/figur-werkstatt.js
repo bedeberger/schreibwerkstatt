@@ -52,7 +52,24 @@ function _auftritteSeg(auftritte) {
   return seg;
 }
 
-export function buildBrainstormPrompt(figurName, archetype, knotenPfad, mindmapJson, buchKontext, bestehendeFiguren = [], bestehendeOrte = [], existingChildren = [], beziehungen = []) {
+// Cross-Feature: geplante Handlung dieser Figur aus der Plot-Werkstatt — Beats, an
+// denen sie beteiligt ist (direkt verlinkt oder als Strang-Hauptfigur), in Board-
+// Lesereihenfolge: „Akt: Titel [status] → Kapitel {Strang} (Intensität)".
+function _plotBeatsLines(plotBeats) {
+  return (plotBeats || []).slice(0, 60)
+    .filter(b => b && typeof b.titel === 'string' && b.titel.trim())
+    .map(b => {
+      const st = b.verworfen ? 'verworfen' : (b.status === 'im_buch' ? 'im Buch' : 'geplant');
+      const akt = b.akt ? `${b.akt}: ` : '';
+      const kap = b.kapitel ? ` → ${b.kapitel}` : '';
+      const str = b.strang ? ` {Strang: ${b.strang}}` : '';
+      const int = b.intensitaet ? ` (Intensität ${b.intensitaet}/5)` : '';
+      return `- ${akt}${b.titel.trim()} [${st}]${kap}${str}${int}`;
+    })
+    .join('\n');
+}
+
+export function buildBrainstormPrompt(figurName, archetype, knotenPfad, mindmapJson, buchKontext, bestehendeFiguren = [], bestehendeOrte = [], existingChildren = [], beziehungen = [], plotBeats = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const archSeg = archetype ? ` (Archetyp: ${archetype})` : '';
   const figLines = _figurenLines(bestehendeFiguren);
@@ -65,10 +82,19 @@ export function buildBrainstormPrompt(figurName, archetype, knotenPfad, mindmapJ
   const childSeg = childList.length
     ? `\nVORHANDENE SUB-KNOTEN AM ZIEL-KNOTEN (NICHT wiederholen):\n${childList.map(c => `- ${c}`).join('\n')}\n`
     : '';
+  // Cross-Feature: geplante Handlung der Figur (Plot-Werkstatt). Erdet besonders
+  // Bogen-/Konflikt-/Subtext-Knoten auf die schon skizzierte Handlung.
+  const plotLines = _plotBeatsLines(plotBeats);
+  const plotSeg = plotLines
+    ? `\nGEPLANTE HANDLUNG DIESER FIGUR (Plot-Beats — die Figur ist an diesen Handlungspunkten beteiligt):\n${plotLines}\n`
+    : '';
+  const plotBullet = plotLines
+    ? '\n- Kommt die Figur bereits in geplanten Beats vor (oben), sollen die Ideen (besonders bei Bogen/Konflikt/Subtext) zu dieser geplanten Handlung passen und sie psychologisch fundieren'
+    : '';
   return `Du entwickelst eine Romanfigur weiter. Die Autorin arbeitet am Knoten "${knotenPfad}" einer Figuren-Mindmap und braucht 3–7 prägnante Sub-Ideen.
 
 FIGUR: ${figurName}${archSeg}
-${ctxSeg}${figSeg}${bezSeg}${ortSeg}
+${ctxSeg}${figSeg}${bezSeg}${ortSeg}${plotSeg}
 AKTUELLE MINDMAP (JSON):
 ${JSON.stringify(mindmapJson)}
 
@@ -79,7 +105,7 @@ Liefere 3–7 konkrete, voneinander unterscheidbare Vorschläge als Sub-Ideen f�
 - Knappe Begründung (1 Satz), warum sie zur Figur und zum Buchkontext passt
 - Keine Wiederholung bestehender Knoten in der Mindmap (insbesondere der oben gelisteten Sub-Knoten)
 - Keine Doppelung von Eigenschaften bestehender Figuren — Abgrenzung schärft Profil
-- Schauplätze, falls erwähnt, müssen zu den oben gelisteten Orten passen oder klar neu sein
+- Schauplätze, falls erwähnt, müssen zu den oben gelisteten Orten passen oder klar neu sein${plotBullet}
 
 Antworte mit diesem JSON-Schema:
 {
@@ -101,7 +127,7 @@ export const SCHEMA_BRAINSTORM = _obj({
 // bestehende Figuren (Name+Rolle) + Orte (Name+Typ). Findet Widersprüche,
 // Lücken und Klischees. Severity-Vokabular kompatibel zu .severity-tag--*.
 
-export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKontext, bestehendeFiguren, bestehendeOrte, beziehungen = [], eigeneAuftritte = null) {
+export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKontext, bestehendeFiguren, bestehendeOrte, beziehungen = [], eigeneAuftritte = null, plotBeats = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const archSeg = archetype ? ` (Archetyp: ${archetype})` : '';
   const figLines = _figurenLines(bestehendeFiguren);
@@ -114,11 +140,23 @@ export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKo
   const auftritteCheck = auftritteSeg
     ? '\n- Widersprüche zwischen Mindmap-Plan und dem, was im Buch bereits über die Figur geschrieben steht (Szenen/Ereignisse oben)'
     : '';
+  // Cross-Feature: geplante Handlung der Figur (Plot-Werkstatt). Erlaubt den Abgleich
+  // „geplanter Figurenbogen ↔ geplante Beats" — die wertvollste Cross-Prüfung, die
+  // weder Mindmap noch Plot allein leisten.
+  const plotLines = _plotBeatsLines(plotBeats);
+  const plotSeg = plotLines
+    ? `\nGEPLANTE HANDLUNG DIESER FIGUR (Plot-Beats aus der Plot-Werkstatt — Beats, an denen die Figur beteiligt ist, in Lesereihenfolge):\n${plotLines}\n`
+    : '';
+  const plotCheck = plotLines
+    ? `
+- Figurenbogen vs. geplante Handlung: Deckt sich der in der Mindmap skizzierte Bogen (bzw. Want/Need/Wound/Lie) mit den oben gelisteten Plot-Beats? Wird der innere Wandel in der Handlung tatsächlich eingelöst — gibt es Beats, die Need/Lie auf die Probe stellen, oder treibt der Plot nur den oberflächlichen Want?
+- Zentral aber flach / tief aber unverankert: Ist die Figur in vielen Beats beteiligt, aber psychologisch dünn ausgearbeitet — oder umgekehrt tief ausgearbeitet, taucht aber in keinem Beat auf?`
+    : '';
 
   return `Du prüfst eine in Entwicklung befindliche Romanfigur auf Stimmigkeit mit der Buchwelt. Die Autorin arbeitet die Figur als Mindmap aus; deine Aufgabe ist es, Widersprüche, Lücken und Klischees zu benennen — schonungslos, aber konstruktiv.
 
 FIGUR: ${figurName}${archSeg}
-${ctxSeg}${figSeg}${bezSeg}${ortSeg}${auftritteSeg}
+${ctxSeg}${figSeg}${bezSeg}${ortSeg}${auftritteSeg}${plotSeg}
 FIGUR-MINDMAP (JSON):
 ${JSON.stringify(mindmapJson)}
 
@@ -126,7 +164,7 @@ Prüfe auf:
 - Widersprüche innerhalb der Mindmap (z.B. Hintergrund passt nicht zur Stimme)
 - Konflikte mit Buchkontext (z.B. Beruf passt nicht zum Setting/Epoche)
 - Konflikte mit bestehenden Figuren (z.B. Doppelung von Rolle/Funktion, namentliche Verwechslungsgefahr)
-- Konflikte mit Schauplätzen (z.B. Wohnort existiert nicht)${auftritteCheck}
+- Konflikte mit Schauplätzen (z.B. Wohnort existiert nicht)${auftritteCheck}${plotCheck}
 - Klischees und blasse Stellen, die mehr Substanz brauchen
 - Fehlende Aspekte, die für eine glaubwürdige Figur unverzichtbar wären
 

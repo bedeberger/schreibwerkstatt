@@ -120,6 +120,33 @@
     </div>
   </div>
 
+  <!-- Figuren-Coverage (Cross-Feature Plot ↔ Figuren-Werkstatt, lokal): geplante
+       Tiefe ↔ geplante Handlung. Chips → öffnen die Werkstatt-Figur. -->
+  <div class="plot-coverage" x-show="figureCoverageRelevant()" x-cloak x-data="collapsible(false)">
+    <button type="button" class="collapsible-toggle" x-bind="trigger">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+      <span x-text="$app.t('plot.figcoverage.title')"></span>
+    </button>
+    <div class="plot-coverage-body" x-bind="panel" x-cloak>
+      <div class="plot-coverage-group" x-show="figureCoverage().developedNoPlot.length">
+        <span class="entity-meta-label" x-text="$app.t('plot.figcoverage.developedNoPlot', { n: figureCoverage().developedNoPlot.length })"></span>
+        <div class="plot-coverage-chips">
+          <template x-for="d in figureCoverage().developedNoPlot" :key="d.id">
+            <span class="tag tag--werkstatt internal-link" @click="$app.openWerkstattDraftById(d.id)" x-text="d.name"></span>
+          </template>
+        </div>
+      </div>
+      <div class="plot-coverage-group" x-show="figureCoverage().inPlotNoArc.length">
+        <span class="entity-meta-label" x-text="$app.t('plot.figcoverage.inPlotNoArc', { n: figureCoverage().inPlotNoArc.length })"></span>
+        <div class="plot-coverage-chips">
+          <template x-for="d in figureCoverage().inPlotNoArc" :key="d.id">
+            <span class="tag tag--werkstatt internal-link" @click="$app.openWerkstattDraftById(d.id)" x-text="d.name"></span>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Spannungsbogen: Intensität der Beats (1–5) als Kurve. Ohne Stränge eine
        globale Kurve in Board-Lesereihenfolge; mit Strängen je Strang eine eigene
        farbige Kurve. Sichtbar ab 2 nicht-verworfenen Beats mit Intensität. -->
@@ -129,9 +156,22 @@
       <span x-text="$app.t('plot.tension.title')"></span>
     </button>
     <div class="plot-tension-body" x-bind="panel" x-cloak>
-      <div class="plot-tension-chart">
+      <!-- Figur-Fokus: hebt die Beats einer Figur auf der Kurve hervor (Figurenbogen) -->
+      <div class="plot-tension-focus" x-show="tensionFigurOptions().length">
+        <div x-data="combobox($app.t('plot.tension.focusPlaceholder'), $app.t('plot.tension.focusAll'))"
+             x-modelable="value" x-model="tensionFocusFigur"
+             x-effect="options = tensionFigurOptions()"></div>
+      </div>
+      <div class="plot-tension-chart" :class="{ 'plot-tension-chart--focused': tensionFocusActive() }">
         <span class="plot-tension-axis plot-tension-axis--high" x-text="$app.t('plot.tension.high')"></span>
         <span class="plot-tension-axis plot-tension-axis--low" x-text="$app.t('plot.tension.low')"></span>
+        <!-- Figur-Fokus-Kurve: Linie nur durch die Beats der fokussierten Figur
+             (strang-loser Modus). Eigenständiges überlagertes <svg> (kein x-if im <svg>). -->
+        <template x-if="!tensionCurve().series.length && tensionFocusActive()">
+          <svg class="plot-tension-svg plot-tension-svg--focus" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <polyline :points="tensionFocusLine()" vector-effect="non-scaling-stroke" />
+          </svg>
+        </template>
         <!-- ohne Stränge: eine Kurve (CSS-Stroke). x-for/x-if NIE direkt ins <svg>
              (SVG-namespaced <template> hat keine .content → Alpine-importNode bricht);
              darum pro Zweig ein eigenständiges, überlagertes <svg>. -->
@@ -149,6 +189,7 @@
         <!-- Punkte ohne Stränge -->
         <template x-for="p in (tensionCurve().series.length ? [] : tensionCurve().points)" :key="p.beat.id">
           <button type="button" class="plot-tension-dot"
+                  :class="{ 'plot-tension-dot--dim': tensionFocusActive() && !beatHasTensionFigur(p.beat), 'plot-tension-dot--focus': tensionFocusActive() && beatHasTensionFigur(p.beat) }"
                   :style="{ left: p.xPct + '%', bottom: p.bottomPct + '%', '--col-accent': p.color }"
                   @click="startEditBeat(p.beat)"
                   :data-tip="(p.act ? p.act.name + ' · ' : '') + p.beat.titel + ' (' + p.beat.intensitaet + '/5)'"
@@ -158,6 +199,7 @@
         <template x-for="s in tensionCurve().series" :key="s.key">
           <template x-for="p in s.points" :key="p.beat.id">
             <button type="button" class="plot-tension-dot"
+                    :class="{ 'plot-tension-dot--dim': tensionFocusActive() && !beatHasTensionFigur(p.beat), 'plot-tension-dot--focus': tensionFocusActive() && beatHasTensionFigur(p.beat) }"
                     :style="{ left: p.xPct + '%', bottom: p.bottomPct + '%', '--col-accent': threadAccent(s.thread) }"
                     @click="startEditBeat(p.beat)"
                     :data-tip="s.label + ' · ' + p.beat.titel + ' (' + p.beat.intensitaet + '/5)'"

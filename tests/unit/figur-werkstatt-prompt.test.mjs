@@ -174,3 +174,34 @@ test('buildConsistencyPrompt: ohne Figuren/Orte → keine leeren Blöcke', async
   assert.doesNotMatch(p, /BESTEHENDE FIGUREN/);
   assert.doesNotMatch(p, /BESTEHENDE ORTE/);
 });
+
+// ── Cross-Feature: geplante Handlung (Plot-Beats) ───────────────────────────
+const samplePlotBeats = [
+  { titel: 'Anna findet den Brief', status: 'geplant', verworfen: false, akt: 'Akt 1', kapitel: 'Kapitel 2', strang: 'Anna-Strang', intensitaet: 3 },
+  { titel: 'Konfrontation am Hafen', status: 'im_buch', verworfen: false, akt: 'Akt 3' },
+];
+
+test('buildConsistencyPrompt: Plot-Beats werden gelistet + Bogen-Abgleich-Prüfpunkt', async () => {
+  const { buildConsistencyPrompt } = await import(promptsUrl);
+  const p = buildConsistencyPrompt('Anna', null, sampleMindmap, '', [], [], [], null, samplePlotBeats);
+  assert.match(p, /GEPLANTE HANDLUNG DIESER FIGUR/);
+  assert.match(p, /Akt 1: Anna findet den Brief \[geplant\] → Kapitel 2 \{Strang: Anna-Strang\} \(Intensität 3\/5\)/);
+  assert.match(p, /Akt 3: Konfrontation am Hafen \[im Buch\]/);
+  assert.match(p, /Figurenbogen vs\. geplante Handlung/);
+  assert.match(p, /Zentral aber flach/);
+});
+
+test('buildConsistencyPrompt: ohne Plot-Beats → kein Plot-Block/Check (Abwärtskompat)', async () => {
+  const { buildConsistencyPrompt } = await import(promptsUrl);
+  const p = buildConsistencyPrompt('Anna', null, sampleMindmap, '', [], [], [], null, []);
+  assert.doesNotMatch(p, /GEPLANTE HANDLUNG DIESER FIGUR/);
+  assert.doesNotMatch(p, /Figurenbogen vs\. geplante Handlung/);
+});
+
+test('buildBrainstormPrompt: Plot-Beats grunden Bogen-/Konflikt-Knoten', async () => {
+  const { buildBrainstormPrompt } = await import(promptsUrl);
+  const p = buildBrainstormPrompt('Anna', null, 'Steckbrief > Bogen', sampleMindmap, '', [], [], [], [], samplePlotBeats);
+  assert.match(p, /GEPLANTE HANDLUNG DIESER FIGUR/);
+  assert.match(p, /Anna findet den Brief/);
+  assert.match(p, /zu dieser geplanten Handlung passen/);
+});

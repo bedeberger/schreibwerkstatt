@@ -88,6 +88,23 @@ export const appNavigationMethods = {
     }
   },
 
+  // Cross-Feature: aus der Figuren-Werkstatt ins Plot-Board springen, gefiltert auf
+  // die Beats dieser Werkstatt-Figur. Die Plot-Karte hört `plot:filter-draft-figure`
+  // und parkt das Ziel, falls das Board noch nicht geladen ist.
+  async openPlotForDraftFigure(draftId) {
+    this._beginNavigation();
+    try {
+      if (!this.showPlotCard) {
+        await this.togglePlotCard();
+      }
+      window.dispatchEvent(new CustomEvent('plot:filter-draft-figure', {
+        detail: { draftId },
+      }));
+    } finally {
+      this._endNavigation();
+    }
+  },
+
   async openSzeneById(szeneId) {
     this._beginNavigation();
     try {
