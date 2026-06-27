@@ -197,6 +197,14 @@ Eine eigenständige, per-Boolean klappbare Sektion nutzt **`Alpine.data('collaps
 </div>
 ```
 
+**Header-Action-Buttons — Vorbild ist die Notebook-Seitenansicht-Toolbar (SSoT):** Die Aktions-Icons im Karten-Header folgen exakt dem Cluster der Einzelseiten-Ansicht ([public/partials/editor-notebook.html](public/partials/editor-notebook.html), `.card-actions--grouped`). Konkret:
+- **Container:** `.card-actions` (Gap `--space-6`), bei ≥2 semantischen Bündeln `.card-actions--grouped` + `.action-sep`. **Nie** Buttons direkt in `.card-header-aside` setzen — dessen Gap (`--space-14`) ist für Status-/Token-Cluster gedacht und reisst die Icons sichtbar weiter auseinander als auf allen anderen Karten.
+- **Button-Klasse:** `icon-btn icon-btn--ghost` (transparent bis Hover, einheitliche 28×28-Chips). **Nicht** der umrandete `.icon-btn` (default/outlined) für Header-Cluster.
+- **Aktiver Toggle** (Panel offen, Fullscreen ein): `:class="{ 'is-active': … }"` + `:aria-pressed` — nicht eine eigene `.primary`/`.active`-Klasse.
+- **Schliessen im Cluster:** liegt der Close-Button mit weiteren Aktionen in derselben `.card-actions`-Reihe, ist er ebenfalls `icon-btn icon-btn--ghost` mit `#x`-Sprite (nicht der abgesetzte `.btn-card-close`, der nur für den allein-stehenden, absolut positionierten Header-Close gilt — siehe [Action-Icon-Library](#action-icon-library-verbindlich) „Schliessen").
+
+Referenz-Cluster: [public/partials/recherche.html](public/partials/recherche.html) (Chat / Vollbild / Schliessen als Ghost-Trio).
+
 ---
 
 ## Combobox (Auswahlfeld)
