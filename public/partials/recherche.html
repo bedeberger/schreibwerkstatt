@@ -301,6 +301,22 @@
               </template>
             </div>
 
+            <!-- Link-Picker (inline am Item, nur das aktive sichtbar) -->
+            <template x-if="linkPickerItemId === item.id">
+              <div class="recherche-linkpicker">
+                <span class="recherche-linkpicker-label" x-text="$app.t('recherche.link.pickerLabel')"></span>
+                <div x-data="combobox($app.t('recherche.link.pickKind'))"
+                     x-modelable="value" x-model="linkPickerKind"
+                     x-effect="options = linkKinds()"
+                     @combobox-change="linkPickerTargetId = ''"></div>
+                <div x-data="combobox($app.t('recherche.link.pickTarget'))"
+                     x-modelable="value" x-model="linkPickerTargetId"
+                     x-effect="options = linkTargetOptions()" class="recherche-linkpicker-target"></div>
+                <button type="button" class="btn-compact recherche-primary" @click="confirmLinkPicker()" :disabled="!linkPickerTargetId" x-text="$app.t('recherche.link.confirm')"></button>
+                <button type="button" class="btn-compact" @click="cancelLinkPicker()" x-text="$app.t('recherche.cancel')"></button>
+              </div>
+            </template>
+
             <!-- Tags -->
             <div class="research-tags" x-show="item.tags && item.tags.length">
               <template x-for="tag in item.tags" :key="tag">
@@ -373,17 +389,4 @@
     </template>
   </div>
 
-  <!-- Link-Picker (Single-Instance) -->
-  <div x-show="linkPickerItemId !== null" x-cloak class="recherche-linkpicker">
-    <span class="recherche-linkpicker-label" x-text="$app.t('recherche.link.pickerLabel')"></span>
-    <div x-data="combobox($app.t('recherche.link.pickKind'))"
-         x-modelable="value" x-model="linkPickerKind"
-         x-effect="options = linkKinds()"
-         @combobox-change="linkPickerTargetId = ''"></div>
-    <div x-data="combobox($app.t('recherche.link.pickTarget'))"
-         x-modelable="value" x-model="linkPickerTargetId"
-         x-effect="options = linkTargetOptions()" class="recherche-linkpicker-target"></div>
-    <button type="button" class="btn-compact recherche-primary" @click="confirmLinkPicker()" :disabled="!linkPickerTargetId" x-text="$app.t('recherche.link.confirm')"></button>
-    <button type="button" class="btn-compact" @click="cancelLinkPicker()" x-text="$app.t('recherche.cancel')"></button>
-  </div>
 </div>

@@ -267,6 +267,7 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   font-size: 0.85em;
   letter-spacing: 0.03em;
   color: var(--color-muted);
+  margin-right: var(--space-2xs);
 }
 .research-chip-x {
   display: inline-flex;
