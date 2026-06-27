@@ -896,6 +896,40 @@ CSS: [public/css/entities/entity-list.css](public/css/entities/entity-list.css).
 
 ---
 
+## Detail-Gruppen + Steckbrief-Raster (Figuren-Detail)
+
+**Use:** Reich annotierte Entity-Details (viele heterogene Felder) in benannte Gruppen bündeln und kurze Fakten als ausgerichtetes Label/Wert-Raster zeigen, statt einer langen flachen Spalte gleichrangiger Sektionstitel.
+
+**Markup:**
+```html
+<section class="figur-group" x-show="…">
+  <h4 class="figur-group-title" x-text="t('…group…')"></h4>
+  <dl class="figur-steckbrief-grid">
+    <template x-if="f.rolle">
+      <div class="figur-fact"><dt x-text="t('…rolle')"></dt><dd x-text="f.rolle"></dd></div>
+    </template>
+    <!-- weitere kurze Fakten … -->
+  </dl>
+  <!-- längere Prosa-Felder als volle Breite: .figur-detail-row mit inline-Label -->
+  <!-- Untersektionen (Listen/Tags/Zeitstrahl) mit .bewertung-section-title -->
+</section>
+```
+
+**Klassen** [public/css/entities/figuren.css](public/css/entities/figuren.css):
+- `.figur-group` — Gruppe mit Top-Trenner; `:first-of-type` ohne Trenner.
+- `.figur-group-title` — fetter Uppercase-Gruppentitel mit `--card-accent`-Tick (Hierarchie-Ebene über `.bewertung-section-title`).
+- `.figur-steckbrief-grid` — `grid` mit `max-content 1fr`, ab 720px `max-content 1fr max-content 1fr` (zwei Label/Wert-Paare pro Zeile → nutzt Kartenbreite).
+- `.figur-fact` — `display: contents`, damit `dt`/`dd` direkt im Grid fluchten (nötig als `x-if`-Wurzelelement).
+
+**Regeln:**
+- Nur **kurze** Werte ins Raster (Rolle, Beruf, Badges, Adresse). Prosa-Felder (Beschreibungen, Motivation) als volle Breite per `.figur-detail-row` mit inline-Label — sonst zerbricht der lange Text in halbe Zellen.
+- Sub-Sektionstitel innerhalb einer Gruppe bleiben `.bewertung-section-title`; nur die **erste** unter dem Gruppentitel verliert ihren oberen Abstand.
+- Drei Gruppen für Figuren: Steckbrief (Fakten) · Charakter (Innenleben/Entwicklung) · Im Buch (Auftritte/Beziehungen/Zeitstrahl).
+
+**Beispiele:** [public/partials/figuren.html](public/partials/figuren.html)
+
+---
+
 ## Table-Scroll (`.table-scroll`)
 
 **Use:** Wrapper um breite Tabellen, damit sie auf engen Viewports horizontal scrollen statt aus der Karte zu ragen. Pflicht für mehrspaltige Admin-/Listen-Tables.

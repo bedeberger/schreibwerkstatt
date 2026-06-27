@@ -136,7 +136,7 @@ function _yearToMs(year) {
 // Breite in Prozent umrechnen und kollidierende Chips werden links→rechts zu
 // einem Sammel-Chip verschmolzen (Counts addiert, Klick springt zum ersten).
 // `bandWidthPx = 0` (Tests, erster Paint vor der Messung) ⇒ kein Merge.
-export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 6, bandWidthPx = 0 } = {}) {
+export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 12, bandWidthPx = 0 } = {}) {
   const bounds = timelineBounds(items);
   if (!bounds) return { lanes: 0, markers: [], bounds: null };
   const spanMs = Math.max(1, bounds.max - bounds.min);
@@ -203,10 +203,13 @@ export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 6, bandWid
   }
 
   // 3) „+N"-Chips kollisionsfrei machen: bei bekannter Pixelbreite benachbarte
-  //    Chips, deren Text-Boxen überlappen würden, links→rechts zu einem Sammel-
-  //    Chip verschmelzen (Count addiert, Lane = oberste der Gruppe, x = Mitte,
-  //    Klick-id = erster). Konservativ (Anker = rechter Rand der Gruppe), errt
-  //    Richtung „eher mergen" — nie überlappen.
+  //    Chips, deren Text-Boxen überlappen würden, links→rechts verschmelzen
+  //    (Count addiert, Lane = oberste der Gruppe, x = Mitte, Klick-id = erster).
+  //    Kollisionsprüfung ist *paarweise* zwischen benachbarten Original-Chips
+  //    (Anker = x + Eigenbreite des letzten Mitglieds), NICHT gegen die wachsende
+  //    Gruppen-Summe — sonst kettet ein bereits dicker Chip immer weitere
+  //    Nachbarn an und es entsteht ein einziges Riesen-„+N". So bleiben in einer
+  //    dichten Strecke mehrere kleine Chips statt eines opaken Klumpens.
   if (bandWidthPx > 0) {
     const more = markers.filter(m => m.kind === 'more').sort((a, b) => a.x - b.x);
     if (more.length > 1) {
@@ -219,13 +222,16 @@ export function layoutBandItems(items, { minSlotPct = 1.4, maxLanes = 6, bandWid
       const groups = [];
       let cur = null;
       for (const m of more) {
-        if (cur && (m.x - cur.xRight) < halfPct(cur.count) + halfPct(m.count) + gapPct) {
+        // Überlappt m mit dem zuletzt einsortierten Chip (dessen Eigenbreite)?
+        if (cur && (m.x - cur.lastX) < halfPct(cur.lastCount) + halfPct(m.count) + gapPct) {
           cur.count += m.count;
           cur.xRight = m.x;
+          cur.lastX = m.x;
+          cur.lastCount = m.count;
           cur.lane = Math.max(cur.lane, m.lane);
           continue;
         }
-        cur = { kind: 'more', id: m.id, xLeft: m.x, xRight: m.x, lane: m.lane, count: m.count };
+        cur = { kind: 'more', id: m.id, xLeft: m.x, xRight: m.x, lastX: m.x, lastCount: m.count, lane: m.lane, count: m.count };
         groups.push(cur);
       }
       const mergedMore = groups.map(g => ({

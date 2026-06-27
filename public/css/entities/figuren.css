@@ -109,14 +109,58 @@
 .figur-praesenz-punktuell    { --badge-hue: var(--palette-orange); }
 .figur-praesenz-randfigur    { --badge-hue: var(--palette-gray); }
 
-/* === Figuren: Kerninfo (Rolle/Motivation/Konflikt/Entwicklung) === */
-.figur-kerninfo {
-  margin-bottom: var(--space-md);
-  padding: var(--space-sm) var(--space-md);
-  background: color-mix(in srgb, var(--card-accent) 6%, var(--color-surface));
-  border-left: 2px solid color-mix(in srgb, var(--card-accent) 55%, var(--color-border));
-  border-radius: var(--radius-sm);
+/* === Figuren: Detail-Gruppen (Steckbrief / Charakter / Im Buch) === */
+.figur-group {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 0.5px solid var(--color-border);
 }
+.figur-group:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.figur-group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text);
+}
+.figur-group-title::before {
+  content: "";
+  width: 3px;
+  height: 0.9em;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--card-accent);
+}
+
+/* Steckbrief: ausgerichtetes Label/Wert-Raster (Doppelpunkte fluchten) */
+.figur-steckbrief-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--space-md);
+  row-gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+.figur-fact { display: contents; }
+.figur-steckbrief-grid dt { color: var(--color-muted); white-space: nowrap; }
+.figur-steckbrief-grid dd { margin: 0; color: var(--color-text); min-width: 0; }
+/* Ab Tablet zwei Label/Wert-Paare pro Zeile (nutzt die Kartenbreite) */
+@media (min-width: 720px) {
+  .figur-steckbrief-grid {
+    grid-template-columns: max-content 1fr max-content 1fr;
+    column-gap: var(--space-lg);
+  }
+}
+
 .figur-kerninfo-row { font-size: var(--font-size-sm); line-height: 1.55; margin-bottom: var(--space-xs); }
 .figur-kerninfo-row:last-child { margin-bottom: 0; }
 
@@ -137,8 +181,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin-top: var(--space-xl);
+  margin-top: var(--space-lg);
   margin-bottom: var(--space-sm);
+}
+/* Erste Untersektion direkt unter einem Gruppentitel braucht keinen grossen Abstand */
+.figur-group > *:first-child .bewertung-section-title:not(.bewertung-section-title--inline),
+.figur-group > .bewertung-section-title:not(.bewertung-section-title--inline):first-child {
+  margin-top: 0;
 }
 .figur-detail .bewertung-section-title:not(.bewertung-section-title--inline)::before {
   content: "";

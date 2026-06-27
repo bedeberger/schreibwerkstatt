@@ -19,15 +19,19 @@
     </div>
   </div>
 
-  <!-- Jahres-Stand (nur bei „echter Zeitlinie" in den Buch-Einstellungen) -->
+  <!-- Jahres-Stand pro Kapitel (nur bei „echter Zeitlinie" in den Buch-Einstellungen) -->
   <div class="gz-chronology" x-show="$app.zeitstrahlChronology && $app.globalZeitstrahl.length > 0" x-cloak>
-    <div class="gz-chronology-stat">
-      <span class="gz-chronology-label" x-text="$app.t('events.chronologyEnd')"></span>
-      <span class="gz-chronology-value" x-text="$app.zeitstrahlChronology?.endYear"></span>
-    </div>
-    <div class="gz-chronology-stat">
-      <span class="gz-chronology-label" x-text="$app.t('events.chronologySpan')"></span>
-      <span class="gz-chronology-value"
+    <ul class="gz-chronology-list" x-show="$app.zeitstrahlChronology?.chapters?.length">
+      <template x-for="c in ($app.zeitstrahlChronology?.chapters || [])" :key="c.chapter_id">
+        <li class="gz-chronology-row">
+          <span class="gz-chronology-kap" x-text="c.name"></span>
+          <span class="gz-chronology-year" x-text="c.minYear === c.maxYear ? c.minYear : (c.minYear + '–' + c.maxYear)"></span>
+        </li>
+      </template>
+    </ul>
+    <div class="gz-chronology-total">
+      <span class="gz-chronology-total-label" x-text="$app.t('events.chronologySpan')"></span>
+      <span class="gz-chronology-total-value"
             x-text="$app.zeitstrahlChronology ? ($app.zeitstrahlChronology.minYear === $app.zeitstrahlChronology.maxYear ? $app.zeitstrahlChronology.minYear : $app.zeitstrahlChronology.minYear + '–' + $app.zeitstrahlChronology.maxYear) : ''"></span>
     </div>
   </div>

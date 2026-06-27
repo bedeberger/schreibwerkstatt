@@ -247,36 +247,72 @@
   font-style: italic;
 }
 
-/* Jahres-Stand: kompakte Kennzahlen-Leiste über der Zeitleiste. „Am Manuskript-
-   Ende" (wo die Figuren stehen, wo zuletzt geschrieben wurde) + Jahres-Spektrum
-   des Romans. Nur bei book_settings.zeitlinie_real befüllt. */
+/* Jahres-Stand pro Kapitel: Story-Jahr, in dem jedes Kapitel spielt (in Lese-
+   Reihenfolge), darunter die Gesamt-Zeitspanne des Romans. Nur bei
+   book_settings.zeitlinie_real befüllt. */
 .gz-chronology {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-6);
-  margin-top: var(--space-10);
-}
-
-.gz-chronology-stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-5) var(--space-10);
+  margin: var(--space-6) 0;
+  padding: var(--space-5) var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface-2, var(--color-surface));
 }
 
-.gz-chronology-label {
+.gz-chronology-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.gz-chronology-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.gz-chronology-row:last-child {
+  border-bottom: none;
+}
+
+.gz-chronology-kap {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gz-chronology-year {
+  flex: none;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--card-accent, var(--color-text));
+}
+
+.gz-chronology-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 2px solid var(--color-border);
+}
+
+.gz-chronology-total-label {
   font-size: var(--font-size-mini);
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.gz-chronology-value {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
+.gz-chronology-total-value {
+  font-size: var(--font-size-base);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--card-accent, var(--color-text));
 }

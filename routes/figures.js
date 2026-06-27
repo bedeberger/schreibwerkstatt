@@ -30,11 +30,13 @@ function _readingOrdinalMap(bookId) {
   return map;
 }
 
-// "In welchem Jahr stecken die Figuren?" — abgeleitet aus den sicher datierten
+// "In welchem Jahr spielt der Roman?" — abgeleitet aus den sicher datierten
 // Zeitstrahl-Events (datum_unsicher === false, datum_year gesetzt).
 //   minYear/maxYear  → Jahres-Spektrum des Romans (Start inkl. Spannen-Ende)
-//   endYear          → Jahr des Events, das der zuletzt geschriebenen Manuskript-
-//                      Stelle am nächsten liegt ("wo ich aufgehört habe")
+//   endYear          → spätestes Story-Jahr des Romans (= maxYear)
+//   chapters         → Story-Jahr je Kapitel in Lese-Reihenfolge:
+//                      [{ chapter_id, name, minYear, maxYear }]. Ein Kapitel
+//                      bündelt die sicher datierten Events, die es verlinken.
 // null, wenn es keine sicher datierten Events gibt. Abgeleitete Jahre
 // (datum_unsicher) fliessen bewusst NICHT ein.
 function _computeChronology(bookId, events) {
@@ -46,19 +48,29 @@ function _computeChronology(bookId, events) {
     const end = e.datum_ende_year != null ? e.datum_ende_year : e.datum_year;
     if (end > maxYear) maxYear = end;
   }
-  const ordinal = _readingOrdinalMap(bookId);
-  let bestOrd = -1, endYear = null;
+  // Pro-Kapitel: Story-Jahr(e), in denen das Kapitel spielt. kapitel[i] gehört
+  // zu chapter_ids[i] (gleiche Push-Reihenfolge in der /zeitstrahl-Route).
+  const byChapter = new Map(); // chapter_id → { chapter_id, name, min, max }
   for (const e of secure) {
-    let ord = -1;
-    for (const cid of (e.chapter_ids || [])) { const o = ordinal.get('c' + cid); if (o != null && o > ord) ord = o; }
-    for (const pid of (e.page_ids || []))    { const o = ordinal.get('p' + pid); if (o != null && o > ord) ord = o; }
-    if (ord < 0) continue;
-    if (ord > bestOrd || (ord === bestOrd && e.datum_year > endYear)) { bestOrd = ord; endYear = e.datum_year; }
+    const end = e.datum_ende_year != null ? e.datum_ende_year : e.datum_year;
+    const ids = e.chapter_ids || [], names = e.kapitel || [];
+    ids.forEach((cid, i) => {
+      if (cid == null) return;
+      const c = byChapter.get(cid);
+      if (!c) { byChapter.set(cid, { chapter_id: cid, name: names[i] || null, min: e.datum_year, max: end }); }
+      else {
+        if (e.datum_year < c.min) c.min = e.datum_year;
+        if (end > c.max) c.max = end;
+        if (!c.name && names[i]) c.name = names[i];
+      }
+    });
   }
-  // Kein Event mit Manuskript-Position (z.B. nur Figuren-Events ohne Verortung):
-  // Fallback auf das späteste Story-Jahr.
-  if (endYear == null) endYear = maxYear;
-  return { minYear, maxYear, endYear };
+  const ordinal = _readingOrdinalMap(bookId);
+  const chapters = [...byChapter.values()]
+    .filter(c => c.name) // ohne Namen nicht anzeigbar (z.B. gelöschtes Kapitel)
+    .sort((a, b) => (ordinal.get('c' + a.chapter_id) ?? Infinity) - (ordinal.get('c' + b.chapter_id) ?? Infinity))
+    .map(c => ({ chapter_id: c.chapter_id, name: c.name, minYear: c.min, maxYear: c.max }));
+  return { minYear, maxYear, endYear: maxYear, chapters };
 }
 
 // Erste 4-stellige Jahreszahl aus einem Datums-String (z.B. "Frühling 1850").
