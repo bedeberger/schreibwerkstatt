@@ -180,12 +180,13 @@ test('buildLektoratPrompt: erzeugt nicht-leeren Prompt-Body', async () => {
   assert.ok(out.includes('Der Hund läuft im Wald.'));
 });
 
-test('buildLektoratPrompt (claude): enthält alle 17 Typen im Enum + 5 neue Spezial-Blöcke', async () => {
+test('buildLektoratPrompt (claude): enthält alle Cloud-Typen im Enum + Spezial-Blöcke', async () => {
   const m = await freshPrompts('claude');
   const out = m.buildLektoratPrompt('Der Hund läuft im Wald.', { buchtyp: 'roman' });
-  for (const t of ['filterwort', 'klischee', 'pleonasmus', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
+  for (const t of ['satzbau', 'filterwort', 'klischee', 'pleonasmus', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
     assert.match(out, new RegExp(t), `Typ «${t}» fehlt im Cloud-Prompt`);
   }
+  assert.match(out, /Satzbau-Regeln/);
   assert.match(out, /Filterwort-Regeln/);
   assert.match(out, /Klischee-Regeln/);
   assert.match(out, /Pleonasmus-Regeln/);
@@ -219,12 +220,12 @@ test('buildLektoratPrompt (ollama): nur 6 Local-Typen, keine neuen Spezial-Blöc
   assert.ok(!out.includes('Figurenkonsistenz-Regeln'));
 });
 
-test('SCHEMA_LEKTORAT (claude): enum umfasst alle 19 Cloud-Typen', async () => {
+test('SCHEMA_LEKTORAT (claude): enum umfasst alle 20 Cloud-Typen', async () => {
   const m = await freshPrompts('claude');
   const e = m.SCHEMA_LEKTORAT?.properties?.fehler?.items?.properties?.typ?.enum;
   assert.ok(Array.isArray(e), 'enum-Array fehlt im Schema');
-  assert.equal(e.length, 19);
-  for (const t of ['filterwort', 'klischee', 'pleonasmus', 'ki_geruch', 'dialogformat', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
+  assert.equal(e.length, 20);
+  for (const t of ['satzbau', 'filterwort', 'klischee', 'pleonasmus', 'ki_geruch', 'dialogformat', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
     assert.ok(e.includes(t), `Schema-enum fehlt «${t}»`);
   }
 });

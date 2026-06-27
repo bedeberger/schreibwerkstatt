@@ -7,6 +7,7 @@ import { _obj, _str } from './schema-utils.js';
 import {
   _buildGrammatikBlock,
   _buildStilBlock,
+  _buildSatzbauBlock,
   _buildWiederholungBlock,
   _buildSchwacheVerbenBlock,
   _buildFuellwortBlock,
@@ -101,14 +102,14 @@ function _buildLektoratPromptBody(text, textLabel, {
   // Textverständnis, an dem kleine Modelle häufig scheitern oder in Wiederholungsloops geraten.
   const typEnum = _isLocal
     ? 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort'
-    : 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort|filterwort|klischee|pleonasmus|ki_geruch|show_vs_tell|passiv|perspektivbruch|tempuswechsel|dialogformat|namenskonsistenz|figurenmerkmal|anrede|schauplatzmerkmal';
+    : 'rechtschreibung|grammatik|stil|satzbau|wiederholung|schwaches_verb|fuellwort|filterwort|klischee|pleonasmus|ki_geruch|show_vs_tell|passiv|perspektivbruch|tempuswechsel|dialogformat|namenskonsistenz|figurenmerkmal|anrede|schauplatzmerkmal';
 
   // Lokal + Cloud: Typ-Priorität und Anti-Doppelung pro Textspanne. Verhindert,
   // dass derselbe Satz mehrfach gemeldet wird (z.B. fuellwort + schwaches_verb +
   // stil am gleichen Wort) – pro Span genau ein Eintrag mit dem spezifischsten Typ.
   const dedupTypen = _isLocal
     ? 'rechtschreibung > grammatik > wiederholung > schwaches_verb > fuellwort > stil'
-    : 'dialogformat > rechtschreibung > grammatik > namenskonsistenz > figurenmerkmal > schauplatzmerkmal > anrede > pleonasmus > wiederholung > perspektivbruch > tempuswechsel > klischee > ki_geruch > passiv > show_vs_tell > filterwort > schwaches_verb > fuellwort > stil';
+    : 'dialogformat > rechtschreibung > grammatik > namenskonsistenz > figurenmerkmal > schauplatzmerkmal > anrede > pleonasmus > wiederholung > perspektivbruch > tempuswechsel > klischee > ki_geruch > passiv > show_vs_tell > filterwort > schwaches_verb > fuellwort > satzbau > stil';
 
   const dedupBlock = `
 EIN-EINTRAG-PRO-STELLE (Anti-Doppelung, alle Typen):
@@ -158,7 +159,7 @@ ${_isLocal
   · namenskonsistenz: einzelnes Wort (der falsch geschriebene Name)
   · figurenmerkmal, anrede, schauplatzmerkmal, pleonasmus, dialogformat: Phrase (genau die widersprüchliche / redundante / typografisch falsche Stelle)
   · wiederholung, schwaches_verb, fuellwort, filterwort, passiv, show_vs_tell, perspektivbruch, tempuswechsel: vollständiger Satz
-  · klischee, ki_geruch, stil: vollständiger Satz ODER eindeutig abgrenzbare Phrase – beide Felder müssen denselben Span-Typ haben`}
+  · klischee, ki_geruch, stil, satzbau: vollständiger Satz ODER eindeutig abgrenzbare Phrase – beide Felder müssen denselben Span-Typ haben`}
 `;
 
   const filterBlock = _isLocal
@@ -173,7 +174,7 @@ SCHWERE-SCHWELLE (Anti-Pedanterie, Pflicht-Filter vor dem Aufnehmen ins «fehler
 - Selbsttest pro Eintrag: «Würde ein professioneller Lektor diese Stelle in einem bezahlten Lektorat anstreichen?» Wenn die Antwort «vielleicht», «Geschmacksache» oder «nur am Rand» wäre → weglassen.
 - VERWORFEN-Kandidaten: minimal alternative Synonyme ohne klaren Gewinn, Mikro-Stilpräferenzen, ein einzelnes «sehr» / «ein bisschen» wenn der Satz sonst rund läuft, vollkommen idiomatische Wendungen, regional übliche Formulierungen, ironisch oder bewusst eingesetzte «Schwächen».
 - MECHANISCHE FEHLER unterliegen der Schwere-Schwelle UND der Mengen-Obergrenze NICHT – sie werden IMMER und VOLLSTÄNDIG gemeldet, egal wie viele es sind: Rechtschreibung, Grammatik (Kongruenz, Kasus, Rektion, Verbformen, Modus), ZEICHENSETZUNG/INTERPUNKTION (fehlende oder falsch gesetzte Kommas, Satzschlusszeichen, Apostroph, Gedankenstrich), TEMPUSBRÜCHE (typ «tempuswechsel») und Dialogformat-Typografie (typ «dialogformat»). Das sind objektive Fehler, keine Geschmacksfragen – nie als «vielleicht» / «Geschmacksache» / «nur am Rand» abtun, nie wegen einer Obergrenze streichen.
-- Die Schwere-Schwelle und die Mengen-Obergrenze gelten NUR für subjektive/stilistische Findings (stil, schwaches_verb, fuellwort, filterwort, klischee, ki_geruch, show_vs_tell, passiv, pleonasmus, wiederholung). Dort gilt: lieber 5 starke, präzise Findings als 25 schwache. Wenn nach dem Selbsttest mehr als ~20 solcher stilistischen Einträge übrig bleiben, hart priorisieren: nur die schwersten ~20 behalten, restliche weglassen. Mechanische Fehler (oben) zählen NICHT gegen dieses Limit und werden nie gestrichen.
+- Die Schwere-Schwelle und die Mengen-Obergrenze gelten NUR für subjektive/stilistische Findings (stil, satzbau, schwaches_verb, fuellwort, filterwort, klischee, ki_geruch, show_vs_tell, passiv, pleonasmus, wiederholung). Dort gilt: lieber 5 starke, präzise Findings als 25 schwache. Wenn nach dem Selbsttest mehr als ~20 solcher stilistischen Einträge übrig bleiben, hart priorisieren: nur die schwersten ~20 behalten, restliche weglassen. Mechanische Fehler (oben) zählen NICHT gegen dieses Limit und werden nie gestrichen.
 `;
 
   // Selbstkontroll-Pass: Sortierung + Schluss-Review. Hat bei Claude messbaren
@@ -214,7 +215,8 @@ Beispiel eines VERWORFENEN Eintrags (Korrektur-Purität verletzt):
 
   const spezialBlocks = _isLocal
     ? ''
-    : `${_buildFilterwortBlock()}
+    : `${_buildSatzbauBlock()}
+${_buildFilterwortBlock()}
 ${_buildKlischeeBlock()}
 ${_buildPleonasmusBlock()}
 ${_buildShowVsTellBlock()}
@@ -320,6 +322,7 @@ function _buildLektoratSchema() {
   const enumLocal = ['rechtschreibung', 'grammatik', 'stil', 'wiederholung', 'schwaches_verb', 'fuellwort'];
   const enumCloud = [
     ...enumLocal,
+    'satzbau',
     'filterwort', 'klischee', 'pleonasmus', 'ki_geruch',
     'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel',
     'dialogformat',

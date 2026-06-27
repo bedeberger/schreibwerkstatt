@@ -82,7 +82,7 @@ function findPreviousPage(pages, currentPageId, currentChapterId) {
 
 // Gültige Fehlertypen und Validierung für Lektorat-Ergebnisse
 const VALID_TYPEN = new Set([
-  'rechtschreibung', 'grammatik', 'stil', 'wiederholung',
+  'rechtschreibung', 'grammatik', 'stil', 'satzbau', 'wiederholung',
   'schwaches_verb', 'fuellwort', 'filterwort', 'klischee', 'pleonasmus', 'ki_geruch',
   'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel', 'dialogformat',
   'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal',

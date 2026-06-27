@@ -41,13 +41,32 @@ export function _buildStilBlock() {
   return `
 Stil-Regeln (typ: «stil»):
 - «stil» ist KEIN Auffang-Eimer. Er greift NUR für stilistische Schwächen, die KEINEM spezifischeren Typ zugeordnet werden können.
-- Wenn ein spezifischerer Typ passt (schwaches_verb, fuellwort, wiederholung, passiv, show_vs_tell, grammatik, rechtschreibung) → diesen Typ verwenden, NICHT «stil».
-- «stil» deckt ab: holprige Wortstellung / schwerfälliger Satzbau, gestelzte oder umständliche Formulierung, Stilbruch im Register (z.B. Bürokratendeutsch in literarischem Text), unklare Bezüge / Mehrdeutigkeit, falsch gewählte Idiomatik / Kollokation, übermässige Adjektiv-/Adverb-Häufung, Nominalstil statt Verbstil, Pleonasmen / Tautologien.
-- «stil» deckt NICHT ab: einzelne schwache Verben (→ schwaches_verb), einzelne Füllwörter (→ fuellwort), Wortwiederholung (→ wiederholung), abstraktes Telling (→ show_vs_tell), Passivkonstruktion (→ passiv), Grammatikfehler (→ grammatik).
+- Wenn ein spezifischerer Typ passt (satzbau, schwaches_verb, fuellwort, wiederholung, passiv, show_vs_tell, grammatik, rechtschreibung) → diesen Typ verwenden, NICHT «stil».
+- «stil» deckt ab: gestelzte oder umständliche Wortwahl, Stilbruch im Register (z.B. Bürokratendeutsch in literarischem Text), unklare Bezüge / Mehrdeutigkeit, falsch gewählte Idiomatik / Kollokation, übermässige Adjektiv-/Adverb-Häufung.
+- «stil» deckt NICHT ab: holprige Wortstellung / schwerfälliger oder verschachtelter Satzbau / monotoner Satzrhythmus (→ satzbau), einzelne schwache Verben (→ schwaches_verb), einzelne Füllwörter (→ fuellwort), Wortwiederholung (→ wiederholung), abstraktes Telling (→ show_vs_tell), Passivkonstruktion (→ passiv), Grammatikfehler (→ grammatik).
 - In direkter Rede / Dialog NICHT melden: Figurensprache darf holprig, gestelzt oder unidiomatisch sein – das charakterisiert die Figur. «stil» gilt ausschliesslich für Erzähltext.
 - «original»: vollständiger Satz oder eindeutig abgrenzbare Phrase zeichengenau aus dem Text.
 - PFLICHT: «korrektur» muss immer eine konkrete Umformulierung enthalten – nicht leer lassen, nicht dasselbe wie «original». Keine Stilanmerkung ohne konkreten Verbesserungsvorschlag.
 - Selbsttest: Lässt sich die Schwäche präzise mit einem der spezifischen Typen benennen? Wenn ja → spezifischen Typ verwenden, «stil» weglassen.`;
+}
+
+export function _buildSatzbauBlock() {
+  return `
+Satzbau-Regeln (typ: «satzbau»):
+- «satzbau» greift, wenn ein Satz GRAMMATISCH KORREKT, aber ungeschickt KONSTRUIERT ist und dadurch schwer lesbar wirkt. Es geht um die Architektur des Satzes (Reihenfolge, Verschachtelung, Rhythmus), nicht um Wortwahl.
+- Abgrenzung (Pflicht):
+  · Ist die Wortstellung grammatisch FALSCH (Verbzweit-/Verbletztstellung verletzt, falscher Bezug) → typ «grammatik», NICHT «satzbau».
+  · Geht es um Register, Idiomatik, Adjektiv-Häufung, Nominalstil eines Einzelworts, Mehrdeutigkeit → typ «stil».
+  · «satzbau» = der Satz ist regelkonform, liest sich aber holprig wegen seiner Konstruktion.
+- Typische Muster:
+  · SCHACHTELSATZ: tief verschachtelte Nebensätze / verschränkte Konstruktion, bei der der Leser den Faden verliert; weit auseinandergerissene Satzklammer (Subjekt und finites Verb / Hilfsverb und Partizip durch lange Einschübe getrennt).
+  · MONOTONIE: mehrere aufeinanderfolgende Sätze mit identischem Bau oder identischem Satzanfang (z.B. drei Sätze nacheinander «Er …», «Er …», «Er …»; reihenweise gleich lange Hauptsätze).
+  · UMSTÄNDLICHE KONSTRUKTION: schwerfällige Voranstellungen, übermässige Inversion, gestelzte Wortfolge, Nominalstil-Bandwurm über den ganzen Satz, der sich klarer als Verbalstil sagen liesse.
+- In direkter Rede / Dialog NICHT melden: Figurensprache darf holprig oder verschachtelt sein. «satzbau» gilt ausschliesslich für Erzähltext.
+- «original»: vollständiger Satz (bei Monotonie der erste betroffene Satz) ODER eindeutig abgrenzbare Phrase zeichengenau aus dem Text – denselben Span-Typ in «korrektur» beibehalten.
+- «korrektur»: derselbe Satz klarer konstruiert (entschachteln, Klammer schliessen, Satzanfang variieren, Nominal- zu Verbalstil) – Bedeutung und Stimme erhalten, nicht bloss kürzen.
+- «erklaerung»: EIN Satz, benennt das verletzte Muster («tief verschachtelter Schachtelsatz», «dritter Satz in Folge mit gleichem Anfang», «weit auseinandergerissene Satzklammer»).
+- Severity-Schwelle: nur deutliche Fälle, die ein Lektor anstreichen würde. Ein leicht längerer, aber gut lesbarer Satz ist KEIN Finding. Bei Zweifel → weglassen.`;
 }
 
 // sw: explizite Stoppwort-Liste; Caller muss sie übergeben (kein globaler Fallback).
