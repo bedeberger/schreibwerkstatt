@@ -44,6 +44,12 @@
 
   function position(target) {
     if (!layer) return;
+    // Vor dem Messen die Inline-Position neutralisieren: ein fixed/auto-width
+    // Element berechnet seine Shrink-to-fit-Breite aus (Viewport − left). Ein
+    // stale `left` vom vorher gezeigten Tooltip (rechtsbündige Header-Icons)
+    // engt den Platz ein → langer Text bricht um → offsetWidth misst falsch.
+    layer.style.left = '0px';
+    layer.style.top = '0px';
     const rect = target.getBoundingClientRect();
     const lw = layer.offsetWidth;
     const lh = layer.offsetHeight;
