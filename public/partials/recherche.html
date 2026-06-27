@@ -81,17 +81,17 @@
               <div class="research-chat-proposals">
                 <div class="research-chat-proposals-head" x-text="$app.t('recherche.chat.proposalsHead')"></div>
                 <template x-for="(prop, pi) in researchProposals(msg)" :key="pi">
-                  <div class="research-chat-proposal" :class="{ 'research-chat-proposal--saved': prop._saved }">
+                  <div class="research-chat-proposal" :class="{ 'research-chat-proposal--saved': isProposalSaved(msgIdx, pi) }">
                     <span class="research-kind-badge" :class="'research-kind-badge--' + prop.kind" x-text="kindLabel(prop.kind)"></span>
                     <div class="research-chat-proposal-body">
                       <span class="research-chat-proposal-title" x-show="prop.title" x-text="prop.title"></span>
                       <span class="research-chat-proposal-snippet" x-show="prop.body" x-text="prop.body"></span>
                       <a class="research-chat-proposal-url" x-show="prop.url" :href="prop.url" target="_blank" rel="noopener noreferrer" x-text="prop.url"></a>
                     </div>
-                    <button type="button" class="btn-compact" x-show="!prop._saved"
-                            @click="saveResearchProposal(msg, prop)" :disabled="prop._saving"
+                    <button type="button" class="btn-compact" x-show="!isProposalSaved(msgIdx, pi)"
+                            @click="saveResearchProposal(msgIdx, pi, prop)" :disabled="isProposalSaving(msgIdx, pi)"
                             x-text="$app.t('recherche.chat.proposalSave')"></button>
-                    <span class="research-chat-proposal-saved" x-show="prop._saved" x-text="$app.t('recherche.chat.proposalSaved')"></span>
+                    <span class="research-chat-proposal-saved" x-show="isProposalSaved(msgIdx, pi)" x-text="$app.t('recherche.chat.proposalSaved')"></span>
                   </div>
                 </template>
               </div>
@@ -228,7 +228,7 @@
 
         <!-- Anzeige-Modus -->
         <template x-if="editingId !== item.id">
-          <div class="research-item-body">
+          <div class="research-item-body research-item-body--clickable" @click="onItemBodyClick(item, $event)">
             <div class="research-item-head">
               <span class="research-kind-badge" :class="'research-kind-badge--' + item.kind" x-text="kindLabel(item.kind)"></span>
               <span class="research-item-title" x-show="item.title" x-text="item.title"></span>
@@ -310,7 +310,7 @@
 
         <!-- Bearbeiten-Modus -->
         <template x-if="editingId === item.id">
-          <div class="recherche-form">
+          <div class="recherche-form" @keydown.escape="cancelEdit()">
             <div class="recherche-form-row">
               <div x-data="combobox($app.t('recherche.kindLabel'))"
                    x-modelable="value" x-model="editDraft.kind"

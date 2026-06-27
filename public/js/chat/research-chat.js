@@ -127,13 +127,21 @@ export const researchChatMethods = {
     return out;
   },
 
+  // Stabiler Schlüssel für den Speicher-Status eines Vorschlags (pro Session,
+  // Nachricht und Vorschlags-Index). Trägt den UI-Status auf Card-Ebene statt auf
+  // dem x-for-Item-Proxy — siehe `_proposalSaved`/`_proposalSaving` in recherche-card.js.
+  _proposalKey(msgIdx, pi) { return `${this.researchChatSessionId}:${msgIdx}:${pi}`; },
+  isProposalSaved(msgIdx, pi) { return !!this._proposalSaved[this._proposalKey(msgIdx, pi)]; },
+  isProposalSaving(msgIdx, pi) { return !!this._proposalSaving[this._proposalKey(msgIdx, pi)]; },
+
   // Einen vom Chat vorgeschlagenen Eintrag tatsächlich ins Board speichern.
   // Persistiert erst HIER (POST /research) — der Chat hat nur vorgeschlagen.
-  async saveResearchProposal(msg, proposal) {
+  async saveResearchProposal(msgIdx, pi, proposal) {
     const app = window.__app;
     const bookId = app?.selectedBookId;
-    if (!bookId || !proposal || proposal._saved || proposal._saving) return;
-    proposal._saving = true;
+    const key = this._proposalKey(msgIdx, pi);
+    if (!bookId || !proposal || this._proposalSaved[key] || this._proposalSaving[key]) return;
+    this._proposalSaving = { ...this._proposalSaving, [key]: true };
     try {
       const row = await fetchJson('/research', {
         method: 'POST',
@@ -151,11 +159,13 @@ export const researchChatMethods = {
       // Ins offene Board einfügen (oben) + Tag-Pool aktualisieren.
       this.items = [row, ...this.items];
       this._loadTags();
-      proposal._saved = true;
+      this._proposalSaved = { ...this._proposalSaved, [key]: true };
     } catch (e) {
       this.errorMessage = app.t('recherche.chat.saveError');
     } finally {
-      proposal._saving = false;
+      const next = { ...this._proposalSaving };
+      delete next[key];
+      this._proposalSaving = next;
     }
   },
 

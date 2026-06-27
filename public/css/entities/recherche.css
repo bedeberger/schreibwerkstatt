@@ -124,6 +124,7 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 .research-item--archived { opacity: 0.6; }
 
 .research-item-body { display: flex; flex-direction: column; gap: var(--space-3); }
+.research-item-body--clickable { cursor: pointer; }
 
 .research-item-head {
   display: flex;

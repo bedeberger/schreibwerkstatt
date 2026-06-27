@@ -63,6 +63,14 @@ export function registerRechercheCard() {
     researchChatStatus: '',
     _researchChatPollTimer: null,
 
+    // Saving-/Saved-Status der Chat-Speicher-Vorschläge — Card-Level statt auf dem
+    // verschachtelten proposal-Objekt, weil Mutationen am x-for-Item-Proxy nach
+    // einem await nicht zuverlässig ins Template durchschlagen (Reactive-Proxy-
+    // Identity). Schlüssel: `${sessionId}:${msgIdx}:${pi}`. Reassign (kein In-Place-
+    // Mutate), damit Alpine die Änderung sicher sieht.
+    _proposalSaved: {},
+    _proposalSaving: {},
+
     _lifecycle: null,
 
     init() {

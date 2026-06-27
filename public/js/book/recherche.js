@@ -250,6 +250,15 @@ export const rechercheMethods = {
   },
   cancelEdit() { this.editingId = null; this.editDraft = _emptyDraft(); },
 
+  // Klick auf den Eintrag öffnet den Edit-Modus — ausser auf interaktiven
+  // Elementen (Aktions-Buttons, Links, Datei-Inputs, Tag-/Link-Chips), die
+  // ihre eigene Aktion behalten.
+  onItemBodyClick(item, ev) {
+    if (this.busy) return;
+    if (ev.target.closest('a, button, input, label, .research-tag, .research-link-chip')) return;
+    this.startEdit(item);
+  },
+
   async saveEdit(item) {
     const app = window.__app;
     this.busy = true;
