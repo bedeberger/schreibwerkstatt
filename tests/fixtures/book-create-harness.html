@@ -1,0 +1,136 @@
+<!doctype html>
+<!-- Mini-Harness für Playwright-Tests des Buch-erstellen-Modals (index.html).
+     Mountet die Modal-Markup 1:1 gegen die echte Alpine-Runtime + die ECHTE
+     combobox-Komponente (nicht gestubt), damit Buchtyp-/Kategorie-Auswahl,
+     Pflichtfeld-Validierung und der Persistenz-Pfad (createBook → /booksettings
+     → /books/:id/category) end-to-end verifiziert werden. Backend-Endpunkte
+     werden im Spec via page.route gemockt.
+
+     Markup liegt in <template> + wird erst nach der Data-Registrierung via
+     initTree gemountet (Pattern wie pdf-export-harness) — sonst initialisiert
+     Alpine das statische x-data, bevor bookCreateRoot registriert ist. -->
+<html lang="de-CH">
+<head>
+  <meta charset="utf-8">
+  <title>Book-Create Harness</title>
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/layout/base.css">
+  <link rel="stylesheet" href="/public/css/components/card-form.css">
+  <link rel="stylesheet" href="/public/css/book/book-create-modal.css">
+
+  <!-- Anchor-Plugin VOR Alpine-Core (Combobox-Dropdown nutzt x-anchor). -->
+  <script defer src="/public/vendor/alpine-anchor-3.15.12.min.js"></script>
+  <script defer src="/public/vendor/alpine-3.15.12.min.js"></script>
+</head>
+<body>
+
+<div id="mount"></div>
+
+<!-- 1:1 aus index.html (Buch-erstellen-Modal); die beiden .book-create-field-
+     Wrapper tragen Test-ids zum stabilen Ansteuern der zwei Comboboxes. -->
+<template id="tpl">
+  <div x-data="bookCreateRoot()">
+    <button type="button" id="open-btn" @click="openCreateBook()">Neues Buch</button>
+
+    <dialog id="book-create-dialog" class="book-create-dialog"
+            x-ref="bookCreateDialog"
+            @cancel.prevent="if (!bookCreateBusy) cancelCreateBook()"
+            @click="if ($event.target === $el && !bookCreateBusy) cancelCreateBook()">
+      <div class="book-create-title" x-text="t('book.create.title')"></div>
+      <input type="text"
+             class="book-create-input"
+             x-ref="bookCreateInput"
+             x-model="bookCreateName"
+             maxlength="255"
+             :placeholder="t('book.create.namePlaceholder')"
+             :aria-label="t('book.create.nameLabel')"
+             :disabled="bookCreateBusy"
+             @keydown.enter.prevent="submitCreateBook()">
+      <div class="book-create-field" id="field-buchtyp">
+        <label class="book-create-label" x-text="t('book.create.buchtypLabel')"></label>
+        <div x-data="combobox(t('book.create.buchtypLabel'))"
+             x-modelable="value" x-model="bookCreateBuchtyp"
+             x-effect="options = bookCreateBuchtypOptions()"></div>
+      </div>
+      <div class="book-create-field" id="field-category" x-show="bookCreateCategoryPool.length > 0" x-cloak>
+        <label class="book-create-label" x-text="t('book.create.categoryLabel')"></label>
+        <div x-data="combobox(t('book.create.categoryLabel'))"
+             x-modelable="value" x-model="bookCreateCategoryId"
+             x-effect="options = bookCreateCategoryOptions()"></div>
+      </div>
+      <div class="book-create-error" id="create-error" x-show="bookCreateError" x-cloak x-text="bookCreateError"></div>
+      <div class="book-create-actions">
+        <button type="button" class="book-create-btn book-create-btn--cancel"
+                :disabled="bookCreateBusy"
+                @click="cancelCreateBook()"
+                x-text="t('book.create.cancel')"></button>
+        <button type="button" id="submit-btn" class="book-create-btn book-create-btn--primary"
+                :disabled="bookCreateBusy || !bookCreateName.trim()"
+                @click="submitCreateBook()">
+          <span x-show="!bookCreateBusy" x-text="t('book.create.submit')"></span>
+          <span x-show="bookCreateBusy" x-cloak x-text="t('book.create.submitting')"></span>
+        </button>
+      </div>
+    </dialog>
+  </div>
+</template>
+
+<script type="module">
+  import { registerCombobox } from '/public/js/combobox.js';
+  import { bookCreateMethods } from '/public/js/book/book-create.js';
+
+  function whenAlpineReady(fn) {
+    if (window.Alpine && typeof window.Alpine.data === 'function') return fn();
+    document.addEventListener('alpine:init', fn, { once: true });
+  }
+
+  whenAlpineReady(async () => {
+    const dict = await fetch('/public/js/i18n/de.json').then(r => r.json());
+    function tStub(key, params = {}) {
+      let s = dict[key] || key;
+      for (const [k, v] of Object.entries(params || {})) s = s.replaceAll('{' + k + '}', v);
+      return s;
+    }
+
+    registerCombobox();
+    window.Alpine.magic('app', () => ({ t: tStub }));
+
+    // bookCreateRoot = Root-Felder + Methoden, die das Modal aus index.html
+    // erwartet. Stubs für alles über das Modal hinaus (loadBooks,
+    // toggleBookSettingsCard). Persistenz-Calls laufen über echtes fetch → im
+    // Spec via page.route gemockt; Stub-Treffer landen in window.__calls.
+    window.Alpine.data('bookCreateRoot', () => ({
+      bookCreateName: '',
+      bookCreateBuchtyp: '',
+      bookCreateCategoryId: '',
+      bookCreateCategoryPool: [],
+      bookCreateBusy: false,
+      bookCreateError: '',
+      uiLocale: 'de',
+      selectedBookId: '',
+      showBookSettingsCard: false,
+      promptConfig: {
+        buchtypen: {
+          de: {
+            roman: { label: 'Roman' },
+            krimi: { label: 'Krimi / Thriller' },
+            sachbuch: { label: 'Sachbuch' },
+          },
+        },
+      },
+      t: tStub,
+      async loadBooks() { window.__calls.loadBooks = (window.__calls.loadBooks || 0) + 1; },
+      toggleBookSettingsCard() { this.showBookSettingsCard = true; window.__calls.openedSettings = true; },
+      ...bookCreateMethods,
+    }));
+
+    window.__calls = {};
+    const mount = document.getElementById('mount');
+    mount.appendChild(document.getElementById('tpl').content.cloneNode(true));
+    window.Alpine.initTree(mount);
+    window.__harnessReady = true;
+  });
+</script>
+
+</body>
+</html>

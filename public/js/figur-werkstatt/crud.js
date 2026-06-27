@@ -42,7 +42,7 @@ export const crudMethods = {
       }
     } catch (e) {
       if (isStale()) return;
-      this.errorMessage = app.t('werkstatt.error.load') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.load') || app.t('common.unknownError');
       this.drafts = [];
     } finally {
       if (!isStale()) this.loading = false;
@@ -193,7 +193,7 @@ export const crudMethods = {
   async createDraft() {
     const app = window.__app;
     const name = (this.newName || '').trim();
-    if (!name) { this.errorMessage = app.t('werkstatt.error.nameRequired') || app.t('common.error'); return; }
+    if (!name) { this.errorMessage = app.t('werkstatt.error.nameRequired') || app.t('common.unknownError'); return; }
     const bookId = app.selectedBookId;
     if (!bookId) return;
     this.busy = true;
@@ -209,7 +209,7 @@ export const crudMethods = {
       this.selectDraft(row.id);
       this.errorMessage = '';
     } catch (e) {
-      this.errorMessage = app.t('werkstatt.error.create') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.create') || app.t('common.unknownError');
     } finally {
       this.busy = false;
     }
@@ -220,7 +220,7 @@ export const crudMethods = {
     const sel = this.selectedDraft();
     if (!sel) return false;
     const name = (this.editName || '').trim();
-    if (!name) { this.errorMessage = app.t('werkstatt.error.nameRequired') || app.t('common.error'); return false; }
+    if (!name) { this.errorMessage = app.t('werkstatt.error.nameRequired') || app.t('common.unknownError'); return false; }
     // Mindmap nur exportieren, wenn Editor zu diesem Draft gehört (_jmDraftId
     // wird in _mountMindmap nach show() gesetzt). Sonst Server-State behalten.
     const exported = this._jmDraftId === sel.id ? this._exportMindmap() : null;
@@ -242,7 +242,7 @@ export const crudMethods = {
       this._mindmapDirty = false;
       return true;
     } catch (e) {
-      this.errorMessage = app.t('werkstatt.error.save') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.save') || app.t('common.unknownError');
       return false;
     } finally {
       this.busy = false;
@@ -283,7 +283,7 @@ export const crudMethods = {
         if (this.drafts.length > 0) this.selectDraft(this.drafts[0].id);
       }
     } catch (e) {
-      this.errorMessage = app.t('werkstatt.error.delete') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.delete') || app.t('common.unknownError');
     } finally {
       this.busy = false;
     }

@@ -90,6 +90,10 @@
     // (savePublication speichert sonst bewusst nicht, um keinen leeren Full-
     // Replace-Upsert auszulösen). Nur diese eine Quelle, nicht der ganze onShow.
     const card = window.Alpine.$data(slot.querySelector('[x-data="bookSettingsCard"]'));
+    // Buchtyp ist Pflichtfeld in saveActiveTab (_taxonomyError) — Produktion lädt
+    // ihn via loadBookSettings. Hier nur loadPublication, also den Buchtyp setzen,
+    // sonst blockt der Save-Gate und savePublication läuft nie.
+    card.bookSettingsBuchtyp = 'roman';
     await card.loadPublication();
 
     window.__harnessReady = true;

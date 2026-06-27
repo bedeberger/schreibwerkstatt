@@ -20,7 +20,7 @@ export const importMethods = {
       this.importables = Array.isArray(rows) ? rows : [];
     } catch (e) {
       this.importables = [];
-      this.errorMessage = app.t('werkstatt.error.importLoad') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.importLoad') || app.t('common.unknownError');
     } finally {
       this.importablesLoading = false;
     }
@@ -65,7 +65,7 @@ export const importMethods = {
       this.selectDraft(body.id);
       this.errorMessage = '';
     } catch (e) {
-      this.errorMessage = app.t('werkstatt.error.import') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.import') || app.t('common.unknownError');
     } finally {
       this.busy = false;
     }

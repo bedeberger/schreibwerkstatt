@@ -59,7 +59,7 @@ export const jobsMethods = {
           this.brainstormStatus = '';
           this._brainstormJobId = null;
           if (this.selectedDraftId === this._brainstormJobDraftId) {
-            this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+            this.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
           }
           this._brainstormJobDraftId = null;
         },
@@ -73,7 +73,7 @@ export const jobsMethods = {
     } catch (e) {
       this.brainstormLoading = false;
       this._brainstormJobDraftId = null;
-      this.errorMessage = app.t('werkstatt.error.brainstorm') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.brainstorm') || app.t('common.unknownError');
     }
   },
 
@@ -146,7 +146,7 @@ export const jobsMethods = {
           this.consistencyStatus = '';
           this._consistencyJobId = null;
           if (this.selectedDraftId === this._consistencyJobDraftId) {
-            this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+            this.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
           }
           this._consistencyJobDraftId = null;
         },
@@ -160,7 +160,7 @@ export const jobsMethods = {
     } catch (e) {
       this.consistencyLoading = false;
       this._consistencyJobDraftId = null;
-      this.errorMessage = app.t('werkstatt.error.consistency') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.consistency') || app.t('common.unknownError');
     }
   },
 

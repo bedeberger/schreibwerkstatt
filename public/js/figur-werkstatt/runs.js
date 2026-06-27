@@ -34,7 +34,7 @@ export const runsMethods = {
     } catch (e) {
       if (this._runsLoadDraftId !== draftId) return;
       this.runs = { brainstorm: [], consistency: [] };
-      this.errorMessage = app.t('werkstatt.error.runsLoad') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.runsLoad') || app.t('common.unknownError');
     } finally {
       if (this._runsLoadDraftId === draftId) this.runsLoading = false;
     }
@@ -74,7 +74,7 @@ export const runsMethods = {
       }
       this.selectedRunId = run.id;
     } catch (e) {
-      this.errorMessage = app.t('werkstatt.error.runLoad') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.runLoad') || app.t('common.unknownError');
     }
   },
 
@@ -96,7 +96,7 @@ export const runsMethods = {
         else this.consistencyResult = null;
       }
     } catch (e) {
-      this.errorMessage = app.t('werkstatt.error.runDelete') || app.t('common.error');
+      this.errorMessage = app.t('werkstatt.error.runDelete') || app.t('common.unknownError');
     }
   },
 
@@ -171,7 +171,7 @@ export const runsMethods = {
         this.brainstormStatus = '';
         this._brainstormJobId = null;
         if (this.selectedDraftId === this._brainstormJobDraftId) {
-          this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+          this.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
         }
         this._brainstormJobDraftId = null;
       },
@@ -224,7 +224,7 @@ export const runsMethods = {
         this.consistencyStatus = '';
         this._consistencyJobId = null;
         if (this.selectedDraftId === this._consistencyJobDraftId) {
-          this.errorMessage = app.t(job.error || 'common.error', job.errorParams || {});
+          this.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
         }
         this._consistencyJobDraftId = null;
       },

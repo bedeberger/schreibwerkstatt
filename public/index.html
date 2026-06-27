@@ -577,13 +577,13 @@
          @keydown.enter.prevent="submitCreateBook()">
   <div class="book-create-field">
     <label class="book-create-label" x-text="t('book.create.buchtypLabel')"></label>
-    <div x-data="combobox(t('book.create.buchtypLabel'))"
+    <div x-data="combobox(() => t('book.create.buchtypLabel'))"
          x-modelable="value" x-model="bookCreateBuchtyp"
          x-effect="options = bookCreateBuchtypOptions()"></div>
   </div>
   <div class="book-create-field" x-show="bookCreateCategoryPool.length > 0" x-cloak>
     <label class="book-create-label" x-text="t('book.create.categoryLabel')"></label>
-    <div x-data="combobox(t('book.create.categoryLabel'))"
+    <div x-data="combobox(() => t('book.create.categoryLabel'))"
          x-modelable="value" x-model="bookCreateCategoryId"
          x-effect="options = bookCreateCategoryOptions()"></div>
   </div>
