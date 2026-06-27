@@ -140,7 +140,7 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 .research-item--pinned { background: var(--color-bg); }
 .research-item--archived { opacity: 0.6; }
 
-.research-item-body { display: flex; flex-direction: column; gap: var(--space-4); }
+.research-item-body { display: flex; flex-direction: column; gap: var(--space-sm); }
 .research-item-body--clickable { cursor: pointer; }
 
 .research-item-head {
@@ -247,9 +247,6 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   flex-wrap: wrap;
   gap: var(--space-xs);
 }
-/* Etwas Luft vor den Verknüpfungs-Chips, damit Beschreibung und Links nicht
-   aneinanderkleben (Body-Gap ist bewusst eng). */
-.research-links { margin-top: var(--space-6); }
 
 .research-link-chip {
   display: inline-flex;

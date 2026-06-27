@@ -388,15 +388,15 @@
 .chat-images {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-8);
-  margin-top: var(--space-8);
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
 }
 .chat-image {
   margin: 0;
   max-width: 320px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-xs);
 }
 .chat-image img {
   display: block;
@@ -409,7 +409,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-8);
+  gap: var(--space-sm);
   font-size: var(--font-size-micro);
   color: var(--color-subtle);
 }
