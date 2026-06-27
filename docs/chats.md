@@ -31,5 +31,6 @@ Agentischer Chat als **Panel in der Recherche-/Wissensboard-Karte**, **Claude-on
 ## Geteiltes
 
 - **Storage:** `chat_sessions` (diskriminiert über `kind`) + `chat_messages`. Beim Buch-Migration-Export werden Seiten- und Buch-Chat mitgenommen ([docs/book-migration.md](book-migration.md)).
+- **History-Titel (KI):** `chat_sessions.title` hält einen kurzen, KI-zusammengefassten Titel für den History-Eintrag — einmal pro Session beim ersten Antwort-Turn generiert ([routes/jobs/chat-title.js](../routes/jobs/chat-title.js), Prompt `buildChatTitlePrompt` + `SCHEMA_CHAT_TITLE`). Non-fatal: schlägt die Generierung fehl, bleibt `title` NULL und die Liste fällt auf die Vorschau (erste Nachricht) zurück. Der Titel kommt im Job-Result (`sessionTitle`) zurück und wird in [chat-base.js](../public/js/chat/chat-base.js) (`onDone`) in die Sessions-Liste übernommen; das Rendering liest `s.title || s.preview`.
 - **Frontend-Basis:** [chat-base.js](../public/js/chat/chat-base.js) (`makeChatMethods`) — gemeinsames Verhalten, in die jeweilige Card gespreadet. Implementierungs-Detail, keine fachliche Kopplung.
 - **Temperatur:** `ai.chat_temperature` (app_settings) überschreibt Provider-Defaults für Seiten- **und** Buch-Chat ([docs/ai-providers.md](ai-providers.md)).

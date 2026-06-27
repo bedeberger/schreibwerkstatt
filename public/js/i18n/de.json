@@ -3160,6 +3160,7 @@
   "recherche.chat.hint": "Claude mit Web-Suche. Recherchiert und sammelt — schreibt nie in den Buchtext.",
   "recherche.chat.webSearches": "{n}× Web-Suche",
   "recherche.chat.proposalsHead": "Vorschläge zum Speichern",
+  "recherche.chat.sourcesHead": "Quellen",
   "recherche.chat.proposalSave": "Speichern",
   "recherche.chat.proposalSaved": "Gespeichert",
   "recherche.chat.untitled": "Unbenannte Recherche",

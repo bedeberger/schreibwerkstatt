@@ -13,6 +13,7 @@ const {
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
 const { executeTool, validateFinalAnswerCitations } = require('./book-chat-tools');
+const { generateSessionTitle } = require('./chat-title');
 const { runResearchChatJob } = require('./research-chat');
 const { makeAgenticChatJob, buildAgenticHistory, stripTrailingEmptyJson } = require('./agentic-chat');
 const { imageGenEnabled } = require('../../lib/image-gen');
@@ -142,12 +143,14 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     );
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
     recordChatLedgerForMessage(asstMsgResult.lastInsertRowid);
+    const sessionTitle = await generateSessionTitle({ session, userMessage: message, assistantAnswer: antwort, provider, logger });
     completeJob(jobId, {
       session_id: session.id,
       user_message_id: userMsgId,
       assistant_message_id: asstMsgResult.lastInsertRowid,
       updatedAt: pageUpdatedAt,
       tokensIn, tokensOut,
+      ...(sessionTitle ? { sessionTitle } : {}),
     }, chatTps, `«${session.page_name || '-'}» session=${sessionId}, ${vorschlaege.length} Vorschläge`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });
@@ -382,6 +385,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     `).run(session.id, antwort, tokensIn, tokensOut, cacheReadIn, cacheCreationIn, cacheCreation1hIn, provider, model, bookChatTps, JSON.stringify(contextInfo), assistantNow);
     db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
     recordChatLedgerForMessage(asstMsgResult.lastInsertRowid);
+    const sessionTitle = await generateSessionTitle({ session, userMessage: message, assistantAnswer: antwort, provider: effectiveProvider, logger });
     completeJob(jobId, {
       session_id: session.id,
       user_message_id: userMsgId,
@@ -389,6 +393,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       tokensIn, tokensOut,
       pagesUsed: selectedPages.length,
       pagesTotal: pageContents.length,
+      ...(sessionTitle ? { sessionTitle } : {}),
     }, bookChatTps, `«${session.book_name || '-'}» session=${sessionId}, ${selectedPages.length}/${pageContents.length} Seiten`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });

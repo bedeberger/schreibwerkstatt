@@ -122,12 +122,20 @@ export function makeChatMethods(cfg) {
         catch (e) { console.error(`[${L} onError reload]`, e); }
         this[p.status] = errHtml;
       },
-      onDone: async () => {
+      onDone: async (job) => {
         this[p.loading] = false;
         if (p.progress) this[p.progress] = 0;
         this[p.status] = '';
         await loadSession.call(this, sessionId);
         if (cfg.onPollDone) await cfg.onPollDone.call(this);
+        // KI-Titel wird nur auf der ersten Runde generiert und kommt im Job-Result
+        // zurück. In die (ggf. optimistisch aufgebaute) Sessions-Liste übernehmen,
+        // damit der History-Eintrag sofort den Titel statt der Vorschau zeigt.
+        const newTitle = job?.result?.sessionTitle;
+        if (newTitle && Array.isArray(this[p.sessions])) {
+          const row = this[p.sessions].find(s => s.id === sessionId);
+          if (row) row.title = newTitle;
+        }
       },
     });
   }

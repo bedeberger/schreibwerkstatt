@@ -365,11 +365,11 @@ function restoreChats(bookId, data, ctx) {
   const { pageOf, email } = ctx;
   const sessionMap = new Map();
   const insSession = db.prepare(`INSERT INTO chat_sessions
-    (book_id,kind,page_id,user_email,created_at,last_message_at,opening_page_text) VALUES (?,?,?,?,?,?,?)`);
+    (book_id,kind,page_id,user_email,title,created_at,last_message_at,opening_page_text) VALUES (?,?,?,?,?,?,?,?)`);
   for (const r of (Array.isArray(data.sessions) ? data.sessions : [])) {
     let pid = null;
     if (r.kind === 'page') { pid = pageOf(r.page_id); if (!pid) continue; } // CHECK: page-Session braucht page_id
-    const res = insSession.run(bookId, r.kind === 'book' ? 'book' : 'page', pid, email,
+    const res = insSession.run(bookId, r.kind === 'book' ? 'book' : 'page', pid, email, r.title ?? null,
       r.created_at || _now(), r.last_message_at || r.created_at || _now(), r.opening_page_text ?? null);
     sessionMap.set(r.id, res.lastInsertRowid);
   }

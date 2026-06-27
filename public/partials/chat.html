@@ -93,7 +93,7 @@
         :class="s.id === chatSessionId ? 'chat-session-item--active' : ''"
         @click="loadChatSession(s.id)"
       >
-        <div class="chat-session-preview" x-text="(s.preview || $app.t('chat.previewEmpty')).slice(0, 80)"></div>
+        <div class="chat-session-preview" x-text="(s.title || s.preview || $app.t('chat.previewEmpty')).slice(0, 80)"></div>
         <div class="chat-session-meta" x-text="$app.formatDate(s.last_message_at)"></div>
         <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
       </div>
@@ -236,7 +236,7 @@
         :class="s.id === bookChatSessionId ? 'chat-session-item--active' : ''"
         @click="loadBookChatSession(s.id)"
       >
-        <div class="chat-session-preview" x-text="(s.preview || $app.t('chat.previewEmpty')).slice(0, 80)"></div>
+        <div class="chat-session-preview" x-text="(s.title || s.preview || $app.t('chat.previewEmpty')).slice(0, 80)"></div>
         <div class="chat-session-meta" x-text="$app.formatDate(s.last_message_at)"></div>
         <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteBookChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
       </div>

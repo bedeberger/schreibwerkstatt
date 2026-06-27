@@ -114,7 +114,7 @@ function listBookScopedSessions(req, res, { kind }) {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
   const rows = db.prepare(`
-    SELECT cs.id, cs.book_id, b.name AS book_name, cs.created_at, cs.last_message_at,
+    SELECT cs.id, cs.book_id, b.name AS book_name, cs.title, cs.created_at, cs.last_message_at,
            (SELECT content FROM chat_messages WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
     FROM chat_sessions cs
     LEFT JOIN books b ON b.book_id = cs.book_id
@@ -154,7 +154,7 @@ router.get('/sessions/:page_id', (req, res) => {
   const pageId = toIntId(req.params.page_id);
   if (!pageId) return res.status(400).json({ error_code: 'INVALID_ID' });
   const rows = db.prepare(`
-    SELECT cs.id, cs.book_id, cs.page_id, p.page_name, cs.created_at, cs.last_message_at,
+    SELECT cs.id, cs.book_id, cs.page_id, p.page_name, cs.title, cs.created_at, cs.last_message_at,
            (SELECT content FROM chat_messages WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
     FROM chat_sessions cs
     LEFT JOIN pages p ON p.page_id = cs.page_id

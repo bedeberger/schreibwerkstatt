@@ -17,7 +17,7 @@
 //   executeTool(name, input, ctx),
 //   consumeFinalAnswer({ finalUse, ctx, toolLog, iterNum, logger }) → finalText (JSON-String),
 //   parseFinal(finalText, logger) → antwort-String,
-//   buildContextInfo({ toolLog, iter, webSearches, ctx }) → object,
+//   buildContextInfo({ toolLog, iter, webSearches, webResults, ctx }) → object,
 //   buildCompletePayload?({ base, ctx }) → object (default: base),
 //   buildSummary({ session, sessionId, toolLog, iter, webSearches, ctx }) → string,
 // }
@@ -30,6 +30,7 @@ const {
 } = require('./shared');
 const appSettings = require('../../lib/app-settings');
 const { recordChatLedgerForMessage } = require('../../db/cost-ledger');
+const { generateSessionTitle } = require('./chat-title');
 
 // Modell-Drift: schreibt Prosa-Antwort und hängt am Ende ```json\n{}\n``` als
 // Compliance-Theater an. extractBalancedJson greift dann das leere {} → antwort
@@ -79,12 +80,17 @@ function makeAgenticChatJob(config) {
       const state = {
         totalTokIn: 0, totalTokOut: 0,
         totalCacheRead: 0, totalCacheCreation: 0, totalCacheCreation1h: 0,
-        genMs: 0, lastModel: null, webSearches: 0,
+        genMs: 0, lastModel: null, webSearches: 0, webResults: [],
       };
       // Token-Summen fortschreiben + UI mit echten Provider-Zahlen nachziehen
       // (onProgress liefert nur chars-basierte Schätzung, die bei reinen
       // Tool-Use-Iterationen ohne Text-Stream 0 bleibt). Zählt zudem
-      // web_search-Nutzung (server_tool_use-Blöcke, nur Claude-Web-Suche).
+      // web_search-Nutzung (server_tool_use-Blöcke, nur Claude-Web-Suche) und
+      // sammelt die web_search_result-Trefferdokumente in Auftrittsreihenfolge
+      // (für klickbare Zitat-Quellen im Recherche-Chat). NICHT dedupen: das
+      // Modell referenziert Treffer über ihre Position (`<cite index="N-…">` →
+      // N-tes Dokument); Dedup würde die Indizes verschieben. Buch-Chat nutzt
+      // keine Web-Suche → bleibt leer und unberührt.
       const accumulate = (result) => {
         state.totalTokIn  += result.tokensIn;
         state.totalTokOut += result.tokensOut;
@@ -95,6 +101,14 @@ function makeAgenticChatJob(config) {
         if (result.model) state.lastModel = result.model;
         for (const b of result.rawContentBlocks || []) {
           if (b.type === 'server_tool_use' && b.name === 'web_search') state.webSearches++;
+          // Fehler-Results haben content als Objekt (nicht Array) → Array-Guard.
+          if (b.type === 'web_search_tool_result' && Array.isArray(b.content)) {
+            for (const r of b.content) {
+              if (r && r.type === 'web_search_result' && r.url) {
+                state.webResults.push({ url: r.url, title: r.title || r.url });
+              }
+            }
+          }
         }
         updateJob(jobId, {
           tokensIn: state.totalTokIn, tokensOut: state.totalTokOut,
@@ -212,7 +226,7 @@ function makeAgenticChatJob(config) {
 
       const assistantNow = new Date().toISOString();
       const tpsVal = (state.genMs > 0 && state.totalTokOut > 0) ? state.totalTokOut / (state.genMs / 1000) : null;
-      const contextInfo = config.buildContextInfo({ toolLog, iter, webSearches: state.webSearches, ctx });
+      const contextInfo = config.buildContextInfo({ toolLog, iter, webSearches: state.webSearches, webResults: state.webResults, ctx });
       const model = state.lastModel || appSettings.get('ai.claude.model') || 'claude-sonnet-4-6';
       const asstMsgResult = db.prepare(`
         INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, web_searches, provider, model, tps, context_info, created_at)
@@ -221,12 +235,15 @@ function makeAgenticChatJob(config) {
       db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
       recordChatLedgerForMessage(asstMsgResult.lastInsertRowid);
 
+      const sessionTitle = await generateSessionTitle({ session, userMessage: message, assistantAnswer: antwort, provider, logger });
+
       const base = {
         session_id: session.id,
         user_message_id: userMsgId,
         assistant_message_id: asstMsgResult.lastInsertRowid,
         tokensIn: state.totalTokIn, tokensOut: state.totalTokOut,
         toolCalls: toolLog.length, iterations: iter + 1,
+        ...(sessionTitle ? { sessionTitle } : {}),
       };
       const payload = config.buildCompletePayload ? config.buildCompletePayload({ base, ctx }) : base;
       completeJob(jobId, payload, tpsVal, config.buildSummary({ session, sessionId, toolLog, iter, webSearches: state.webSearches, ctx }));

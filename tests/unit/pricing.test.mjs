@@ -1,7 +1,7 @@
 // PRICING + costUsd().
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PRICING, costUsd, fallbackFamily } from '../../lib/pricing.js';
+import { PRICING, WEB_SEARCH_USD_PER_1K, costUsd, fallbackFamily } from '../../lib/pricing.js';
 
 test('costUsd: lokale Provider liefern 0', () => {
   assert.equal(costUsd({ provider: 'ollama', model: 'llama3.2', tokensIn: 1000, tokensOut: 500 }), 0);
@@ -77,6 +77,28 @@ test('costUsd: Family-Fallback wirkt fuer dated model IDs', () => {
 test('PRICING: Opus > Sonnet > Haiku (Input-Preis)', () => {
   assert.ok(PRICING['claude-opus-4-7'].input > PRICING['claude-sonnet-4-6'].input);
   assert.ok(PRICING['claude-sonnet-4-6'].input > PRICING['claude-haiku-4-5'].input);
+});
+
+test('costUsd: Web-Suche als separater Server-Tool-Posten (~$10/1k)', () => {
+  // 5 Web-Suchen, keine Tokens → 5 * 10/1000 = 0.05
+  assert.equal(WEB_SEARCH_USD_PER_1K, 10.00);
+  assert.equal(costUsd({ provider: 'claude', model: 'claude-sonnet-4-6', webSearches: 5 }), 0.05);
+});
+
+test('costUsd: Web-Such-Kosten ZUSAETZLICH zu den Token-Kosten', () => {
+  const tokensOnly = costUsd({ provider: 'claude', model: 'claude-sonnet-4-6', tokensIn: 1_000_000, tokensOut: 1_000_000 });
+  const withSearch = costUsd({ provider: 'claude', model: 'claude-sonnet-4-6', tokensIn: 1_000_000, tokensOut: 1_000_000, webSearches: 4 });
+  assert.equal(Math.round((withSearch - tokensOnly) * 1000) / 1000, 0.04);
+});
+
+test('costUsd: Web-Suche nur fuer Claude (lokale Provider 0)', () => {
+  assert.equal(costUsd({ provider: 'ollama', model: 'llama3.2', webSearches: 10 }), 0);
+});
+
+test('costUsd: webSearches nullish/0 aendert nichts', () => {
+  const base = costUsd({ provider: 'claude', model: 'claude-sonnet-4-6', tokensIn: 1_000_000 });
+  assert.equal(costUsd({ provider: 'claude', model: 'claude-sonnet-4-6', tokensIn: 1_000_000, webSearches: 0 }), base);
+  assert.equal(costUsd({ provider: 'claude', model: 'claude-sonnet-4-6', tokensIn: 1_000_000, webSearches: null }), base);
 });
 
 test('costUsd: nullish/NaN-Tokens behandelt wie 0', () => {

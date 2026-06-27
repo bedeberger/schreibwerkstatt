@@ -35,6 +35,10 @@ Klon des agentischen Buch-Chat-Loops (`runBookChatJobAgent`), aber ohne Seiten-V
 
 Kein eigenes Card — Sub-State + Methoden sind in `rechercheCard` gespreadet ([public/js/cards/recherche-card.js](../public/js/cards/recherche-card.js)), Chat-Logik aus der geteilten `makeChatMethods`-Factory ([public/js/chat/chat-base.js](../public/js/chat/chat-base.js), Label `ResearchChat`). Toggle-Button im Karten-Header (nur bei `$app.researchChatEnabled`). Markup reused die `chat.css`-Klassen.
 
+## Web-Such-Zitate (klickbare Quellen)
+
+Bei aktiver `web_search` schreibt das Modell `<cite index="N-…">…</cite>`-Marker als Klartext in die `final_answer`-Antwort (claude.ai-Zitatformat; die strukturierten API-Citations hängen an Text-Blöcken, die finale Antwort ist aber ein Tool-Argument). Der geteilte Loop ([routes/jobs/agentic-chat.js](../routes/jobs/agentic-chat.js)) sammelt die `web_search_result`-Trefferdokumente (`url`+`title`) aus den `web_search_tool_result`-Blöcken **in Auftrittsreihenfolge, ohne Dedup** (das Modell referenziert per Position) und persistiert sie als `context_info.sources` (nur Recherche-Chat — Buch-Chat hat keine Web-Suche). Das Frontend ([research-chat.js](../public/js/chat/research-chat.js) `_renderResearchAnswer`) entfernt die `<cite>`-Tags, ersetzt sie durch klickbare Superscript-Marker `[N]` (1-basiert → N-tes Dokument, einzige Stelle der Basis-Annahme in `_resolveSource`) und rendert unter der Antwort eine Quellenliste (`researchCitedSources`). Sentinels (``/``) umgehen den XSS-Escape von `renderChatMarkdown`; url/title werden beim Inject escaped.
+
 ## Routen
 
 - `POST /chat/session/research` / `GET /chat/sessions/research/:book_id` ([routes/chat.js](../routes/chat.js)) — editor-scoped, buchweit.

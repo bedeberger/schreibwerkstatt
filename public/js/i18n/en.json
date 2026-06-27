@@ -3160,6 +3160,7 @@
   "recherche.chat.hint": "Claude with web search. Researches and collects — never writes into the manuscript.",
   "recherche.chat.webSearches": "{n}× web search",
   "recherche.chat.proposalsHead": "Suggestions to save",
+  "recherche.chat.sourcesHead": "Sources",
   "recherche.chat.proposalSave": "Save",
   "recherche.chat.proposalSaved": "Saved",
   "recherche.chat.untitled": "Untitled research",

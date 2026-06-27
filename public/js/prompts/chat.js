@@ -685,6 +685,31 @@ export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, revi
   return parts.join('\n');
 }
 
+// ── Chat-Titel ────────────────────────────────────────────────────────────────
+
+/**
+ * System-Prompt für die KI-Zusammenfassung eines Chat-Verlaufs zu einem kurzen
+ * History-Titel. Genutzt von allen drei Chats (Seiten-/Buch-/Recherche-Chat) über
+ * routes/jobs/chat-title.js. Bewusst knapp — der Titel steht in einer schmalen
+ * History-Liste, nicht als ganzer Satz.
+ */
+export function buildChatTitlePrompt() {
+  const parts = [
+    'Du erstellst einen sehr kurzen, prägnanten Titel für einen Chat-Verlauf.',
+    'Fasse das Thema der folgenden Konversation in maximal 6 Wörtern zusammen.',
+    'Regeln:',
+    '- Verwende dieselbe Sprache wie die Konversation.',
+    '- Beschreibe das Thema; wiederhole nicht wörtlich die ganze Frage.',
+    '- Kein Schlusspunkt, keine Anführungszeichen, keine Emojis, keine Aufzählung.',
+    '',
+    'Antworte ausschliesslich als JSON-Objekt: {"titel": "…"}',
+  ];
+  if (!_isLocal) parts.push('', JSON_ONLY);
+  return parts.join('\n');
+}
+
+export const SCHEMA_CHAT_TITLE = _obj({ titel: _str });
+
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 export const SCHEMA_CHAT = _obj({

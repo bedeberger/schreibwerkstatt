@@ -165,10 +165,12 @@ export {
   buildChatSystemPrompt,
   buildBookChatSystemPrompt,
   buildBookChatAgentSystemPrompt,
+  buildChatTitlePrompt,
   BOOK_CHAT_TOOLS,
   BOOK_CHAT_FORCE_FINAL_INSTRUCTION,
   SCHEMA_CHAT,
   SCHEMA_BOOK_CHAT,
+  SCHEMA_CHAT_TITLE,
 } from './prompts/chat.js';
 
 export {

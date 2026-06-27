@@ -81,11 +81,15 @@ const runResearchChatJob = makeAgenticChatJob({
     return antwort;
   },
 
-  buildContextInfo: ({ toolLog, iter, webSearches, ctx }) => ({
+  buildContextInfo: ({ toolLog, iter, webSearches, webResults, ctx }) => ({
     mode: 'research',
     tool_calls: toolLog,
     iterations: iter + 1,
     web_searches: webSearches,
+    // Web-Such-Trefferdokumente in Auftrittsreihenfolge (1-basiert). Das Frontend
+    // löst die `<cite index="N-…">`-Marker des Modells über die Position N auf und
+    // rendert klickbare Quell-Links + eine Quellenliste.
+    ...(webResults.length ? { sources: webResults } : {}),
     // Speicher-Vorschläge — Frontend rendert sie als „Als … speichern"-Buttons.
     ...(ctx.proposals.length ? { proposals: ctx.proposals } : {}),
   }),

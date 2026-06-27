@@ -8637,6 +8637,22 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 221 abgeschlossen (web_searches in chat_messages + ai_cost_ledger — Web-Such-Kosten).');
   }
 
+  if (version < 222) {
+    // title: KI-zusammengefasster Titel für den History-Eintrag einer Chat-Session
+    // (Seiten-/Buch-/Recherche-Chat). Wird einmal pro Session aus der ersten Runde
+    // generiert; NULL → Frontend fällt auf die Vorschau (erste Nachricht) zurück.
+    const csCols222 = db.pragma('table_info(chat_sessions)').map(c => c.name);
+    if (!csCols222.includes('title')) {
+      db.prepare('ALTER TABLE chat_sessions ADD COLUMN title TEXT').run();
+    }
+    const fkErrors222 = db.pragma('foreign_key_check');
+    if (fkErrors222.length) {
+      throw new Error(`Migration 222: foreign_key_check meldet ${fkErrors222.length} Verstoesse: ${JSON.stringify(fkErrors222.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 222').run();
+    logger.info('DB-Migration auf Version 222 abgeschlossen (chat_sessions.title — KI-Titel für History-Einträge).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {
