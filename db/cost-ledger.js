@@ -36,9 +36,9 @@ const _chatSourced = new Set(CHAT_SOURCED_JOB_TYPES);
 const _ins = db.prepare(`
   INSERT OR IGNORE INTO ai_cost_ledger
     (ts, user_email, source, type, book_id, provider, model,
-     tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, usd, source_ref)
+     tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, web_searches, usd, source_ref)
   VALUES (@ts, @user_email, @source, @type, @book_id, @provider, @model,
-          @tokens_in, @tokens_out, @cache_read_in, @cache_creation_in, @cache_creation_1h_in, @usd, @source_ref)
+          @tokens_in, @tokens_out, @cache_read_in, @cache_creation_in, @cache_creation_1h_in, @web_searches, @usd, @source_ref)
 `);
 
 function _record(row) {
@@ -55,11 +55,13 @@ function _record(row) {
     cache_read_in: row.cache_read_in || 0,
     cache_creation_in: row.cache_creation_in || 0,
     cache_creation_1h_in: row.cache_creation_1h_in || 0,
+    web_searches: row.web_searches || 0,
     usd: costUsd({
       provider: row.provider, model: row.model,
       tokensIn: row.tokens_in, tokensOut: row.tokens_out,
       cacheReadIn: row.cache_read_in, cacheCreationIn: row.cache_creation_in,
       cacheCreation1hIn: row.cache_creation_1h_in,
+      webSearches: row.web_searches,
     }),
     source_ref: row.source_ref,
   });
@@ -103,7 +105,8 @@ function recordJobLedger(jobId) {
 const _selChatMsg = db.prepare(`
   SELECT cm.id, cm.created_at, cs.user_email AS user_email, cs.kind AS type, cs.book_id AS book_id,
          cm.provider, cm.model,
-         cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in, cm.cache_creation_1h_in
+         cm.tokens_in, cm.tokens_out, cm.cache_read_in, cm.cache_creation_in, cm.cache_creation_1h_in,
+         cm.web_searches
     FROM chat_messages cm
     JOIN chat_sessions cs ON cs.id = cm.session_id
    WHERE cm.id = ? AND cm.role = 'assistant'
@@ -128,6 +131,7 @@ function recordChatLedgerForMessage(messageId) {
       cache_read_in: r.cache_read_in,
       cache_creation_in: r.cache_creation_in,
       cache_creation_1h_in: r.cache_creation_1h_in,
+      web_searches: r.web_searches,
       source_ref: `chatmsg:${messageId}`,
     });
   } catch (e) {
@@ -146,7 +150,7 @@ function queryRange({ fromIso, toIso, userEmail, provider, source } = {}) {
   if (source)    where.push('source = @source');
   return db.prepare(`
     SELECT ts, user_email, source, type, book_id, provider, model,
-           tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, usd
+           tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, web_searches, usd
       FROM ai_cost_ledger
      WHERE ${where.join(' AND ')}
   `).all({

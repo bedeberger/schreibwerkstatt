@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../../db/schema');
-const { callAIChat, callAIWithTools, parseJSONLenient, chatTemperature, getContextConfigFor, resolveProvider } = require('../../lib/ai');
+const { callAIChat, parseJSONLenient, chatTemperature, getContextConfigFor, resolveProvider } = require('../../lib/ai');
 const {
   _promptConfig,
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
@@ -14,6 +14,7 @@ const {
 const contentStore = require('../../lib/content-store');
 const { executeTool, validateFinalAnswerCitations } = require('./book-chat-tools');
 const { runResearchChatJob } = require('./research-chat');
+const { makeAgenticChatJob, buildAgenticHistory, stripTrailingEmptyJson } = require('./agentic-chat');
 const { imageGenEnabled } = require('../../lib/image-gen');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
@@ -33,18 +34,6 @@ function _sanitizeVorschlaege(arr) {
   });
 }
 
-// Modell-Drift bei Sonnet/Claude: schreibt Prosa-Antwort, hängt am Ende
-// `\`\`\`json\n{}\n\`\`\`` als Compliance-Theater an. `extractBalancedJson`
-// greift dann das leere `{}` → parseJSON wirkt erfolgreich, aber `antwort`
-// fehlt. Trailing-Fence vor Speicherung entfernen.
-function _stripTrailingEmptyJson(text) {
-  if (typeof text !== 'string') return text;
-  return text
-    .replace(/\s*```(?:json)?\s*\{\s*\}\s*```\s*$/i, '')
-    .replace(/\s*\{\s*\}\s*$/, '')
-    .trim();
-}
-
 function _parseChatResponse(text) {
   // Lenient: bei kaputtem JSON (z.B. unescaptes `"` oder typografische Quotes
   // im Modell-Output) wenigstens `antwort` per Regex retten. Vorschläge gehen
@@ -60,34 +49,13 @@ function _parseChatResponse(text) {
   // r.ok-aber-antwort-leer = Modell schrieb Prosa und trailing leeres `{}`,
   // das extractBalancedJson erwischt hat. Roh-Prosa speichern, fence weg.
   if (r.ok) {
-    return { antwort: _stripTrailingEmptyJson(text) || text, vorschlaege: [], fallback: true };
+    return { antwort: stripTrailingEmptyJson(text) || text, vorschlaege: [], fallback: true };
   }
   return {
-    antwort: r.partial.antwort ?? _stripTrailingEmptyJson(r.partial._raw ?? text) ?? text,
+    antwort: r.partial.antwort ?? stripTrailingEmptyJson(r.partial._raw ?? text) ?? text,
     vorschlaege: [],
     fallback: true,
   };
-}
-
-/**
- * Rolling-Window für den Buch-Chat: erste user+assistant-Runde als Kontext-Anker
- * + die letzten tailMessages Nachrichten. Verhindert unbegrenztes Historien-Wachstum.
- */
-function _bookChatBuildHistory(sessionId, tailMessages = 10) {
-  const all = buildChatMessageHistory(sessionId);
-  if (all.length <= tailMessages + 2) return all;
-
-  // Erste vollständige Runde sichern (Kontext-Anker)
-  const anchor = [];
-  if (all[0]?.role === 'user')      anchor.push(all[0]);
-  if (all[1]?.role === 'assistant') anchor.push(all[1]);
-
-  // Letzte tailMessages Nachrichten
-  const tail = all.slice(-tailMessages);
-
-  // Überschneidung: wenn Anchor bereits im Tail liegt, nur Tail zurückgeben
-  const anchorInTail = anchor.length > 0 && all.length - tailMessages <= 0;
-  return anchorInTail ? tail : [...anchor, ...tail];
 }
 
 // ── Job: Chat ─────────────────────────────────────────────────────────────────
@@ -321,7 +289,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     }
 
     // ── Schritt 2: Historien-Rolling-Window (Anker + letzte 10 Nachrichten) ─────
-    const historyWithoutLast = _bookChatBuildHistory(session.id).slice(0, -1);
+    const historyWithoutLast = buildAgenticHistory(session.id).slice(0, -1);
     const historyChars = historyWithoutLast.reduce((s, m) => s + (m.content?.length || 0), 0);
 
     // ── Schritt 3: Dynamisches Text-Budget ──────────────────────────────────────
@@ -561,267 +529,80 @@ async function _consumeFinalAnswer(finalUse, ctx, toolLog, iterNum, logger) {
   return JSON.stringify({ antwort });
 }
 
-async function runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEmail, userToken) {
-  const logger = makeJobLogger(jobId);
-  const { buildBookChatAgentSystemPrompt, BOOK_CHAT_TOOLS, BOOK_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts();
-  const effectiveProvider = resolveProvider({ userEmail });
-  _applyBookChatClaudeOverrides(effectiveProvider, logger);
-  const aiCfg = getContextConfigFor(effectiveProvider);
-  try {
-    updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
+// Agentischer Buch-Chat: ruft Tools aus routes/jobs/book-chat-tools.js auf, um
+// Fragen über den gesamten Buchindex zu beantworten, statt alle Seiten vorab zu
+// laden. Loop/Persistenz kommen aus makeAgenticChatJob (siehe agentic-chat.js);
+// hier nur die Buch-Chat-spezifischen Achsen (Provider-Override, Tool-Set inkl.
+// generate_image, final_answer-Zitat-Validierung, context_info mit Bildern).
+const runBookChatJobAgent = makeAgenticChatJob({
+  startLabel: 'Agent',
+  errLabel: 'Agent',
+  callProvider: undefined,   // lässt lib/ai den (ggf. via setContext überschriebenen) Provider auflösen
+  resolveProvider: (userEmail, logger) => {
+    const effectiveProvider = resolveProvider({ userEmail });
+    _applyBookChatClaudeOverrides(effectiveProvider, logger);
+    return effectiveProvider;
+  },
 
-    const session = db.prepare(`
-      SELECT cs.*, b.name AS book_name FROM chat_sessions cs
-      LEFT JOIN books b ON b.book_id = cs.book_id
-      WHERE cs.id = ? AND cs.user_email = ?
-    `).get(parseInt(sessionId), userEmail);
-    if (!session) throw i18nError('job.error.sessionNotFound');
-    logger.info(`Start (Agent): «${session.book_name || '-'}» session=${sessionId}, msg-len=${message.length}`);
+  loadSession: (sessionId, userEmail) => db.prepare(`
+    SELECT cs.*, b.name AS book_name FROM chat_sessions cs
+    LEFT JOIN books b ON b.book_id = cs.book_id
+    WHERE cs.id = ? AND cs.user_email = ?
+  `).get(parseInt(sessionId), userEmail),
 
+  async prepare({ session, userEmail, userToken, aiCfg, logger, jobSignal }) {
+    const { buildBookChatAgentSystemPrompt, BOOK_CHAT_TOOLS, BOOK_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts();
     const figuren = getFiguren(session.book_id, userEmail);
     const review  = getLatestReview(session.book_id, userEmail);
     const { SYSTEM_BOOK_CHAT: bookChatSys } = await getBookPrompts(session.book_id, userEmail);
     const maxToolIter = _bookChatMaxToolIter();
-    const tokenBudget = _bookChatTokenBudget(aiCfg);
-    const toolResultCap = _toolResultCapChars(maxToolIter, aiCfg);
-    const systemPrompt = buildBookChatAgentSystemPrompt(
-      session.book_name || '', figuren, review, bookChatSys, maxToolIter
-    );
-
-    // generate_image nur anbieten, wenn der Bild-Endpunkt konfiguriert ist —
-    // sonst spart das Input-Tokens und das Modell ruft kein totes Werkzeug.
-    const activeTools = imageGenEnabled()
-      ? BOOK_CHAT_TOOLS
-      : BOOK_CHAT_TOOLS.filter(t => t.name !== 'generate_image');
-
-    const jobSignal = jobAbortControllers.get(jobId)?.signal;
-    const ctx = {
-      bookId: session.book_id,
-      sessionId: session.id,
-      userEmail,
-      userToken,
-      jobSignal,
-      logger,
-      // generate_image-Tool sammelt hier {image_id, prompt, mime}; wird nach dem
-      // Loop in context_info.images persistiert (Frontend-Anzeige im Verlauf).
-      images: [],
-      // Input-Budget des effektiven Providers (inkl. Bookchat-Override) — list_chapters
-      // leitet daraus ab, ob das ganze Buch in den Kontext passt und gibt dem Agenten
-      // einen entsprechenden Lade-Hinweis (Voll-Lektüre statt search_passages-Raten).
-      inputBudgetChars: aiCfg.inputBudgetChars,
+    const systemPrompt = buildBookChatAgentSystemPrompt(session.book_name || '', figuren, review, bookChatSys, maxToolIter);
+    // generate_image nur anbieten, wenn der Bild-Endpunkt konfiguriert ist — sonst
+    // spart das Input-Tokens und das Modell ruft kein totes Werkzeug.
+    const tools = imageGenEnabled() ? BOOK_CHAT_TOOLS : BOOK_CHAT_TOOLS.filter(t => t.name !== 'generate_image');
+    return {
+      systemPrompt,
+      tools,
+      maxToolIter,
+      tokenBudget: _bookChatTokenBudget(aiCfg),
+      toolResultCap: _toolResultCapChars(maxToolIter, aiCfg),
+      forceFinalInstruction: BOOK_CHAT_FORCE_FINAL_INSTRUCTION,
+      ctx: {
+        bookId: session.book_id, sessionId: session.id, userEmail, userToken,
+        jobSignal, logger,
+        // generate_image-Tool sammelt hier {image_id, prompt, mime}; nach dem Loop
+        // in context_info.images persistiert (Frontend-Anzeige im Verlauf).
+        images: [],
+        // Input-Budget des effektiven Providers — list_chapters leitet daraus ab,
+        // ob das ganze Buch in den Kontext passt (Voll-Lektüre statt search-Raten).
+        inputBudgetChars: aiCfg.inputBudgetChars,
+      },
     };
+  },
 
-    // Historien-Rolling-Window (Anker + letzte 10 Nachrichten)
-    const historyWithoutLast = _bookChatBuildHistory(session.id).slice(0, -1);
-    let messages = [...historyWithoutLast, { role: 'user', content: message }];
+  executeTool: (name, input, ctx) => executeTool(name, input, ctx),
 
-    let totalTokIn = 0, totalTokOut = 0, totalCacheRead = 0, totalCacheCreation = 0, totalCacheCreation1h = 0;
-    let finalText = null;
-    let genMs = 0;
-    let lastModel = null; // tatsächlich genutztes Claude-Modell (reflektiert ggf. den Bookchat-Override)
-    const toolLog = []; // für context_info
-    let iter = 0;
+  // final_answer mit Zitat-Validierung (Beweisspur, nicht blockierend).
+  consumeFinalAnswer: ({ finalUse, ctx, toolLog, iterNum, logger }) =>
+    _consumeFinalAnswer(finalUse, ctx, toolLog, iterNum, logger),
 
-    for (iter = 0; iter < maxToolIter; iter++) {
-      if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
-      updateJob(jobId, {
-        statusText: 'job.phase.agentTools',
-        statusParams: { current: iter + 1, total: maxToolIter },
-        progress: Math.min(90, 10 + iter * 12),
-      });
-
-      const onProgress = ({ chars, tokIn }) => {
-        const updates = {};
-        if (tokIn > 0)  updates.tokensIn  = totalTokIn + tokIn;
-        if (chars > 0)  updates.tokensOut = totalTokOut + Math.floor(chars / aiCfg.charsPerToken);
-        if (Object.keys(updates).length) updateJob(jobId, updates);
-      };
-
-      const result = await callAIWithTools(
-        messages, systemPrompt, activeTools, onProgress,
-        undefined, jobSignal, undefined
-      );
-      totalTokIn  += result.tokensIn;
-      totalTokOut += result.tokensOut;
-      totalCacheRead       += (result.cacheReadIn || 0);
-      totalCacheCreation   += (result.cacheCreationIn || 0);
-      totalCacheCreation1h += (result.cacheCreation1hIn || 0);
-      if (result.genDurationMs) genMs += result.genDurationMs;
-      if (result.model) lastModel = result.model;
-
-      // UI mit echten Claude-Zahlen nachziehen (onProgress liefert nur chars-basierte Schätzung,
-      // die bei reinen Tool-Use-Iterationen ohne Text-Stream 0 bleibt).
-      updateJob(jobId, {
-        tokensIn: totalTokIn, tokensOut: totalTokOut,
-        cacheReadIn: totalCacheRead, cacheCreationIn: totalCacheCreation,
-        cacheCreation1hIn: totalCacheCreation1h,
-      });
-
-      if (result.truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: totalTokIn, tokOut: totalTokOut, total: totalTokIn + totalTokOut });
-
-      if (result.tokensIn > tokenBudget) {
-        logger.warn(`Context-Budget überschritten (${result.tokensIn}/${tokenBudget} Input-Tokens) – Loop abgebrochen.`);
-        finalText = result.text || JSON.stringify({ antwort: '__i18n:chat.errors.contextExceeded__' });
-        break;
-      }
-
-      if (result.stopReason !== 'tool_use') {
-        // Modell beendet mit Prosa statt final_answer-Tool (Sonnet-Drift).
-        // Prosa IST die finale Antwort — direkt als antwort-Envelope verpacken,
-        // statt sie durch _parseChatResponse/parseJSON zu schicken (sonst
-        // JSON-Parse-Fehler-ERROR + ai_parse_fails-Dump auf validem Klartext).
-        // Ausnahme: Modell lieferte bereits {antwort:…}-JSON — dann unverändert.
-        const raw = (result.text || '').trim();
-        finalText = raw.startsWith('{')
-          ? raw
-          : JSON.stringify({ antwort: _stripTrailingEmptyJson(raw) || raw });
-        break;
-      }
-
-      // final_answer ist Pflicht-Endpunkt: extrahiert antwort aus Tool-Input,
-      // beendet Loop ohne executeTool/Reply-Round. Wenn das Modell daneben
-      // weitere Tool-Uses emittiert, ignorieren — final_answer terminiert.
-      const finalUse = result.toolUses.find(tu => tu.name === 'final_answer');
-      if (finalUse) {
-        finalText = await _consumeFinalAnswer(finalUse, ctx, toolLog, iter + 1, logger);
-        break;
-      }
-
-      // Tool-Use: alle tool_uses ausführen und als user-tool_result an messages anhängen.
-      messages.push({ role: 'assistant', content: result.rawContentBlocks });
-      const toolResults = [];
-      for (const tu of result.toolUses) {
-        if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
-        const t0 = Date.now();
-        let out;
-        let ok = true;
-        let errMsg = null;
-        try {
-          out = await executeTool(tu.name, tu.input, ctx);
-        } catch (e) {
-          if (e.name === 'AbortError') throw e;
-          ok = false;
-          errMsg = e.message;
-          out = { error: e.message };
-        }
-        const durationMs = Date.now() - t0;
-        const content = JSON.stringify(out);
-        const resultBytes = content.length;
-        const truncated = resultBytes > toolResultCap;
-        toolLog.push({
-          name: tu.name,
-          input: tu.input,
-          ok,
-          durationMs,
-          resultBytes,
-          truncated,
-          iter: iter + 1,
-          ...(errMsg ? { error: errMsg } : {}),
-        });
-        if (ok) {
-          logger.info(`tool=${tu.name} dur=${durationMs}ms bytes=${resultBytes}${truncated ? ' truncated' : ''} iter=${iter + 1}`);
-        } else {
-          logger.warn(`tool=${tu.name} dur=${durationMs}ms bytes=${resultBytes} iter=${iter + 1} FAILED: ${errMsg}`);
-        }
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: tu.id,
-          content: truncated ? content.slice(0, toolResultCap) + '…' : content,
-          ...(out && out.error ? { is_error: true } : {}),
-        });
-      }
-      messages.push({ role: 'user', content: toolResults });
-    }
-
-    if (finalText == null) {
-      // Iterationen erschöpft, ohne dass final_answer gerufen wurde (z.B. breite
-      // Recherche-Aufgaben wie "Zitate aus 10–20 Kapiteln"). Statt mit einem
-      // Fehler aufzugeben: ein erzwungener Synthese-Turn. Die bereits gesammelten
-      // tool_results hängen in `messages`; wir bieten dem Modell nur noch
-      // final_answer als Werkzeug an (kein tool_choice-Forcing — das kollidiert
-      // mit adaptive thinking; die Werkzeug-Beschränkung reicht: das Modell ruft
-      // final_answer oder antwortet in Prosa, beides terminal).
-      logger.warn(`Max-Iterationen (${maxToolIter}) erreicht – erzwinge Synthese aus dem bereits gesammelten Kontext.`);
-      updateJob(jobId, { statusText: 'job.phase.agentSynthesize', progress: 92 });
-      messages.push({ role: 'user', content: BOOK_CHAT_FORCE_FINAL_INSTRUCTION });
-      const finalOnlyTools = BOOK_CHAT_TOOLS.filter(t => t.name === 'final_answer');
-      try {
-        const result = await callAIWithTools(
-          messages, systemPrompt, finalOnlyTools,
-          ({ chars, tokIn }) => {
-            const updates = {};
-            if (tokIn > 0) updates.tokensIn  = totalTokIn + tokIn;
-            if (chars > 0) updates.tokensOut = totalTokOut + Math.floor(chars / aiCfg.charsPerToken);
-            if (Object.keys(updates).length) updateJob(jobId, updates);
-          },
-          undefined, jobSignal, undefined
-        );
-        totalTokIn  += result.tokensIn;
-        totalTokOut += result.tokensOut;
-        totalCacheRead       += (result.cacheReadIn || 0);
-        totalCacheCreation   += (result.cacheCreationIn || 0);
-        totalCacheCreation1h += (result.cacheCreation1hIn || 0);
-        if (result.genDurationMs) genMs += result.genDurationMs;
-        if (result.model) lastModel = result.model;
-        updateJob(jobId, {
-          tokensIn: totalTokIn, tokensOut: totalTokOut,
-          cacheReadIn: totalCacheRead, cacheCreationIn: totalCacheCreation,
-          cacheCreation1hIn: totalCacheCreation1h,
-        });
-        const finalUse = result.toolUses?.find(tu => tu.name === 'final_answer');
-        if (finalUse) {
-          finalText = await _consumeFinalAnswer(finalUse, ctx, toolLog, maxToolIter + 1, logger);
-        } else {
-          // Modell antwortete in Prosa statt via final_answer — Prosa IST die Antwort.
-          const raw = (result.text || '').trim();
-          if (raw) finalText = raw.startsWith('{') ? raw : JSON.stringify({ antwort: _stripTrailingEmptyJson(raw) || raw });
-        }
-      } catch (e) {
-        if (e.name === 'AbortError') throw e;
-        logger.warn(`Synthese-Turn fehlgeschlagen: ${e.message}`);
-      }
-      if (finalText == null) {
-        logger.warn('Synthese-Turn lieferte keine Antwort – Fallback-Meldung.');
-        finalText = JSON.stringify({ antwort: '__i18n:chat.errors.maxIterReached__' });
-      }
-    }
-
+  parseFinal: (finalText, logger) => {
     const { antwort, fallback } = _parseChatResponse(finalText);
-    if (fallback) {
-      logger.warn('Agent-Antwort kein valides JSON – Rohtext (gesäubert) wird gespeichert.');
-    }
+    if (fallback) logger.warn('Agent-Antwort kein valides JSON – Rohtext (gesäubert) wird gespeichert.');
+    return antwort;
+  },
 
-    // Assistant-Nachricht in DB speichern
-    const assistantNow = new Date().toISOString();
-    const tpsVal = (genMs > 0 && totalTokOut > 0) ? totalTokOut / (genMs / 1000) : null;
-    const contextInfo = {
-      mode: 'agent',
-      tool_calls: toolLog,
-      iterations: iter + 1,
-      // Im Chat generierte Bilder (Weltaufbau-/Chat-Visualisierung) — Frontend
-      // rendert sie unter der Antwort und bietet Download via /chat/image/:id.
-      ...(ctx.images.length ? { images: ctx.images } : {}),
-    };
-    const asstMsgResult = db.prepare(`
-      INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, provider, model, tps, context_info, created_at)
-      VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(session.id, antwort, totalTokIn, totalTokOut, totalCacheRead, totalCacheCreation, totalCacheCreation1h, 'claude', (lastModel || appSettings.get('ai.claude.model') || 'claude-sonnet-4-6'), tpsVal, JSON.stringify(contextInfo), assistantNow);
-    db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
-    recordChatLedgerForMessage(asstMsgResult.lastInsertRowid);
+  buildContextInfo: ({ toolLog, iter, ctx }) => ({
+    mode: 'agent',
+    tool_calls: toolLog,
+    iterations: iter + 1,
+    // Im Chat generierte Bilder — Frontend rendert sie unter der Antwort.
+    ...(ctx.images.length ? { images: ctx.images } : {}),
+  }),
 
-    completeJob(jobId, {
-      session_id: session.id,
-      user_message_id: userMsgId,
-      assistant_message_id: asstMsgResult.lastInsertRowid,
-      tokensIn: totalTokIn, tokensOut: totalTokOut,
-      toolCalls: toolLog.length,
-      iterations: iter + 1,
-    }, tpsVal, `Agent session=${sessionId}, ${toolLog.length} Tool-Calls, ${iter + 1} Iter`);
-  } catch (e) {
-    if (e.name !== 'AbortError') logger.error(`Agent-Fehler: ${e.message}`, { stack: e.stack });
-    failJob(jobId, e);
-  }
-}
+  buildSummary: ({ sessionId, toolLog, iter }) =>
+    `Agent session=${sessionId}, ${toolLog.length} Tool-Calls, ${iter + 1} Iter`,
+});
 
 // Dispatcher: wählt zwischen Agent-Pfad und klassischem Pfad.
 function runBookChatJobDispatch(jobId, sessionId, userMsgId, message, userEmail, userToken) {

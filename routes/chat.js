@@ -76,95 +76,40 @@ router.post('/session', jsonBody, async (req, res) => {
   res.json({ id: result.lastInsertRowid });
 });
 
-/** Neue Buch-Chat-Session erstellen (ohne Seiten-Bezug) */
-router.post('/session/book', jsonBody, (req, res) => {
-  const { book_name } = req.body;
-  const book_id = toIntId(req.body?.book_id);
-  const userEmail = req.session?.user?.email || null;
-  if (!book_id || !userEmail) {
-    return res.status(400).json({ error_code: 'BOOKID_LOGIN_REQ' });
-  }
-  setContext({ book: book_id });
-  // Buch-Chat: editor+, ausser allow_lektor_book_chat=1 → lektor+.
-  {
-    const { getBookSettings } = require('../db/schema');
-    const bs = getBookSettings(book_id);
-    const min = bs?.allow_lektor_book_chat ? 'lektor' : 'editor';
-    try { requireBookAccess(req, book_id, min); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
-  }
-  // Orphan-Cleanup analog zum Seiten-Chat (siehe Kommentar oben).
-  const cleanupResBook = db.prepare(`
-    DELETE FROM chat_sessions
-    WHERE book_id = ? AND kind = 'book' AND user_email = ?
-      AND created_at < datetime('now', '-60 seconds')
-      AND NOT EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id)
-  `).run(book_id, userEmail);
-  if (cleanupResBook.changes > 0) {
-    logger.info(`[chat/session/book] Orphan-Cleanup: ${cleanupResBook.changes} leere book-Session(s) für book=${book_id} entfernt.`);
-  }
-
-  upsertBookByName(book_id, book_name);
-  const now = new Date().toISOString();
-  const result = db.prepare(`
-    INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at)
-    VALUES (?, 'book', ?, ?, ?)
-  `).run(book_id, userEmail, now, now);
-  res.json({ id: result.lastInsertRowid });
-});
-
-/** Alle Buch-Chat-Sessions eines Buchs (neueste zuerst, max. 20).
- *  Leere Sessions (ohne Nachrichten) werden ausgefiltert — sie entstehen beim
- *  Öffnen der Chat-Karte (auto-`startNewSession`) und sollen weder in der
- *  History noch im Badge-Count auftauchen, bis der User wirklich schreibt. */
-router.get('/sessions/book/:book_id', (req, res) => {
-  const userEmail = req.session?.user?.email || null;
-  const bookId = toIntId(req.params.book_id);
-  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const rows = db.prepare(`
-    SELECT cs.id, cs.book_id, b.name AS book_name, cs.created_at, cs.last_message_at,
-           (SELECT content FROM chat_messages WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
-    FROM chat_sessions cs
-    LEFT JOIN books b ON b.book_id = cs.book_id
-    WHERE cs.book_id = ? AND cs.kind = 'book' AND cs.user_email = ?
-      AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = cs.id)
-    ORDER BY cs.last_message_at DESC
-    LIMIT 20
-  `).all(bookId, userEmail);
-  res.json(rows);
-});
-
-/** Neue Recherche-Chat-Session erstellen (kind='research', buchweit, editor+).
- *  Claude-only — das Frontend öffnet sie nur, wenn der Provider Claude ist. */
-router.post('/session/research', jsonBody, (req, res) => {
+// Buch-weite Chat-Session anlegen (Buch-Chat + Recherche-Chat). Beide
+// unterscheiden sich nur in `kind` und der ACL-Mindestrolle; Orphan-Cleanup
+// (leere, nie benutzte Sessions desselben kind älter als 60 s verwerfen) und
+// Insert sind geteilt. `minRole(book_id)` löst die Rolle ggf. buch-abhängig auf.
+function createBookScopedSession(req, res, { kind, minRole }) {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   const userEmail = req.session?.user?.email || null;
   if (!book_id || !userEmail) return res.status(400).json({ error_code: 'BOOKID_LOGIN_REQ' });
   setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'editor'); }
+  try { requireBookAccess(req, book_id, minRole(book_id)); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
 
-  // Orphan-Cleanup analog zum Buch-Chat: leere, nie benutzte Sessions verwerfen.
   const cleanup = db.prepare(`
     DELETE FROM chat_sessions
-    WHERE book_id = ? AND kind = 'research' AND user_email = ?
+    WHERE book_id = ? AND kind = ? AND user_email = ?
       AND created_at < datetime('now', '-60 seconds')
       AND NOT EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id)
-  `).run(book_id, userEmail);
-  if (cleanup.changes > 0) logger.info(`[chat/session/research] Orphan-Cleanup: ${cleanup.changes} leere Session(s) für book=${book_id}.`);
+  `).run(book_id, kind, userEmail);
+  if (cleanup.changes > 0) logger.info(`[chat/session/${kind}] Orphan-Cleanup: ${cleanup.changes} leere Session(s) für book=${book_id} entfernt.`);
 
   upsertBookByName(book_id, book_name);
   const now = new Date().toISOString();
   const result = db.prepare(`
     INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at)
-    VALUES (?, 'research', ?, ?, ?)
-  `).run(book_id, userEmail, now, now);
+    VALUES (?, ?, ?, ?, ?)
+  `).run(book_id, kind, userEmail, now, now);
   res.json({ id: result.lastInsertRowid });
-});
+}
 
-/** Alle Recherche-Chat-Sessions eines Buchs (neueste zuerst, max. 20; leere ausgefiltert). */
-router.get('/sessions/research/:book_id', (req, res) => {
+// Buch-weite Chat-Sessions auflisten (neueste zuerst, max. 20). Leere Sessions
+// (ohne Nachrichten) werden ausgefiltert — sie entstehen beim Öffnen der Karte
+// (auto-`startNewSession`) und sollen erst auftauchen, wenn der User schreibt.
+function listBookScopedSessions(req, res, { kind }) {
   const userEmail = req.session?.user?.email || null;
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
@@ -173,13 +118,34 @@ router.get('/sessions/research/:book_id', (req, res) => {
            (SELECT content FROM chat_messages WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
     FROM chat_sessions cs
     LEFT JOIN books b ON b.book_id = cs.book_id
-    WHERE cs.book_id = ? AND cs.kind = 'research' AND cs.user_email = ?
+    WHERE cs.book_id = ? AND cs.kind = ? AND cs.user_email = ?
       AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = cs.id)
     ORDER BY cs.last_message_at DESC
     LIMIT 20
-  `).all(bookId, userEmail);
+  `).all(bookId, kind, userEmail);
   res.json(rows);
-});
+}
+
+/** Neue Buch-Chat-Session erstellen (ohne Seiten-Bezug).
+ *  Buch-Chat: editor+, ausser allow_lektor_book_chat=1 → lektor+. */
+router.post('/session/book', jsonBody, (req, res) => createBookScopedSession(req, res, {
+  kind: 'book',
+  minRole: (book_id) => {
+    const { getBookSettings } = require('../db/schema');
+    return getBookSettings(book_id)?.allow_lektor_book_chat ? 'lektor' : 'editor';
+  },
+}));
+
+router.get('/sessions/book/:book_id', (req, res) => listBookScopedSessions(req, res, { kind: 'book' }));
+
+/** Neue Recherche-Chat-Session erstellen (kind='research', buchweit, editor+).
+ *  Claude-only — das Frontend öffnet sie nur, wenn der Provider Claude ist. */
+router.post('/session/research', jsonBody, (req, res) => createBookScopedSession(req, res, {
+  kind: 'research',
+  minRole: () => 'editor',
+}));
+
+router.get('/sessions/research/:book_id', (req, res) => listBookScopedSessions(req, res, { kind: 'research' }));
 
 /** Alle Sessions einer Seite (neueste zuerst, max. 20).
  *  Siehe Kommentar oben — leere Sessions werden ausgefiltert. */

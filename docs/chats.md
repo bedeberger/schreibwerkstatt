@@ -26,7 +26,7 @@ Buchweiter agentischer Chat **ohne** Vorschläge-System. Sessions: `kind = 'book
 
 ## Recherche-Chat
 
-Agentischer Chat als **Panel in der Recherche-/Wissensboard-Karte**, Claude-only mit Anthropic-Web-Suche. Aufbau analog `runBookChatJobAgent`, aber eigenes Tool-Set + Web-Suche, ohne Seiten-Vorladen/Zitat-Validierung. Rückwärtsgewandt im Sinne der App-Philosophie: recherchiert + sammelt Material, **schreibt nie in den Buchtext**. Vorschläge (`propose_research_item`) werden **nicht** automatisch gespeichert — sie kommen in `context_info.proposals` zurück, der User bestätigt sie im Frontend (POST `/research`). Session-`kind = 'research'`, pro Buch + User gescoped. Kill-Switch / Sichtbarkeit über `$app.researchChatEnabled`. Prompts in [public/js/prompts/recherche.js](../public/js/prompts/recherche.js).
+Agentischer Chat als **Panel in der Recherche-/Wissensboard-Karte**, **Claude-only** mit Anthropics serverseitigem `web_search`-Tool. Aufbau analog `runBookChatJobAgent`, aber eigenes Tool-Set + Web-Suche, ohne Seiten-Vorladen/Zitat-Validierung. Rückwärtsgewandt im Sinne der App-Philosophie: recherchiert + sammelt Material, **schreibt nie in den Buchtext**. Vorschläge (`propose_research_item`) werden **nicht** automatisch gespeichert — sie kommen in `context_info.proposals` zurück, der User bestätigt sie im Frontend (POST `/research`). Session-`kind = 'research'`, pro Buch + User gescoped. Panel nur sichtbar, wenn der effektive Provider Claude ist + Kill-Switch `research_chat.enabled` ≠ false (`/config` → `researchChat.enabled`). Volle Details (Tool-Tabelle, Loop, Bestätigungs-Modell): **[docs/recherche-chat.md](recherche-chat.md)**.
 
 ## Geteiltes
 

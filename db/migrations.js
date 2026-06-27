@@ -8614,6 +8614,29 @@ function _runMigrationsLocked() {
     logger.info("DB-Migration auf Version 220 abgeschlossen (chat_sessions.kind erlaubt 'research' — Recherche-Chat).");
   }
 
+  if (version < 221) {
+    // web_searches: Anzahl der Anthropic-Web-Suchen (server_tool_use 'web_search')
+    // pro Assistant-Nachricht. Anthropic bepreist Web-Suche als separates
+    // Server-Tool (~$10/1'000) ZUSAETZLICH zu den Tokens — bisher gezaehlt
+    // (context_info), aber nie in die USD-Kosten eingerechnet. Spalte in
+    // chat_messages (Quelle) + ai_cost_ledger (eingefrorene Kostenkomponente).
+    // Nur der Recherche-Chat fuellt sie; alle anderen Pfade bleiben bei 0.
+    const cmCols221 = db.pragma('table_info(chat_messages)').map(c => c.name);
+    if (!cmCols221.includes('web_searches')) {
+      db.prepare('ALTER TABLE chat_messages ADD COLUMN web_searches INTEGER NOT NULL DEFAULT 0').run();
+    }
+    const lgCols221 = db.pragma('table_info(ai_cost_ledger)').map(c => c.name);
+    if (!lgCols221.includes('web_searches')) {
+      db.prepare('ALTER TABLE ai_cost_ledger ADD COLUMN web_searches INTEGER NOT NULL DEFAULT 0').run();
+    }
+    const fkErrors221 = db.pragma('foreign_key_check');
+    if (fkErrors221.length) {
+      throw new Error(`Migration 221: foreign_key_check meldet ${fkErrors221.length} Verstoesse: ${JSON.stringify(fkErrors221.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 221').run();
+    logger.info('DB-Migration auf Version 221 abgeschlossen (web_searches in chat_messages + ai_cost_ledger — Web-Such-Kosten).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

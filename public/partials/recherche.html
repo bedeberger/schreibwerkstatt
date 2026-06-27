@@ -108,14 +108,18 @@
 
     <!-- Session-Historie -->
     <div x-show="researchChatSessions.length > 0" class="card-history-section">
-      <div class="chat-session-list">
-        <template x-for="s in researchChatSessions" :key="s.id">
-          <div class="chat-session-item" :class="s.id === researchChatSessionId ? 'chat-session-item--active' : ''">
-            <button type="button" class="chat-session-open" @click="loadResearchChatSession(s.id)" x-text="s.preview || $app.t('recherche.chat.untitled')"></button>
-            <button type="button" class="icon-btn icon-btn--ghost" @click="deleteResearchChatSession(s.id)" :aria-label="$app.t('common.delete')" :data-tip="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
-          </div>
-        </template>
-      </div>
+      <div class="chat-history-title" x-text="$app.t('chat.history')"></div>
+      <template x-for="s in researchChatSessions" :key="s.id">
+        <div
+          class="chat-session-item"
+          :class="s.id === researchChatSessionId ? 'chat-session-item--active' : ''"
+          @click="loadResearchChatSession(s.id)"
+        >
+          <div class="chat-session-preview" x-text="(s.preview || $app.t('recherche.chat.untitled')).slice(0, 80)"></div>
+          <div class="chat-session-meta" x-text="$app.formatDate(s.last_message_at)"></div>
+          <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteResearchChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+        </div>
+      </template>
     </div>
   </div>
 
