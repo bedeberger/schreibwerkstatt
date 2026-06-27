@@ -186,6 +186,7 @@ test('buildLektoratPrompt (claude): enthält alle Cloud-Typen im Enum + Spezial-
   for (const t of ['satzbau', 'filterwort', 'klischee', 'pleonasmus', 'namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal']) {
     assert.match(out, new RegExp(t), `Typ «${t}» fehlt im Cloud-Prompt`);
   }
+  assert.match(out, /Rechtschreib-Regeln/);
   assert.match(out, /Satzbau-Regeln/);
   assert.match(out, /Filterwort-Regeln/);
   assert.match(out, /Klischee-Regeln/);

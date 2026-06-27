@@ -1,5 +1,16 @@
 // Wiederverwendbare Regel-Blöcke für Lektorat- und Review-Prompts.
 // Pure Funktionen – keine Modul-State-Abhängigkeiten.
+//
+// Dialog-Ausnahme – zwei bewusste Stufen (gilt einheitlich über alle Blöcke):
+//   · HARTE Ausnahme («in direkter Rede NICHT melden»): rein stilistisch-literarische
+//     Typen, die Figurensprache legitim charakterisieren – stil, satzbau, show_vs_tell,
+//     filterwort, klischee, ki_geruch. Figurenrede ist hier nie ein Finding.
+//   · WEICHE Ausnahme («in direkter Rede konservativer»): Typen, die auch im Dialog
+//     ein echter Mangel sein können – wiederholung, schwaches_verb, fuellwort, passiv.
+//     Nur melden, wenn die Stelle auch in der Figurenrede hörbar holpert.
+//   · KEINE Ausnahme (auch im Dialog voll melden): mechanische Fehler – rechtschreibung,
+//     grammatik (inkl. Zeichensetzung), dialogformat; Ausnahme nur bei klar erkennbarem,
+//     bewusst gesetztem Dialekt/Idiolekt.
 
 // Grammatik + Zeichensetzung/Interpunktion (beide unter typ «grammatik»). Locale-scharf.
 // Beide Fehlergruppen sind objektiv und mechanisch – sie werden SYSTEMATISCH geprüft und
@@ -37,6 +48,44 @@ Grammatik- & Zeichensetzungs-Regeln (typ: «grammatik»):
 - AUCH in direkter Rede / Dialog melden: Zeichensetzungs- und Grammatikfehler sind dort genauso Fehler – Ausnahme nur, wenn klar erkennbar bewusste Figurensprache/Dialekt vorliegt.`;
 }
 
+// Rechtschreibung (Einzelwort-Schreibung). Locale-scharf. Objektiv/mechanisch –
+// SYSTEMATISCH geprüft und IMMER gemeldet (keine Schwere-Schwelle, keine Obergrenze).
+// Bewusst getrennt vom Grammatik-Block: hier nur die Schreibung des einzelnen Worts,
+// nicht Kommasetzung/Kasus/Kongruenz. ss/ß bzw. AE/BE regelt die KORREKTUR-SPRACHE-
+// Regel (locale-spezifisch) – darum hier NICHT erwähnt.
+export function _buildRechtschreibungBlock(langCode = 'de') {
+  if (langCode === 'en') {
+    return `
+Spelling rules (typ: «rechtschreibung»):
+- OBJECTIVE, mechanical errors. Check word by word; every clear violation is reported, none dropped as "minor". Do NOT flag spellings that are valid in the book's variety – the allowed norm follows from the CORRECTION LANGUAGE rule below.
+- Boundary: pure single-word spelling → «rechtschreibung». Commas, case agreement, verb forms, and apostrophe issues (its/it's, your/you're) → «grammatik».
+- Typical classes:
+  · Commonly confused homophones: their/there, lose/loose, affect/effect, then/than, to/too, complement/compliment, stationary/stationery.
+  · Compound vs. open spelling: everyday vs. every day, alright/all right, into vs. in to.
+  · Doubled/dropped letters, transpositions, typos (recieve→receive, seperate→separate, definately→definitely).
+  · Capitalisation of proper nouns mid-sentence.
+- «original»: the misspelled word, character-exact.
+- «korrektur»: the same span spelled correctly (1:1 replacement, same span type).
+- «erklaerung»: ONE sentence naming the rule («there = place, their = possessive», «typo: receive»).
+- Report inside direct speech too – exception only for clearly intentional dialect/idiolect.`;
+  }
+  // Default: Deutsch
+  return `
+Rechtschreib-Regeln (typ: «rechtschreibung»):
+- OBJEKTIVE, mechanische Fehler. Prüfe Wort für Wort; jeder eindeutige Verstoss wird gemeldet, keiner als «geringfügig» weggelassen. Schreibvarianten der Buch-Sprache NICHT als Fehler melden – die zulässige Norm ergibt sich aus der KORREKTUR-SPRACHE-Regel weiter unten.
+- Abgrenzung: reine Schreibung des Einzelworts → «rechtschreibung». Kommasetzung, Kasus/Kongruenz, Verbformen → «grammatik».
+- Typische Fehlerklassen:
+  · Homophone / Verwechslungen: das/dass, seit/seid, wider/wieder, Lid/Lied, Saite/Seite, Ende/Ente.
+  · Getrennt- und Zusammenschreibung: «kennenlernen», «sodass», «infrage», «aufgrund», «zurzeit» – fälschliche Trennung oder Zusammenziehung.
+  · Gross-/Kleinschreibung im Satzinnern: Substantivierungen grossschreiben («das Schöne», «im Allgemeinen», «etwas Neues»); nominalisierte Verben/Adjektive; Verben/Adjektive klein.
+  · Doppelkonsonanten/-vokale, Dehnung/Schärfung, Fugen-s, Endungen (-ig/-lich/-isch) – z.B. «Standart» statt «Standard», «wiederspiegeln» statt «widerspiegeln».
+  · Tippfehler, Buchstabendreher, fehlende oder zusätzliche Buchstaben.
+- «original»: das falsch geschriebene Wort (bei Getrennt-/Zusammenschreibung die ganze Wortgruppe) zeichengenau.
+- «korrektur»: dieselbe Stelle korrekt geschrieben (1:1-Ersatz, gleicher Span-Typ).
+- «erklaerung»: EIN Satz, benennt die Regel («das (Artikel) vs. dass (Konjunktion)», «Zusammenschreibung: kennenlernen», «Substantivierung grossschreiben»).
+- AUCH in direkter Rede / Dialog melden – Ausnahme nur bei klar erkennbarer, bewusst gesetzter Figurensprache/Dialekt.`;
+}
+
 export function _buildStilBlock() {
   return `
 Stil-Regeln (typ: «stil»):
@@ -47,6 +96,7 @@ Stil-Regeln (typ: «stil»):
 - In direkter Rede / Dialog NICHT melden: Figurensprache darf holprig, gestelzt oder unidiomatisch sein – das charakterisiert die Figur. «stil» gilt ausschliesslich für Erzähltext.
 - «original»: vollständiger Satz oder eindeutig abgrenzbare Phrase zeichengenau aus dem Text.
 - PFLICHT: «korrektur» muss immer eine konkrete Umformulierung enthalten – nicht leer lassen, nicht dasselbe wie «original». Keine Stilanmerkung ohne konkreten Verbesserungsvorschlag.
+- «erklaerung»: EIN Satz, benennt die stilistische Schwäche («gestelzte Wortwahl», «unklarer Bezug», «Adjektiv-Häufung»).
 - Selbsttest: Lässt sich die Schwäche präzise mit einem der spezifischen Typen benennen? Wenn ja → spezifischen Typ verwenden, «stil» weglassen.`;
 }
 
@@ -82,6 +132,7 @@ Wiederholung-Regeln (typ: «wiederholung»):
 - In direkter Rede / Dialog konservativer: Wiederholungen in Figurensprache sind oft bewusste Charakterisierung – nur melden, wenn die Wiederholung den Erzähltext (nicht die Figurenrede) betrifft, oder eine Figur derart auffällig wiederholt, dass es als Sprachfehler statt Charakterisierung wirkt.
 - «original»: vollständiger Satz zeichengenau aus dem Text (damit die Textstelle eindeutig auffindbar ist)
 - «korrektur»: derselbe Satz mit dem besten Synonym – exakt gleiche grammatische Form (Kasus, Numerus, Tempus)
+- «erklaerung»: EIN Satz, nennt das wiederholte Wort bzw. den Stamm («Stamm «laufen» dreimal auf der Seite»)
 - Synonym-Selbsttest vor jedem Eintrag: Klingt der Satz danach natürlich? Bedeutung erhalten? Passt zum Autorenstil?`;
 }
 
@@ -94,6 +145,7 @@ Schwache-Verben-Regeln (typ: «schwaches_verb»):
 - In direkter Rede / Dialog konservativer: blasse Verben in Figurensprache sind oft authentisch (Alltagston). Nur melden, wenn das Verb im Erzähltext steht oder die Figurenrede auffällig flach klingt und durch ein präziseres Verb messbar gewinnt.
 - «original»: vollständiger Satz zeichengenau aus dem Text (damit die Textstelle eindeutig auffindbar ist)
 - «korrektur»: derselbe Satz mit dem stärkeren Verb — exakt gleiche grammatische Form und Tempus
+- «erklaerung»: EIN Satz, benennt das schwache Verb und den Gewinn («blasses «machen» – präziseres Verb möglich»)
 - Selbsttest vor jedem Eintrag: Ist das Ersatzverb wirklich präziser und bildstärker? Passt es zum Stil und Ton des Textes?`;
 }
 
@@ -105,6 +157,7 @@ Füllwort-Regeln (typ: «fuellwort»):
 - Nur melden, wenn das Streichen oder Ersetzen den Satz strafft, ohne Bedeutung oder Stimme zu verlieren — in Dialogen können Füllwörter bewusst eingesetzt sein
 - «original»: vollständiger Satz zeichengenau aus dem Text
 - «korrektur»: derselbe Satz ohne das Füllwort (oder mit knapperer Formulierung)
+- «erklaerung»: EIN Satz, nennt das Füllwort («überflüssiges «eigentlich»»)
 - Selbsttest: Verliert der Satz durch die Streichung an Rhythmus, Stimme oder Bedeutungsnuance? Dann weglassen.`;
 }
 
@@ -116,9 +169,10 @@ Show-vs-Tell-Regeln (typ: «show_vs_tell»):
   · «sein»/«fühlen»/«wirken» + Adjektiv für Innenleben: «Er war wütend», «Sie fühlte sich traurig», «Er wirkte nervös», «Sie schien erschöpft»
   · Zustandsverben mit Eigenschafts-Etikett: «Das Haus war alt», «Die Stimmung war gedrückt», «Es herrschte Stille»
   · Abstrakte Substantive als Subjekt oder Prädikatsnomen: «Die Schönheit der Landschaft überwältigte ihn», «Es war pure Trauer in ihren Augen», «Ein Gefühl der Einsamkeit erfasste sie»
-  · Erklärende Adverbien statt Handlung: «sagte er wütend», «antwortete sie traurig»
+  · Erklärende Adverbien statt Handlung: «sagte er wütend», «antwortete sie traurig» (ein EINZELNES solches Redebegleit-Adverb gehört hierher; erst die gehäufte Inquit-Adverb-Inflation über die Passage ist «ki_geruch»)
 - «original»: vollständiger Satz zeichengenau aus dem Text
 - «korrektur»: derselbe Satz umformuliert mit konkreten Sinneseindrücken, Handlungen, Körpersprache oder Details, die das Gleiche zeigen (NICHT der ganze Absatz – nur den einen Satz ersetzen)
+- «erklaerung»: EIN Satz, benennt das Telling («Gefühl benannt statt gezeigt», «erklärendes Inquit-Adverb statt Handlung»)
 - In direkter Rede / Dialog NICHT melden: Figuren dürfen abstrakt über ihre Gefühle sprechen («Ich bin müde»). Show-vs-Tell gilt ausschliesslich für Erzähltext.
 - Nur melden, wenn eine szenische Darstellung den Text spürbar lebendiger macht — nicht jede abstrakte Aussage muss umgeschrieben werden (z.B. in Zusammenfassungen, Rückblenden oder schnellen Übergängen ist Telling erlaubt und stilistisch korrekt)
 - Selbsttest: Passt die szenische Variante zum Erzähltempo und zur Szene? Nicht aufblähen. Würde die szenische Variante den Lesefluss bremsen, obwohl die Stelle gerade Tempo braucht? Dann weglassen.`;
@@ -132,6 +186,7 @@ Filterwort-Regeln (typ: «filterwort»):
 - Nicht melden, wenn die Wahrnehmung selbst der Punkt ist («Erst jetzt sah sie, dass …» – Erkenntnis ist Plot-Beat).
 - «original»: vollständiger Satz zeichengenau aus dem Text.
 - «korrektur»: derselbe Satz ohne Filter-Verb, mit der Wahrnehmungssache direkt geschildert.
+- «erklaerung»: EIN Satz, benennt das Filterverb («Wahrnehmungsverb «sah» schiebt sich zwischen Leser und Szene»).
 - Selbsttest: Wird das Filterverb gestrichen und das Wahrgenommene direkt erzählt, gewinnt der Satz an Unmittelbarkeit? Wenn nein → weglassen.`;
 }
 
@@ -143,6 +198,8 @@ Klischee-Regeln (typ: «klischee»):
 - In direkter Rede / Dialog NICHT melden: Figuren dürfen klischeehaft sprechen.
 - «original»: Phrase ODER vollständiger Satz zeichengenau aus dem Text (denselben Span-Typ in «korrektur» beibehalten).
 - «korrektur»: konkretes, frisches Bild oder schlichte Beschreibung – nicht das nächste Klischee.
+- Abgrenzung: abgenutzte, aber konkrete Bilder/Phrasen → «klischee»; hohle, generische LLM-Floskeln ohne Bodenhaftung («Reise zu sich selbst», «Symphonie der Gefühle») → «ki_geruch».
+- «erklaerung»: EIN Satz, benennt das Klischee («abgegriffene Metapher», «toter Vergleich», «gemischtes Bild»).
 - Selbsttest: Würde ein professioneller Lektor die Stelle als «zu abgegriffen» markieren? Bei Zweifel weglassen.`;
 }
 
@@ -154,6 +211,7 @@ Pleonasmus-Regeln (typ: «pleonasmus»):
 - Nicht melden, wenn die Doppelung als bewusste Verstärkung lesbar ist (Lyrik, ironisches Register, Figurenrede mit Charakterisierung).
 - «original»: die redundante Phrase zeichengenau aus dem Text (Span = Phrase).
 - «korrektur»: dieselbe Phrase ohne Redundanz – nur die nicht-überflüssige Komponente bleibt stehen.
+- «erklaerung»: EIN Satz, benennt die Redundanz («weisser Schimmel – ein Schimmel ist immer weiss»).
 - Selbsttest: Geht Information verloren, wenn der redundante Teil gestrichen wird? Wenn nein → melden.`;
 }
 
@@ -165,7 +223,7 @@ KI-Geruch-Regeln (typ: «ki_geruch»):
   · GENERIC-ADJEKTIVE: leere Intensitäts- und Bedeutungssteigerer ohne sinnliche Verankerung («atemberaubend», «überwältigend», «gewaltig», «sanft», «zart», «geheimnisvoll», «magisch», «episch», «wunderschön», «unendlich», «zeitlos», «pur», «rein», «kristallklar», «samtweich», «strahlend»). Vor allem in Häufung oder als Adjektiv-Kette mehrerer dieser Wörter im gleichen Satz/Absatz.
   · TRICOLA / PARALLELISMUS: dreigliedrige Aufzählung mit auffallend gleicher Satzlänge oder gleichem Bau («Er sah sie, er hörte sie, er fühlte sie.», «Die Stille. Die Leere. Die Kälte.», «Nicht aus Wut, nicht aus Trauer, nicht aus Verzweiflung.»). Typischer LLM-Rhythmus-Tic; vereinzelt vertretbar, gehäuft KI-Marker.
   · GENERISCHE METAPHERN: abstrakte Sinnbild-Phrasen ohne Bodenhaftung («Reise zu sich selbst», «Tanz des Schicksals», «Symphonie der Gefühle», «Echo der Vergangenheit», «Wandteppich der Zeit», «Faden der Erinnerung», «Spiegel der Seele», «Schleier des Vergessens», «Funke der Hoffnung»). Hohle Metapher-Floskeln, die auf alles und nichts passen.
-  · ERKLÄR-TICS / AUFGESETZTE BEDEUTSAMKEIT: Inquit-Adverbien-Inflation («sagte sie nachdenklich», «flüsterte er sanft», «erwiderte sie zögernd»), Bedeutungs-Präambeln («Mit jedem Atemzug ...», «In diesem Moment wusste sie ...», «Es war, als ob ...», «Tief in ihrem Inneren ...», «Etwas in ihr ...»), redundante Gefühls-Doppelung («ein Lächeln, das gleichzeitig Trauer und Hoffnung trug»).
+  · ERKLÄR-TICS / AUFGESETZTE BEDEUTSAMKEIT: Inquit-Adverbien-INFLATION (mehrere erklärende Redebegleit-Adverbien gehäuft in derselben Passage: «sagte sie nachdenklich» … «flüsterte er sanft» … «erwiderte sie zögernd» …; ein EINZELNES solches Adverb gehört zu «show_vs_tell», nicht hierher), Bedeutungs-Präambeln («Mit jedem Atemzug ...», «In diesem Moment wusste sie ...», «Es war, als ob ...», «Tief in ihrem Inneren ...», «Etwas in ihr ...»), redundante Gefühls-Doppelung («ein Lächeln, das gleichzeitig Trauer und Hoffnung trug»).
 - «original»: vollständiger Satz oder eindeutig abgrenzbare Phrase zeichengenau aus dem Text (denselben Span-Typ in «korrektur» beibehalten).
 - «korrektur»: konkrete Umformulierung mit sinnlicher Verankerung, präzisem Verb, eigener Stimme – nicht bloss kürzen, nicht das nächste KI-Muster.
 - «erklaerung»: EIN Satz, benennt das verletzte Muster («Generic-Adjektive ohne sinnliche Verankerung», «Tricola-Rhythmus mit drei parallelen Kola», «generische Metapher ohne Bodenhaftung», «Erklär-Inquit / aufgesetzte Bedeutsamkeit»).
@@ -250,9 +308,11 @@ Dialogformat-Regeln (typ: «dialogformat»):
 export function _buildPassivBlock() {
   return `
 Passivkonstruktionen-Regeln (typ: «passiv»):
-- Melde vermeidbare Passivkonstruktionen, die den Text schwerfällig oder unpersönlich machen.
+- Melde vermeidbare VORGANGSPASSIVE (werden + Partizip II), die den Text schwerfällig oder unpersönlich machen, weil das handelnde Subjekt verschwindet. Beispiel: «Die Tür wurde von ihr geöffnet.» → aktiv «Sie öffnete die Tür.»
+- NICHT melden: Zustandspassiv (sein + Partizip II), das einen Zustand statt einen Vorgang beschreibt («Die Tür war geschlossen.», «Das Fenster ist zerbrochen.») – meist legitim und kein Passiv im engeren Sinn.
 - «original»: vollständiger Satz, zeichengenau aus dem Text.
 - «korrektur»: derselbe Satz in aktiver Formulierung — benenne das handelnde Subjekt klar.
+- «erklaerung»: EIN Satz, benennt den Grund («Vorgangspassiv verschleiert das handelnde Subjekt – Aktiv ist klarer»).
 - In direkter Rede / Dialog: melde konservativer. Figuren-Passiv spiegelt oft Sprechgewohnheit oder Distanz – flagge nur, wenn die Stelle auch im Dialog hörbar holpert.
 - Melde nicht, wenn der Autor das Passiv bewusst setzt (Täter unbekannt/unwichtig, wissenschaftlicher Stil, Betonung auf dem Objekt) oder die Aktivform gezwungen klingt.
 - Selbsttest: Klingt deine Aktivformulierung klarer, lebendiger und natürlich im Kontext? Wenn nein → weglassen.`;

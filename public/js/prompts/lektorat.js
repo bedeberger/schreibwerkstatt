@@ -5,6 +5,7 @@
 import { _isLocal } from './state.js';
 import { _obj, _str } from './schema-utils.js';
 import {
+  _buildRechtschreibungBlock,
   _buildGrammatikBlock,
   _buildStilBlock,
   _buildSatzbauBlock,
@@ -173,7 +174,7 @@ SCHWERE-SCHWELLE (Anti-Pedanterie, Pflicht-Filter vor dem Aufnehmen ins «fehler
 - Melde NUR Schwächen, die einem ernsthaften Leser spürbar ins Auge fallen oder das Lese-Erlebnis nachweislich beeinträchtigen.
 - Selbsttest pro Eintrag: «Würde ein professioneller Lektor diese Stelle in einem bezahlten Lektorat anstreichen?» Wenn die Antwort «vielleicht», «Geschmacksache» oder «nur am Rand» wäre → weglassen.
 - VERWORFEN-Kandidaten: minimal alternative Synonyme ohne klaren Gewinn, Mikro-Stilpräferenzen, ein einzelnes «sehr» / «ein bisschen» wenn der Satz sonst rund läuft, vollkommen idiomatische Wendungen, regional übliche Formulierungen, ironisch oder bewusst eingesetzte «Schwächen».
-- MECHANISCHE FEHLER unterliegen der Schwere-Schwelle UND der Mengen-Obergrenze NICHT – sie werden IMMER und VOLLSTÄNDIG gemeldet, egal wie viele es sind: Rechtschreibung, Grammatik (Kongruenz, Kasus, Rektion, Verbformen, Modus), ZEICHENSETZUNG/INTERPUNKTION (fehlende oder falsch gesetzte Kommas, Satzschlusszeichen, Apostroph, Gedankenstrich), TEMPUSBRÜCHE (typ «tempuswechsel») und Dialogformat-Typografie (typ «dialogformat»). Das sind objektive Fehler, keine Geschmacksfragen – nie als «vielleicht» / «Geschmacksache» / «nur am Rand» abtun, nie wegen einer Obergrenze streichen.
+- MECHANISCHE FEHLER unterliegen der Schwere-Schwelle UND der Mengen-Obergrenze NICHT – sie werden IMMER und VOLLSTÄNDIG gemeldet, egal wie viele es sind: Rechtschreibung, Grammatik (Kongruenz, Kasus, Rektion, Verbformen, Modus), ZEICHENSETZUNG/INTERPUNKTION (fehlende oder falsch gesetzte Kommas, Satzschlusszeichen, Apostroph, Gedankenstrich), TEMPUSBRÜCHE (typ «tempuswechsel»), PERSPEKTIVBRÜCHE (typ «perspektivbruch») und Dialogformat-Typografie (typ «dialogformat»). Das sind objektive Fehler, keine Geschmacksfragen – nie als «vielleicht» / «Geschmacksache» / «nur am Rand» abtun, nie wegen einer Obergrenze streichen.
 - Die Schwere-Schwelle und die Mengen-Obergrenze gelten NUR für subjektive/stilistische Findings (stil, satzbau, schwaches_verb, fuellwort, filterwort, klischee, ki_geruch, show_vs_tell, passiv, pleonasmus, wiederholung). Dort gilt: lieber 5 starke, präzise Findings als 25 schwache. Wenn nach dem Selbsttest mehr als ~20 solcher stilistischen Einträge übrig bleiben, hart priorisieren: nur die schwersten ~20 behalten, restliche weglassen. Mechanische Fehler (oben) zählen NICHT gegen dieses Limit und werden nie gestrichen.
 `;
 
@@ -183,7 +184,7 @@ SCHWERE-SCHWELLE (Anti-Pedanterie, Pflicht-Filter vor dem Aufnehmen ins «fehler
   const selbstkontrollBlock = _isLocal ? '' : `
 SELBSTKONTROLL-PASS (Pflicht vor dem Antworten):
 Bevor du die JSON-Antwort ausgibst, gehe deine gesammelten Findings einmal durch und prüfe:
-1. SCHWERE: Hat jeder stilistische Eintrag den Selbsttest «professioneller Lektor anstreichen?» bestanden? Wenn nein → streichen. AUSNAHME: mechanische Fehler (rechtschreibung, grammatik inkl. Zeichensetzung/Interpunktion, tempuswechsel, dialogformat) bestehen diesen Test immer und werden NIE gestrichen – auch nicht, um unter eine Mengen-Obergrenze zu kommen.
+1. SCHWERE: Hat jeder stilistische Eintrag den Selbsttest «professioneller Lektor anstreichen?» bestanden? Wenn nein → streichen. AUSNAHME: mechanische Fehler (rechtschreibung, grammatik inkl. Zeichensetzung/Interpunktion, tempuswechsel, perspektivbruch, dialogformat) bestehen diesen Test immer und werden NIE gestrichen – auch nicht, um unter eine Mengen-Obergrenze zu kommen.
 2. DOPPELUNG: Überlappt «original» eines Eintrags textlich mit dem «original» eines anderen Eintrags? Wenn ja → nur den mit dem treffendsten Typ (gemäss Typ-Priorität oben) behalten.
 3. PURITÄT: Enthält «korrektur» Meta-Präfixe / Guillemets / Begründungs-Anhänge? Wenn ja → korrigieren oder Eintrag streichen.
 4. ZEICHENGENAUIGKEIT: Liesse sich «original» mit einem String-Find im Originaltext genau einmal finden? Wenn nein → korrigieren oder streichen.
@@ -272,7 +273,7 @@ Szenen-Regeln:
 
   const aufgabeSatz = _isLocal
     ? 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, Zeichensetzungs-/Interpunktionsfehler (insbesondere Kommasetzung), stilistische Auffälligkeiten und auffällige Wortwiederholungen. Prüfe Grammatik und Zeichensetzung Satz für Satz und gründlich.'
-    : 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, Zeichensetzungs-/Interpunktionsfehler (insbesondere Kommasetzung), Tempusbrüche, stilistische Auffälligkeiten und auffällige Wortwiederholungen. Prüfe Grammatik, Zeichensetzung und Erzähltempus Satz für Satz und gründlich – das sind objektive Fehler, die nicht übersehen werden dürfen. Bewerte ausserdem die Szenen der Seite.';
+    : 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, Zeichensetzungs-/Interpunktionsfehler (insbesondere Kommasetzung), Tempus- und Perspektivbrüche, holprigen Satzbau, stilistische Auffälligkeiten und auffällige Wortwiederholungen – ebenso auf schwache Verben, Füll- und Filterwörter, Klischees, KI-Geruch, Show-statt-Tell, vermeidbares Passiv, Dialogformat-Typografie und Konsistenz von Figuren und Schauplätzen (Zuständigkeit und Details der einzelnen Typen siehe Regelblöcke unten). Prüfe Grammatik, Zeichensetzung und Erzähltempus Satz für Satz und gründlich – das sind objektive Fehler, die nicht übersehen werden dürfen. Bewerte ausserdem die Szenen der Seite.';
 
   // XML-Wrapper für die strukturell trennbaren Sektionen — hilft Claude beim
   // Parsen von Aufgabe, Schema, Beispielen und Originaltext als distinkte
@@ -290,6 +291,7 @@ ${metaBlock}${povBlock}${wichtigBlock}${korrekturPuritaetBlock}${severityBlock}$
 ${schemaBlock}
 </output_format>
 ${beispielSection}${szenenRegelnBlock}
+${_buildRechtschreibungBlock(langCode)}
 ${_buildGrammatikBlock(langCode)}
 ${_buildStilBlock()}
 ${_buildWiederholungBlock(stopwords)}
