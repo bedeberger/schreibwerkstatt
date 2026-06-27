@@ -219,6 +219,9 @@ export {
   buildSystemResearchLink,
   buildResearchLinkPrompt,
   SCHEMA_RESEARCH_LINK,
+  buildResearchChatAgentSystemPrompt,
+  RESEARCH_CHAT_TOOLS,
+  RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION,
 } from './prompts/recherche.js';
 
 export {

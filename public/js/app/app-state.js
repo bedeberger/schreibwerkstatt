@@ -92,6 +92,11 @@ const shellState = () => ({
   // pausiert); ttsPaused = pausiert; ttsLoading = wartet auf Audio des aktuellen
   // Satzes; ttsIndex/ttsTotal = Satz-Fortschritt fuer die Status-Pille.
   ttsEnabled: false,
+  // Recherche-Chat (Panel in der Recherche-Karte). /config liefert
+  // `researchChat.enabled` (true wenn effektiver Provider Claude + API-Key gesetzt +
+  // Kill-Switch an). Blendet den Chat-Umschalter in der Recherche-Karte ein —
+  // Web-Suche gibt es nur über die Anthropic-API.
+  researchChatEnabled: false,
   // Atempause (ms) zwischen den vorgelesenen Fragmenten (aus /config, vom Admin
   // konfigurierbar). fragmentMs Satz-zu-Satz, paragraphMs an Absatzgrenzen; 0 =
   // keine Pause. Defaults mirroren die app-settings-Defaults.

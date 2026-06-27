@@ -134,6 +134,53 @@ router.get('/sessions/book/:book_id', (req, res) => {
   res.json(rows);
 });
 
+/** Neue Recherche-Chat-Session erstellen (kind='research', buchweit, editor+).
+ *  Claude-only — das Frontend öffnet sie nur, wenn der Provider Claude ist. */
+router.post('/session/research', jsonBody, (req, res) => {
+  const { book_name } = req.body;
+  const book_id = toIntId(req.body?.book_id);
+  const userEmail = req.session?.user?.email || null;
+  if (!book_id || !userEmail) return res.status(400).json({ error_code: 'BOOKID_LOGIN_REQ' });
+  setContext({ book: book_id });
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+
+  // Orphan-Cleanup analog zum Buch-Chat: leere, nie benutzte Sessions verwerfen.
+  const cleanup = db.prepare(`
+    DELETE FROM chat_sessions
+    WHERE book_id = ? AND kind = 'research' AND user_email = ?
+      AND created_at < datetime('now', '-60 seconds')
+      AND NOT EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id)
+  `).run(book_id, userEmail);
+  if (cleanup.changes > 0) logger.info(`[chat/session/research] Orphan-Cleanup: ${cleanup.changes} leere Session(s) für book=${book_id}.`);
+
+  upsertBookByName(book_id, book_name);
+  const now = new Date().toISOString();
+  const result = db.prepare(`
+    INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at)
+    VALUES (?, 'research', ?, ?, ?)
+  `).run(book_id, userEmail, now, now);
+  res.json({ id: result.lastInsertRowid });
+});
+
+/** Alle Recherche-Chat-Sessions eines Buchs (neueste zuerst, max. 20; leere ausgefiltert). */
+router.get('/sessions/research/:book_id', (req, res) => {
+  const userEmail = req.session?.user?.email || null;
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const rows = db.prepare(`
+    SELECT cs.id, cs.book_id, b.name AS book_name, cs.created_at, cs.last_message_at,
+           (SELECT content FROM chat_messages WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
+    FROM chat_sessions cs
+    LEFT JOIN books b ON b.book_id = cs.book_id
+    WHERE cs.book_id = ? AND cs.kind = 'research' AND cs.user_email = ?
+      AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = cs.id)
+    ORDER BY cs.last_message_at DESC
+    LIMIT 20
+  `).all(bookId, userEmail);
+  res.json(rows);
+});
+
 /** Alle Sessions einer Seite (neueste zuerst, max. 20).
  *  Siehe Kommentar oben — leere Sessions werden ausgefiltert. */
 router.get('/sessions/:page_id', (req, res) => {

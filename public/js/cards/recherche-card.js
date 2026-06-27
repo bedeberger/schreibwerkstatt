@@ -4,6 +4,7 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
 import { rechercheMethods } from '../book/recherche.js';
+import { researchChatMethods } from '../chat/research-chat.js';
 
 function _emptyDraft() {
   return { kind: 'note', title: '', body: '', url: '', source: '', tags: '', fileName: '' };
@@ -50,13 +51,25 @@ export function registerRechercheCard() {
     suggestStatus: '',
     _suggestTimer: null,
 
+    // Recherche-Chat-Panel (Claude-only, mit Web-Suche). Eigener Sub-State neben
+    // dem Board; Methoden aus researchChatMethods (makeChatMethods-Factory).
+    researchChatOpen: false,
+    researchChatSessions: [],
+    researchChatMessages: [],
+    researchChatSessionId: null,
+    researchChatInput: '',
+    researchChatLoading: false,
+    researchChatProgress: 0,
+    researchChatStatus: '',
+    _researchChatPollTimer: null,
+
     _lifecycle: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'recherche',
         showFlag: 'showRechercheCard',
-        timerKeys: ['_suggestTimer'],
+        timerKeys: ['_suggestTimer', '_researchChatPollTimer'],
         resetState: { creating: false, editingId: null, menuOpenId: null, linkPickerItemId: null, busy: false },
         load: () => this.loadRecherche(),
         extraListeners: [
@@ -65,9 +78,11 @@ export function registerRechercheCard() {
         ],
         onBookChanged: (e, ctx, root) => {
           this.resetRecherche();
+          this.resetResearchChat();
+          this.researchChatOpen = false;
           if (root.showRechercheCard && root.selectedBookId) this.loadRecherche();
         },
-        onViewReset: () => this.resetRecherche(),
+        onViewReset: () => { this.resetRecherche(); this.resetResearchChat(); this.researchChatOpen = false; },
       });
 
       // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit).
@@ -82,5 +97,6 @@ export function registerRechercheCard() {
     destroy() { this._lifecycle?.destroy(); },
 
     ...rechercheMethods,
+    ...researchChatMethods,
   }));
 }

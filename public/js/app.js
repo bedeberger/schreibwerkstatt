@@ -835,6 +835,7 @@ document.addEventListener('alpine:init', () => {
           };
         }
         this.ttsEnabled = !!cfg.tts?.enabled;
+        this.researchChatEnabled = !!cfg.researchChat?.enabled;
         if (cfg.tts?.pause) {
           const frag = Number(cfg.tts.pause.fragmentMs);
           const para = Number(cfg.tts.pause.paragraphMs);

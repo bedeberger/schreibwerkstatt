@@ -13,6 +13,7 @@ const {
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
 const { executeTool, validateFinalAnswerCitations } = require('./book-chat-tools');
+const { runResearchChatJob } = require('./research-chat');
 const { imageGenEnabled } = require('../../lib/image-gen');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
@@ -464,6 +465,9 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
     if (jobType === 'book-chat') {
       const bs = getBookSettings(session.book_id);
       minRole = bs?.allow_lektor_book_chat ? 'lektor' : 'editor';
+    } else if (jobType === 'research-chat') {
+      // Recherche-Board ist editor-scoped → Recherche-Chat ebenso.
+      minRole = 'editor';
     }
     try { requireBookAccess(req, session.book_id, minRole); }
     catch (e) {
@@ -853,6 +857,18 @@ chatRouter.post('/book-chat', jsonBody, (req, res) => _handleChatPost(req, res, 
     ? { key: 'job.label.bookChatBook', params: { name: s.book_name } }
     : { key: 'job.label.bookChat', params: null },
   runFn: runBookChatJobDispatch,
+}));
+
+chatRouter.post('/research-chat', jsonBody, (req, res) => _handleChatPost(req, res, {
+  jobType: 'research-chat',
+  sessionSelect: `SELECT cs.id, cs.book_id, b.name AS book_name
+                  FROM chat_sessions cs
+                  LEFT JOIN books b ON b.book_id = cs.book_id
+                  WHERE cs.id = ? AND cs.user_email = ? AND cs.kind = 'research'`,
+  labelFn: s => s.book_name
+    ? { key: 'job.label.researchChatBook', params: { name: s.book_name } }
+    : { key: 'job.label.researchChat', params: null },
+  runFn: runResearchChatJob,
 }));
 
 chatRouter.delete('/book-chat-cache', (req, res) => {

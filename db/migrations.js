@@ -8576,6 +8576,44 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 219 abgeschlossen (figures.stale — Reconcile-Markierung verschwundener Figuren).');
   }
 
+  if (version < 220) {
+    // chat_sessions.kind bekommt den dritten Wert 'research' fuer den Recherche-Chat
+    // (Claude-only, agentisch, mit Web-Suche; buchweit wie kind='book', page_id IS NULL).
+    // SQLite kann den CHECK nicht per ALTER aendern → Recreate-Pattern.
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      DROP TABLE IF EXISTS chat_sessions_new;
+      CREATE TABLE chat_sessions_new (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id           INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        kind              TEXT    NOT NULL DEFAULT 'page' CHECK(kind IN ('page','book','research')),
+        page_id           INTEGER REFERENCES pages(page_id) ON DELETE CASCADE,
+        user_email        TEXT    NOT NULL,
+        created_at        TEXT    NOT NULL,
+        last_message_at   TEXT    NOT NULL,
+        opening_page_text TEXT,
+        CHECK ((kind = 'page' AND page_id IS NOT NULL)
+            OR (kind IN ('book','research') AND page_id IS NULL))
+      );
+      INSERT INTO chat_sessions_new
+        (id, book_id, kind, page_id, user_email, created_at, last_message_at, opening_page_text)
+      SELECT id, book_id, kind, page_id, user_email, created_at, last_message_at, opening_page_text
+      FROM chat_sessions;
+      DROP TABLE chat_sessions;
+      ALTER TABLE chat_sessions_new RENAME TO chat_sessions;
+      CREATE INDEX idx_cs_page_id ON chat_sessions(page_id, user_email);
+      CREATE INDEX idx_cs_book_id ON chat_sessions(book_id, user_email);
+      CREATE INDEX idx_cs_kind    ON chat_sessions(book_id, user_email, kind);
+    `);
+    db.pragma('foreign_keys = ON');
+    const fkErrors220 = db.pragma('foreign_key_check');
+    if (fkErrors220.length) {
+      throw new Error(`Migration 220: foreign_key_check meldet ${fkErrors220.length} Verstoesse: ${JSON.stringify(fkErrors220.slice(0, 5))}`);
+    }
+    db.prepare('UPDATE schema_version SET version = 220').run();
+    logger.info("DB-Migration auf Version 220 abgeschlossen (chat_sessions.kind erlaubt 'research' — Recherche-Chat).");
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

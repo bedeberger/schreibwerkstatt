@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const logger = require('../logger');
 const avatarCache = require('../lib/avatar-cache');
-const { MAX_TOKENS_OUT, CHARS_PER_TOKEN } = require('../lib/ai');
+const { MAX_TOKENS_OUT, CHARS_PER_TOKEN, resolveProvider } = require('../lib/ai');
 const { getBookLocale } = require('../db/schema');
 const appUsers = require('../db/app-users');
 const { getPromptConfig } = require('../lib/prompts-loader');
@@ -113,6 +113,15 @@ router.get('/config', (req, res) => {
     mapTiles: {
       url: tileFrontendUrl(),
       attribution: String(appSettings.get('geocode.tiles.attribution') || '').trim(),
+    },
+    // Recherche-Chat (agentisch, mit Web-Suche) — Claude-only. Das Panel in der
+    // Recherche-Karte erscheint nur, wenn der EFFEKTIVE Provider dieses Users Claude
+    // ist (Web-Suche gibt es nur über die Anthropic-API), ein API-Key gesetzt ist und
+    // der Admin-Kill-Switch nicht auf false steht (Default an).
+    researchChat: {
+      enabled: appSettings.get('research_chat.enabled') !== false
+        && (sessionUser ? resolveProvider({ userEmail: sessionUser.email }) : (appSettings.get('ai.provider') || 'claude')) === 'claude'
+        && !!String(appSettings.get('ai.claude.api_key') || '').trim(),
     },
   });
 });
