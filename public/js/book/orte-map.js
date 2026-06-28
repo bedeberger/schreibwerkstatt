@@ -70,6 +70,16 @@ export const orteMapMethods = {
     setTimeout(() => this._map?.invalidateSize(), 0);
   },
 
+  // Marker nach einer Filteraenderung neu zeichnen (nur im Karten-Tab, Map muss
+  // stehen). Leaflet ist dann garantiert geladen (this._map existiert ⇒ window.L
+  // gesetzt), darum kein loadLeaflet-await noetig. Gekoppelt via $watch in
+  // orte-card.js — ohne diesen Pfad bleiben die Marker nach Such-/Filter-Reset
+  // stehen, waehrend die Locate-Liste (x-for orteFiltered) schon gefiltert ist.
+  refreshOrteMarkersForFilter() {
+    if (this.viewMode !== 'map' || !this._map) return;
+    this._renderOrteMarkers(window.L);
+  },
+
   _renderOrteMarkers(L) {
     if (!this._map || !this._markers) return;
     this._markers.clearLayers();

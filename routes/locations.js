@@ -47,6 +47,25 @@ router.get('/:book_id', (req, res) => {
   const kapMap = {};
   for (const lc of lcRows) (kapMap[lc.location_id] ??= []).push({ chapter_id: lc.chapter_id, name: lc.chapter_name, haeufigkeit: lc.haeufigkeit });
 
+  // Fallback-Kapitel: hat ein Ort keine expliziten location_chapters, aber eine
+  // Erste-Erwähnung-Seite, leiten wir das Kapitel aus deren chapter_id ab –
+  // dieselbe Quelle, die location_chapters bei Szenen-/Seitenbezug ohnehin nutzt.
+  const derivePageIds = [...new Set(
+    rows.filter(r => !kapMap[r.id] && r.erste_erwaehnung_page_id)
+        .map(r => r.erste_erwaehnung_page_id)
+  )];
+  const pageChapterMap = {};
+  if (derivePageIds.length) {
+    const { sql: pgSql, values: pgVals } = inClause(derivePageIds);
+    const pcRows = db.prepare(`
+      SELECT p.page_id, p.chapter_id, c.chapter_name
+      FROM pages p
+      JOIN chapters c ON c.chapter_id = p.chapter_id
+      WHERE p.page_id IN ${pgSql}
+    `).all(...pgVals);
+    for (const pc of pcRows) pageChapterMap[pc.page_id] = { chapter_id: pc.chapter_id, name: pc.chapter_name, haeufigkeit: 1, derived: true };
+  }
+
   const orte = rows.map(r => ({
     id:                       r.loc_id,
     stale:                    !!r.stale,
@@ -62,7 +81,7 @@ router.get('/:book_id', (req, res) => {
     geo_query:                r.geo_query || null,
     geo_land:                 r.geo_land || null,
     figuren:                  figMap[r.id] || [],
-    kapitel:                  kapMap[r.id] || [],
+    kapitel:                  kapMap[r.id] || (pageChapterMap[r.erste_erwaehnung_page_id] ? [pageChapterMap[r.erste_erwaehnung_page_id]] : []),
   }));
 
   res.json({ orte, updated_at: rows[0]?.updated_at || null });

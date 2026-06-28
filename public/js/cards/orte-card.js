@@ -41,6 +41,15 @@ export function registerOrteCard() {
         if (v === 'list' || v === 'grid') localStorage.setItem('orte.viewMode', v);
         if (v === 'map') this.ensureOrteMap();
       });
+      // Karten-Marker reaktiv an den Filter koppeln. orteFiltered ist die
+      // Marker-Quelle, aber Leaflet zeichnet imperativ — ohne Watch bleiben die
+      // Marker nach Such-/Filteraenderung (inkl. Reset) stehen, waehrend die
+      // Locate-Liste schon gefiltert ist. Signatur ueber die gefilterten ids
+      // feuert nur bei echter Mengenaenderung (Drag/Geocode rendern selbst).
+      this.$watch(
+        () => window.__app.orteFiltered.map(o => o.id).join(','),
+        () => this.refreshOrteMarkersForFilter(),
+      );
       this._lifecycle = setupCardLifecycle(this, {
         name: 'orte',
         showFlag: 'showOrteCard',
