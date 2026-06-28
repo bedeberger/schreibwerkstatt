@@ -16,8 +16,10 @@
 //    kohärente Generation; die Netzkopie wird nur als Notnagel ungecacht
 //    durchgereicht.
 //  - Nicht-kritische Shell-Assets (vendor/*, fonts/*): self-contained,
-//    versionsstabil → klassisch Cache-First mit Netz-Fallback (kein Skew auf
-//    App-Feldern möglich).
+//    versionsstabil → eigener VENDOR_CACHE (NICHT an SHELL_BUILD gekoppelt),
+//    Cache-First mit Netz-Fallback. Da der Cache-Name generationsunabhängig ist,
+//    überleben diese ~2.8 MB jeden Deploy, statt bei jedem Generationswechsel
+//    neu vom Netz gezogen zu werden (kein Skew auf App-Feldern möglich).
 //  - SHELL_CACHE-Name leitet sich aus dem Content-Hash (__SHELL_BUILD) ab:
 //    jede Asset-Änderung erzeugt automatisch eine neue Generation — kein
 //    manueller Versions-Bump mehr. Regeneriert via `npm run sw:manifest`
@@ -38,7 +40,10 @@ const MANIFEST_SET = new Set(SHELL_MANIFEST);
 const SHELL_CACHE = 'schreibwerkstatt-shell-' + SHELL_BUILD;
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
-const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE]);
+// Versionsstabile Assets (vendor/*, fonts/*) leben generationsunabhängig hier,
+// damit sie nicht bei jedem Deploy mit dem SHELL_CACHE weggeworfen werden.
+const VENDOR_CACHE = 'schreibwerkstatt-vendor-v1';
+const ACTIVE_CACHES = new Set([SHELL_CACHE, CONTENT_CACHE, CONFIG_CACHE, VENDOR_CACHE]);
 const SHELL_PATH = '/index.html';
 const CONFIG_PATH = '/config';
 
@@ -63,6 +68,7 @@ const NEVER_CACHE_PREFIXES = [
 
 const SHELL_ASSET_REGEX = /\.(?:css|js|mjs|json|svg|ico|png|woff2?)$/i;
 const PARTIAL_REGEX = /^\/partials\//;
+const VERSION_STABLE_REGEX = /^\/(?:vendor|fonts)\//;
 
 // /js/plausible-init.js wird vom Server dynamisch aus app_settings gerendert
 // (Plausible an/aus + URL). Niemals cachen, sonst greift Admin-Toggle nicht
@@ -78,21 +84,41 @@ function isShellRequest(url) {
 }
 
 function isNeverCache(url) {
-  return NEVER_CACHE_PREFIXES.some(p => url.pathname === p || url.pathname.startsWith(p + '/') || url.pathname.startsWith(p));
+  // Exakter Pfad oder echter Unterpfad (mit Slash). Kein nackter Prefix-Match —
+  // sonst würde z.B. `/searchbar` fälschlich als `/search` gewertet.
+  return NEVER_CACHE_PREFIXES.some(p => url.pathname === p || url.pathname.startsWith(p + '/'));
+}
+
+// Atomarer Precache mit Backoff-Retry. `cache.addAll` ist all-or-nothing: ein
+// einziger fehlgeschlagener von ~480 Requests rejectet den ganzen Satz und
+// committet nichts (kein halb gefüllter Cache). Genau im schlechten Netz (= das
+// Zielszenario) reicht ein transienter Fehler, um ein Update nie zu installieren.
+// Darum mehrere Versuche mit wachsender Pause; bleibt es nach `attempts` beim
+// Fehler, propagiert der letzte Error und der Install scheitert sauber — der alte
+// SW bedient seinen eigenen, kohärenten Satz unverändert weiter.
+async function precacheWithRetry(cache, paths, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await cache.addAll(paths.map(p => new Request(p, { cache: 'reload' })));
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) await new Promise(r => setTimeout(r, 500 * (i + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL_CACHE);
     // Den VOLLSTÄNDIGEN kohärenz-kritischen Asset-Satz dieser Generation ATOMAR
-    // vorcachen: App-JS + Partials + App-CSS + i18n + Icon-Sprite. `addAll` ist
-    // all-or-nothing — scheitert ein Request, rejecten wir den Install und der
-    // alte SW bedient seinen eigenen, kohärenten Satz unverändert weiter (kein
-    // halb gefüllter Cache). So zieht zur Laufzeit nie ein lazy-gefetchtes Partial
-    // / dynamisch importiertes Modul eine fremde Generation vom Netz. `cache:
-    // 'reload'` umgeht den HTTP-Cache, damit der Precache wirklich diese Generation
-    // holt.
-    await cache.addAll(SHELL_MANIFEST.map(p => new Request(p, { cache: 'reload' })));
+    // vorcachen: App-JS + Partials + App-CSS + i18n + Icon-Sprite. So zieht zur
+    // Laufzeit nie ein lazy-gefetchtes Partial / dynamisch importiertes Modul eine
+    // fremde Generation vom Netz. `cache: 'reload'` umgeht den HTTP-Cache, damit
+    // der Precache wirklich diese Generation holt.
+    await precacheWithRetry(cache, SHELL_MANIFEST);
     // Einstiegspunkt (SPA-Shell) best-effort dazu — nicht im Manifest, da
     // index.html SWR-bedient wird; offline-Install scheitert hier lautlos.
     try { await cache.add(new Request('/', { cache: 'reload' })); } catch {}
@@ -162,6 +188,22 @@ async function notifyIncoherent(pathname) {
 // versionsstabil, kein Skew auf App-Feldern möglich → klassisch Cache-First mit
 // Netz-Fallback (lazy nachladbar, auch nach Eviction).
 async function handleShellAsset(req, url) {
+  // Versionsstabile Assets (vendor/*, fonts/*) liegen im generationsunabhängigen
+  // VENDOR_CACHE → ein Hit überlebt jeden Deploy, kein erneuter Netz-Fetch beim
+  // Generationswechsel. Kein Skew möglich (self-contained, kein App-Feld-Bezug).
+  if (VERSION_STABLE_REGEX.test(url.pathname)) {
+    const vcache = await caches.open(VENDOR_CACHE);
+    const vhit = await vcache.match(req);
+    if (vhit) return vhit;
+    try {
+      const net = await fetch(req);
+      if (net && net.ok) vcache.put(req, net.clone());
+      return net;
+    } catch {
+      return new Response('Offline', { status: 503 });
+    }
+  }
+
   const cache = await caches.open(SHELL_CACHE);
   const cached = await cache.match(req);
   if (cached) return cached;

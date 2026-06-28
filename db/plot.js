@@ -206,6 +206,14 @@ const _stmtListFigsForBook = db.prepare(`
     JOIN figures   f ON f.id = pbf.figure_id
    WHERE b.book_id = ? AND b.user_email = ?
 `);
+// Figuren EINES Beats (für _beatRow ohne vorgebaute Buch-Map — verhindert den
+// buchweiten Link-Scan bei jeder Einzel-Beat-Mutation/-Lesung).
+const _stmtFigsForBeat = db.prepare(`
+  SELECT f.fig_id AS fig_id
+    FROM plot_beat_figures pbf
+    JOIN figures f ON f.id = pbf.figure_id
+   WHERE pbf.beat_id = ?
+`);
 const _stmtDeleteFigsForBeat = db.prepare('DELETE FROM plot_beat_figures WHERE beat_id = ?');
 const _stmtInsertFig = db.prepare('INSERT OR IGNORE INTO plot_beat_figures (beat_id, figure_id) VALUES (?, ?)');
 
@@ -217,6 +225,12 @@ const _stmtListDraftFigsForBook = db.prepare(`
     FROM plot_beat_draft_figures pbdf
     JOIN plot_beats b ON b.id = pbdf.beat_id
    WHERE b.book_id = ? AND b.user_email = ?
+`);
+// Werkstatt-Figuren EINES Beats (Pendant zu _stmtFigsForBeat).
+const _stmtDraftFigsForBeat = db.prepare(`
+  SELECT pbdf.draft_figure_id AS draft_id
+    FROM plot_beat_draft_figures pbdf
+   WHERE pbdf.beat_id = ?
 `);
 const _stmtDeleteDraftFigsForBeat = db.prepare('DELETE FROM plot_beat_draft_figures WHERE beat_id = ?');
 const _stmtInsertDraftFig = db.prepare('INSERT OR IGNORE INTO plot_beat_draft_figures (beat_id, draft_figure_id) VALUES (?, ?)');
@@ -282,8 +296,10 @@ function _setBeatDraftFigures(beatId, draftFigureIds) {
 function _beatRow(beatId, figMap = null, draftFigMap = null) {
   const r = _stmtGetBeat.get(parseInt(beatId));
   if (!r) return null;
-  const figs = figMap ? (figMap[r.id] || []) : _figMapForBook(r.book_id, r.user_email)[r.id] || [];
-  const draftFigs = draftFigMap ? (draftFigMap[r.id] || []) : _draftFigMapForBook(r.book_id, r.user_email)[r.id] || [];
+  // Ohne vorgebaute Buch-Map (Einzel-Beat-Pfad) gezielt nur die Links DIESES
+  // Beats laden — kein buchweiter Scan pro Mutation/Lesung.
+  const figs = figMap ? (figMap[r.id] || []) : _stmtFigsForBeat.all(r.id).map(x => x.fig_id);
+  const draftFigs = draftFigMap ? (draftFigMap[r.id] || []) : _stmtDraftFigsForBeat.all(r.id).map(x => x.draft_id);
   return { ...r, fig_ids: figs, draft_fig_ids: draftFigs };
 }
 
@@ -329,6 +345,14 @@ const updateBeat = db.transaction((id, fields, figureIds, draftFigureIds) => {
 
 function getBeat(id) {
   return _beatRow(id);
+}
+
+// Leichtgewichtiger Beat-Stamm (ohne Figuren-Arrays) für Owner-/Scope-Checks in
+// den Routen. Trägt book_id/user_email/act_id/thread_id — alles, was die
+// PATCH/DELETE-Handler zur Autorisierung + Hybrid-Akt-Prüfung brauchen, ohne den
+// (per Beat sonst günstigen, aber unnötigen) Figuren-Aufbau von getBeat.
+function getBeatMeta(id) {
+  return _stmtGetBeat.get(parseInt(id)) || null;
 }
 
 // Map page_id → Anzahl nicht-verworfener Beats, die mit dem Kapitel der Seite
@@ -558,7 +582,7 @@ const unforkThreadActs = db.transaction((bookId, userEmail, threadId) => {
 
 const _stmtInsertConsistencyRun = db.prepare(`
   INSERT INTO plot_consistency_runs (book_id, user_email, created_at, konflikt_count, result_json, model)
-  VALUES (?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ${NOW_ISO_SQL}, ?, ?, ?)
 `);
 const _stmtListConsistencyRuns = db.prepare(`
   SELECT id, book_id, created_at, konflikt_count, model
@@ -574,9 +598,8 @@ const _stmtGetConsistencyRun = db.prepare(`
 const _stmtDeleteConsistencyRun = db.prepare('DELETE FROM plot_consistency_runs WHERE id = ? AND user_email = ?');
 
 function insertPlotConsistencyRun({ bookId, userEmail, konfliktCount = 0, result, model = null }) {
-  const now = new Date().toISOString();
   const info = _stmtInsertConsistencyRun.run(
-    parseInt(bookId), userEmail, now, parseInt(konfliktCount) || 0, JSON.stringify(result), model
+    parseInt(bookId), userEmail, parseInt(konfliktCount) || 0, JSON.stringify(result), model
   );
   return info.lastInsertRowid;
 }
@@ -611,7 +634,7 @@ function deletePlotConsistencyRun(id, userEmail) {
 
 const _stmtInsertBrainstormRun = db.prepare(`
   INSERT INTO plot_brainstorm_runs (book_id, user_email, act_id, thread_id, created_at, vorschlag_count, result_json, model)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ${NOW_ISO_SQL}, ?, ?, ?)
 `);
 const _stmtListBrainstormRuns = db.prepare(`
   SELECT r.id, r.book_id, r.act_id, r.thread_id, r.created_at, r.vorschlag_count, r.model,
@@ -633,12 +656,11 @@ const _stmtGetBrainstormRun = db.prepare(`
 const _stmtDeleteBrainstormRun = db.prepare('DELETE FROM plot_brainstorm_runs WHERE id = ? AND user_email = ?');
 
 function insertPlotBrainstormRun({ bookId, userEmail, actId = null, threadId = null, vorschlagCount = 0, result, model = null }) {
-  const now = new Date().toISOString();
   const info = _stmtInsertBrainstormRun.run(
     parseInt(bookId), userEmail,
     actId != null ? parseInt(actId) : null,
     threadId != null ? parseInt(threadId) : null,
-    now, parseInt(vorschlagCount) || 0, JSON.stringify(result), model
+    parseInt(vorschlagCount) || 0, JSON.stringify(result), model
   );
   return info.lastInsertRowid;
 }
@@ -668,7 +690,7 @@ module.exports = {
   listActs, getAct, createAct, updateAct, deleteAct, reorderActs,
   threadHasOwnActs, forkThreadActs, unforkThreadActs,
   listThreads, getThread, createThread, updateThread, deleteThread, reorderThreads, _validThreadId,
-  listBeats, getBeat, createBeat, updateBeat, deleteBeat, reorderBeats, pageBeatCounts, chapterBeatCounts,
+  listBeats, getBeat, getBeatMeta, createBeat, updateBeat, deleteBeat, reorderBeats, pageBeatCounts, chapterBeatCounts,
   figurePlotUsage,
   resolveFigureIds, resolveDraftFigureIds,
   insertPlotConsistencyRun, listPlotConsistencyRuns, getPlotConsistencyRun, deletePlotConsistencyRun,

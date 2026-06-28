@@ -146,7 +146,12 @@ if ('serviceWorker' in navigator) {
         // einspielt; v.a. auf Mobile (Tab im Hintergrund / SW gekillt) sieht
         // der User Frontend-Updates dann nie. 60s ist günstig: minimale
         // Bandbreite (nur sw.js wird revalidiert), schnelle Sichtbarkeit.
-        setInterval(() => { reg.update().catch(() => {}); }, 60_000);
+        // Im versteckten Tab pausieren (Funk/Akku auf Mobile) und beim
+        // Wiedersichtbarwerden einmal sofort nachholen.
+        setInterval(() => { if (!document.hidden) reg.update().catch(() => {}); }, 60_000);
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) reg.update().catch(() => {});
+        });
         const notify = (worker) => {
           if (!worker || !navigator.serviceWorker.controller) return;
           window.__pendingWorker = worker;
