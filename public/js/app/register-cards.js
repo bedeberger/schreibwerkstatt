@@ -7,6 +7,7 @@ import { registerBookOverviewCard } from '../cards/book-overview-card.js';
 import { registerBookStatsCard } from '../cards/book-stats-card.js';
 import { registerCatalogStore } from '../cards/catalog-store.js';
 import { registerNavStore } from '../cards/nav-store.js';
+import { registerTtsStore } from '../cards/tts-store.js';
 import { registerEreignisseCard } from '../cards/ereignisse-card.js';
 import { registerOrteCard } from '../cards/orte-card.js';
 import { registerSongsCard } from '../cards/songs-card.js';
@@ -105,6 +106,7 @@ export function registerAppMagics() {
 export function registerAllCards() {
   registerCatalogStore();
   registerNavStore();
+  registerTtsStore();
   registerStilCard();
   registerFehlerHeatmapCard();
   registerBookOverviewCard();

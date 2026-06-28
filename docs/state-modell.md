@@ -6,7 +6,10 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
 
 1. **Root `Alpine.data('lektorat')`** ([public/js/app.js:254](../public/js/app.js#L254)) — `x-data="lektorat"` am `<body>`. SSoT für: Navigation, Session/Shell, i18n-Locale, **alle `showXxxCard`-Flags** (Hash-Router + Exklusivität), Job-Queue, Editor-Edit-Mode, Auto-Save, Selection. Cross-Cutting-Methoden: `t/tRaw`, `bsGet/bsGetAll`, `loadFiguren/loadOrte/loadSzenen`, `selectPage`, `gotoStelle`, `_closeOtherMainCards`.
 2. **Sub-Komponenten `Alpine.data('xxxCard')`** in [public/js/cards/](../public/js/cards/) — eine pro UI-Card. Eigener fachlicher State + `init()`/`destroy()`. Karten haben **keine** eigenen `showXxxCard`-Flags (Root ist SSoT); sie hören via `$watch(() => window.__app.showXxxCard)` auf Öffnen/Schliessen.
-3. **`Alpine.store('catalog')`** ([public/js/cards/catalog-store.js](../public/js/cards/catalog-store.js)) — geteilte Fach-Daten `figuren / orte / songs / szenen / globalZeitstrahl`. Root spiegelt sie via Getter/Setter-Proxy ([public/js/app.js:268-277](../public/js/app.js#L268-L277)), damit `this.figuren = …` und `this.figuren.push(…)` weiter funktionieren. Karten lesen via `$store.catalog` oder `$app.figuren`.
+3. **`Alpine.store(...)`** — geteilte, benannte State-Inseln, die der Root jeweils via Getter/Setter-Proxy (in [public/js/app.js](../public/js/app.js)) unter den gewohnten Namen spiegelt, damit `this.x = …` aus Root-Methoden und bare/`$app`-Template-Bindings unverändert funktionieren. Karten greifen direkt via `$store.<name>` zu (sichtbare Abhängigkeit statt ambient `window.__app`):
+   - **`catalog`** ([catalog-store.js](../public/js/cards/catalog-store.js)) — Fach-Daten `figuren / orte / songs / szenen / globalZeitstrahl / zeitstrahlChronology`. Proxy behält die Key-Namen.
+   - **`nav`** ([nav-store.js](../public/js/cards/nav-store.js)) — Navigations-State `books / selectedBookId / pages / tree` (von ~29 Modulen gelesen). Proxy behält die Key-Namen.
+   - **`tts`** ([tts-store.js](../public/js/cards/tts-store.js)) — TTS/Proof-Listening `enabled / pause / playing / paused / loading / index / total`. Store-Name liefert den Namespace → Keys ohne `tts`-Präfix; Root-Proxy mappt auf `ttsEnabled / ttsPlaying / …`.
 
 ## Root-State-Slices ([public/js/app/app-state.js](../public/js/app/app-state.js))
 

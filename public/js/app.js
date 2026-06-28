@@ -93,6 +93,25 @@ document.addEventListener('alpine:init', () => {
     get tree() { return Alpine.store('nav').tree; },
     set tree(v) { Alpine.store('nav').tree = v; },
 
+    // ── TTS-Proxy ──────────────────────────────────────────────────────────────
+    // TTS/Proof-Listening-State lebt in Alpine.store('tts'). Root exponiert ihn
+    // unter den gewohnten Namen (this.ttsPlaying = …), damit tts-proof.js und die
+    // bare Template-Bindings unverändert bleiben. Karten greifen via $store.tts zu.
+    get ttsEnabled() { return Alpine.store('tts').enabled; },
+    set ttsEnabled(v) { Alpine.store('tts').enabled = v; },
+    get ttsPause() { return Alpine.store('tts').pause; },
+    set ttsPause(v) { Alpine.store('tts').pause = v; },
+    get ttsPlaying() { return Alpine.store('tts').playing; },
+    set ttsPlaying(v) { Alpine.store('tts').playing = v; },
+    get ttsPaused() { return Alpine.store('tts').paused; },
+    set ttsPaused(v) { Alpine.store('tts').paused = v; },
+    get ttsLoading() { return Alpine.store('tts').loading; },
+    set ttsLoading(v) { Alpine.store('tts').loading = v; },
+    get ttsIndex() { return Alpine.store('tts').index; },
+    set ttsIndex(v) { Alpine.store('tts').index = v; },
+    get ttsTotal() { return Alpine.store('tts').total; },
+    set ttsTotal(v) { Alpine.store('tts').total = v; },
+
     // ── Computed ─────────────────────────────────────────────────────────────
     // Admin-only View: Globaler Admin (global_role='admin') bekommt eine
     // reduzierte Oberfläche — keine Sidebar, keine Buchwahl, nur Admin-Tiles

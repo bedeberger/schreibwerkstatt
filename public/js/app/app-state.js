@@ -85,27 +85,13 @@ const shellState = () => ({
   // Caret-Position, sonst haengt es ans Editorende an. Auto-Fokus beim Öffnen
   // des Edit-Modus zaehlt NICHT (in startEdit auf false zurueckgesetzt).
   sttCaretUserSet: false,
-  // TTS / Proof-Listening (Notebook-Seitenansicht, Read-Modus). /config liefert
-  // `tts.enabled` (true wenn Admin enabled + Host gesetzt). Blendet den
-  // Vorlese-Dock in der Leseansicht ein. Voice/Speed/Format loest der /tts/speak-Proxy serverseitig
-  // auf — kein Frontend-State dafuer. ttsPlaying = Session aktiv (inkl.
-  // pausiert); ttsPaused = pausiert; ttsLoading = wartet auf Audio des aktuellen
-  // Satzes; ttsIndex/ttsTotal = Satz-Fortschritt fuer die Status-Pille.
-  ttsEnabled: false,
+  // TTS / Proof-Listening State lebt in Alpine.store('tts') (cards/tts-store.js);
+  // der Root proxied es als this.ttsEnabled/ttsPlaying/… (app.js).
   // Recherche-Chat (Panel in der Recherche-Karte). /config liefert
   // `researchChat.enabled` (true wenn effektiver Provider Claude + API-Key gesetzt +
   // Kill-Switch an). Blendet den Chat-Umschalter in der Recherche-Karte ein —
   // Web-Suche gibt es nur über die Anthropic-API.
   researchChatEnabled: false,
-  // Atempause (ms) zwischen den vorgelesenen Fragmenten (aus /config, vom Admin
-  // konfigurierbar). fragmentMs Satz-zu-Satz, paragraphMs an Absatzgrenzen; 0 =
-  // keine Pause. Defaults mirroren die app-settings-Defaults.
-  ttsPause: { fragmentMs: 250, paragraphMs: 550 },
-  ttsPlaying: false,
-  ttsPaused: false,
-  ttsLoading: false,
-  ttsIndex: 0,
-  ttsTotal: 0,
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).
