@@ -61,24 +61,6 @@ document.addEventListener('alpine:init', () => {
     // ── State ────────────────────────────────────────────────────────────────
     ...initialLektoratState(),
 
-    // ── Catalog-Proxy ────────────────────────────────────────────────────────
-    // Figuren, Orte, Szenen, globalZeitstrahl leben in Alpine.store('catalog').
-    // Root exponiert sie als direkt adressierbare Properties, damit this.figuren=
-    // / this.orte.push weiter funktionieren. Karten können auch direkt via
-    // $store.catalog zugreifen.
-    get figuren() { return Alpine.store('catalog').figuren; },
-    set figuren(v) { Alpine.store('catalog').figuren = v; },
-    get orte() { return Alpine.store('catalog').orte; },
-    set orte(v) { Alpine.store('catalog').orte = v; },
-    get songs() { return Alpine.store('catalog').songs; },
-    set songs(v) { Alpine.store('catalog').songs = v; },
-    get szenen() { return Alpine.store('catalog').szenen; },
-    set szenen(v) { Alpine.store('catalog').szenen = v; },
-    get globalZeitstrahl() { return Alpine.store('catalog').globalZeitstrahl; },
-    set globalZeitstrahl(v) { Alpine.store('catalog').globalZeitstrahl = v; },
-    get zeitstrahlChronology() { return Alpine.store('catalog').zeitstrahlChronology; },
-    set zeitstrahlChronology(v) { Alpine.store('catalog').zeitstrahlChronology = v; },
-
     // ── Nav-Proxy ──────────────────────────────────────────────────────────────
     // books, selectedBookId, pages, tree leben in Alpine.store('nav') (geteilt
     // mit ~29 Reader-Modulen). Root exponiert sie als direkt adressierbare
@@ -106,30 +88,30 @@ document.addEventListener('alpine:init', () => {
     // (figuren.html, orte.html, szenen.html) ersetzen diese ein vielfaches
     // `.find(x => x.id === id)` pro Zeile durch einen Map-Lookup.
     get figurenById() {
-      if (this._figMapRef !== this.figuren) {
-        this._figMapRef = this.figuren;
-        this._figMap = new Map((this.figuren || []).map(f => [f.id, f]));
+      if (this._figMapRef !== this.$store.catalog.figuren) {
+        this._figMapRef = this.$store.catalog.figuren;
+        this._figMap = new Map((this.$store.catalog.figuren || []).map(f => [f.id, f]));
       }
       return this._figMap;
     },
     get orteById() {
-      if (this._ortMapRef !== this.orte) {
-        this._ortMapRef = this.orte;
-        this._ortMap = new Map((this.orte || []).map(o => [o.id, o]));
+      if (this._ortMapRef !== this.$store.catalog.orte) {
+        this._ortMapRef = this.$store.catalog.orte;
+        this._ortMap = new Map((this.$store.catalog.orte || []).map(o => [o.id, o]));
       }
       return this._ortMap;
     },
     get szenenById() {
-      if (this._szeneMapRef !== this.szenen) {
-        this._szeneMapRef = this.szenen;
-        this._szeneMap = new Map((this.szenen || []).map(s => [s.id, s]));
+      if (this._szeneMapRef !== this.$store.catalog.szenen) {
+        this._szeneMapRef = this.$store.catalog.szenen;
+        this._szeneMap = new Map((this.$store.catalog.szenen || []).map(s => [s.id, s]));
       }
       return this._szeneMap;
     },
 
     get szenenNachKapitel() {
       const map = new Map();
-      for (const s of this.szenen) {
+      for (const s of this.$store.catalog.szenen) {
         if (!s.kapitel) continue;
         if (!map.has(s.kapitel)) map.set(s.kapitel, { total: 0, stark: 0, mittel: 0, schwach: 0 });
         const e = map.get(s.kapitel);
@@ -143,7 +125,7 @@ document.addEventListener('alpine:init', () => {
     },
     get szenenNachSeite() {
       const map = new Map();
-      for (const s of this.szenen) {
+      for (const s of this.$store.catalog.szenen) {
         if (!s.seite) continue;
         if (!map.has(s.seite)) map.set(s.seite, { total: 0, kapitel: s.kapitel });
         map.get(s.seite).total++;
@@ -159,11 +141,11 @@ document.addEventListener('alpine:init', () => {
     // Übersichts-Badges. Ersetzt die doppelte Inline-Filterung im Template.
     get szenenNachFigur() {
       const counts = new Map();
-      for (const s of this.szenen) {
+      for (const s of this.$store.catalog.szenen) {
         for (const id of (s.fig_ids || [])) counts.set(id, (counts.get(id) || 0) + 1);
       }
       const out = [];
-      for (const f of this.figuren) {
+      for (const f of this.$store.catalog.figuren) {
         const total = counts.get(f.id) || 0;
         if (total === 0) continue;
         out.push({ id: f.id, name: f.kurzname || f.name, total, wenig: total < 3 });
@@ -174,14 +156,14 @@ document.addEventListener('alpine:init', () => {
     // Filter-Tabs. Ein Scan statt 6 Inline-Filter-Durchläufen pro Render.
     get szenenWertungCounts() {
       const c = { stark: 0, mittel: 0, schwach: 0 };
-      for (const s of this.szenen) {
+      for (const s of this.$store.catalog.szenen) {
         const w = s.wertung || 'mittel';
         if (w in c) c[w]++;
       }
       return c;
     },
     get songsFiltered() {
-      return applySongsFilters(this.songs, this.songsFilters).sort((a, b) => {
+      return applySongsFilters(this.$store.catalog.songs, this.songsFilters).sort((a, b) => {
         const aK = Math.min(...(a.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
         const bK = Math.min(...(b.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
         if (aK !== bK) return aK - bK;
@@ -190,7 +172,7 @@ document.addEventListener('alpine:init', () => {
     },
     get songsByFigurId() {
       const map = new Map();
-      for (const s of (this.songs || [])) {
+      for (const s of (this.$store.catalog.songs || [])) {
         for (const f of (s.figuren || [])) {
           const id = f.fig_id || f;
           if (!id) continue;
@@ -208,7 +190,7 @@ document.addEventListener('alpine:init', () => {
       // Referenz nicht, fliessen aber als Live-Reads in die nachgelagerten Karten-
       // Filter ein (kein Cache-Problem — Koordinaten sind hier kein Filterkriterium).
       const f = this.orteFilters;
-      const sig = [this.orte, this.szenen, f.suche || '', f.figurId || '', f.kapitel || '', f.szeneId || ''];
+      const sig = [this.$store.catalog.orte, this.$store.catalog.szenen, f.suche || '', f.figurId || '', f.kapitel || '', f.szeneId || ''];
       const c = this._orteFilteredCache;
       if (c && c.sig.length === sig.length && c.sig.every((v, i) => v === sig[i])) return c.val;
       const val = this._computeOrteFiltered();
@@ -220,11 +202,11 @@ document.addEventListener('alpine:init', () => {
       const q = f.suche ? f.suche.toLowerCase() : '';
       const matchText = (o) => !q || [o.name, o.typ, o.stimmung, o.beschreibung, o.land]
         .some(v => v && String(v).toLowerCase().includes(q));
-      return this.orte.filter(o =>
+      return this.$store.catalog.orte.filter(o =>
         matchText(o) &&
         (!f.figurId || (o.figuren || []).includes(f.figurId)) &&
         (!f.kapitel || (o.kapitel || []).some(k => k.name === f.kapitel || String(k.chapter_id) === String(f.kapitel))) &&
-        (!f.szeneId || this.szenen.some(s => String(s.id) === String(f.szeneId) && (s.ort_ids || []).includes(o.id)))
+        (!f.szeneId || this.$store.catalog.szenen.some(s => String(s.id) === String(f.szeneId) && (s.ort_ids || []).includes(o.id)))
       ).sort((a, b) => {
         const aK = Math.min(...(a.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
         const bK = Math.min(...(b.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
@@ -236,7 +218,7 @@ document.addEventListener('alpine:init', () => {
       });
     },
     get szenenFiltered() {
-      return applySzenenFilters(this.szenen, this.szenenFilters).sort((a, b) => {
+      return applySzenenFilters(this.$store.catalog.szenen, this.szenenFilters).sort((a, b) => {
         const c = this._chapterIdx(a.kapitel) - this._chapterIdx(b.kapitel);
         if (c !== 0) return c;
         const p = this._pageIdx(a.seite) - this._pageIdx(b.seite);

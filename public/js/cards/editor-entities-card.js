@@ -84,8 +84,8 @@ export function registerEditorEntitiesCard() {
         clearHighlights();
         recompute();
       });
-      this.$watch(() => (window.__app?.figuren || []).length, recompute);
-      this.$watch(() => (window.__app?.orte || []).length, recompute);
+      this.$watch(() => (window.__app?.$store.catalog.figuren || []).length, recompute);
+      this.$watch(() => (window.__app?.$store.catalog.orte || []).length, recompute);
 
       // Wenn BookSettings die Flag aendert oder ein anderes Geraet sie
       // updatet, refetcht der Root die Setting — wir reagieren auf Recompute.
@@ -151,7 +151,7 @@ export function registerEditorEntitiesCard() {
       });
     },
 
-    // Stellt sicher, dass `app.szenen` fuer das aktuelle Buch geladen ist.
+    // Stellt sicher, dass `app.$store.catalog.szenen` fuer das aktuelle Buch geladen ist.
     // Andere Trigger (Szenen-/Orte-Karte, Komplettanalyse, Palette) laden
     // bei Bedarf; das Entity-Panel ist eigener Konsument und muss selber dafuer
     // sorgen, sonst bleibt die Szenen-Sektion permanent leer.
@@ -159,7 +159,7 @@ export function registerEditorEntitiesCard() {
       const app = window.__app;
       const bookId = app?.selectedBookId;
       if (!bookId) return;
-      if (Array.isArray(app.szenen) && app.szenen.length > 0) return;
+      if (Array.isArray(app.$store.catalog.szenen) && app.$store.catalog.szenen.length > 0) return;
       const tag = bookId + ':' + (app?.session?.email || '');
       if (this._szenenLoadTag === tag) return;
       this._szenenLoadTag = tag;
@@ -195,7 +195,7 @@ export function registerEditorEntitiesCard() {
       const root = document.querySelector(EDIT_SELECTOR)
                 || document.querySelector('#editor-card .page-content-view');
       if (!root) { clearHighlights(); this._highlights = []; return; }
-      const entities = toEntitiesList(app.figuren, app.orte);
+      const entities = toEntitiesList(app.$store.catalog.figuren, app.$store.catalog.orte);
       this._highlights = applyHighlights(root, entities);
     },
 
@@ -318,8 +318,8 @@ export function registerEditorEntitiesCard() {
       const { hit, rect } = found;
       ev.preventDefault();
       const data = hit.kind === 'figure'
-        ? (app.figuren || []).find(f => f.id === hit.id)
-        : (app.orte    || []).find(o => o.id === hit.id);
+        ? (app.$store.catalog.figuren || []).find(f => f.id === hit.id)
+        : (app.$store.catalog.orte    || []).find(o => o.id === hit.id);
       const { x, y } = this._computePopoverXY(rect);
       this._popoverRange = hit.range || null;
       this._popoverAnchor = null;

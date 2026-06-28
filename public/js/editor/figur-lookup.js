@@ -35,7 +35,7 @@ function wordAtClientPoint(x, y) {
 export const figurLookupMethods = {
   _buildFigurLookupIndex() {
     const map = new Map();
-    for (const f of (this.figuren || [])) {
+    for (const f of (this.$store.catalog.figuren || [])) {
       const keys = new Set();
       if (f.name) keys.add(normalizeName(f.name));
       if (f.kurzname) keys.add(normalizeName(f.kurzname));

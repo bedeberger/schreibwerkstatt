@@ -26,7 +26,7 @@ export function registerSongsCard() {
         load: (root) => root.loadSongs(root.selectedBookId),
         onShow: async (root) => {
           const tasks = [root.loadSongs(root.selectedBookId)];
-          if (!root.figuren.length) tasks.push(root.loadFiguren(root.selectedBookId));
+          if (!root.$store.catalog.figuren.length) tasks.push(root.loadFiguren(root.selectedBookId));
           await Promise.all(tasks);
         },
       });

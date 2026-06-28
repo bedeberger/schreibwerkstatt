@@ -18,7 +18,7 @@ export const sharedMethods = {
   // beziehungslose Geister-Knoten den Graph verschmutzen (ihre kapitel-Belege
   // bleiben erhalten). Im Figuren-Katalog bleiben sie — mit Badge — sichtbar.
   _graphFiguren() {
-    return (window.__app.figuren || []).filter(f => !f.stale);
+    return (Alpine.store('catalog').figuren || []).filter(f => !f.stale);
   },
 
   _figTypColor(typ) {

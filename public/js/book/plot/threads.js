@@ -32,7 +32,7 @@ export const threadsMethods = {
     this.threadDraft = {
       name: thread.name || '',
       farbe: thread.farbe || null,
-      // Katalog-Bindung wird als TEXT-fig_id geführt (matcht $app.figuren),
+      // Katalog-Bindung wird als TEXT-fig_id geführt (matcht $store.catalog.figuren),
       // Werkstatt-Bindung als INTEGER draft_figures.id.
       figure_id: thread.fig_id || '',
       draft_figure_id: thread.draft_figure_id || '',

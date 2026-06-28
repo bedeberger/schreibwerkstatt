@@ -173,12 +173,12 @@
                   <input type="text" class="plot-thread-name-input" x-model="threadDraft.name"
                          data-spellcheck="spelling" :placeholder="$app.t('plot.thread.namePlaceholder')"
                          @keydown.enter.prevent="saveEditThread(row.lane.thread)" @keydown.escape="cancelEditThread()">
-                  <label class="plot-edit-label" x-show="$app.figuren.length" x-text="$app.t('plot.thread.bindFigure')"></label>
-                  <div x-show="$app.figuren.length"
+                  <label class="plot-edit-label" x-show="$store.catalog.figuren.length" x-text="$app.t('plot.thread.bindFigure')"></label>
+                  <div x-show="$store.catalog.figuren.length"
                        x-data="combobox({ placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure') })"
                        x-modelable="value" x-model="threadDraft.figure_id"
                        @combobox-change="threadDraft.figure_id && (threadDraft.draft_figure_id = '')"
-                       x-effect="options = $app.figuren.map(f => ({ value: f.id, label: f.kurzname || f.name }))"></div>
+                       x-effect="options = $store.catalog.figuren.map(f => ({ value: f.id, label: f.kurzname || f.name }))"></div>
                   <label class="plot-edit-label" x-show="draftFiguren.length" x-text="$app.t('plot.thread.bindDraftFigure')"></label>
                   <div x-show="draftFiguren.length"
                        x-data="combobox({ placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure') })"

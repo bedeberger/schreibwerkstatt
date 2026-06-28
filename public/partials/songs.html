@@ -9,8 +9,8 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('songs.title')"></span>
-      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !songsLoading">
-        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      <div class="card-subline" x-show="$store.jobs.alleAktualisierenLastRun && !songsLoading">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></span>
       </div>
     </div>
   </div>
@@ -20,18 +20,18 @@
   </div>
   <div x-show="songsStatus" class="card-status" x-html="songsStatus"></div>
 
-  <div x-show="$app.songs.length === 0 && !songsLoading && !songsStatus" class="card-empty">
+  <div x-show="$store.catalog.songs.length === 0 && !songsLoading && !songsStatus" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
 
   <!-- Skeleton -->
-  <div x-show="songsLoading && $app.songs.length === 0" class="entity-skeleton entity-list--accented" x-cloak>
+  <div x-show="songsLoading && $store.catalog.songs.length === 0" class="entity-skeleton entity-list--accented" x-cloak>
     <template x-for="i in 6" :key="i">
       <div class="entity-skeleton-row">
         <span class="entity-skeleton-cell entity-skeleton-cell--anchor"></span>
@@ -42,14 +42,14 @@
   </div>
 
   <!-- Filter-Leiste -->
-  <div x-show="$app.songs.length > 0" class="filter-bar">
+  <div x-show="$store.catalog.songs.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
       <input type="text" x-model="$app.songsFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
       <button type="button" class="search-clear--icon" x-show="$app.songsFilters.suche" @click="$app.songsFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.songsFilters.figurId"
-         x-effect="options = $app.figuren.filter(f => $app.songs.some(s => (s.figuren || []).some(x => (x.fig_id || x) === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">
+         x-effect="options = $store.catalog.figuren.filter(f => $store.catalog.songs.some(s => (s.figuren || []).some(x => (x.fig_id || x) === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">
     </div>
     <div x-data="catalogFilter('chapter')"
          x-modelable="value" x-model="$app.songsFilters.kapitel"
@@ -63,11 +63,11 @@
          x-modelable="value" x-model="$app.songsFilters.kontextTyp"
          x-effect="options = $app.songsKontextTypListe().map(k => ({value: k, label: $app.t('songs.kontextTyp.' + k, { _default: k })}))">
     </div>
-    <span class="filter-count" x-text="$app.songsFiltered.length + ' / ' + $app.songs.length"></span>
+    <span class="filter-count" x-text="$app.songsFiltered.length + ' / ' + $store.catalog.songs.length"></span>
   </div>
 
   <!-- Songliste -->
-  <div x-show="$app.songs.length > 0" class="entity-list entity-list--accented song-list">
+  <div x-show="$store.catalog.songs.length > 0" class="entity-list entity-list--accented song-list">
     <template x-for="s in $app.songsFiltered" :key="s.id">
       <div>
         <div class="entity-row" :data-song-id="s.id" @click="$app.selectedSongId = $app.selectedSongId === s.id ? null : s.id">

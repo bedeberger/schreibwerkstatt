@@ -141,7 +141,7 @@ export const PROVIDERS = [
     prefix: '@',
     sectionKey: 'palette.section.figuren',
     list(root) {
-      return Array.isArray(root.figuren) ? root.figuren : [];
+      return Array.isArray(root.$store.catalog.figuren) ? root.$store.catalog.figuren : [];
     },
     drafts(root) {
       return Array.isArray(root.werkstattDrafts) ? root.werkstattDrafts : [];
@@ -151,7 +151,7 @@ export const PROVIDERS = [
     // damit die Palette sie auch findet, wenn die Werkstatt-Karte nie geöffnet
     // wurde.
     prepare(root) {
-      if (root.selectedBookId && !(root.figuren && root.figuren.length) && typeof root.loadFiguren === 'function') {
+      if (root.selectedBookId && !(root.$store.catalog.figuren && root.$store.catalog.figuren.length) && typeof root.loadFiguren === 'function') {
         _onceForBook(root.selectedBookId, 'figuren', () => root.loadFiguren(root.selectedBookId));
       }
       if (root.selectedBookId && !this.drafts(root).length) {
@@ -210,11 +210,11 @@ export const PROVIDERS = [
     prefix: '$',
     sectionKey: 'palette.section.orte',
     list(root) {
-      return Array.isArray(root.orte) ? root.orte : [];
+      return Array.isArray(root.$store.catalog.orte) ? root.$store.catalog.orte : [];
     },
     // Orte werden sonst nur beim Öffnen der Orte-Karte geladen.
     prepare(root) {
-      if (root.selectedBookId && !(root.orte && root.orte.length) && typeof root.loadOrte === 'function') {
+      if (root.selectedBookId && !(root.$store.catalog.orte && root.$store.catalog.orte.length) && typeof root.loadOrte === 'function') {
         _onceForBook(root.selectedBookId, 'orte', () => root.loadOrte(root.selectedBookId));
       }
     },
@@ -296,11 +296,11 @@ export const PROVIDERS = [
     prefix: '%',
     sectionKey: 'palette.section.szenen',
     list(root) {
-      return Array.isArray(root.szenen) ? root.szenen : [];
+      return Array.isArray(root.$store.catalog.szenen) ? root.$store.catalog.szenen : [];
     },
     // Szenen werden sonst nur beim Öffnen der Szenen-Karte geladen.
     prepare(root) {
-      if (root.selectedBookId && !(root.szenen && root.szenen.length) && typeof root.loadSzenen === 'function') {
+      if (root.selectedBookId && !(root.$store.catalog.szenen && root.$store.catalog.szenen.length) && typeof root.loadSzenen === 'function') {
         _onceForBook(root.selectedBookId, 'szenen', () => root.loadSzenen(root.selectedBookId));
       }
     },

@@ -17,20 +17,20 @@ export const appKomplettMethods = {
   },
 
   async alleAktualisieren() {
-    if (!this.selectedBookId || this.alleAktualisierenLoading) return;
+    if (!this.selectedBookId || this.$store.jobs.alleAktualisierenLoading) return;
     if (!await this.appConfirm({ message: this.t('komplett.confirm') })) return;
-    this.alleAktualisierenLoading = true;
-    this.alleAktualisierenProgress = 0;
-    this.alleAktualisierenTokIn = 0;
-    this.alleAktualisierenTokOut = 0;
-    this.alleAktualisierenTps = null;
-    this.alleAktualisierenPassMode = null;
-    this.alleAktualisierenWarnings = [];
+    this.$store.jobs.alleAktualisierenLoading = true;
+    this.$store.jobs.alleAktualisierenProgress = 0;
+    this.$store.jobs.alleAktualisierenTokIn = 0;
+    this.$store.jobs.alleAktualisierenTokOut = 0;
+    this.$store.jobs.alleAktualisierenTps = null;
+    this.$store.jobs.alleAktualisierenPassMode = null;
+    this.$store.jobs.alleAktualisierenWarnings = [];
     this.showKomplettStatus = true;
     const bookId = this.selectedBookId;
     const bookName = this.selectedBookName;
     try {
-      this.alleAktualisierenStatus = this.t('komplett.started');
+      this.$store.jobs.alleAktualisierenStatus = this.t('komplett.started');
       const { jobId } = await fetchJson('/jobs/komplett-analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -42,8 +42,8 @@ export const appKomplettMethods = {
       this._startKomplettPoll(jobId, bookId);
     } catch (e) {
       console.error('[alleAktualisieren]', e);
-      this.alleAktualisierenStatus = `${this.t('common.errorColon')}${e.message}`;
-      this.alleAktualisierenLoading = false;
+      this.$store.jobs.alleAktualisierenStatus = `${this.t('common.errorColon')}${e.message}`;
+      this.$store.jobs.alleAktualisierenLoading = false;
     }
   },
 
@@ -51,27 +51,28 @@ export const appKomplettMethods = {
     this._startPoll({
       timerProp: '_komplettPollTimer',
       progressProp: 'alleAktualisierenProgress',
+      progressTarget: this.$store.jobs,
       jobId,
       lsKey: null,
       onProgress: (job) => {
-        if (job.statusText) this.alleAktualisierenStatus = this.t(job.statusText, job.statusParams);
-        if (job.tokensIn != null) this.alleAktualisierenTokIn = job.tokensIn;
-        if (job.tokensOut != null) this.alleAktualisierenTokOut = job.tokensOut;
-        if (job.tokensPerSec != null) this.alleAktualisierenTps = job.tokensPerSec;
-        if (job.passMode) this.alleAktualisierenPassMode = job.passMode;
+        if (job.statusText) this.$store.jobs.alleAktualisierenStatus = this.t(job.statusText, job.statusParams);
+        if (job.tokensIn != null) this.$store.jobs.alleAktualisierenTokIn = job.tokensIn;
+        if (job.tokensOut != null) this.$store.jobs.alleAktualisierenTokOut = job.tokensOut;
+        if (job.tokensPerSec != null) this.$store.jobs.alleAktualisierenTps = job.tokensPerSec;
+        if (job.passMode) this.$store.jobs.alleAktualisierenPassMode = job.passMode;
       },
       onNotFound: () => {
-        this.alleAktualisierenLoading = false;
-        this.alleAktualisierenStatus = this.t('komplett.interrupted');
+        this.$store.jobs.alleAktualisierenLoading = false;
+        this.$store.jobs.alleAktualisierenStatus = this.t('komplett.interrupted');
       },
       onError: (job) => {
-        this.alleAktualisierenLoading = false;
-        this.alleAktualisierenStatus = `${this.t('common.errorColon')}${job.error ? this.t(job.error, job.errorParams) : this.t('app.jobFailed')}`;
+        this.$store.jobs.alleAktualisierenLoading = false;
+        this.$store.jobs.alleAktualisierenStatus = `${this.t('common.errorColon')}${job.error ? this.t(job.error, job.errorParams) : this.t('app.jobFailed')}`;
       },
       onDone: async (job) => {
         // Non-critical-Degradierungen (Soziogramm/P3b/Kontinuität) persistent im
         // Status-Panel zeigen – sonst ununterscheidbar von „alles ok".
-        this.alleAktualisierenWarnings = Array.isArray(job?.result?.warnings) ? job.result.warnings : [];
+        this.$store.jobs.alleAktualisierenWarnings = Array.isArray(job?.result?.warnings) ? job.result.warnings : [];
         try {
           // _loadKontinuitaetHistory lebt auf kontinuitaetCard (nicht im Root) —
           // Card per card:refresh-Event reloaden lassen (Lifecycle hört darauf).
@@ -87,10 +88,10 @@ export const appKomplettMethods = {
         } finally {
           // Loading-Flag MUSS auch dann zurück, wenn ein Sibling-Reload wirft —
           // sonst bleibt Button-Ring + Status-Panel auf "running" hängen.
-          this.alleAktualisierenLoading = false;
+          this.$store.jobs.alleAktualisierenLoading = false;
           const doneMsg = this.t('common.finished');
-          this.alleAktualisierenStatus = doneMsg;
-          clearStatusAfter(this, 'alleAktualisierenStatus', doneMsg, 4000);
+          this.$store.jobs.alleAktualisierenStatus = doneMsg;
+          clearStatusAfter(this.$store.jobs, 'alleAktualisierenStatus', doneMsg, 4000);
         }
       },
     });
@@ -100,16 +101,16 @@ export const appKomplettMethods = {
     if (!bookId) return;
     try {
       const { lastRun } = await fetchJson(`/jobs/last-run?type=komplett-analyse&book_id=${bookId}`, { signal });
-      this.alleAktualisierenLastRun = lastRun ? formatLastRun(lastRun, (k, p) => this.t(k, p), this.uiLocale) : null;
+      this.$store.jobs.alleAktualisierenLastRun = lastRun ? formatLastRun(lastRun, (k, p) => this.t(k, p), this.uiLocale) : null;
     } catch (e) {
       if (e?.name === 'AbortError') return;
       console.error('[loadLastKomplettRun]', e);
-      this.alleAktualisierenLastRun = null;
+      this.$store.jobs.alleAktualisierenLastRun = null;
     }
   },
 
   _komplettPhasen() {
-    const p = this.alleAktualisierenProgress;
+    const p = this.$store.jobs.alleAktualisierenProgress;
     // Thresholds entsprechen den Server-Progress-Punkten nach den jeweiligen aiCalls:
     //   orteConsolidate=55  = Ende Phase 3 (43→55)
     //   songsConsolidate=56 = Ende Phase 3 Songs (55→56)
@@ -130,7 +131,7 @@ export const appKomplettMethods = {
       { key: 'phase.timeline',           threshold: 82  },
       { key: 'phase.continuity',         threshold: 97  },
     ];
-    const visible = phases.filter(ph => !(ph.onlyMulti && this.alleAktualisierenPassMode === 'single'));
+    const visible = phases.filter(ph => !(ph.onlyMulti && this.$store.jobs.alleAktualisierenPassMode === 'single'));
     return visible.map((ph, i) => {
       const done = p >= ph.threshold;
       const prevThreshold = i === 0 ? 0 : visible[i - 1].threshold;

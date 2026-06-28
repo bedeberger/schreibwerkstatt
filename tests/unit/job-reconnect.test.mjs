@@ -46,9 +46,14 @@ function makeCtx() {
     figurenLoading: false, figurenProgress: 0, figurenStatus: '',
     showFiguresCard: false, showBookReviewCard: false, showKapitelReviewCard: false,
     batchLoading: false, batchProgress: 0, batchStatus: '',
-    alleAktualisierenLoading: false, alleAktualisierenProgress: 0,
-    alleAktualisierenTokIn: 0, alleAktualisierenTokOut: 0, alleAktualisierenTps: null,
-    alleAktualisierenStatus: '', showKomplettStatus: false,
+    showKomplettStatus: false,
+    // alleAktualisieren* leben in Alpine.store('jobs'); Plain-Stub, da
+    // checkPendingJobs via this.$store.jobs.alleAktualisierenLoading gatet.
+    $store: { jobs: {
+      alleAktualisierenLoading: false, alleAktualisierenProgress: 0,
+      alleAktualisierenTokIn: 0, alleAktualisierenTokOut: 0, alleAktualisierenTps: null,
+      alleAktualisierenStatus: '',
+    } },
     t: (k) => k,
     startFiguresPoll() {},
     startBatchPoll() {},

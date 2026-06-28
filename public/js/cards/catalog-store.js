@@ -1,7 +1,10 @@
 // Alpine.store('catalog') — geteilte Fach-Daten, die von mehreren Karten
-// gelesen/geschrieben werden: `figuren`, `orte`, `szenen`, `globalZeitstrahl`.
-// Der Root spiegelt sie via Getter/Setter-Proxy (app.js), Karten greifen direkt
-// via this.$store.catalog zu.
+// gelesen/geschrieben werden: `figuren`, `orte`, `songs`, `szenen`,
+// `globalZeitstrahl`, `zeitstrahlChronology`. Kein Root-Proxy: alle Konsumenten
+// greifen direkt zu — Root-Computeds/-Slices + in den Root gespreadete
+// Fachmodule (book/figuren.js etc.) via `this.$store.catalog.*`, Karten/Helper
+// via `Alpine.store('catalog').*`, Templates via `$store.catalog.*`. Die
+// Root-Lookup-Maps `figurenById`/`orteById`/`szenenById` lesen ebenfalls hier.
 
 export function registerCatalogStore() {
   if (typeof window === 'undefined' || !window.Alpine) return;

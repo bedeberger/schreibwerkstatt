@@ -80,7 +80,7 @@
     </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="plotFilters.figurId"
-         x-effect="options = $app.figuren.filter(f => beats.some(b => (b.fig_ids||[]).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">
+         x-effect="options = $store.catalog.figuren.filter(f => beats.some(b => (b.fig_ids||[]).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">
     </div>
     <div x-data="catalogFilter('werkstattFigur')"
          x-show="beats.some(b => (b.draft_fig_ids||[]).length)"

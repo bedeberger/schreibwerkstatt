@@ -91,8 +91,8 @@
     <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
          x-modelable="value" x-model="beatDraft.chapter_id"
          x-effect="options = $app.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
-    <label class="plot-edit-label" x-show="$app.figuren.length" x-text="$app.t('plot.beat.figuren')"></label>
-    <div x-show="$app.figuren.length"
+    <label class="plot-edit-label" x-show="$store.catalog.figuren.length" x-text="$app.t('plot.beat.figuren')"></label>
+    <div x-show="$store.catalog.figuren.length"
          x-data="combobox({ placeholder: $app.t('plot.beat.figurenPick'), multiple: true })"
          x-modelable="value" x-model="beatDraft.figure_ids"
          x-effect="options = beatFigureOptions()"></div>

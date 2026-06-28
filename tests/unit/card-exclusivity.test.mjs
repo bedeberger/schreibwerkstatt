@@ -47,17 +47,25 @@ function makeCtx() {
     figurenProgress: 0,
     selectedFigurId: null,
     figurenFilters: { kapitel: '', seite: '' },
-    globalZeitstrahl: [],
     showGlobalZeitstrahl: false,
     ereignisseFilters: { figurId: '', kapitel: '', seite: '' },
-    szenen: [],
     szenenUpdatedAt: null,
     selectedSzeneId: null,
     szenenFilters: { wertung: '', figurId: '', kapitel: '', ortId: '' },
     orteFilters: { figurId: '', kapitel: '', szeneId: '' },
-    songs: [],
     selectedSongId: null,
     songsFilters: { figurId: '', kapitel: '', szeneId: '', genre: '', kontextTyp: '', suche: '' },
+    // Katalog- + Job-Daten leben in Alpine.store('catalog') bzw. Alpine.store('jobs');
+    // resetView schreibt via this.$store.catalog.* / this.$store.jobs.* — das Mock
+    // spiegelt diese Struktur.
+    $store: {
+      catalog: { figuren: [], orte: [], songs: [], szenen: [], globalZeitstrahl: [], zeitstrahlChronology: null },
+      jobs: {
+        alleAktualisierenLoading: false, alleAktualisierenStatus: '', alleAktualisierenProgress: 0,
+        alleAktualisierenTokIn: 0, alleAktualisierenTokOut: 0, alleAktualisierenTps: null,
+        alleAktualisierenLastRun: null,
+      },
+    },
     batchLoading: false,
     batchProgress: 0,
     batchStatus: '',
@@ -66,8 +74,6 @@ function makeCtx() {
     clearBookstackSearch() {},
     selectedBookId: 42,
     currentPage: { id: 7 },
-    figuren: [],
-    orte: [],
     pages: [],
     resetPage() { /* noop */ },
     loadFiguren: async () => {},

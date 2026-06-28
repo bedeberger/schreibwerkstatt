@@ -626,9 +626,9 @@
 </dialog>
 
 <!-- Job-Queue Footer -->
-<div class="job-queue-bar" x-show="jobQueueItems.length > 0" x-cloak aria-live="polite" aria-atomic="false">
+<div class="job-queue-bar" x-show="$store.jobs.jobQueueItems.length > 0" x-cloak aria-live="polite" aria-atomic="false">
   <span class="job-queue-label" x-text="t('jobQueue.label')"></span>
-  <template x-for="job in (jobQueueExpanded ? jobQueueItems : jobQueueItems.slice(0, 3))" :key="job.id">
+  <template x-for="job in ($store.jobs.jobQueueExpanded ? $store.jobs.jobQueueItems : $store.jobs.jobQueueItems.slice(0, 3))" :key="job.id">
     <div class="job-queue-pill" :class="'job-queue-pill--' + job.status" @click="navigateToJob(job)" :data-tip="t('jobQueue.jumpTo')">
       <span class="job-queue-pill-label" x-text="t(job.label, job.labelParams)"></span>
       <span class="job-queue-pill-status" x-text="t(job.statusText, job.statusParams)"></span>
@@ -640,11 +640,11 @@
   </template>
   <button type="button"
           class="job-queue-toggle-btn"
-          x-show="jobQueueItems.length > 3"
-          @click="jobQueueExpanded = !jobQueueExpanded"
-          :data-tip="jobQueueExpanded ? t('jobQueue.collapse') : t('jobQueue.expand', { count: jobQueueItems.length - 3 })"
-          :aria-label="jobQueueExpanded ? t('jobQueue.collapse') : t('jobQueue.expand', { count: jobQueueItems.length - 3 })"
-          x-text="jobQueueExpanded ? '−' : '+' + (jobQueueItems.length - 3)"></button>
+          x-show="$store.jobs.jobQueueItems.length > 3"
+          @click="$store.jobs.jobQueueExpanded = !$store.jobs.jobQueueExpanded"
+          :data-tip="$store.jobs.jobQueueExpanded ? t('jobQueue.collapse') : t('jobQueue.expand', { count: $store.jobs.jobQueueItems.length - 3 })"
+          :aria-label="$store.jobs.jobQueueExpanded ? t('jobQueue.collapse') : t('jobQueue.expand', { count: $store.jobs.jobQueueItems.length - 3 })"
+          x-text="$store.jobs.jobQueueExpanded ? '−' : '+' + ($store.jobs.jobQueueItems.length - 3)"></button>
 </div>
 
 </body>

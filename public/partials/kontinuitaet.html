@@ -10,8 +10,8 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('kontinuitaet.title')"></span>
-      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !kontinuitaetLoading">
-        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      <div class="card-subline" x-show="$store.jobs.alleAktualisierenLastRun && !kontinuitaetLoading">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></span>
       </div>
     </div>
   </div>
@@ -25,7 +25,7 @@
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
@@ -74,7 +74,7 @@
     </div>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.kontinuitaetFilters.figurId"
-         x-effect="options = $app.figuren.filter(f => (kontinuitaetResult?.issues||[]).some(i => i.fig_ids?.length ? i.fig_ids.includes(f.id) : (i.figuren||[]).includes(f.name))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
+         x-effect="options = $store.catalog.figuren.filter(f => (kontinuitaetResult?.issues||[]).some(i => i.fig_ids?.length ? i.fig_ids.includes(f.id) : (i.figuren||[]).includes(f.name))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
          >
     </div>
     <div x-data="catalogFilter('chapter')"

@@ -12,7 +12,7 @@ import { escHtml, fmtTok } from '../utils.js';
 // Karten-Bar denselben Stand zeigen. Nur für laufende Jobs; das Entfernen
 // terminaler Jobs bleibt Sache der Queue-Disappearance-Detection.
 function syncJobQueueItem(job) {
-  const items = window.__app?.jobQueueItems;
+  const items = window.Alpine?.store('jobs')?.jobQueueItems;
   if (!Array.isArray(items)) return;
   const item = items.find(j => j.id === job.id);
   if (!item) return;
@@ -28,8 +28,11 @@ function syncJobQueueItem(job) {
 // Generischer Job-Poller. `ctx` ist das Komponenten-Objekt (Root oder Card),
 // in dessen Feldern `timerProp` und `progressProp` geschrieben wird.
 //
-// config: { timerProp, jobId, lsKey?, progressProp?, intervalMs?,
+// config: { timerProp, jobId, lsKey?, progressProp?, progressTarget?, intervalMs?,
 //           onProgress, onNotFound, onError, onDone }
+// progressTarget: optionales Objekt, in das `progressProp` geschrieben wird
+//   (Default `ctx`). Nötig, wenn die Progress-Property in einem Alpine.store
+//   statt am Komponenten-`ctx` liegt (z. B. Komplettanalyse → $store.jobs).
 // intervalMs: Default 2000. PDF-Export fährt 1000 für schnelleres UI-Feedback.
 export function startPoll(ctx, config) {
   if (ctx[config.timerProp]) clearInterval(ctx[config.timerProp]);
@@ -59,7 +62,7 @@ export function startPoll(ctx, config) {
       if (!resp.ok) return;
       const job = await resp.json();
       if (done) return;
-      if (config.progressProp) ctx[config.progressProp] = job.progress || 0;
+      if (config.progressProp) (config.progressTarget || ctx)[config.progressProp] = job.progress || 0;
       if (job.status === 'running' || job.status === 'queued') {
         syncJobQueueItem(job);
         config.onProgress?.(job);

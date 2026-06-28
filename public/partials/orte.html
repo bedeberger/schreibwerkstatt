@@ -9,8 +9,8 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('orte.title')"></span>
-      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !orteLoading">
-        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      <div class="card-subline" x-show="$store.jobs.alleAktualisierenLastRun && !orteLoading">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></span>
       </div>
     </div>
   </div>
@@ -20,19 +20,19 @@
   </div>
   <div x-show="orteStatus" class="card-status" x-html="orteStatus"></div>
 
-  <div x-show="$app.orte.length === 0 && !orteLoading && !orteStatus" class="card-empty">
+  <div x-show="$store.catalog.orte.length === 0 && !orteLoading && !orteStatus" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <p class="card-empty-hint" x-text="$app.t('empty.orte.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
 
   <!-- Skeleton während Loading vor erstem Datensatz -->
-  <div x-show="orteLoading && $app.orte.length === 0" class="entity-skeleton entity-list--accented" x-cloak>
+  <div x-show="orteLoading && $store.catalog.orte.length === 0" class="entity-skeleton entity-list--accented" x-cloak>
     <template x-for="i in 6" :key="i">
       <div class="entity-skeleton-row">
         <span class="entity-skeleton-cell entity-skeleton-cell--anchor"></span>
@@ -43,7 +43,7 @@
   </div>
 
   <!-- Ansicht-Umschalter (Liste / Grid / Karte) — Karte nur bei realen Orten -->
-  <div x-show="$app.orte.length > 0" class="tabs entity-view-toggle" role="tablist" :aria-label="$app.t('orte.viewLabel')">
+  <div x-show="$store.catalog.orte.length > 0" class="tabs entity-view-toggle" role="tablist" :aria-label="$app.t('orte.viewLabel')">
     <template x-for="m in (orteRealEnabled ? ['list','grid','map'] : ['list','grid'])" :key="m">
       <button type="button" role="tab"
               class="tabs-btn"
@@ -55,14 +55,14 @@
   </div>
 
   <!-- Filter-Leiste -->
-  <div x-show="$app.orte.length > 0" class="filter-bar">
+  <div x-show="$store.catalog.orte.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
       <input type="text" x-model="$app.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
       <button type="button" class="search-clear--icon" x-show="$app.orteFilters.suche" @click="$app.orteFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.orteFilters.figurId"
-         x-effect="options = $app.figuren.filter(f => $app.orte.some(o => (o.figuren || []).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
+         x-effect="options = $store.catalog.figuren.filter(f => $store.catalog.orte.some(o => (o.figuren || []).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
          >
     </div>
     <div x-data="catalogFilter('chapter')"
@@ -70,17 +70,17 @@
          x-effect="options = $app.orteKapitelListe().map(k => ({value: k, label: k}))"
          >
     </div>
-    <div x-show="$app.szenen.length > 0"
+    <div x-show="$store.catalog.szenen.length > 0"
          x-data="catalogFilter('szene')"
          x-modelable="value" x-model="$app.orteFilters.szeneId"
-         x-effect="options = $app.szenen.map(s => ({value: String(s.id), label: s.titel}))"
+         x-effect="options = $store.catalog.szenen.map(s => ({value: String(s.id), label: s.titel}))"
          >
     </div>
-    <span class="filter-count" x-text="$app.orteFiltered.length + ' / ' + $app.orte.length"></span>
+    <span class="filter-count" x-text="$app.orteFiltered.length + ' / ' + $store.catalog.orte.length"></span>
   </div>
 
   <!-- Ortsliste -->
-  <div x-show="$app.orte.length > 0 && viewMode === 'list'" class="entity-list entity-list--accented ort-list">
+  <div x-show="$store.catalog.orte.length > 0 && viewMode === 'list'" class="entity-list entity-list--accented ort-list">
     <template x-for="o in $app.orteFiltered" :key="o.id">
       <div>
         <div class="entity-row" :class="{ 'entity-row--stale': o.stale }" :data-ortid="o.id" @click="$app.selectedOrtId = $app.selectedOrtId === o.id ? null : o.id">
@@ -122,9 +122,9 @@
               <span class="tag internal-link" @click.stop="$app.openKapitelByName(k.name)" x-text="k.name + (k.haeufigkeit > 1 ? ' ×' + k.haeufigkeit : '')"></span>
             </template>
           </div>
-          <div x-show="$app.szenen.some(s => (s.ort_ids||[]).includes(o.id))" class="entity-meta-row">
+          <div x-show="$store.catalog.szenen.some(s => (s.ort_ids||[]).includes(o.id))" class="entity-meta-row">
             <span class="entity-meta-label" x-text="$app.t('orte.szenen')"></span>
-            <template x-for="s in $app.szenen.filter(s => (s.ort_ids||[]).includes(o.id))" :key="s.id">
+            <template x-for="s in $store.catalog.szenen.filter(s => (s.ort_ids||[]).includes(o.id))" :key="s.id">
               <span class="tag" x-text="s.titel"></span>
             </template>
           </div>
@@ -134,7 +134,7 @@
   </div>
 
   <!-- Grid (Matrix): sortierbare Tabelle aller gefilterten Schauplätze -->
-  <div x-show="$app.orte.length > 0 && viewMode === 'grid'" class="table-scroll" x-cloak>
+  <div x-show="$store.catalog.orte.length > 0 && viewMode === 'grid'" class="table-scroll" x-cloak>
     <table class="entity-grid-table"
            x-data="sortableTable({
              rows: () => orteGridRows(),
@@ -201,7 +201,7 @@
   </div>
 
   <!-- Geo-Karte: Marker je verorteter Schauplatz + Geocode-Liste -->
-  <div x-show="$app.orte.length > 0 && viewMode === 'map'" class="ort-map-view" x-cloak>
+  <div x-show="$store.catalog.orte.length > 0 && viewMode === 'map'" class="ort-map-view" x-cloak>
     <div class="ort-map-actions">
       <button type="button" class="icon-btn"
               :disabled="_geoUndoStack.length === 0"
@@ -255,7 +255,7 @@
         </div>
       </template>
     </div>
-    <div class="ort-map-footer" x-show="$app.orte.some(o => o.lat != null && o.lng != null)">
+    <div class="ort-map-footer" x-show="$store.catalog.orte.some(o => o.lat != null && o.lng != null)">
       <button type="button" class="btn-compact danger"
               :disabled="geocodingAll || geocodingId != null"
               @click="clearAllGeorefs()"

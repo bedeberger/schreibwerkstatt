@@ -71,6 +71,7 @@
     //  3) Alpine-Script erst danach dynamisch laden — sonst feuert init,
     //     bevor unser Listener da ist.
     const { registerEreignisseCard } = await import('/public/js/cards/ereignisse-card.js');
+    const { registerJobsStore } = await import('/public/js/cards/jobs-store.js');
 
     const MOCK_EVENTS = [
       {
@@ -121,7 +122,6 @@
         figuren: [],
         globalZeitstrahl: MOCK_EVENTS,
         ereignisseFilters: { suche: '', figurId: '', kapitel: '', seite: '', subtyp: '' },
-        alleAktualisierenLastRun: null,
         t: (k, params) => params ? `${k} ${JSON.stringify(params)}` : k,
         _deriveKapitel: () => [],
         _deriveSeiten: () => [],
@@ -133,6 +133,7 @@
       window.Alpine.store('catalog', {
         figuren: [], orte: [], szenen: [], globalZeitstrahl: MOCK_EVENTS,
       });
+      registerJobsStore();
       registerEreignisseCard();
     });
 

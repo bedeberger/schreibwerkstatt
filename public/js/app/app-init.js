@@ -17,7 +17,7 @@ export const appInitMethods = {
   // Registrierung bei Re-Init.
   destroy() {
     this._abortCtrl?.abort();
-    if (this._jobQueueTimer) clearInterval(this._jobQueueTimer);
+    if (this.$store.jobs._jobQueueTimer) clearInterval(this.$store.jobs._jobQueueTimer);
     if (this._statusTimer) clearTimeout(this._statusTimer);
     if (typeof this._teardownStatsObserver === 'function') this._teardownStatsObserver();
   },

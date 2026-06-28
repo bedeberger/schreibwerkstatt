@@ -6,7 +6,7 @@ export const orteMethods = {
   async loadOrte(bookId) {
     try {
       const data = await fetchJson('/locations/' + bookId);
-      this.orte = data?.orte || [];
+      this.$store.catalog.orte = data?.orte || [];
       this.orteUpdatedAt = data?.updated_at || null;
     } catch (e) {
       console.error('[loadOrte]', e);
@@ -18,7 +18,7 @@ export const orteMethods = {
       const r = await fetch('/locations/' + this.selectedBookId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orte: this.orte }),
+        body: JSON.stringify({ orte: this.$store.catalog.orte }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return true;

@@ -2,7 +2,7 @@
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/ereignisse-card.js.
   Fachdaten (globalZeitstrahl) leben in Alpine.store('catalog') und werden
-  über den Root-Proxy als $app.globalZeitstrahl exponiert. ereignisseFilters
+  über den Root-Proxy als $store.catalog.globalZeitstrahl exponiert. ereignisseFilters
   bleibt am Root (app-navigation schreibt darauf). Meta-State + UI-Helper
   (filteredEreignisse, ereignisseKapitelListe, ereignisseSeitenListe,
   ereignisseSubtypListe, formatEventDate, eventSpanYears) leben hier in der
@@ -13,16 +13,16 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('events.title')"></span>
-      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !ereignisseLoading && !zeitstrahlConsolidating">
-        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      <div class="card-subline" x-show="$store.jobs.alleAktualisierenLastRun && !ereignisseLoading && !zeitstrahlConsolidating">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></span>
       </div>
     </div>
   </div>
 
   <!-- Jahres-Stand pro Kapitel (nur bei „echter Zeitlinie" in den Buch-Einstellungen) -->
-  <div class="gz-chronology" x-show="$app.zeitstrahlChronology && $app.globalZeitstrahl.length > 0" x-cloak>
-    <ul class="gz-chronology-list" x-show="$app.zeitstrahlChronology?.chapters?.length">
-      <template x-for="c in ($app.zeitstrahlChronology?.chapters || [])" :key="c.chapter_id">
+  <div class="gz-chronology" x-show="$store.catalog.zeitstrahlChronology && $store.catalog.globalZeitstrahl.length > 0" x-cloak>
+    <ul class="gz-chronology-list" x-show="$store.catalog.zeitstrahlChronology?.chapters?.length">
+      <template x-for="c in ($store.catalog.zeitstrahlChronology?.chapters || [])" :key="c.chapter_id">
         <li class="gz-chronology-row">
           <span class="gz-chronology-kap" x-text="c.name"></span>
           <span class="gz-chronology-year" x-text="c.minYear === c.maxYear ? c.minYear : (c.minYear + '–' + c.maxYear)"></span>
@@ -32,7 +32,7 @@
     <div class="gz-chronology-total">
       <span class="gz-chronology-total-label" x-text="$app.t('events.chronologySpan')"></span>
       <span class="gz-chronology-total-value"
-            x-text="$app.zeitstrahlChronology ? ($app.zeitstrahlChronology.minYear === $app.zeitstrahlChronology.maxYear ? $app.zeitstrahlChronology.minYear : $app.zeitstrahlChronology.minYear + '–' + $app.zeitstrahlChronology.maxYear) : ''"></span>
+            x-text="$store.catalog.zeitstrahlChronology ? ($store.catalog.zeitstrahlChronology.minYear === $store.catalog.zeitstrahlChronology.maxYear ? $store.catalog.zeitstrahlChronology.minYear : $store.catalog.zeitstrahlChronology.minYear + '–' + $store.catalog.zeitstrahlChronology.maxYear) : ''"></span>
     </div>
   </div>
 
@@ -49,26 +49,26 @@
   <div x-show="zeitstrahlStatus && !ereignisseLoading" class="card-status" x-html="zeitstrahlStatus"></div>
 
   <!-- Leer-Hinweis mit CTA -->
-  <div x-show="$app.globalZeitstrahl.length === 0 && !zeitstrahlConsolidating && !ereignisseLoading" class="card-empty">
+  <div x-show="$store.catalog.globalZeitstrahl.length === 0 && !zeitstrahlConsolidating && !ereignisseLoading" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <p class="card-empty-hint" x-text="$app.t('empty.ereignisse.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
 
   <!-- Filter -->
-  <div x-show="$app.globalZeitstrahl.length > 0" class="filter-bar">
+  <div x-show="$store.catalog.globalZeitstrahl.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
       <input type="text" x-model="$app.ereignisseFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
       <button type="button" class="search-clear--icon" x-show="$app.ereignisseFilters.suche" @click="$app.ereignisseFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$app.ereignisseFilters.figurId"
-         x-effect="options = $app.figuren.filter(f => $app.globalZeitstrahl.some(ev => ev.figuren.some(fr => fr.id === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
+         x-effect="options = $store.catalog.figuren.filter(f => $store.catalog.globalZeitstrahl.some(ev => ev.figuren.some(fr => fr.id === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
          >
     </div>
     <div x-data="catalogFilter('subtyp')"
@@ -88,11 +88,11 @@
          :class="{'combobox-wrap--disabled': _disabled}"
          >
     </div>
-    <span class="filter-count" x-text="filteredEreignisse().length + ' / ' + $app.globalZeitstrahl.length"></span>
+    <span class="filter-count" x-text="filteredEreignisse().length + ' / ' + $store.catalog.globalZeitstrahl.length"></span>
   </div>
 
   <!-- Zeitleiste: Jahres-Band (selbstgebaut, farbcodierte Marker pro Subtyp) + Liste darunter -->
-  <div x-show="$app.globalZeitstrahl.length > 0" class="gz-layout">
+  <div x-show="$store.catalog.globalZeitstrahl.length > 0" class="gz-layout">
     <div class="gz-band" x-show="timelineItemCount > 0" role="group"
          :aria-label="$app.t('events.timelineNav')"
          :style="{ '--gz-band-lanes': bandModel().lanes }">

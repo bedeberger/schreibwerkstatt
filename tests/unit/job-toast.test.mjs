@@ -6,8 +6,9 @@ import { appJobsCoreMethods } from '../../public/js/app/app-jobs-core.js';
 
 function makeCtx() {
   return {
-    jobToast: null,
-    _jobToastTimer: null,
+    // jobToast/_jobToastTimer/_toastedJobIds leben in Alpine.store('jobs');
+    // im Unit-Test ein Plain-Stub, da die Methoden via this.$store.jobs zugreifen.
+    $store: { jobs: { jobToast: null, _jobToastTimer: null, _toastedJobIds: new Set() } },
     currentPage: null,
     pages: [],
     pageLastChecked: {},
@@ -29,11 +30,11 @@ test('komplett-analyse done → ok-Toast mit Label + done-Suffix', () => {
     bookId: 42,
     job: { status: 'done' },
   });
-  assert.equal(ctx.jobToast.severity, 'ok');
-  assert.equal(ctx.jobToast.jobType, 'komplett-analyse');
-  assert.equal(ctx.jobToast.bookId, 42);
-  assert.match(ctx.jobToast.message, /toast\.job\.komplettAnalyse/);
-  assert.match(ctx.jobToast.message, /toast\.job\.done/);
+  assert.equal(ctx.$store.jobs.jobToast.severity, 'ok');
+  assert.equal(ctx.$store.jobs.jobToast.jobType, 'komplett-analyse');
+  assert.equal(ctx.$store.jobs.jobToast.bookId, 42);
+  assert.match(ctx.$store.jobs.jobToast.message, /toast\.job\.komplettAnalyse/);
+  assert.match(ctx.$store.jobs.jobToast.message, /toast\.job\.done/);
 });
 
 test('pdf-export error → err-Toast mit failed-Suffix', () => {
@@ -44,9 +45,9 @@ test('pdf-export error → err-Toast mit failed-Suffix', () => {
     bookId: 7,
     job: { status: 'error', error: 'job.error.bookEmpty' },
   });
-  assert.equal(ctx.jobToast.severity, 'err');
-  assert.match(ctx.jobToast.message, /toast\.job\.pdfExport/);
-  assert.match(ctx.jobToast.message, /toast\.job\.failed/);
+  assert.equal(ctx.$store.jobs.jobToast.severity, 'err');
+  assert.match(ctx.$store.jobs.jobToast.message, /toast\.job\.pdfExport/);
+  assert.match(ctx.$store.jobs.jobToast.message, /toast\.job\.failed/);
 });
 
 test('cancelled → kein Toast', () => {
@@ -57,7 +58,7 @@ test('cancelled → kein Toast', () => {
     bookId: 1,
     job: { status: 'cancelled' },
   });
-  assert.equal(ctx.jobToast, null);
+  assert.equal(ctx.$store.jobs.jobToast, null);
 });
 
 test('type=check done → ok-Toast', () => {
@@ -68,9 +69,9 @@ test('type=check done → ok-Toast', () => {
     dedupId: 999,
     job: { status: 'done', result: { fehler: [] } },
   });
-  assert.equal(ctx.jobToast.severity, 'ok');
-  assert.equal(ctx.jobToast.jobType, 'check');
-  assert.match(ctx.jobToast.message, /toast\.job\.check/);
+  assert.equal(ctx.$store.jobs.jobToast.severity, 'ok');
+  assert.equal(ctx.$store.jobs.jobToast.jobType, 'check');
+  assert.match(ctx.$store.jobs.jobToast.message, /toast\.job\.check/);
 });
 
 test('unbekannter Job-Typ → kein Toast', () => {
@@ -81,7 +82,7 @@ test('unbekannter Job-Typ → kein Toast', () => {
     bookId: 1,
     job: { status: 'done' },
   });
-  assert.equal(ctx.jobToast, null);
+  assert.equal(ctx.$store.jobs.jobToast, null);
 });
 
 test('_dismissJobToast räumt State + Timer', () => {
@@ -92,20 +93,20 @@ test('_dismissJobToast räumt State + Timer', () => {
     bookId: 1,
     job: { status: 'done' },
   });
-  assert.ok(ctx.jobToast);
-  assert.ok(ctx._jobToastTimer);
+  assert.ok(ctx.$store.jobs.jobToast);
+  assert.ok(ctx.$store.jobs._jobToastTimer);
   ctx._dismissJobToast();
-  assert.equal(ctx.jobToast, null);
-  assert.equal(ctx._jobToastTimer, null);
+  assert.equal(ctx.$store.jobs.jobToast, null);
+  assert.equal(ctx.$store.jobs._jobToastTimer, null);
 });
 
 test('aufeinanderfolgende Toasts ersetzen sich (Timer reset)', () => {
   const ctx = makeCtx();
   ctx._onJobFinished({ type: 'review', jobId: 7, bookId: 1, job: { status: 'done' } });
-  const firstTimer = ctx._jobToastTimer;
+  const firstTimer = ctx.$store.jobs._jobToastTimer;
   ctx._onJobFinished({ type: 'pdf-export', jobId: 8, bookId: 1, job: { status: 'done' } });
-  assert.notEqual(ctx._jobToastTimer, firstTimer);
-  assert.equal(ctx.jobToast.jobType, 'pdf-export');
+  assert.notEqual(ctx.$store.jobs._jobToastTimer, firstTimer);
+  assert.equal(ctx.$store.jobs.jobToast.jobType, 'pdf-export');
 });
 
 test('check done im aktuellen Buch → refreshPageAges + markPageChecked', () => {
@@ -165,19 +166,19 @@ test('derselbe Job toastet genau einmal (Dedup per-Card-Poller + Queue-Diff)', (
   const ctx = makeCtx();
   // per-Card-Poller-Pfad: Job hat eine echte id
   ctx._maybeShowJobToast({ type: 'review', job: { id: 'job-xyz', status: 'done' }, bookId: 1 });
-  assert.ok(ctx.jobToast);
+  assert.ok(ctx.$store.jobs.jobToast);
   ctx._dismissJobToast();
   // Queue-Diff-Pfad für denselben Job (jobId == job.id) → kein zweiter Toast
   ctx._onJobFinished({ type: 'review', jobId: 'job-xyz', bookId: 1, job: { id: 'job-xyz', status: 'done' } });
-  assert.equal(ctx.jobToast, null);
+  assert.equal(ctx.$store.jobs.jobToast, null);
 });
 
 test('neue Whitelist-Typen (book-import, epub-export, geocode-resolve) toasten', () => {
   for (const t of ['book-import', 'epub-export', 'geocode-resolve']) {
     const ctx = makeCtx();
     ctx._onJobFinished({ type: t, jobId: 1, bookId: 1, job: { status: 'done' } });
-    assert.ok(ctx.jobToast, `${t} sollte Toast erzeugen`);
-    assert.equal(ctx.jobToast.severity, 'ok');
+    assert.ok(ctx.$store.jobs.jobToast, `${t} sollte Toast erzeugen`);
+    assert.equal(ctx.$store.jobs.jobToast.severity, 'ok');
   }
 });
 
@@ -191,7 +192,7 @@ test('alle Whitelist-Typen erzeugen Toast', () => {
   for (const t of types) {
     const ctx = makeCtx();
     ctx._onJobFinished({ type: t, jobId: 1, bookId: 1, job: { status: 'done' } });
-    assert.ok(ctx.jobToast, `${t} sollte Toast erzeugen`);
-    assert.equal(ctx.jobToast.severity, 'ok');
+    assert.ok(ctx.$store.jobs.jobToast, `${t} sollte Toast erzeugen`);
+    assert.equal(ctx.$store.jobs.jobToast.severity, 'ok');
   }
 });

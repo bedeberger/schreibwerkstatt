@@ -108,11 +108,11 @@ export const runsMethods = {
   // "${draftId}|${knotenId}", consistency-dedupId ist die nackte draftId.
   async _reattachActiveJobs(draftId) {
     if (!draftId) return;
-    const app = window.__app;
+    const queued = window.Alpine?.store('jobs')?.jobQueueItems;
     let queue;
     try {
-      queue = Array.isArray(app?.jobQueueItems) && app.jobQueueItems.length > 0
-        ? app.jobQueueItems
+      queue = Array.isArray(queued) && queued.length > 0
+        ? queued
         : await fetchJson('/jobs/queue');
     } catch { return; }
     if (!Array.isArray(queue)) return;

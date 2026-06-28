@@ -63,7 +63,7 @@ export function registerOrteCard() {
         load: (root) => root.loadOrte(root.selectedBookId),
         onShow: async (root) => {
           const tasks = [root.loadOrte(root.selectedBookId), this.loadOrteReal()];
-          if (!root.szenen.length) tasks.push(root.loadSzenen(root.selectedBookId));
+          if (!root.$store.catalog.szenen.length) tasks.push(root.loadSzenen(root.selectedBookId));
           await Promise.all(tasks);
         },
         extraListeners: [

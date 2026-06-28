@@ -10,11 +10,14 @@ import assert from 'node:assert/strict';
 const { applySzenenFilters, appUiMethods } = await import('../../public/js/app/app-ui.js');
 
 function makeCtx(overrides = {}) {
+  // Katalog-Daten (szenen/orte) leben in Alpine.store('catalog'); die Methoden
+  // lesen via this.$store.catalog.* — das Mock spiegelt diese Struktur.
+  const { szenen = [], orte = [], ...rest } = overrides;
   return {
-    szenen: [],
+    $store: { catalog: { szenen, orte } },
     szenenFilters: { wertung: '', figurId: '', kapitel: '', ortId: '', suche: '' },
     _chapterOrderMap: new Map(),
-    ...overrides,
+    ...rest,
     szenenKapitelListe: appUiMethods.szenenKapitelListe,
     _deriveKapitel: appUiMethods._deriveKapitel,
     _sortByChapterOrder: appUiMethods._sortByChapterOrder,

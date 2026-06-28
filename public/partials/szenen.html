@@ -9,8 +9,8 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('szenen.title')"></span>
-      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !szenenLoading">
-        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      <div class="card-subline" x-show="$store.jobs.alleAktualisierenLastRun && !szenenLoading">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></span>
       </div>
     </div>
   </div>
@@ -22,19 +22,19 @@
   <div x-show="szenenStatus" class="card-status" x-html="szenenStatus"></div>
 
   <!-- Leer-Hinweis mit CTA -->
-  <div x-show="!$app.szenen.length && !szenenLoading && !szenenStatus" class="card-empty">
+  <div x-show="!$store.catalog.szenen.length && !szenenLoading && !szenenStatus" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <p class="card-empty-hint" x-text="$app.t('empty.szenen.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
 
   <!-- Skeleton während Loading vor erstem Datensatz -->
-  <div x-show="szenenLoading && !$app.szenen.length" class="entity-skeleton entity-list--accented" x-cloak>
+  <div x-show="szenenLoading && !$store.catalog.szenen.length" class="entity-skeleton entity-list--accented" x-cloak>
     <template x-for="i in 6" :key="i">
       <div class="entity-skeleton-row">
         <span class="entity-skeleton-cell entity-skeleton-cell--anchor"></span>
@@ -45,7 +45,7 @@
   </div>
 
   <!-- Szenen-Übersicht: klappbar -->
-  <div x-show="$app.szenen.length > 0" class="szenen-uebersicht" x-data="collapsible()">
+  <div x-show="$store.catalog.szenen.length > 0" class="szenen-uebersicht" x-data="collapsible()">
     <button type="button" class="collapsible-toggle" x-bind="trigger">
       <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
       <span x-text="$app.t('szenen.distribution')"></span>
@@ -93,7 +93,7 @@
   </div>
 
   <!-- Alle Szenen -->
-  <div x-show="$app.szenen.length > 0" class="szenen-liste-section">
+  <div x-show="$store.catalog.szenen.length > 0" class="szenen-liste-section">
     <!-- Ansicht-Umschalter (Liste / Grid) -->
     <div class="tabs entity-view-toggle" role="tablist" :aria-label="$app.t('szenen.viewLabel')">
       <template x-for="m in ['list','grid']" :key="m">
@@ -116,7 +116,7 @@
                 :class="{ 'tabs-btn--active': $app.szenenFilters.wertung === '' }"
                 @click="$app.szenenFilters.wertung = ''">
           <span x-text="$app.t('common.all')"></span>
-          <span class="tabs-btn-count" x-text="$app.szenen.length"></span>
+          <span class="tabs-btn-count" x-text="$store.catalog.szenen.length"></span>
         </button>
         <template x-for="w in ['stark','mittel','schwach']" :key="w">
           <button type="button" class="tabs-btn"
@@ -130,7 +130,7 @@
       </div>
       <div x-data="catalogFilter('figur')"
            x-modelable="value" x-model="$app.szenenFilters.figurId"
-           x-effect="options = $app.figuren.filter(f => $app.szenen.some(s => s.fig_ids.includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
+           x-effect="options = $store.catalog.figuren.filter(f => $store.catalog.szenen.some(s => s.fig_ids.includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
            >
       </div>
       <div x-data="catalogFilter('chapter')"
@@ -138,13 +138,13 @@
            x-effect="options = $app.szenenKapitelListe().map(k => ({value: k, label: k}))"
            >
       </div>
-      <div x-show="$app.orte.length > 0"
+      <div x-show="$store.catalog.orte.length > 0"
            x-data="catalogFilter('ort')"
            x-modelable="value" x-model="$app.szenenFilters.ortId"
-           x-effect="options = $app.orte.filter(o => $app.szenen.some(s => (s.ort_ids||[]).includes(o.id))).map(o => ({value: o.id, label: o.name}))"
+           x-effect="options = $store.catalog.orte.filter(o => $store.catalog.szenen.some(s => (s.ort_ids||[]).includes(o.id))).map(o => ({value: o.id, label: o.name}))"
            >
       </div>
-      <span class="filter-count" x-text="$app.szenenFiltered.length + ' / ' + $app.szenen.length"></span>
+      <span class="filter-count" x-text="$app.szenenFiltered.length + ' / ' + $store.catalog.szenen.length"></span>
     </div>
 
     <!-- Kompakte Szenen-Liste -->

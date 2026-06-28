@@ -35,7 +35,7 @@ export const kontinuitaetMethods = {
         if (issue.fig_ids?.length) {
           if (!issue.fig_ids.includes(filters.figurId)) return false;
         } else {
-          const selectedName = root.figuren.find(f => f.id === filters.figurId)?.name || '';
+          const selectedName = root.$store.catalog.figuren.find(f => f.id === filters.figurId)?.name || '';
           if (selectedName && !(issue.figuren || []).includes(selectedName)) return false;
         }
       }

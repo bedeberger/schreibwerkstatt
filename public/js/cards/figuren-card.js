@@ -132,7 +132,7 @@ export function registerFigurenCard() {
 
       // Sprachwechsel → Graph-Labels neu rendern (uiLocale Teil des Hash).
       this.$watch(() => window.__app.uiLocale, () => {
-        if (window.__app.showFiguresCard && window.__app.figuren?.length) {
+        if (window.__app.showFiguresCard && Alpine.store('catalog').figuren?.length) {
           this.renderFigurGraph();
         }
       });
@@ -167,19 +167,19 @@ export function registerFigurenCard() {
     // UI-Helper: aus Comboboxen via x-effect mehrfach pro Render gerufen
     // (für _disabled + options). Memo auf Identität der Quell-Daten.
     figurenKapitelListe() {
-      return this._memoKapitel([window.__app.figuren]);
+      return this._memoKapitel([Alpine.store('catalog').figuren]);
     },
 
     figurenSeitenListe() {
       // seiten = Array {kapitel, seite} — eigener Iterator (keine 1:1-Relation).
-      return this._memoSeiten([window.__app.figuren, window.__app.figurenFilters.kapitel]);
+      return this._memoSeiten([Alpine.store('catalog').figuren, window.__app.figurenFilters.kapitel]);
     },
 
     filteredFiguren() {
       const root = window.__app;
       const f = root.figurenFilters;
       return this._memoFiltered([
-        root.figuren,
+        root.$store.catalog.figuren,
         root._chapterOrderMap,
         f.suche ?? '',
         f.kapitel ?? '',

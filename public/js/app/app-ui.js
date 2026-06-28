@@ -102,10 +102,10 @@ export const appUiMethods = {
   },
 
   szenenKapitelListe() {
-    return this._deriveKapitel(this.szenen, s => s.kapitel);
+    return this._deriveKapitel(this.$store.catalog.szenen, s => s.kapitel);
   },
   orteKapitelListe() {
-    return this._deriveKapitel(this.orte, o => o.kapitel);
+    return this._deriveKapitel(this.$store.catalog.orte, o => o.kapitel);
   },
 
   // ── Email-Display-Lookup ────────────────────────────────────────────────

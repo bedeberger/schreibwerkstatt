@@ -38,7 +38,7 @@ export function registerKontinuitaetCard() {
         showFlag: 'showKontinuitaetCard',
         timerKeys: ['_kontinuitaetPollTimer'],
         onShow: async (root) => {
-          if (!root.figuren?.length) await root.loadFiguren(root.selectedBookId);
+          if (!root.$store.catalog.figuren?.length) await root.loadFiguren(root.selectedBookId);
           await this._loadKontinuitaetHistory();
         },
         load: () => this._loadKontinuitaetHistory(),

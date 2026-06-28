@@ -89,7 +89,7 @@ export const importMethods = {
   importedFromName() {
     const sel = this.selectedDraft();
     if (!sel?.source_figure_id) return null;
-    const figs = window.__app?.figuren || [];
+    const figs = window.__app?.$store.catalog.figuren || [];
     const fig = figs.find(f => f.id === sel.source_figure_id);
     return fig?.name || null;
   },

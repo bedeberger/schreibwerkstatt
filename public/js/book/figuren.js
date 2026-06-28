@@ -111,7 +111,7 @@ export const figurenMethods = {
   async loadFiguren(bookId, { signal } = {}) {
     try {
       const data = await fetchJson('/figures/' + bookId, { signal });
-      this.figuren = (data?.figuren || []).map(_sanitizeFigur);
+      this.$store.catalog.figuren = (data?.figuren || []).map(_sanitizeFigur);
       this.figurenUpdatedAt = data?.updated_at || null;
       this._figurLookupIndex = null;
       this._buildGlobalZeitstrahl();
@@ -126,7 +126,7 @@ export const figurenMethods = {
       const r = await fetch('/figures/' + this.selectedBookId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ figuren: this.figuren }),
+        body: JSON.stringify({ figuren: this.$store.catalog.figuren }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
     } catch (e) {

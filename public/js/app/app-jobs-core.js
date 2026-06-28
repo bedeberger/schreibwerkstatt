@@ -283,11 +283,11 @@ export const appJobsCoreMethods = {
     };
     // Dedup: derselbe Job kann über den per-Card-Poller UND den Queue-Diff
     // terminal werden — Toast trotzdem genau einmal.
-    if (!this._toastedJobIds) this._toastedJobIds = new Set();
+    if (!this.$store.jobs._toastedJobIds) this.$store.jobs._toastedJobIds = new Set();
     const jobId = job.id ?? detail.jobId;
     if (jobId != null) {
-      if (this._toastedJobIds.has(jobId)) return;
-      this._toastedJobIds.add(jobId);
+      if (this.$store.jobs._toastedJobIds.has(jobId)) return;
+      this.$store.jobs._toastedJobIds.add(jobId);
     }
     const labelKey = labels[detail.type];
     const isError = job.status !== 'done';
@@ -308,34 +308,34 @@ export const appJobsCoreMethods = {
   },
 
   _showJobToast({ message, severity, jobType, bookId }) {
-    if (this._jobToastTimer) { clearTimeout(this._jobToastTimer); this._jobToastTimer = null; }
-    this.jobToast = { message, severity, jobType, bookId };
+    if (this.$store.jobs._jobToastTimer) { clearTimeout(this.$store.jobs._jobToastTimer); this.$store.jobs._jobToastTimer = null; }
+    this.$store.jobs.jobToast = { message, severity, jobType, bookId };
     const ttl = severity === 'err' ? 9000 : 4500;
-    this._jobToastTimer = setTimeout(() => {
-      this.jobToast = null;
-      this._jobToastTimer = null;
+    this.$store.jobs._jobToastTimer = setTimeout(() => {
+      this.$store.jobs.jobToast = null;
+      this.$store.jobs._jobToastTimer = null;
     }, ttl);
   },
 
   _dismissJobToast() {
-    if (this._jobToastTimer) { clearTimeout(this._jobToastTimer); this._jobToastTimer = null; }
-    this.jobToast = null;
+    if (this.$store.jobs._jobToastTimer) { clearTimeout(this.$store.jobs._jobToastTimer); this.$store.jobs._jobToastTimer = null; }
+    this.$store.jobs.jobToast = null;
   },
 
   _startJobQueuePoll() {
-    if (this._jobQueueTimer) clearInterval(this._jobQueueTimer);
+    if (this.$store.jobs._jobQueueTimer) clearInterval(this.$store.jobs._jobQueueTimer);
     if (!this._jobQueueIdsLastSeen) this._jobQueueIdsLastSeen = new Map();
     this._jobQueueFailures = 0;
     const poll = () => this._pollJobQueue();
     poll();
-    this._jobQueueTimer = setInterval(poll, 5000);
+    this.$store.jobs._jobQueueTimer = setInterval(poll, 5000);
     // Wakeup: Tab kommt aus Background. Counter resetten, sofort frisch pollen
     // (löscht den Banner, falls er fälschlich angezeigt wurde) und Polling
     // wieder starten, falls es nach 5 Fehlern eingestellt war.
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
       this._jobQueueFailures = 0;
-      if (!this._jobQueueTimer) this._jobQueueTimer = setInterval(poll, 5000);
+      if (!this.$store.jobs._jobQueueTimer) this.$store.jobs._jobQueueTimer = setInterval(poll, 5000);
       poll();
     }, this._abortCtrl?.signal ? { signal: this._abortCtrl.signal } : false);
     // Sofort-Refresh: Feature-Module dispatchen `job:enqueued` nach POST,
@@ -347,7 +347,7 @@ export const appJobsCoreMethods = {
     try {
       const items = await fetchJson('/jobs/queue');
       this._detectFinishedJobs(items);
-      this.jobQueueItems = items;
+      this.$store.jobs.jobQueueItems = items;
       this._jobQueueFailures = 0;
       if (this.serverOffline) this.serverOffline = false;
     } catch (e) {
@@ -366,9 +366,9 @@ export const appJobsCoreMethods = {
       if (this._jobQueueFailures >= 2 && !this.serverOffline && !this.sessionExpired) {
         this.serverOffline = true;
       }
-      if (this._jobQueueFailures >= 5 && this._jobQueueTimer) {
-        clearInterval(this._jobQueueTimer);
-        this._jobQueueTimer = null;
+      if (this._jobQueueFailures >= 5 && this.$store.jobs._jobQueueTimer) {
+        clearInterval(this.$store.jobs._jobQueueTimer);
+        this.$store.jobs._jobQueueTimer = null;
       }
     }
   },
@@ -377,7 +377,7 @@ export const appJobsCoreMethods = {
     try {
       const res = await fetch('/jobs/' + jobId, { method: 'DELETE' });
       if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-      this.jobQueueItems = this.jobQueueItems.filter(j => j.id !== jobId);
+      this.$store.jobs.jobQueueItems = this.$store.jobs.jobQueueItems.filter(j => j.id !== jobId);
     } catch (e) {
       console.error('[cancelJob]', e);
       this.setStatus(this.t('app.jobCancelFailed'), false, 4000);
@@ -506,18 +506,18 @@ export const appJobsCoreMethods = {
     });
 
     // Prüfen ob ein komplett-analyse Job vom Server noch läuft (z.B. Tab geschlossen)
-    if (!this.alleAktualisierenLoading) {
+    if (!this.$store.jobs.alleAktualisierenLoading) {
       try {
         const { jobId, status, progress, statusText, statusParams } = await fetchJson(
           `/jobs/active?type=komplett-analyse&book_id=${bookId}`
         );
         if (jobId && (status === 'running' || status === 'queued')) {
-          this.alleAktualisierenLoading = true;
-          this.alleAktualisierenProgress = progress || 0;
-          this.alleAktualisierenTokIn = 0;
-          this.alleAktualisierenTokOut = 0;
-          this.alleAktualisierenTps = null;
-          this.alleAktualisierenStatus = statusText ? this.t(statusText, statusParams) : this.t('komplett.running');
+          this.$store.jobs.alleAktualisierenLoading = true;
+          this.$store.jobs.alleAktualisierenProgress = progress || 0;
+          this.$store.jobs.alleAktualisierenTokIn = 0;
+          this.$store.jobs.alleAktualisierenTokOut = 0;
+          this.$store.jobs.alleAktualisierenTps = null;
+          this.$store.jobs.alleAktualisierenStatus = statusText ? this.t(statusText, statusParams) : this.t('komplett.running');
           this.showKomplettStatus = true;
           this._startKomplettPoll(jobId, bookId);
         }

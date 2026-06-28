@@ -58,6 +58,8 @@ const shellState = () => ({
   // und wird direkt via $store.tts / this.$store.tts gelesen (kein Root-Proxy).
   // Collaboration/Presence/Soft-Lock State lebt in Alpine.store('collab')
   // (cards/collab-store.js), ebenfalls direkt via $store.collab (kein Root-Proxy).
+  // Job-Infrastruktur (Queue-Footer, Job-Toast, „Alle aktualisieren"-Status)
+  // lebt in Alpine.store('jobs') (cards/jobs-store.js), direkt via $store.jobs.
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).
@@ -598,33 +600,10 @@ const entitiesState = () => {
   };
 };
 
-const jobsState = () => ({
-  jobQueueItems: [],
-  jobQueueExpanded: false,
-  _jobQueueTimer: null,
-  alleAktualisierenLoading: false,
-  alleAktualisierenStatus: '',
-  alleAktualisierenLastRun: null,
-  alleAktualisierenProgress: 0,
-  alleAktualisierenTokIn: 0,
-  alleAktualisierenTokOut: 0,
-  alleAktualisierenTps: null,
-  alleAktualisierenPassMode: null,
-  // Non-critical-Degradierungen aus dem letzten Komplettlauf (Job-Result.warnings):
-  // [{ key }] – im Status-Panel als Hinweiszeilen gerendert.
-  alleAktualisierenWarnings: [],
-  // Globaler Job-Done-Toast. Wird von `_maybeShowJobToast` für relevante
-  // Job-Typen gesetzt (komplett-analyse, review, kapitel-review, figuren,
-  // kontinuitaet, book-chat, finetune-export, pdf-export, batch-check,
-  // werkstatt-*). Auto-Dismiss via `_jobToastTimer`. Severity 'ok' für done,
-  // 'err' für error. Zwei Auslösepfade: per-Card-Poller (`startPoll`, race-frei
-  // sobald der Job terminal ist) und Queue-Diff (`_onJobFinished`, fängt
-  // Reload/Buchwechsel/geschlossene-Karte). `_toastedJobIds` dedupt, damit ein
-  // Job genau einmal toastet, egal welcher Pfad zuerst feuert.
-  jobToast: null,
-  _jobToastTimer: null,
-  _toastedJobIds: new Set(),
-});
+// Job-Infrastruktur-State (Queue-Footer, Job-Done-Toast, „Alle aktualisieren"/
+// Komplettanalyse-Status) lebt in Alpine.store('jobs') (cards/jobs-store.js) und
+// wird direkt via $store.jobs / this.$store.jobs gelesen (kein Root-Proxy).
+// Owner: app/app-jobs-core.js + app/app-komplett.js.
 
 export function initialLektoratState() {
   return {
@@ -655,6 +634,5 @@ export function initialLektoratState() {
     ...bookCreateState(),
     ...dailyProgressState(),
     ...entitiesState(),
-    ...jobsState(),
   };
 }

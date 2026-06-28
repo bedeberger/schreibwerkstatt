@@ -414,12 +414,12 @@ export function registerEreignisseCard() {
 
     // UI-Helper. Lesen $root-Filter + -Daten.
     ereignisseKapitelListe() {
-      return window.__app._deriveKapitel(window.__app.globalZeitstrahl, ev => ev.kapitel);
+      return window.__app._deriveKapitel(Alpine.store('catalog').globalZeitstrahl, ev => ev.kapitel);
     },
 
     ereignisseSeitenListe() {
       return window.__app._deriveSeiten(
-        window.__app.globalZeitstrahl,
+        Alpine.store('catalog').globalZeitstrahl,
         window.__app.ereignisseFilters.kapitel,
         ev => ev.kapitel,
         ev => Array.isArray(ev.seiten) ? ev.seiten : ev.seite,
@@ -429,7 +429,7 @@ export function registerEreignisseCard() {
     // Liste sichtbarer Subtypen im aktuellen Buch — Filter zeigt nur was vorkommt.
     ereignisseSubtypListe() {
       const seen = new Set();
-      for (const ev of (window.__app.globalZeitstrahl || [])) {
+      for (const ev of (Alpine.store('catalog').globalZeitstrahl || [])) {
         seen.add(ev.subtyp || 'sonstiges');
       }
       return [...seen].sort();
@@ -463,7 +463,7 @@ export function registerEreignisseCard() {
       const root = window.__app;
       const f = root.ereignisseFilters;
       return this._memoFiltered([
-        root.globalZeitstrahl,
+        root.$store.catalog.globalZeitstrahl,
         f.suche  ?? '',
         f.figurId ?? '',
         f.kapitel ?? '',

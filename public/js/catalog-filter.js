@@ -10,7 +10,7 @@
 //
 //   <div x-data="catalogFilter('figur')"
 //        x-modelable="value" x-model="$app.szenenFilters.figurId"
-//        x-effect="options = $app.figuren.filter(...).map(...)"></div>
+//        x-effect="options = $store.catalog.figuren.filter(...).map(...)"></div>
 //
 // Erweiterung: neue Filter-Typen (z. B. 'tag', 'datum') hier ergänzen,
 // i18n-Keys in `public/js/i18n/{de,en}.json` analog hinzufügen.

@@ -11,6 +11,7 @@ import { registerTtsStore } from '../cards/tts-store.js';
 import { registerSttStore } from '../cards/stt-store.js';
 import { registerConfigStore } from '../cards/config-store.js';
 import { registerCollabStore } from '../cards/collab-store.js';
+import { registerJobsStore } from '../cards/jobs-store.js';
 import { registerEreignisseCard } from '../cards/ereignisse-card.js';
 import { registerOrteCard } from '../cards/orte-card.js';
 import { registerSongsCard } from '../cards/songs-card.js';
@@ -113,6 +114,7 @@ export function registerAllCards() {
   registerSttStore();
   registerConfigStore();
   registerCollabStore();
+  registerJobsStore();
   registerStilCard();
   registerFehlerHeatmapCard();
   registerBookOverviewCard();

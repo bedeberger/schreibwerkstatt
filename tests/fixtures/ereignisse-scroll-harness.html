@@ -54,6 +54,7 @@
 
   <script type="module">
     const { registerEreignisseCard } = await import('/public/js/cards/ereignisse-card.js');
+    const { registerJobsStore } = await import('/public/js/cards/jobs-store.js');
 
     // 20 dated + 78 undated events.
     const MOCK = [];
@@ -73,13 +74,13 @@
         selectedBookId: 1, selectedBookName: 'Testbuch', showEreignisseCard: true,
         figuren: [], globalZeitstrahl: MOCK,
         ereignisseFilters: { suche: '', figurId: '', kapitel: '', seite: '', subtyp: '' },
-        alleAktualisierenLastRun: null,
         t: (k, params) => params ? `${k} ${JSON.stringify(params)}` : k,
         _deriveKapitel: () => [], _deriveSeiten: () => [], _reloadZeitstrahl: () => {},
         gotoStelle: () => {}, openFigurById: () => {}, gotoPageById: () => {},
       });
       window.Alpine.magic('app', () => window.__app);
       window.Alpine.store('catalog', { figuren: [], orte: [], szenen: [], globalZeitstrahl: MOCK });
+      registerJobsStore();
       registerEreignisseCard();
     });
     document.addEventListener('alpine:initialized', () => {

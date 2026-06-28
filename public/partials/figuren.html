@@ -10,8 +10,8 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('figuren.title')"></span>
-      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !$app.figurenLoading">
-        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      <div class="card-subline" x-show="$store.jobs.alleAktualisierenLastRun && !$app.figurenLoading">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></span>
       </div>
     </div>
   </div>
@@ -23,19 +23,19 @@
   <div x-show="$app.figurenStatus" class="card-status" x-html="$app.figurenStatus"></div>
 
   <!-- Leer-Hinweis mit CTA -->
-  <div x-show="$app.figuren.length === 0 && !$app.figurenLoading && !$app.figurenStatus" class="card-empty">
+  <div x-show="$store.catalog.figuren.length === 0 && !$app.figurenLoading && !$app.figurenStatus" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <p class="card-empty-hint" x-text="$app.t('empty.figuren.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
 
   <!-- Graph -->
-  <div x-show="$app.figuren.length > 0" class="figur-graph-section">
+  <div x-show="$store.catalog.figuren.length > 0" class="figur-graph-section">
 
     <!-- Modus-Toggle -->
     <div class="tabs tabs--fullwidth">
@@ -114,13 +114,13 @@
 
 
   <!-- Figurenliste -->
-  <div x-show="$app.figuren.length > 0" class="figur-list-section">
+  <div x-show="$store.catalog.figuren.length > 0" class="figur-list-section">
     <div class="figur-list-header">
       <div class="history-heading" x-text="$app.t('figuren.heading')"></div>
     </div>
 
      <!-- Filter -->
-    <div x-show="$app.figuren.length > 0 && figurenKapitelListe().length > 0" class="filter-bar">
+    <div x-show="$store.catalog.figuren.length > 0 && figurenKapitelListe().length > 0" class="filter-bar">
       <span class="filter-search-wrap">
         <input type="text" x-model="$app.figurenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
         <button type="button" class="search-clear--icon" x-show="$app.figurenFilters.suche" @click="$app.figurenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
@@ -138,7 +138,7 @@
           :class="{'combobox-wrap--disabled': _disabled}"
           >
       </div>
-      <span class="filter-count" x-text="filteredFiguren().length + ' / ' + $app.figuren.length"></span>
+      <span class="filter-count" x-text="filteredFiguren().length + ' / ' + $store.catalog.figuren.length"></span>
     </div>
 
     <template x-for="f in filteredFiguren()" :key="f.id">

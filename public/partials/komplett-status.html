@@ -1,16 +1,16 @@
 <!-- Komplettanalyse: Primärbutton mit eingebettetem Fortschrittsring + Status-/Aktionsmenü (⋯) -->
-<div class="komplett-status-wrap" @click.outside="showKomplettStatus = false" @mouseenter="if (alleAktualisierenLoading) showKomplettStatus = true">
+<div class="komplett-status-wrap" @click.outside="showKomplettStatus = false" @mouseenter="if ($store.jobs.alleAktualisierenLoading) showKomplettStatus = true">
   <button type="button"
           class="update-all-btn"
-          :class="{ 'update-all-btn--running': alleAktualisierenLoading }"
+          :class="{ 'update-all-btn--running': $store.jobs.alleAktualisierenLoading }"
           @click="alleAktualisieren()"
-          :disabled="alleAktualisierenLoading || !selectedBookId"
+          :disabled="$store.jobs.alleAktualisierenLoading || !selectedBookId"
           :data-tip="t('header.updateAllTitle')">
     <span class="update-all-btn-ring"
-          x-show="alleAktualisierenLoading"
-          :style="{ '--progress': (alleAktualisierenProgress || 0) + '%' }"
+          x-show="$store.jobs.alleAktualisierenLoading"
+          :style="{ '--progress': ($store.jobs.alleAktualisierenProgress || 0) + '%' }"
           aria-hidden="true"></span>
-    <span class="update-all-btn-icon" x-show="!alleAktualisierenLoading" aria-hidden="true">
+    <span class="update-all-btn-icon" x-show="!$store.jobs.alleAktualisierenLoading" aria-hidden="true">
       <svg class="icon"><use href="/icons.svg?v=691#rotate-cw"/></svg>
     </span>
     <span class="update-all-btn-label" x-text="t('header.updateAll')"></span>
@@ -27,24 +27,24 @@
     <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#more-horizontal"/></svg>
   </button>
   <span class="komplett-last-run"
-        x-show="!alleAktualisierenLoading && alleAktualisierenLastRun"
+        x-show="!$store.jobs.alleAktualisierenLoading && $store.jobs.alleAktualisierenLastRun"
         x-cloak
-        x-text="t('common.asOf', { date: alleAktualisierenLastRun })"></span>
+        x-text="t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></span>
   <div class="komplett-status-panel" x-show="showKomplettStatus" x-cloak role="menu">
     <div class="komplett-status-title" x-text="t('komplett.title')"></div>
-    <div class="komplett-status-laststamp" x-show="alleAktualisierenLastRun" x-cloak
-         x-text="t('common.asOf', { date: alleAktualisierenLastRun })"></div>
-    <template x-if="alleAktualisierenLoading || alleAktualisierenLastRun">
+    <div class="komplett-status-laststamp" x-show="$store.jobs.alleAktualisierenLastRun" x-cloak
+         x-text="t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></div>
+    <template x-if="$store.jobs.alleAktualisierenLoading || $store.jobs.alleAktualisierenLastRun">
       <div class="komplett-status-progress">
         <div class="progress-bar-wrap komplett-progress-bar-wrap">
-          <div class="progress-bar" :style="{ '--progress': alleAktualisierenProgress + '%' }"></div>
+          <div class="progress-bar" :style="{ '--progress': $store.jobs.alleAktualisierenProgress + '%' }"></div>
         </div>
         <div class="komplett-progress-label">
-          <span x-text="alleAktualisierenStatus || t('komplett.done')"></span>
-          <span x-show="alleAktualisierenTokIn > 0 || alleAktualisierenTokOut > 0" class="komplett-tokens">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#arrow-up"/></svg><span x-text="_fmtTok(alleAktualisierenTokIn)"></span>
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#arrow-down"/></svg><span x-text="_fmtTok(alleAktualisierenTokOut)"></span>
-            <span x-show="alleAktualisierenTps" x-text="' · ' + Math.round(alleAktualisierenTps) + ' tok/s'"></span>
+          <span x-text="$store.jobs.alleAktualisierenStatus || t('komplett.done')"></span>
+          <span x-show="$store.jobs.alleAktualisierenTokIn > 0 || $store.jobs.alleAktualisierenTokOut > 0" class="komplett-tokens">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#arrow-up"/></svg><span x-text="_fmtTok($store.jobs.alleAktualisierenTokIn)"></span>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#arrow-down"/></svg><span x-text="_fmtTok($store.jobs.alleAktualisierenTokOut)"></span>
+            <span x-show="$store.jobs.alleAktualisierenTps" x-text="' · ' + Math.round($store.jobs.alleAktualisierenTps) + ' tok/s'"></span>
           </span>
         </div>
         <ul class="komplett-phase-list" x-show="_komplettPhasen().length">
@@ -59,8 +59,8 @@
         </ul>
       </div>
     </template>
-    <ul class="komplett-warnings" x-show="!alleAktualisierenLoading && alleAktualisierenWarnings.length" x-cloak>
-      <template x-for="w in alleAktualisierenWarnings" :key="w.key">
+    <ul class="komplett-warnings" x-show="!$store.jobs.alleAktualisierenLoading && $store.jobs.alleAktualisierenWarnings.length" x-cloak>
+      <template x-for="w in $store.jobs.alleAktualisierenWarnings" :key="w.key">
         <li class="komplett-warning-item" x-text="t(w.key, w.params)"></li>
       </template>
     </ul>
@@ -69,7 +69,7 @@
               class="komplett-status-action-btn"
               role="menuitem"
               @click="showKomplettStatus = false; clearChapterCache()"
-              :disabled="alleAktualisierenLoading || !selectedBookId"
+              :disabled="$store.jobs.alleAktualisierenLoading || !selectedBookId"
               :data-tip="t('header.clearCacheTitle')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
         <span x-text="t('header.clearCache')"></span>

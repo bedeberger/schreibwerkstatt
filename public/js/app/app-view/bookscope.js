@@ -18,12 +18,12 @@ export const bookscopeMethods = {
       detail: { bookId: this.selectedBookId },
     }));
     this._stopCollabPoll?.();
-    this.figuren = [];
-    this.orte = [];
-    this.songs = [];
-    this.szenen = [];
-    this.globalZeitstrahl = [];
-    this.zeitstrahlChronology = null;
+    this.$store.catalog.figuren = [];
+    this.$store.catalog.orte = [];
+    this.$store.catalog.songs = [];
+    this.$store.catalog.szenen = [];
+    this.$store.catalog.globalZeitstrahl = [];
+    this.$store.catalog.zeitstrahlChronology = null;
     this.werkstattDrafts = [];
     this.werkstattDraftId = null;
     this.bookReviewHistory = [];
@@ -85,12 +85,12 @@ export const bookscopeMethods = {
     // Komplett-Analyse-UI zurücksetzen, damit ein neues Buch eine eigene
     // Komplett-Analyse queuen kann. Der Server-Job des alten Buchs läuft weiter;
     // checkPendingJobs(bookId) reconnectet beim Zurückwechseln automatisch.
-    this.alleAktualisierenLoading = false;
-    this.alleAktualisierenStatus = '';
-    this.alleAktualisierenProgress = 0;
-    this.alleAktualisierenTokIn = 0;
-    this.alleAktualisierenTokOut = 0;
-    this.alleAktualisierenTps = null;
+    this.$store.jobs.alleAktualisierenLoading = false;
+    this.$store.jobs.alleAktualisierenStatus = '';
+    this.$store.jobs.alleAktualisierenProgress = 0;
+    this.$store.jobs.alleAktualisierenTokIn = 0;
+    this.$store.jobs.alleAktualisierenTokOut = 0;
+    this.$store.jobs.alleAktualisierenTps = null;
     this.showKomplettStatus = false;
     this.resetDailyProgress();
     if (this.selectedBookId) this.loadDailyProgress(this.selectedBookId);
@@ -194,14 +194,14 @@ export const bookscopeMethods = {
     this.figurenStatus = '';
     this.figurenProgress = 0;
     this.selectedFigurId = null;
-    this.globalZeitstrahl = [];
-    this.zeitstrahlChronology = null;
+    this.$store.catalog.globalZeitstrahl = [];
+    this.$store.catalog.zeitstrahlChronology = null;
     this.showGlobalZeitstrahl = false;
-    this.szenen = [];
+    this.$store.catalog.szenen = [];
     this.szenenUpdatedAt = null;
     this.selectedSzeneId = null;
-    this.orte = [];
-    this.songs = [];
+    this.$store.catalog.orte = [];
+    this.$store.catalog.songs = [];
     this.selectedSongId = null;
     // Filter-Reset einheitlich über FILTER_SCOPES — deckt auch `suche`-Keys
     // ab, die früher nur teilweise gesetzt wurden (drift-freie SSoT).
@@ -214,11 +214,11 @@ export const bookscopeMethods = {
     // Last-Run-Stempel gehört zum Buch, nicht zur View — Buch bleibt bei
     // Home-Klick gewählt, also für das aktuelle Buch neu laden statt nullen.
     if (this.selectedBookId && typeof this.loadLastKomplettRun === 'function') this.loadLastKomplettRun(this.selectedBookId);
-    else this.alleAktualisierenLastRun = null;
-    this.alleAktualisierenProgress = 0;
-    this.alleAktualisierenTokIn = 0;
-    this.alleAktualisierenTokOut = 0;
-    this.alleAktualisierenTps = null;
+    else this.$store.jobs.alleAktualisierenLastRun = null;
+    this.$store.jobs.alleAktualisierenProgress = 0;
+    this.$store.jobs.alleAktualisierenTokIn = 0;
+    this.$store.jobs.alleAktualisierenTokOut = 0;
+    this.$store.jobs.alleAktualisierenTps = null;
     this.showKomplettStatus = false;
     this.resetBookChat();
     // Default-Home: nach komplettem Reset Übersicht öffnen, falls Buch gewählt.

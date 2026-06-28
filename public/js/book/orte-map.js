@@ -169,7 +169,7 @@ export const orteMapMethods = {
   // befüllen, damit Undo/Redo konsistent zum Serverstand bleiben.
   async _applyGeoSnapshot(snap, counterStack) {
     const app = window.__app;
-    const target = app.orte.find(x => x.id === snap.id);
+    const target = app.$store.catalog.orte.find(x => x.id === snap.id);
     if (!target) return; // Ort gelöscht → Eintrag verfällt still
     const cur = { id: snap.id, lat: target.lat, lng: target.lng };
     target.lat = snap.lat;
@@ -221,7 +221,7 @@ export const orteMapMethods = {
     marker.on('dragend', async () => {
       const ll = marker.getLatLng();
       const app = window.__app;
-      const target = app.orte.find(x => x.id === o.id);
+      const target = app.$store.catalog.orte.find(x => x.id === o.id);
       if (!target) return;
       const prev = { lat: target.lat, lng: target.lng };
       // Vorherige Position auf den Undo-Stack legen, BEVOR sie überschrieben
@@ -383,7 +383,7 @@ export const orteMapMethods = {
     // gerade gespeicherten Koordinaten via clearedCoords-Heuristik wieder nullen.
     for (const r of results) {
       if (!r || r.lat == null || r.lng == null) continue;
-      const t = app.orte.find(x => x.id === r.id);
+      const t = app.$store.catalog.orte.find(x => x.id === r.id);
       if (t) {
         t.lat = r.lat;
         t.lng = r.lng;
@@ -412,7 +412,7 @@ export const orteMapMethods = {
         this._renderOrteMarkers(L, false);
         // Treffer → auf die neue Position zoomen. Kein Treffer → der rote
         // Mitte-Pin liegt bereits sichtbar in der Kartenmitte, kein setView.
-        const target = app.orte.find(x => x.id === o.id);
+        const target = app.$store.catalog.orte.find(x => x.id === o.id);
         if (hit && target) this._map?.setView([target.lat, target.lng], Math.max(this._map.getZoom(), 6));
       }
     } catch (e) {
@@ -448,7 +448,7 @@ export const orteMapMethods = {
   // Marker verschwindet, Ort wird wieder geocodierbar.
   async clearGeoref(o) {
     const app = window.__app;
-    const target = app.orte.find(x => x.id === o.id);
+    const target = app.$store.catalog.orte.find(x => x.id === o.id);
     if (!target || (target.lat == null && target.lng == null)) return;
     const prev = { lat: target.lat, lng: target.lng };
     target.lat = null;
@@ -473,7 +473,7 @@ export const orteMapMethods = {
   async clearAllGeorefs() {
     if (this.geocodingId || this.geocodingAll) return;
     const app = window.__app;
-    const located = app.orte.filter(o => o.lat != null || o.lng != null);
+    const located = app.$store.catalog.orte.filter(o => o.lat != null || o.lng != null);
     if (!located.length) return;
     const ok = await app.appConfirm({
       message: app.t('orte.map.clearAllConfirm', { n: located.length }),
@@ -486,7 +486,7 @@ export const orteMapMethods = {
     const saved = await app.patchOrtCoords(located.map(o => ({ id: o.id, lat: null, lng: null })));
     if (!saved) {
       for (const p of prev) {
-        const t = app.orte.find(x => x.id === p.id);
+        const t = app.$store.catalog.orte.find(x => x.id === p.id);
         if (t) { t.lat = p.lat; t.lng = p.lng; }
       }
       this.setOrteMapStatus(app.t('orte.map.saveFailed'));
