@@ -15,7 +15,20 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(__dirname, '..', '..');
-const read = (p) => fs.readFileSync(path.join(repo, p), 'utf8');
+// Submodul-bewusst: liegt neben <name>.js ein <name>/-Verzeichnis (Facade-Split),
+// werden dessen .js-Submodule angehängt, damit Source-Invarianten den ganzen
+// Modul-Quelltext sehen statt nur die Re-Export-Facade.
+const read = (p) => {
+  const full = path.join(repo, p);
+  let src = fs.readFileSync(full, 'utf8');
+  const dir = full.replace(/\.js$/, '');
+  if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+    for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.js')).sort()) {
+      src += '\n' + fs.readFileSync(path.join(dir, f), 'utf8');
+    }
+  }
+  return src;
+};
 
 const editSrc = read('public/js/editor/notebook/edit.js');
 const storageSrc = read('public/js/editor/notebook/storage.js');
@@ -62,27 +75,27 @@ test('Auto-Save: IDLE < MAX (sonst Cap nutzlos)', () => {
 // ── Shared-Lib-Konsum ────────────────────────────────────────────────────────
 
 test('Shared-Lib: getActiveEditorContainer aus shared/active-editor importiert', () => {
-  assert.match(editSrc, /from\s+['"]\.\.\/shared\/active-editor\.js['"]/,
+  assert.match(editSrc, /from\s+['"](?:\.\.\/)+shared\/active-editor\.js['"]/,
     'Container-Lookup darf nicht auf hartcodiertem #editor-card-Selektor liegen');
 });
 
 test('Shared-Lib: stripLektoratMarks aus shared/html-clean importiert', () => {
-  assert.match(editSrc, /stripLektoratMarks[\s\S]*from\s+['"]\.\.\/shared\/html-clean\.js['"]/,
+  assert.match(editSrc, /stripLektoratMarks[\s\S]*from\s+['"](?:\.\.\/)+shared\/html-clean\.js['"]/,
     'Mark-Stripping muss aus shared/ kommen, nicht inline');
 });
 
 test('Shared-Lib: savePage aus shared/page-api importiert (Save geht durch den Wrapper)', () => {
-  assert.match(editSrc, /\bsavePage\b[\s\S]*from\s+['"]\.\.\/shared\/page-api\.js['"]/,
+  assert.match(editSrc, /\bsavePage\b[\s\S]*from\s+['"](?:\.\.\/)+shared\/page-api\.js['"]/,
     'Save muss durch den page-api-Wrapper laufen (der intern buildSavePayload nutzt), nicht raw contentRepo.savePage');
 });
 
 test('Shared-Lib: isPageConflict aus shared/page-api importiert', () => {
-  assert.match(editSrc, /isPageConflict[\s\S]*from\s+['"]\.\.\/shared\/page-api\.js['"]/,
+  assert.match(editSrc, /isPageConflict[\s\S]*from\s+['"](?:\.\.\/)+shared\/page-api\.js['"]/,
     'Konflikt-Erkennung muss aus shared/page-api');
 });
 
 test('Shared-Lib: installEditCounter aus shared/edit-counter importiert', () => {
-  assert.match(editSrc, /installEditCounter[\s\S]*from\s+['"]\.\.\/shared\/edit-counter\.js['"]/,
+  assert.match(editSrc, /installEditCounter[\s\S]*from\s+['"](?:\.\.\/)+shared\/edit-counter\.js['"]/,
     'Counter-Setup muss aus shared/edit-counter');
 });
 

@@ -20,6 +20,7 @@ import { writingTimeMethods } from './book/writing-time.js';
 import { sttTimeMethods } from './book/stt-time.js';
 import { lektoratTimeMethods } from './book/lektorat-time.js';
 import { registerCatalogStore } from './cards/catalog-store.js';
+import { registerNavStore } from './cards/nav-store.js';
 import { registerEreignisseCard } from './cards/ereignisse-card.js';
 import { registerOrteCard } from './cards/orte-card.js';
 import { registerSongsCard } from './cards/songs-card.js';
@@ -367,6 +368,7 @@ document.addEventListener('alpine:init', () => {
   });
 
   registerCatalogStore();
+  registerNavStore();
   registerStilCard();
   registerFehlerHeatmapCard();
   registerBookOverviewCard();
@@ -462,6 +464,20 @@ document.addEventListener('alpine:init', () => {
     set globalZeitstrahl(v) { Alpine.store('catalog').globalZeitstrahl = v; },
     get zeitstrahlChronology() { return Alpine.store('catalog').zeitstrahlChronology; },
     set zeitstrahlChronology(v) { Alpine.store('catalog').zeitstrahlChronology = v; },
+
+    // ── Nav-Proxy ──────────────────────────────────────────────────────────────
+    // books, selectedBookId, pages, tree leben in Alpine.store('nav') (geteilt
+    // mit ~29 Reader-Modulen). Root exponiert sie als direkt adressierbare
+    // Properties, damit this.selectedBookId= / this.tree.push weiter
+    // funktionieren. Karten können auch direkt via $store.nav zugreifen.
+    get books() { return Alpine.store('nav').books; },
+    set books(v) { Alpine.store('nav').books = v; },
+    get selectedBookId() { return Alpine.store('nav').selectedBookId; },
+    set selectedBookId(v) { Alpine.store('nav').selectedBookId = v; },
+    get pages() { return Alpine.store('nav').pages; },
+    set pages(v) { Alpine.store('nav').pages = v; },
+    get tree() { return Alpine.store('nav').tree; },
+    set tree(v) { Alpine.store('nav').tree = v; },
 
     // ── Computed ─────────────────────────────────────────────────────────────
     // Admin-only View: Globaler Admin (global_role='admin') bekommt eine

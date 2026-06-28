@@ -1,0 +1,73 @@
+// Geteilte Imports + Modul-Konstanten der appViewMethods-Submodule.
+import { htmlToText, fetchJson, escHtml, decorateMentions } from '../../utils.js';
+import { computeTodayRing } from '../../today-ring.js';
+import { EXCLUSIVE_CARDS } from '../../cards/feature-registry.js';
+import { contentRepo } from '../../repo/content.js';
+import { readDraft, clearDraft } from '../../editor/draft-storage.js';
+import { setLastPageId, getLastPageId, getFilters } from '../../local-prefs.js';
+import { getDeviceId } from '../../device-id.js';
+import { EVT } from '../../events.js';
+
+// Karten-Scopes, deren Filter pro Buch im localStorage persistiert werden.
+// Defaults werden bei Buchwechsel angewandt; gespeicherte Werte überschreiben
+// jeweils nur die genannten Keys. SSoT für persist (app.js-Watcher),
+// restore (`_restoreBookPrefs`) und reset (`resetView`).
+export const FILTER_SCOPES = [
+  ['figurenFilters',      { kapitel: '', seite: '', suche: '' }],
+  ['ereignisseFilters',   { figurId: '', kapitel: '', seite: '', suche: '' }],
+  ['szenenFilters',       { wertung: '', figurId: '', kapitel: '', ortId: '', suche: '' }],
+  ['orteFilters',         { figurId: '', kapitel: '', szeneId: '', suche: '' }],
+  ['songsFilters',        { figurId: '', kapitel: '', szeneId: '', genre: '', kontextTyp: '', suche: '' }],
+  ['kontinuitaetFilters', { figurId: '', kapitel: '', schwere: '' }],
+];
+
+// Generischer Karten-Toggle. Liest Behavior-Felder aus EXCLUSIVE_CARDS-Entry
+// (onReclick, requiresBook, loadDeps, auditEvent, extraRefreshOnOpen) und
+// kapselt die Open/Close/Refresh-Pfade. Bespoke-Toggles (kapitelReview, ideen,
+// chat, tree) leben weiterhin als eigene Methoden.
+export async function _toggleCardGeneric(entry) {
+  if (this[entry.flag]) {
+    if (entry.onReclick === 'refresh') {
+      window.dispatchEvent(new CustomEvent(EVT.CARD_REFRESH, { detail: { name: entry.refreshName || entry.key } }));
+      this._scrollToCardByKey(entry.key);
+    } else {
+      this[entry.flag] = false;
+    }
+    return;
+  }
+  if (entry.requiresBook && !this.selectedBookId) return;
+  this._closeOtherMainCards(entry.key);
+  if (entry.partial) await this._ensurePartial(entry.partial);
+  this[entry.flag] = true;
+  this._scrollToCardByKey(entry.key);
+  if (entry.auditEvent) this.logAuditEvent?.(entry.auditEvent, { book: this.selectedBookId });
+  if (entry.extraRefreshOnOpen) {
+    window.dispatchEvent(new CustomEvent(EVT.CARD_REFRESH, { detail: { name: entry.key } }));
+  }
+  if (entry.loadDeps?.length) {
+    const tasks = [];
+    for (const dep of entry.loadDeps) {
+      const empty = !(this[dep.skipIfNonEmpty]?.length);
+      if (empty && typeof this[dep.method] === 'function') {
+        tasks.push(this[dep.method](this.selectedBookId));
+      }
+    }
+    if (tasks.length) await Promise.all(tasks);
+  }
+}
+
+// Auto-generierte Toggle-Methoden — eine pro EXCLUSIVE_CARDS-Eintrag (ausser
+// `bespoke: true`). Werden in `appViewMethods` gespreaded, damit Alpine sie
+// als reguläre Methoden auf der Root-Component sieht (Templates, Hash-Router,
+// Palette rufen `toggleXxxCard()` direkt).
+export const generatedToggles = {};
+for (const entry of EXCLUSIVE_CARDS) {
+  if (entry.bespoke || !entry.toggle) continue;
+  generatedToggles[entry.toggle] = async function() { return _toggleCardGeneric.call(this, entry); };
+}
+
+// View-Steuerung: Exklusivität zwischen Buch-/Seiten-Karten, Seitenauswahl,
+// Reset-Logik beim Buch-/Seitenwechsel. Buchebenen-Features und Editor sind
+// gegenseitig exklusiv (siehe CLAUDE.md-Regel "Feature-Toggle").
+
+export { EVT, EXCLUSIVE_CARDS, clearDraft, computeTodayRing, contentRepo, decorateMentions, escHtml, fetchJson, getDeviceId, getFilters, getLastPageId, htmlToText, readDraft, setLastPageId };

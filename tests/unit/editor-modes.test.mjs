@@ -24,7 +24,20 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(__dirname, '..', '..');
-const read = (p) => fs.readFileSync(path.join(repo, p), 'utf8');
+// Submodul-bewusst: liegt neben <name>.js ein <name>/-Verzeichnis (Facade-Split),
+// werden dessen .js-Submodule angehängt, damit Source-Invarianten den ganzen
+// Modul-Quelltext sehen statt nur die Re-Export-Facade.
+const read = (p) => {
+  const full = path.join(repo, p);
+  let src = fs.readFileSync(full, 'utf8');
+  const dir = full.replace(/\.js$/, '');
+  if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+    for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.js')).sort()) {
+      src += '\n' + fs.readFileSync(path.join(dir, f), 'utf8');
+    }
+  }
+  return src;
+};
 
 // ── I1: enterFocusMode verlangt editMode ─────────────────────────────────────
 test('I1: enterFocusMode bricht ab, wenn editMode false', () => {
@@ -264,6 +277,6 @@ test('Cmd+Shift+E Hotkey routet zustandsabhängig (focus → exit, edit → ente
     'Hotkey: active-Branch ruft exitFocusMode');
   assert.match(combined, /_focusState\s*===\s*['"]idle['"][\s\S]*?enterFocusMode/,
     'Hotkey: idle-Branch ruft enterFocusMode');
-  assert.match(combined, /editor:focus:enter-from-pageview/,
+  assert.match(combined, /editor:focus:enter-from-pageview|EVT\.EDITOR_FOCUS_ENTER_FROM_PAGEVIEW/,
     'Hotkey: Page-View-Branch dispatcht editor:focus:enter-from-pageview');
 });

@@ -129,7 +129,10 @@ const aiProviderState = () => ({
 });
 
 const navigationState = () => ({
-  books: [],
+  // books / selectedBookId / pages / tree leben in Alpine.store('nav') (geteilt
+  // mit ~29 Reader-Modulen). Der Root spiegelt sie via Getter/Setter-Proxy
+  // (app.js) — hier daher kein eigenes Feld, sonst überschriebe der Spread den
+  // Proxy-Getter. Siehe cards/nav-store.js.
   // Erst nach dem ersten loadBooks() true. Gate fuer den Welcome-Empty-State
   // (books.length === 0), damit der nicht waehrend des initialen Ladens blitzt.
   booksLoaded: false,
@@ -137,7 +140,6 @@ const navigationState = () => ({
   // fuer die Buchwahl-Combobox (Bücher gruppiert nach Kategorie, siehe
   // tree.js#bookComboOptions). Wird nur befuellt, wenn Bücher Kategorien haben.
   bookFilterCategoryPool: [],
-  selectedBookId: '',
   // Per-Buch ACL-Rolle aus /books/:id/access. `currentBookRole` ist die Rolle
   // fuer selectedBookId (Snapshot fuer $watch + Getter `canEdit`/`canReview`).
   // null = nicht ermittelbar (kein Zugriff oder Endpoint-Fehler) → Frontend
@@ -148,8 +150,6 @@ const navigationState = () => ({
   // Per-Buch: true wenn mind. 2 ACL-Eintraege (Owner + N) → Collab-Poller + Presence-Pings
   // erst dann starten. Single-User-Bücher pollen nicht. Befüllt in `_loadBookRole`.
   bookSharedFlags: {},
-  pages: [],
-  tree: [],
   // Tree wird während Buchwechsel-Fetch sichtbar gelassen + via CSS gedimmt +
   // Klicks blockiert, statt vorab geleert (sonst leerer Tree bei Fetch-Fail).
   treeLoading: false,
