@@ -9,6 +9,7 @@ import { registerCatalogStore } from '../cards/catalog-store.js';
 import { registerNavStore } from '../cards/nav-store.js';
 import { registerTtsStore } from '../cards/tts-store.js';
 import { registerSttStore } from '../cards/stt-store.js';
+import { registerConfigStore } from '../cards/config-store.js';
 import { registerEreignisseCard } from '../cards/ereignisse-card.js';
 import { registerOrteCard } from '../cards/orte-card.js';
 import { registerSongsCard } from '../cards/songs-card.js';
@@ -109,6 +110,7 @@ export function registerAllCards() {
   registerNavStore();
   registerTtsStore();
   registerSttStore();
+  registerConfigStore();
   registerStilCard();
   registerFehlerHeatmapCard();
   registerBookOverviewCard();

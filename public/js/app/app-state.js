@@ -48,31 +48,13 @@ const shellState = () => ({
   // App-Version (vom Server via /config → VERSION-Datei). Manuell vor jedem
   // Commit gepflegt; SSoT ist lib/version.js. Anzeige in den UserSettings.
   appVersion: '',
-  // Tile-Server der Orte-Karte (vom Server via /config → app_settings
-  // geocode.tiles.*). Leaflet holt die Kacheln direkt im Browser; die URL liegt
-  // hier, damit ein self-hosted Tile-Server konfigurierbar ist. attribution
-  // leer = orte-map.js faellt auf den i18n-Default zurueck. Default deckt den
-  // Hard-Refresh ab, bevor /config geladen ist.
-  mapTiles: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '' },
-  // LT-Spellcheck-Aktivierung. /config liefert
-  // `languagetool.enabled` (true wenn Admin enabled + URL gesetzt). Wird in
-  // Editor-Templates via `:spellcheck="!$app.languagetoolEnabled"` gelesen
-  // und vom Spellcheck-Controller (cards/editor-spellcheck/controller.js)
-  // als Master-Switch konsumiert.
-  languagetoolEnabled: false,
-  // Debounce-Zeit (ms) zwischen Eingabe und LT-Check im Editor-Controller.
-  // Aus /config → app_settings `languagetool.debounce_ms`. Form-Felder
-  // (input/textarea) nutzen eigene Defaults und ignorieren diesen Wert.
-  languagetoolDebounceMs: 1500,
+  // Read-only /config-Settings (mapTiles, languagetoolEnabled,
+  // languagetoolDebounceMs, researchChatEnabled) leben in Alpine.store('config')
+  // (cards/config-store.js); der Root proxied sie unter denselben Namen (app.js).
   // STT-Diktat State lebt in Alpine.store('stt') (cards/stt-store.js); der Root
   // proxied es als this.sttEnabled/sttRecording/sttCaretUserSet/… (app.js).
   // TTS / Proof-Listening State lebt in Alpine.store('tts') (cards/tts-store.js);
   // der Root proxied es als this.ttsEnabled/ttsPlaying/… (app.js).
-  // Recherche-Chat (Panel in der Recherche-Karte). /config liefert
-  // `researchChat.enabled` (true wenn effektiver Provider Claude + API-Key gesetzt +
-  // Kill-Switch an). Blendet den Chat-Umschalter in der Recherche-Karte ein —
-  // Web-Suche gibt es nur über die Anthropic-API.
-  researchChatEnabled: false,
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).
