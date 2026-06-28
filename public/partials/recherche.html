@@ -84,7 +84,7 @@
                 <div class="research-chat-proposals-head" x-text="$app.t('recherche.chat.proposalsHead')"></div>
                 <template x-for="(prop, pi) in researchProposals(msg)" :key="pi">
                   <div class="research-chat-proposal" :class="{ 'research-chat-proposal--saved': isProposalSaved(msgIdx, pi) }">
-                    <span class="research-kind-badge" :class="'research-kind-badge--' + prop.kind" x-text="kindLabel(prop.kind)"></span>
+                    <span class="research-kind-badge palette-badge" :class="'research-kind-badge--' + prop.kind" x-text="kindLabel(prop.kind)"></span>
                     <div class="research-chat-proposal-body">
                       <span class="research-chat-proposal-title" x-show="prop.title" x-text="prop.title"></span>
                       <span class="research-chat-proposal-snippet" x-show="prop.body" x-text="prop.body"></span>
@@ -235,11 +235,32 @@
     </div>
   </div>
 
-  <div x-show="loading" class="recherche-loading" x-text="$app.t('common.loading')"></div>
-  <div x-show="!loading && items.length === 0 && !creating" class="recherche-empty" x-text="$app.t('recherche.empty')"></div>
+  <!-- Skeleton während Loading vor erstem Datensatz -->
+  <div x-show="loading" class="recherche-skeleton entity-list--accented" x-cloak>
+    <template x-for="i in 4" :key="i">
+      <div class="recherche-skeleton-card">
+        <div class="recherche-skeleton-head">
+          <span class="entity-skeleton-cell recherche-skeleton-badge"></span>
+          <span class="entity-skeleton-cell recherche-skeleton-title"></span>
+        </div>
+        <span class="entity-skeleton-cell recherche-skeleton-line"></span>
+        <span class="entity-skeleton-cell recherche-skeleton-line recherche-skeleton-line--short"></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- Empty-State mit CTA: kein Eintrag → direkt anlegen. -->
+  <div x-show="!loading && items.length === 0 && !creating" class="card-empty" x-cloak>
+    <p class="card-empty-text" x-text="$app.t('recherche.empty')"></p>
+    <p class="card-empty-hint" x-text="$app.t('recherche.emptyHint')"></p>
+    <button type="button" class="primary card-empty-cta" @click="startCreate()" :disabled="busy">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+      <span x-text="$app.t('recherche.new')"></span>
+    </button>
+  </div>
 
   <!-- Schnipsel-Liste -->
-  <div class="recherche-list" x-show="!loading">
+  <div class="recherche-list" x-show="!loading && items.length > 0">
     <template x-for="item in items" :key="item.id">
       <div class="research-item" :class="{ 'research-item--pinned': item.pinned, 'research-item--archived': item.archived }">
 
@@ -247,14 +268,14 @@
         <template x-if="editingId !== item.id">
           <div class="research-item-body research-item-body--clickable" @click="onItemBodyClick(item, $event)">
             <div class="research-item-head">
-              <span class="research-kind-badge" :class="'research-kind-badge--' + item.kind" x-text="kindLabel(item.kind)"></span>
+              <span class="research-kind-badge palette-badge" :class="'research-kind-badge--' + item.kind" x-text="kindLabel(item.kind)"></span>
               <span class="research-item-title" x-show="item.title" x-text="item.title"></span>
               <div class="research-item-actions">
                 <button type="button" class="icon-btn" @click="startEdit(item)" :disabled="busy" :data-tip="$app.t('recherche.edit')" :aria-label="$app.t('recherche.edit')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg></button>
-                <button type="button" class="icon-btn" @click="openLinkPicker(item)" :disabled="busy" :data-tip="$app.t('recherche.link.add')" :aria-label="$app.t('recherche.link.add')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg></button>
-                <button type="button" class="icon-btn" @click="suggestLinks(item)" :disabled="busy || suggestItemId === item.id" :data-tip="$app.t('recherche.suggest.btn')" :aria-label="$app.t('recherche.suggest.btn')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg></button>
                 <button type="button" class="icon-btn" @click.stop="menuOpenId = (menuOpenId === item.id ? null : item.id)" :disabled="busy" :aria-label="$app.t('recherche.actions')" aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg></button>
                 <div class="context-menu context-menu--dropdown" x-show="menuOpenId === item.id" x-cloak @click.outside="menuOpenId = null" @keydown.escape.window="menuOpenId = null" role="menu">
+                  <button type="button" class="context-menu-item" role="menuitem" @click="menuOpenId = null; openLinkPicker(item)" x-text="$app.t('recherche.link.add')"></button>
+                  <button type="button" class="context-menu-item" role="menuitem" @click="suggestLinks(item)" :disabled="busy || suggestItemId === item.id" x-text="$app.t('recherche.suggest.btn')"></button>
                   <button type="button" class="context-menu-item" role="menuitem" @click="togglePin(item)" x-text="item.pinned ? $app.t('recherche.unpin') : $app.t('recherche.pin')"></button>
                   <button type="button" class="context-menu-item" role="menuitem" @click="toggleArchive(item)" x-text="item.archived ? $app.t('recherche.unarchive') : $app.t('recherche.archive')"></button>
                   <label class="context-menu-item research-menu-upload" role="menuitem">

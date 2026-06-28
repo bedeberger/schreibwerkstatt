@@ -3215,6 +3215,7 @@
   "recherche.archive": "Archivieren",
   "recherche.unarchive": "Aus Archiv holen",
   "recherche.empty": "Noch keine Recherche-Einträge für dieses Buch.",
+  "recherche.emptyHint": "Sammle hier Notizen, Links, Zitate, Faktensplitter und Bilder — optional mit Figuren, Orten oder Kapiteln verknüpft.",
   "recherche.confirmDelete": "Diesen Eintrag wirklich löschen?",
   "recherche.kindLabel": "Typ",
   "recherche.kind.note": "Notiz",

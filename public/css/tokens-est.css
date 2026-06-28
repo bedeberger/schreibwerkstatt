@@ -27,23 +27,11 @@
   white-space: nowrap;
   pointer-events: none;
 }
-.tok-tt-label {
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: var(--space-6);
-}
 .tok-tt-row {
   display: flex;
   align-items: center;
   gap: var(--space-6);
   margin-bottom: var(--space-3);
-}
-.tok-tt-hint {
-  color: var(--color-subtle);
-  font-size: var(--font-size-micro);
-  margin-top: var(--space-6);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-5);
 }
 .tok-tt-enter { transition: opacity var(--transition-base); }
 .tok-tt-hidden { opacity: 0; }

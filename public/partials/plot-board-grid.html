@@ -131,6 +131,9 @@
                     <span class="plot-swim-lane-figure internal-link" x-show="threadFigureLabel(row.lane.thread)"
                           @click.stop="row.lane.thread.fig_id ? $app.openFigurById(row.lane.thread.fig_id) : (row.lane.thread.draft_figure_id && $app.openWerkstattDraftById(row.lane.thread.draft_figure_id))"
                           x-text="threadFigureLabel(row.lane.thread)"></span>
+                    <span class="plot-swim-lane-chapter internal-link" x-show="row.lane.thread.chapter_name"
+                          @click.stop="$app.openKapitelByName(row.lane.thread.chapter_name)"
+                          x-text="row.lane.thread.chapter_name"></span>
                     <span class="plot-swim-lane-ownacts" x-show="threadHasOwnActs(row.lane.id)" x-text="$app.t('plot.thread.ownActs')"></span>
                   </div>
                   <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-swim-lane-toggle"

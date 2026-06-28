@@ -128,14 +128,32 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 }
 .recherche-primary:hover:not(:disabled) { filter: brightness(1.08); }
 
-/* ── Liste + Items ──────────────────────────────────────────────────────── */
-.recherche-loading,
-.recherche-empty {
-  padding: var(--space-lg);
-  text-align: center;
-  color: var(--color-muted);
+/* ── Skeleton (Loading vor erstem Datensatz) ────────────────────────────── */
+/* Card-förmige Platzhalter passend zur .research-item-Optik. Shimmer kommt aus
+   .entity-skeleton-cell (entity-list.css), kein eigener Keyframe. */
+.recherche-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
 }
+.recherche-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-card-bg);
+  padding: var(--space-6) var(--space-sm);
+  opacity: var(--opacity-disabled);
+}
+.recherche-skeleton-head { display: flex; align-items: center; gap: var(--space-xs); }
+.recherche-skeleton-badge { width: 3.5rem; height: 14px; flex-shrink: 0; }
+.recherche-skeleton-title { height: 14px; flex: 1; max-width: 40%; }
+.recherche-skeleton-line { height: 11px; width: 100%; }
+.recherche-skeleton-line--short { max-width: 65%; }
 
+/* ── Liste + Items ──────────────────────────────────────────────────────── */
 /* Einspaltige Liste: ruhige, gut lesbare Schnipsel untereinander. */
 .recherche-list {
   display: flex;
@@ -169,6 +187,8 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   flex-wrap: wrap;
 }
 
+/* Hue-getriebener Badge (DESIGN.md): Layout hier, Hintergrund/Text liefert
+   die .palette-badge-Basis aus dem --badge-hue per color-mix (theme-aware). */
 .research-kind-badge {
   display: inline-block;
   padding: 0.1em 0.5em;
@@ -177,13 +197,13 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  background: var(--card-accent);
-  color: #fff;
 }
-.research-kind-badge--quote { background: var(--card-accent-szenen, var(--card-accent)); }
-.research-kind-badge--fact  { background: var(--card-accent-orte, var(--card-accent)); }
-.research-kind-badge--link  { background: var(--color-muted); }
-.research-kind-badge--image { background: var(--card-accent-figuren, var(--card-accent)); }
+.research-kind-badge--note     { --badge-hue: var(--palette-gray); }
+.research-kind-badge--link     { --badge-hue: var(--palette-blue); }
+.research-kind-badge--quote    { --badge-hue: var(--palette-purple); }
+.research-kind-badge--fact     { --badge-hue: var(--palette-green); }
+.research-kind-badge--image    { --badge-hue: var(--palette-pink); }
+.research-kind-badge--document { --badge-hue: var(--palette-amber); }
 
 .research-item-title {
   font-weight: 600;

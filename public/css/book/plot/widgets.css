@@ -75,6 +75,10 @@
     cursor: pointer;
   }
   .plot-konflikt--open { border-color: var(--card-accent); }
+  /* `.internal-link` trägt die Zeile nur für die Tastatur-Delegation (role=button,
+     Enter/Space → aufklappen). Der globale Underline-/Opacity-Hover ist auf der
+     ganzen Akkordeon-Zeile unerwünscht — Signal ist Border-Color + Chevron. */
+  .plot-konflikt.internal-link:hover { opacity: 1; text-decoration: none; }
   .plot-konflikt-head { display: flex; align-items: center; gap: var(--space-xs); }
   .plot-konflikt-beat { font-weight: 600; font-size: var(--font-size-xs); color: var(--color-text); flex: 0 0 auto; }
   .plot-konflikt-problem { font-size: var(--font-size-xs); color: var(--color-muted); flex: 1 1 auto; overflow-wrap: anywhere; }

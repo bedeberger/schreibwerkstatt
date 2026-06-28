@@ -134,10 +134,4 @@
   background: var(--color-schwach-bg);
   color: var(--color-schwach-text);
 }
-
-/* === Globale-Zeitstrahl-Marker für Szenen === */
-.gz-marker--szene          { background: var(--color-accent); }
-.gz-marker--szene-stark    { background: var(--color-stark); box-shadow: 0 0 0 1.5px var(--color-stark); }
-.gz-marker--szene-mittel   { background: var(--color-mittel); box-shadow: 0 0 0 1.5px var(--color-mittel); }
-.gz-marker--szene-schwach  { background: var(--color-schwach); box-shadow: 0 0 0 1.5px var(--color-schwach); }
 }

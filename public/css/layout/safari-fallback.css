@@ -47,10 +47,5 @@
   .heatmap-cell--primary {
     background: var(--color-history-active-bg);
   }
-
-  /* Synonym-Button – Soft-Primary-Tint via existierende Var */
-  .syn-btn {
-    background: var(--color-history-active-bg);
-  }
 }
 }

@@ -113,10 +113,6 @@
   width: 100%;
 }
 
-/* === Token-Badges: W und Z im Seitenbaum ausblenden === */
-.tok-tree-words,
-.tok-tree-chars { display: none; }
-
 /* === Sub-Kapitel-Sektion: aufgelockerte Card-im-Card mit Indent-Stufe === */
 .kapitel-subchapters {
   display: flex;

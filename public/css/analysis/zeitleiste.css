@@ -1,45 +1,5 @@
 @layer components {
 /* === Globale Zeitleiste === */
-.global-zeitstrahl-section {
-  margin-top: var(--space-20);
-  border-top: 0.5px solid var(--color-border);
-  padding-top: var(--space-14);
-}
-
-.global-zeitstrahl-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  cursor: pointer;
-  user-select: none;
-  padding: var(--space-2xs) 0;
-}
-
-.global-zeitstrahl-header:hover .global-zeitstrahl-heading { color: var(--color-primary); }
-
-.global-zeitstrahl-heading { margin: 0; }
-
-.gz-consolidate-btn {
-  margin-left: auto;
-  font-size: var(--font-size-mini);
-  padding: var(--space-2xs) 10px;
-  min-width: 110px;
-}
-
-.gz-status-row {
-  padding: var(--space-xs) 0 2px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-
-.global-zeitstrahl-meta {
-  font-size: var(--font-size-xs);
-  color: var(--color-muted);
-  flex: 1;
-}
-
 .global-zeitstrahl-body {
   position: relative;
   margin-top: var(--space-14);

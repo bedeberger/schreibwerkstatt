@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "13303daaf8072cbf";
+self.__SHELL_BUILD = "6c89e1bdfcbcd557";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -77,7 +77,6 @@ self.__SHELL_MANIFEST = [
   "/css/editor/shared/editor-chrome.css",
   "/css/editor/spellcheck.css",
   "/css/editor/synonym-menu.css",
-  "/css/editor/synonyme.css",
   "/css/entities/entity-grid.css",
   "/css/entities/entity-list.css",
   "/css/entities/ereignisse-span.css",

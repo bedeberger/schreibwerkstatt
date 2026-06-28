@@ -3215,6 +3215,7 @@
   "recherche.archive": "Archive",
   "recherche.unarchive": "Unarchive",
   "recherche.empty": "No research entries for this book yet.",
+  "recherche.emptyHint": "Collect notes, links, quotes, fact snippets and images here — optionally linked to characters, locations or chapters.",
   "recherche.confirmDelete": "Really delete this entry?",
   "recherche.kindLabel": "Type",
   "recherche.kind.note": "Note",

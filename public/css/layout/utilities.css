@@ -44,15 +44,6 @@
 }
 
 /* === Utility-Klassen === */
-.tag--link {
-  margin-left: var(--space-6);
-  text-decoration: none;
-  display: inline-block;
-  padding: var(--space-2xs) 8px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  vertical-align: middle;
-}
 .display-contents { display: contents; }
 .editor-section { margin-top: 1rem; }
 .stilbox--spaced { margin-top: var(--space-md); }

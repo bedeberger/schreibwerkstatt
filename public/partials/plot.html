@@ -240,7 +240,8 @@
     <div x-show="consistencyResult && !consistencyResult.konflikte.length" class="card-status" x-text="$app.t('plot.consistency.noFindings')"></div>
     <div class="plot-konflikt-list">
       <template x-for="(k, idx) in (consistencyResult ? consistencyResult.konflikte : [])" :key="idx">
-        <div class="plot-konflikt" :class="{ 'plot-konflikt--open': selectedKonfliktIdx === idx }"
+        <div class="plot-konflikt internal-link" :class="{ 'plot-konflikt--open': selectedKonfliktIdx === idx }"
+             :aria-expanded="selectedKonfliktIdx === idx"
              @click="selectedKonfliktIdx = selectedKonfliktIdx === idx ? null : idx">
           <div class="plot-konflikt-head">
             <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('plot.severity.' + k.schwere)"></span>
