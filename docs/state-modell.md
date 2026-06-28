@@ -10,6 +10,7 @@ Verbindlicher Aufbau des Alpine-State. Vor jeder UI-Änderung die richtige Ebene
    - **`catalog`** ([catalog-store.js](../public/js/cards/catalog-store.js)) — Fach-Daten `figuren / orte / songs / szenen / globalZeitstrahl / zeitstrahlChronology`. Proxy behält die Key-Namen.
    - **`nav`** ([nav-store.js](../public/js/cards/nav-store.js)) — Navigations-State `books / selectedBookId / pages / tree` (von ~29 Modulen gelesen). Proxy behält die Key-Namen.
    - **`tts`** ([tts-store.js](../public/js/cards/tts-store.js)) — TTS/Proof-Listening `enabled / pause / playing / paused / loading / index / total`. Store-Name liefert den Namespace → Keys ohne `tts`-Präfix; Root-Proxy mappt auf `ttsEnabled / ttsPlaying / …`.
+   - **`stt`** ([stt-store.js](../public/js/cards/stt-store.js)) — STT-Diktat `enabled / vad / recording / pending / transcribing / busy / caretUserSet`. Keys ohne `stt`-Präfix; Root-Proxy mappt auf `sttEnabled / sttRecording / …`. `$watch('sttRecording')` (stt-time.js) funktioniert über den Proxy-Getter (wie `selectedBookId`).
 
 ## Root-State-Slices ([public/js/app/app-state.js](../public/js/app/app-state.js))
 

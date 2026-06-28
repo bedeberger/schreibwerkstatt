@@ -64,27 +64,8 @@ const shellState = () => ({
   // Aus /config → app_settings `languagetool.debounce_ms`. Form-Felder
   // (input/textarea) nutzen eigene Defaults und ignorieren diesen Wert.
   languagetoolDebounceMs: 1500,
-  // STT-Diktat (nur Notebook-Editor). /config liefert `stt.enabled` (true wenn
-  // Admin enabled + Host gesetzt). Blendet den Mic-Button in der Notebook-
-  // Toolbar ein. Sprache loest der Proxy aus der Buch-Locale auf — kein
-  // Frontend-State dafuer. sttVad steuert die browserseitige VAD-Segmentierung
-  // (aus /config). sttRecording = aktive Aufnahme; sttPending = kurzlebiger
-  // Re-Entry-Guard waehrend getUserMedia/Stop laeuft. sttTranscribing = Anzahl
-  // laufender Transkriptions-Requests; sttBusy = davon abgeleiteter
-  // Anzeige-Flag mit Mindest-Standzeit (verhindert Sub-Sekunden-Flackern des
-  // „Transkribiert"-Status bei kurzen Segmenten). Kein per-Tick-Pegel-State im
-  // Label — das strobte frueher mit jeder Silbe.
-  sttEnabled: false,
-  sttVad: { silenceMs: 800, threshold: 0.015, maxSegmentS: 30 },
-  sttRecording: false,
-  sttPending: false,
-  sttTranscribing: 0,
-  sttBusy: false,
-  // True, sobald der User bewusst per Klick einen Caret im Edit-Feld gesetzt
-  // hat. Steuert den STT-Einfuege-Anker: gesetzt -> Diktat startet an der
-  // Caret-Position, sonst haengt es ans Editorende an. Auto-Fokus beim Öffnen
-  // des Edit-Modus zaehlt NICHT (in startEdit auf false zurueckgesetzt).
-  sttCaretUserSet: false,
+  // STT-Diktat State lebt in Alpine.store('stt') (cards/stt-store.js); der Root
+  // proxied es als this.sttEnabled/sttRecording/sttCaretUserSet/… (app.js).
   // TTS / Proof-Listening State lebt in Alpine.store('tts') (cards/tts-store.js);
   // der Root proxied es als this.ttsEnabled/ttsPlaying/… (app.js).
   // Recherche-Chat (Panel in der Recherche-Karte). /config liefert

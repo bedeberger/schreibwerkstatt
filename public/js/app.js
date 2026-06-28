@@ -112,6 +112,26 @@ document.addEventListener('alpine:init', () => {
     get ttsTotal() { return Alpine.store('tts').total; },
     set ttsTotal(v) { Alpine.store('tts').total = v; },
 
+    // ── STT-Proxy ──────────────────────────────────────────────────────────────
+    // STT-Diktat-State lebt in Alpine.store('stt'). Root exponiert ihn unter den
+    // gewohnten Namen (this.sttRecording = …), damit stt-dictation.js/stt-time.js/
+    // Edit-Lifecycle/figur-lookup.js und die bare Template-Bindings unverändert
+    // bleiben (inkl. $watch('sttRecording')). Karten greifen via $store.stt zu.
+    get sttEnabled() { return Alpine.store('stt').enabled; },
+    set sttEnabled(v) { Alpine.store('stt').enabled = v; },
+    get sttVad() { return Alpine.store('stt').vad; },
+    set sttVad(v) { Alpine.store('stt').vad = v; },
+    get sttRecording() { return Alpine.store('stt').recording; },
+    set sttRecording(v) { Alpine.store('stt').recording = v; },
+    get sttPending() { return Alpine.store('stt').pending; },
+    set sttPending(v) { Alpine.store('stt').pending = v; },
+    get sttTranscribing() { return Alpine.store('stt').transcribing; },
+    set sttTranscribing(v) { Alpine.store('stt').transcribing = v; },
+    get sttBusy() { return Alpine.store('stt').busy; },
+    set sttBusy(v) { Alpine.store('stt').busy = v; },
+    get sttCaretUserSet() { return Alpine.store('stt').caretUserSet; },
+    set sttCaretUserSet(v) { Alpine.store('stt').caretUserSet = v; },
+
     // ── Computed ─────────────────────────────────────────────────────────────
     // Admin-only View: Globaler Admin (global_role='admin') bekommt eine
     // reduzierte Oberfläche — keine Sidebar, keine Buchwahl, nur Admin-Tiles
