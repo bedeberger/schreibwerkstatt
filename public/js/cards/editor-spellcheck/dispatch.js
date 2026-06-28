@@ -232,7 +232,7 @@ export function setupSpellcheckDispatch(app) {
   // solange LT aktiv ist — sonst konkurrieren zwei Squiggle-Systeme (v.a.
   // Mobile mit installiertem Woerterbuch unterstreicht jedes Feld nativ, nicht
   // klickbar als LT-Popover). LT-Indikator ist das Badge. Analog zu den drei
-  // Editoren (`:spellcheck="!languagetoolEnabled"`). LT aus -> native als
+  // Editoren (`:spellcheck="!$store.config.languagetoolEnabled"`). LT aus -> native als
   // Fallback wieder an.
   function _setNative(el, on) {
     try { el.spellcheck = on; } catch {}
