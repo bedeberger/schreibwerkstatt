@@ -184,14 +184,14 @@ export const appInitMethods = {
           maxSegmentS: Number(cfg.stt.vad.maxSegmentS) || this.sttVad.maxSegmentS,
         };
       }
-      this.ttsEnabled = !!cfg.tts?.enabled;
+      this.$store.tts.enabled = !!cfg.tts?.enabled;
       this.researchChatEnabled = !!cfg.researchChat?.enabled;
       if (cfg.tts?.pause) {
         const frag = Number(cfg.tts.pause.fragmentMs);
         const para = Number(cfg.tts.pause.paragraphMs);
-        this.ttsPause = {
-          fragmentMs:  Number.isFinite(frag) ? frag : this.ttsPause.fragmentMs,
-          paragraphMs: Number.isFinite(para) ? para : this.ttsPause.paragraphMs,
+        this.$store.tts.pause = {
+          fragmentMs:  Number.isFinite(frag) ? frag : this.$store.tts.pause.fragmentMs,
+          paragraphMs: Number.isFinite(para) ? para : this.$store.tts.pause.paragraphMs,
         };
       }
       if (cfg.mapTiles?.url) {

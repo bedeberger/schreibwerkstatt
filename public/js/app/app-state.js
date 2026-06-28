@@ -53,8 +53,8 @@ const shellState = () => ({
   // (cards/config-store.js); der Root proxied sie unter denselben Namen (app.js).
   // STT-Diktat State lebt in Alpine.store('stt') (cards/stt-store.js); der Root
   // proxied es als this.sttEnabled/sttRecording/sttCaretUserSet/… (app.js).
-  // TTS / Proof-Listening State lebt in Alpine.store('tts') (cards/tts-store.js);
-  // der Root proxied es als this.ttsEnabled/ttsPlaying/… (app.js).
+  // TTS / Proof-Listening State lebt in Alpine.store('tts') (cards/tts-store.js)
+  // und wird direkt via $store.tts / this.$store.tts gelesen (kein Root-Proxy).
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).

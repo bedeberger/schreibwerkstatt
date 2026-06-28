@@ -27,37 +27,37 @@
 
   <!-- TTS / Proof-Listening: schwebender Vorlese-Dock unten LINKS über dem
        Seitentext. Liest den Text satzweise vor, markiert den aktuellen Satz.
-       Nur sichtbar, wenn Admin TTS aktiviert hat (ttsEnabled = Root-State aus
+       Nur sichtbar, wenn Admin TTS aktiviert hat ($store.tts.enabled aus
        /config) und die Seite Inhalt hat. -->
-  <template x-if="ttsEnabled">
+  <template x-if="$store.tts.enabled">
     <div class="tts-dock" x-show="renderedPageHtml" x-cloak>
       <!-- Status links: „liest" mit Satz-Fortschritt bzw. „pausiert". -->
       <span class="tts-status" aria-live="polite"
-            x-show="ttsPlaying"
-            :class="ttsPaused ? 'is-paused' : 'is-reading'"
-            x-text="ttsPaused ? t('tts.status.paused') : (ttsLoading && !ttsIndex ? t('tts.status.loading') : t('tts.status.reading', { i: ttsIndex, n: ttsTotal }))"></span>
+            x-show="$store.tts.playing"
+            :class="$store.tts.paused ? 'is-paused' : 'is-reading'"
+            x-text="$store.tts.paused ? t('tts.status.paused') : ($store.tts.loading && !$store.tts.index ? t('tts.status.loading') : t('tts.status.reading', { i: $store.tts.index, n: $store.tts.total }))"></span>
       <!-- Naechster Satz (nur waehrend laufender Wiedergabe). -->
       <button type="button" class="tts-dock-btn tts-dock-btn--sub"
-              x-show="ttsPlaying && !ttsPaused"
+              x-show="$store.tts.playing && !$store.tts.paused"
               :data-tip="t('tts.skip')" :aria-label="t('tts.skip')"
               @click="skipTtsProof()">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#chevron-last"/></svg>
       </button>
       <!-- Stoppen (nur wenn aktiv). -->
       <button type="button" class="tts-dock-btn tts-dock-btn--sub"
-              x-show="ttsPlaying"
+              x-show="$store.tts.playing"
               :data-tip="t('tts.stop')" :aria-label="t('tts.stop')"
               @click="stopTtsProof()">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#square"/></svg>
       </button>
       <!-- Haupttaste: starten (Kopfhoerer) / pausieren / fortsetzen. -->
       <button type="button" class="tts-dock-btn"
-              :aria-pressed="ttsPlaying && !ttsPaused"
-              :class="{ 'is-reading': ttsPlaying && !ttsPaused }"
-              :data-tip="!ttsPlaying ? t('tts.listen') : (ttsPaused ? t('tts.resume') : t('tts.pause'))"
-              :aria-label="!ttsPlaying ? t('tts.listen') : (ttsPaused ? t('tts.resume') : t('tts.pause'))"
+              :aria-pressed="$store.tts.playing && !$store.tts.paused"
+              :class="{ 'is-reading': $store.tts.playing && !$store.tts.paused }"
+              :data-tip="!$store.tts.playing ? t('tts.listen') : ($store.tts.paused ? t('tts.resume') : t('tts.pause'))"
+              :aria-label="!$store.tts.playing ? t('tts.listen') : ($store.tts.paused ? t('tts.resume') : t('tts.pause'))"
               @click="toggleTtsProof()">
-        <svg class="icon" aria-hidden="true"><use :href="`/icons.svg?v=694#${!ttsPlaying ? 'headphones' : (ttsPaused ? 'play' : 'pause')}`"/></svg>
+        <svg class="icon" aria-hidden="true"><use :href="`/icons.svg?v=694#${!$store.tts.playing ? 'headphones' : ($store.tts.paused ? 'play' : 'pause')}`"/></svg>
       </button>
     </div>
   </template>

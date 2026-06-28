@@ -3,9 +3,10 @@
 // Store-Oberfläche. Der Store-Name liefert den Namespace, darum tragen die Keys
 // kein `tts`-Präfix mehr (Zugriff via `$store.tts.playing`).
 //
-// Der Root spiegelt die Felder via Getter/Setter-Proxy (app.js) als
-// `this.ttsPlaying`/`ttsEnabled`/…, sodass die Methoden in tts-proof.js und die
-// bare Template-Bindings in editor-body-view.html unverändert funktionieren.
+// Konsumenten greifen direkt zu (kein Root-Proxy): tts-proof.js (in den Root
+// gespreadet) via `this.$store.tts.playing`, app-init.js setzt beim Boot
+// `this.$store.tts.enabled`/`pause`, das Template editor-body-view.html bindet
+// `$store.tts.*`. Damit ist die Abhängigkeit explizit statt über die Root-Singleton.
 //
 // Feld-Bedeutung:
 //   enabled — /config `tts.enabled` (Admin enabled + Host gesetzt); blendet den

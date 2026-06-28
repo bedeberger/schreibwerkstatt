@@ -44,7 +44,7 @@ const TTS_MAX_CHUNK_CHARS = 220;
 // naechste Fragment ueberzugehen, gibt eine kurze Stille dem Ohr Luft — naeher
 // am natuerlichen Vorlesen. An Absatzgrenzen (Block-Wechsel) etwas laenger.
 // Fallback, falls /config keine Werte liefert — der Admin ueberschreibt sie via
-// `tts.pause.fragment_ms` / `tts.pause.paragraph_ms` (this.ttsPause).
+// `tts.pause.fragment_ms` / `tts.pause.paragraph_ms` (this.$store.tts.pause).
 const TTS_FRAGMENT_PAUSE_MS = 250;
 const TTS_PARAGRAPH_PAUSE_MS = 550;
 const TTS_MAX_RETRY = 1;
@@ -184,7 +184,7 @@ export const ttsProofMethods = {
     // scheitern).
     activeRt = null;
     this._ttsFailToasted = false; // Fehler-Toast nur einmal pro Session (kein Flood)
-    const stop = () => { if (this.ttsPlaying) this._ttsStop(); };
+    const stop = () => { if (this.$store.tts.playing) this._ttsStop(); };
     window.addEventListener(EVT.BOOK_CHANGED, stop, { signal });
     window.addEventListener(EVT.VIEW_RESET, stop, { signal });
     // In den Edit-Modus wechseln (Dock ist read-only) / Seite gewechselt ->
@@ -300,12 +300,12 @@ export const ttsProofMethods = {
 
   // Hauptbutton: idle -> starten; aktiv -> pausieren <-> fortsetzen.
   toggleTtsProof() {
-    if (!this.ttsEnabled) return;
+    if (!this.$store.tts.enabled) return;
     const rt = activeRt;
-    if (!this.ttsPlaying || !rt) { this._ttsStart(); return; }
-    if (this.ttsPaused) {
+    if (!this.$store.tts.playing || !rt) { this._ttsStart(); return; }
+    if (this.$store.tts.paused) {
       rt.paused = false;
-      this.ttsPaused = false;
+      this.$store.tts.paused = false;
       // War mitten in der Wiedergabe pausiert (Audio pending) -> dasselbe Element
       // weiterspielen; war beim Laden pausiert (kein aktives Audio) -> Schleife
       // neu antreiben.
@@ -319,7 +319,7 @@ export const ttsProofMethods = {
       }
     } else {
       rt.paused = true;
-      this.ttsPaused = true;
+      this.$store.tts.paused = true;
       try { rt.audio?.pause(); } catch { /* noop */ }
     }
   },
@@ -329,7 +329,7 @@ export const ttsProofMethods = {
   // pausierten Zustand ausgeblendet.
   skipTtsProof() {
     const rt = activeRt;
-    if (!rt || this.ttsPaused) return;
+    if (!rt || this.$store.tts.paused) return;
     try { rt.audio?.pause(); } catch { /* noop */ }
     if (rt.resolveCurrent) {
       const r = rt.resolveCurrent;
@@ -341,7 +341,7 @@ export const ttsProofMethods = {
   stopTtsProof() { this._ttsStop(); },
 
   _ttsStart() {
-    if (!this.ttsEnabled || this.ttsPlaying) return;
+    if (!this.$store.tts.enabled || this.$store.tts.playing) return;
     const segs = this._ttsCollectSegments();
     if (!segs.length) {
       this._ttsLog('start aborted: no segments (empty text)');
@@ -362,11 +362,11 @@ export const ttsProofMethods = {
     };
     activeRt = rt;
     this._ttsFailToasted = false;
-    this.ttsPlaying = true;
-    this.ttsPaused = false;
-    this.ttsLoading = false;
-    this.ttsTotal = segs.length;
-    this.ttsIndex = 0;
+    this.$store.tts.playing = true;
+    this.$store.tts.paused = false;
+    this.$store.tts.loading = false;
+    this.$store.tts.total = segs.length;
+    this.$store.tts.index = 0;
     this._ttsRun(rt);
   },
 
@@ -384,12 +384,12 @@ export const ttsProofMethods = {
       while (activeRt === rt && rt.i < rt.segs.length) {
         if (rt.paused) return; // Fortsetzen treibt die Schleife neu an
         const idx = rt.i;
-        this.ttsIndex = idx + 1;
+        this.$store.tts.index = idx + 1;
         this._ttsHighlight(idx);
         for (let k = 0; k <= TTS_PREFETCH_AHEAD; k++) this._ttsPrefetch(rt, idx + k);
-        this.ttsLoading = true;
+        this.$store.tts.loading = true;
         const url = await rt.cache.get(idx);
-        this.ttsLoading = false;
+        this.$store.tts.loading = false;
         if (activeRt !== rt || rt.paused) return;
         if (url == null) { this._ttsWarn(`segment ${idx} skipped (synth failed)`); rt.i++; continue; } // Fehler-Satz uebersprungen (schon getoastet)
         const ended = await this._ttsPlayUrl(rt, url);
@@ -397,7 +397,7 @@ export const ttsProofMethods = {
         if (!ended) return; // pausiert/gestoppt -> Steuerung liegt bei Toggle/Stop
         rt.i++;
         // Atempause vor dem naechsten Fragment (an Absatzgrenzen laenger). Dauer
-        // vom Admin konfigurierbar (this.ttsPause aus /config), Default via
+        // vom Admin konfigurierbar (this.$store.tts.pause aus /config), Default via
         // Konstanten. 0 = keine Pause (kein unnoetiger Await). Kein Audio aktiv
         // -> nur via Stop abbrechbar (abort.signal); Pause waehrend der Pause
         // faengt der `rt.paused`-Return oben in der naechsten Runde.
@@ -405,8 +405,8 @@ export const ttsProofMethods = {
         if (next) {
           const blockChange = next.block !== rt.segs[idx].block;
           const ms = blockChange
-            ? (this.ttsPause?.paragraphMs ?? TTS_PARAGRAPH_PAUSE_MS)
-            : (this.ttsPause?.fragmentMs ?? TTS_FRAGMENT_PAUSE_MS);
+            ? (this.$store.tts.pause?.paragraphMs ?? TTS_PARAGRAPH_PAUSE_MS)
+            : (this.$store.tts.pause?.fragmentMs ?? TTS_FRAGMENT_PAUSE_MS);
           if (ms > 0) {
             await this._ttsDelay(ms, rt.abort.signal);
             if (activeRt !== rt || rt.paused) return;
@@ -545,11 +545,11 @@ export const ttsProofMethods = {
   _ttsStop() {
     const rt = activeRt;
     activeRt = null; // Guard: laufende Schleife/Prefetches verwerfen ab hier
-    this.ttsPlaying = false;
-    this.ttsPaused = false;
-    this.ttsLoading = false;
-    this.ttsIndex = 0;
-    this.ttsTotal = 0;
+    this.$store.tts.playing = false;
+    this.$store.tts.paused = false;
+    this.$store.tts.loading = false;
+    this.$store.tts.index = 0;
+    this.$store.tts.total = 0;
     this._ttsClearHighlight();
     if (!rt) return;
     this._ttsLog(`stop at segment ${rt.i}/${rt.segs.length}`);
