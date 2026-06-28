@@ -13,16 +13,16 @@
 const { db } = require('../../db/schema');
 const { _truncateResult } = require('./book-chat-tools/shared');
 const searchIndex = require('../../lib/search');
+const {
+  PROPOSAL_KINDS, LIST_FILTER_KINDS, TITLE_MAX, BODY_MAX, SOURCE_MAX,
+  cleanStr, normalizeUrls, normalizeTags,
+} = require('../../lib/research-validate');
 
+// FTS-Vorfilter weit fassen (wie das Board), dann auf ITEM_LIST_MAX kappen.
+const FTS_LIMIT = 500;
 const ITEM_LIST_MAX = 60;
 const SNIPPET_MAX = 220;
 const DOC_TEXT_MAX = 8000;
-const PROPOSAL_TITLE_MAX = 300;
-const PROPOSAL_BODY_MAX = 20000;
-const PROPOSAL_URL_MAX = 2000;
-const PROPOSAL_URL_LABEL_MAX = 300;
-const PROPOSAL_MAX_URLS = 20;
-const PROPOSAL_SOURCE_MAX = 1000;
 const MAX_PROPOSALS = 12;
 
 const _snip = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
@@ -31,21 +31,24 @@ const _snip = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 function tool_list_research_items(input, ctx) {
   const where = ['ri.book_id = ?', 'ri.archived = 0'];
   const vals = [ctx.bookId];
-  const KINDS = new Set(['note', 'link', 'quote', 'fact', 'image', 'document']);
-  if (KINDS.has(input.kind)) { where.push('ri.kind = ?'); vals.push(input.kind); }
+  if (LIST_FILTER_KINDS.has(input.kind)) { where.push('ri.kind = ?'); vals.push(input.kind); }
 
   const q = String(input.q || '').trim();
   if (q) {
     try {
-      const hits = searchIndex.query(q, { bookId: ctx.bookId, kinds: ['research'], limit: 200 });
+      const hits = searchIndex.query(q, { bookId: ctx.bookId, kinds: ['research'], limit: FTS_LIMIT });
       const ids = (hits?.hits || []).map(h => h.entity_id).filter(Boolean);
-      if (!ids.length) return { items: [], count: 0 };
+      if (!ids.length) return { items: [], count: 0, total: 0, truncated: false };
       where.push(`ri.id IN (${ids.map(() => '?').join(',')})`);
       vals.push(...ids);
     } catch (e) {
       ctx.logger?.warn?.(`[research-chat] FTS-Filter fehlgeschlagen: ${e.message}`);
     }
   }
+
+  // Gesamtzahl passender Einträge — damit das Modell weiß, ob die auf ITEM_LIST_MAX
+  // gedeckelte Liste truncated ist (statt still „nur diese existieren" anzunehmen).
+  const total = db.prepare(`SELECT COUNT(*) AS n FROM research_items ri WHERE ${where.join(' AND ')}`).get(...vals)?.n || 0;
 
   const rows = db.prepare(
     `SELECT ri.id, ri.kind, ri.title, ri.body, ri.source, ri.doc_name,
@@ -82,7 +85,7 @@ function tool_list_research_items(input, ctx) {
       ...(r.doc_name ? { doc_name: r.doc_name } : {}),
     };
   });
-  return { items, count: items.length };
+  return { items, count: items.length, total, truncated: total > items.length };
 }
 
 // ── read_research_item ───────────────────────────────────────────────────────
@@ -145,30 +148,16 @@ function tool_list_book_entities(input, ctx) {
 // ── propose_research_item ────────────────────────────────────────────────────
 // Persistiert NICHTS — sammelt nur in ctx.proposals; der User bestätigt im Frontend.
 function tool_propose_research_item(input, ctx) {
-  const KINDS = new Set(['note', 'link', 'quote', 'fact']);
-  const kind = KINDS.has(input.kind) ? input.kind : 'note';
-  const title = _snip(input.title, PROPOSAL_TITLE_MAX);
-  const body = String(input.body || '').trim().slice(0, PROPOSAL_BODY_MAX);
-  const source = _snip(input.source, PROPOSAL_SOURCE_MAX);
-  const tags = Array.isArray(input.tags)
-    ? input.tags.map(t => _snip(t, 60)).filter(Boolean).slice(0, 20)
-    : [];
+  const kind = PROPOSAL_KINDS.has(input.kind) ? input.kind : 'note';
+  const title = cleanStr(input.title, TITLE_MAX) || '';
+  const body = cleanStr(input.body, BODY_MAX) || '';
+  const source = cleanStr(input.source, SOURCE_MAX) || '';
+  const tags = normalizeTags(input.tags);
 
-  // urls: Array von { url, label? } (oder reine URL-Strings). http(s)-only
-  // (XSS/Schema-Schutz beim späteren :href-Binding), je URL einmal.
-  const seenUrls = new Set();
-  const urls = [];
-  let hadBadUrl = false;
-  for (const raw of (Array.isArray(input.urls) ? input.urls : [])) {
-    const u = _snip(typeof raw === 'string' ? raw : raw?.url, PROPOSAL_URL_MAX);
-    if (!u) continue;
-    if (!/^https?:\/\//i.test(u)) { hadBadUrl = true; continue; }
-    if (seenUrls.has(u)) continue;
-    seenUrls.add(u);
-    const label = typeof raw === 'object' ? _snip(raw?.label, PROPOSAL_URL_LABEL_MAX) : '';
-    urls.push({ url: u, label });
-    if (urls.length >= PROPOSAL_MAX_URLS) break;
-  }
+  // Normalisierung (http(s)-only, Dedup, Cap, Label) geteilt mit POST /research
+  // über lib/research-validate — so kann der Vorschlag nicht andere Regeln
+  // akzeptieren als das Speichern später durchlässt.
+  const { urls, hadBadUrl } = normalizeUrls(input.urls);
 
   if (!title && !body && !urls.length) {
     return { ok: false, error: 'Vorschlag braucht mindestens Titel, Inhalt oder eine URL.' };

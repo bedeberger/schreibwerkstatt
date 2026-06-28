@@ -186,7 +186,9 @@ export const RESEARCH_CHAT_TOOLS = [
         source: { type: 'string', description: 'Quelle (z.B. Buchtitel, Datenbank, Archiv), worauf der Inhalt sich stützt — als Freitext-Nachweis.' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Optionale Schlagworte.' },
       },
-      required: ['kind', 'title'],
+      // title NICHT zwingend: ein reiner link-Eintrag darf nur aus urls bestehen
+      // (der Handler verlangt mindestens Titel ODER body ODER eine url).
+      required: ['kind'],
     },
   },
   {

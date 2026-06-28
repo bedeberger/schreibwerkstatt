@@ -16,3 +16,8 @@ export const ACT_PALETTE = ['blue', 'green', 'amber', 'orange', 'red', 'wine', '
 
 // Intensität → vertikale Position im Spannungsband (10–90 %, etwas Rand oben/unten).
 export const _intensityBottomPct = (i) => 10 + ((i - 1) / 4) * 80;
+
+// Beat-Titel normalisieren für den Abgleich Befund ↔ Beat (gleiche Vertragsbasis
+// wie der Consistency-Job, der den Beat nur per Titel-String referenziert). EINE
+// Quelle für derived.js (Index/Match) und ai.js (Sprung) — divergierte sonst still.
+export const normTitle = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');

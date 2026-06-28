@@ -25,6 +25,7 @@
   <!-- Leer-Hinweis mit CTA -->
   <div x-show="$app.figuren.length === 0 && !$app.figurenLoading && !$app.figurenStatus" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+    <p class="card-empty-hint" x-text="$app.t('empty.figuren.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
             :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">

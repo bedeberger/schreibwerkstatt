@@ -5,6 +5,7 @@
 import { fetchJson, tzOpts } from '../../utils.js';
 import { startPoll, runningJobStatus } from '../../cards/job-helpers.js';
 import { toggleWrapFullscreen } from '../../fullscreen.js';
+import { normTitle } from './constants.js';
 
 export const aiMethods = {
   // ── KI: Brainstorm ──────────────────────────────────────────────────────
@@ -92,7 +93,15 @@ export const aiMethods = {
     this._brainstormJobId = null;
   },
 
-  dismissBrainstorm() { this.brainstormResult = null; this.brainstormActId = null; this.brainstormThreadId = null; this.selectedBrainstormRunId = null; },
+  // Inline-Vorschlags-Panel + Lauf-Auswahl leeren (geteilt von dismiss/toggle-close/delete).
+  _clearBrainstormPanel() {
+    this.brainstormResult = null;
+    this.brainstormActId = null;
+    this.brainstormThreadId = null;
+    this.selectedBrainstormRunId = null;
+  },
+
+  dismissBrainstorm() { this._clearBrainstormPanel(); },
 
   // ── KI: Brainstorm-Lauf-Historie ──────────────────────────────────────────
   // Persistierte Läufe pro Buch (zusätzlich pro Akt/Strang). Liste kommt ohne
@@ -119,13 +128,7 @@ export const aiMethods = {
     const app = window.__app;
     if (!run || this.brainstormLoading) return;
     if (run.act_id == null) { this.errorMessage = app.t('plot.error.runLoad'); return; }
-    if (this.selectedBrainstormRunId === run.id) {
-      this.selectedBrainstormRunId = null;
-      this.brainstormResult = null;
-      this.brainstormActId = null;
-      this.brainstormThreadId = null;
-      return;
-    }
+    if (this.selectedBrainstormRunId === run.id) { this._clearBrainstormPanel(); return; }
     try {
       const detail = await fetchJson(`/plot/brainstorm-runs/${run.id}`);
       if (!detail?.result) throw new Error('no result');
@@ -146,12 +149,7 @@ export const aiMethods = {
     try {
       await fetchJson(`/plot/brainstorm-runs/${runId}`, { method: 'DELETE' });
       this.brainstormRuns = this.brainstormRuns.filter(r => r.id !== runId);
-      if (this.selectedBrainstormRunId === runId) {
-        this.selectedBrainstormRunId = null;
-        this.brainstormResult = null;
-        this.brainstormActId = null;
-        this.brainstormThreadId = null;
-      }
+      if (this.selectedBrainstormRunId === runId) this._clearBrainstormPanel();
     } catch (e) {
       this.errorMessage = app.t('plot.error.runDelete');
     }
@@ -229,7 +227,14 @@ export const aiMethods = {
     this._consistencyJobId = null;
   },
 
-  dismissConsistency() { this.consistencyResult = null; this.selectedKonfliktIdx = null; this.selectedRunId = null; },
+  // Consistency-Panel + Lauf-Auswahl leeren (geteilt von dismiss/toggle-close/delete).
+  _clearConsistencyPanel() {
+    this.consistencyResult = null;
+    this.selectedKonfliktIdx = null;
+    this.selectedRunId = null;
+  },
+
+  dismissConsistency() { this._clearConsistencyPanel(); },
 
   // ── Konsistenz-Triage: Befund ↔ Beat ──────────────────────────────────────
   // Scrollt einen Beat ins Sichtfeld und hebt ihn kurz hervor. $root-skopiert
@@ -248,8 +253,8 @@ export const aiMethods = {
   // Vertragsbasis wie der Befund). Übergreifende Befunde ("—") haben kein Ziel.
   gotoKonfliktBeat(k) {
     if (!k || !k.beat || k.beat === '—') return;
-    const key = (k.beat || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const beat = (this.beats || []).find(b => (b.titel || '').trim().toLowerCase().replace(/\s+/g, ' ') === key);
+    const key = normTitle(k.beat);
+    const beat = (this.beats || []).find(b => normTitle(b.titel) === key);
     if (beat) this.scrollToBeat(beat.id);
   },
 
@@ -285,12 +290,7 @@ export const aiMethods = {
   async openConsistencyRun(runId) {
     const app = window.__app;
     if (!runId || this.consistencyLoading) return;
-    if (this.selectedRunId === runId) {
-      this.selectedRunId = null;
-      this.consistencyResult = null;
-      this.selectedKonfliktIdx = null;
-      return;
-    }
+    if (this.selectedRunId === runId) { this._clearConsistencyPanel(); return; }
     try {
       const run = await fetchJson(`/plot/consistency-runs/${runId}`);
       if (!run?.result) throw new Error('no result');
@@ -309,11 +309,7 @@ export const aiMethods = {
     try {
       await fetchJson(`/plot/consistency-runs/${runId}`, { method: 'DELETE' });
       this.consistencyRuns = this.consistencyRuns.filter(r => r.id !== runId);
-      if (this.selectedRunId === runId) {
-        this.selectedRunId = null;
-        this.consistencyResult = null;
-        this.selectedKonfliktIdx = null;
-      }
+      if (this.selectedRunId === runId) this._clearConsistencyPanel();
     } catch (e) {
       this.errorMessage = app.t('plot.error.runDelete');
     }

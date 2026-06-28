@@ -66,40 +66,49 @@ function _figurenContext(bookId, userEmail) {
 }
 
 // Schauplätze des Buchs (Orte). locations ist keine pages/chapters/books →
-// Direkt-SQL erlaubt. Ein Buch ohne Orte liefert regulär [].
+// Direkt-SQL erlaubt. Ein Buch ohne Orte liefert regulär []; ein echter DB-Fehler
+// failt den Job source-annotiert (statt stillschweigend ohne Orte weiterzulaufen).
 function _orteContext(bookId, userEmail) {
-  return db.prepare(`
-    SELECT name, typ, beschreibung, stimmung
-      FROM locations
-     WHERE book_id = ? AND user_email = ?
-     ORDER BY sort_order, id
-  `).all(parseInt(bookId), userEmail).map(o => ({
-    name: o.name,
-    typ: o.typ || null,
-    beschreibung: o.beschreibung || null,
-    stimmung: o.stimmung || null,
-  }));
+  try {
+    return db.prepare(`
+      SELECT name, typ, beschreibung, stimmung
+        FROM locations
+       WHERE book_id = ? AND user_email = ?
+       ORDER BY sort_order, id
+    `).all(parseInt(bookId), userEmail).map(o => ({
+      name: o.name,
+      typ: o.typ || null,
+      beschreibung: o.beschreibung || null,
+      stimmung: o.stimmung || null,
+    }));
+  } catch (e) {
+    throw _plotContextError('orte', e);
+  }
 }
 
 // Buchweiter Figuren-Zeitstrahl (figure_events, chronologisch nach sort_order)
 // mit aufgelöster Figur + Kapitel. figure_events/figures sind keine pages/
 // chapters/books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige zur Lesezeit).
 function _zeitstrahlContext(bookId, userEmail) {
-  return db.prepare(`
-    SELECT fe.datum, fe.ereignis, fe.typ, f.name AS figur, c.chapter_name AS kapitel
-      FROM figure_events fe
-      JOIN figures f ON f.id = fe.figure_id
-      LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
-     WHERE f.book_id = ? AND f.user_email = ?
-     ORDER BY fe.sort_order, fe.id
-     LIMIT 300
-  `).all(parseInt(bookId), userEmail).map(e => ({
-    datum: e.datum || null,
-    ereignis: e.ereignis,
-    typ: e.typ || null,
-    figur: e.figur || null,
-    kapitel: e.kapitel || null,
-  }));
+  try {
+    return db.prepare(`
+      SELECT fe.datum, fe.ereignis, fe.typ, f.name AS figur, c.chapter_name AS kapitel
+        FROM figure_events fe
+        JOIN figures f ON f.id = fe.figure_id
+        LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
+       WHERE f.book_id = ? AND f.user_email = ?
+       ORDER BY fe.sort_order, fe.id
+       LIMIT 300
+    `).all(parseInt(bookId), userEmail).map(e => ({
+      datum: e.datum || null,
+      ereignis: e.ereignis,
+      typ: e.typ || null,
+      figur: e.figur || null,
+      kapitel: e.kapitel || null,
+    }));
+  } catch (e) {
+    throw _plotContextError('zeitstrahl', e);
+  }
 }
 
 // Offene Kontinuitäts-Befunde aus dem letzten Continuity-Check (nur Consistency).
@@ -235,25 +244,29 @@ async function _kapitelContext(bookId) {
 // beteiligten Figuren. figure_scenes/scene_figures sind keine pages/chapters/
 // books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige-Wert zur Lesezeit).
 function _szenenContext(bookId, userEmail) {
-  const scenes = db.prepare(`
-    SELECT fs.id, fs.titel, c.chapter_name AS kapitel
-      FROM figure_scenes fs
-      LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
-     WHERE fs.book_id = ? AND fs.user_email = ?
-     ORDER BY fs.sort_order, fs.id
-     LIMIT 150
-  `).all(parseInt(bookId), userEmail);
-  if (!scenes.length) return [];
-  const figRows = db.prepare(`
-    SELECT sf.scene_id, f.name
-      FROM scene_figures sf
-      JOIN figure_scenes fs ON fs.id = sf.scene_id
-      JOIN figures f ON f.id = sf.figure_id
-     WHERE fs.book_id = ? AND fs.user_email = ?
-  `).all(parseInt(bookId), userEmail);
-  const byScene = {};
-  for (const r of figRows) (byScene[r.scene_id] = byScene[r.scene_id] || []).push(r.name);
-  return scenes.map(s => ({ titel: s.titel, kapitel: s.kapitel, figuren: byScene[s.id] || [] }));
+  try {
+    const scenes = db.prepare(`
+      SELECT fs.id, fs.titel, c.chapter_name AS kapitel
+        FROM figure_scenes fs
+        LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
+       WHERE fs.book_id = ? AND fs.user_email = ?
+       ORDER BY fs.sort_order, fs.id
+       LIMIT 150
+    `).all(parseInt(bookId), userEmail);
+    if (!scenes.length) return [];
+    const figRows = db.prepare(`
+      SELECT sf.scene_id, f.name
+        FROM scene_figures sf
+        JOIN figure_scenes fs ON fs.id = sf.scene_id
+        JOIN figures f ON f.id = sf.figure_id
+       WHERE fs.book_id = ? AND fs.user_email = ?
+    `).all(parseInt(bookId), userEmail);
+    const byScene = {};
+    for (const r of figRows) (byScene[r.scene_id] = byScene[r.scene_id] || []).push(r.name);
+    return scenes.map(s => ({ titel: s.titel, kapitel: s.kapitel, figuren: byScene[s.id] || [] }));
+  } catch (e) {
+    throw _plotContextError('szenen', e);
+  }
 }
 
 // Handlungsstränge (Swimlanes) mit aufgelöster Hauptfigur. Katalog-Bindung über

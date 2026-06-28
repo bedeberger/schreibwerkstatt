@@ -109,6 +109,12 @@
     flex-direction: column;
     gap: var(--space-sm);
     min-height: 40px;
+    /* Flaches Board: die Drop-Zone wächst über die Beats hinaus und füllt den
+       Spalten-Body. So ist die ganze Spaltenfläche unter den Karten Drop-Ziel —
+       ein Akt-übergreifender Drag landet zuverlässig, auch wenn die Ziel-Spalte
+       nur wenige Beats hat. (Add-/Brainstorm-Buttons bleiben darunter, ausserhalb
+       des Containers.) */
+    flex: 1 1 auto;
   }
 
   /* SortableJS-Container: hält ausser dem x-for-Anker nur die Beat-Karten (Add-/
@@ -121,12 +127,6 @@
     gap: var(--space-sm);
     min-height: 28px;
   }
-  /* Flaches Board: die Drop-Zone wächst über die Beats hinaus und füllt den
-     Spalten-Body. So ist die ganze Spaltenfläche unter den Karten Drop-Ziel —
-     ein Akt-übergreifender Drag landet zuverlässig, auch wenn die Ziel-Spalte
-     nur wenige Beats hat. (Add-/Brainstorm-Buttons bleiben darunter, ausserhalb
-     des Containers.) */
-  .plot-column-body { flex: 1 1 auto; }
   .plot-column-body .plot-beats { flex: 1 1 auto; min-height: 120px; }
 
   /* ── Beat-Karte ────────────────────────────────────────────────────────── */

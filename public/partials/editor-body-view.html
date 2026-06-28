@@ -1,6 +1,22 @@
 <!-- Leseansicht (Read-Modus). Der TTS-/Vorlese-Dock lebt hier (nicht im Edit-
      Modus): Proof-Listening liest den gerenderten Seitentext satzweise vor. -->
 <div x-show="!editMode" class="page-view-wrap">
+  <!-- Aha-Nudge (Erstkontakt): einmaliger Hinweis, der das KI-Lektorat sichtbar
+       macht. Nur im Lese-Modus mit Inhalt, solange Lektorat verfügbar ist und
+       weder läuft noch Findings offen sind. Dismiss persistiert in localStorage
+       (Source of Truth) — Template re-mountet pro Seite und liest neu, zeigt nach
+       einmaligem Ausblenden nie wieder. Self-contained, kein Root-State. -->
+  <template x-if="renderedPageHtml && canReview() && !currentPageEmpty && !checkLoading && !checkDone">
+    <div x-data="{ dismissed: localStorage.getItem('sw:ahaLektorat') === '1', _dismiss(){ this.dismissed = true; try { localStorage.setItem('sw:ahaLektorat', '1'); } catch (e) {} } }"
+         x-show="!dismissed" x-cloak class="page-aha" role="note">
+      <span class="page-aha__text" x-text="t('page.aha.text')"></span>
+      <button type="button" class="page-aha__action" @click="runCheck(); _dismiss()" x-text="t('page.aha.action')"></button>
+      <button type="button" class="icon-btn icon-btn--ghost page-aha__close" @click="_dismiss()" :data-tip="t('page.aha.dismiss')" :aria-label="t('page.aha.dismiss')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg>
+      </button>
+    </div>
+  </template>
+
   <div x-show="renderedPageHtml"
        class="page-content-view"
        x-html="renderedPageHtml"

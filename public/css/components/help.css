@@ -81,7 +81,65 @@
   color: var(--color-text);
 }
 
+/* Welcome-Empty-State: 3-Schritt-Ablauf (Schreiben → Analysieren → Überarbeiten)
+   + Philosophie-Zeile. Vermittelt früh, dass die KI rückwärtsgewandt arbeitet
+   (nie generativ im Text). Links-bündige Liste, als Block in der zentrierten
+   Empty-Card. Schritt-Nummern eckig (var(--radius-sm)). */
+.welcome-steps {
+  list-style: none;
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  text-align: left;
+  width: 100%;
+  max-width: 44ch;
+}
+.welcome-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+.welcome-step-num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-bg);
+  color: var(--color-accent-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.welcome-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.welcome-step-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.welcome-step-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+}
+.welcome-philosophy {
+  margin: var(--space-md) 0 0;
+  max-width: 48ch;
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+}
+
 @media (max-width: 640px) {
   .help-features { grid-template-columns: 1fr; }
   .help-feature { padding: var(--space-md); }
+  .welcome-steps { max-width: 100%; }
 }

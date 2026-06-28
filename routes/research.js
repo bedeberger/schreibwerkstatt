@@ -18,6 +18,10 @@ const { prepareCover } = require('../lib/cover-prepare');
 const { extractPdfText } = require('../lib/pdf-extract');
 const { NOW_ISO_SQL } = require('../db/now');
 const searchIndex = require('../lib/search');
+const {
+  RESEARCH_KINDS, TITLE_MAX, BODY_MAX, SOURCE_MAX, TAG_MAX,
+  cleanStr, normalizeUrls, normalizeTags,
+} = require('../lib/research-validate');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -25,16 +29,6 @@ const jsonBody = express.json();
 const rawImage = express.raw({ type: ['image/*'], limit: '12mb' });
 const rawDoc = express.raw({ type: ['application/pdf'], limit: '25mb' });
 const DOCNAME_MAX = 200;
-
-const KINDS = new Set(['note', 'link', 'quote', 'fact', 'image']);
-const TITLE_MAX = 300;
-const BODY_MAX = 20000;
-const URL_MAX = 2000;
-const URL_LABEL_MAX = 300;
-const MAX_URLS = 20;
-const SOURCE_MAX = 1000;
-const TAG_MAX = 60;
-const MAX_TAGS = 20;
 
 // target_kind → { col, table, pk, nameCol, orderCol } für Validierung,
 // Display-JOIN und Sortierung „nach verknüpfter Entität". orderCol ist die Spalte,
@@ -70,13 +64,6 @@ function _guard(req, res, bookId, minRole) {
   setContext({ book: bookId });
   try { requireBookAccess(req, bookId, minRole); return true; }
   catch (e) { return !sendACLError(res, e); }
-}
-
-function _clean(v, max) {
-  if (typeof v !== 'string') return null;
-  const t = v.trim();
-  if (!t) return null;
-  return t.slice(0, max);
 }
 
 // Tags + Links für eine Menge Items nachladen und nach item_id gruppieren.
@@ -144,37 +131,26 @@ function _emitItem(id) {
   return row;
 }
 
-// urls: Array von { url, label? } (oder reinen URL-Strings) → geordnete Kind-Tabelle.
-// Nur http(s) (XSS-/Schema-Schutz beim späteren :href-Binding), je URL einmal.
+// urls → geordnete Kind-Tabelle. Normalisierung (http(s)-only, Dedup, Cap, Label)
+// kommt aus lib/research-validate (geteilt mit dem Chat-Vorschlag).
 function _replaceUrls(itemId, urls) {
   db.prepare('DELETE FROM research_item_urls WHERE item_id = ?').run(itemId);
-  if (!Array.isArray(urls)) return;
+  const { urls: clean } = normalizeUrls(urls);
+  if (!clean.length) return;
   const ins = db.prepare(
     `INSERT INTO research_item_urls (item_id, url, label, position, created_at)
      VALUES (?, ?, ?, ?, ${NOW_ISO_SQL})`
   );
-  const seen = new Set();
   let pos = 0;
-  for (const raw of urls.slice(0, MAX_URLS)) {
-    const url = _clean(typeof raw === 'string' ? raw : raw?.url, URL_MAX);
-    if (!url || !/^https?:\/\//i.test(url) || seen.has(url)) continue;
-    seen.add(url);
-    const label = typeof raw === 'object' ? _clean(raw?.label, URL_LABEL_MAX) : null;
-    ins.run(itemId, url, label, pos++);
-  }
+  for (const { url, label } of clean) ins.run(itemId, url, label || null, pos++);
 }
 
 function _replaceTags(itemId, tags) {
   db.prepare('DELETE FROM research_item_tags WHERE item_id = ?').run(itemId);
-  if (!Array.isArray(tags)) return;
-  const seen = new Set();
+  const clean = normalizeTags(tags);
+  if (!clean.length) return;
   const ins = db.prepare('INSERT OR IGNORE INTO research_item_tags (item_id, tag) VALUES (?, ?)');
-  for (const raw of tags.slice(0, MAX_TAGS)) {
-    const tag = _clean(String(raw || ''), TAG_MAX);
-    if (!tag || seen.has(tag.toLowerCase())) continue;
-    seen.add(tag.toLowerCase());
-    ins.run(itemId, tag);
-  }
+  for (const tag of clean) ins.run(itemId, tag);
 }
 
 // ── Liste + Filter ─────────────────────────────────────────────────────────
@@ -188,11 +164,11 @@ router.get('/', (req, res) => {
   const vals = [bookId];
 
   const kind = String(req.query.kind || '').trim();
-  if (KINDS.has(kind)) { where.push('ri.kind = ?'); vals.push(kind); }
+  if (RESEARCH_KINDS.has(kind)) { where.push('ri.kind = ?'); vals.push(kind); }
 
   if (String(req.query.archived || '') !== '1') where.push('ri.archived = 0');
 
-  const tag = _clean(String(req.query.tag || ''), TAG_MAX);
+  const tag = cleanStr(String(req.query.tag || ''), TAG_MAX);
   if (tag) {
     where.push('ri.id IN (SELECT item_id FROM research_item_tags WHERE tag = ?)');
     vals.push(tag);
@@ -350,10 +326,10 @@ router.post('/', jsonBody, (req, res) => {
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
   if (!_guard(req, res, bookId, 'editor')) return;
 
-  const kind = KINDS.has(req.body?.kind) ? req.body.kind : 'note';
-  const title = _clean(req.body?.title, TITLE_MAX);
-  const body = _clean(req.body?.body, BODY_MAX);
-  const source = _clean(req.body?.source, SOURCE_MAX);
+  const kind = RESEARCH_KINDS.has(req.body?.kind) ? req.body.kind : 'note';
+  const title = cleanStr(req.body?.title, TITLE_MAX);
+  const body = cleanStr(req.body?.body, BODY_MAX);
+  const source = cleanStr(req.body?.source, SOURCE_MAX);
   const urls = Array.isArray(req.body?.urls) ? req.body.urls : [];
   const hasUrl = urls.some(u => /^https?:\/\//i.test(String(typeof u === 'string' ? u : u?.url || '').trim()));
   if (!title && !body && !hasUrl) return res.status(400).json({ error_code: 'EMPTY' });
@@ -384,12 +360,12 @@ router.patch('/:id', jsonBody, (req, res) => {
   const vals = [];
   const b = req.body || {};
   if (typeof b.kind !== 'undefined') {
-    if (!KINDS.has(b.kind)) return res.status(400).json({ error_code: 'INVALID_KIND' });
+    if (!RESEARCH_KINDS.has(b.kind)) return res.status(400).json({ error_code: 'INVALID_KIND' });
     sets.push('kind = ?'); vals.push(b.kind);
   }
-  if (typeof b.title !== 'undefined')  { sets.push('title = ?');  vals.push(_clean(b.title, TITLE_MAX)); }
-  if (typeof b.body !== 'undefined')   { sets.push('body = ?');   vals.push(_clean(b.body, BODY_MAX)); }
-  if (typeof b.source !== 'undefined') { sets.push('source = ?'); vals.push(_clean(b.source, SOURCE_MAX)); }
+  if (typeof b.title !== 'undefined')  { sets.push('title = ?');  vals.push(cleanStr(b.title, TITLE_MAX)); }
+  if (typeof b.body !== 'undefined')   { sets.push('body = ?');   vals.push(cleanStr(b.body, BODY_MAX)); }
+  if (typeof b.source !== 'undefined') { sets.push('source = ?'); vals.push(cleanStr(b.source, SOURCE_MAX)); }
   if (typeof b.pinned !== 'undefined')   { sets.push('pinned = ?');   vals.push(b.pinned ? 1 : 0); }
   if (typeof b.archived !== 'undefined') { sets.push('archived = ?'); vals.push(b.archived ? 1 : 0); }
 
@@ -517,7 +493,7 @@ router.post('/:id/doc', rawDoc, async (req, res) => {
   if (!Buffer.isBuffer(req.body) || !req.body.length) {
     return res.status(400).json({ error_code: 'NO_DOC' });
   }
-  const docName = _clean(String(req.query.name || ''), DOCNAME_MAX) || 'Dokument.pdf';
+  const docName = cleanStr(String(req.query.name || ''), DOCNAME_MAX) || 'Dokument.pdf';
   try {
     const { text, pages } = await extractPdfText(req.body);
     db.prepare(

@@ -35,6 +35,21 @@ function _guard(req, res, bookId, minRole = 'editor') {
   catch (e) { return !sendACLError(res, e); }
 }
 
+// Entity per :id laden + Owner (user_email) + Buch-ACL prüfen. Gibt die Entity
+// zurück oder null (die passende Fehler-Response wurde dann bereits gesendet).
+// SSoT für die sonst in jedem :id-Handler (Akt/Beat/Thread/Run) wiederholte
+// Login-/ID-/Owner-/Guard-Kette.
+function _loadOwned(req, res, getFn, notFoundCode) {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) { res.status(401).json({ error_code: 'LOGIN_REQ' }); return null; }
+  const id = toIntId(req.params.id);
+  if (!id) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
+  const row = getFn(id);
+  if (!row || row.user_email !== userEmail) { res.status(404).json({ error_code: notFoundCode }); return null; }
+  if (!_guard(req, res, row.book_id)) return null;
+  return row;
+}
+
 // chapter_id muss zum Buch gehören, sonst NULL (kein Fremd-Verweis).
 function _validChapterId(bookId, chapterId) {
   if (!chapterId) return null;
@@ -150,13 +165,9 @@ router.post('/acts', jsonBody, (req, res) => {
 });
 
 router.patch('/acts/:id', jsonBody, (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const act = plotDb.getAct(id);
-  if (!act || act.user_email !== userEmail) return res.status(404).json({ error_code: 'ACT_NOT_FOUND' });
-  if (!_guard(req, res, act.book_id)) return;
+  const act = _loadOwned(req, res, plotDb.getAct, 'ACT_NOT_FOUND');
+  if (!act) return;
+  const id = act.id;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : act.name;
   if (!name) return res.status(400).json({ error_code: 'NAME_REQ' });
   if (name.length > MAX_ACT_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
@@ -166,15 +177,10 @@ router.patch('/acts/:id', jsonBody, (req, res) => {
 });
 
 router.delete('/acts/:id', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const act = plotDb.getAct(id);
-  if (!act || act.user_email !== userEmail) return res.status(404).json({ error_code: 'ACT_NOT_FOUND' });
-  if (!_guard(req, res, act.book_id)) return;
-  plotDb.deleteAct(id);
-  logger.info(`[plot] act delete id=${id} book=${act.book_id}`);
+  const act = _loadOwned(req, res, plotDb.getAct, 'ACT_NOT_FOUND');
+  if (!act) return;
+  plotDb.deleteAct(act.id);
+  logger.info(`[plot] act delete id=${act.id} book=${act.book_id}`);
   res.json({ ok: true });
 });
 
@@ -210,13 +216,10 @@ router.post('/threads', jsonBody, (req, res) => {
 });
 
 router.patch('/threads/:id', jsonBody, (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const thread = plotDb.getThread(id);
-  if (!thread || thread.user_email !== userEmail) return res.status(404).json({ error_code: 'THREAD_NOT_FOUND' });
-  if (!_guard(req, res, thread.book_id)) return;
+  const thread = _loadOwned(req, res, plotDb.getThread, 'THREAD_NOT_FOUND');
+  if (!thread) return;
+  const id = thread.id;
+  const userEmail = thread.user_email;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : thread.name;
   if (!name) return res.status(400).json({ error_code: 'NAME_REQ' });
   if (name.length > MAX_THREAD_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
@@ -240,15 +243,10 @@ router.patch('/threads/:id', jsonBody, (req, res) => {
 });
 
 router.delete('/threads/:id', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const thread = plotDb.getThread(id);
-  if (!thread || thread.user_email !== userEmail) return res.status(404).json({ error_code: 'THREAD_NOT_FOUND' });
-  if (!_guard(req, res, thread.book_id)) return;
-  plotDb.deleteThread(id);
-  logger.info(`[plot] thread delete id=${id} book=${thread.book_id}`);
+  const thread = _loadOwned(req, res, plotDb.getThread, 'THREAD_NOT_FOUND');
+  if (!thread) return;
+  plotDb.deleteThread(thread.id);
+  logger.info(`[plot] thread delete id=${thread.id} book=${thread.book_id}`);
   res.json({ ok: true });
 });
 
@@ -268,35 +266,25 @@ router.put('/threads/order', jsonBody, (req, res) => {
 // werden in den Strang geklont, dessen Beats wandern auf die Klone. Braucht ≥1
 // geteilten Akt (sonst NO_SHARED_ACTS). Idempotent (schon geforkt → ok).
 router.post('/threads/:id/fork-acts', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const thread = plotDb.getThread(id);
-  if (!thread || thread.user_email !== userEmail) return res.status(404).json({ error_code: 'THREAD_NOT_FOUND' });
-  if (!_guard(req, res, thread.book_id)) return;
+  const thread = _loadOwned(req, res, plotDb.getThread, 'THREAD_NOT_FOUND');
+  if (!thread) return;
   try {
-    plotDb.forkThreadActs(thread.book_id, userEmail, id);
+    plotDb.forkThreadActs(thread.book_id, thread.user_email, thread.id);
   } catch (e) {
     if (e.code === 'NO_SHARED_ACTS') return res.status(400).json({ error_code: 'NO_SHARED_ACTS' });
     throw e;
   }
-  logger.info(`[plot] thread fork-acts id=${id} book=${thread.book_id}`);
+  logger.info(`[plot] thread fork-acts id=${thread.id} book=${thread.book_id}`);
   res.json({ ok: true });
 });
 
 // Eigene Aktstruktur auflösen: Beats zurück auf die geteilten Akte umhängen
 // (positionsweise) und die strang-eigenen Akte löschen.
 router.delete('/threads/:id/fork-acts', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const thread = plotDb.getThread(id);
-  if (!thread || thread.user_email !== userEmail) return res.status(404).json({ error_code: 'THREAD_NOT_FOUND' });
-  if (!_guard(req, res, thread.book_id)) return;
-  plotDb.unforkThreadActs(thread.book_id, userEmail, id);
-  logger.info(`[plot] thread unfork-acts id=${id} book=${thread.book_id}`);
+  const thread = _loadOwned(req, res, plotDb.getThread, 'THREAD_NOT_FOUND');
+  if (!thread) return;
+  plotDb.unforkThreadActs(thread.book_id, thread.user_email, thread.id);
+  logger.info(`[plot] thread unfork-acts id=${thread.id} book=${thread.book_id}`);
   res.json({ ok: true });
 });
 
@@ -333,13 +321,10 @@ router.post('/beats', jsonBody, (req, res) => {
 });
 
 router.patch('/beats/:id', jsonBody, (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const beat = plotDb.getBeat(id);
-  if (!beat || beat.user_email !== userEmail) return res.status(404).json({ error_code: 'BEAT_NOT_FOUND' });
-  if (!_guard(req, res, beat.book_id)) return;
+  const beat = _loadOwned(req, res, plotDb.getBeatMeta, 'BEAT_NOT_FOUND');
+  if (!beat) return;
+  const id = beat.id;
+  const userEmail = beat.user_email;
 
   const fields = {};
   if (typeof req.body?.titel === 'string') {
@@ -400,15 +385,10 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
 });
 
 router.delete('/beats/:id', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const beat = plotDb.getBeat(id);
-  if (!beat || beat.user_email !== userEmail) return res.status(404).json({ error_code: 'BEAT_NOT_FOUND' });
-  if (!_guard(req, res, beat.book_id)) return;
-  plotDb.deleteBeat(id);
-  logger.info(`[plot] beat delete id=${id} book=${beat.book_id}`);
+  const beat = _loadOwned(req, res, plotDb.getBeatMeta, 'BEAT_NOT_FOUND');
+  if (!beat) return;
+  plotDb.deleteBeat(beat.id);
+  logger.info(`[plot] beat delete id=${beat.id} book=${beat.book_id}`);
   res.json({ ok: true });
 });
 
@@ -438,25 +418,15 @@ router.get('/consistency-runs', (req, res) => {
 });
 
 router.get('/consistency-runs/:id', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const run = plotDb.getPlotConsistencyRun(id);
-  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
-  if (!_guard(req, res, run.book_id)) return;
+  const run = _loadOwned(req, res, plotDb.getPlotConsistencyRun, 'RUN_NOT_FOUND');
+  if (!run) return;
   res.json(run);
 });
 
 router.delete('/consistency-runs/:id', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const run = plotDb.getPlotConsistencyRun(id);
-  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
-  if (!_guard(req, res, run.book_id)) return;
-  plotDb.deletePlotConsistencyRun(id, userEmail);
+  const run = _loadOwned(req, res, plotDb.getPlotConsistencyRun, 'RUN_NOT_FOUND');
+  if (!run) return;
+  plotDb.deletePlotConsistencyRun(run.id, run.user_email);
   res.json({ ok: true });
 });
 
@@ -474,25 +444,15 @@ router.get('/brainstorm-runs', (req, res) => {
 });
 
 router.get('/brainstorm-runs/:id', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const run = plotDb.getPlotBrainstormRun(id);
-  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
-  if (!_guard(req, res, run.book_id)) return;
+  const run = _loadOwned(req, res, plotDb.getPlotBrainstormRun, 'RUN_NOT_FOUND');
+  if (!run) return;
   res.json(run);
 });
 
 router.delete('/brainstorm-runs/:id', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const run = plotDb.getPlotBrainstormRun(id);
-  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
-  if (!_guard(req, res, run.book_id)) return;
-  plotDb.deletePlotBrainstormRun(id, userEmail);
+  const run = _loadOwned(req, res, plotDb.getPlotBrainstormRun, 'RUN_NOT_FOUND');
+  if (!run) return;
+  plotDb.deletePlotBrainstormRun(run.id, run.user_email);
   res.json({ ok: true });
 });
 

@@ -143,7 +143,7 @@ export const researchChatMethods = {
     if (!bookId || !proposal || this._proposalSaved[key] || this._proposalSaving[key]) return;
     this._proposalSaving = { ...this._proposalSaving, [key]: true };
     try {
-      const row = await fetchJson('/research', {
+      await fetchJson('/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -156,9 +156,9 @@ export const researchChatMethods = {
           tags: Array.isArray(proposal.tags) ? proposal.tags : [],
         }),
       });
-      // Ins offene Board einfügen (oben) + Tag-Pool aktualisieren.
-      this.items = [row, ...this.items];
-      this._loadTags();
+      // Board aus Server-Wahrheit neu laden (respektiert aktive Filter/Sortierung
+      // + frischt den Tag-Pool mit) statt das Item blind oben einzufügen.
+      await this.loadRecherche();
       this._proposalSaved = { ...this._proposalSaved, [key]: true };
     } catch (e) {
       this.errorMessage = app.t('recherche.chat.saveError');

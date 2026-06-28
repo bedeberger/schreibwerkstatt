@@ -959,7 +959,7 @@ body.share-page {
 .share-thread__edit {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin-top: 6px;
 }
 
@@ -997,7 +997,6 @@ body.share-page {
 .share-thread__action--danger:hover { color: #c43838; }
 .share-thread__action:disabled { opacity: 0.6; cursor: not-allowed; text-decoration: none; }
 .share-thread__reply-actions { display: flex; align-items: center; gap: 8px; }
-.share-thread__edit { display: flex; flex-direction: column; gap: 8px; }
 .share-thread__edit .comment-rail__textarea { width: 100%; box-sizing: border-box; }
 .share-page .comment-rail__textarea:focus { outline: 2px solid var(--share-accent); outline-offset: -1px; }
 

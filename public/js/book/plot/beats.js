@@ -4,43 +4,35 @@
 import { fetchJson } from '../../utils.js';
 
 export const beatsMethods = {
-  // ── Beats ──────────────────────────────────────────────────────────────────
-  startAddBeat(actId) {
-    this.addingActId = actId;
-    this.newBeatTitel = '';
-    this.$nextTick(() => {
-      const el = this.$root?.querySelector(`[data-add-beat-act="${actId}"] .plot-add-beat-input`);
-      el?.focus();
-    });
-  },
-  cancelAddBeat() { this.addingActId = null; this.newBeatTitel = ''; },
+  // ── Beat anlegen (flach + Grid-Zelle teilen den Kern) ───────────────────────
+  // Flach: akt-only (thread_id null), Selektor `[data-add-beat-act]`, Add-Modus
+  // über `addingActId`. Grid: zell-granular (thread_id gesetzt), Selektor
+  // `[data-add-beat-cell]`, Add-Modus über `addingCell`. Die öffentlichen Methoden
+  // (von den Partials referenziert) bleiben dünn und delegieren an die Kerne.
 
-  // keepAdding=true (Enter / „Hinzufügen"): Feld leeren + refokussieren zum
-  // schnellen Stapeln. keepAdding=false (Verlassen via Blur): speichern und den
-  // Add-Modus schliessen, ohne den Fokus zurückzureissen.
-  async saveNewBeat(actId, { keepAdding = true } = {}) {
+  // Das Eingabefeld einer Add-Zone refokussieren (nach dem Stapeln eines Beats).
+  _focusAddInput(scopeSelector) {
+    this.$root?.querySelector(`${scopeSelector} .plot-add-beat-input`)?.focus();
+  },
+
+  // Gemeinsamer Speicherpfad. cancel/refocus/close kapseln den einzigen
+  // Unterschied (addingActId vs addingCell). threadId === null im flachen Pfad.
+  async _createBeatInline({ actId, threadId, keepAdding, cancel, refocus, close }) {
     const app = window.__app;
     const titel = (this.newBeatTitel || '').trim();
-    if (!titel) { this.cancelAddBeat(); return; }
+    if (!titel) { cancel(); return; }
     this.busy = true;
     try {
       const beat = await fetchJson('/plot/beats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, act_id: actId, titel }),
+        body: JSON.stringify({ book_id: app.selectedBookId, act_id: actId, thread_id: threadId ?? null, titel }),
       });
       this.beats = [...this.beats, beat];
       this._memos = {};
       this.newBeatTitel = '';
       this.errorMessage = '';
-      if (keepAdding) {
-        this.$nextTick(() => {
-          const el = this.$root?.querySelector(`[data-add-beat-act="${actId}"] .plot-add-beat-input`);
-          el?.focus();
-        });
-      } else {
-        this.addingActId = null;
-      }
+      if (keepAdding) this.$nextTick(refocus); else close();
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');
     } finally { this.busy = false; }
@@ -54,81 +46,75 @@ export const beatsMethods = {
   // Der Spellcheck-Dispatcher wickelt das Feld beim Fokus in ein
   // <span class="lt-field-wrap"> — der DOM-Move feuert ein synchrones blur,
   // obwohl der Fokus unmittelbar danach wiederhergestellt wird. Würde blur sofort
-  // cancelAddBeat (leeres Feld beim ersten Klick), blendete das x-if das Input
-  // direkt wieder aus und der User kann gar nichts eingeben. Darum eine Frame
-  // deferren und nur reagieren, wenn der Fokus das Feld wirklich verlassen hat
-  // (analog onActBlur).
-  onAddBeatBlur(actId, ev) {
-    if (this.busy || this.addingActId !== actId) return;
+  // canceln (leeres Feld beim ersten Klick), blendete das x-if das Input direkt
+  // wieder aus und der User kann gar nichts eingeben. Darum eine Frame deferren und
+  // nur reagieren, wenn der Fokus das Feld wirklich verlassen hat (analog onActBlur).
+  _deferAddBeatBlur(ev, isActive, cancel, save) {
+    if (this.busy || !isActive()) return;
     const to = ev?.relatedTarget;
     if (to?.closest?.('.plot-add-beat-actions, .lt-badge, .lt-popover')) return;
     if (document.querySelector('.lt-popover')) return;
     const input = ev?.target || null;
     requestAnimationFrame(() => {
-      if (this.busy || this.addingActId !== actId) return;
+      if (this.busy || !isActive()) return;
       if (input && document.activeElement === input) return;
-      if (!(this.newBeatTitel || '').trim()) { this.cancelAddBeat(); return; }
-      this.saveNewBeat(actId, { keepAdding: false });
+      if (!(this.newBeatTitel || '').trim()) { cancel(); return; }
+      save();
     });
   },
 
-  // ── Beat hinzufügen in einer Grid-Zelle (Akt × Strang) ─────────────────────
-  // Eigener Pfad neben startAddBeat/saveNewBeat (die akt-only sind), weil im Grid
-  // beim Anlegen direkt der Strang (thread_id) mitgesetzt wird. addingCell ist der
-  // Zell-Schlüssel `${actId}:${threadId|null}`.
+  // ── Flaches Board (akt-only) ────────────────────────────────────────────────
+  startAddBeat(actId) {
+    this.addingActId = actId;
+    this.newBeatTitel = '';
+    this.$nextTick(() => this._focusAddInput(`[data-add-beat-act="${actId}"]`));
+  },
+  cancelAddBeat() { this.addingActId = null; this.newBeatTitel = ''; },
+
+  // keepAdding=true (Enter / „Hinzufügen"): Feld leeren + refokussieren zum
+  // schnellen Stapeln. keepAdding=false (Blur): speichern + Add-Modus schliessen.
+  saveNewBeat(actId, { keepAdding = true } = {}) {
+    return this._createBeatInline({
+      actId, threadId: null, keepAdding,
+      cancel: () => this.cancelAddBeat(),
+      refocus: () => this._focusAddInput(`[data-add-beat-act="${actId}"]`),
+      close: () => { this.addingActId = null; },
+    });
+  },
+
+  onAddBeatBlur(actId, ev) {
+    this._deferAddBeatBlur(ev,
+      () => this.addingActId === actId,
+      () => this.cancelAddBeat(),
+      () => this.saveNewBeat(actId, { keepAdding: false }));
+  },
+
+  // ── Grid-Zelle (Akt × Strang) ───────────────────────────────────────────────
+  // addingCell ist der Zell-Schlüssel `${actId}:${threadId|null}`.
   _cellKey(actId, threadId) { return `${actId}:${threadId == null ? 'null' : threadId}`; },
 
   startAddBeatCell(actId, threadId) {
     this.addingCell = this._cellKey(actId, threadId);
     this.newBeatTitel = '';
-    this.$nextTick(() => {
-      const el = this.$root?.querySelector(`[data-add-beat-cell="${this.addingCell}"] .plot-add-beat-input`);
-      el?.focus();
-    });
+    this.$nextTick(() => this._focusAddInput(`[data-add-beat-cell="${this.addingCell}"]`));
   },
   cancelAddBeatCell() { this.addingCell = null; this.newBeatTitel = ''; },
 
-  async saveNewBeatCell(actId, threadId, { keepAdding = true } = {}) {
-    const app = window.__app;
-    const titel = (this.newBeatTitel || '').trim();
-    if (!titel) { this.cancelAddBeatCell(); return; }
-    this.busy = true;
-    try {
-      const beat = await fetchJson('/plot/beats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, act_id: actId, thread_id: threadId ?? null, titel }),
-      });
-      this.beats = [...this.beats, beat];
-      this._memos = {};
-      this.newBeatTitel = '';
-      this.errorMessage = '';
-      if (keepAdding) {
-        this.$nextTick(() => {
-          const el = this.$root?.querySelector(`[data-add-beat-cell="${this._cellKey(actId, threadId)}"] .plot-add-beat-input`);
-          el?.focus();
-        });
-      } else {
-        this.addingCell = null;
-      }
-    } catch (e) {
-      this.errorMessage = app.t('plot.error.save');
-    } finally { this.busy = false; }
+  saveNewBeatCell(actId, threadId, { keepAdding = true } = {}) {
+    return this._createBeatInline({
+      actId, threadId: threadId ?? null, keepAdding,
+      cancel: () => this.cancelAddBeatCell(),
+      refocus: () => this._focusAddInput(`[data-add-beat-cell="${this._cellKey(actId, threadId)}"]`),
+      close: () => { this.addingCell = null; },
+    });
   },
 
   onAddBeatCellBlur(actId, threadId, ev) {
     const key = this._cellKey(actId, threadId);
-    if (this.busy || this.addingCell !== key) return;
-    const to = ev?.relatedTarget;
-    if (to?.closest?.('.plot-add-beat-actions, .lt-badge, .lt-popover')) return;
-    if (document.querySelector('.lt-popover')) return;
-    const input = ev?.target || null;
-    requestAnimationFrame(() => {
-      if (this.busy || this.addingCell !== key) return;
-      if (input && document.activeElement === input) return;
-      if (!(this.newBeatTitel || '').trim()) { this.cancelAddBeatCell(); return; }
-      this.saveNewBeatCell(actId, threadId, { keepAdding: false });
-    });
+    this._deferAddBeatBlur(ev,
+      () => this.addingCell === key,
+      () => this.cancelAddBeatCell(),
+      () => this.saveNewBeatCell(actId, threadId, { keepAdding: false }));
   },
 
   startEditBeat(beat) {

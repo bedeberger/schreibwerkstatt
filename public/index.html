@@ -401,6 +401,30 @@
   <div class="card-empty">
     <p class="card-empty-text" x-text="t('welcome.title')"></p>
     <p class="card-empty-hint" x-text="t('welcome.hint')"></p>
+    <ol class="welcome-steps">
+      <li class="welcome-step">
+        <span class="welcome-step-num" aria-hidden="true">1</span>
+        <span class="welcome-step-body">
+          <span class="welcome-step-title" x-text="t('welcome.step1Title')"></span>
+          <span class="welcome-step-desc" x-text="t('welcome.step1Desc')"></span>
+        </span>
+      </li>
+      <li class="welcome-step">
+        <span class="welcome-step-num" aria-hidden="true">2</span>
+        <span class="welcome-step-body">
+          <span class="welcome-step-title" x-text="t('welcome.step2Title')"></span>
+          <span class="welcome-step-desc" x-text="t('welcome.step2Desc')"></span>
+        </span>
+      </li>
+      <li class="welcome-step">
+        <span class="welcome-step-num" aria-hidden="true">3</span>
+        <span class="welcome-step-body">
+          <span class="welcome-step-title" x-text="t('welcome.step3Title')"></span>
+          <span class="welcome-step-desc" x-text="t('welcome.step3Desc')"></span>
+        </span>
+      </li>
+    </ol>
+    <p class="welcome-philosophy" x-text="t('welcome.philosophy')"></p>
     <button class="primary" @click="openCreateBook()" x-text="t('welcome.cta')"></button>
     <button type="button" class="welcome-help-link internal-link" @click="toggleHelpCard()" x-text="t('welcome.helpLink')"></button>
   </div>

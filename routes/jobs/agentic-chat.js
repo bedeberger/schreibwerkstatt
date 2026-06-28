@@ -43,6 +43,17 @@ function stripTrailingEmptyJson(text) {
     .trim();
 }
 
+// Provider-gerechter Model-Fallback, falls kein callAIWithTools-Result ein Model
+// lieferte (z.B. wenn alle Iterationen scheiterten). Sonst würde die Zeile mit dem
+// Claude-Model + Claude-Pricing persistiert, obwohl der Job unter ollama/openai-
+// compat lief — Cost-Ledger (recordChatLedgerForMessage) liest provider+model direkt
+// aus der chat_messages-Zeile.
+function _defaultModelFor(provider) {
+  if (provider === 'ollama')        return appSettings.get('ai.ollama.model') || 'llama3.2';
+  if (provider === 'openai-compat') return appSettings.get('ai.openai-compat.model') || 'llama3.2';
+  return appSettings.get('ai.claude.model') || 'claude-sonnet-4-6';
+}
+
 // Rolling-Window: erste user+assistant-Runde als Kontext-Anker + die letzten
 // tailMessages Nachrichten. Verhindert unbegrenztes Historien-Wachstum.
 function buildAgenticHistory(sessionId, tailMessages = 10) {
@@ -227,11 +238,11 @@ function makeAgenticChatJob(config) {
       const assistantNow = new Date().toISOString();
       const tpsVal = (state.genMs > 0 && state.totalTokOut > 0) ? state.totalTokOut / (state.genMs / 1000) : null;
       const contextInfo = config.buildContextInfo({ toolLog, iter, webSearches: state.webSearches, webResults: state.webResults, ctx });
-      const model = state.lastModel || appSettings.get('ai.claude.model') || 'claude-sonnet-4-6';
+      const model = state.lastModel || _defaultModelFor(provider);
       const asstMsgResult = db.prepare(`
         INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, web_searches, provider, model, tps, context_info, created_at)
         VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(session.id, antwort, state.totalTokIn, state.totalTokOut, state.totalCacheRead, state.totalCacheCreation, state.totalCacheCreation1h, state.webSearches, 'claude', model, tpsVal, JSON.stringify(contextInfo), assistantNow);
+      `).run(session.id, antwort, state.totalTokIn, state.totalTokOut, state.totalCacheRead, state.totalCacheCreation, state.totalCacheCreation1h, state.webSearches, provider, model, tpsVal, JSON.stringify(contextInfo), assistantNow);
       db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(assistantNow, session.id);
       recordChatLedgerForMessage(asstMsgResult.lastInsertRowid);
 

@@ -22,6 +22,7 @@
 
   <div x-show="$app.orte.length === 0 && !orteLoading && !orteStatus" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+    <p class="card-empty-hint" x-text="$app.t('empty.orte.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
             :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">

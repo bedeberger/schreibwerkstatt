@@ -51,6 +51,7 @@
   <!-- Leer-Hinweis mit CTA -->
   <div x-show="$app.globalZeitstrahl.length === 0 && !zeitstrahlConsolidating && !ereignisseLoading" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
+    <p class="card-empty-hint" x-text="$app.t('empty.ereignisse.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
             :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">

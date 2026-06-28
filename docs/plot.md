@@ -46,6 +46,8 @@ Alle unter `/plot` ([routes/plot.js](../routes/plot.js)), ACL via `requireBookAc
 |---------|------|-------|
 | `GET`    | `/?book_id=X`      | Board laden → `{ acts, threads, beats }`. Beats inkl. `chapter_name` (LEFT JOIN) + `thread_id` + `fig_ids[]`. Threads inkl. `fig_id` (TEXT, via JOIN) + `draft_figure_id` + `chapter_id` + `chapter_name` (LEFT JOIN) |
 | `GET`    | `/figure-usage?book_id=X&draft_id=Y` | Plot-Beteiligung einer Werkstatt-Figur → `{ beatCount, activeBeatCount, threads }` (via `figurePlotUsage`; `source_figure_id` serverseitig aus dem Owner-geprüften Draft). Speist das Cross-Feature-Badge in der [Figuren-Werkstatt](figur-werkstatt.md) |
+| `GET`    | `/page-beat-counts?book_id=X`    | Map `page_id` → Anzahl nicht-verworfener Beats im Kapitel der Seite (`pageBeatCounts`). Speist den Plot-Verknüpfungs-Indikator im Notebook-Editor (analog `/ideen/counts`, `/research/page-counts`) |
+| `GET`    | `/chapter-beat-counts?book_id=X` | Map `chapter_id` → Anzahl nicht-verworfener Beats im Kapitel (`chapterBeatCounts`). Speist den Indikator in der Kapitelansicht |
 | `POST`   | `/acts`            | `{ book_id, name, farbe?, thread_id? }` — neuer Akt ans Spaltenende (gesetzter `thread_id` → strang-eigener Akt, Hybrid; sonst geteilt) |
 | `PATCH`  | `/acts/:id`        | `{ name?, farbe? }` umbenennen/umfärben |
 | `DELETE` | `/acts/:id`        | Akt löschen — `plot_beats` hängen via CASCADE dran |
