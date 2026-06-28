@@ -97,7 +97,7 @@ export function createSyncCard(spec) {
       // Endpoint /links liefert `connected: false`, wenn Buchtyp != 'blog' oder
       // keine Connection gespeichert ist — kein zusätzlicher Client-Gate nötig.
       async loadLinks() {
-        const bookId = window.__app?.selectedBookId;
+        const bookId = Alpine.store('nav').selectedBookId;
         if (!bookId) {
           this.connected = false;
           this.providerMeta = {};
@@ -145,7 +145,7 @@ export function createSyncCard(spec) {
       },
 
       async push(pageId) {
-        const bookId = window.__app?.selectedBookId;
+        const bookId = Alpine.store('nav').selectedBookId;
         if (!bookId) return;
         if (this.pushBusy[pageId]) return;
         if (typeof spec.confirmPush === 'function') {

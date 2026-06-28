@@ -372,7 +372,7 @@ export function registerPdfExportCard() {
       try {
         // Umschlag-PDF immer Buch-scoped; sonst der gewählte Scope.
         const ref = target === 'cover'
-          ? (window.__app?.selectedBookId ? { scope: 'book', id: parseInt(window.__app.selectedBookId) } : null)
+          ? (Alpine.store('nav').selectedBookId ? { scope: 'book', id: parseInt(Alpine.store('nav').selectedBookId) } : null)
           : this._exportEntity();
         if (!ref) { this.exportError = window.__app.t('pdfExport.error.startFailed'); this.exporting = false; return; }
         const r = await fetch('/jobs/pdf-export', {
@@ -474,21 +474,21 @@ export function registerPdfExportCard() {
     },
     exportChapterOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree)) return [];
-      return app.tree
+      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
+      return Alpine.store('nav').tree
         .filter(c => c.type === 'chapter' && !c.solo)
         .map(c => ({ value: c.id, label: c.name }));
     },
     selectedChapterHasSubs() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree) || !this.exportChapterId) return false;
-      const ch = app.tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
+      if (!app || !Array.isArray(Alpine.store('nav').tree) || !this.exportChapterId) return false;
+      const ch = Alpine.store('nav').tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
       return !!ch?.hasChildren;
     },
     exportPageOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.pages)) return [];
-      return app.pages.map(p => ({ value: p.id, label: p.name }));
+      if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
+      return Alpine.store('nav').pages.map(p => ({ value: p.id, label: p.name }));
     },
 
     // Optionen fuer Kapitel-ohne-Nummer-Auswahl (Multi-Combobox).
@@ -496,8 +496,8 @@ export function registerPdfExportCard() {
     // ein Top-Kapitel hier gewaehlt, sind auch alle Subs automatisch unnumbered.
     unnumberedChapterPickOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree)) return [];
-      return app.tree
+      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
+      return Alpine.store('nav').tree
         .filter(c => c.type === 'chapter' && !c.solo)
         .map(c => ({
           value: c.id,
@@ -541,14 +541,14 @@ export function registerPdfExportCard() {
     // Seiten-Picker: Pages mit Kapitel-Prefix gruppiert (Label "Kapitel — Seite").
     skipPageCounterPagePickOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.pages)) return [];
+      if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
       const chapterById = new Map();
-      if (Array.isArray(app.tree)) {
-        for (const c of app.tree) {
+      if (Array.isArray(Alpine.store('nav').tree)) {
+        for (const c of Alpine.store('nav').tree) {
           if (c.type === 'chapter') chapterById.set(c.id, c.name);
         }
       }
-      return app.pages.map(p => {
+      return Alpine.store('nav').pages.map(p => {
         const chName = p.chapter_id ? chapterById.get(p.chapter_id) : null;
         return {
           value: p.id,
@@ -598,7 +598,7 @@ export function registerPdfExportCard() {
       const scope = this.exportScope || 'book';
       if (scope === 'page' && this.exportPageId) return { scope: 'page', id: this.exportPageId };
       if (scope === 'chapter' && this.exportChapterId) return { scope: 'chapter', id: this.exportChapterId };
-      const bid = app.selectedBookId;
+      const bid = Alpine.store('nav').selectedBookId;
       return bid ? { scope: 'book', id: parseInt(bid) } : null;
     },
 

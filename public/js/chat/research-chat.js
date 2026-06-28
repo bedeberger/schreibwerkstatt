@@ -138,7 +138,7 @@ export const researchChatMethods = {
   // Persistiert erst HIER (POST /research) — der Chat hat nur vorgeschlagen.
   async saveResearchProposal(msgIdx, pi, proposal) {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     const key = this._proposalKey(msgIdx, pi);
     if (!bookId || !proposal || this._proposalSaved[key] || this._proposalSaving[key]) return;
     this._proposalSaving = { ...this._proposalSaving, [key]: true };
@@ -184,11 +184,11 @@ export const researchChatMethods = {
     },
     scrollElId: 'research-chat-messages',
     activeJobType: 'research-chat',
-    canOpen: (ctx) => !!ctx.$app.selectedBookId && !!ctx.$store.config.researchChatEnabled,
-    sessionsUrl: (ctx) => '/chat/sessions/research/' + ctx.$app.selectedBookId,
+    canOpen: (ctx) => !!Alpine.store('nav').selectedBookId && !!ctx.$store.config.researchChatEnabled,
+    sessionsUrl: (ctx) => '/chat/sessions/research/' + Alpine.store('nav').selectedBookId,
     newSessionUrl: '/chat/session/research',
     newSessionBody: (ctx) => ({
-      book_id:   parseInt(ctx.$app.selectedBookId),
+      book_id:   parseInt(Alpine.store('nav').selectedBookId),
       book_name: ctx.$app.selectedBookName,
     }),
     sendUrl: '/jobs/research-chat',
@@ -210,7 +210,7 @@ export const researchChatMethods = {
         const firstUserMsg = (this.researchChatMessages || []).find(m => m.role === 'user');
         const root = window.__app;
         this.researchChatSessions = [
-          { id: sid, book_id: parseInt(root.selectedBookId), book_name: root.selectedBookName, created_at: nowIso, last_message_at: nowIso, preview: firstUserMsg ? firstUserMsg.content : '' },
+          { id: sid, book_id: parseInt(Alpine.store('nav').selectedBookId), book_name: root.selectedBookName, created_at: nowIso, last_message_at: nowIso, preview: firstUserMsg ? firstUserMsg.content : '' },
           ...sessions,
         ];
       }

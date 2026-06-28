@@ -36,8 +36,20 @@ function makeCtx({ hash = '', books = [{ id: 42 }, { id: 99 }] } = {}) {
   function makeToggle(flag) {
     return async function () { this[flag] = true; };
   }
+  // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr). Im Test
+  // spiegelt ein internes nav-Objekt unter $store.nav; Getter/Setter-Aliasse
+  // halten die bestehenden c.selectedBookId-Mutationen am Leben.
+  const nav = { selectedBookId: null, books, pages: [], tree: [] };
   return {
-    selectedBookId: null,
+    get selectedBookId() { return nav.selectedBookId; },
+    set selectedBookId(v) { nav.selectedBookId = v; },
+    get books() { return nav.books; },
+    set books(v) { nav.books = v; },
+    get pages() { return nav.pages; },
+    set pages(v) { nav.pages = v; },
+    get tree() { return nav.tree; },
+    set tree(v) { nav.tree = v; },
+    $store: { nav },
     currentPage: null,
     selectedFigurId: null,
     selectedOrtId: null,
@@ -59,8 +71,6 @@ function makeCtx({ hash = '', books = [{ id: 42 }, { id: 99 }] } = {}) {
     showBookSettingsCard: false,
     showUserSettingsCard: false,
     showFinetuneExportCard: false,
-    books,
-    pages: [],
     _hashInitialized: false,
     _initialApplyDone: false,
     _resetBookScopedState() {},

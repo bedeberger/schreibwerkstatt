@@ -34,7 +34,7 @@
              x-effect="options = exportPageOptions()"></div>
       </div>
       <button type="button" class="primary" x-show="!exporting"
-              :disabled="!$app.selectedBookId || !activeProfile"
+              :disabled="!$store.nav.selectedBookId || !activeProfile"
               @click="exportDocx()">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
         <span x-text="$app.t('docxExport.export')"></span>

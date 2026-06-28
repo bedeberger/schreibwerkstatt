@@ -66,7 +66,7 @@ export const ttsProofMethods = {
   // (der /tts/speak-Proxy loggt nur die einzelnen Synthese-Calls). Lifecycle als
   // level=info, Fehler/Retry als level=warn. Best-effort: Netzfehler verschluckt.
   _ttsLog(msg, level = 'info') {
-    const body = { level, msg, bookId: this.selectedBookId || null };
+    const body = { level, msg, bookId: this.$store.nav.selectedBookId || null };
     try {
       fetch('/telemetry/tts-log', {
         method: 'POST',
@@ -348,7 +348,7 @@ export const ttsProofMethods = {
       this._showJobToast?.({ message: this.t('tts.error.empty'), severity: 'info', jobType: 'tts', bookId: null });
       return;
     }
-    this._ttsLog(`start segments=${segs.length} locale=${this._ttsLocaleCode()} book=${this.selectedBookId || '-'} page=${this.currentPage?.id || '-'}`);
+    this._ttsLog(`start segments=${segs.length} locale=${this._ttsLocaleCode()} book=${this.$store.nav.selectedBookId || '-'} page=${this.currentPage?.id || '-'}`);
     const rt = {
       segs,
       i: 0,
@@ -481,7 +481,7 @@ export const ttsProofMethods = {
     if (signal?.aborted) return null;
     text = this._ttsNormalizeForSpeech(text);
     const params = new URLSearchParams();
-    if (this.selectedBookId) params.set('bookId', this.selectedBookId);
+    if (this.$store.nav.selectedBookId) params.set('bookId', this.$store.nav.selectedBookId);
     if (this.currentPage?.id) params.set('pageId', this.currentPage.id);
     const qs = params.toString() ? `?${params}` : '';
     let res;

@@ -20,7 +20,7 @@
          x-data="radioGroup({ variant: 'card' })" x-modelable="value" x-model="mode"
          x-effect="options = [
            { value: 'new-book', label: $app.t('folderImport.mode.newBook') },
-           { value: 'merge', label: $app.t('folderImport.mode.merge'), disabled: !$app.selectedBookId }
+           { value: 'merge', label: $app.t('folderImport.mode.merge'), disabled: !$store.nav.selectedBookId }
          ]"></div>
 
     <div class="folder-import-field" x-show="importKind === 'diary'">

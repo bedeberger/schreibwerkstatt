@@ -34,8 +34,8 @@ export const lektoratMethods = {
     // KI-Korrekturen/Vorschläge liefern oft gerade `"`/`'` — auf Buch-Style
     // ziehen (de-CH «», de-DE „" …), bevor sie persistiert werden. Ganze Seite,
     // damit Quotes vollen Open/Close-Kontext haben. Idempotent, fehlertolerant.
-    if (selectedErrors.length > 0 && this.selectedBookId) {
-      const { html } = await runQuoteNormalizeHtml({ bookId: this.selectedBookId, html: finalHtml });
+    if (selectedErrors.length > 0 && this.$store.nav.selectedBookId) {
+      const { html } = await runQuoteNormalizeHtml({ bookId: this.$store.nav.selectedBookId, html: finalHtml });
       finalHtml = html;
     }
 
@@ -107,7 +107,7 @@ export const lektoratMethods = {
       return;
     }
     const pageIdAtStart = this.currentPage.id;
-    this.logAuditEvent?.('lektoratOpened', { book: this.selectedBookId, page: pageIdAtStart });
+    this.logAuditEvent?.('lektoratOpened', { book: this.$store.nav.selectedBookId, page: pageIdAtStart });
     this.checkLoading = true;
     this.checkDone = false;
     this.activeHistoryEntryId = null;
@@ -297,8 +297,8 @@ export const lektoratMethods = {
   },
 
   async batchCheck() {
-    if (!this.pages.length) return;
-    if (!await this.appConfirm({ message: this.t('lektorat.batchConfirm', { n: this.pages.length }) })) return;
+    if (!this.$store.nav.pages.length) return;
+    if (!await this.appConfirm({ message: this.t('lektorat.batchConfirm', { n: this.$store.nav.pages.length }) })) return;
     this.batchLoading = true;
     this.batchProgress = 0;
     this.batchStatus = this._runningJobStatus(this.t('common.starting'), 0, 0);
@@ -306,9 +306,9 @@ export const lektoratMethods = {
       const { jobId } = await fetchJson('/jobs/batch-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: parseInt(this.selectedBookId), book_name: this.selectedBookName || null }),
+        body: JSON.stringify({ book_id: parseInt(this.$store.nav.selectedBookId), book_name: this.selectedBookName || null }),
       });
-      localStorage.setItem('lektorat_batchcheck_job_' + this.selectedBookId, jobId);
+      localStorage.setItem('lektorat_batchcheck_job_' + this.$store.nav.selectedBookId, jobId);
       this.startBatchPoll(jobId);
     } catch (e) {
       console.error('[batchCheck]', e);
@@ -318,7 +318,7 @@ export const lektoratMethods = {
   },
 
   startBatchPoll(jobId) {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     this._startPoll({
       timerProp: '_batchPollTimer',
       jobId,

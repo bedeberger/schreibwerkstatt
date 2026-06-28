@@ -19,7 +19,7 @@ export const rechercheMethods = {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   async loadRecherche() {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.items = []; return; }
     this.loading = true;
     try {
@@ -44,7 +44,7 @@ export const rechercheMethods = {
   },
 
   async _loadTags() {
-    const bookId = window.__app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.tagPool = []; return; }
     try {
       const rows = await fetchJson(`/research/tags?book_id=${bookId}`);
@@ -53,7 +53,7 @@ export const rechercheMethods = {
   },
 
   async ensureLinkTargets() {
-    const bookId = window.__app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || this._linkTargetsBookId === bookId) return;
     try {
       this.linkTargets = await fetchJson(`/research/link-targets?book_id=${bookId}`);
@@ -196,7 +196,7 @@ export const rechercheMethods = {
 
   async createItem() {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     const d = this.draft;
     const file = this.$refs?.createFile?.files?.[0] || null;
@@ -446,7 +446,7 @@ export const rechercheMethods = {
   // ── KI-Verknüpfungsvorschläge ──────────────────────────────────────────────
   async suggestLinks(item) {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     this.suggestItemId = item.id;
     this.suggestStatus = app.t('recherche.suggest.running');
@@ -501,23 +501,22 @@ export const rechercheMethods = {
   // frisch ziehen. Buchweit geteilt → ein leichter Request hält alle Editoren sync.
   async _refreshRecherchePageCounts() {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     try {
       const map = await fetchJson(`/research/page-counts?book_id=${bookId}`);
-      app.rechercheCounts = map || {};
+      Alpine.store('badges').rechercheCounts = map || {};
       if (app.currentPage?.id) app.currentPageRechercheCount = (map || {})[app.currentPage.id] || 0;
     } catch { /* Indikator-Refresh ist best-effort */ }
   },
   // Kapitel-Indikator-Map (Sidebar) nach Link-/Archiv-/Lösch-Änderungen frisch
   // ziehen. Buchweit geteilt, analog zu _refreshRecherchePageCounts.
   async _refreshRechercheChapterCounts() {
-    const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     try {
       const map = await fetchJson(`/research/chapter-counts?book_id=${bookId}`);
-      app.chapterRechercheCounts = map || {};
+      Alpine.store('badges').chapterRechercheCounts = map || {};
     } catch { /* Indikator-Refresh ist best-effort */ }
   },
   _sortItems(arr) {

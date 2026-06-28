@@ -20,7 +20,7 @@ export const lifecycleMethods = {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   async loadBoard() {
     const app = window.__app;
-    const bookId = app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.acts = []; this.threads = []; this.beats = []; this.draftFiguren = []; return; }
     this.loading = true;
     this._memos = {};

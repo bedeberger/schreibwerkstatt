@@ -17,7 +17,18 @@ globalThis.CustomEvent = globalThis.CustomEvent || class CustomEvent {
 
 function makeCtx() {
   // Spiegelt cards-Flags aus app-state.js. Default: alles geschlossen.
+  // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr): nav-Objekt
+  // unter $store.nav + Getter/Setter-Aliasse fuer c.selectedBookId-Mutationen.
+  const nav = { selectedBookId: 42, books: [], pages: [], tree: [] };
   return {
+    get selectedBookId() { return nav.selectedBookId; },
+    set selectedBookId(v) { nav.selectedBookId = v; },
+    get pages() { return nav.pages; },
+    set pages(v) { nav.pages = v; },
+    get tree() { return nav.tree; },
+    set tree(v) { nav.tree = v; },
+    get books() { return nav.books; },
+    set books(v) { nav.books = v; },
     showBookOverviewCard: false,
     showBookReviewCard: false,
     showKapitelReviewCard: false,
@@ -59,6 +70,7 @@ function makeCtx() {
     // resetView schreibt via this.$store.catalog.* / this.$store.jobs.* — das Mock
     // spiegelt diese Struktur.
     $store: {
+      nav,
       catalog: { figuren: [], orte: [], songs: [], szenen: [], globalZeitstrahl: [], zeitstrahlChronology: null },
       jobs: {
         alleAktualisierenLoading: false, alleAktualisierenStatus: '', alleAktualisierenProgress: 0,
@@ -72,9 +84,7 @@ function makeCtx() {
     _batchPollTimer: null,
     _komplettPollTimer: null,
     clearBookstackSearch() {},
-    selectedBookId: 42,
     currentPage: { id: 7 },
-    pages: [],
     resetPage() { /* noop */ },
     loadFiguren: async () => {},
     loadOrte: async () => {},

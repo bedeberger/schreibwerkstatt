@@ -22,7 +22,7 @@ export const aiMethods = {
       const resp = await fetchJson('/jobs/plot-brainstorm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, act_id: act.id, thread_id: thread ? thread.id : null }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, act_id: act.id, thread_id: thread ? thread.id : null }),
       });
       this._brainstormJobId = resp.jobId;
       startPoll(this, {
@@ -72,7 +72,7 @@ export const aiMethods = {
       const beat = await fetchJson('/plot/beats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, act_id: actId, thread_id: this.brainstormResult.threadId ?? null, titel: v.label, beschreibung: v.begruendung || '' }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, act_id: actId, thread_id: this.brainstormResult.threadId ?? null, titel: v.label, beschreibung: v.begruendung || '' }),
       });
       this.beats = [...this.beats, beat];
       this._memos = {};
@@ -110,7 +110,7 @@ export const aiMethods = {
   // — genau wie ein frischer Lauf, sodass „Übernehmen" unverändert greift.
   async loadBrainstormRuns() {
     const app = window.__app;
-    const bookId = app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.brainstormRuns = []; return; }
     try {
       const rows = await fetchJson(`/plot/brainstorm-runs?book_id=${bookId}`);
@@ -177,7 +177,7 @@ export const aiMethods = {
       const resp = await fetchJson('/jobs/plot-consistency', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId }),
       });
       this._consistencyJobId = resp.jobId;
       startPoll(this, {
@@ -275,7 +275,7 @@ export const aiMethods = {
   // (consistencyResult) gelegt — genau wie ein frischer Lauf.
   async loadConsistencyRuns() {
     const app = window.__app;
-    const bookId = app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.consistencyRuns = []; return; }
     try {
       const rows = await fetchJson(`/plot/consistency-runs?book_id=${bookId}`);

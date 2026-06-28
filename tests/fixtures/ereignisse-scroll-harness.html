@@ -81,6 +81,10 @@
       window.Alpine.magic('app', () => window.__app);
       window.Alpine.store('catalog', { figuren: [], orte: [], szenen: [], globalZeitstrahl: MOCK });
       registerJobsStore();
+      // window.__app ist hier ein plain reactive Objekt (kein Alpine-Component),
+      // hat also kein $store-Magic. Karten-JS liest Fach-Daten via
+      // root.$store.catalog → hier explizit auf die registrierten Stores spiegeln.
+      window.__app.$store = { catalog: window.Alpine.store('catalog'), jobs: window.Alpine.store('jobs') };
       registerEreignisseCard();
     });
     document.addEventListener('alpine:initialized', () => {

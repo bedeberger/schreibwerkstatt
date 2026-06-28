@@ -73,7 +73,7 @@ export const coverageMethods = {
   // vom Strang geerbt), Quelle sind die $app.tree-Kapitel. Deps inkl. threads, weil
   // das geerbte Kapitel an der Strang-Bindung hängt.
   plotCoverage() {
-    const tree = window.__app.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     return this._memo('coverage', [this.beats, this.threads, tree], () => {
       const chapters = tree.filter(it => it.type === 'chapter');
       const covered = new Set((this.beats || []).map(b => this.effectiveChapterNameForBeat(b)).filter(Boolean));

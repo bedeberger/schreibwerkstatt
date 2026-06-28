@@ -9,7 +9,7 @@
       <span class="card-title" x-text="$app.t('overview.title')"></span>
     </div>
     <div class="card-actions">
-      <button type="button" class="icon-btn icon-btn--ghost" @click="loadBookOverview($app.selectedBookId)" :disabled="overviewLoading"
+      <button type="button" class="icon-btn icon-btn--ghost" @click="loadBookOverview($store.nav.selectedBookId)" :disabled="overviewLoading"
               :data-tip="$app.t('overview.refresh')" :aria-label="$app.t('overview.refresh')">
         <span x-show="overviewLoading" class="spinner"></span>
         <svg x-show="!overviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
@@ -21,7 +21,7 @@
   <div x-show="overviewLoading && !overviewLatest()" class="muted-msg muted-msg--spaced" x-text="$app.t('overview.loading')"></div>
   <div x-show="!overviewLoading && !overviewLatest() && (!overviewCoverage || overviewCoverage.total_pages === 0)" class="muted-msg muted-msg--spaced" x-text="$app.t('overview.empty')"></div>
 
-  <div class="overview-grid" x-show="overviewLatest() || overviewCoverage?.total_pages > 0 || $app.pages.length > 0">
+  <div class="overview-grid" x-show="overviewLatest() || overviewCoverage?.total_pages > 0 || $store.nav.pages.length > 0">
     <div id="partial-bookoverview-snapshot"></div>
     <div id="partial-bookoverview-charts"></div>
     <div id="partial-bookoverview-diary"></div>
@@ -40,12 +40,12 @@
     <div class="overview-tile overview-tile--actions">
       <div class="overview-tile-label" x-text="$app.t('overview.quickActions')"></div>
       <div class="overview-actions">
-        <button type="button" class="btn-compact" @click="$app.toggleBookChatCard()" :disabled="!$app.pages.length" x-text="$app.t('tile.bookchat')"></button>
-        <button type="button" class="btn-compact" @click="$app.toggleKontinuitaetCard()" :disabled="!$app.pages.length" x-text="$app.t('tile.kontinuitaet')"></button>
-        <button type="button" class="btn-compact" @click="$app.toggleEreignisseCard()" :disabled="!$app.pages.length" x-text="$app.t('tile.events')"></button>
+        <button type="button" class="btn-compact" @click="$app.toggleBookChatCard()" :disabled="!$store.nav.pages.length" x-text="$app.t('tile.bookchat')"></button>
+        <button type="button" class="btn-compact" @click="$app.toggleKontinuitaetCard()" :disabled="!$store.nav.pages.length" x-text="$app.t('tile.kontinuitaet')"></button>
+        <button type="button" class="btn-compact" @click="$app.toggleEreignisseCard()" :disabled="!$store.nav.pages.length" x-text="$app.t('tile.events')"></button>
         <button type="button" class="btn-compact" @click="$app.toggleBookOrganizerCard()" x-text="$app.t('tile.bookOrganizer')"></button>
-        <button type="button" class="btn-compact" @click="$app.openShareLinksForBook()" :disabled="!$app.pages.length" x-text="$app.t('share.create.book')"></button>
-        <button type="button" class="btn-compact" @click="$app.alleAktualisieren()" :disabled="$store.jobs.alleAktualisierenLoading || !$app.pages.length" x-text="$app.t('palette.action.komplett')"></button>
+        <button type="button" class="btn-compact" @click="$app.openShareLinksForBook()" :disabled="!$store.nav.pages.length" x-text="$app.t('share.create.book')"></button>
+        <button type="button" class="btn-compact" @click="$app.alleAktualisieren()" :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.pages.length" x-text="$app.t('palette.action.komplett')"></button>
       </div>
     </div>
   </div>

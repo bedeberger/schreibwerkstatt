@@ -167,7 +167,7 @@ export const dndMethods = {
     // dem DOM lesen — DOM wurde gerade revertet und ist nicht mehr massgeblich.
     const targetIdx = Number.isFinite(evt.newIndex) ? evt.newIndex : bucket.length;
     bucket.splice(Math.max(0, Math.min(targetIdx, bucket.length)), 0, pageObj);
-    // Subchapter-Pages koennen tief liegen → fullReload, damit root.tree
+    // Subchapter-Pages koennen tief liegen → fullReload, damit Alpine.store('nav').tree
     // (flach) konsistent bleibt.
     const fullReload = toChapId !== 0 && this._chapterDepth(toChapId) > 1;
     const affected = [toChapId, fromChapId !== toChapId ? fromChapId : null].filter(v => v != null);

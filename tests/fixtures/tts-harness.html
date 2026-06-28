@@ -87,6 +87,9 @@
       selectedBookId: 1,
       currentPage: { id: 7 },
       $store: {
+        // Nav-State lebt in Alpine.store('nav') — tts-proof.js liest
+        // this.$store.nav.selectedBookId (Log + Speak-Params).
+        nav: { selectedBookId: 1, pages: [], tree: [] },
         tts: {
           enabled,
           // Pausen auf 0 -> Tests laufen schnell; Pause-Test setzt sie selbst.

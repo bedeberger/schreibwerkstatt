@@ -5,14 +5,23 @@ import assert from 'node:assert/strict';
 import { appJobsCoreMethods } from '../../public/js/app/app-jobs-core.js';
 
 function makeCtx() {
+  // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr): nav unter
+  // $store.nav + Aliasse fuer direkte c.selectedBookId/pages-Zugriffe.
+  const nav = { selectedBookId: null, books: [], pages: [], tree: [] };
   return {
+    get selectedBookId() { return nav.selectedBookId; },
+    set selectedBookId(v) { nav.selectedBookId = v; },
+    get pages() { return nav.pages; },
+    set pages(v) { nav.pages = v; },
+    get tree() { return nav.tree; },
+    set tree(v) { nav.tree = v; },
+    get books() { return nav.books; },
+    set books(v) { nav.books = v; },
     // jobToast/_jobToastTimer/_toastedJobIds leben in Alpine.store('jobs');
     // im Unit-Test ein Plain-Stub, da die Methoden via this.$store.jobs zugreifen.
-    $store: { jobs: { jobToast: null, _jobToastTimer: null, _toastedJobIds: new Set() } },
+    $store: { nav, jobs: { jobToast: null, _jobToastTimer: null, _toastedJobIds: new Set() } },
     currentPage: null,
-    pages: [],
     pageLastChecked: {},
-    selectedBookId: null,
     refreshAgesCalls: 0,
     markPageChecked() {},
     loadPageHistory() {},

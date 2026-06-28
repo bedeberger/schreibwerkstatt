@@ -14,7 +14,7 @@ export const statsMethods = {
   overviewLatest() {
     const app = window.__app;
     const tokEsts = app?.tokEsts || {};
-    const pages = app?.pages || [];
+    const pages = Alpine.store('nav').pages || [];
     const stats = this.overviewStats || [];
     return this._memo('latest', [stats, tokEsts, pages], () => {
       const ids = Object.keys(tokEsts);

@@ -64,7 +64,7 @@ export const boardMethods = {
   beatFigureOptions() {
     const app = window.__app;
     const figs = app?.figuren || [];
-    const tree = app?.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     return this._memo('figOpts', [figs, tree], () => {
       const order = new Map();
       tree.filter(it => it.type === 'chapter').forEach((c, i) => order.set(c.name, i));

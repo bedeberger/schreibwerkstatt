@@ -40,7 +40,7 @@ export function registerBookReviewCard() {
 
       const onCardRefreshHistory = async (e) => {
         if (e.detail?.name !== 'bookReview') return;
-        if (window.__app.selectedBookId) await window.__app.loadBookReviewHistory(window.__app.selectedBookId);
+        if (Alpine.store('nav').selectedBookId) await window.__app.loadBookReviewHistory(Alpine.store('nav').selectedBookId);
       };
 
       this._lifecycle = setupCardLifecycle(this, {
@@ -102,7 +102,7 @@ export function registerBookReviewCard() {
       progressResetDelay: 400,
       buildPayload() {
         return {
-          book_id: parseInt(window.__app.selectedBookId),
+          book_id: parseInt(Alpine.store('nav').selectedBookId),
           book_name: window.__app.selectedBookName,
         };
       },
@@ -113,10 +113,10 @@ export function registerBookReviewCard() {
       async onDone(job) {
         if (!job.result?.review) return;
         this.bookReviewStatus = window.__app.t('review.pagesAnalyzed', { n: job.result.pageCount || '?' });
-        if (window.__app.selectedBookId) await window.__app.loadBookReviewHistory(window.__app.selectedBookId);
+        if (Alpine.store('nav').selectedBookId) await window.__app.loadBookReviewHistory(Alpine.store('nav').selectedBookId);
       },
       async onOpen() {
-        if (window.__app.selectedBookId) await window.__app.loadBookReviewHistory(window.__app.selectedBookId);
+        if (Alpine.store('nav').selectedBookId) await window.__app.loadBookReviewHistory(Alpine.store('nav').selectedBookId);
       },
     }),
   }));

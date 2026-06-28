@@ -50,6 +50,10 @@
     };
     window.Alpine.magic('app', () => window.__app);
 
+    // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr) — die Karte
+    // liest selectedBookId/tree/pages direkt via $store.nav / Alpine.store('nav').
+    window.Alpine.store('nav', { books: [], selectedBookId: 102, pages: [], tree: [] });
+
     // Combobox-Stub (echte Impl lebt mid-file in app.js). Tests interagieren
     // nicht mit Comboboxes; Stub verhindert nur Expression-Errors.
     window.Alpine.data('combobox', () => ({

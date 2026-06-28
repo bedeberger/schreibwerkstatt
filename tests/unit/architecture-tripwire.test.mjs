@@ -10,7 +10,8 @@
 //
 //   2. Nav-Store-SSoT (public/js/cards/nav-store.js): books/selectedBookId/pages/
 //      tree leben ausschliesslich im Store, nicht in der Root-God-State
-//      (app-state.js). Root spiegelt sie via Getter/Setter-Proxy (app.js).
+//      (app-state.js). Kein Root-Proxy mehr — Konsumenten lesen direkt
+//      $store.nav / this.$store.nav / Alpine.store('nav').
 //
 // Prosa-Regel = Vorschlag, Test = Gesetz. Neuer Verstoss → CI rot.
 
@@ -97,18 +98,17 @@ test('Nav-Store: definiert books/selectedBookId/pages/tree', () => {
   }
 });
 
-test('Nav-State NICHT in app-state.js (sonst ueberschreibt der Spread den Proxy)', () => {
+test('Nav-State NICHT in app-state.js (lebt im Store)', () => {
   const stateSrc = readFileSync(APP_STATE, 'utf8');
   const offenders = NAV_FIELDS.filter((f) => new RegExp(`^\\s{2,}${f}\\s*:`, 'm').test(stateSrc));
   assert.deepEqual(offenders, [],
     `Diese Nav-Felder gehoeren in cards/nav-store.js, nicht in app-state.js: ${offenders.join(', ')}`);
 });
 
-test('Root spiegelt Nav-Felder via Getter/Setter-Proxy auf den Store (app.js)', () => {
+test('Kein Root-Proxy mehr fuer Nav-Felder (app.js): Konsumenten lesen $store.nav', () => {
   const appSrc = readFileSync(APP_JS, 'utf8');
   for (const f of NAV_FIELDS) {
-    assert.match(appSrc, new RegExp(`get ${f}\\(\\)\\s*\\{[^}]*store\\(\\s*'nav'\\s*\\)`),
-      `app.js braucht get ${f}() → Alpine.store('nav')`);
-    assert.match(appSrc, new RegExp(`set ${f}\\(`), `app.js braucht set ${f}() fuer den Nav-Proxy`);
+    assert.doesNotMatch(appSrc, new RegExp(`get ${f}\\(\\)\\s*\\{[^}]*store\\(\\s*'nav'\\s*\\)`),
+      `app.js darf keinen Nav-Proxy mehr haben — get ${f}() → Alpine.store('nav') entfernen; Konsumenten lesen $store.nav.${f}`);
   }
 });

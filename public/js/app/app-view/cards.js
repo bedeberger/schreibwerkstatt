@@ -44,16 +44,16 @@ export const cardsMethods = {
   // Hauptkarte/Editor aktiv. Wird beim Buchwechsel + bei `#book/:id`-Deeplink
   // ohne View aufgerufen.
   async _maybeOpenBookOverview({ restoreLastPage = true } = {}) {
-    if (!this.selectedBookId) return;
+    if (!this.$store.nav.selectedBookId) return;
     if (this.showEditorCard) return;
     const anyOpen = EXCLUSIVE_CARDS.some(c => this[c.flag]);
     if (anyOpen) return;
     // Letzte Seite restaurieren, falls vorhanden und im aktuellen Buch noch
     // existiert. Bei explizitem Home-Klick (resetView) übersprungen.
     if (restoreLastPage) {
-      const lastId = getLastPageId(this.currentUser?.email, this.selectedBookId);
-      if (lastId && Array.isArray(this.pages) && this.pages.length) {
-        const page = this.pages.find(p => p.id === lastId);
+      const lastId = getLastPageId(this.currentUser?.email, this.$store.nav.selectedBookId);
+      if (lastId && Array.isArray(this.$store.nav.pages) && this.$store.nav.pages.length) {
+        const page = this.$store.nav.pages.find(p => p.id === lastId);
         if (page) {
           await this.selectPage(page);
           return;
@@ -152,7 +152,7 @@ export const cardsMethods = {
     const pid = parseInt(pageId, 10);
     if (!pid) return;
     if (this.currentPage?.id !== pid) {
-      const page = (this.pages || []).find(p => p.id === pid);
+      const page = (this.$store.nav.pages || []).find(p => p.id === pid);
       if (!page) return;
       await this.selectPage(page);
     }
@@ -178,7 +178,7 @@ export const cardsMethods = {
     if (this.showIdeenCard) this.showIdeenCard = false;
     await this._ensurePartial('chat');
     this.showChatCard = true;
-    this.logAuditEvent?.('chatOpened', { book: this.selectedBookId, page: this.currentPage.id });
+    this.logAuditEvent?.('chatOpened', { book: this.$store.nav.selectedBookId, page: this.currentPage.id });
   },
 
   // Seitenwechsel: Seiten-Chat resetten (Chat ist pro Seite).
@@ -195,11 +195,11 @@ export const cardsMethods = {
     if (this.showTreeCard) { this.showTreeCard = false; this.resetPage(); return; }
     this._closeOtherMainCards('tree');
     this.showTreeCard = true;
-    if (!this.pages.length) await this.loadPages();
+    if (!this.$store.nav.pages.length) await this.loadPages();
     // Prüfen ob bereits ein Batch-Check-Job für dieses Buch läuft
-    if (!this._batchPollTimer && !this.batchLoading && this.selectedBookId) {
+    if (!this._batchPollTimer && !this.batchLoading && this.$store.nav.selectedBookId) {
       try {
-        const { jobId } = await fetchJson(`/jobs/active?type=batch-check&book_id=${this.selectedBookId}`);
+        const { jobId } = await fetchJson(`/jobs/active?type=batch-check&book_id=${this.$store.nav.selectedBookId}`);
         if (jobId) {
           this.batchLoading = true;
           this.batchProgress = 0;

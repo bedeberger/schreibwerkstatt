@@ -27,7 +27,7 @@ import { figurLookupMethods } from './editor/figur-lookup.js';
 import { shortcutsMethods } from './editor/shortcuts.js';
 import { featuresUsageMethods } from './features-usage.js';
 import { initialLektoratState } from './app/app-state.js';
-import { appUiMethods, applySzenenFilters, applySongsFilters } from './app/app-ui.js';
+import { appUiMethods } from './app/app-ui.js';
 import { appChromeMethods } from './app/app-chrome.js';
 import { appKomplettMethods } from './app/app-komplett.js';
 import { appJobsCoreMethods } from './app/app-jobs-core.js';
@@ -61,19 +61,9 @@ document.addEventListener('alpine:init', () => {
     // ── State ────────────────────────────────────────────────────────────────
     ...initialLektoratState(),
 
-    // ── Nav-Proxy ──────────────────────────────────────────────────────────────
-    // books, selectedBookId, pages, tree leben in Alpine.store('nav') (geteilt
-    // mit ~29 Reader-Modulen). Root exponiert sie als direkt adressierbare
-    // Properties, damit this.selectedBookId= / this.tree.push weiter
-    // funktionieren. Karten können auch direkt via $store.nav zugreifen.
-    get books() { return Alpine.store('nav').books; },
-    set books(v) { Alpine.store('nav').books = v; },
-    get selectedBookId() { return Alpine.store('nav').selectedBookId; },
-    set selectedBookId(v) { Alpine.store('nav').selectedBookId = v; },
-    get pages() { return Alpine.store('nav').pages; },
-    set pages(v) { Alpine.store('nav').pages = v; },
-    get tree() { return Alpine.store('nav').tree; },
-    set tree(v) { Alpine.store('nav').tree = v; },
+    // Navigations-State (books, selectedBookId, pages, tree) lebt in
+    // Alpine.store('nav') (cards/nav-store.js) und wird direkt via $store.nav /
+    // this.$store.nav gelesen (kein Root-Proxy — wie catalog/tts/jobs).
 
     // ── Computed ─────────────────────────────────────────────────────────────
     // Admin-only View: Globaler Admin (global_role='admin') bekommt eine
@@ -162,14 +152,6 @@ document.addEventListener('alpine:init', () => {
       }
       return c;
     },
-    get songsFiltered() {
-      return applySongsFilters(this.$store.catalog.songs, this.songsFilters).sort((a, b) => {
-        const aK = Math.min(...(a.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
-        const bK = Math.min(...(b.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
-        if (aK !== bK) return aK - bK;
-        return (a.titel || '').localeCompare(b.titel || '', 'de');
-      });
-    },
     get songsByFigurId() {
       const map = new Map();
       for (const s of (this.$store.catalog.songs || [])) {
@@ -182,51 +164,6 @@ document.addEventListener('alpine:init', () => {
       }
       return map;
     },
-    get orteFiltered() {
-      // Memo: Schlüssel aus den Eingaben, die das Ergebnis bestimmen (orte-/
-      // szenen-Referenz + Filterwerte). Bei Treffer dieselbe Array-Referenz →
-      // stabile x-for-Keys, und orteMapped()/unlocatedOrte() teilen sich das eine
-      // gefilterte Array statt es je neu zu rechnen. lat/lng-Mutationen ändern die
-      // Referenz nicht, fliessen aber als Live-Reads in die nachgelagerten Karten-
-      // Filter ein (kein Cache-Problem — Koordinaten sind hier kein Filterkriterium).
-      const f = this.orteFilters;
-      const sig = [this.$store.catalog.orte, this.$store.catalog.szenen, f.suche || '', f.figurId || '', f.kapitel || '', f.szeneId || ''];
-      const c = this._orteFilteredCache;
-      if (c && c.sig.length === sig.length && c.sig.every((v, i) => v === sig[i])) return c.val;
-      const val = this._computeOrteFiltered();
-      this._orteFilteredCache = { sig, val };
-      return val;
-    },
-    _computeOrteFiltered() {
-      const f = this.orteFilters;
-      const q = f.suche ? f.suche.toLowerCase() : '';
-      const matchText = (o) => !q || [o.name, o.typ, o.stimmung, o.beschreibung, o.land]
-        .some(v => v && String(v).toLowerCase().includes(q));
-      return this.$store.catalog.orte.filter(o =>
-        matchText(o) &&
-        (!f.figurId || (o.figuren || []).includes(f.figurId)) &&
-        (!f.kapitel || (o.kapitel || []).some(k => k.name === f.kapitel || String(k.chapter_id) === String(f.kapitel))) &&
-        (!f.szeneId || this.$store.catalog.szenen.some(s => String(s.id) === String(f.szeneId) && (s.ort_ids || []).includes(o.id)))
-      ).sort((a, b) => {
-        const aK = Math.min(...(a.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
-        const bK = Math.min(...(b.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
-        if (aK !== bK) return aK - bK;
-        const aP = this._pageIdIdx(a.erste_erwaehnung_page_id);
-        const bP = this._pageIdIdx(b.erste_erwaehnung_page_id);
-        if (aP !== bP) return aP - bP;
-        return (a.name || '').localeCompare(b.name || '', 'de');
-      });
-    },
-    get szenenFiltered() {
-      return applySzenenFilters(this.$store.catalog.szenen, this.szenenFilters).sort((a, b) => {
-        const c = this._chapterIdx(a.kapitel) - this._chapterIdx(b.kapitel);
-        if (c !== 0) return c;
-        const p = this._pageIdx(a.seite) - this._pageIdx(b.seite);
-        if (p !== 0) return p;
-        return (a.titel || '').localeCompare(b.titel || '', 'de');
-      });
-    },
-
     get statusHtml() {
       if (!this.status) return '';
       const safe = escHtml(this.status);
@@ -241,7 +178,7 @@ document.addEventListener('alpine:init', () => {
     // Liegt am Root, weil x-effect der Combobox-Sub-x-data nur $app/Magics,
     // nicht Karten-Methoden sieht.
     ideenMovePickerOptions() {
-      const tree = this.tree || [];
+      const tree = this.$store.nav.tree || [];
       if (this.ideenScope === 'chapter') {
         const curCid = this.ideenChapterId;
         return tree
@@ -261,7 +198,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     get selectedBookName() {
-      const book = this.books.find(b => String(b.id) === String(this.selectedBookId));
+      const book = this.$store.nav.books.find(b => String(b.id) === String(this.$store.nav.selectedBookId));
       return book?.name || '';
     },
 
@@ -276,7 +213,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     get filteredTree() {
-      const tree = this.tree;
+      const tree = this.$store.nav.tree;
       if (!this.pageSearch) {
         const byId = new Map(tree.map(it => [it.id, it]));
         const isVisible = (item) => {

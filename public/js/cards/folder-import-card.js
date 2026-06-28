@@ -35,7 +35,7 @@ export function registerFolderImportCard() {
         showFlag: 'showFolderImportCard',
         showNeedsBookId: false,
         onShow: () => {
-          if (window.__app?.selectedBookId) {
+          if (Alpine.store('nav').selectedBookId) {
             this.mode = 'merge';
           }
         },
@@ -82,7 +82,7 @@ export function registerFolderImportCard() {
       if (!this.file || this.busy) return false;
       if (this.importKind === 'swbook') return true; // Buch-Name + Owner kommen aus dem Bundle
       if (this.mode === 'new-book' && !this.bookName.trim()) return false;
-      if (this.mode === 'merge' && !window.__app.selectedBookId) return false;
+      if (this.mode === 'merge' && !Alpine.store('nav').selectedBookId) return false;
       return true;
     },
 
@@ -115,7 +115,7 @@ export function registerFolderImportCard() {
         params.set('mode', this.mode);
         params.set('grouping', this.grouping);
         if (this.mode === 'new-book') params.set('book_name', this.bookName.trim());
-        else params.set('book_id', String(window.__app.selectedBookId));
+        else params.set('book_id', String(Alpine.store('nav').selectedBookId));
         url = '/jobs/folder-import?' + params.toString();
       }
       try {
@@ -166,7 +166,7 @@ export function registerFolderImportCard() {
           this.result = job.result || null;
           if (this.result?.bookId) {
             window.__app.loadBooks?.().then(() => {
-              window.__app.selectedBookId = this.result.bookId;
+              Alpine.store('nav').selectedBookId = this.result.bookId;
               location.hash = '#book/' + this.result.bookId;
             });
           }

@@ -110,13 +110,13 @@ export const treeMethods = {
       chars: normalized.length,
     };
     this.tokEsts = { ...this.tokEsts, [page.id]: stat };
-    if (!this.selectedBookId) return;
+    if (!this.$store.nav.selectedBookId) return;
     fetch('/history/page-stats/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify([{
         page_id: page.id,
-        book_id: parseInt(this.selectedBookId),
+        book_id: parseInt(this.$store.nav.selectedBookId),
         tok: stat.tok,
         words: stat.words,
         chars: stat.chars,
@@ -126,11 +126,11 @@ export const treeMethods = {
   },
 
   async refreshPageAges() {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     if (!bookId) return;
     try {
       const map = await fetchJson('/history/page-ages/' + bookId);
-      if (this.selectedBookId === bookId) this.pageLastChecked = map || {};
+      if (this.$store.nav.selectedBookId === bookId) this.pageLastChecked = map || {};
     } catch { /* ignore */ }
   },
 
@@ -140,7 +140,7 @@ export const treeMethods = {
   // Kapitel-Items — Alpine-Reaktivität trägt das Update an die Sidebar.
   _refreshChapterStats() {
     const ts = this.tokEsts || {};
-    const items = (this.tree || []).filter(it => it.type === 'chapter');
+    const items = (this.$store.nav.tree || []).filter(it => it.type === 'chapter');
     const childMap = new Map();
     for (const it of items) {
       if (it.solo || !it.parent_id) continue;
@@ -213,13 +213,13 @@ export const treeMethods = {
     } catch { return {}; }
   },
   _persistTreeOpenState() {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     if (!bookId) return;
     try {
       const key = this._treeOpenStorageKey(bookId);
       if (!key) return;
       const state = {};
-      for (const item of this.tree) {
+      for (const item of this.$store.nav.tree) {
         if (item.type === 'chapter' && !item.solo) state[item.id] = !!item.open;
       }
       localStorage.setItem(key, JSON.stringify(state));
@@ -235,7 +235,7 @@ export const treeMethods = {
     this.setChapterOpen(item, !item.open);
   },
   setAllChaptersOpen(value) {
-    for (const item of this.tree) {
+    for (const item of this.$store.nav.tree) {
       if (item.type === 'chapter' && !item.solo) item.open = !!value;
     }
     this._persistTreeOpenState();
@@ -269,14 +269,14 @@ export const treeMethods = {
   async loadBooks(opts = {}) {
     try {
       this.setStatus(this.t('tree.connecting'), true);
-      this.books = await contentRepo.listBooks({ fresh: opts.fresh === true });
+      this.$store.nav.books = await contentRepo.listBooks({ fresh: opts.fresh === true });
       // Wake-Refresh: Caller (_refreshAfterWake) triggert loadPages selbst mit source='wake'.
       // Hier weiterzureichen würde Tree erneut clearen (loadPages ohne source) → Flicker.
       // skipPages: für Metadaten-only-Refreshes (Kategorie/Tag/Rename) — Pagetree bleibt stehen.
       const skipLoadPages = opts.source === 'wake' || opts.skipPages === true;
       // Pool fuer Filter-Pills aus aktuellem Bestand ableiten.
       const catIds = new Set();
-      for (const b of this.books) {
+      for (const b of this.$store.nav.books) {
         if (b.category_id) catIds.add(b.category_id);
       }
       // Kategorie-Namen aus globalem Pool nachladen (kein Snapshot pro Buch).
@@ -286,19 +286,19 @@ export const treeMethods = {
           if (r.ok) this.bookFilterCategoryPool = (await r.json()).categories || [];
         } catch (_) {}
       }
-      if (!this.selectedBookId || !this.books.some(b => String(b.id) === String(this.selectedBookId))) {
+      if (!this.$store.nav.selectedBookId || !this.$store.nav.books.some(b => String(b.id) === String(this.$store.nav.selectedBookId))) {
         let restored = '';
         try {
           const key = `sw:lastBookId:${this.currentUser?.email || ''}`;
           const stored = localStorage.getItem(key);
-          if (stored && this.books.some(b => String(b.id) === String(stored))) restored = String(stored);
+          if (stored && this.$store.nav.books.some(b => String(b.id) === String(stored))) restored = String(stored);
         } catch (_) {}
-        this.selectedBookId = restored || String(this.books[0]?.id || '');
+        this.$store.nav.selectedBookId = restored || String(this.$store.nav.books[0]?.id || '');
       }
       this.showBookCard = true;
       this.booksLoaded = true;
-      this.setStatus(this.t('tree.booksFound', { n: this.books.length }), false, 4000);
-      if (this.selectedBookId) this._loadBookRole(this.selectedBookId);
+      this.setStatus(this.t('tree.booksFound', { n: this.$store.nav.books.length }), false, 4000);
+      if (this.$store.nav.selectedBookId) this._loadBookRole(this.$store.nav.selectedBookId);
       if (!skipLoadPages) await this.loadPages();
     } catch (e) {
       console.error('[loadBooks]', e);
@@ -312,12 +312,12 @@ export const treeMethods = {
   // (alphabetisch nach Kategorie, dann Titel), unkategorisierte unter einer
   // eigenen "Ohne Kategorie"-Gruppe am Ende. Hat kein Buch eine Kategorie, bleibt
   // `group` leer → flache Liste (byte-gleich zum ungruppierten Verhalten).
-  // Liest this.books + this.bookFilterCategoryPool im x-effect → reaktiv getrackt.
+  // Liest this.$store.nav.books + this.bookFilterCategoryPool im x-effect → reaktiv getrackt.
   bookComboOptions() {
     const names = new Map(this.bookFilterCategoryPool.map(c => [String(c.id), c.name]));
-    const hasCategories = this.books.some(b => b.category_id && names.has(String(b.category_id)));
+    const hasCategories = this.$store.nav.books.some(b => b.category_id && names.has(String(b.category_id)));
     const uncategorized = hasCategories ? this.t('book.filter.uncategorized') : '';
-    const opts = this.books.map(b => {
+    const opts = this.$store.nav.books.map(b => {
       const cat = b.category_id ? names.get(String(b.category_id)) : null;
       return { value: String(b.id), label: b.name, group: cat || uncategorized };
     });
@@ -343,7 +343,7 @@ export const treeMethods = {
       });
       if (!res.ok) { this.entitiesEnabledForCurrentBook = false; return; }
       const data = await res.json();
-      if (String(this.selectedBookId) === id) {
+      if (String(this.$store.nav.selectedBookId) === id) {
         this.entitiesEnabledForCurrentBook = !!data.entities_enabled;
       }
     } catch (_) {
@@ -354,7 +354,7 @@ export const treeMethods = {
   // Toolbar-Toggle aus dem Notebook-Editor — PUTtet nur entities_enabled,
   // dispatcht book:settings:updated damit die Entities-Sub neu rechnet.
   async toggleEntitiesEnabledForCurrentBook() {
-    const id = this.selectedBookId;
+    const id = this.$store.nav.selectedBookId;
     if (!id) return;
     if (this._entitiesBusy) return;
     this._entitiesBusy = true;
@@ -387,7 +387,7 @@ export const treeMethods = {
     const id = bookId ? String(bookId) : '';
     if (!id) { this.currentBookRole = null; return; }
     if (Object.prototype.hasOwnProperty.call(this.bookRoles, id)) {
-      if (String(this.selectedBookId) === id) this.currentBookRole = this.bookRoles[id];
+      if (String(this.$store.nav.selectedBookId) === id) this.currentBookRole = this.bookRoles[id];
       return;
     }
     let role = null;
@@ -406,7 +406,7 @@ export const treeMethods = {
     }
     this.bookRoles[id] = role;
     this.bookSharedFlags[id] = shared;
-    if (String(this.selectedBookId) === id) {
+    if (String(this.$store.nav.selectedBookId) === id) {
       this.currentBookRole = role;
       // Shared-Flag steht jetzt fest → vollen Poll ggf. starten, ohne den schon
       // laufenden leichten Geraete-Ping (aus _startCollabPoll) abzureissen.
@@ -431,9 +431,9 @@ export const treeMethods = {
   },
 
   currentBuchtyp() {
-    const id = String(this.selectedBookId || '');
+    const id = String(this.$store.nav.selectedBookId || '');
     if (!id) return null;
-    const book = (this.books || []).find(b => String(b.id) === id);
+    const book = (this.$store.nav.books || []).find(b => String(b.id) === id);
     return book?.buchtyp || null;
   },
   isTagebuch() {
@@ -441,7 +441,7 @@ export const treeMethods = {
   },
 
   async loadPages(opts = {}) {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     if (!bookId) return;
     // Laufenden Figuren-Job-Poll abbrechen (Buch könnte gewechselt haben).
     // checkPendingJobs am Ende reconnectet korrekt für das neue Buch.
@@ -482,14 +482,15 @@ export const treeMethods = {
         this._filteredTreeMemo = null;
         this.tokEsts = {};
         this.pageLastChecked = {};
-        this.ideenCounts = {};
-        this.chapterIdeenCounts = {};
-        this.rechercheCounts = {};
-        this.chapterRechercheCounts = {};
-        this.plotBeatCounts = {};
-        this.chapterPlotBeatCounts = {};
-        this.shareCommentCounts = {};
-        this.shareLinkCounts = {};
+        const badges = this.$store.badges;
+        badges.ideenCounts = {};
+        badges.chapterIdeenCounts = {};
+        badges.rechercheCounts = {};
+        badges.chapterRechercheCounts = {};
+        badges.plotBeatCounts = {};
+        badges.chapterPlotBeatCounts = {};
+        badges.shareCommentCounts = {};
+        badges.shareLinkCounts = {};
       }
       this._tokenEstGen++;
       // Buchwechsel: SW-CONTENT_CACHE (SWR) kann stale Listen liefern, daher fresh.
@@ -498,7 +499,7 @@ export const treeMethods = {
       const tree = await contentRepo.bookTree(bookId, { fresh, signal });
 
       // Buch wurde gewechselt während die Anfrage lief → veraltete Daten verwerfen.
-      if (this.selectedBookId !== bookId) return;
+      if (this.$store.nav.selectedBookId !== bookId) return;
 
       // pages-Cache im Hintergrund aktualisieren (fire-and-forget)
       const qs = opts.source ? `?source=${encodeURIComponent(opts.source)}` : '';
@@ -538,14 +539,14 @@ export const treeMethods = {
       });
 
       // Seiten ohne Kapitel immer zuerst — danach Kapitel in Tree-Reihenfolge.
-      this.pages = [
+      this.$store.nav.pages = [
         ...tree.topPages.map(decoratePage),
         ...flatChapters.flatMap(c => c.pages.map(decoratePage)),
       ];
 
       const openState = this._loadTreeOpenState(bookId);
-      this.tree = [
-        ...this.pages.filter(p => !p.chapter_id).map(p => ({
+      this.$store.nav.tree = [
+        ...this.$store.nav.pages.filter(p => !p.chapter_id).map(p => ({
           type: 'chapter',
           id: 'solo-' + p.id,
           name: p.name,
@@ -566,20 +567,20 @@ export const treeMethods = {
           open: Object.prototype.hasOwnProperty.call(openState, c.id) ? !!openState[c.id] : true,
           solo: false,
           hasChildren: (childCountMap.get(c.id) || 0) > 0,
-          pages: this.pages.filter(p => p.chapter_id === c.id),
+          pages: this.$store.nav.pages.filter(p => p.chapter_id === c.id),
         })),
       ];
 
       // Persistent sort maps – built once per book load, used by all filter sorting
       this._chapterOrderMap = new Map();
       let chIdx = 0;
-      for (const item of this.tree) {
+      for (const item of this.$store.nav.tree) {
         if (item.type === 'chapter' && !item.solo) this._chapterOrderMap.set(item.name, chIdx++);
       }
       this._pageOrderMap = new Map();
       this._pageIdOrderMap = new Map();
-      for (let i = 0; i < this.pages.length; i++) {
-        const p = this.pages[i];
+      for (let i = 0; i < this.$store.nav.pages.length; i++) {
+        const p = this.$store.nav.pages[i];
         if (!this._pageOrderMap.has(p.name)) this._pageOrderMap.set(p.name, i);
         this._pageIdOrderMap.set(p.id, i);
       }
@@ -600,27 +601,28 @@ export const treeMethods = {
           fetchJson('/plot/chapter-beat-counts?book_id=' + bookId, { signal }).catch(() => ({})),
         ]);
         this.pageLastChecked = ageMap || {};
-        this.ideenCounts = ideenMap || {};
-        this.chapterIdeenCounts = chapterIdeenMap || {};
-        this.rechercheCounts = rechercheMap || {};
-        this.chapterRechercheCounts = chapterRechercheMap || {};
-        this.shareCommentCounts = shareCommentMap || {};
-        this.shareLinkCounts = shareLinkMap || {};
-        this.plotBeatCounts = plotBeatMap || {};
-        this.chapterPlotBeatCounts = chapterPlotBeatMap || {};
+        const badges = this.$store.badges;
+        badges.ideenCounts = ideenMap || {};
+        badges.chapterIdeenCounts = chapterIdeenMap || {};
+        badges.rechercheCounts = rechercheMap || {};
+        badges.chapterRechercheCounts = chapterRechercheMap || {};
+        badges.shareCommentCounts = shareCommentMap || {};
+        badges.shareLinkCounts = shareLinkMap || {};
+        badges.plotBeatCounts = plotBeatMap || {};
+        badges.chapterPlotBeatCounts = chapterPlotBeatMap || {};
         // Editor-Badge der offenen Seite mit frischer Map abgleichen (Race: Seite
         // kann vor dem Counts-Fetch via restoreLastPage geöffnet worden sein).
         if (this.currentPage?.id) {
-          this.currentPageRechercheCount = this.rechercheCounts[this.currentPage.id] || 0;
-          this.currentPageShareCommentCount = this.shareCommentCounts[this.currentPage.id] || 0;
-          this.currentPageShareLinkCount = this.shareLinkCounts[this.currentPage.id] || 0;
-          this.currentPagePlotBeatCount = this.plotBeatCounts[this.currentPage.id] || 0;
+          this.currentPageRechercheCount = badges.rechercheCounts[this.currentPage.id] || 0;
+          this.currentPageShareCommentCount = badges.shareCommentCounts[this.currentPage.id] || 0;
+          this.currentPageShareLinkCount = badges.shareLinkCounts[this.currentPage.id] || 0;
+          this.currentPagePlotBeatCount = badges.plotBeatCounts[this.currentPage.id] || 0;
         }
         // Cache-Hits in einem Rutsch zuweisen (statt Index-Assign in der Loop),
         // damit der tokEsts-$watch in app.js#init feuert und die Kapitel-Stats
         // synchron mit dem ersten Tree-Render aktualisiert.
         const initialTokEsts = {};
-        for (const p of this.pages) {
+        for (const p of this.$store.nav.pages) {
           const c = statsCache[p.id];
           if (c && c.updated_at === p.updated_at) {
             initialTokEsts[p.id] = { tok: c.tok, words: c.words, chars: c.chars };
@@ -664,8 +666,8 @@ export const treeMethods = {
       // Endgültiger Fail (Session expired, Timeout, Netz weg): alten Tree
       // verwerfen. Sonst sieht User Sackgassen-Tree mit Seiten aus dem alten
       // Buch und kann nicht navigieren (Klick → Page aus fremdem Buch).
-      this.tree = [];
-      this.pages = [];
+      this.$store.nav.tree = [];
+      this.$store.nav.pages = [];
       this.setStatus(this.t('common.errorColon') + e.message);
     } finally {
       if (this._bookLoadAbort === loadCtrl) {
@@ -691,14 +693,14 @@ export const treeMethods = {
   },
 
   async createChapter({ afterChapterId } = {}) {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     const title = (this.newChapterTitle || '').trim();
     if (!bookId || !title || this.newChapterCreating) return null;
     this.newChapterCreating = true;
     this.newChapterError = '';
     try {
       const afterItem = afterChapterId
-        ? this.tree.find(i => i.type === 'chapter' && !i.solo && String(i.id) === String(afterChapterId))
+        ? this.$store.nav.tree.find(i => i.type === 'chapter' && !i.solo && String(i.id) === String(afterChapterId))
         : null;
       const body = { book_id: parseInt(bookId), name: title };
       if (afterItem && Number.isFinite(afterItem.priority)) body.position = afterItem.priority + 1;
@@ -717,7 +719,7 @@ export const treeMethods = {
         solo: false,
         pages: [],
       };
-      this.tree = [...this.tree, chapterItem].sort(_sortSoloFirst);
+      this.$store.nav.tree = [...this.$store.nav.tree, chapterItem].sort(_sortSoloFirst);
       if (this._chapterOrderMap) this._chapterOrderMap.set(chapterItem.name, this._chapterOrderMap.size);
       this._persistTreeOpenState();
       return chapterItem;
@@ -744,9 +746,9 @@ export const treeMethods = {
   async loadTokenEstimates(gen, signal) {
     if (this._tokenEstGen !== gen) return;
     if (signal?.aborted) return;
-    const bookId = this.selectedBookId;
-    if (!bookId || !this.pages.length) return;
-    const missing = this.pages.some(p => !this.tokEsts[p.id]);
+    const bookId = this.$store.nav.selectedBookId;
+    if (!bookId || !this.$store.nav.pages.length) return;
+    const missing = this.$store.nav.pages.some(p => !this.tokEsts[p.id]);
     if (!missing) return;
 
     this._setupStatsObserver(bookId, gen);

@@ -28,7 +28,7 @@
     <p class="card-empty-hint" x-text="$app.t('empty.figuren.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>

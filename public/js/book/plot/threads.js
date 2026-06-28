@@ -14,7 +14,7 @@ export const threadsMethods = {
       const thread = await fetchJson('/plot/threads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, name }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, name }),
       });
       this.threads = [...this.threads, thread];
       this._memos = {};
@@ -145,7 +145,7 @@ export const threadsMethods = {
       await fetchJson('/plot/threads/order', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, order: ordered.map(t => t.id) }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, order: ordered.map(t => t.id) }),
       });
     } catch (e) { this.errorMessage = app.t('plot.error.save'); }
   },

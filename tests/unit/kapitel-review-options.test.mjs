@@ -9,8 +9,13 @@ import assert from 'node:assert/strict';
 const { kapitelReviewMethods } = await import('../../public/js/book/kapitel-review.js');
 
 function ctx(tree) {
+  // Nav-Tree lebt in Alpine.store('nav') (kein Root-Proxy mehr) — Methode liest
+  // this.$store.nav.tree; Alias haelt den bestehenden tree-Zugriff am Leben.
+  const nav = { selectedBookId: 1, books: [], pages: [], tree };
   return {
-    tree,
+    get tree() { return nav.tree; },
+    set tree(v) { nav.tree = v; },
+    $store: { nav },
     _bookQualifiesForChapterReview: kapitelReviewMethods._bookQualifiesForChapterReview,
     kapitelReviewChapterOptions: kapitelReviewMethods.kapitelReviewChapterOptions,
   };

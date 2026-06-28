@@ -28,7 +28,7 @@
               :data-tip="$app.t('editor.revisions.clientTitle')"
               x-text="rev.client"></span>
         <span class="user-chip"
-              x-show="rev.user_email && $app.bookSharedFlags?.[$app.selectedBookId]"
+              x-show="rev.user_email && $app.bookSharedFlags?.[$store.nav.selectedBookId]"
               :class="{ 'user-chip--self': isOwnRevision(rev) }"
               :data-tip="rev.user_email">
           <span class="user-chip__avatar"
@@ -80,7 +80,7 @@
             </h2>
             <span class="badge badge-ok" x-text="sourceLabel(viewerRev.source)"></span>
             <span class="user-chip"
-                  x-show="viewerRev.user_email && $app.bookSharedFlags?.[$app.selectedBookId]"
+                  x-show="viewerRev.user_email && $app.bookSharedFlags?.[$store.nav.selectedBookId]"
                   :class="{ 'user-chip--self': isOwnRevision(viewerRev) }"
                   :data-tip="viewerRev.user_email">
               <span class="user-chip__avatar"

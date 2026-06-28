@@ -123,7 +123,7 @@ export const figurenMethods = {
 
   async saveFiguren() {
     try {
-      const r = await fetch('/figures/' + this.selectedBookId, {
+      const r = await fetch('/figures/' + this.$store.nav.selectedBookId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ figuren: this.$store.catalog.figuren }),

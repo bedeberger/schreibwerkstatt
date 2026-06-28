@@ -119,7 +119,7 @@ export const historyMethods = {
 
   async _applyReorderSnapshot(snap) {
     const root = window.__app;
-    const bookId = parseInt(root.selectedBookId, 10);
+    const bookId = parseInt(Alpine.store('nav').selectedBookId, 10);
     if (!bookId) return false;
     this.workTree = JSON.parse(JSON.stringify(snap.workTree));
     this.soloPages = JSON.parse(JSON.stringify(snap.soloPages));

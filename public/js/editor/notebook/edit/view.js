@@ -61,11 +61,11 @@ export const viewMethods = {
 
   async normalizeQuotes() {
     const app = window.__app;
-    if (!app?.selectedBookId) return;
+    if (!Alpine.store('nav').selectedBookId) return;
     const editEl = this._getEditEl();
     if (!editEl) return;
     const { ok, count } = await runQuoteNormalize({
-      bookId: app.selectedBookId,
+      bookId: Alpine.store('nav').selectedBookId,
       rootEl: editEl,
     });
     if (!ok) return;

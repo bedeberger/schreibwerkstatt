@@ -15,7 +15,7 @@ export const orteMethods = {
 
   async saveOrte() {
     try {
-      const r = await fetch('/locations/' + this.selectedBookId, {
+      const r = await fetch('/locations/' + this.$store.nav.selectedBookId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orte: this.$store.catalog.orte }),
@@ -34,7 +34,7 @@ export const orteMethods = {
   async patchOrtCoords(patches) {
     if (!Array.isArray(patches) || !patches.length) return true;
     try {
-      const r = await fetch('/locations/' + this.selectedBookId + '/coords', {
+      const r = await fetch('/locations/' + this.$store.nav.selectedBookId + '/coords', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ patches }),

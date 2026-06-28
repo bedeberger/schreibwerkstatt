@@ -6,7 +6,7 @@ export const accessMethods = {
   // ── Sharing ────────────────────────────────────────────────────────────────
 
   async loadBookAccess() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.bookAccessList = []; return; }
     this.bookAccessLoading = true;
     this.bookAccessError = '';
@@ -54,7 +54,7 @@ export const accessMethods = {
   // verschickt. Geteilt wird dann erst nach Annahme der Einladung.
   async submitShareInvite() {
     if (!this.bookAccessIsOwner()) return;
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     const email = (this.shareEmail || '').trim().toLowerCase();
     const role = this.shareRole;
     if (!bookId || !email) return;
@@ -102,7 +102,7 @@ export const accessMethods = {
 
   async changeBookAccessRole(email, newRole) {
     if (!this.bookAccessIsOwner()) return;
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     this.bookAccessError = '';
     try {
       const r = await fetch(`/books/${bookId}/access/${encodeURIComponent(email)}`, {
@@ -121,7 +121,7 @@ export const accessMethods = {
 
   async revokeBookAccess(email) {
     if (!this.bookAccessIsOwner()) return;
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!await window.__app.appConfirm({
       message: window.__app.t('book.share.revokeConfirm', { email }),
       confirmLabel: window.__app.t('common.delete'),
@@ -141,7 +141,7 @@ export const accessMethods = {
 
   async transferOwnership(email) {
     if (!this.bookAccessIsOwner()) return;
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!await window.__app.appConfirm({
       message: window.__app.t('book.share.transferConfirm', { email }),
       confirmLabel: window.__app.t('book.share.transferConfirmBtn'),

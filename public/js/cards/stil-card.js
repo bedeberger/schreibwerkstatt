@@ -17,12 +17,12 @@ export function registerStilCard() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showStilCard',
         load: async (root) => {
-          await this.loadStilStats(root.selectedBookId);
+          await this.loadStilStats(Alpine.store('nav').selectedBookId);
           if (this._stilNeedsSync()) await this.runStilSync();
         },
         onBookChanged: (e, ctx, root) => {
           if (!root.showStilCard) return;
-          const bookId = e.detail?.bookId || root.selectedBookId;
+          const bookId = e.detail?.bookId || Alpine.store('nav').selectedBookId;
           if (bookId) ctx.loadStilStats(bookId);
         },
         resetStateView: {

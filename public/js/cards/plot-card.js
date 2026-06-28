@@ -144,7 +144,7 @@ export function registerPlotCard() {
         onBookChanged: () => {
           this._destroySortables();
           this.resetPlot();
-          if (window.__app.showPlotCard && window.__app.selectedBookId) this.loadBoard();
+          if (window.__app.showPlotCard && Alpine.store('nav').selectedBookId) this.loadBoard();
         },
         onViewReset: () => { this._destroySortables(); this.resetPlot(); },
         onCardRefresh: () => this.loadBoard(),

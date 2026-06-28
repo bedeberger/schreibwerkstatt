@@ -38,7 +38,7 @@ export function registerBookOverviewCard() {
       // Trigger laufen durch `scheduleLoad`, das per Microtask coalesciert
       // und dedupliziert — sonst Race zwischen Reset und neuem Load.
       const scheduleLoad = () => {
-        const bookId = window.__app?.selectedBookId || null;
+        const bookId = Alpine.store('nav').selectedBookId || null;
         if (!bookId) { this._pendingBookId = null; return; }
         // Schon gescheduled für diesen Buch → noop, sonst doppelter Load.
         if (this._pendingBookId === bookId) return;

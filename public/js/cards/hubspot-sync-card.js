@@ -57,7 +57,7 @@ const hubspotSpec = {
   async confirmPush(pageId) {
     const root = window.__app;
     if (!root) return true;
-    const page = (root.pages || []).find(p => p.id === pageId);
+    const page = (Alpine.store('nav').pages || []).find(p => p.id === pageId);
     if (!page || this.statusFor(page) !== 'pushed-dirty') return true;
     const pageName = page.name || '';
     return !!(await root.appConfirm({

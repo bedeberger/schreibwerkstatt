@@ -16,11 +16,11 @@ export const crudMethods = {
 
   async loadDrafts() {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.drafts = []; return; }
     // Stale-Schutz: bei Buchwechsel während des Fetch verwirft eine spätere
     // Antwort des alten Buchs den frisch geladenen State des neuen sonst.
-    const isStale = () => window.__app?.selectedBookId !== bookId;
+    const isStale = () => Alpine.store('nav').selectedBookId !== bookId;
     this.loading = true;
     try {
       const rows = await fetchJson(`/draft-figures/${bookId}`);
@@ -134,7 +134,7 @@ export const crudMethods = {
   // Best-effort: Plot ist optional; ein Fehler hier lässt das Badge nur weg.
   async loadPlotUsage() {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     const draftId = this.selectedDraftId;
     this.plotUsage = null;
     if (!bookId || !draftId) return;
@@ -194,7 +194,7 @@ export const crudMethods = {
     const app = window.__app;
     const name = (this.newName || '').trim();
     if (!name) { this.errorMessage = app.t('werkstatt.error.nameRequired') || app.t('common.unknownError'); return; }
-    const bookId = app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     this.busy = true;
     try {

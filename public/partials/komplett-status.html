@@ -4,7 +4,7 @@
           class="update-all-btn"
           :class="{ 'update-all-btn--running': $store.jobs.alleAktualisierenLoading }"
           @click="alleAktualisieren()"
-          :disabled="$store.jobs.alleAktualisierenLoading || !selectedBookId"
+          :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId"
           :data-tip="t('header.updateAllTitle')">
     <span class="update-all-btn-ring"
           x-show="$store.jobs.alleAktualisierenLoading"
@@ -19,7 +19,7 @@
           class="icon-btn icon-btn--ghost"
           :class="{ 'is-active': showKomplettStatus }"
           @click="showKomplettStatus = !showKomplettStatus"
-          :disabled="!selectedBookId"
+          :disabled="!$store.nav.selectedBookId"
           :data-tip="t('header.statusMenu')"
           :aria-label="t('header.statusMenu')"
           aria-haspopup="menu"
@@ -69,7 +69,7 @@
               class="komplett-status-action-btn"
               role="menuitem"
               @click="showKomplettStatus = false; clearChapterCache()"
-              :disabled="$store.jobs.alleAktualisierenLoading || !selectedBookId"
+              :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId"
               :data-tip="t('header.clearCacheTitle')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
         <span x-text="t('header.clearCache')"></span>

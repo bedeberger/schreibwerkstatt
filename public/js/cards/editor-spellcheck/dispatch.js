@@ -31,9 +31,9 @@ export function setupSpellcheckDispatch(app) {
   let bookBlockObserver = null;  // MutationObserver fuer Bucheditor (Block-Wechsel) — lebt unabhaengig vom Controller
 
   function _currentBook() {
-    const id = app.selectedBookId;
+    const id = Alpine.store('nav').selectedBookId;
     if (!id) return null;
-    return (app.books || []).find(b => String(b.id) === String(id)) || null;
+    return (Alpine.store('nav').books || []).find(b => String(b.id) === String(id)) || null;
   }
   function _locale() {
     const b = _currentBook();
@@ -45,7 +45,7 @@ export function setupSpellcheckDispatch(app) {
     return 'auto';
   }
   function _bookId() {
-    const id = app.selectedBookId;
+    const id = Alpine.store('nav').selectedBookId;
     return id ? Number(id) : null;
   }
   function _pageId() {
@@ -164,7 +164,7 @@ export function setupSpellcheckDispatch(app) {
   app.$watch('showBookEditorCard',  _evaluate);
   // Buchwechsel im Bucheditor: gleiche Karte, anderes Buch -> Re-Attach mit
   // anderem Locale-Context.
-  app.$watch('selectedBookId',      () => {
+  app.$watch(() => Alpine.store('nav').selectedBookId,      () => {
     if (current) _evaluate();
     _refreshAllForms();
   });

@@ -37,7 +37,7 @@ export const actsMethods = {
       const act = await fetchJson('/plot/acts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, name }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, name }),
       });
       this.acts = [...this.acts, act];
       this.newActName = '';
@@ -137,7 +137,7 @@ export const actsMethods = {
       await fetchJson('/plot/acts/order', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, order: ordered.map(a => a.id) }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, order: ordered.map(a => a.id) }),
       });
     } catch (e) { this.errorMessage = app.t('plot.error.save'); }
   },
@@ -167,7 +167,7 @@ export const actsMethods = {
       const act = await fetchJson('/plot/acts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, name, thread_id: threadId == null ? null : threadId }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, name, thread_id: threadId == null ? null : threadId }),
       });
       this.acts = [...this.acts, act];
       this._memos = {};

@@ -209,11 +209,11 @@ export const viewMethods = {
   },
 
   // Kapitel-Längenverteilung (Zeichen) für die Collapse-Tile am Organizer-Fuss.
-  // Quelle: root.tree Top-Level-Kapitel mit .stats (von _refreshChapterStats
+  // Quelle: Alpine.store('nav').tree Top-Level-Kapitel mit .stats (von _refreshChapterStats
   // gefüllt, Sub-Kapitel-Zeichen sind bereits aufaggregiert). Diverging-Bar um
   // Median analog overviewChapterDistribution. Reihenfolge = Lese-Reihenfolge.
   chapterLengthDist() {
-    const tree = window.__app?.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     const roots = tree.filter(it => it.type === 'chapter' && !it.solo && it.parent_id == null);
     // Signatur statt tree-Ref: stats wird in-place mutiert (kein neuer Ref),
     // sonst bliebe das Memo nach DnD/Stats-Refresh stale.

@@ -24,7 +24,7 @@
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
@@ -63,12 +63,12 @@
          x-modelable="value" x-model="$app.songsFilters.kontextTyp"
          x-effect="options = $app.songsKontextTypListe().map(k => ({value: k, label: $app.t('songs.kontextTyp.' + k, { _default: k })}))">
     </div>
-    <span class="filter-count" x-text="$app.songsFiltered.length + ' / ' + $store.catalog.songs.length"></span>
+    <span class="filter-count" x-text="songsFiltered.length + ' / ' + $store.catalog.songs.length"></span>
   </div>
 
   <!-- Songliste -->
   <div x-show="$store.catalog.songs.length > 0" class="entity-list entity-list--accented song-list">
-    <template x-for="s in $app.songsFiltered" :key="s.id">
+    <template x-for="s in songsFiltered" :key="s.id">
       <div>
         <div class="entity-row" :data-song-id="s.id" @click="$app.selectedSongId = $app.selectedSongId === s.id ? null : s.id">
           <span x-show="s.kontext_typ" class="tag entity-typ-tag" x-text="$app.t('songs.kontextTyp.' + s.kontext_typ, { _default: s.kontext_typ })"></span>

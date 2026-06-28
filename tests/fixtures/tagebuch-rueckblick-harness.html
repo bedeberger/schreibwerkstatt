@@ -124,6 +124,8 @@
         selectPage: (p) => { window.__selectedTag = p?.name || null; },
       });
       window.Alpine.magic('app', () => window.__app);
+      // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr).
+      window.Alpine.store('nav', { books: [], selectedBookId: 1, pages: PAGES, tree: [] });
       registerTagebuchRueckblickCard();
     });
 

@@ -59,7 +59,7 @@ export function registerWorldFactsCard() {
     },
 
     async loadWorldFacts() {
-      const bookId = window.__app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId) return;
       this.wfLoading = true;
       try {

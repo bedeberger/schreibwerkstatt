@@ -27,7 +27,7 @@
     <p class="card-empty-hint" x-text="$app.t('empty.szenen.hint')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
@@ -144,12 +144,12 @@
            x-effect="options = $store.catalog.orte.filter(o => $store.catalog.szenen.some(s => (s.ort_ids||[]).includes(o.id))).map(o => ({value: o.id, label: o.name}))"
            >
       </div>
-      <span class="filter-count" x-text="$app.szenenFiltered.length + ' / ' + $store.catalog.szenen.length"></span>
+      <span class="filter-count" x-text="szenenFiltered.length + ' / ' + $store.catalog.szenen.length"></span>
     </div>
 
     <!-- Kompakte Szenen-Liste -->
     <div x-show="viewMode === 'list'" class="entity-list entity-list--accented">
-      <template x-for="(s, i) in $app.szenenFiltered" :key="s.id || i">
+      <template x-for="(s, i) in szenenFiltered" :key="s.id || i">
         <div>
           <div class="entity-row"
                :data-szeneid="s.id"
@@ -199,7 +199,7 @@
     <div x-show="viewMode === 'grid'" class="table-scroll" x-cloak>
       <table class="entity-grid-table"
              x-data="sortableTable({
-               rows: () => window.__app.szenenFiltered,
+               rows: () => szenenFiltered,
                defaultKey: 'kapitel',
                types: { wertung: 'string', titel: 'string', kapitel: 'string', seite: 'string' },
                persistKey: 'szenen.grid',

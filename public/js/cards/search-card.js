@@ -108,7 +108,7 @@ export function registerSearchCard() {
         kind: this.activeKinds.join(','),
         limit: '50',
       });
-      const bookId = window.__app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (this.scopeMode === 'book' && bookId) params.set('book_id', String(bookId));
 
       try {
@@ -151,7 +151,7 @@ export function registerSearchCard() {
           case 'page':
             return root.gotoPageById?.(hit.entity_id);
           case 'chapter': {
-            const tree = root.tree || [];
+            const tree = Alpine.store('nav').tree || [];
             const ch = tree.find(t => t.type === 'chapter' && String(t.id) === String(hit.entity_id));
             if (ch && typeof root.openKapitelReviewForChapter === 'function') {
               return root.openKapitelReviewForChapter(hit.entity_id);
@@ -160,8 +160,8 @@ export function registerSearchCard() {
             return;
           }
           case 'book':
-            if (hit.book_id && root.selectedBookId !== hit.book_id) {
-              root.selectedBookId = hit.book_id;
+            if (hit.book_id && Alpine.store('nav').selectedBookId !== hit.book_id) {
+              Alpine.store('nav').selectedBookId = hit.book_id;
             }
             root.toggleBookOverviewCard?.();
             return;

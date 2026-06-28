@@ -24,7 +24,7 @@ export const orteMapMethods = {
   // Liest orte_real + Sprache aus den Buch-Einstellungen. Schaltet bei
   // deaktiviertem Feature einen evtl. offenen Karten-Tab zurueck auf Liste.
   async loadOrteReal() {
-    const id = window.__app.selectedBookId;
+    const id = Alpine.store('nav').selectedBookId;
     if (!id) { this.orteRealEnabled = false; return; }
     try {
       const s = await fetchJson('/booksettings/' + id);
@@ -44,7 +44,7 @@ export const orteMapMethods = {
 
   // Gefilterte Orte mit gesetzten Koordinaten (Marker-Quelle).
   orteMapped() {
-    return window.__app.orteFiltered.filter(o => o.lat != null && o.lng != null);
+    return this.orteFiltered.filter(o => o.lat != null && o.lng != null);
   },
 
   // Karten-Status setzen. Abschluss-/Fehlermeldungen leeren sich nach kurzer Zeit
@@ -63,7 +63,7 @@ export const orteMapMethods = {
   // (nicht nach dem ISO-Code). Memoized auf die orteFiltered-Referenz (stabil
   // dank Getter-Memo) + Sprache → keine neue Array-/Objekt-Allokation pro Render.
   orteGridRows() {
-    const list = window.__app.orteFiltered;
+    const list = this.orteFiltered;
     const lang = this._geoLang || 'de';
     const c = this._gridRowsCache;
     if (c && c.list === list && c.lang === lang) return c.val;
@@ -340,7 +340,7 @@ export const orteMapMethods = {
 
   // Orte ohne Koordinaten (im aktuellen Filter) — Quelle für Batch-Geocode + Zähler.
   unlocatedOrte() {
-    return window.__app.orteFiltered.filter(o => o.lat == null || o.lng == null);
+    return this.orteFiltered.filter(o => o.lat == null || o.lng == null);
   },
 
   // KI-first-Verortung für eine Liste von Orten. Der Server normalisiert jedes
@@ -353,14 +353,14 @@ export const orteMapMethods = {
   async _geocodeViaAI(items) {
     const app = window.__app;
     const hitIds = new Set();
-    if (!items.length || !app.selectedBookId) return hitIds;
+    if (!items.length || !Alpine.store('nav').selectedBookId) return hitIds;
     let resp;
     try {
       resp = await fetchJson('/jobs/geocode-resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          book_id: app.selectedBookId,
+          book_id: Alpine.store('nav').selectedBookId,
           items: items.map(o => ({ id: o.id, name: (o.name || '').trim() })),
         }),
       });

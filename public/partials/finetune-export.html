@@ -17,7 +17,7 @@
     <div class="card-actions">
       <button type="button" class="icon-btn icon-btn--ghost"
               @click="runFinetuneExport()"
-              :disabled="finetuneLoading || !finetuneAnyTypeSelected() || !$app.selectedBookId"
+              :disabled="finetuneLoading || !finetuneAnyTypeSelected() || !$store.nav.selectedBookId"
               :data-tip="finetuneLoading ? $app.t('finetune.generating') : $app.t('finetune.generate')"
               :aria-label="$app.t('finetune.generate')">
         <span x-show="finetuneLoading" class="spinner"></span>

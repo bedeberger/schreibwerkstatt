@@ -13,13 +13,13 @@ const { test, expect } = require('@playwright/test');
 async function bootApp(page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
-    () => window.__app && Array.isArray(window.__app.books) && window.__app.books.length > 0,
+    () => window.__app && Array.isArray(window.Alpine.store('nav').books) && window.Alpine.store('nav').books.length > 0,
     null, { timeout: 30000 });
-  const bookId = await page.evaluate(() => window.__app.books[0].id);
+  const bookId = await page.evaluate(() => window.Alpine.store('nav').books[0].id);
   await page.evaluate((id) => { location.hash = '#book/' + id; }, bookId);
   await page.waitForFunction(
-    (id) => String(window.__app.selectedBookId) === String(id)
-            && Array.isArray(window.__app.pages) && window.__app.pages.length > 0,
+    (id) => String(window.Alpine.store('nav').selectedBookId) === String(id)
+            && Array.isArray(window.Alpine.store('nav').pages) && window.Alpine.store('nav').pages.length > 0,
     bookId, { timeout: 20000 });
 }
 
@@ -66,7 +66,7 @@ test('folder-import: Merge-Option disabled reagiert reaktiv auf selectedBookId',
   expect(await merge.isDisabled(), 'Merge enabled bei gewähltem Buch').toBe(false);
 
   // Buch entfernen → Merge wird disabled (reaktiv via inline $app.selectedBookId).
-  await page.evaluate(() => { window.__app.selectedBookId = ''; });
+  await page.evaluate(() => { window.Alpine.store('nav').selectedBookId = ''; });
   await page.waitForTimeout(250);
   expect(await merge.isDisabled(), 'Merge disabled ohne Buch').toBe(true);
 });

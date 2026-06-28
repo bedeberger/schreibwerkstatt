@@ -38,7 +38,7 @@ export function registerKontinuitaetCard() {
         showFlag: 'showKontinuitaetCard',
         timerKeys: ['_kontinuitaetPollTimer'],
         onShow: async (root) => {
-          if (!root.$store.catalog.figuren?.length) await root.loadFiguren(root.selectedBookId);
+          if (!root.$store.catalog.figuren?.length) await root.loadFiguren(Alpine.store('nav').selectedBookId);
           await this._loadKontinuitaetHistory();
         },
         load: () => this._loadKontinuitaetHistory(),
@@ -49,7 +49,7 @@ export function registerKontinuitaetCard() {
           }
           doReset(ctx);
           if (!root.showKontinuitaetCard) return;
-          if (!root.selectedBookId) return;
+          if (!Alpine.store('nav').selectedBookId) return;
           await ctx._loadKontinuitaetHistory();
         },
         onViewReset: (e, ctx) => {

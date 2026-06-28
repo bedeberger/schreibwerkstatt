@@ -11,7 +11,7 @@
     <div class="card-actions">
       <button type="button" class="icon-btn icon-btn--ghost"
               @click="captureSnapshot()"
-              :disabled="capturing || !$app.selectedBookId"
+              :disabled="capturing || !$store.nav.selectedBookId"
               :data-tip="capturing ? $app.t('snapshots.saving') : $app.t('snapshots.save')"
               :aria-label="$app.t('snapshots.save')">
         <span x-show="capturing" class="spinner"></span>
@@ -36,7 +36,7 @@
            :placeholder="$app.t('snapshots.descPlaceholder')">
     <button type="button" class="btn-compact snapshots-capture__btn"
             @click="captureSnapshot()"
-            :disabled="capturing || !$app.selectedBookId"
+            :disabled="capturing || !$store.nav.selectedBookId"
             x-text="capturing ? $app.t('snapshots.saving') : $app.t('snapshots.save')"></button>
   </div>
 
@@ -58,7 +58,7 @@
               @click="sortBy('seq')" x-text="$app.t('snapshots.col.fassung')"></th>
           <th class="sortable-th" :class="sortClass('created_at')" :aria-sort="ariaSort('created_at')"
               @click="sortBy('created_at')" x-text="$app.t('snapshots.col.date')"></th>
-          <th x-show="$app.bookSharedFlags?.[$app.selectedBookId]" x-text="$app.t('snapshots.col.author')"></th>
+          <th x-show="$app.bookSharedFlags?.[$store.nav.selectedBookId]" x-text="$app.t('snapshots.col.author')"></th>
           <th class="snapshots-num sortable-th" :class="sortClass('chars')" :aria-sort="ariaSort('chars')"
               @click="sortBy('chars')" x-text="$app.t('snapshots.col.chars')"></th>
           <th class="snapshots-num sortable-th" :class="sortClass('pages')" :aria-sort="ariaSort('pages')"
@@ -77,7 +77,7 @@
                     x-text="s.description"></span>
             </td>
             <td x-text="$app.formatDate(s.created_at)"></td>
-            <td x-show="$app.bookSharedFlags?.[$app.selectedBookId]">
+            <td x-show="$app.bookSharedFlags?.[$store.nav.selectedBookId]">
               <span class="user-chip" x-show="s.user_email"
                     :class="{ 'user-chip--self': isOwn(s) }" :data-tip="s.user_email">
                 <span class="user-chip__avatar"

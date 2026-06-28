@@ -814,9 +814,10 @@ test('plotMethods.effectiveChapterNameForBeat: eigenes Kapitel hat Vorrang, sons
 });
 
 test('plotMethods.plotCoverage: geerbtes Strang-Kapitel zählt als abgedeckt + nicht als kapitelloser Beat', () => {
-  const prevWin = globalThis.window;
-  globalThis.window = {
-    __app: { tree: [{ type: 'chapter', name: 'Kap 5' }, { type: 'chapter', name: 'Kap 6' }] },
+  const prevAlpine = globalThis.Alpine;
+  // Nav-Tree lebt in Alpine.store('nav') (kein Root-Proxy mehr).
+  globalThis.Alpine = {
+    store: () => ({ tree: [{ type: 'chapter', name: 'Kap 5' }, { type: 'chapter', name: 'Kap 6' }] }),
   };
   try {
     const threads = [{ id: 7, chapter_name: 'Kap 5' }];
@@ -826,7 +827,7 @@ test('plotMethods.plotCoverage: geerbtes Strang-Kapitel zählt als abgedeckt + n
     assert.deepEqual(cov.uncovered, ['Kap 6']); // Kap 5 gilt via Vererbung als abgedeckt
     assert.equal(cov.beatsNoChapter, 0);        // der Beat hat effektiv ein Kapitel
   } finally {
-    if (prevWin === undefined) delete globalThis.window; else globalThis.window = prevWin;
+    if (prevAlpine === undefined) delete globalThis.Alpine; else globalThis.Alpine = prevAlpine;
   }
 });
 

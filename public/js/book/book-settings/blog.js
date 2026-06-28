@@ -10,7 +10,7 @@ export const blogMethods = {
   // blogPullJobId). Job-Status-Polling läuft via root job-queue events.
 
   async loadBlogStatus() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     try {
       const data = await fetchJson(`/blog/${bookId}/status`);
@@ -70,7 +70,7 @@ export const blogMethods = {
 
 
   async testBlogConnection() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || !this.blogFormReady()) return;
     this._setBlogBusy('test');
     try {
@@ -95,7 +95,7 @@ export const blogMethods = {
 
 
   async saveBlogConnection() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || !this.blogFormReady()) return;
     this._setBlogBusy('save');
     try {
@@ -125,7 +125,7 @@ export const blogMethods = {
 
 
   async disconnectBlog() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     if (!confirm(window.__app.t('blog.connect.disconnectConfirm'))) return;
     this._setBlogBusy('disconnect');
@@ -144,7 +144,7 @@ export const blogMethods = {
 
 
   async startBlogImport() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || this.blogImportJobId) return;
     try {
       const res = await fetch('/jobs/blog-import', {
@@ -163,7 +163,7 @@ export const blogMethods = {
 
 
   async startBlogPull() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || this.blogPullJobId) return;
     try {
       const res = await fetch('/jobs/blog-pull', {
@@ -182,7 +182,7 @@ export const blogMethods = {
 
 
   async startBlogReconcile() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || this.blogReconcileJobId) return;
     if (!confirm(window.__app.t('blog.action.reconcileConfirm'))) return;
     try {

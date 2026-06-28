@@ -137,8 +137,8 @@ export function registerPaletteCard() {
     _ctx() {
       const root = window.__app || {};
       return {
-        selectedBookId: root.selectedBookId,
-        pages: root.pages,
+        selectedBookId: Alpine.store('nav').selectedBookId,
+        pages: Alpine.store('nav').pages,
         bookRole: root.currentBookRole || null,
         buchtyp: (typeof root.currentBuchtyp === 'function' ? root.currentBuchtyp() : null) || null,
       };
@@ -160,7 +160,7 @@ export function registerPaletteCard() {
         (root.$store.catalog.figuren || []).length,
         (root.$store.catalog.orte || []).length,
         (root.$store.catalog.szenen || []).length,
-        (root.tree || []).length,
+        (Alpine.store('nav').tree || []).length,
         (root.recentFeatureKeys || []).join(','),
         (root.recentPageIds || []).join(','),
         root.uiLocale || '',
@@ -549,7 +549,7 @@ export function registerPaletteCard() {
         fetch('/usage/track', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, source: 'palette', book_id: window.__app?.selectedBookId || null }),
+          body: JSON.stringify({ key, source: 'palette', book_id: Alpine.store('nav').selectedBookId || null }),
           credentials: 'same-origin',
         }).catch(() => {});
       } catch {}

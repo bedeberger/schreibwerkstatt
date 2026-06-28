@@ -9,8 +9,8 @@ test('plot: Beat per SortableJS-Drag umsortieren persistiert', async ({ page }) 
   page.on('pageerror', e => errors.push(String(e)));
 
   await page.goto('/');
-  await page.waitForFunction(() => window.__app && window.__app.selectedBookId);
-  const bookId = await page.evaluate(() => window.__app.selectedBookId);
+  await page.waitForFunction(() => window.__app && window.Alpine.store('nav').selectedBookId);
+  const bookId = await page.evaluate(() => window.Alpine.store('nav').selectedBookId);
 
   // Board seeden: 1 Akt + 3 Beats via API (im Page-Kontext, mit Session-Cookie).
   const ids = await page.evaluate(async (bookId) => {

@@ -56,7 +56,7 @@ export const treeContextMenuMethods = {
 
   // Sucht Chapter-Item rekursiv im Tree. `_onChapterHeaderActivate` braucht die
   // Item-Referenz (open-Flag, Pages, hasChildren), nicht nur die ID.
-  _findTreeChapter(id, items = this.tree) {
+  _findTreeChapter(id, items = this.$store.nav.tree) {
     if (!items) return null;
     for (const it of items) {
       if (it.type === 'chapter' && String(it.id) === String(id)) return it;
@@ -69,7 +69,7 @@ export const treeContextMenuMethods = {
   },
 
   _findTreePage(id) {
-    return (this.pages || []).find(p => String(p.id) === String(id)) || null;
+    return (this.$store.nav.pages || []).find(p => String(p.id) === String(id)) || null;
   },
 
   pagetreeCtxOpen() {

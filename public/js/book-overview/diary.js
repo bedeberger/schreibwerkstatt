@@ -1,7 +1,7 @@
 // Tagebuch-Tiles der Buch-Overview (nur bei buchtyp 'tagebuch'): Lücken &
 // Konsistenz, Wochentag-Rhythmus, Rückblick-Heatmap. Alles rückwärtsgewandt/
 // auswertend (kein generatives Schreiben). Die ersten beiden Tiles rechnen rein
-// clientseitig aus `window.__app.pages` (Seitenname = ISO-Datum) + `tokEsts`;
+// clientseitig aus `Alpine.store('nav').pages` (Seitenname = ISO-Datum) + `tokEsts`;
 // die Heatmap liest die serverseitig aggregierte `overviewRueckblickCoverage`.
 //
 // Compute-Bodies sind als pure `_computeXxx` extrahiert (Alpine-frei testbar);
@@ -47,7 +47,7 @@ export const diaryMethods = {
   },
 
   diaryHasEntries() {
-    const pages = window.__app?.pages || [];
+    const pages = Alpine.store('nav').pages || [];
     return this._memo('diaryHasEntries', [pages], () => this._diaryEntryDates(pages).length > 0);
   },
 
@@ -88,7 +88,7 @@ export const diaryMethods = {
   },
 
   diaryGapsConsistency() {
-    const pages = window.__app?.pages || [];
+    const pages = Alpine.store('nav').pages || [];
     return this._memo('diaryGaps', [pages], () =>
       this._computeDiaryGapsConsistency(this._diaryEntryDates(pages), localIsoDate()));
   },
@@ -116,7 +116,7 @@ export const diaryMethods = {
 
   diaryWeekdayRhythm() {
     const app = window.__app;
-    const pages = app?.pages || [];
+    const pages = Alpine.store('nav').pages || [];
     const tokEsts = app?.tokEsts || {};
     return this._memo('diaryWeekday', [pages, tokEsts], () => {
       const entries = [];

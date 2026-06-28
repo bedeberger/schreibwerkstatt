@@ -31,7 +31,7 @@ export const orteMethods = {
   // aufgelöste ID). Skalierung global über alle Cells.
   overviewOrtPresence() {
     const orte = this.overviewOrte || [];
-    const tree = window.__app?.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     return this._memo('ortPresence', [orte, tree], () => {
       const empty = { places: [], rows: [] };
       const app = window.__app;

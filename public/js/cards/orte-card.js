@@ -5,7 +5,7 @@
 //   - `orte` (im Store, als $root-Getter verfügbar)
 //   - `orteFilters` (app-navigation.js schreibt darauf)
 //   - `selectedOrtId` (Hash-Router)
-//   - `loadOrte`, `orteFiltered` (Root-Spread; von komplett-Job, Szenen-Trigger
+//   - `loadOrte` (Root-Spread; von komplett-Job, Szenen-Trigger
 //     und _reloadVisibleBookCards genutzt)
 //   - `patchOrtCoords` (Koordinaten-Patch für Geo-Edits), `saveOrte` (Full-Save
 //     + FTS-Rebuild via PUT /locations/:id)
@@ -35,6 +35,11 @@ export function registerOrteCard() {
     _markerById: {},          // ort-id → Leaflet-Marker (Cross-Highlight-Lookup)
     _unlocatedLatLng: {},     // ort-id → { lat, lng }: stabile Raster-Position unverorteter Pins
     _gridRowsCache: null,     // Memo fuer orteGridRows() (Land-Label-Sort im Grid)
+    // Memo für den orteFiltered-Getter: { sig, val }. Der Getter wird pro Render
+    // mehrfach gelesen (Liste, Grid, Karte) und filtert + sortiert je voll —
+    // Cache liefert bei unveränderten Eingaben dieselbe Array-Referenz zurück
+    // (stabile Keys, kein Doppel-Compute in der Karte).
+    _orteFilteredCache: null,
     _ortePollTimer: null,
     _geocodeJobTimer: null,   // transienter Poll-Timer fuer den KI-Geocode-Fallback-Job
     _orteMapStatusTimer: null,// Auto-Clear-Timer fuer orteMapStatus
@@ -52,7 +57,7 @@ export function registerOrteCard() {
       // Locate-Liste schon gefiltert ist. Signatur ueber die gefilterten ids
       // feuert nur bei echter Mengenaenderung (Drag/Geocode rendern selbst).
       this.$watch(
-        () => window.__app.orteFiltered.map(o => o.id).join(','),
+        () => this.orteFiltered.map(o => o.id).join(','),
         () => this.refreshOrteMarkersForFilter(),
       );
       this._lifecycle = setupCardLifecycle(this, {
@@ -60,10 +65,10 @@ export function registerOrteCard() {
         showFlag: 'showOrteCard',
         timerKeys: ['_ortePollTimer', '_geocodeJobTimer', '_orteMapStatusTimer'],
         resetState: { orteLoading: false, orteProgress: 0, orteStatus: '', orteRealEnabled: false, geocodingId: null, geocodingAll: false, highlightOrtId: null, orteMapStatus: '' },
-        load: (root) => root.loadOrte(root.selectedBookId),
+        load: (root) => root.loadOrte(Alpine.store('nav').selectedBookId),
         onShow: async (root) => {
-          const tasks = [root.loadOrte(root.selectedBookId), this.loadOrteReal()];
-          if (!root.$store.catalog.szenen.length) tasks.push(root.loadSzenen(root.selectedBookId));
+          const tasks = [root.loadOrte(Alpine.store('nav').selectedBookId), this.loadOrteReal()];
+          if (!root.$store.catalog.szenen.length) tasks.push(root.loadSzenen(Alpine.store('nav').selectedBookId));
           await Promise.all(tasks);
         },
         extraListeners: [
@@ -78,6 +83,41 @@ export function registerOrteCard() {
     destroy() {
       this._teardownMap();
       this._lifecycle?.destroy();
+    },
+
+    // Gefilterte + sortierte Orte für Liste/Grid/Karte. Filter-State + Kapitel-/
+    // Seiten-Order leben am Root, darum via window.__app gelesen; der Cache ist
+    // Karten-State (eine Referenz pro unveränderter Eingabe → stabile Keys).
+    get orteFiltered() {
+      const root = window.__app;
+      const f = root.orteFilters;
+      const sig = [root.$store.catalog.orte, root.$store.catalog.szenen, f.suche || '', f.figurId || '', f.kapitel || '', f.szeneId || ''];
+      const c = this._orteFilteredCache;
+      if (c && c.sig.length === sig.length && c.sig.every((v, i) => v === sig[i])) return c.val;
+      const val = this._computeOrteFiltered();
+      this._orteFilteredCache = { sig, val };
+      return val;
+    },
+    _computeOrteFiltered() {
+      const root = window.__app;
+      const f = root.orteFilters;
+      const q = f.suche ? f.suche.toLowerCase() : '';
+      const matchText = (o) => !q || [o.name, o.typ, o.stimmung, o.beschreibung, o.land]
+        .some(v => v && String(v).toLowerCase().includes(q));
+      return root.$store.catalog.orte.filter(o =>
+        matchText(o) &&
+        (!f.figurId || (o.figuren || []).includes(f.figurId)) &&
+        (!f.kapitel || (o.kapitel || []).some(k => k.name === f.kapitel || String(k.chapter_id) === String(f.kapitel))) &&
+        (!f.szeneId || root.$store.catalog.szenen.some(s => String(s.id) === String(f.szeneId) && (s.ort_ids || []).includes(o.id)))
+      ).sort((a, b) => {
+        const aK = Math.min(...(a.kapitel || []).map(k => root._chapterIdx(k.name)), 9999);
+        const bK = Math.min(...(b.kapitel || []).map(k => root._chapterIdx(k.name)), 9999);
+        if (aK !== bK) return aK - bK;
+        const aP = root._pageIdIdx(a.erste_erwaehnung_page_id);
+        const bP = root._pageIdIdx(b.erste_erwaehnung_page_id);
+        if (aP !== bP) return aP - bP;
+        return (a.name || '').localeCompare(b.name || '', 'de');
+      });
     },
 
     ...orteMapMethods,

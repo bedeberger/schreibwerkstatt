@@ -110,7 +110,7 @@ export function registerFinetuneExportCard() {
         this.finetuneStats = null;
         this.finetuneJobId = null;
         return {
-          book_id: parseInt(window.__app.selectedBookId),
+          book_id: parseInt(Alpine.store('nav').selectedBookId),
           book_name: window.__app.selectedBookName,
           types: {
             style:      !!this.finetuneTypeStyle,

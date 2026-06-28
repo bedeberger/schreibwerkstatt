@@ -80,16 +80,16 @@ export const diaryCalendarMethods = {
   // Map<'YYYY-MM-DD', page>. Cache invalidiert bei pages-Replacement.
   diaryCalendarPagesMap() {
     const cache = _ensureCache(this);
-    if (cache.pagesRef === this.pages && cache.map) return cache.map;
+    if (cache.pagesRef === this.$store.nav.pages && cache.map) return cache.map;
     const m = new Map();
-    for (const p of (this.pages || [])) {
+    for (const p of (this.$store.nav.pages || [])) {
       const md = (p.name || '').match(/^(\d{4})-(\d{2})-(\d{2})\b/);
       if (md) {
         const key = `${md[1]}-${md[2]}-${md[3]}`;
         if (!m.has(key)) m.set(key, p);
       }
     }
-    cache.pagesRef = this.pages;
+    cache.pagesRef = this.$store.nav.pages;
     cache.map = m;
     cache.months = null;
     cache.sorted = null;
@@ -106,7 +106,7 @@ export const diaryCalendarMethods = {
     // ohne pagesRef-Check würde nach Buchwechsel die alte `cache.months`-Liste
     // zurückkommen (Label + Sprung-Combobox zeigen sonst altes Buch bis ein
     // weiterer Reactive-Trigger feuert).
-    if (cache.pagesRef === this.pages && cache.months) return cache.months;
+    if (cache.pagesRef === this.$store.nav.pages && cache.months) return cache.months;
     const map = this.diaryCalendarPagesMap();
     const counts = new Map();
     for (const key of map.keys()) {
@@ -219,7 +219,7 @@ export const diaryCalendarMethods = {
   // Lädt Buchsprache (de/en) aus /booksettings, gecacht pro Buch. Default 'de'.
   async _getDiaryBookLanguage() {
     const cache = _ensureCache(this);
-    const id = String(this.selectedBookId || '');
+    const id = String(this.$store.nav.selectedBookId || '');
     if (!id) return 'de';
     if (cache.langByBookId[id]) return cache.langByBookId[id];
     try {
@@ -242,7 +242,7 @@ export const diaryCalendarMethods = {
   // - month-style Sub-Kapitel vorhanden, Monat fehlt → neu anlegen
   //   (Name "YYYY <Monatsname>" in Buchsprache, position = monthNum)
   async _resolveDiaryEntryChapter(yearChapterId, year, monthNum) {
-    const subs = (this.tree || []).filter(it =>
+    const subs = (this.$store.nav.tree || []).filter(it =>
       it.type === 'chapter'
         && !it.solo
         && String(it.parent_id) === String(yearChapterId)
@@ -266,7 +266,7 @@ export const diaryCalendarMethods = {
     const names = lang === 'en' ? MONTH_NAMES_EN : MONTH_NAMES_DE;
     const subName = `${year} ${names[monthNum - 1]}`;
     const created = await contentRepo.createChapter({
-      book_id: parseInt(this.selectedBookId, 10),
+      book_id: parseInt(this.$store.nav.selectedBookId, 10),
       name: subName,
       parent_chapter_id: yearChapterId,
       position: monthNum,
@@ -283,12 +283,12 @@ export const diaryCalendarMethods = {
   // Top-Level-Kapitel pro Jahr. Liefert Chapter-ID.
   async _ensureDiaryYearChapter(year) {
     const yearStr = String(year);
-    const existing = this.tree.find(
+    const existing = this.$store.nav.tree.find(
       it => it.type === 'chapter' && !it.solo && it.name === yearStr
     );
     if (existing) return existing.id;
     const created = await contentRepo.createChapter({
-      book_id: parseInt(this.selectedBookId, 10),
+      book_id: parseInt(this.$store.nav.selectedBookId, 10),
       name: yearStr,
       position: parseInt(yearStr, 10),
     });
@@ -302,7 +302,7 @@ export const diaryCalendarMethods = {
       solo: false,
       pages: [],
     };
-    this.tree = [...this.tree, chapterItem].sort(_sortSoloFirst);
+    this.$store.nav.tree = [...this.$store.nav.tree, chapterItem].sort(_sortSoloFirst);
     return created.id;
   },
 
@@ -323,14 +323,14 @@ export const diaryCalendarMethods = {
       const yearChapterId = await this._ensureDiaryYearChapter(year);
       const chapterId = await this._resolveDiaryEntryChapter(yearChapterId, year, monthNum);
       const created = await contentRepo.createPage({
-        book_id: parseInt(this.selectedBookId, 10),
+        book_id: parseInt(this.$store.nav.selectedBookId, 10),
         chapter_id: chapterId,
         name: dateIso,
         html: '<p></p>',
       });
       if (!created?.id) throw new Error('createPage returned no id');
-      this.pages = [...this.pages, created];
-      const treeCh = this.tree.find(
+      this.$store.nav.pages = [...this.$store.nav.pages, created];
+      const treeCh = this.$store.nav.tree.find(
         it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId)
       );
       if (treeCh) {
@@ -351,7 +351,7 @@ export const diaryCalendarMethods = {
   // Sortiert Diary-Pages chronologisch (älteste zuerst). Cache wie pagesMap.
   _diarySortedPages() {
     const cache = _ensureCache(this);
-    if (cache.pagesRef === this.pages && cache.sorted) return cache.sorted;
+    if (cache.pagesRef === this.$store.nav.pages && cache.sorted) return cache.sorted;
     this.diaryCalendarPagesMap();
     const entries = [...cache.map.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -398,7 +398,7 @@ export const diaryCalendarMethods = {
   diaryAnniversaryEntries() {
     const cache = _ensureCache(this);
     const mmdd = this.diaryAnniversaryToday();
-    if (cache.pagesRef === this.pages && cache.anniversary && cache.anniversaryKey === mmdd) {
+    if (cache.pagesRef === this.$store.nav.pages && cache.anniversary && cache.anniversaryKey === mmdd) {
       return cache.anniversary;
     }
     const map = this.diaryCalendarPagesMap();
@@ -418,7 +418,7 @@ export const diaryCalendarMethods = {
   diaryRangeEntries() {
     const cache = _ensureCache(this);
     const ck = `${this.diaryRangeFrom}|${this.diaryRangeTo}`;
-    if (cache.pagesRef === this.pages && cache.range && cache.rangeKey === ck) {
+    if (cache.pagesRef === this.$store.nav.pages && cache.range && cache.rangeKey === ck) {
       return cache.range;
     }
     const map = this.diaryCalendarPagesMap();
@@ -459,7 +459,7 @@ export const diaryCalendarMethods = {
   },
   _loadDiaryAnniversaryOpen() {
     try {
-      const key = this._diaryAnniversaryStorageKey(this.selectedBookId);
+      const key = this._diaryAnniversaryStorageKey(this.$store.nav.selectedBookId);
       if (!key) return true;
       const raw = localStorage.getItem(key);
       return raw === null ? true : raw === '1';
@@ -468,7 +468,7 @@ export const diaryCalendarMethods = {
   toggleDiaryAnniversaryOpen() {
     this.diaryAnniversaryOpen = !this.diaryAnniversaryOpen;
     try {
-      const key = this._diaryAnniversaryStorageKey(this.selectedBookId);
+      const key = this._diaryAnniversaryStorageKey(this.$store.nav.selectedBookId);
       if (key) localStorage.setItem(key, this.diaryAnniversaryOpen ? '1' : '0');
     } catch { /* quota / disabled storage — ignore */ }
   },

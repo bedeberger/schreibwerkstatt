@@ -83,6 +83,9 @@
       // Plain-Store-Stub bereit (keine echte Alpine-Reaktivitaet noetig — die
       // State->DOM-Spiegelung uebernimmt der setInterval unten).
       $store: {
+        // Nav-State lebt in Alpine.store('nav') — stt-dictation.js liest
+        // this.$store.nav.selectedBookId.
+        nav: { selectedBookId: 1, pages: [], tree: [] },
         stt: {
           enabled,
           // Schnelle Schwellen fuer den Test (sonst 800ms Stille pro Cut).

@@ -6,18 +6,18 @@ import { EVT } from '../events.js';
 // Server-seitiger Job-Typ: `komplett-analyse` (siehe routes/jobs/komplett.js).
 export const appKomplettMethods = {
   async clearChapterCache() {
-    if (!this.selectedBookId) return;
+    if (!this.$store.nav.selectedBookId) return;
     if (!await this.appConfirm({
       message: this.t('app.cacheClearConfirm'),
       confirmLabel: this.t('common.delete'),
       danger: true,
     })) return;
-    const { deleted } = await fetchJson(`/jobs/chapter-cache/${this.selectedBookId}`, { method: 'DELETE' });
+    const { deleted } = await fetchJson(`/jobs/chapter-cache/${this.$store.nav.selectedBookId}`, { method: 'DELETE' });
     await this.appAlert({ message: this.t('app.cacheCleared', { n: deleted }) });
   },
 
   async alleAktualisieren() {
-    if (!this.selectedBookId || this.$store.jobs.alleAktualisierenLoading) return;
+    if (!this.$store.nav.selectedBookId || this.$store.jobs.alleAktualisierenLoading) return;
     if (!await this.appConfirm({ message: this.t('komplett.confirm') })) return;
     this.$store.jobs.alleAktualisierenLoading = true;
     this.$store.jobs.alleAktualisierenProgress = 0;
@@ -27,7 +27,7 @@ export const appKomplettMethods = {
     this.$store.jobs.alleAktualisierenPassMode = null;
     this.$store.jobs.alleAktualisierenWarnings = [];
     this.showKomplettStatus = true;
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     const bookName = this.selectedBookName;
     try {
       this.$store.jobs.alleAktualisierenStatus = this.t('komplett.started');

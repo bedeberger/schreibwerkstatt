@@ -26,7 +26,7 @@ export const beatsMethods = {
       const beat = await fetchJson('/plot/beats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, act_id: actId, thread_id: threadId ?? null, titel }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, act_id: actId, thread_id: threadId ?? null, titel }),
       });
       this.beats = [...this.beats, beat];
       this._memos = {};
@@ -299,7 +299,7 @@ export const beatsMethods = {
       await fetchJson('/plot/beats/order', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: app.selectedBookId, order }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, order }),
       });
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');

@@ -16,7 +16,7 @@ export const lektoratTimeMethods = {
 
   _lektoratTimeActive() {
     return !!(this.checkDone
-      && this.selectedBookId
+      && this.$store.nav.selectedBookId
       && this.currentPage?.id
       && document.visibilityState === 'visible');
   },
@@ -32,7 +32,7 @@ export const lektoratTimeMethods = {
       if (this._lektoratTimeActive()) this._startLektoratHeartbeat();
     };
     this.$watch('checkDone',         sync);
-    this.$watch('selectedBookId',    restart);
+    this.$watch(() => this.$store.nav.selectedBookId,    restart);
     this.$watch(() => this.currentPage?.id, restart);
     document.addEventListener('visibilitychange', sync, { signal });
     window.addEventListener('pagehide', () => this._stopLektoratHeartbeat(true), { signal });
@@ -43,7 +43,7 @@ export const lektoratTimeMethods = {
     if (this._lektoratHeartbeatTimer) return;
     this._lektoratActiveSince = Date.now();
     this._lektoratActivePageId = this.currentPage?.id || null;
-    this._lektoratActiveBookId = this.selectedBookId || null;
+    this._lektoratActiveBookId = this.$store.nav.selectedBookId || null;
     this._lektoratHeartbeatTimer = setInterval(() => {
       this._flushLektoratTime(false);
     }, HEARTBEAT_MS);

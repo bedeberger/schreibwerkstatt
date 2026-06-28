@@ -95,7 +95,7 @@ export const ideenMethods = {
     if (!content) { this.errorMessage = app.t('ideen.error.contentRequired'); return; }
     if (content.length > 4000) { this.errorMessage = app.t('ideen.error.contentTooLong'); return; }
     const scope = _activeScope(app);
-    const bookId = app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!scope || !bookId) return;
 
     this.busy = true;
@@ -258,32 +258,32 @@ export const ideenMethods = {
     this._setTreeIdeenCount(scope, count);
   },
 
-  // Patched ideenCounts/chapterIdeenCounts-Map am Root für Sidebar-Indikator.
+  // Patched ideenCounts/chapterIdeenCounts-Map im badges-Store für Sidebar-Indikator.
   _setTreeIdeenCount(scope, count) {
-    const app = window.__app;
-    if (!app || !scope?.id) return;
+    const badges = Alpine.store('badges');
+    if (!badges || !scope?.id) return;
     if (scope.kind === 'page') {
-      const next = { ...(app.ideenCounts || {}) };
+      const next = { ...(badges.ideenCounts || {}) };
       if (count > 0) next[scope.id] = count;
       else           delete next[scope.id];
-      app.ideenCounts = next;
+      badges.ideenCounts = next;
     } else {
-      const next = { ...(app.chapterIdeenCounts || {}) };
+      const next = { ...(badges.chapterIdeenCounts || {}) };
       if (count > 0) next[scope.id] = count;
       else           delete next[scope.id];
-      app.chapterIdeenCounts = next;
+      badges.chapterIdeenCounts = next;
     }
   },
 
   _bumpTreeCountForTarget(idee, targetId) {
-    const app = window.__app;
-    if (!app) return;
+    const badges = Alpine.store('badges');
+    if (!badges) return;
     const isPage = idee.page_id != null;
     const mapKey = isPage ? 'ideenCounts' : 'chapterIdeenCounts';
-    const prev = (app[mapKey] && app[mapKey][targetId]) || 0;
-    const next = { ...(app[mapKey] || {}) };
+    const prev = (badges[mapKey] && badges[mapKey][targetId]) || 0;
+    const next = { ...(badges[mapKey] || {}) };
     next[targetId] = prev + 1;
-    app[mapKey] = next;
+    badges[mapKey] = next;
   },
 
   _replaceIdee(row) {

@@ -5,7 +5,7 @@
 // Storage-Zugriff via contentRepo (Domain-Repository, /content/*).
 //
 // Speicher-Strategie: nach jeder erfolgreichen Mutation patchen wir den
-// Root-Tree IN-PLACE. Kein `loadPages()` (würde root.pages + root.tree
+// Root-Tree IN-PLACE. Kein `loadPages()` (würde Alpine.store('nav').pages + Alpine.store('nav').tree
 // reassignen → ganze App-UI re-rendert, sichtbarer Flicker). Sidebar liest
 // dieselben Items, die wir mutieren, und re-rendert nur die betroffenen Stellen
 // via Alpine-Deep-Reactivity.
@@ -67,7 +67,7 @@ export function registerBookOrganizerCard() {
           });
         },
         // Re-Klick auf offene Karte: lokaler Snapshot reicht — Drag/Rename/CRUD
-        // mutieren root.tree in-place, Server-Stand und Card-State sind in
+        // mutieren Alpine.store('nav').tree in-place, Server-Stand und Card-State sind in
         // sync. `loadPages` würde Sidebar-Tree clearen + neu fetchen → Flicker.
         onCardRefresh: async (e, ctx) => {
           await ctx._rerender();

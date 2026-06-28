@@ -55,6 +55,10 @@
 
     window.Alpine.magic('app', () => window.__app);
 
+    // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr) — die Karte
+    // liest selectedBookId/tree/pages direkt via $store.nav / Alpine.store('nav').
+    window.Alpine.store('nav', { books: [], selectedBookId: 1, pages: [], tree: [] });
+
     // Combobox-Stub für die Harness — die echte Implementation lebt in
     // public/js/app.js (mid-file, nicht trivial extrahierbar). Tests interagieren
     // nicht mit Comboboxes; der Stub verhindert nur den "Alpine Expression Error:

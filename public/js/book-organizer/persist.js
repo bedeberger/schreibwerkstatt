@@ -11,11 +11,11 @@ export const persistMethods = {
   },
 
   // Holt frischen nested bookTree vom Server und baut workTree (rekursiv mit
-  // subchapters). root.tree ist flach (Phase 3b haengt nested an); deshalb
+  // subchapters). Alpine.store('nav').tree ist flach (Phase 3b haengt nested an); deshalb
   // fetcht der Organizer eigenstaendig — sonst saehe er keine Sub-Kapitel.
   async _snapshotFromServer() {
     const root = window.__app;
-    const bookId = parseInt(root.selectedBookId, 10);
+    const bookId = parseInt(Alpine.store('nav').selectedBookId, 10);
     if (!bookId) {
       this.workTree = [];
       this.soloPages = [];
@@ -95,13 +95,13 @@ export const persistMethods = {
     return tree;
   },
 
-  // Phase-3-Vereinfachung: subchapter-Mutationen koennen root.tree (flach) nicht
+  // Phase-3-Vereinfachung: subchapter-Mutationen koennen Alpine.store('nav').tree (flach) nicht
   // konsistent in-place mirrorn — wir reloaden stattdessen root komplett. Fuer
   // reine Top-Level-Reorder oder Page-Bucket-Moves bleibt der granulare Mirror,
   // damit Sidebar nicht flackert.
   async _persistOrder({ affectedChapters = null, fullReload = false } = {}) {
     const root = window.__app;
-    const bookId = parseInt(root.selectedBookId, 10);
+    const bookId = parseInt(Alpine.store('nav').selectedBookId, 10);
     if (!bookId) return false;
     const tree = this._buildTreeFromWorkstate();
     return await this._runMutation(async () => {

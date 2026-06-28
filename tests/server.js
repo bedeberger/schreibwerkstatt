@@ -135,6 +135,15 @@ async function handleMockRoute(req, res, urlPath) {
     }
   }
 
+  // Booksettings-Mock: runQuoteNormalizeHtml (lektorat saveCorrections, sobald
+  // $store.nav.selectedBookId gesetzt ist) lädt die Buch-Locale für die
+  // Quote-Normalisierung. Liefert eine gültige Locale → kein 404-console.error.
+  if (urlPath.match(/^\/booksettings\/\d+$/) && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ language: 'de', region: 'CH' }));
+    return true;
+  }
+
   // History-Endpoint: Lektorat patched nach saveCorrections die applied/selected-Listen.
   if (urlPath.match(/^\/history\/check\/\d+\/saved$/) && req.method === 'PATCH') {
     const body = await readBody(req);

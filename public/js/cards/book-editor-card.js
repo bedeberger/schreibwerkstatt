@@ -161,7 +161,7 @@ export function registerBookEditorCard() {
           commentFilterStatus: 'all', commentFilterReviewer: '',
           commentRailVisible: false, commentStackHeight: 0, _pendingGotoBid: null,
         },
-        load: (root) => this._load(root.selectedBookId),
+        load: (root) => this._load(Alpine.store('nav').selectedBookId),
       });
 
       // Vertikale Verankerung der Kommentar-Karten: Observer für Stream-Reflow +

@@ -16,17 +16,18 @@ export const badgesMethods = {
       this.currentPageIdeenOpenCount = openCount;
       // Recherche-Count aus der buchweit geladenen Map (kein Extra-Request);
       // wird bei Link-Änderungen in der Recherche-Karte frisch gehalten.
-      this.currentPageRechercheCount = (this.rechercheCounts || {})[pageId] || 0;
+      const badges = this.$store.badges;
+      this.currentPageRechercheCount = (badges.rechercheCounts || {})[pageId] || 0;
       // Plot-Beat-Count ebenfalls aus der buchweit geladenen Map (kein Extra-Request).
-      this.currentPagePlotBeatCount = (this.plotBeatCounts || {})[pageId] || 0;
-      this.currentPageShareCommentCount = (this.shareCommentCounts || {})[pageId] || 0;
-      this.currentPageShareLinkCount = (this.shareLinkCounts || {})[pageId] || 0;
+      this.currentPagePlotBeatCount = (badges.plotBeatCounts || {})[pageId] || 0;
+      this.currentPageShareCommentCount = (badges.shareCommentCounts || {})[pageId] || 0;
+      this.currentPageShareLinkCount = (badges.shareLinkCounts || {})[pageId] || 0;
       this.currentPageChatSessionCount = (Array.isArray(sessions) ? sessions : []).length;
       // Tree-Indikator mit frischer Wahrheit syncen (z.B. bei Cross-Tab-Edits).
-      const next = { ...(this.ideenCounts || {}) };
+      const next = { ...(badges.ideenCounts || {}) };
       if (openCount > 0) next[pageId] = openCount;
       else delete next[pageId];
-      this.ideenCounts = next;
+      badges.ideenCounts = next;
     } catch (e) {
       console.error('[loadPageBadgeCounts]', e);
     }
@@ -36,12 +37,12 @@ export const badgesMethods = {
   // Pro-Seite-Map offener Reviewer-Kommentare neu laden (nach Resolve/Delete in
   // der Share-Karte) und den Badge der offenen Seite syncen.
   async refreshShareCommentCounts() {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     if (!bookId) return;
     try {
       const map = await fetchJson(`/share/api/page-comment-counts?book_id=${bookId}`).catch(() => null);
-      if (!map || this.selectedBookId !== bookId) return;
-      this.shareCommentCounts = map;
+      if (!map || this.$store.nav.selectedBookId !== bookId) return;
+      this.$store.badges.shareCommentCounts = map;
       if (this.currentPage?.id) this.currentPageShareCommentCount = map[this.currentPage.id] || 0;
     } catch (e) {
       console.error('[refreshShareCommentCounts]', e);
@@ -54,19 +55,19 @@ export const badgesMethods = {
   // syncen. Beats hängen am Kapitel → Page-Count ist kapitelweit projiziert,
   // die Kapitelansicht liest chapterPlotBeatCounts direkt.
   async refreshPlotBeatCounts() {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     if (!bookId) return;
     try {
       const [pageMap, chapterMap] = await Promise.all([
         fetchJson(`/plot/page-beat-counts?book_id=${bookId}`).catch(() => null),
         fetchJson(`/plot/chapter-beat-counts?book_id=${bookId}`).catch(() => null),
       ]);
-      if (this.selectedBookId !== bookId) return;
+      if (this.$store.nav.selectedBookId !== bookId) return;
       if (pageMap) {
-        this.plotBeatCounts = pageMap;
+        this.$store.badges.plotBeatCounts = pageMap;
         if (this.currentPage?.id) this.currentPagePlotBeatCount = pageMap[this.currentPage.id] || 0;
       }
-      if (chapterMap) this.chapterPlotBeatCounts = chapterMap;
+      if (chapterMap) this.$store.badges.chapterPlotBeatCounts = chapterMap;
     } catch (e) {
       console.error('[refreshPlotBeatCounts]', e);
     }
@@ -76,12 +77,12 @@ export const badgesMethods = {
   // Pro-Seite-Map aktiver Share-Links neu laden (nach Create/Revoke in der
   // Share-Karte) und den „Teilen"-Badge der offenen Seite syncen.
   async refreshShareLinkCounts() {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     if (!bookId) return;
     try {
       const map = await fetchJson(`/share/api/page-link-counts?book_id=${bookId}`).catch(() => null);
-      if (!map || this.selectedBookId !== bookId) return;
-      this.shareLinkCounts = map;
+      if (!map || this.$store.nav.selectedBookId !== bookId) return;
+      this.$store.badges.shareLinkCounts = map;
       if (this.currentPage?.id) this.currentPageShareLinkCount = map[this.currentPage.id] || 0;
     } catch (e) {
       console.error('[refreshShareLinkCounts]', e);

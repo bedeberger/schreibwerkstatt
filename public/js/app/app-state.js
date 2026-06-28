@@ -84,9 +84,8 @@ const aiProviderState = () => ({
 
 const navigationState = () => ({
   // books / selectedBookId / pages / tree leben in Alpine.store('nav') (geteilt
-  // mit ~29 Reader-Modulen). Der Root spiegelt sie via Getter/Setter-Proxy
-  // (app.js) — hier daher kein eigenes Feld, sonst überschriebe der Spread den
-  // Proxy-Getter. Siehe cards/nav-store.js.
+  // mit ~29 Reader-Modulen) und werden direkt via $store.nav / this.$store.nav
+  // gelesen (kein Root-Proxy — wie catalog/tts/jobs). Siehe cards/nav-store.js.
   // Erst nach dem ersten loadBooks() true. Gate fuer den Welcome-Empty-State
   // (books.length === 0), damit der nicht waehrend des initialen Ladens blitzt.
   booksLoaded: false,
@@ -380,26 +379,12 @@ const lektoratState = () => ({
   tokEsts: {},
   _tokenEstGen: 0,
   pageLastChecked: {},
-  ideenCounts: {},
-  chapterIdeenCounts: {},
-  // Map page_id → Anzahl verknüpfter Recherche-Items (buchweit geteilt).
-  // Speist den Seiten-Indikator in Sidebar + Editor.
-  rechercheCounts: {},
-  // Map chapter_id → Anzahl verknüpfter Recherche-Items (buchweit geteilt).
-  // Speist den Kapitel-Indikator in der Sidebar.
-  chapterRechercheCounts: {},
-  // Map page_id → Anzahl nicht-verworfener Plot-Beats im Kapitel der Seite.
-  // Speist den Plot-Verknüpfungs-Indikator im Editor (Beats hängen am Kapitel).
-  plotBeatCounts: {},
-  // Map chapter_id → Anzahl nicht-verworfener Plot-Beats im Kapitel.
-  // Speist den Plot-Verknüpfungs-Indikator in der Kapitelansicht.
-  chapterPlotBeatCounts: {},
-  // Map page_id → Anzahl offener Reviewer-Kommentare aus Share-Links (Page-,
-  // Kapitel- oder Buch-Share).
-  shareCommentCounts: {},
-  // Map page_id → Anzahl aktiver Share-Links, die diese Seite enthalten.
-  // Speist den Badge am „Teilen"-Eintrag des Page-Action-Menüs.
-  shareLinkCounts: {},
+  // Buchweite Badge-Count-Maps (ideenCounts, chapterIdeenCounts, rechercheCounts,
+  // chapterRechercheCounts, plotBeatCounts, chapterPlotBeatCounts,
+  // shareCommentCounts, shareLinkCounts) leben in Alpine.store('badges')
+  // (cards/badges-store.js) und werden direkt via $store.badges / this.$store.badges
+  // bzw. Alpine.store('badges') gelesen (kein Root-Proxy). Die abgeleiteten
+  // currentPage*Count-Skalare der offenen Seite bleiben hier (page-/currentPage-gebunden).
   // Scope der aktuell offenen Ideen-Karte: 'page' (neben Editor) oder
   // 'chapter' (neben Kapitelreview). ideenChapterId nur in 'chapter'-Modus
   // gesetzt. currentPageIdeenOpenCount/currentChapterIdeenOpenCount halten die
@@ -511,11 +496,6 @@ const orteState = () => ({
     szeneId: '',
     suche: '',
   },
-  // Memo für den orteFiltered-Getter: { sig, val }. Der Getter wird pro Render
-  // mehrfach gelesen (Liste, Grid, Karte) und filtert + sortiert je voll —
-  // Cache liefert bei unveränderten Eingaben dieselbe Array-Referenz zurück
-  // (stabile Keys, kein Doppel-Compute in der Karte).
-  _orteFilteredCache: null,
 });
 
 const songsState = () => ({

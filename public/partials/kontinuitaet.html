@@ -25,7 +25,7 @@
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
-            :disabled="$store.jobs.alleAktualisierenLoading || !$app.selectedBookId">
+            :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
@@ -159,7 +159,7 @@
       <div class="nameguard-actions">
         <button type="button" class="secondary"
                 @click="nameGuardRun()"
-                :disabled="nameGuardLoading || !$app.selectedBookId">
+                :disabled="nameGuardLoading || !$store.nav.selectedBookId">
           <span x-show="!nameGuardLoading" x-text="$app.t('nameGuard.run')"></span>
           <span x-show="nameGuardLoading" x-text="$app.t('nameGuard.running')"></span>
         </button>

@@ -15,7 +15,7 @@ export const bookscopeMethods = {
     this._bookLoadAbort?.abort(new DOMException('book switch', 'AbortError'));
     this._bookLoadAbort = null;
     window.dispatchEvent(new CustomEvent(EVT.BOOK_CHANGED, {
-      detail: { bookId: this.selectedBookId },
+      detail: { bookId: this.$store.nav.selectedBookId },
     }));
     this._stopCollabPoll?.();
     this.$store.catalog.figuren = [];
@@ -35,14 +35,15 @@ export const bookscopeMethods = {
     this.pageHistory = [];
     this.activeHistoryEntryId = null;
     this.tokEsts = {};
-    this.ideenCounts = {};
-    this.chapterIdeenCounts = {};
-    this.rechercheCounts = {};
-    this.chapterRechercheCounts = {};
-    this.plotBeatCounts = {};
-    this.chapterPlotBeatCounts = {};
-    this.shareCommentCounts = {};
-    this.shareLinkCounts = {};
+    const badges = this.$store.badges;
+    badges.ideenCounts = {};
+    badges.chapterIdeenCounts = {};
+    badges.rechercheCounts = {};
+    badges.chapterRechercheCounts = {};
+    badges.plotBeatCounts = {};
+    badges.chapterPlotBeatCounts = {};
+    badges.shareCommentCounts = {};
+    badges.shareLinkCounts = {};
     this.currentPageRechercheCount = 0;
     this.currentPagePlotBeatCount = 0;
     this.currentPageShareCommentCount = 0;
@@ -68,10 +69,10 @@ export const bookscopeMethods = {
     this.songsUpdatedAt = null;
 
     this.recentPageIds = [];
-    if (typeof this.loadRecentPages === 'function' && this.selectedBookId) {
-      this.loadRecentPages(this.selectedBookId);
+    if (typeof this.loadRecentPages === 'function' && this.$store.nav.selectedBookId) {
+      this.loadRecentPages(this.$store.nav.selectedBookId);
     }
-    this._restoreBookPrefs(this.selectedBookId);
+    this._restoreBookPrefs(this.$store.nav.selectedBookId);
 
     // Root-gehaltene Pollers stoppen (zielen sonst auf altes Buch).
     const timers = [
@@ -93,7 +94,7 @@ export const bookscopeMethods = {
     this.$store.jobs.alleAktualisierenTps = null;
     this.showKomplettStatus = false;
     this.resetDailyProgress();
-    if (this.selectedBookId) this.loadDailyProgress(this.selectedBookId);
+    if (this.$store.nav.selectedBookId) this.loadDailyProgress(this.$store.nav.selectedBookId);
   },
 
 
@@ -139,7 +140,7 @@ export const bookscopeMethods = {
       if (this.isAdminOnly) return;
       if (this.editMode || this.editDirty) return;
       try {
-        if (!this.selectedBookId) {
+        if (!this.$store.nav.selectedBookId) {
           await this.loadBooks();
         } else {
           await this.loadBooks({ source: 'wake' });
@@ -213,7 +214,7 @@ export const bookscopeMethods = {
     if (this._komplettPollTimer) { clearInterval(this._komplettPollTimer); this._komplettPollTimer = null; }
     // Last-Run-Stempel gehört zum Buch, nicht zur View — Buch bleibt bei
     // Home-Klick gewählt, also für das aktuelle Buch neu laden statt nullen.
-    if (this.selectedBookId && typeof this.loadLastKomplettRun === 'function') this.loadLastKomplettRun(this.selectedBookId);
+    if (this.$store.nav.selectedBookId && typeof this.loadLastKomplettRun === 'function') this.loadLastKomplettRun(this.$store.nav.selectedBookId);
     else this.$store.jobs.alleAktualisierenLastRun = null;
     this.$store.jobs.alleAktualisierenProgress = 0;
     this.$store.jobs.alleAktualisierenTokIn = 0;
@@ -242,7 +243,7 @@ export const bookscopeMethods = {
         fetchJson(`/history/book-stats/${bookId}`).catch(() => []),
         fetchJson(`/booksettings/${bookId}`).catch(() => null),
       ]);
-      if (this.selectedBookId != bookId) return;
+      if (this.$store.nav.selectedBookId != bookId) return;
       this.dailyProgressStats = Array.isArray(stats) ? stats : [];
       this.dailyProgressIsFinished = !!settings?.is_finished;
       this.dailyProgressDailyGoalChars = settings?.daily_goal_chars != null ? Number(settings.daily_goal_chars) : null;

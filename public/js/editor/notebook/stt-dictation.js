@@ -537,7 +537,7 @@ export const sttDictationMethods = {
   async _sttFetchTranscript(blob, mime, attempt, signal) {
     if (signal?.aborted) return null; // Session beendet -> still verwerfen
     const params = new URLSearchParams();
-    if (this.selectedBookId) params.set('bookId', this.selectedBookId);
+    if (this.$store.nav.selectedBookId) params.set('bookId', this.$store.nav.selectedBookId);
     if (this.currentPage?.id) params.set('pageId', this.currentPage.id);
     const qs = params.toString() ? `?${params}` : '';
     let res;

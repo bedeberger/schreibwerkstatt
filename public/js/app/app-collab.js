@@ -47,7 +47,7 @@ export const appCollabMethods = {
   // Partei am Buch ist: anderer ACL-User ODER eigenes Zweit-Geraet. Idempotent.
   _ensureFullCollabPoll(bookId) {
     if (this.$store.collab._collabPollTimer) return;
-    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
     // Erster Tick holt sich den Server-Stempel als Baseline — sonst wuerden
     // historische Edits beim Buchwechsel als „neu" gemeldet.
     this.$store.collab._collabSince = null;
@@ -96,7 +96,7 @@ export const appCollabMethods = {
   },
 
   async _sendBookDevicePing(bookId) {
-    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
     let data;
     try {
       const r = await fetch('/content/books/' + bookId + '/device-ping', {
@@ -126,7 +126,7 @@ export const appCollabMethods = {
   // landet sein Push auch dann als Tree-Marker, wenn der Browser eine andere Seite
   // offen hat); `_selfPageDeviceCount` deckt zusaetzlich den Seitenkonflikt ab.
   _reconcileFullCollabPoll(bookId) {
-    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
     const id = String(bookId);
     const needFull = this.bookSharedFlags[id] === true
       || this.$store.collab._selfBookDeviceCount > 1
@@ -154,13 +154,13 @@ export const appCollabMethods = {
   // stoppen, Buchwahl raeumen, View resetten, Buchliste neu laden (das Buch
   // verschwindet daraus). Re-Entry-Guard, weil changes+presence parallel feuern.
   _handleBookAccessLost(bookId) {
-    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
     if (this.$store.collab._bookAccessLostFor === String(bookId)) return;
     this.$store.collab._bookAccessLostFor = String(bookId);
     this._stopCollabPoll();
     if (this.$store.collab._lockHeartbeatTimer) { clearInterval(this.$store.collab._lockHeartbeatTimer); this.$store.collab._lockHeartbeatTimer = null; }
     this.$store.collab._currentEditLock = null;
-    this.selectedBookId = '';
+    this.$store.nav.selectedBookId = '';
     this.resetView();
     this.loadBooks?.();
     this.setStatus(this.t('collab.bookAccessLost'), false, 6000);
@@ -169,7 +169,7 @@ export const appCollabMethods = {
 
   async _collabPollOnce(bookId) {
     if (document.hidden) return;
-    if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
+    if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
     // Beide Reads parallel: /changes (Diff seit since) + /presence (Live-Heartbeat).
     await Promise.all([
       this._collabFetchChanges(bookId),

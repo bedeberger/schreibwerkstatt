@@ -33,16 +33,16 @@ export const bookChatMethods = {
     },
     scrollElId: 'book-chat-messages',
     activeJobType: 'book-chat',
-    canOpen: (ctx) => !!ctx.$app.selectedBookId,
-    sessionsUrl: (ctx) => '/chat/sessions/book/' + ctx.$app.selectedBookId,
+    canOpen: (ctx) => !!Alpine.store('nav').selectedBookId,
+    sessionsUrl: (ctx) => '/chat/sessions/book/' + Alpine.store('nav').selectedBookId,
     newSessionUrl: '/chat/session/book',
     newSessionBody: (ctx) => ({
-      book_id:   parseInt(ctx.$app.selectedBookId),
+      book_id:   parseInt(Alpine.store('nav').selectedBookId),
       book_name: ctx.$app.selectedBookName,
     }),
     sendUrl: '/jobs/book-chat',
     onBeforeNewSession: async function () {
-      await fetch('/jobs/book-chat-cache?book_id=' + window.__app.selectedBookId, { method: 'DELETE' });
+      await fetch('/jobs/book-chat-cache?book_id=' + Alpine.store('nav').selectedBookId, { method: 'DELETE' });
     },
     onReopen: async function () {
       await this.loadBookChatSessions();
@@ -67,7 +67,7 @@ export const bookChatMethods = {
         this.bookChatSessions = [
           {
             id: sid,
-            book_id: parseInt(root.selectedBookId),
+            book_id: parseInt(Alpine.store('nav').selectedBookId),
             book_name: root.selectedBookName,
             created_at: nowIso,
             last_message_at: nowIso,

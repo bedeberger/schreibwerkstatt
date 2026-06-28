@@ -65,7 +65,7 @@
                     :data-tip="$app.t('editor.btn.moreActions')" :aria-label="$app.t('editor.btn.moreActions')">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg>
             </button>
-            <span class="icon-btn-badge" x-show="($app.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$app.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
+            <span class="icon-btn-badge" x-show="($store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
           </span>
           <div class="context-menu context-menu--dropdown" x-show="kapitelReviewMenuOpen" x-cloak role="menu">
             <button type="button" class="context-menu-item context-menu-item--icon"
@@ -75,21 +75,21 @@
                     @click="$app.toggleChapterIdeenCard($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
               <span x-text="$app.t('ideen.chapter.toggle')"></span>
-              <span class="btn-count" x-show="($app.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$app.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
+              <span class="btn-count" x-show="($store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
-                    x-show="($app.chapterRechercheCounts[$app.kapitelReviewChapterId] || 0) > 0"
+                    x-show="($store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId] || 0) > 0"
                     @click="$app.openRechercheForChapter($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#book-open"/></svg>
               <span x-text="$app.t('recherche.title')"></span>
-              <span class="btn-count" x-text="$app.chapterRechercheCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('recherche.openCountTitle', { n: $app.chapterRechercheCounts[$app.kapitelReviewChapterId] })"></span>
+              <span class="btn-count" x-text="$store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('recherche.openCountTitle', { n: $store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId] })"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
-                    x-show="($app.chapterPlotBeatCounts[$app.kapitelReviewChapterId] || 0) > 0"
+                    x-show="($store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId] || 0) > 0"
                     @click="$app.openPlotBoard(); kapitelReviewMenuOpen = false">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
               <span x-text="$app.t('plot.title')"></span>
-              <span class="btn-count" x-text="$app.chapterPlotBeatCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('plot.chapterBeatsCountTitle', { n: $app.chapterPlotBeatCounts[$app.kapitelReviewChapterId] })"></span>
+              <span class="btn-count" x-text="$store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('plot.chapterBeatsCountTitle', { n: $store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId] })"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="$app.canEdit() && $app.kapitelReviewChapterId"

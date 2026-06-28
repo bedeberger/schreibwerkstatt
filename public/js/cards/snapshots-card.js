@@ -51,15 +51,15 @@ export function registerSnapshotsCard() {
 
     init() {
       const app = window.__app;
-      if (app?.selectedBookId && app?.showSnapshotsCard) this.loadSnapshots(app.selectedBookId);
+      if (Alpine.store('nav').selectedBookId && app?.showSnapshotsCard) this.loadSnapshots(Alpine.store('nav').selectedBookId);
 
       this.$watch(() => window.__app?.showSnapshotsCard, (on) => {
-        if (on && window.__app?.selectedBookId) this.loadSnapshots(window.__app.selectedBookId);
+        if (on && Alpine.store('nav').selectedBookId) this.loadSnapshots(Alpine.store('nav').selectedBookId);
       });
 
       this._onRefresh = (e) => {
         if (e?.detail?.name !== 'snapshots') return;
-        if (window.__app?.selectedBookId) this.loadSnapshots(window.__app.selectedBookId, { fresh: true });
+        if (Alpine.store('nav').selectedBookId) this.loadSnapshots(Alpine.store('nav').selectedBookId, { fresh: true });
       };
       this._onBookChanged = () => this.reset();
       this._onViewReset = () => this.reset();
@@ -131,7 +131,7 @@ export function registerSnapshotsCard() {
     // ── Capture ─────────────────────────────────────────────────────────────────
     async captureSnapshot() {
       const app = window.__app;
-      const bookId = app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId || this.capturing) return;
       this.capturing = true;
       try {
@@ -162,7 +162,7 @@ export function registerSnapshotsCard() {
 
     async deleteSnapshot(snap) {
       const app = window.__app;
-      const bookId = app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!snap?.id || !bookId || this.deletingId) return;
       if (!confirm(app.t('snapshots.deleteConfirm', { n: snap.seq }))) return;
       this.deletingId = snap.id;
@@ -185,7 +185,7 @@ export function registerSnapshotsCard() {
     // ── Restore (Buch auf eine Fassung zuruecksetzen) ──────────────────────────────
     async restoreSnapshot(snap) {
       const app = window.__app;
-      const bookId = app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!snap?.id || !bookId || this.restoringId || this.deletingId) return;
       if (!confirm(app.t('snapshots.restoreConfirm', { n: snap.seq }))) return;
       this.restoringId = snap.id;
@@ -211,7 +211,7 @@ export function registerSnapshotsCard() {
     // ── Reader (Fassung nur-lesend, Bucheditor-Look, Diff gegen aktuell) ────────────
     async openSnapshot(snap) {
       const app = window.__app;
-      const bookId = app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!snap?.id || !bookId) return;
       this.readerSnap = snap;
       this.readerOpen = true;
@@ -297,7 +297,7 @@ export function registerSnapshotsCard() {
 
     exportUrl(fmt) {
       const app = window.__app;
-      const bookId = app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId || !this.readerSnap?.id) return '#';
       return `/snapshots/${bookId}/${this.readerSnap.id}/export/${fmt}`;
     },
@@ -322,7 +322,7 @@ export function registerSnapshotsCard() {
 
     async exportPdf() {
       const app = window.__app;
-      const bookId = app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId || !this.readerSnap?.id || !this.pdfProfileId || this.pdfExporting) return;
       this.pdfExporting = true;
       this.pdfError = '';
@@ -457,7 +457,7 @@ export function registerSnapshotsCard() {
 
     async runCompare() {
       const app = window.__app;
-      const bookId = app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId || !this.canCompare()) { this.diff = null; return; }
       this.diffLoading = true;
       this.diffError = '';

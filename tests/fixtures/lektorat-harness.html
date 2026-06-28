@@ -26,6 +26,11 @@
       ...pageViewMethods,
       ...lektoratMethods,
 
+      // Nav-State lebt in Alpine.store('nav') — lektorat.js/page-view.js lesen
+      // this.$store.nav.selectedBookId/pages/tree. Plain-Stub statt echtem Store
+      // (kein Alpine-Component-Kontext im Harness, $store-Magic fehlt).
+      $store: { nav: { selectedBookId: 42, pages: [], tree: [] } },
+
       // ── State-Defaults (die Felder, die lektoratMethods lesen/schreiben) ──
       currentPage: { id: 1, book_id: 42, name: 'Testseite' },
       originalHtml: '',

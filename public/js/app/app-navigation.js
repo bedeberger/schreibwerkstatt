@@ -158,11 +158,11 @@ export const appNavigationMethods = {
   _resolvePage(kapitel, seite) {
     const kName = Array.isArray(kapitel) ? kapitel[0] : kapitel;
     if (!kName && !seite) return null;
-    const chapters = (this.tree || []).filter(t => t.type === 'chapter' && !t.solo);
+    const chapters = (this.$store.nav.tree || []).filter(t => t.type === 'chapter' && !t.solo);
     const sLower = seite ? String(seite).toLowerCase() : '';
     if (!kName) {
-      return this.pages.find(p => p.name === seite)
-        || this.pages.find(p => p.name.toLowerCase() === sLower)
+      return this.$store.nav.pages.find(p => p.name === seite)
+        || this.$store.nav.pages.find(p => p.name.toLowerCase() === sLower)
         || null;
     }
     const chapter = chapters.find(c => c.name === kName);
@@ -188,13 +188,13 @@ export const appNavigationMethods = {
 
   gotoPageById(pageId) {
     if (!pageId) return;
-    const page = this.pages.find(p => String(p.id) === String(pageId));
+    const page = this.$store.nav.pages.find(p => String(p.id) === String(pageId));
     if (page) this.selectPage(page);
   },
 
   gotoChapterById(chapterId) {
     if (!chapterId) return;
-    const chapter = (this.tree || []).find(t => t.type === 'chapter' && String(t.id) === String(chapterId));
+    const chapter = (this.$store.nav.tree || []).find(t => t.type === 'chapter' && String(t.id) === String(chapterId));
     const first = chapter?.pages?.[0];
     if (first) this.selectPage(first);
   },

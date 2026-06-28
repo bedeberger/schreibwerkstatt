@@ -29,7 +29,7 @@
     <template x-for="fmt in ['pdf','docx-normseite','html','txt','md']" :key="fmt">
       <button type="button"
               :class="{ 'is-running': bookExportLoading === fmt }"
-              :disabled="!!bookExportLoading || !$app.selectedBookId"
+              :disabled="!!bookExportLoading || !$store.nav.selectedBookId"
               @click="bookExport(fmt)">
         <span x-show="bookExportLoading === fmt" class="spinner"></span>
         <svg x-show="bookExportLoading !== fmt" class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
@@ -38,17 +38,17 @@
     </template>
     <button type="button"
             class="primary"
-            :disabled="!$app.selectedBookId"
+            :disabled="!$store.nav.selectedBookId"
             @click="_handoffToPdfCustom()"
             x-text="$app.t('book.export.pdfCustom')"></button>
     <button type="button"
             class="primary"
-            :disabled="!$app.selectedBookId"
+            :disabled="!$store.nav.selectedBookId"
             @click="_handoffToEpubCustom()"
             x-text="$app.t('book.export.epubCustom')"></button>
     <button type="button"
             class="primary"
-            :disabled="!$app.selectedBookId"
+            :disabled="!$store.nav.selectedBookId"
             @click="_handoffToDocxCustom()"
             x-text="$app.t('book.export.docxCustom')"></button>
   </div>
@@ -83,7 +83,7 @@
 
     <button type="button"
             :class="{ 'is-running': bookExportLoading === 'swbook' }"
-            :disabled="!!bookExportLoading || !$app.selectedBookId"
+            :disabled="!!bookExportLoading || !$store.nav.selectedBookId"
             @click="migrateExport()">
       <span x-show="bookExportLoading === 'swbook'" class="spinner"></span>
       <svg x-show="bookExportLoading !== 'swbook'" class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>

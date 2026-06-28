@@ -67,7 +67,7 @@ export function createCommentRail(cfg) {
 
     // Buch-Kommentare laden (alle Links des Owners zum Buch) + auflösen.
     async _railLoad(bookId) {
-      const id = bookId || window.__app?.selectedBookId;
+      const id = bookId || Alpine.store('nav').selectedBookId;
       if (!id) { this[K.comments] = []; this[K.threads] = []; return; }
       this[K.loadingBookId] = id;
       try {

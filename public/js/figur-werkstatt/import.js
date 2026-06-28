@@ -9,7 +9,7 @@ import { fetchJson } from '../utils.js';
 export const importMethods = {
   async startImport() {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     this.importing = true;
     this.importablesLoading = true;
@@ -34,7 +34,7 @@ export const importMethods = {
 
   async runImport() {
     const app = window.__app;
-    const bookId = app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     const figureId = parseInt(this.selectedImportFigureId);
     if (!bookId || !figureId) return;
     this.busy = true;

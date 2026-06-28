@@ -14,7 +14,7 @@ import { EVT } from '../events.js';
 //       showFlag: 'showOrteCard',     // root flag to watch
 //       timerKeys: ['_ortePollTimer'],
 //       resetState: { orteLoading: false, orteProgress: 0, orteStatus: '' },
-//       load: (root) => root.loadOrte(root.selectedBookId),
+//       load: (root) => root.loadOrte(Alpine.store('nav').selectedBookId),
 //     });
 //   },
 //   destroy() { this._lifecycle.destroy(); },

@@ -39,9 +39,18 @@ globalThis.fetch = async (url) => {
 };
 
 function makeCtx() {
+  // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr): nav-Objekt
+  // unter $store.nav + Aliasse fuer direkte c.selectedBookId/tree-Zugriffe.
+  const nav = { selectedBookId: 42, books: [], pages: [], tree: [] };
   return {
-    selectedBookId: 42,
-    tree: [],
+    get selectedBookId() { return nav.selectedBookId; },
+    set selectedBookId(v) { nav.selectedBookId = v; },
+    get tree() { return nav.tree; },
+    set tree(v) { nav.tree = v; },
+    get pages() { return nav.pages; },
+    set pages(v) { nav.pages = v; },
+    get books() { return nav.books; },
+    set books(v) { nav.books = v; },
     figuren: [],
     figurenLoading: false, figurenProgress: 0, figurenStatus: '',
     showFiguresCard: false, showBookReviewCard: false, showKapitelReviewCard: false,
@@ -49,7 +58,7 @@ function makeCtx() {
     showKomplettStatus: false,
     // alleAktualisieren* leben in Alpine.store('jobs'); Plain-Stub, da
     // checkPendingJobs via this.$store.jobs.alleAktualisierenLoading gatet.
-    $store: { jobs: {
+    $store: { nav, jobs: {
       alleAktualisierenLoading: false, alleAktualisierenProgress: 0,
       alleAktualisierenTokIn: 0, alleAktualisierenTokOut: 0, alleAktualisierenTps: null,
       alleAktualisierenStatus: '',

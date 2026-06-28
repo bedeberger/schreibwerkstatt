@@ -346,7 +346,7 @@ export function registerMyStatsCard() {
 
     // Buchname aus der bereits geladenen Root-Buchliste (id → name).
     _bookName(bookId) {
-      const b = (window.__app.books || []).find(x => String(x.id) === String(bookId));
+      const b = (Alpine.store('nav').books || []).find(x => String(x.id) === String(bookId));
       return b?.name || (window.__app.t('mystats.unknownBook') + ' ' + bookId);
     },
 

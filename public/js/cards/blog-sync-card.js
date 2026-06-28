@@ -48,7 +48,7 @@ const blogSpec = {
     conflictData: null,
 
     async openConflict(pageId) {
-      const bookId = window.__app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId) return;
       this.conflictOpen = pageId;
       this.conflictData = null;
@@ -76,7 +76,7 @@ const blogSpec = {
 
     async resolveConflict(side) {
       if (!this.conflictOpen) return;
-      const bookId = window.__app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       const pageId = this.conflictOpen;
       try {
         const res = await fetch(`/blog/${bookId}/pages/${pageId}/resolve`, {

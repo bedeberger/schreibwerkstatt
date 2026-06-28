@@ -50,7 +50,7 @@ export function registerBookStatsCard() {
 
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showBookStatsCard',
-        load: (root) => this.loadBookStats(root.selectedBookId),
+        load: (root) => this.loadBookStats(Alpine.store('nav').selectedBookId),
         resetState: {
           bookStatsData: [],
           bookStatsCoverage: null,

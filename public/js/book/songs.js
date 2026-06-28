@@ -15,7 +15,7 @@ export const songsMethods = {
 
   async saveSongs() {
     try {
-      const r = await fetch('/songs/' + this.selectedBookId, {
+      const r = await fetch('/songs/' + this.$store.nav.selectedBookId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ songs: this.$store.catalog.songs }),

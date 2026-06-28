@@ -6,17 +6,17 @@
               :data-tip="t('sidebar.loadPages')" :aria-label="t('sidebar.loadPages')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
       </button>
-      <button type="button" class="icon-btn icon-btn--ghost" @click="toggleBookOrganizerCard()" :disabled="!selectedBookId"
+      <button type="button" class="icon-btn icon-btn--ghost" @click="toggleBookOrganizerCard()" :disabled="!$store.nav.selectedBookId"
               :class="{ 'is-active': showBookOrganizerCard }"
               :data-tip="t('tile.bookOrganizer.title')" :aria-label="t('tile.bookOrganizer')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
       </button>
-      <button type="button" class="icon-btn icon-btn--ghost" @click="toggleBookEditorCard()" :disabled="!pages.length"
+      <button type="button" class="icon-btn icon-btn--ghost" @click="toggleBookEditorCard()" :disabled="!$store.nav.pages.length"
               :class="{ 'is-active': showBookEditorCard }"
               :data-tip="t('tile.bookEditor.title')" :aria-label="t('tile.bookEditor')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scroll"/></svg>
       </button>
-      <button type="button" class="icon-btn icon-btn--ghost" @click="batchCheck()" :disabled="!pages.length"
+      <button type="button" class="icon-btn icon-btn--ghost" @click="batchCheck()" :disabled="!$store.nav.pages.length"
               :data-tip="t('sidebar.checkAllTitle')" :aria-label="t('sidebar.checkAll')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#spell-check"/></svg>
       </button>
@@ -108,16 +108,16 @@
               @mouseenter.stop="_showTokTip($el, item.stats, { _chapterOnly: true })"
               @mouseleave.stop="_hideTokTip()"></span>
           </template>
-          <span x-show="!item.solo && chapterIdeenCounts[item.id] > 0"
+          <span x-show="!item.solo && $store.badges.chapterIdeenCounts[item.id] > 0"
                 class="ideen-count-badge"
-                x-text="chapterIdeenCounts[item.id]"
-                :data-tip="t('ideen.openCountTitle', { n: chapterIdeenCounts[item.id] })"></span>
-          <span x-show="!item.solo && chapterRechercheCounts[item.id] > 0"
+                x-text="$store.badges.chapterIdeenCounts[item.id]"
+                :data-tip="t('ideen.openCountTitle', { n: $store.badges.chapterIdeenCounts[item.id] })"></span>
+          <span x-show="!item.solo && $store.badges.chapterRechercheCounts[item.id] > 0"
                 class="recherche-count-badge internal-link"
                 @click.stop="openRechercheForChapter(item.id)"
-                x-text="chapterRechercheCounts[item.id]"
-                :data-tip="t('recherche.openCountTitle', { n: chapterRechercheCounts[item.id] })"
-                :aria-label="t('recherche.openCountTitle', { n: chapterRechercheCounts[item.id] })"></span>
+                x-text="$store.badges.chapterRechercheCounts[item.id]"
+                :data-tip="t('recherche.openCountTitle', { n: $store.badges.chapterRechercheCounts[item.id] })"
+                :aria-label="t('recherche.openCountTitle', { n: $store.badges.chapterRechercheCounts[item.id] })"></span>
         </span>
       </div>
       <div x-show="item.solo || item.open" class="tree-chapter-pages">
@@ -144,7 +144,7 @@
                       x-text="userInitials(p.user_email)"></span>
               </template>
             </span>
-            <span x-show="tokEsts[page.id] || ideenCounts[page.id] > 0 || rechercheCounts[page.id] > 0" class="tok-stats">
+            <span x-show="tokEsts[page.id] || $store.badges.ideenCounts[page.id] > 0 || $store.badges.rechercheCounts[page.id] > 0" class="tok-stats">
               <template x-if="tokEsts[page.id]?.words > 0">
                 <span class="tok-stats-wrap">
                   <span class="tok-badge tok-neutral"
@@ -156,18 +156,18 @@
               <template x-if="tokEsts[page.id] && tokEsts[page.id].words === 0">
                 <span class="tok-badge tok-empty" x-text="t('sidebar.empty')"></span>
               </template>
-              <span x-show="ideenCounts[page.id] > 0"
+              <span x-show="$store.badges.ideenCounts[page.id] > 0"
                     class="ideen-count-badge internal-link"
                     @click.stop="openIdeenForPage(page.id)"
-                    x-text="ideenCounts[page.id]"
-                    :data-tip="t('ideen.openCountTitle', { n: ideenCounts[page.id] })"
-                    :aria-label="t('ideen.openCountTitle', { n: ideenCounts[page.id] })"></span>
-              <span x-show="rechercheCounts[page.id] > 0"
+                    x-text="$store.badges.ideenCounts[page.id]"
+                    :data-tip="t('ideen.openCountTitle', { n: $store.badges.ideenCounts[page.id] })"
+                    :aria-label="t('ideen.openCountTitle', { n: $store.badges.ideenCounts[page.id] })"></span>
+              <span x-show="$store.badges.rechercheCounts[page.id] > 0"
                     class="recherche-count-badge internal-link"
                     @click.stop="openRechercheForPage(page.id)"
-                    x-text="rechercheCounts[page.id]"
-                    :data-tip="t('recherche.openCountTitle', { n: rechercheCounts[page.id] })"
-                    :aria-label="t('recherche.openCountTitle', { n: rechercheCounts[page.id] })"></span>
+                    x-text="$store.badges.rechercheCounts[page.id]"
+                    :data-tip="t('recherche.openCountTitle', { n: $store.badges.rechercheCounts[page.id] })"
+                    :aria-label="t('recherche.openCountTitle', { n: $store.badges.rechercheCounts[page.id] })"></span>
             </span>
           </div>
         </template>
@@ -177,7 +177,7 @@
   <template x-if="filteredTree.length === 0 && pageSearch">
     <div class="muted-msg muted-msg--sm" x-text="t('sidebar.noPagesFound')"></div>
   </template>
-  <template x-if="!pageSearch && selectedBookId && tree.length === 0 && !treeLoading">
+  <template x-if="!pageSearch && $store.nav.selectedBookId && $store.nav.tree.length === 0 && !treeLoading">
     <div class="sidebar-empty-book">
       <div class="muted-msg muted-msg--sm" x-text="t('sidebar.emptyBook')"></div>
       <button type="button" @click="createChapterPrompt()" x-text="t('bookOrganizer.newChapter')"></button>

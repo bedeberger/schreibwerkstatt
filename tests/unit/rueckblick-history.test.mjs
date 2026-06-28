@@ -5,6 +5,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 let selected = null;
+// Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr) — Methoden lesen
+// pages via Alpine.store('nav'). Minimal-Stub fuer node:test.
+const navStore = { books: [], selectedBookId: 1, pages: [], tree: [] };
+globalThis.Alpine = { store: (name) => (name === 'nav' ? navStore : {}) };
 globalThis.window = { __app: { uiLocale: 'de', selectPage: (p) => { selected = p; } }, innerWidth: 1000 };
 
 const { tagebuchRueckblickMethods: M } = await import('../../public/js/book/tagebuch-rueckblick.js');
@@ -78,7 +82,7 @@ test('toggleBeleg: setzt aktiven Key + dedupte/sortierte Belegtage, erneuter Kli
 
 test('gotoBelegTag: schliesst Belege-Leiste + navigiert', () => {
   selected = null;
-  globalThis.window.__app.pages = [{ name: '2024-03-04', id: 7 }];
+  navStore.pages = [{ name: '2024-03-04', id: 7 }];
   const c = ctx({ rbBeleg: { key: 'orte:x', label: 'x', belege: ['2024-03-04'] } });
   c.gotoBelegTag('2024-03-04');
   assert.equal(c.rbBeleg.key, null);

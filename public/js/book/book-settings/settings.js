@@ -3,11 +3,11 @@ import { EVT, contentRepo, countryOptions, fetchJson } from './_shared.js';
 
 export const settingsMethods = {
   async loadBookSettings() {
-    if (!window.__app.selectedBookId) return;
+    if (!Alpine.store('nav').selectedBookId) return;
     this.bookSettingsLoading = true;
     try {
-      const data = await fetchJson(`/booksettings/${window.__app.selectedBookId}`);
-      const book = window.__app.books.find(b => String(b.id) === String(window.__app.selectedBookId));
+      const data = await fetchJson(`/booksettings/${Alpine.store('nav').selectedBookId}`);
+      const book = Alpine.store('nav').books.find(b => String(b.id) === String(Alpine.store('nav').selectedBookId));
       this.bookSettingsName       = book?.name || '';
       this.bookSettingsLanguage  = data.language    || 'de';
       this.bookSettingsRegion    = data.region      || 'CH';
@@ -37,7 +37,7 @@ export const settingsMethods = {
   // wird nur das Stilprofil-Feld aus dem Job-Result übernommen — der Rest des
   // Formulars (ggf. ungespeicherte Edits) bleibt unangetastet.
   async generateStilprofil() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || this.stilprofilGenerating) return;
     this.stilprofilGenerating = true;
     this.stilprofilError = '';
@@ -60,7 +60,7 @@ export const settingsMethods = {
 
   // Kategorie. Pool global; pro Buch eine Kategorie (optional).
   async loadBookCategory() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     try {
       const [pool, categoryRes] = await Promise.all([
@@ -81,7 +81,7 @@ export const settingsMethods = {
 
 
   async saveBookCategory(value) {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     // value aus combobox-change-Event-Detail; x-modelable-Sync zu bookCategoryId
     // ist beim Dispatch noch nicht propagiert (stale read).
@@ -138,19 +138,19 @@ export const settingsMethods = {
 
 
   async saveBookSettings() {
-    if (!window.__app.selectedBookId) return;
+    if (!Alpine.store('nav').selectedBookId) return;
     this.bookSettingsSaving = true;
     this.bookSettingsSaved  = false;
     this.bookSettingsError  = '';
     try {
-      const bookId = window.__app.selectedBookId;
-      const currentBook = window.__app.books.find(b => String(b.id) === String(bookId));
+      const bookId = Alpine.store('nav').selectedBookId;
+      const currentBook = Alpine.store('nav').books.find(b => String(b.id) === String(bookId));
       const newName = (this.bookSettingsName || '').trim();
       if (!newName) throw new Error(window.__app.t('book.create.errorEmpty'));
       if (newName !== (currentBook?.name || '')) {
         await contentRepo.updateBook(bookId, { name: newName });
       }
-      const r = await fetch(`/booksettings/${window.__app.selectedBookId}`, {
+      const r = await fetch(`/booksettings/${Alpine.store('nav').selectedBookId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -207,7 +207,7 @@ export const settingsMethods = {
 
   // ── Publikation (book_publication: Cover/Titelei/Bio, geteilt mit PDF+EPUB) ──
   async loadPublication() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     try {
       this.bookPublication = await fetchJson(`/publication/${bookId}`);
@@ -219,7 +219,7 @@ export const settingsMethods = {
 
 
   async savePublication() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     // Nicht speichern, bevor die volle Meta geladen ist — der strikte Full-
     // Replace-Upsert würde den DB-Stand sonst mit leeren Defaults überschreiben.
@@ -275,7 +275,7 @@ export const settingsMethods = {
 
 
   async uploadPublicationCover(file) {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!file || !bookId) return;
     this.pubCoverUploading = true; this.pubCoverError = '';
     try {
@@ -290,7 +290,7 @@ export const settingsMethods = {
 
 
   async removePublicationCover() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     const r = await fetch(`/publication/${bookId}/cover`, { method: 'DELETE' });
     if (!r.ok) return;
@@ -300,14 +300,14 @@ export const settingsMethods = {
 
 
   publicationCoverUrl() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!this.bookPublication?.has_cover || !bookId) return '';
     return `/publication/${bookId}/cover?v=${this.pubPreviewVersion}`;
   },
 
 
   async uploadPublicationAuthorImage(file) {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!file || !bookId) return;
     this.pubAuthorUploading = true; this.pubAuthorError = '';
     try {
@@ -322,7 +322,7 @@ export const settingsMethods = {
 
 
   async removePublicationAuthorImage() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     const r = await fetch(`/publication/${bookId}/author-image`, { method: 'DELETE' });
     if (!r.ok) return;
@@ -332,7 +332,7 @@ export const settingsMethods = {
 
 
   publicationAuthorImageUrl() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!this.bookPublication?.has_author_image || !bookId) return '';
     return `/publication/${bookId}/author-image?v=${this.pubPreviewVersion}`;
   },

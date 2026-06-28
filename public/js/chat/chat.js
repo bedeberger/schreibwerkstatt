@@ -25,7 +25,7 @@ const baseMethods = makeChatMethods({
   sessionsUrl: (ctx) => '/chat/sessions/' + ctx.$app.currentPage.id,
   newSessionUrl: '/chat/session',
   newSessionBody: (ctx) => ({
-    book_id:   parseInt(ctx.$app.selectedBookId),
+    book_id:   parseInt(Alpine.store('nav').selectedBookId),
     book_name: ctx.$app.selectedBookName,
     page_id:   ctx.$app.currentPage.id,
     page_name: ctx.$app.currentPage.name,

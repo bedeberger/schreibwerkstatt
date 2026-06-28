@@ -155,7 +155,7 @@
                     <span>
                       <template x-if="pi > 0"><span class="chat-context-sep">, </span></template>
                       <a x-show="p.id"
-                         :href="'#book/' + $app.selectedBookId + '/page/' + p.id"
+                         :href="'#book/' + $store.nav.selectedBookId + '/page/' + p.id"
                          @click.prevent="$app.gotoPageById(p.id)"
                          class="chat-context-link" x-text="p.name"></a>
                       <span x-show="!p.id" x-text="p.name"></span>

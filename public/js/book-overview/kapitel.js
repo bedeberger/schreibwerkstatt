@@ -14,7 +14,7 @@ export const kapitelMethods = {
   overviewChapterDistribution() {
     const app = window.__app;
     if (!app) return [];
-    const tree = app.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     const tokEsts = app.tokEsts || {};
     return this._memo('chapterDist', [tree, tokEsts], () => {
       const { roots, rootOf } = this._chapterRollup();
@@ -81,7 +81,7 @@ export const kapitelMethods = {
   overviewChapterFindings() {
     const heat = this.overviewHeat;
     if (!heat || !Array.isArray(heat.chapters) || !heat.matrix) return [];
-    const tree = window.__app?.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     return this._memo('chapterFindings', [heat, tree], () => this._computeChapterFindings(heat));
   },
 
@@ -164,7 +164,7 @@ export const kapitelMethods = {
   // der Sekunden über tracked Kapitel; Schwelle ≥3 tracked Kapitel für Median.
   // Sort: tracked nach seconds desc, noTime ans Ende.
   overviewChapterLektoratTime() {
-    const tree = window.__app?.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     const lt = this.overviewLektoratTime;
     return this._memo('chapterLektoratTime', [tree, lt], () => this._computeChapterLektoratTime(lt));
   },

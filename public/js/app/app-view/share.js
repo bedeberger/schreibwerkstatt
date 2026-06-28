@@ -70,7 +70,7 @@ export const shareMethods = {
     const ret = this._shareReturn;
     this._shareReturn = null;
     if (ret?.kind === 'page') {
-      const page = (this.pages || []).find(p => p.id === ret.id);
+      const page = (this.$store.nav.pages || []).find(p => p.id === ret.id);
       if (page) { await this.selectPage(page); return; }
     } else if (ret?.kind === 'kapitelReview') {
       await this.openKapitelReviewForChapter(ret.id);
@@ -82,7 +82,7 @@ export const shareMethods = {
         return;
       }
     }
-    if (this.selectedBookId && !this.showEditorCard && !this.showBookStatsCard) {
+    if (this.$store.nav.selectedBookId && !this.showEditorCard && !this.showBookStatsCard) {
       await this.toggleBookStatsCard();
       return;
     }

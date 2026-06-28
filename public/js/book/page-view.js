@@ -247,18 +247,18 @@ export const pageViewMethods = {
 
   /** Lädt Figurenkontext für das aktuelle Kapitel (nur bei >1 Seite im Kapitel) */
   async loadChapterFigures() {
-    if (!this.currentPage?.chapter_id || !this.selectedBookId) {
+    if (!this.currentPage?.chapter_id || !this.$store.nav.selectedBookId) {
       this.chapterFigures = [];
       return;
     }
     // Bei nur einer Seite pro Kapitel liefert der Endpoint alle Buchfiguren → nicht hilfreich
-    const chapter = this.tree?.find(c => c.id === this.currentPage.chapter_id);
+    const chapter = this.$store.nav.tree?.find(c => c.id === this.currentPage.chapter_id);
     if (chapter && chapter.pages?.length <= 1) {
       this.chapterFigures = [];
       return;
     }
     try {
-      const data = await fetchJson(`/figures/chapter/${this.selectedBookId}/${this.currentPage.chapter_id}`);
+      const data = await fetchJson(`/figures/chapter/${this.$store.nav.selectedBookId}/${this.currentPage.chapter_id}`);
       this.chapterFigures = (data?.figuren || []).map(_sanitizeFigur);
     } catch (e) {
       console.error('[loadChapterFigures]', e);

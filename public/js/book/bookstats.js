@@ -74,7 +74,7 @@ export const bookstatsMethods = {
     ]);
 
     // Stale-Guard: spätere Response eines alten Buchs nicht in neuen State kippen.
-    if (String(bookId) !== String(window.__app.selectedBookId)) return;
+    if (String(bookId) !== String(Alpine.store('nav').selectedBookId)) return;
 
     const failed = results.filter(r => r.status === 'rejected');
     for (const r of failed) console.error('[loadBookStats]', r.reason);
@@ -105,16 +105,16 @@ export const bookstatsMethods = {
     this.bookStatsLoading = true;
     this.bookStatsSyncStatus = `<span class="spinner"></span>${window.__app.t('bookstats.syncing')}`;
     try {
-      const result = await fetchJson('/sync/book/' + window.__app.selectedBookId, { method: 'POST' });
+      const result = await fetchJson('/sync/book/' + Alpine.store('nav').selectedBookId, { method: 'POST' });
       if (result.error) throw new Error(result.error);
       const localeTag = (window.__app.uiLocale === 'en') ? 'en-US' : 'de-CH';
       const now = new Date().toLocaleTimeString(localeTag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
       this.bookStatsSyncStatus = window.__app.t('bookstats.syncDone', { time: now });
-      await this.loadBookStats(window.__app.selectedBookId);
+      await this.loadBookStats(Alpine.store('nav').selectedBookId);
       // page_stats-Cache in tokEsts übernehmen, falls Seiten geladen
-      if (window.__app.pages.length) {
-        const cache = await fetchJson('/history/page-stats/' + window.__app.selectedBookId);
-        for (const p of window.__app.pages) {
+      if (Alpine.store('nav').pages.length) {
+        const cache = await fetchJson('/history/page-stats/' + Alpine.store('nav').selectedBookId);
+        for (const p of Alpine.store('nav').pages) {
           const c = cache[p.id];
           if (c && c.updated_at === p.updated_at) {
             window.__app.tokEsts[p.id] = { tok: c.tok, words: c.words, chars: c.chars };

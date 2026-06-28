@@ -39,8 +39,8 @@ export function registerKapitelReviewCard() {
         const d = e.detail;
         if (d?.type !== 'chapter-review' || d.job?.status !== 'done') return;
         const root = window.__app;
-        if (!root.selectedBookId || String(d.bookId) !== String(root.selectedBookId)) return;
-        this.loadKapitelReviewHistory(root.selectedBookId);
+        if (!Alpine.store('nav').selectedBookId || String(d.bookId) !== String(Alpine.store('nav').selectedBookId)) return;
+        this.loadKapitelReviewHistory(Alpine.store('nav').selectedBookId);
       };
 
       const onJobReconnect = (e) => {
@@ -76,7 +76,7 @@ export function registerKapitelReviewCard() {
         timerKeys: [],
         showNeedsBookId: false,
         onShow: () => this._openKapitelReview(),
-        load: (root) => this.loadKapitelReviewHistory(root.selectedBookId),
+        load: (root) => this.loadKapitelReviewHistory(Alpine.store('nav').selectedBookId),
         onBookChanged: (e, ctx) => reset(ctx),
         onViewReset:   (e, ctx) => reset(ctx),
         extraListeners: [
@@ -123,7 +123,7 @@ export function registerKapitelReviewCard() {
     get kapitelReviewOut()      { return this._currentSlot().out; },
 
     _lsKeyKapitelReview(chapterId) {
-      return `lektorat_chapter_review_job_${window.__app.selectedBookId}_${chapterId}`;
+      return `lektorat_chapter_review_job_${Alpine.store('nav').selectedBookId}_${chapterId}`;
     },
 
     renderStars(note) { return renderStars(note); },
@@ -170,7 +170,7 @@ export function registerKapitelReviewCard() {
             slot.out = this._renderKapitelReviewHtml(r);
             setTimeout(() => { slot.progress = 0; }, 400);
             slot.status = this._formatStatus(root.t('kapitelReview.pagesAnalyzed', { n: job.result.pageCount || '?' }));
-            if (root.selectedBookId) await this.loadKapitelReviewHistory(root.selectedBookId);
+            if (Alpine.store('nav').selectedBookId) await this.loadKapitelReviewHistory(Alpine.store('nav').selectedBookId);
           }
         },
       });
@@ -192,7 +192,7 @@ export function registerKapitelReviewCard() {
       const current = root.kapitelReviewChapterId;
       // Gültig = irgendein Kapitel im Tree (auch 0-seitige), damit ein per
       // Sidebar/Hash gezielt gewähltes neues Kapitel nicht überschrieben wird.
-      const tree = root.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       const stillValid = current && tree.some(i =>
         i.type === 'chapter' && !i.solo && String(i.id) === String(current)
       );
@@ -200,18 +200,18 @@ export function registerKapitelReviewCard() {
         const eligible = this.kapitelReviewChapterOptions();
         root.kapitelReviewChapterId = eligible.length ? String(eligible[0].id) : '';
       }
-      if (root.selectedBookId) {
-        await this.loadKapitelReviewHistory(root.selectedBookId);
+      if (Alpine.store('nav').selectedBookId) {
+        await this.loadKapitelReviewHistory(Alpine.store('nav').selectedBookId);
       }
     },
 
     async runKapitelReview() {
       const root = window.__app;
-      const bookId = root.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       const bookName = root.selectedBookName;
       const chapterId = root.kapitelReviewChapterId;
       if (!chapterId) return;
-      const chapter = (root.tree || []).find(i => i.type === 'chapter' && String(i.id) === String(chapterId));
+      const chapter = (Alpine.store('nav').tree || []).find(i => i.type === 'chapter' && String(i.id) === String(chapterId));
       const chapterName = chapter?.name || '';
       const includeSubchapters = this.kapitelReviewIncludeSubchapters(chapterId);
       const slot = this._ensureSlot(chapterId);
@@ -246,7 +246,7 @@ export function registerKapitelReviewCard() {
     // den `hasChildren`-Flag aus dem Tree (tree.js setzt ihn aus childCountMap).
     kapitelReviewHasSubchapters(chapterId) {
       if (!chapterId) return false;
-      const tree = window.__app.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       const ch = tree.find(it =>
         it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId),
       );
@@ -254,9 +254,9 @@ export function registerKapitelReviewCard() {
     },
 
     // Liefert alle Nachfahren-Kapitel-IDs (inkl. Self), basierend auf
-    // root.tree-parent_id-Kette. Genutzt fuer Stats-Aggregation und Default-Flag.
+    // Alpine.store('nav').tree-parent_id-Kette. Genutzt fuer Stats-Aggregation und Default-Flag.
     _kapitelReviewDescendantIds(chapterId) {
-      const tree = window.__app.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       const ids = new Set([String(chapterId)]);
       let added = true;
       while (added) {
@@ -293,7 +293,7 @@ export function registerKapitelReviewCard() {
     kapitelReviewEffectivePageCount(chapterId) {
       const id = chapterId || window.__app.kapitelReviewChapterId;
       if (!id) return 0;
-      const tree = window.__app.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       if (!this.kapitelReviewIncludeSubchapters(id)) {
         const ch = tree.find(i => i.type === 'chapter' && !i.solo && String(i.id) === String(id));
         return ch?.pages?.length || 0;
@@ -310,7 +310,7 @@ export function registerKapitelReviewCard() {
     async deleteKapitelReview(id) {
       try {
         await fetchJson('/history/chapter-review/' + id, { method: 'DELETE' });
-        if (window.__app.selectedBookId) await this.loadKapitelReviewHistory(window.__app.selectedBookId);
+        if (Alpine.store('nav').selectedBookId) await this.loadKapitelReviewHistory(Alpine.store('nav').selectedBookId);
       } catch (e) {
         console.error('[deleteKapitelReview]', e);
       }
@@ -320,7 +320,7 @@ export function registerKapitelReviewCard() {
     // mindestens eines mit mehreren Seiten), lohnt sich das Kapitel-Review für
     // alle Kapitel – auch für solche mit nur einer Seite.
     _bookQualifiesForChapterReview() {
-      const chapters = (window.__app.tree || []).filter(i => i.type === 'chapter' && !i.solo);
+      const chapters = (Alpine.store('nav').tree || []).filter(i => i.type === 'chapter' && !i.solo);
       return chapters.length >= 2 && chapters.some(c => c.pages.length > 1);
     },
 
@@ -329,7 +329,7 @@ export function registerKapitelReviewCard() {
     // Job lädt bei include_subchapters=true alle Descendant-Pages.
     kapitelReviewChapterOptions() {
       if (!this._bookQualifiesForChapterReview()) return [];
-      return (window.__app.tree || [])
+      return (Alpine.store('nav').tree || [])
         .filter(i => i.type === 'chapter' && !i.solo
           && (i.pages.length > 0 || this.kapitelReviewHasSubchapters(i.id)))
         .map(c => ({ id: c.id, name: c.name, pageCount: this.kapitelReviewEffectivePageCount(c.id) }));
@@ -337,11 +337,11 @@ export function registerKapitelReviewCard() {
 
     // Direkte + transitiv geerbte Sub-Kapitel des aktiven Kapitels, in Tree-
     // Order (DFS), jedes mit `depthOffset` relativ zum Parent (1, 2, …) und
-    // den eigenen Pages aus root.tree.
+    // den eigenen Pages aus Alpine.store('nav').tree.
     kapitelReviewSubchapterTree(chapterId) {
       const id = chapterId || window.__app.kapitelReviewChapterId;
       if (!id) return [];
-      const tree = window.__app.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       const byParent = new Map();
       for (const it of tree) {
         if (it.type !== 'chapter' || it.solo) continue;
@@ -382,7 +382,7 @@ export function registerKapitelReviewCard() {
 
     kapitelReviewSelectedChapter() {
       if (!window.__app.kapitelReviewChapterId) return null;
-      return (window.__app.tree || []).find(i =>
+      return (Alpine.store('nav').tree || []).find(i =>
         i.type === 'chapter' && !i.solo && String(i.id) === String(window.__app.kapitelReviewChapterId)
       ) || null;
     },
@@ -403,7 +403,7 @@ export function registerKapitelReviewCard() {
       if (!ch) return null;
       const root = window.__app;
       const ests = root.tokEsts || {};
-      const tree = root.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       const includeSubs = this.kapitelReviewIncludeSubchapters(ch.id);
       const chapterIds = includeSubs
         ? this._kapitelReviewDescendantIds(ch.id)
@@ -451,8 +451,8 @@ export function registerKapitelReviewCard() {
           priority: created.position, // legacy Sort-Alias wie decoratePage
           chapterName: chapter.name,
         };
-        root.pages = [...root.pages, newPage];
-        const chapterItem = root.tree.find(i =>
+        Alpine.store('nav').pages = [...root.pages, newPage];
+        const chapterItem = Alpine.store('nav').tree.find(i =>
           i.type === 'chapter' && !i.solo && String(i.id) === String(chapter.id)
         );
         if (chapterItem) {

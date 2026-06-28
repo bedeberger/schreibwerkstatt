@@ -29,7 +29,7 @@ export const tagebuchRueckblickMethods = {
   // Liefert die für die Combobox verfügbaren Zeiträume (Jahre + Monate),
   // absteigend (neueste zuerst). Format: [{ value, label }].
   availableZeitraeume() {
-    const pages = window.__app?.pages || [];
+    const pages = Alpine.store('nav').pages || [];
     return this._memo('zeitraeume', [pages, window.__app?.uiLocale],
       () => this._computeZeitraeume(pages));
   },
@@ -89,7 +89,7 @@ export const tagebuchRueckblickMethods = {
 
   // Jüngste updated_at (ms) aller datierten Seiten des Zeitraums; 0 wenn keine.
   _newestPageMtimeForZeitraum(z) {
-    const pages = window.__app?.pages || [];
+    const pages = Alpine.store('nav').pages || [];
     return this._memo('newestMtime:' + z, [pages, z], () => {
       const prefix = /^\d{4}$/.test(z) ? z + '-' : z; // Jahr → 'YYYY-', Monat → 'YYYY-MM'
       let newest = 0;
@@ -105,7 +105,7 @@ export const tagebuchRueckblickMethods = {
 
   // Springt zur Tagebuch-Seite eines Datums (page_name === 'YYYY-MM-DD').
   gotoRueckblickTag(datum) {
-    const pages = window.__app?.pages || [];
+    const pages = Alpine.store('nav').pages || [];
     const page = pages.find(p => (p?.name || '').slice(0, 10) === String(datum).slice(0, 10));
     if (page) window.__app.selectPage(page);
   },
@@ -181,7 +181,7 @@ export const tagebuchRueckblickMethods = {
 
   // ── History (dauerhaft gespeicherte Rückblicke, re-öffenbar) ────────────────
   async loadRueckblickHistory() {
-    const bookId = window.__app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.rueckblickHistory = []; this.rbHistoryLoaded = true; return; }
     try {
       this.rueckblickHistory = await fetchJson('/history/rueckblick/' + bookId);

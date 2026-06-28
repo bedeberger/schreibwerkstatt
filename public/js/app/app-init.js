@@ -207,7 +207,7 @@ export const appInitMethods = {
       this._applyingHash = true;
       const hashParts = (location.hash || '').replace(/^#/, '').split('/').filter(Boolean);
       if (hashParts[0] === 'book' && hashParts[1]) {
-        this.selectedBookId = hashParts[1];
+        this.$store.nav.selectedBookId = hashParts[1];
       }
       // Admin-only-View überspringt Buch-Bootstrap: keine Sidebar, keine
       // Buchwahl, Landing sind die Admin-Tiles (admin-home-Partial).
@@ -217,22 +217,22 @@ export const appInitMethods = {
         await this.loadBooks();
         // Top-3 Recency-Features für Quick-Pills laden (best-effort).
         this.loadRecentFeatures();
-        if (this.selectedBookId) this.loadRecentPages(this.selectedBookId);
-        if (this.selectedBookId) this.loadDailyProgress(this.selectedBookId);
+        if (this.$store.nav.selectedBookId) this.loadRecentPages(this.$store.nav.selectedBookId);
+        if (this.$store.nav.selectedBookId) this.loadDailyProgress(this.$store.nav.selectedBookId);
         // Gespeicherte Filter pro Buch anwenden, bevor Hash-Router das
         // initiale View setzt (Filter-Restore + Hash-getriebene Argumente
         // koexistieren so deterministisch).
-        if (this.selectedBookId) this._restoreBookPrefs(this.selectedBookId);
+        if (this.$store.nav.selectedBookId) this._restoreBookPrefs(this.$store.nav.selectedBookId);
       }
       await this._applyHash();
-      if (!this.isAdminOnly && this.selectedBookId) this._loadBookRole(this.selectedBookId);
-      if (!this.isAdminOnly && this.selectedBookId) this._loadEntitiesEnabledForBook(this.selectedBookId);
+      if (!this.isAdminOnly && this.$store.nav.selectedBookId) this._loadBookRole(this.$store.nav.selectedBookId);
+      if (!this.isAdminOnly && this.$store.nav.selectedBookId) this._loadEntitiesEnabledForBook(this.$store.nav.selectedBookId);
       if (!this.isAdminOnly) await this._maybeOpenBookOverview();
       this._syncUrlNow();
       this._applyingHash = false;
-      if (this.selectedBookId) {
+      if (this.$store.nav.selectedBookId) {
         try {
-          localStorage.setItem(`sw:lastBookId:${this.currentUser?.email || ''}`, String(this.selectedBookId));
+          localStorage.setItem(`sw:lastBookId:${this.currentUser?.email || ''}`, String(this.$store.nav.selectedBookId));
         } catch (_) {}
       }
       this._setupHashRouting();
@@ -247,15 +247,15 @@ export const appInitMethods = {
       // setzen.
       for (const [key] of FILTER_SCOPES) {
         this.$watch(key, (val) => {
-          if (!this.selectedBookId) return;
-          setFilters(this.currentUser?.email, this.selectedBookId, key, val);
+          if (!this.$store.nav.selectedBookId) return;
+          setFilters(this.currentUser?.email, this.$store.nav.selectedBookId, key, val);
         }, { deep: true });
       }
 
       this.$watch('entityPanelOpen', (val) => {
         try { localStorage.setItem('sw:entityPanelOpen', val ? '1' : '0'); } catch (_) {}
       });
-      this.$watch('selectedBookId', async (newVal, oldVal) => {
+      this.$watch(() => this.$store.nav.selectedBookId, async (newVal, oldVal) => {
         if (this._applyingHash) return;
         if (!newVal) return;
         // Alpine kann den Watcher mit identischem Wert feuern (z.B. bei
@@ -275,7 +275,7 @@ export const appInitMethods = {
         this._startCollabPoll(newVal);
       });
       this._startJobQueuePoll();
-      if (this.selectedBookId) this._startCollabPoll(this.selectedBookId);
+      if (this.$store.nav.selectedBookId) this._startCollabPoll(this.$store.nav.selectedBookId);
       this._setupWritingTime();
       this._setupLektoratTime();
       this._setupSttTime();

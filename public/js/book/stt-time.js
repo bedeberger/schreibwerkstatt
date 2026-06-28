@@ -17,7 +17,7 @@ export const sttTimeMethods = {
 
   _sttTimeActive() {
     return !!(this.$store.stt.recording
-      && this.selectedBookId
+      && this.$store.nav.selectedBookId
       && document.visibilityState === 'visible');
   },
 
@@ -28,7 +28,7 @@ export const sttTimeMethods = {
       else this._stopSttHeartbeat(false);
     };
     this.$watch(() => this.$store.stt.recording, sync);
-    this.$watch('selectedBookId', () => {
+    this.$watch(() => this.$store.nav.selectedBookId, () => {
       this._stopSttHeartbeat(false);
       if (this._sttTimeActive()) this._startSttHeartbeat();
     });
@@ -74,7 +74,7 @@ export const sttTimeMethods = {
     const chars = this._sttCharsPending || 0;
     this._sttCharsPending = 0;
     if (seconds <= 0 && chars <= 0) return;
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     if (!bookId) return;
     const payload = { book_id: Number(bookId), seconds, chars };
     if (useBeacon && navigator.sendBeacon) {

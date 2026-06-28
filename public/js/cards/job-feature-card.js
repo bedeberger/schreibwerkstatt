@@ -46,7 +46,7 @@ export function createCardJobFeature(cfg) {
   }
 
   const startPollMethod = function (jobId) {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     startPoll(this, {
       timerProp,
       jobId,
@@ -98,7 +98,7 @@ export function createCardJobFeature(cfg) {
   };
 
   const runMethod = async function () {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     this[loading] = true;
     if (progress) this[progress] = 0;
     if (show) window.__app[show] = true;
@@ -131,10 +131,10 @@ export function createCardJobFeature(cfg) {
   // cfg.onOpen für Erst-Initialisierung (z.B. History laden).
   const onVisibleMethod = async function () {
     if (cfg.onOpen) await cfg.onOpen.call(this);
-    if (!this[timerProp] && !this[loading] && window.__app.selectedBookId) {
+    if (!this[timerProp] && !this[loading] && Alpine.store('nav').selectedBookId) {
       try {
         const { jobId } = await fetchJson(
-          `/jobs/active?type=${activeType}&book_id=${window.__app.selectedBookId}`
+          `/jobs/active?type=${activeType}&book_id=${Alpine.store('nav').selectedBookId}`
         );
         if (jobId) {
           this[loading] = true;

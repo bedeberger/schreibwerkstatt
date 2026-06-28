@@ -131,7 +131,7 @@ export function registerTagebuchRueckblickCard() {
       },
       buildPayload() {
         return {
-          book_id: parseInt(window.__app.selectedBookId),
+          book_id: parseInt(Alpine.store('nav').selectedBookId),
           zeitraum: this.rueckblickZeitraum,
         };
       },

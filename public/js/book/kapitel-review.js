@@ -35,7 +35,7 @@ export const kapitelReviewMethods = {
   // Kapitelseite. Match per exaktem Namen, dann case-insensitive.
   async openKapitelByName(name) {
     if (!name) return;
-    const chapters = (this.tree || []).filter(i => i.type === 'chapter' && !i.solo);
+    const chapters = (this.$store.nav.tree || []).filter(i => i.type === 'chapter' && !i.solo);
     const lc = String(name).toLowerCase();
     const ch = chapters.find(c => c.name === name)
       || chapters.find(c => c.name.toLowerCase() === lc);
@@ -53,13 +53,13 @@ export const kapitelReviewMethods = {
   // mit mehreren Seiten), lohnt sich das Kapitel-Review. Reine Flachbücher
   // deckt das Seiten-Lektorat ab.
   _bookQualifiesForChapterReview() {
-    const chapters = (this.tree || []).filter(i => i.type === 'chapter' && !i.solo);
+    const chapters = (this.$store.nav.tree || []).filter(i => i.type === 'chapter' && !i.solo);
     return chapters.length >= 2 && chapters.some(c => c.pages.length > 1);
   },
 
   kapitelReviewChapterOptions() {
     if (!this._bookQualifiesForChapterReview()) return [];
-    const tree = this.tree || [];
+    const tree = this.$store.nav.tree || [];
     const hasSub = (id) => tree.some(i =>
       i.type === 'chapter' && !i.solo && String(i.parent_id) === String(id)
     );

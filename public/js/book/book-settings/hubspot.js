@@ -9,7 +9,7 @@ export const hubspotMethods = {
   // hubspotImportJobId. Job-Status-Polling via job-queue events.
 
   async loadHubspotStatus() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     try {
       const data = await fetchJson(`/hubspot/${bookId}/status`);
@@ -70,7 +70,7 @@ export const hubspotMethods = {
 
 
   async testHubspotConnection() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     this._setHubspotBusy('test');
     try {
@@ -95,7 +95,7 @@ export const hubspotMethods = {
 
 
   async loadHubspotLists() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     const tokenQ = this.hubspotForm.token
       ? `?token=${encodeURIComponent(this.hubspotForm.token)}`
@@ -114,7 +114,7 @@ export const hubspotMethods = {
 
 
   async saveHubspotConnection() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || !this.hubspotFormReady()) return;
     this._setHubspotBusy('save');
     try {
@@ -143,7 +143,7 @@ export const hubspotMethods = {
 
 
   async disconnectHubspot() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
     if (!confirm(window.__app.t('hubspot.connect.disconnectConfirm'))) return;
     this._setHubspotBusy('disconnect');
@@ -164,7 +164,7 @@ export const hubspotMethods = {
 
 
   async startHubspotImport() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || this.hubspotImportJobId) return;
     try {
       const res = await fetch('/jobs/hubspot-import', {
@@ -183,7 +183,7 @@ export const hubspotMethods = {
 
 
   async startHubspotReconcile() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || this.hubspotReconcileJobId) return;
     if (!confirm(window.__app.t('hubspot.action.reconcileConfirm'))) return;
     try {

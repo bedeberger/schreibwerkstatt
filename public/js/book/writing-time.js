@@ -23,7 +23,7 @@ export const writingTimeMethods = {
 
   _writingTimeActive() {
     return !!((this.editMode || this.focusActive)
-      && this.selectedBookId
+      && this.$store.nav.selectedBookId
       && document.visibilityState === 'visible');
   },
 
@@ -35,7 +35,7 @@ export const writingTimeMethods = {
     };
     this.$watch('editMode',       sync);
     this.$watch('focusActive',    sync);
-    this.$watch('selectedBookId', () => {
+    this.$watch(() => this.$store.nav.selectedBookId, () => {
       this._stopWritingHeartbeat(false);
       if (this._writingTimeActive()) this._startWritingHeartbeat();
     });
@@ -76,7 +76,7 @@ export const writingTimeMethods = {
     // Idle-Cutoff: letzte bewusste Eingabe liegt länger als IDLE_MS zurück →
     // Editor offen, aber untätig. Intervall verfällt, statt Zeit zu buchen.
     if (this._writingLastActivity == null || now - this._writingLastActivity > IDLE_MS) return;
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     if (!bookId) return;
     const payload = { book_id: Number(bookId), seconds };
     if (useBeacon && navigator.sendBeacon) {

@@ -30,12 +30,12 @@ export const fehlerHeatmapMethods = {
   },
 
   async loadFehlerHeatmap() {
-    if (!window.__app.selectedBookId) return;
+    if (!Alpine.store('nav').selectedBookId) return;
     this.fehlerHeatmapLoading = true;
     this.fehlerHeatmapStatus = '';
     try {
       const mode = MODES.includes(this.fehlerHeatmapMode) ? this.fehlerHeatmapMode : 'open';
-      const data = await fetchJson(`/history/fehler-heatmap/${window.__app.selectedBookId}?mode=${mode}`);
+      const data = await fetchJson(`/history/fehler-heatmap/${Alpine.store('nav').selectedBookId}?mode=${mode}`);
       this.fehlerHeatmapData = data;
     } catch (e) {
       console.error('[loadFehlerHeatmap]', e);
@@ -149,7 +149,7 @@ export const fehlerHeatmapMethods = {
   },
 
   async fehlerHeatmapJumpToPage(pageId) {
-    const page = (window.__app.pages || []).find(p => p.id === pageId);
+    const page = (Alpine.store('nav').pages || []).find(p => p.id === pageId);
     if (!page) return;
     window.__app.showFehlerHeatmapCard = false;
     this.activeFehlerDetailKey = null;
@@ -173,7 +173,7 @@ export const fehlerHeatmapMethods = {
       await root.openKapitelReviewForChapter(chapterId);
       return;
     }
-    const chapterNode = (root.tree || []).find(i => i.type === 'chapter' && String(i.id) === String(chapterId));
+    const chapterNode = (Alpine.store('nav').tree || []).find(i => i.type === 'chapter' && String(i.id) === String(chapterId));
     const firstPage = chapterNode?.pages?.[0];
     if (firstPage) {
       root.showFehlerHeatmapCard = false;

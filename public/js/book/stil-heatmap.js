@@ -54,9 +54,9 @@ export const stilMethods = {
     this.stilSyncing = true;
     this.stilStatus = `<span class="spinner"></span>${window.__app.t('stil.computing')}`;
     try {
-      const result = await fetchJson('/sync/book/' + window.__app.selectedBookId, { method: 'POST' });
+      const result = await fetchJson('/sync/book/' + Alpine.store('nav').selectedBookId, { method: 'POST' });
       if (result.error) throw new Error(result.error);
-      await this.loadStilStats(window.__app.selectedBookId);
+      await this.loadStilStats(Alpine.store('nav').selectedBookId);
       this.stilStatus = '';
     } catch (e) {
       this.stilStatus = window.__app.t('common.errorColon') + (e.message || '');
@@ -273,7 +273,7 @@ export const stilMethods = {
   },
 
   async stilJumpToPage(pageId) {
-    const page = (window.__app.pages || []).find(p => p.id === pageId);
+    const page = (Alpine.store('nav').pages || []).find(p => p.id === pageId);
     if (!page) return;
     window.__app.showStilCard = false;
     this.activeStilDetailKey = null;
@@ -290,7 +290,7 @@ export const stilMethods = {
       await root.openKapitelReviewForChapter(chapterKey);
       return;
     }
-    const chapterNode = (root.tree || []).find(i => i.type === 'chapter' && String(i.id) === String(chapterKey));
+    const chapterNode = (Alpine.store('nav').tree || []).find(i => i.type === 'chapter' && String(i.id) === String(chapterKey));
     const firstPage = chapterNode?.pages?.[0];
     if (firstPage) {
       root.showStilCard = false;

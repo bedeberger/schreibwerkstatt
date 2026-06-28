@@ -72,7 +72,7 @@ export function registerEditorEntitiesCard() {
       });
       // Buch-Wechsel: Szenen fuer neues Buch nachladen (Kontext-Panel zeigt
       // Szenen/Ereignisse unabhaengig vom Entity-Toggle, also auch hier laden).
-      this.$watch(() => window.__app?.selectedBookId, () => {
+      this.$watch(() => Alpine.store('nav').selectedBookId, () => {
         this._ensureSzenenLoaded();
       });
       this.$watch(() => window.__app?.currentPage?.id, () => {
@@ -91,7 +91,7 @@ export function registerEditorEntitiesCard() {
       // updatet, refetcht der Root die Setting — wir reagieren auf Recompute.
       this._onSettingsUpdated = (ev) => {
         const id = ev?.detail?.bookId;
-        if (id && String(id) !== String(window.__app?.selectedBookId)) return;
+        if (id && String(id) !== String(Alpine.store('nav').selectedBookId)) return;
         recompute();
       };
       window.addEventListener(EVT.BOOK_SETTINGS_UPDATED, this._onSettingsUpdated, { signal });
@@ -157,7 +157,7 @@ export function registerEditorEntitiesCard() {
     // sorgen, sonst bleibt die Szenen-Sektion permanent leer.
     _ensureSzenenLoaded() {
       const app = window.__app;
-      const bookId = app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId) return;
       if (Array.isArray(app.$store.catalog.szenen) && app.$store.catalog.szenen.length > 0) return;
       const tag = bookId + ':' + (app?.session?.email || '');

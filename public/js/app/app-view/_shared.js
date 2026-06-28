@@ -35,12 +35,12 @@ export async function _toggleCardGeneric(entry) {
     }
     return;
   }
-  if (entry.requiresBook && !this.selectedBookId) return;
+  if (entry.requiresBook && !this.$store.nav.selectedBookId) return;
   this._closeOtherMainCards(entry.key);
   if (entry.partial) await this._ensurePartial(entry.partial);
   this[entry.flag] = true;
   this._scrollToCardByKey(entry.key);
-  if (entry.auditEvent) this.logAuditEvent?.(entry.auditEvent, { book: this.selectedBookId });
+  if (entry.auditEvent) this.logAuditEvent?.(entry.auditEvent, { book: this.$store.nav.selectedBookId });
   if (entry.extraRefreshOnOpen) {
     window.dispatchEvent(new CustomEvent(EVT.CARD_REFRESH, { detail: { name: entry.key } }));
   }
@@ -49,7 +49,7 @@ export async function _toggleCardGeneric(entry) {
     for (const dep of entry.loadDeps) {
       const empty = !(this[dep.skipIfNonEmpty]?.length);
       if (empty && typeof this[dep.method] === 'function') {
-        tasks.push(this[dep.method](this.selectedBookId));
+        tasks.push(this[dep.method](this.$store.nav.selectedBookId));
       }
     }
     if (tasks.length) await Promise.all(tasks);

@@ -19,7 +19,7 @@ const { attachConsoleGuard } = require('../e2e/_helpers/console-guard');
 async function bootApp(page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
-    () => window.__app && Array.isArray(window.__app.books) && window.__app.books.length > 0,
+    () => window.__app && Array.isArray(window.Alpine.store('nav').books) && window.Alpine.store('nav').books.length > 0,
     null,
     { timeout: 30000 },
   );
@@ -27,11 +27,11 @@ async function bootApp(page) {
 
 // Seed-Buch auswaehlen + Seiten laden (via Hash-Deeplink → _applyHash).
 async function selectSeededBook(page) {
-  const bookId = await page.evaluate(() => window.__app.books[0].id);
+  const bookId = await page.evaluate(() => window.Alpine.store('nav').books[0].id);
   await page.evaluate((id) => { location.hash = '#book/' + id; }, bookId);
   await page.waitForFunction(
-    (id) => String(window.__app.selectedBookId) === String(id)
-            && Array.isArray(window.__app.pages) && window.__app.pages.length > 0,
+    (id) => String(window.Alpine.store('nav').selectedBookId) === String(id)
+            && Array.isArray(window.Alpine.store('nav').pages) && window.Alpine.store('nav').pages.length > 0,
     bookId,
     { timeout: 20000 },
   );
@@ -97,7 +97,7 @@ test('alle drei Editoren oeffnen ohne Konsolenfehler', async ({ page }) => {
 
   // Notebook-Editor: erste Seite selektieren (selectPage → Editor-Modus).
   let before = guard.unmatched().length;
-  await page.evaluate(async () => { await window.__app.selectPage(window.__app.pages[0]); });
+  await page.evaluate(async () => { await window.__app.selectPage(window.Alpine.store('nav').pages[0]); });
   await page.waitForTimeout(500);
   let fresh = guard.unmatched().slice(before);
   if (fresh.length) failures.push(`Notebook-Editor:\n    ${fresh.map((f) => `[${f.channel}] ${f.text}`).join('\n    ')}`);

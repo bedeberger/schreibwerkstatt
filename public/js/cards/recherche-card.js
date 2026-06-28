@@ -88,7 +88,7 @@ export function registerRechercheCard() {
           this.resetRecherche();
           this.resetResearchChat();
           this.researchChatOpen = false;
-          if (root.showRechercheCard && root.selectedBookId) this.loadRecherche();
+          if (root.showRechercheCard && Alpine.store('nav').selectedBookId) this.loadRecherche();
         },
         onViewReset: () => { this.resetRecherche(); this.resetResearchChat(); this.researchChatOpen = false; },
       });

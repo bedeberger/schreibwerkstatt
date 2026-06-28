@@ -16,6 +16,11 @@ globalThis.fetch = async (url) => {
   return { ok: true, json: async () => [] };
 };
 
+// Nav-State (tree/pages) lebt in Alpine.store('nav') (kein Root-Proxy mehr). Die
+// Tests setzen weiterhin globalThis.window.__app.{tree,pages}; dieser Shim
+// aliassiert store('nav') darauf, sodass die Methoden ihre Nav-Daten finden.
+globalThis.Alpine = { store: (n) => (n === 'nav' ? (globalThis.window?.__app || {}) : {}) };
+
 function makeCtx() {
   const ctx = {
     overviewLoading: false,

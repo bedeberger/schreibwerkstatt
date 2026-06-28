@@ -42,7 +42,7 @@ export const figurenMethods = {
   overviewFigurePresence() {
     const figs = this.overviewFiguren || [];
     const sz = this.overviewSzenen || [];
-    const tree = window.__app?.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     return this._memo('figPresence', [figs, sz, tree],
       () => this._computeFigurePresence(figs, sz));
   },

@@ -265,7 +265,7 @@
             <button type="button"
               class="book-settings-btn-danger"
               @click="resetBookHistory()"
-              :disabled="bookHistoryResetLoading || !$app.selectedBookId">
+              :disabled="bookHistoryResetLoading || !$store.nav.selectedBookId">
               <span x-show="bookHistoryResetLoading" class="spinner"></span>
               <span x-text="bookHistoryResetLoading ? $app.t('common.deleting') : $app.t('book.settings.dangerButton')"></span>
             </button>
@@ -282,7 +282,7 @@
             <button type="button"
               class="book-settings-btn-danger"
               @click="deleteBook()"
-              :disabled="bookDeleteLoading || !$app.selectedBookId">
+              :disabled="bookDeleteLoading || !$store.nav.selectedBookId">
               <span x-show="bookDeleteLoading" class="spinner"></span>
               <span x-text="bookDeleteLoading ? $app.t('common.deleting') : $app.t('book.settings.deleteBookButton')"></span>
             </button>
@@ -471,9 +471,9 @@
         <h3 class="book-settings-section-title" x-text="$app.t('publication.section.export')"></h3>
         <p class="card-form-hint" x-text="$app.t('publication.exportToolsHint')"></p>
         <div class="card-actions">
-          <button type="button" class="primary" data-label-ok :disabled="!$app.selectedBookId"
+          <button type="button" class="primary" data-label-ok :disabled="!$store.nav.selectedBookId"
                   @click="$app.togglePdfExportCard()" x-text="$app.t('book.export.pdfCustom')"></button>
-          <button type="button" class="primary" data-label-ok :disabled="!$app.selectedBookId"
+          <button type="button" class="primary" data-label-ok :disabled="!$store.nav.selectedBookId"
                   @click="$app.toggleEpubExportCard()" x-text="$app.t('book.export.epubCustom')"></button>
         </div>
       </section>

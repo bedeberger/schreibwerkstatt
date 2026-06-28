@@ -93,17 +93,17 @@ export const loadMethods = {
     if (this._staleCheckBookId === bookId) return;
     this._staleCheckBookId = bookId;
     try {
-      // Nach Buchwechsel kann app.pages noch leer sein (loadPages async).
+      // Nach Buchwechsel kann Alpine.store('nav').pages noch leer sein (loadPages async).
       // Kurz pollen, dann aufgeben.
-      for (let i = 0; i < 30 && (!app.pages || !app.pages.length); i++) {
+      for (let i = 0; i < 30 && (!Alpine.store('nav').pages || !Alpine.store('nav').pages.length); i++) {
         await new Promise(r => setTimeout(r, 100));
-        if (app.selectedBookId !== bookId) return;
+        if (Alpine.store('nav').selectedBookId !== bookId) return;
       }
-      const pages = app.pages || [];
+      const pages = Alpine.store('nav').pages || [];
       if (!pages.length) return;
       const cache = await fetchJsonRetry(`/history/page-stats/${bookId}`).catch(() => null);
       if (!cache) return;
-      if (app.selectedBookId !== bookId) return;
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       let stale = false;
       // (a) per-Seite-Diff: BookStack-pages.updated_at vs page_stats-Cache.
       for (const p of pages) {
@@ -151,7 +151,7 @@ export const loadMethods = {
       try {
         const res = await fetch(`/sync/book/${bookId}`, { method: 'POST' });
         if (!res.ok) return;
-        if (app.selectedBookId !== bookId) return;
+        if (Alpine.store('nav').selectedBookId !== bookId) return;
         // tokEsts aktualisieren — gleicher Pfad wie syncBookStats in bookstats.js,
         // damit Sidebar-Σ und Hero-Snapshot nach dem Auto-Sync sofort aktuell sind.
         // REASSIGN, nicht index-assign: book-overview-Methoden cachen via _memo
@@ -169,7 +169,7 @@ export const loadMethods = {
           }
           app.tokEsts = updated;
         } catch { /* tokEsts-Update non-critical */ }
-        if (!app.showBookOverviewCard || app.selectedBookId !== bookId) return;
+        if (!app.showBookOverviewCard || Alpine.store('nav').selectedBookId !== bookId) return;
         await this.loadBookOverview(bookId);
       } finally {
         if (this._statsSyncBookId === bookId) this._statsSyncBookId = null;
@@ -219,7 +219,7 @@ export const loadMethods = {
   // Fallback für Server-Rows, die nur `chapter_name` ohne `chapter_id`
   // liefern (Backfill-Lücken).
   _chapterRollup() {
-    const tree = window.__app?.tree || [];
+    const tree = Alpine.store('nav').tree || [];
     return this._memo('rollup', [tree], () => {
       const chs = tree.filter(i => i.type === 'chapter' && !i.solo);
       const byId = new Map(chs.map(c => [Number(c.id), c]));
@@ -253,7 +253,7 @@ export const loadMethods = {
   },
 
   // Cache hit nur wenn ALLE Source-Refs (deps) identisch zur letzten Compute.
-  // Wichtig für Tiles, die zusätzlich zu `overviewXxx` auch `app.tree`/
+  // Wichtig für Tiles, die zusätzlich zu `overviewXxx` auch `Alpine.store('nav').tree`/
   // `app.figuren` lesen — sonst wird ein Compute mit leerem `tree` (während
   // loadPages noch läuft) als `null` cached und Tile bleibt aus, obwohl
   // tree danach befüllt wird (Haupt-Source-Ref unverändert).

@@ -29,7 +29,7 @@ export const exportMethods = {
   // folder-import-Card (Modus „Schreibwerkstatt-Buch").
   async migrateExport() {
     const app = window.__app;
-    const bid = app?.selectedBookId;
+    const bid = Alpine.store('nav').selectedBookId;
     if (!bid || this.bookExportLoading) return;
     this.bookExportLoading = 'swbook';
     this.bookExportError = '';
@@ -75,7 +75,7 @@ export const exportMethods = {
     const scope = this.exportScope || 'book';
     if (scope === 'page' && this.exportPageId) return { scope: 'page', id: this.exportPageId };
     if (scope === 'chapter' && this.exportChapterId) return { scope: 'chapter', id: this.exportChapterId };
-    const bid = app.selectedBookId;
+    const bid = Alpine.store('nav').selectedBookId;
     if (bid) return { scope: 'book', id: parseInt(bid) };
     return null;
   },
@@ -90,16 +90,16 @@ export const exportMethods = {
 
   exportChapterOptions() {
     const app = window.__app;
-    if (!app || !Array.isArray(app.tree)) return [];
-    return app.tree
+    if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
+    return Alpine.store('nav').tree
       .filter(c => c.type === 'chapter' && !c.solo)
       .map(c => ({ value: c.id, label: c.name }));
   },
 
   exportPageOptions() {
     const app = window.__app;
-    if (!app || !Array.isArray(app.pages)) return [];
-    return app.pages.map(p => ({ value: p.id, label: p.name }));
+    if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
+    return Alpine.store('nav').pages.map(p => ({ value: p.id, label: p.name }));
   },
 
   _handoffToPdfCustom() {

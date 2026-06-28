@@ -4,13 +4,13 @@ import { EVT, contentRepo, fetchJson } from './_shared.js';
 export const adminMethods = {
 
   async loadBookJobStats() {
-    if (!window.__app.selectedBookId) {
+    if (!Alpine.store('nav').selectedBookId) {
       this.bookJobStats = null;
       return;
     }
     this.bookJobStatsLoading = true;
     try {
-      this.bookJobStats = await fetchJson(`/jobs/stats?book_id=${encodeURIComponent(window.__app.selectedBookId)}`);
+      this.bookJobStats = await fetchJson(`/jobs/stats?book_id=${encodeURIComponent(Alpine.store('nav').selectedBookId)}`);
     } catch (e) {
       console.error('[book-settings] Job-Statistiken laden fehlgeschlagen:', e);
       this.bookJobStats = [];
@@ -21,9 +21,9 @@ export const adminMethods = {
 
 
   async resetBookHistory() {
-    const bookId = window.__app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
-    const book = window.__app.books.find(b => String(b.id) === String(bookId));
+    const book = Alpine.store('nav').books.find(b => String(b.id) === String(bookId));
     const name = book?.name || '';
     if (!await window.__app.appConfirm({
       message: window.__app.t('userSettings.resetConfirm', { name }),
@@ -48,7 +48,7 @@ export const adminMethods = {
         reviews:   d.book_reviews || 0,
         chats:     d.chat_sessions || 0,
       });
-      if (String(window.__app.selectedBookId) === String(bookId)) {
+      if (String(Alpine.store('nav').selectedBookId) === String(bookId)) {
         window.__app.pageHistory       = [];
         window.__app.bookReviewHistory = [];
         window.dispatchEvent(new CustomEvent(EVT.CHAT_RESET));
@@ -65,9 +65,9 @@ export const adminMethods = {
 
   async deleteBook() {
     const app = window.__app;
-    const bookId = app.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) return;
-    const book = app.books.find(b => String(b.id) === String(bookId));
+    const book = Alpine.store('nav').books.find(b => String(b.id) === String(bookId));
     const name = book?.name || '';
     if (!await app.appConfirm({
       message: app.t('book.settings.deleteBookConfirm', { name }),
@@ -80,7 +80,7 @@ export const adminMethods = {
     try {
       await contentRepo.deleteBook(bookId);
       app.showBookSettingsCard = false;
-      app.selectedBookId = '';
+      Alpine.store('nav').selectedBookId = '';
       app.resetView();
       await app.loadBooks();
       app.setStatus(app.t('book.settings.deleteBookSummary', { name }), false, 5000);
@@ -103,7 +103,7 @@ export const adminMethods = {
     if (this.bookJobRuns[type]) return;
     this.bookJobRunsLoading = true;
     try {
-      const bookId = window.__app.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       const runs = await fetchJson(`/jobs/runs?book_id=${encodeURIComponent(bookId)}&type=${encodeURIComponent(type)}&limit=20`);
       this.bookJobRuns[type] = runs;
     } catch (e) {

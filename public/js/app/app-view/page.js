@@ -33,10 +33,10 @@ export const pageMethods = {
     this.showEditorCard = true;
     this.$nextTick(() => this._scrollToEditorCard());
 
-    if (typeof this._trackPageUsage === 'function' && this.selectedBookId) {
-      this._trackPageUsage(p.id, this.selectedBookId);
+    if (typeof this._trackPageUsage === 'function' && this.$store.nav.selectedBookId) {
+      this._trackPageUsage(p.id, this.$store.nav.selectedBookId);
     }
-    setLastPageId(this.currentUser?.email, this.selectedBookId, p.id);
+    setLastPageId(this.currentUser?.email, this.$store.nav.selectedBookId, p.id);
 
     this._loadPageBadgeCounts(p.id);
 
@@ -177,7 +177,7 @@ export const pageMethods = {
 
 
   // Inline-Rename des Seitentitels aus dem Editor-Card-Header. Spiegelt den
-  // neuen Namen in currentPage, root.pages und root.tree (inkl. Solo-Wrapper +
+  // neuen Namen in currentPage, Alpine.store('nav').pages und Alpine.store('nav').tree (inkl. Solo-Wrapper +
   // Sub-Kapitel) — Buchorganizer-Pfade pflegen Order-Maps, hier nicht nötig.
   async renameCurrentPage(ev) {
     const newName = (ev?.target?.value || '').trim();
@@ -190,7 +190,7 @@ export const pageMethods = {
     try {
       await contentRepo.updatePage(page.id, { name: newName });
       page.name = newName;
-      const rp = this.pages.find(p => p.id === page.id);
+      const rp = this.$store.nav.pages.find(p => p.id === page.id);
       if (rp) rp.name = newName;
       const renameInTree = (items) => {
         for (const it of items) {
@@ -203,7 +203,7 @@ export const pageMethods = {
           if (it.subchapters?.length) renameInTree(it.subchapters);
         }
       };
-      renameInTree(this.tree);
+      renameInTree(this.$store.nav.tree);
     } catch (e) {
       this.setStatus(this.t('bookOrganizer.saveFailed', { detail: e.message }));
       if (ev?.target) ev.target.value = oldName;

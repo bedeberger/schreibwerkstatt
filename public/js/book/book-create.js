@@ -100,7 +100,7 @@ export const bookCreateMethods = {
       this.bookCreateBuchtyp = '';
       this.bookCreateCategoryId = '';
       await this.loadBooks({ fresh: true });
-      this.selectedBookId = String(created.id);
+      this.$store.nav.selectedBookId = String(created.id);
       if (this.toggleBookSettingsCard) {
         if (!this.showBookSettingsCard) this.toggleBookSettingsCard();
       }

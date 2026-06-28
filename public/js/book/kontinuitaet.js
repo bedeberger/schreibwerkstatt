@@ -7,7 +7,7 @@ import { fetchJson } from '../utils.js';
 export const kontinuitaetMethods = {
   async _loadKontinuitaetHistory() {
     try {
-      const data = await fetchJson('/jobs/kontinuitaet/' + window.__app.selectedBookId);
+      const data = await fetchJson('/jobs/kontinuitaet/' + Alpine.store('nav').selectedBookId);
       this.kontinuitaetResult = data;
     } catch (e) {
       console.error('[_loadKontinuitaetHistory]', e);
@@ -22,7 +22,7 @@ export const kontinuitaetMethods = {
   kontinuitaetIssuesFiltered() {
     const root = window.__app;
     const filters = root.kontinuitaetFilters;
-    const chapters = (root.tree || []).filter(t => t.type === 'chapter');
+    const chapters = (Alpine.store('nav').tree || []).filter(t => t.type === 'chapter');
     const chapterNames = new Set(chapters.map(t => t.name));
     const fromStelle = (s) => {
       if (!s) return null;
@@ -114,7 +114,7 @@ export const kontinuitaetMethods = {
   kontinuitaetKapitelListe() {
     const root = window.__app;
     const chapterById = new Map(
-      (root.tree || []).filter(t => t.type === 'chapter').map(t => [t.id, t.name])
+      (Alpine.store('nav').tree || []).filter(t => t.type === 'chapter').map(t => [t.id, t.name])
     );
     const chapterNames = new Set(chapterById.values());
     const fromStelle = (s) => {
@@ -149,7 +149,7 @@ export const kontinuitaetMethods = {
   kontinuitaetResolveStelle(stelle, issue, side) {
     const root = window.__app;
     if (!stelle) return null;
-    const chapters = (root.tree || []).filter(t => t.type === 'chapter');
+    const chapters = (Alpine.store('nav').tree || []).filter(t => t.type === 'chapter');
     const chIds = issue?.chapter_ids || [];
     const idx = side === 'b' && chIds.length > 1 ? 1 : 0;
     const targetCh = chIds[idx] ? chapters.find(c => c.id === chIds[idx]) : null;
@@ -191,7 +191,7 @@ export const kontinuitaetMethods = {
   // (Figuren + Orte). Synchroner Endpunkt, kein KI-Job. Auf Knopfdruck.
   async nameGuardRun() {
     const root = window.__app;
-    const bookId = root.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || this.nameGuardLoading) return;
     this.nameGuardLoading = true;
     try {
@@ -219,7 +219,7 @@ export const kontinuitaetMethods = {
   // Eine Variante als gewollt akzeptieren → serverseitige Ignore-Liste + lokal entfernen.
   async nameGuardIgnore(cluster, variant) {
     const root = window.__app;
-    const bookId = root.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId || !cluster || !variant) return;
     try {
       await fetchJson('/name-guard/' + bookId + '/ignore', {

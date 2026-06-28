@@ -27,7 +27,7 @@ function _runFulltextHit(root, hit) {
   switch (hit.kind) {
     case 'page':     return root.gotoPageById?.(hit.entity_id);
     case 'chapter': {
-      const tree = root.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       const ch = tree.find(t => t.type === 'chapter' && String(t.id) === String(hit.entity_id));
       if (ch && typeof root.openKapitelReviewForChapter === 'function') {
         return root.openKapitelReviewForChapter(hit.entity_id);
@@ -36,7 +36,7 @@ function _runFulltextHit(root, hit) {
       return;
     }
     case 'book':
-      if (hit.book_id && root.selectedBookId !== hit.book_id) root.selectedBookId = hit.book_id;
+      if (hit.book_id && Alpine.store('nav').selectedBookId !== hit.book_id) Alpine.store('nav').selectedBookId = hit.book_id;
       return root.toggleBookOverviewCard?.();
     case 'figure':   return root.openFigurById?.(hit.entity_id);
     case 'location': return root.openOrtById?.(hit.entity_id);
@@ -75,7 +75,7 @@ export const PROVIDERS = [
     prefix: '#',
     sectionKey: 'palette.section.pages',
     list(root) {
-      return Array.isArray(root.pages) ? root.pages : [];
+      return Array.isArray(Alpine.store('nav').pages) ? Alpine.store('nav').pages : [];
     },
     search(root, q, _t) {
       const pages = this.list(root);
@@ -103,7 +103,7 @@ export const PROVIDERS = [
     prefix: '!',
     sectionKey: 'palette.section.chapters',
     list(root) {
-      return Array.isArray(root.tree) ? root.tree.filter(t => t.type === 'chapter' && !t.solo) : [];
+      return Array.isArray(Alpine.store('nav').tree) ? Alpine.store('nav').tree.filter(t => t.type === 'chapter' && !t.solo) : [];
     },
     search(root, q, t) {
       const chapters = this.list(root);
@@ -151,13 +151,13 @@ export const PROVIDERS = [
     // damit die Palette sie auch findet, wenn die Werkstatt-Karte nie geöffnet
     // wurde.
     prepare(root) {
-      if (root.selectedBookId && !(root.$store.catalog.figuren && root.$store.catalog.figuren.length) && typeof root.loadFiguren === 'function') {
-        _onceForBook(root.selectedBookId, 'figuren', () => root.loadFiguren(root.selectedBookId));
+      if (Alpine.store('nav').selectedBookId && !(root.$store.catalog.figuren && root.$store.catalog.figuren.length) && typeof root.loadFiguren === 'function') {
+        _onceForBook(Alpine.store('nav').selectedBookId, 'figuren', () => root.loadFiguren(Alpine.store('nav').selectedBookId));
       }
-      if (root.selectedBookId && !this.drafts(root).length) {
-        _onceForBook(root.selectedBookId, 'werkstatt-drafts', async () => {
+      if (Alpine.store('nav').selectedBookId && !this.drafts(root).length) {
+        _onceForBook(Alpine.store('nav').selectedBookId, 'werkstatt-drafts', async () => {
           try {
-            const r = await fetch(`/draft-figures/${root.selectedBookId}`, { credentials: 'same-origin' });
+            const r = await fetch(`/draft-figures/${Alpine.store('nav').selectedBookId}`, { credentials: 'same-origin' });
             if (!r.ok) return;
             const data = await r.json();
             root.werkstattDrafts = Array.isArray(data) ? data : [];
@@ -214,8 +214,8 @@ export const PROVIDERS = [
     },
     // Orte werden sonst nur beim Öffnen der Orte-Karte geladen.
     prepare(root) {
-      if (root.selectedBookId && !(root.$store.catalog.orte && root.$store.catalog.orte.length) && typeof root.loadOrte === 'function') {
-        _onceForBook(root.selectedBookId, 'orte', () => root.loadOrte(root.selectedBookId));
+      if (Alpine.store('nav').selectedBookId && !(root.$store.catalog.orte && root.$store.catalog.orte.length) && typeof root.loadOrte === 'function') {
+        _onceForBook(Alpine.store('nav').selectedBookId, 'orte', () => root.loadOrte(Alpine.store('nav').selectedBookId));
       }
     },
     search(root, q, _t) {
@@ -251,7 +251,7 @@ export const PROVIDERS = [
     prepare(root) {
       const q = (this._lastQuery || '').trim();
       if (q.length < 2) return;
-      const bookId = root.selectedBookId || '';
+      const bookId = Alpine.store('nav').selectedBookId || '';
       const cacheKey = q + '|' + bookId;
       if (this._cache && (this._cache.q + '|' + this._cache.book) === cacheKey) return;
       if (this._inflight === cacheKey) return;
@@ -274,7 +274,7 @@ export const PROVIDERS = [
       this._lastQuery = q;
       this.prepare(root);
       if (!q || q.length < 2) return [];
-      const bookId = root.selectedBookId || '';
+      const bookId = Alpine.store('nav').selectedBookId || '';
       const cacheKey = q + '|' + bookId;
       if (!this._cache || (this._cache.q + '|' + this._cache.book) !== cacheKey) return [];
       const items = this._cache.items || [];
@@ -300,8 +300,8 @@ export const PROVIDERS = [
     },
     // Szenen werden sonst nur beim Öffnen der Szenen-Karte geladen.
     prepare(root) {
-      if (root.selectedBookId && !(root.$store.catalog.szenen && root.$store.catalog.szenen.length) && typeof root.loadSzenen === 'function') {
-        _onceForBook(root.selectedBookId, 'szenen', () => root.loadSzenen(root.selectedBookId));
+      if (Alpine.store('nav').selectedBookId && !(root.$store.catalog.szenen && root.$store.catalog.szenen.length) && typeof root.loadSzenen === 'function') {
+        _onceForBook(Alpine.store('nav').selectedBookId, 'szenen', () => root.loadSzenen(Alpine.store('nav').selectedBookId));
       }
     },
     search(root, q, _t) {

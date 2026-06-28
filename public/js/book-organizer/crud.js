@@ -1,5 +1,5 @@
 // Create/Rename/Delete-Slice. Server-Calls via contentRepo + In-Place-Mirror
-// in root.tree/root.pages. History-Push pro erfolgreichem Schritt.
+// in Alpine.store('nav').tree/Alpine.store('nav').pages. History-Push pro erfolgreichem Schritt.
 import { contentRepo } from '../repo/content.js';
 import { _sortSoloFirst } from '../book/tree.js';
 import { localIsoDate } from '../utils.js';
@@ -25,9 +25,9 @@ export const crudMethods = {
       await contentRepo.updateChapter(id, { name: newName });
       const ch = this._findChapter(id)?.node;
       if (ch) ch.name = newName;
-      // In-place mirror: chapter entry in root.tree + _chapterOrderMap (nur
-      // Top-Level — Sub-Kapitel sind in root.tree noch nicht abgebildet).
-      for (const it of root.tree) {
+      // In-place mirror: chapter entry in Alpine.store('nav').tree + _chapterOrderMap (nur
+      // Top-Level — Sub-Kapitel sind in Alpine.store('nav').tree noch nicht abgebildet).
+      for (const it of Alpine.store('nav').tree) {
         if (it.type === 'chapter' && !it.solo && it.id === id) it.name = newName;
       }
       this._rebuildChapterOrderMap();
@@ -59,10 +59,10 @@ export const crudMethods = {
       await contentRepo.updatePage(id, { name: newName });
       const page = this._findPage(id);
       if (page) page.name = newName;
-      // In-place mirror: page in root.pages + ggf. solo-Tree-Entry.
-      const rp = root.pages.find(p => p.id === id);
+      // In-place mirror: page in Alpine.store('nav').pages + ggf. solo-Tree-Entry.
+      const rp = Alpine.store('nav').pages.find(p => p.id === id);
       if (rp) rp.name = newName;
-      for (const it of root.tree) {
+      for (const it of Alpine.store('nav').tree) {
         if (it.type === 'chapter' && it.solo && it.pages?.[0]?.id === id) {
           it.name = newName;
         }
@@ -89,7 +89,7 @@ export const crudMethods = {
     let createdId = null;
     const ok = await this._runMutation(async () => {
       const created = await contentRepo.createChapter({
-        book_id: parseInt(root.selectedBookId, 10),
+        book_id: parseInt(Alpine.store('nav').selectedBookId, 10),
         name,
       });
       if (!created?.id) return;
@@ -123,7 +123,7 @@ export const crudMethods = {
   async _createPageRaw({ name, chapterId }) {
     const root = window.__app;
     const body = {
-      book_id: parseInt(root.selectedBookId, 10),
+      book_id: parseInt(Alpine.store('nav').selectedBookId, 10),
       name,
       // Server (routes/content.js) defaultet HTML auf '<p></p>' wenn leer —
       // notwendig, weil sonst ein Draft angelegt wird, der nicht in GET /pages
@@ -154,8 +154,8 @@ export const crudMethods = {
       solo: false,
       pages: [],
     };
-    root.tree.push(treeEntry);
-    root.tree.sort(_sortSoloFirst);
+    Alpine.store('nav').tree.push(treeEntry);
+    Alpine.store('nav').tree.sort(_sortSoloFirst);
     this._rebuildChapterOrderMap();
     if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
   },
@@ -163,12 +163,12 @@ export const crudMethods = {
   _mirrorCreatedPage(created, chapterId) {
     const root = window.__app;
     const chapName = chapterId
-      ? root.tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId))?.name || null
+      ? Alpine.store('nav').tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId))?.name || null
       : null;
     const newPage = { ...created, chapterName: chapName };
-    root.pages.push(newPage);
+    Alpine.store('nav').pages.push(newPage);
     if (chapterId) {
-      const treeCh = root.tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId));
+      const treeCh = Alpine.store('nav').tree.find(it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId));
       if (treeCh) {
         // Reassignment statt push: Alpine-Reaktivität greift bei nested
         // Arrays nicht immer zuverlässig, wenn das Parent-Item kürzlich
@@ -178,7 +178,7 @@ export const crudMethods = {
         treeCh.open = true;
       }
     } else {
-      root.tree.push({
+      Alpine.store('nav').tree.push({
         type: 'chapter',
         id: 'solo-' + newPage.id,
         name: newPage.name,
@@ -188,7 +188,7 @@ export const crudMethods = {
         url: null,
         pages: [newPage],
       });
-      root.tree.sort(_sortSoloFirst);
+      Alpine.store('nav').tree.sort(_sortSoloFirst);
     }
     root.tokEsts[newPage.id] = { tok: 0, words: 0, chars: 0 };
     this._rebuildPageOrderMaps();
@@ -232,12 +232,12 @@ export const crudMethods = {
       await contentRepo.deleteChapter(id);
       // Cascade: Kapitel + dessen Seiten landen im Papierkorb.
       const deletedPageIds = new Set(ch.pages.map(p => p.id));
-      for (let i = root.pages.length - 1; i >= 0; i--) {
-        if (deletedPageIds.has(root.pages[i].id)) root.pages.splice(i, 1);
+      for (let i = Alpine.store('nav').pages.length - 1; i >= 0; i--) {
+        if (deletedPageIds.has(Alpine.store('nav').pages[i].id)) Alpine.store('nav').pages.splice(i, 1);
       }
-      for (let i = root.tree.length - 1; i >= 0; i--) {
-        if (root.tree[i].type === 'chapter' && !root.tree[i].solo && root.tree[i].id === id) {
-          root.tree.splice(i, 1);
+      for (let i = Alpine.store('nav').tree.length - 1; i >= 0; i--) {
+        if (Alpine.store('nav').tree[i].type === 'chapter' && !Alpine.store('nav').tree[i].solo && Alpine.store('nav').tree[i].id === id) {
+          Alpine.store('nav').tree.splice(i, 1);
         }
       }
       // Aus workTree entfernen (nested-aware).
@@ -273,14 +273,14 @@ export const crudMethods = {
     let createdId = null;
     const ok = await this._runMutation(async () => {
       const created = await contentRepo.createChapter({
-        book_id: parseInt(root.selectedBookId, 10),
+        book_id: parseInt(Alpine.store('nav').selectedBookId, 10),
         name,
         parent_chapter_id: parentChapterId,
       });
       if (!created?.id) return;
       createdId = created.id;
       this.chapterOpen = { ...this.chapterOpen, [parent.id]: true, [created.id]: true };
-      // root.tree ist flach + depth-first; ein in-place-Mirror muesste die
+      // Alpine.store('nav').tree ist flach + depth-first; ein in-place-Mirror muesste die
       // Insertion-Position rekonstruieren. Stattdessen fullReload — gleicher
       // Pfad wie _deleteChapterRaw fuer Sub-Kapitel. pages:loaded triggert
       // anschliessend _rerender via Card-Listener und befuellt workTree.
@@ -362,13 +362,13 @@ export const crudMethods = {
     const root = window.__app;
     return await this._runMutation(async () => {
       await contentRepo.deletePage(id);
-      const pi = root.pages.findIndex(p => p.id === id);
-      if (pi >= 0) root.pages.splice(pi, 1);
-      for (let i = root.tree.length - 1; i >= 0; i--) {
-        const it = root.tree[i];
+      const pi = Alpine.store('nav').pages.findIndex(p => p.id === id);
+      if (pi >= 0) Alpine.store('nav').pages.splice(pi, 1);
+      for (let i = Alpine.store('nav').tree.length - 1; i >= 0; i--) {
+        const it = Alpine.store('nav').tree[i];
         if (it.type !== 'chapter') continue;
         if (it.solo && it.pages?.[0]?.id === id) {
-          root.tree.splice(i, 1);
+          Alpine.store('nav').tree.splice(i, 1);
         } else if (!it.solo) {
           const j = it.pages.findIndex(p => p.id === id);
           if (j >= 0) it.pages.splice(j, 1);

@@ -64,7 +64,7 @@ export function createJobFeature(cfg) {
   }
 
   const startPoll = function (jobId) {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     this._startPoll({
       timerProp,
       jobId,
@@ -115,7 +115,7 @@ export function createJobFeature(cfg) {
   };
 
   const run = async function () {
-    const bookId = this.selectedBookId;
+    const bookId = this.$store.nav.selectedBookId;
     this[loading] = true;
     if (progress) this[progress] = 0;
     this[show] = true;
@@ -151,10 +151,10 @@ export function createJobFeature(cfg) {
     this._closeOtherMainCards(cfg.closeCardKey);
     this[show] = true;
     if (cfg.onOpen) await cfg.onOpen.call(this);
-    if (!this[timerProp] && !this[loading] && this.selectedBookId) {
+    if (!this[timerProp] && !this[loading] && this.$store.nav.selectedBookId) {
       try {
         const { jobId } = await fetchJson(
-          `/jobs/active?type=${activeType}&book_id=${this.selectedBookId}`
+          `/jobs/active?type=${activeType}&book_id=${this.$store.nav.selectedBookId}`
         );
         if (jobId) {
           this[loading] = true;
@@ -229,7 +229,7 @@ export const appJobsCoreMethods = {
   _onJobFinished(detail) {
     if (!detail) return;
     const isCurrentBook = detail.bookId != null
-      && String(detail.bookId) === String(this.selectedBookId);
+      && String(detail.bookId) === String(this.$store.nav.selectedBookId);
     if (detail.type === 'check' && detail.job?.status === 'done') {
       const pageId = detail.dedupId;
       const r = detail.job.result || {};
@@ -388,11 +388,11 @@ export const appJobsCoreMethods = {
     // Cross-Book-Klick: erst Buch wechseln (Reset + loadPages + Sub-Karten),
     // dann Ziel öffnen. Watcher unterdrücken, damit _maybeOpenBookOverview
     // nicht die unmittelbar folgende Ziel-Karte überlagert.
-    if (job.bookId && String(job.bookId) !== String(this.selectedBookId)) {
-      if (!this.books.some(b => String(b.id) === String(job.bookId))) return;
+    if (job.bookId && String(job.bookId) !== String(this.$store.nav.selectedBookId)) {
+      if (!this.$store.nav.books.some(b => String(b.id) === String(job.bookId))) return;
       this._applyingHash = true;
       try {
-        this.selectedBookId = String(job.bookId);
+        this.$store.nav.selectedBookId = String(job.bookId);
         this._resetBookScopedState();
         await this.loadPages();
         await this._reloadVisibleBookCards();
@@ -410,7 +410,7 @@ export const appJobsCoreMethods = {
     };
     if (job.type === 'check') {
       const pageId = job.dedupId ?? job.bookId;
-      const page = this.pages.find(p => String(p.id) === String(pageId));
+      const page = this.$store.nav.pages.find(p => String(p.id) === String(pageId));
       if (page) await this.selectPage(page);
       return;
     }
@@ -460,7 +460,7 @@ export const appJobsCoreMethods = {
     // hat per-Kapitel-Slot-State und akzeptiert N Reconnects. Probes parallel,
     // damit Tab-Reopen bei vielen Kapiteln nicht N serielle Roundtrips kostet.
     const chapterCandidates = [];
-    for (const [index, item] of (this.tree || []).entries()) {
+    for (const [index, item] of (this.$store.nav.tree || []).entries()) {
       if (item.type !== 'chapter' || item.solo) continue;
       const lsKey = `lektorat_chapter_review_job_${bookId}_${item.id}`;
       const jobIdLs = localStorage.getItem(lsKey);

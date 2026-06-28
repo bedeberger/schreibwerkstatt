@@ -96,7 +96,7 @@ export function registerFigurenCard() {
         name: 'figuren',
         showFlag: 'showFiguresCard',
         load: async (root) => {
-          await root.loadFiguren(root.selectedBookId);
+          await root.loadFiguren(Alpine.store('nav').selectedBookId);
           await this.$nextTick();
           this.renderFigurGraph();
         },
@@ -112,12 +112,12 @@ export function registerFigurenCard() {
           ctx.figurenUpdatedAt = null;
           ctx.figurenGraphKapitel = null;
           if (!root.showFiguresCard) return;
-          const bookId = root.selectedBookId;
+          const bookId = Alpine.store('nav').selectedBookId;
           if (!bookId) return;
           await root.loadFiguren(bookId);
           // Schneller Folge-Buchwechsel: Ergebnis verwerfen, der neue
           // book:changed-Handler rendert.
-          if (String(root.selectedBookId) !== String(bookId)) return;
+          if (String(Alpine.store('nav').selectedBookId) !== String(bookId)) return;
           await ctx.$nextTick();
           ctx.renderFigurGraph();
         },

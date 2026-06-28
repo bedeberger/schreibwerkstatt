@@ -249,8 +249,8 @@ export function registerDocxExportCard() {
     // Kapitel ohne Nummer (Pendant zur PDF/EPUB-Option).
     unnumberedChapterPickOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree)) return [];
-      return app.tree.filter(c => c.type === 'chapter' && !c.solo)
+      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
+      return Alpine.store('nav').tree.filter(c => c.type === 'chapter' && !c.solo)
         .map(c => ({ value: c.id, label: ((c.depth || 1) > 1 ? '— '.repeat((c.depth || 1) - 1) : '') + c.name }));
     },
     unnumberedChapterChips() {
@@ -346,19 +346,19 @@ export function registerDocxExportCard() {
     },
     exportChapterOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree)) return [];
-      return app.tree.filter(c => c.type === 'chapter' && !c.solo).map(c => ({ value: c.id, label: c.name }));
+      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
+      return Alpine.store('nav').tree.filter(c => c.type === 'chapter' && !c.solo).map(c => ({ value: c.id, label: c.name }));
     },
     selectedChapterHasSubs() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree) || !this.exportChapterId) return false;
-      const ch = app.tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
+      if (!app || !Array.isArray(Alpine.store('nav').tree) || !this.exportChapterId) return false;
+      const ch = Alpine.store('nav').tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
       return !!ch?.hasChildren;
     },
     exportPageOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.pages)) return [];
-      return app.pages.map(p => ({ value: p.id, label: p.name }));
+      if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
+      return Alpine.store('nav').pages.map(p => ({ value: p.id, label: p.name }));
     },
     _applyExportPreset({ kind, id } = {}) {
       if (kind === 'page' && id != null)    { this.exportPageId = id; this.exportScope = 'page'; }
@@ -382,7 +382,7 @@ export function registerDocxExportCard() {
       const scope = this.exportScope || 'book';
       if (scope === 'page' && this.exportPageId) return { scope: 'page', id: this.exportPageId };
       if (scope === 'chapter' && this.exportChapterId) return { scope: 'chapter', id: this.exportChapterId };
-      const bid = app.selectedBookId;
+      const bid = Alpine.store('nav').selectedBookId;
       return bid ? { scope: 'book', id: parseInt(bid) } : null;
     },
   }));

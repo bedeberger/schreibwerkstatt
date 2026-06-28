@@ -359,7 +359,7 @@
     <!-- Heute-Ring im Header: Donut links neben Avatar. Pulsiert bei aktivem
          Schreibtag, fuellt sich gegen book_settings.daily_goal_chars (per Buch).
          Klick oeffnet Meine Statistik. -->
-    <template x-if="currentUser && !isAdminOnly && selectedBookId && dailyProgressBookId == selectedBookId && !dailyProgressIsFinished">
+    <template x-if="currentUser && !isAdminOnly && $store.nav.selectedBookId && dailyProgressBookId == $store.nav.selectedBookId && !dailyProgressIsFinished">
       <button type="button"
               class="header-today-ring"
               :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached, 'header-today-ring--empty': !headerTodayRing().active }"
@@ -396,7 +396,7 @@
 
 <!-- Welcome-Empty-State: neuer User ohne Buch. Ersetzt die Buch-Auswahl, solange
      kein einziges Buch existiert. Einziger sichtbarer CTA → Buch anlegen. -->
-<div class="card card--welcome" x-show="currentUser && !isAdminOnly && booksLoaded && books.length === 0" x-cloak>
+<div class="card card--welcome" x-show="currentUser && !isAdminOnly && booksLoaded && $store.nav.books.length === 0" x-cloak>
   <div class="card-empty">
     <p class="card-empty-text" x-text="t('welcome.title')"></p>
     <p class="card-empty-hint" x-text="t('welcome.hint')"></p>
@@ -435,19 +435,19 @@
      Dropdown) statt einer separaten Filter-Zeile. Umbruch nur bei schmalem
      Viewport. -->
 <div class="card card--book-selector"
-     x-show="currentUser && showBookCard && !isAdminOnly && books.length > 0"
+     x-show="currentUser && showBookCard && !isAdminOnly && $store.nav.books.length > 0"
      x-cloak>
   <div class="book-selector-bar">
     <div class="book-selector-combo"
          x-data="combobox({ placeholder: () => t('book.chooseBook'), compact: false, footer: { label: () => t('book.create.action'), action: () => openCreateBook() } })"
-         x-modelable="value" x-model="selectedBookId"
+         x-modelable="value" x-model="$store.nav.selectedBookId"
          x-effect="options = bookComboOptions()"
          @combobox-change="resetView();"></div>
 
     <!-- Palette-Trigger (⌘K / Strg+K): breite Such-Bar, Power-User-Eintritt zu allen Features. -->
     <button type="button"
             class="palette-hero"
-            x-show="selectedBookId"
+            x-show="$store.nav.selectedBookId"
             x-cloak
             @click="openPalette()"
             :data-tip="t('palette.openHint')"

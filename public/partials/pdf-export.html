@@ -41,8 +41,8 @@
       <button type="button"
               class="primary"
               x-show="!exporting"
-              :disabled="!$app.selectedBookId || !activeProfile"
-              :data-tip="!$app.selectedBookId ? $app.t('pdfExport.export.noBookHint') : ''"
+              :disabled="!$store.nav.selectedBookId || !activeProfile"
+              :data-tip="!$store.nav.selectedBookId ? $app.t('pdfExport.export.noBookHint') : ''"
               @click="exportPdf()">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
         <span x-text="$app.t('pdfExport.export')"></span>
@@ -671,7 +671,7 @@
               <button type="button"
                       class="primary"
                       x-show="!exporting"
-                      :disabled="!coverSpecReady() || !$app.selectedBookId"
+                      :disabled="!coverSpecReady() || !$store.nav.selectedBookId"
                       :data-tip="!coverSpecReady() ? $app.t('pdfExport.cover.spineNeedsValues') : ''"
                       @click="exportPdf('cover')">
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>

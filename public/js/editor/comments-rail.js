@@ -82,7 +82,7 @@ export const editorCommentsRailMethods = {
   init() {
     this._railAbort = new AbortController();
     // Buchwechsel: State leeren + Kommentare des neuen Buchs laden.
-    this.$watch(() => window.__app?.selectedBookId, (id) => this._onBookChange(id));
+    this.$watch(() => Alpine.store('nav').selectedBookId, (id) => this._onBookChange(id));
     // Seitenwechsel: Leiste einklappen (Toggle ist pro Seite — sonst „folgt" der
     // offene Zustand auf die nächste Seite, die zufällig Kommentare hat) + neu
     // auflösen. Edit↔Read / frisch gerendertes Seiten-HTML nur neu auflösen.
@@ -104,7 +104,7 @@ export const editorCommentsRailMethods = {
       this.scheduleRecompute();
     }, { signal: this._railAbort.signal });
     // Initial laden, falls schon ein Buch offen ist.
-    const id = window.__app?.selectedBookId;
+    const id = Alpine.store('nav').selectedBookId;
     if (id) this._onBookChange(id);
   },
 

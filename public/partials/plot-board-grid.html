@@ -188,7 +188,7 @@
                   <label class="plot-edit-label" x-text="$app.t('plot.thread.bindChapter')"></label>
                   <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
                        x-modelable="value" x-model="threadDraft.chapter_id"
-                       x-effect="options = $app.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
+                       x-effect="options = $store.nav.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
                   <div class="plot-beat-edit-actions">
                     <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditThread(row.lane.thread)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
                       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>

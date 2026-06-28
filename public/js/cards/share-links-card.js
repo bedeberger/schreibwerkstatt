@@ -107,7 +107,7 @@ export function registerShareLinksCard() {
     },
 
     async loadLinks() {
-      const bookId = window.__app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId) return;
       this.loadingLinks = true;
       this.loadError = '';
@@ -148,7 +148,7 @@ export function registerShareLinksCard() {
     // so binnen ~5 s als Unread-Badge beim Owner auf.
     async _quietRefresh() {
       if (typeof document !== 'undefined' && document.hidden) return;
-      const bookId = window.__app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId) return;
       let rows;
       try {
@@ -188,7 +188,7 @@ export function registerShareLinksCard() {
     },
 
     pageOptions() {
-      const tree = window.__app?.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       const out = [];
       const walk = (items, prefix) => {
         for (const it of items) {
@@ -205,7 +205,7 @@ export function registerShareLinksCard() {
     },
 
     chapterOptions() {
-      const tree = window.__app?.tree || [];
+      const tree = Alpine.store('nav').tree || [];
       const out = [];
       const walk = (items, depth) => {
         for (const it of items) {
@@ -233,7 +233,7 @@ export function registerShareLinksCard() {
         body.chapter_id = parseInt(this.createChapterId, 10);
         if (!body.chapter_id) { this.createError = window.__app.t('share.error.chapterRequired'); return; }
       } else {
-        body.book_id = parseInt(window.__app.selectedBookId, 10);
+        body.book_id = parseInt(Alpine.store('nav').selectedBookId, 10);
         if (!body.book_id) { this.createError = window.__app.t('share.error.bookRequired'); return; }
       }
       this.creating = true;

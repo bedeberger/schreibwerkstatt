@@ -90,7 +90,7 @@
     <label class="plot-edit-label" x-text="$app.t('plot.beat.chapter')"></label>
     <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
          x-modelable="value" x-model="beatDraft.chapter_id"
-         x-effect="options = $app.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
+         x-effect="options = $store.nav.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
     <label class="plot-edit-label" x-show="$store.catalog.figuren.length" x-text="$app.t('plot.beat.figuren')"></label>
     <div x-show="$store.catalog.figuren.length"
          x-data="combobox({ placeholder: $app.t('plot.beat.figurenPick'), multiple: true })"

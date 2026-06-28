@@ -38,8 +38,8 @@
       <button type="button"
               class="primary"
               x-show="!exporting"
-              :disabled="!$app.selectedBookId"
-              :data-tip="!$app.selectedBookId ? $app.t('epubExport.export.noBookHint') : ''"
+              :disabled="!$store.nav.selectedBookId"
+              :data-tip="!$store.nav.selectedBookId ? $app.t('epubExport.export.noBookHint') : ''"
               @click="exportEpub()">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
         <span x-text="$app.t('epubExport.export')"></span>

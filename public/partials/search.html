@@ -38,7 +38,7 @@
 
     <button type="button"
       class="search-scope-toggle"
-      x-show="$app.selectedBookId"
+      x-show="$store.nav.selectedBookId"
       :class="{ 'is-active': scopeMode === 'book' }"
       @click="toggleScope()"
       x-text="scopeMode === 'book' ? $app.t('search.scope.book') : $app.t('search.scope.all')"></button>

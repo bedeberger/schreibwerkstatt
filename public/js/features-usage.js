@@ -29,7 +29,7 @@ export const featuresUsageMethods = {
       await fetch('/usage/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, book_id: this.selectedBookId || null }),
+        body: JSON.stringify({ key, book_id: this.$store.nav.selectedBookId || null }),
         credentials: 'same-origin',
       });
     } catch (e) {

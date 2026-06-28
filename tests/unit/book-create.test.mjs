@@ -33,7 +33,19 @@ function makeDialogStub() {
 function makeCtx(overrides = {}) {
   const dlg = makeDialogStub();
   const input = { focus() { this.focused = true; }, focused: false };
+  // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr): nav unter
+  // $store.nav + Aliasse fuer direkte c.selectedBookId-Zugriffe.
+  const nav = { selectedBookId: '', books: [], pages: [], tree: [] };
   const ctx = {
+    get selectedBookId() { return nav.selectedBookId; },
+    set selectedBookId(v) { nav.selectedBookId = v; },
+    get books() { return nav.books; },
+    set books(v) { nav.books = v; },
+    get pages() { return nav.pages; },
+    set pages(v) { nav.pages = v; },
+    get tree() { return nav.tree; },
+    set tree(v) { nav.tree = v; },
+    $store: { nav },
     bookCreateName: '',
     bookCreateBuchtyp: '',
     bookCreateCategoryId: '',
@@ -41,7 +53,6 @@ function makeCtx(overrides = {}) {
     bookCreateBusy: false,
     bookCreateError: '',
     uiLocale: 'de',
-    selectedBookId: '',
     showBookSettingsCard: false,
     _toggleCalls: 0,
     _loadBooksCalls: 0,

@@ -134,7 +134,7 @@ export function registerEpubExportCard() {
 
     // ── Publikations-Meta (book_publication, geteilt mit PDF + BookSettings) ──
     async loadPublication() {
-      const bookId = window.__app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId) return;
       try {
         const r = await fetch(`/publication/${bookId}`);
@@ -145,7 +145,7 @@ export function registerEpubExportCard() {
     },
 
     async savePublication() {
-      const bookId = window.__app?.selectedBookId;
+      const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId) return;
       // Nicht speichern, bevor die volle Meta geladen ist — der strikte Full-
       // Replace-Upsert (PUT /publication) wuerde den DB-Stand sonst mit leeren
@@ -240,8 +240,8 @@ export function registerEpubExportCard() {
     // Cascade-Hinweis: ein gewaehltes Top-Kapitel macht auch alle Subs unnumeriert.
     unnumberedChapterPickOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree)) return [];
-      return app.tree
+      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
+      return Alpine.store('nav').tree
         .filter(c => c.type === 'chapter' && !c.solo)
         .map(c => ({
           value: c.id,
@@ -372,21 +372,21 @@ export function registerEpubExportCard() {
     },
     exportChapterOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree)) return [];
-      return app.tree
+      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
+      return Alpine.store('nav').tree
         .filter(c => c.type === 'chapter' && !c.solo)
         .map(c => ({ value: c.id, label: c.name }));
     },
     selectedChapterHasSubs() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.tree) || !this.exportChapterId) return false;
-      const ch = app.tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
+      if (!app || !Array.isArray(Alpine.store('nav').tree) || !this.exportChapterId) return false;
+      const ch = Alpine.store('nav').tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
       return !!ch?.hasChildren;
     },
     exportPageOptions() {
       const app = window.__app;
-      if (!app || !Array.isArray(app.pages)) return [];
-      return app.pages.map(p => ({ value: p.id, label: p.name }));
+      if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
+      return Alpine.store('nav').pages.map(p => ({ value: p.id, label: p.name }));
     },
     _applyExportPreset({ kind, id } = {}) {
       if (kind === 'page' && id != null) {
@@ -417,7 +417,7 @@ export function registerEpubExportCard() {
       const scope = this.exportScope || 'book';
       if (scope === 'page' && this.exportPageId) return { scope: 'page', id: this.exportPageId };
       if (scope === 'chapter' && this.exportChapterId) return { scope: 'chapter', id: this.exportChapterId };
-      const bid = app.selectedBookId;
+      const bid = Alpine.store('nav').selectedBookId;
       return bid ? { scope: 'book', id: parseInt(bid) } : null;
     },
   }));

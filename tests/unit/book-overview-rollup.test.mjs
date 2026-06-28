@@ -7,6 +7,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bookOverviewMethods } from '../../public/js/book-overview.js';
 
+// Nav-State (tree/pages) lebt in Alpine.store('nav') (kein Root-Proxy mehr). Die
+// Tests setzen weiterhin globalThis.window.__app.{tree,pages}; dieser Shim
+// aliassiert store('nav') darauf, sodass die Methoden ihre Nav-Daten finden.
+globalThis.Alpine = { store: (n) => (n === 'nav' ? (globalThis.window?.__app || {}) : {}) };
+
 // Tree-Shape spiegelt tree.js#loadPages: flach, depth-annotiert, parent_id.
 // Buch hat:
 //   Root A (id=1, depth=1) — pages 100, 101

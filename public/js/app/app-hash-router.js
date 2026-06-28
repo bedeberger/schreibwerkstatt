@@ -33,8 +33,8 @@ export const appHashRouterMethods = {
     if (this.showAdminParseFailsCard) return '#admin/parse-fails';
     if (this.showAdminJsErrorsCard) return '#admin/js-errors';
     if (this.showAdminDevicesCard) return '#admin/devices';
-    if (!this.selectedBookId) return '';
-    const parts = ['book', this.selectedBookId];
+    if (!this.$store.nav.selectedBookId) return '';
+    const parts = ['book', this.$store.nav.selectedBookId];
     if (this.showEditorCard && this.currentPage?.id) {
       parts.push('page', String(this.currentPage.id));
     } else if (this.showFiguresCard && this.selectedFigurId) {
@@ -262,7 +262,7 @@ export const appHashRouterMethods = {
 
     if (parts[0] !== 'book' || !parts[1]) return;
     const targetBookId = parts[1];
-    if (!this.books.some(b => String(b.id) === targetBookId)) return;
+    if (!this.$store.nav.books.some(b => String(b.id) === targetBookId)) return;
 
     this._applyingHash = true;
     this._inHashApply = true;
@@ -274,18 +274,18 @@ export const appHashRouterMethods = {
       // killen → Page-Stats blieben leer) und kein zweites loadPages (Flicker).
       const isInitialApply = !this._initialApplyDone;
       this._initialApplyDone = true;
-      if (String(this.selectedBookId) !== targetBookId) {
-        this.selectedBookId = targetBookId;
+      if (String(this.$store.nav.selectedBookId) !== targetBookId) {
+        this.$store.nav.selectedBookId = targetBookId;
         this._resetBookScopedState();
         await this.loadPages({ source: 'bookSwitch' });
       } else if (isInitialApply) {
         window.dispatchEvent(new CustomEvent(EVT.BOOK_CHANGED, {
-          detail: { bookId: this.selectedBookId },
+          detail: { bookId: this.$store.nav.selectedBookId },
         }));
         // Initialer Bootstrap: _resetBookScopedState wird hier nicht gerufen,
         // also Filter-Restore explizit. View-Argumente (Figur-Kapitel etc.)
         // überschreiben Filter danach gezielt — Reihenfolge wichtig.
-        this._restoreBookPrefs?.(this.selectedBookId);
+        this._restoreBookPrefs?.(this.$store.nav.selectedBookId);
       }
 
       const view = parts[2];
@@ -299,7 +299,7 @@ export const appHashRouterMethods = {
       switch (view) {
         case 'page':
           if (arg) {
-            const page = this.pages.find(p => String(p.id) === arg);
+            const page = this.$store.nav.pages.find(p => String(p.id) === arg);
             if (page) await this.selectPage(page);
           }
           break;
@@ -467,7 +467,7 @@ export const appHashRouterMethods = {
     // Teardowns vorab abräumen.
     this._teardownHashRouting();
     const watchers = [
-      'selectedBookId', 'currentPage', 'showEditorCard',
+      'currentPage', 'showEditorCard',
       'selectedFigurId', 'selectedOrtId', 'selectedSongId', 'selectedSzeneId',
       'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showWorldFactsCard',
       'showRechercheCard',
@@ -497,6 +497,10 @@ export const appHashRouterMethods = {
       const off = this.$watch(prop, () => this._updateHash());
       if (typeof off === 'function') this._hashWatcherTeardowns.push(off);
     }
+    // selectedBookId lebt in Alpine.store('nav') (kein Root-Property mehr) →
+    // Getter-Watch statt String-Pfad, sonst feuert der Hash-Update nie.
+    const offBook = this.$watch(() => this.$store.nav.selectedBookId, () => this._updateHash());
+    if (typeof offBook === 'function') this._hashWatcherTeardowns.push(offBook);
     window.addEventListener('hashchange', () => this._applyHash(), { signal: this._abortCtrl?.signal });
   },
 
