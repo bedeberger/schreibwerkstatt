@@ -10,7 +10,7 @@
     </div>
     <div class="card-header-aside">
       <div class="card-actions card-actions--grouped">
-        <button type="button" class="icon-btn icon-btn--ghost" x-show="$app.researchChatEnabled"
+        <button type="button" class="icon-btn icon-btn--ghost" x-show="$store.config.researchChatEnabled"
                 :class="{ 'is-active': researchChatOpen }"
                 :aria-pressed="researchChatOpen"
                 @click="toggleResearchChat()"

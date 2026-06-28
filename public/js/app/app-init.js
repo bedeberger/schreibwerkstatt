@@ -173,9 +173,9 @@ export const appInitMethods = {
         // Generation stimmt → Loop-Breaker-Zähler des Update-Banners zurücksetzen.
         try { sessionStorage.removeItem('sw-update-attempts'); } catch {}
       }
-      this.languagetoolEnabled = !!cfg.languagetool?.enabled;
+      this.$store.config.languagetoolEnabled = !!cfg.languagetool?.enabled;
       if (Number.isFinite(cfg.languagetool?.debounceMs)) {
-        this.languagetoolDebounceMs = cfg.languagetool.debounceMs;
+        this.$store.config.languagetoolDebounceMs = cfg.languagetool.debounceMs;
       }
       this.$store.stt.enabled = !!cfg.stt?.enabled;
       if (cfg.stt?.vad) {
@@ -186,7 +186,7 @@ export const appInitMethods = {
         };
       }
       this.$store.tts.enabled = !!cfg.tts?.enabled;
-      this.researchChatEnabled = !!cfg.researchChat?.enabled;
+      this.$store.config.researchChatEnabled = !!cfg.researchChat?.enabled;
       if (cfg.tts?.pause) {
         const frag = Number(cfg.tts.pause.fragmentMs);
         const para = Number(cfg.tts.pause.paragraphMs);
@@ -196,7 +196,7 @@ export const appInitMethods = {
         };
       }
       if (cfg.mapTiles?.url) {
-        this.mapTiles = {
+        this.$store.config.mapTiles = {
           url: cfg.mapTiles.url,
           attribution: cfg.mapTiles.attribution || '',
         };

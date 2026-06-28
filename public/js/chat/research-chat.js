@@ -184,7 +184,7 @@ export const researchChatMethods = {
     },
     scrollElId: 'research-chat-messages',
     activeJobType: 'research-chat',
-    canOpen: (ctx) => !!ctx.$app.selectedBookId && !!ctx.$app.researchChatEnabled,
+    canOpen: (ctx) => !!ctx.$app.selectedBookId && !!ctx.$store.config.researchChatEnabled,
     sessionsUrl: (ctx) => '/chat/sessions/research/' + ctx.$app.selectedBookId,
     newSessionUrl: '/chat/session/research',
     newSessionBody: (ctx) => ({

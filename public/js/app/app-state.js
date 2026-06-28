@@ -50,7 +50,8 @@ const shellState = () => ({
   appVersion: '',
   // Read-only /config-Settings (mapTiles, languagetoolEnabled,
   // languagetoolDebounceMs, researchChatEnabled) leben in Alpine.store('config')
-  // (cards/config-store.js); der Root proxied sie unter denselben Namen (app.js).
+  // (cards/config-store.js) und werden direkt via $store.config gelesen (kein
+  // Root-Proxy).
   // STT-Diktat State lebt in Alpine.store('stt') (cards/stt-store.js) und wird
   // direkt via $store.stt / this.$store.stt gelesen (kein Root-Proxy).
   // TTS / Proof-Listening State lebt in Alpine.store('tts') (cards/tts-store.js)

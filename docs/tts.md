@@ -58,6 +58,7 @@ Reines Lesen: **keine DOM-Mutation**, kein Save-Pfad, kein `data-bid`, kein Stal
 
 - Unit: [tests/unit/tts-proof.test.mjs](../tests/unit/tts-proof.test.mjs) (Satz-Segmentierung, pure), [tests/unit/tts-config-delivery.test.js](../tests/unit/tts-config-delivery.test.js) (Secret-Leck-Schutz).
 - Integration: [tests/integration/tts-proxy.test.js](../tests/integration/tts-proxy.test.js) (disabled/no-text/forward+voice+speed/502/408, `/v1`-Strip, Secret server-seitig).
+- E2E: [tests/e2e/tts-proof.spec.js](../tests/e2e/tts-proof.spec.js) (Harness [tests/fixtures/tts-harness.html](../tests/fixtures/tts-harness.html) mit gemocktem `Audio` + `/tts/speak` + gezählten Object-URLs): Dock nur bei `$store.tts.enabled`, Start → satzweiser `::highlight`-Highlight + Fortschritt, Durchlesen-bis-Ende mit Selbst-Stop, Pause/Resume am Media-Element, Skip, Stop (Highlight + URLs aufgeräumt), leerer Text → `tts.error.empty`, 404/401 → Session-Stop, anhaltender Synthese-Fehler → genau ein `tts.error.failed`-Toast.
 
 ## Betreiber (self-hosted Backend)
 

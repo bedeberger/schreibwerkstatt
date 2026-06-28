@@ -52,9 +52,9 @@ export function setupSpellcheckDispatch(app) {
     const pid = app.currentPage?.page_id ?? app.currentPage?.id ?? null;
     return pid ? Number(pid) : null;
   }
-  function _isEnabled() { return !!app.languagetoolEnabled; }
+  function _isEnabled() { return !!app.$store.config.languagetoolEnabled; }
   function _debounceMs() {
-    const v = Number(app.languagetoolDebounceMs);
+    const v = Number(app.$store.config.languagetoolDebounceMs);
     return Number.isFinite(v) && v > 0 ? v : 1500;
   }
 
@@ -158,7 +158,7 @@ export function setupSpellcheckDispatch(app) {
     try { current?.ctl?.refresh?.(); } catch {}
   });
 
-  app.$watch('languagetoolEnabled', () => { _evaluate(); _evalForms(); });
+  app.$watch(() => app.$store.config.languagetoolEnabled, () => { _evaluate(); _evalForms(); });
   app.$watch('editMode',            _evaluate);
   app.$watch('focusActive',         _evaluate);
   app.$watch('showBookEditorCard',  _evaluate);

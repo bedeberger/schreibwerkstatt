@@ -12,7 +12,7 @@
        :class="{ 'page-content-view--fit-width': pageEditorFitWidth, 'page-content-view--show-marks': pageEditorShowMarks }"
        :style="`--editor-zoom: ${pageEditorZoom}`"
        contenteditable="true"
-       :spellcheck="!$app.languagetoolEnabled"
+       :spellcheck="!$store.config.languagetoolEnabled"
        autocorrect="off"
        autocapitalize="off"
        @input="_markEditDirty()"

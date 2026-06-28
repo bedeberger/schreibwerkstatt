@@ -61,7 +61,7 @@ export function registerUserSettingsCard() {
     },
 
     async loadDictEntries() {
-      if (!window.__app.languagetoolEnabled) { this.dictEntries = []; return; }
+      if (!this.$store.config.languagetoolEnabled) { this.dictEntries = []; return; }
       try {
         const r = await fetch('/dictionary', { credentials: 'same-origin' });
         if (!r.ok) { this.dictEntries = []; return; }

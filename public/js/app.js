@@ -93,20 +93,6 @@ document.addEventListener('alpine:init', () => {
     get tree() { return Alpine.store('nav').tree; },
     set tree(v) { Alpine.store('nav').tree = v; },
 
-    // ── Config-Proxy ─────────────────────────────────────────────────────────
-    // Read-only /config-Settings leben in Alpine.store('config') (einmalig in
-    // app-init.js aus /config gesetzt). Root exponiert sie unter denselben Namen,
-    // damit Templates ($app.languagetoolEnabled), orte-map.js (window.__app.mapTiles)
-    // und $watch('languagetoolEnabled') unverändert bleiben. Via $store.config lesbar.
-    get mapTiles() { return Alpine.store('config').mapTiles; },
-    set mapTiles(v) { Alpine.store('config').mapTiles = v; },
-    get languagetoolEnabled() { return Alpine.store('config').languagetoolEnabled; },
-    set languagetoolEnabled(v) { Alpine.store('config').languagetoolEnabled = v; },
-    get languagetoolDebounceMs() { return Alpine.store('config').languagetoolDebounceMs; },
-    set languagetoolDebounceMs(v) { Alpine.store('config').languagetoolDebounceMs = v; },
-    get researchChatEnabled() { return Alpine.store('config').researchChatEnabled; },
-    set researchChatEnabled(v) { Alpine.store('config').researchChatEnabled = v; },
-
     // ── Computed ─────────────────────────────────────────────────────────────
     // Admin-only View: Globaler Admin (global_role='admin') bekommt eine
     // reduzierte Oberfläche — keine Sidebar, keine Buchwahl, nur Admin-Tiles

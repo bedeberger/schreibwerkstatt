@@ -78,11 +78,22 @@
     const editor = document.getElementById('editor');
     const app = {
       ...sttDictationMethods,
-      sttEnabled: enabled,
-      // Schnelle Schwellen fuer den Test (sonst 800ms Stille pro Cut).
-      sttVad: { silenceMs: 150, threshold: 0.02, maxSegmentS: 30 },
-      sttRecording: false,
-      sttPending: false,
+      // STT-State lebt in Alpine.store('stt') (cards/stt-store.js); das Modul
+      // greift via this.$store.stt.* zu. Der Harness stellt einen passenden
+      // Plain-Store-Stub bereit (keine echte Alpine-Reaktivitaet noetig — die
+      // State->DOM-Spiegelung uebernimmt der setInterval unten).
+      $store: {
+        stt: {
+          enabled,
+          // Schnelle Schwellen fuer den Test (sonst 800ms Stille pro Cut).
+          vad: { silenceMs: 150, threshold: 0.02, maxSegmentS: 30 },
+          recording: false,
+          pending: false,
+          transcribing: 0,
+          busy: false,
+          caretUserSet: false,
+        },
+      },
       selectedBookId: 1,
       t: (k) => k,
       _getEditEl: () => editor,
@@ -101,11 +112,12 @@
       btn.addEventListener('click', () => app.toggleSttDictation());
       document.getElementById('toolbar').appendChild(btn);
       // State -> DOM spiegeln (Alpine-Ersatz im Harness).
+      const s = app.$store.stt;
       setInterval(() => {
-        btn.setAttribute('aria-pressed', String(app.sttRecording));
-        btn.classList.toggle('is-recording', app.sttRecording);
-        btn.classList.toggle('is-pending', app.sttPending);
-        btn.disabled = app.sttPending;
+        btn.setAttribute('aria-pressed', String(s.recording));
+        btn.classList.toggle('is-recording', s.recording);
+        btn.classList.toggle('is-pending', s.pending);
+        btn.disabled = s.pending;
       }, 30);
     }
 

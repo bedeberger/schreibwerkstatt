@@ -3,12 +3,13 @@
 // in der Root-God-State; jetzt eine schmale, benannte Store-Oberfläche.
 //
 // Anders als die Laufzeit-Stores (catalog/nav/stt/tts) ist das hier reine
-// Konfiguration. Der Root spiegelt die Felder via Getter/Setter-Proxy (app.js)
-// unter denselben Namen, sodass Templates (`$app.languagetoolEnabled`),
-// Karten (orte-map.js `window.__app.mapTiles`, research-chat.js
-// `ctx.$app.researchChatEnabled`) und `$watch('languagetoolEnabled')`
-// (editor-spellcheck/dispatch.js) unverändert funktionieren. Keine gemeinsame
-// Präfix-Kürzung — die Keys tragen ihre Domäne selbst (1:1-Proxy wie nav).
+// Konfiguration. Konsumenten greifen direkt zu (kein Root-Proxy): Templates via
+// `$store.config.languagetoolEnabled`, Karten via `this.$store.config.mapTiles`
+// (orte-map.js) bzw. `ctx.$store.config.researchChatEnabled` (research-chat.js),
+// app-init.js setzt beim Boot `this.$store.config.*`, der Spellcheck-Dispatcher
+// watcht `() => app.$store.config.languagetoolEnabled` (Getter-Watch statt
+// String-Pfad). Keine gemeinsame Präfix-Kürzung — die Keys tragen ihre Domäne
+// selbst.
 //
 // Feld-Bedeutung:
 //   mapTiles — Tile-Server der Orte-Karte (/config → app_settings geocode.tiles.*).

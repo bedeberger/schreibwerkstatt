@@ -165,7 +165,7 @@
             <div class="book-editor-page-body"
                  :data-book-editor-page="block.pageId"
                  :contenteditable="activePageId === block.pageId"
-                 :spellcheck="!$app.languagetoolEnabled"
+                 :spellcheck="!$store.config.languagetoolEnabled"
                  x-init="_mountBlockEl($el, block)"
                  x-effect="_maybeRehydrate($el, block)"
                  @mousedown="_onBlockMousedown(block, $event)"

@@ -39,7 +39,7 @@ async function placeCaretStart(page, userSet) {
     const sel = document.getSelection();
     sel.removeAllRanges();
     sel.addRange(r);
-    window.__sttApp.sttCaretUserSet = !!flag;
+    window.__sttApp.$store.stt.caretUserSet = !!flag;
   }, userSet);
 }
 
@@ -47,7 +47,7 @@ async function placeCaretStart(page, userSet) {
 // eingefuegte Transkript warten.
 async function dictateOneSegment(page) {
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
   await page.evaluate(() => { window.__voice = true; });
   await page.waitForTimeout(300);
   await page.evaluate(() => { window.__voice = false; });
@@ -80,7 +80,7 @@ test('Lange Sprechpause -> zweites Segment wird neuer Absatz', async ({ page }) 
   await ready(page, HARNESS + '?enabled=true');
   // Harness-VAD: silenceMs=150 -> Absatzschwelle = 150*2.5 = 375ms Gesamtpause.
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
 
   // Segment 1: sprechen -> Stille (Silence-Cut).
   await page.evaluate(() => { window.__voice = true; });
@@ -115,7 +115,7 @@ test('VAD-Segment fuegt Transkript am Cursor ein + triggert Autosave', async ({ 
   await placeCaret(page);
 
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
   await expect(page.locator('#stt-mic')).toHaveAttribute('aria-pressed', 'true');
 
   // Sprechen simulieren, dann Stille -> VAD schneidet das Segment.
@@ -136,10 +136,10 @@ test('Stop gibt Mikrofon frei (kein Leak)', async ({ page }) => {
   await ready(page);
   await placeCaret(page);
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
 
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === false);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === false);
   const stopped = await page.evaluate(() => window.__micStopped);
   expect(stopped).toBeGreaterThan(0);
   await expect(page.locator('#stt-mic')).toHaveAttribute('aria-pressed', 'false');
@@ -160,7 +160,7 @@ test('Segmente werden in Sprechreihenfolge eingefuegt, auch wenn Transkripte out
   await ready(page, HARNESS + '?enabled=true');
   await placeCaret(page);
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
 
   // Segment 1: sprechen -> Stille (Silence-Cut, langsame Antwort).
   await page.evaluate(() => { window.__voice = true; });
@@ -197,7 +197,7 @@ test('Nach Stop wird kein noch laufendes Transkript mehr eingefuegt', async ({ p
 
   const reqSent = page.waitForRequest('**/stt/transcribe*');
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
   // Ein Segment senden (Silence-Cut), dann sofort stoppen — vor der Antwort.
   await page.evaluate(() => { window.__voice = true; });
   await page.waitForTimeout(250);
@@ -205,7 +205,7 @@ test('Nach Stop wird kein noch laufendes Transkript mehr eingefuegt', async ({ p
   await page.waitForTimeout(250);
   await reqSent; // Request ist raus, Antwort noch unterwegs
   await page.locator('#stt-mic').click(); // STOP
-  await page.waitForFunction(() => window.__sttApp.sttRecording === false);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === false);
 
   // Antwort kaeme jetzt — abwarten und sicherstellen, dass NICHTS eingefuegt wurde.
   await page.waitForTimeout(900);
@@ -217,7 +217,7 @@ test('Nach Stop wird kein noch laufendes Transkript mehr eingefuegt', async ({ p
 test('getUserMedia bekommt Mono + DSP-Constraints', async ({ page }) => {
   await ready(page, HARNESS + '?enabled=true');
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
   const c = await page.evaluate(() => window.__lastConstraints);
   expect(c.audio.channelCount).toBe(1);
   expect(c.audio.noiseSuppression).toBe(true);
@@ -234,7 +234,7 @@ test('Kaputter 200-Body -> Fehler-Toast statt stiller Drop', async ({ page }) =>
   await placeCaret(page);
   const before = await page.evaluate(() => document.getElementById('editor').textContent);
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
   await page.evaluate(() => { window.__voice = true; });
   await page.waitForTimeout(250);
   await page.evaluate(() => { window.__voice = false; });
@@ -252,13 +252,13 @@ test('401 (Session abgelaufen) -> Aufnahme stoppt, kein Fehler-Toast', async ({ 
   await ready(page, HARNESS + '?enabled=true');
   await placeCaret(page);
   await page.locator('#stt-mic').click();
-  await page.waitForFunction(() => window.__sttApp.sttRecording === true);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === true);
   await page.evaluate(() => { window.__voice = true; });
   await page.waitForTimeout(250);
   await page.evaluate(() => { window.__voice = false; });
 
   // 401 -> _sttStop -> Aufnahme aus; kein Fehler-Toast (Session-Banner kaeme global).
-  await page.waitForFunction(() => window.__sttApp.sttRecording === false);
+  await page.waitForFunction(() => window.__sttApp.$store.stt.recording === false);
   const toasts = await page.evaluate(() => window.__toasts.map((t) => t.message));
   expect(toasts).not.toContain('stt.error.failed');
 });
@@ -271,5 +271,5 @@ test('Mic-Permission verweigert -> i18n-Fehler, kein Crash', async ({ page, cons
   const toast = await page.evaluate(() => window.__toasts[0]);
   expect(toast.message).toBe('stt.error.permission');
   // Recording wurde nicht gestartet.
-  expect(await page.evaluate(() => window.__sttApp.sttRecording)).toBe(false);
+  expect(await page.evaluate(() => window.__sttApp.$store.stt.recording)).toBe(false);
 });
