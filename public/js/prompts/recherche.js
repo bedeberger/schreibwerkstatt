@@ -89,20 +89,30 @@ export const RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION =
   + 'Fasse JETZT aus dem bereits Gesammelten die bestmögliche Antwort zusammen und liefere sie über das Werkzeug `final_answer`. '
   + 'Wenn etwas offen blieb, weise kurz darauf hin. Sprache der Antwort: die der Userfrage.';
 
-export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolIter = 6) {
+export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolIter = 6, figures = [], locations = []) {
+  // Figuren + Schauplätze werden vorgeladen (kompakte Liste), damit das Modell
+  // schon bei der ERSTEN Web-Suche den Welt-Kontext in den Suchbegriff
+  // einarbeiten kann — ohne erst eine list_book_entities-Runde zu verbrauchen.
+  // Szenen/Beats/Stränge bleiben on-demand über list_book_entities.
+  const entityBlock = (label, arr) => arr.length
+    ? `\n${label}:\n` + arr.map(e => `- ${e.name}${e.kontext ? ` — ${e.kontext}` : ''}`).join('\n') + '\n'
+    : '';
+  const worldBlock = entityBlock('Figuren des Buchs (Kontext — nutze sie, um gezielt FÜR die Geschichte zu recherchieren)', figures)
+    + entityBlock('Schauplätze des Buchs (Kontext)', locations);
   return [
     'Du bist ein Recherche-Assistent für ein Buchprojekt. Du hilfst dem Autor / der Autorin, Hintergrund-, Sach- und Weltaufbau-Material zu recherchieren, einzuordnen und zu sammeln — neben dem Manuskript, NICHT darin.',
     '',
     `Buch: «${bookName}» — das Recherche-Archiv enthält aktuell ${itemCount} Einträge (Notizen, Links, Zitate, Faktensplitter, hochgeladene PDFs).`,
-    '',
+    worldBlock,
     'Deine Werkzeuge:',
     '- `web_search` — durchsucht das offene Web in Echtzeit. Nutze es für aktuelle, externe oder überprüfbare Fakten (historisches, geografisches, technisches, kulturelles Hintergrundwissen). Gib in der Antwort die Quelle/URL an, auf die du dich stützt.',
     '- `list_research_items` / `read_research_item` — durchsuche und lies das vorhandene Recherche-Material des Autors (inkl. PDF-Volltext). Prüfe es, bevor du etwas Neues recherchierst — vieles ist evtl. schon gesammelt.',
-    '- `list_book_entities` — Figuren, Schauplätze, Szenen und Plot-Abschnitte des Buchs, damit du gezielt FÜR die Geschichte recherchieren kannst.',
+    '- `list_book_entities` — Szenen, Plot-Abschnitte und Handlungsstränge des Buchs (sowie die oben gelisteten Figuren und Schauplätze in voller Tiefe), damit du gezielt FÜR die Geschichte recherchieren kannst.',
     '- `propose_research_item` — schlage ein konkretes Fundstück als neuen Recherche-Eintrag vor (Notiz/Link/Zitat/Fakt). Es wird NICHT automatisch gespeichert — der User bestätigt jeden Vorschlag selbst. Nutze dies großzügig, wenn du Brauchbares findest: knackiger Titel, präziser Inhalt, bei Web-Quellen die URL als Quelle.',
     '- `final_answer` — Pflicht-Endpunkt: jede Antwort an den User MUSS hierüber laufen.',
     '',
     'Arbeitsweise:',
+    '- Nennt die Userfrage eine Figur oder einen Schauplatz, ziehe deren oben gelisteten Kontext heran und arbeite ihn in deine Web-Suche ein.',
     '- Recherchiere, bevor du behauptest. Bei Faktenfragen lieber kurz `web_search`, statt aus dem Gedächtnis zu antworten — und nenne die Quelle.',
     '- Bündle unabhängige Werkzeug-Aufrufe in EINER Runde (mehrere Suchen / Lese-Calls parallel), statt seriell.',
     `- Maximal ${maxToolIter} Werkzeug-Iterationen pro Antwort (eine Iteration = eine Runde, nicht ein Call). Geh effizient damit um.`,

@@ -13,7 +13,7 @@
 const { db } = require('../../db/schema');
 const { resolveProvider } = require('../../lib/ai');
 const { getPrompts, getBookPrompts, i18nError } = require('./shared');
-const { executeResearchTool } = require('./research-chat-tools');
+const { executeResearchTool, entityList } = require('./research-chat-tools');
 const { makeAgenticChatJob, stripTrailingEmptyJson } = require('./agentic-chat');
 const appSettings = require('../../lib/app-settings');
 
@@ -44,7 +44,13 @@ const runResearchChatJob = makeAgenticChatJob({
     const itemCount = db.prepare('SELECT COUNT(*) AS n FROM research_items WHERE book_id = ? AND archived = 0').get(session.book_id)?.n || 0;
     const { SYSTEM_BOOK_CHAT } = await getBookPrompts(session.book_id, userEmail);
     const maxToolIter = _maxToolIter();
-    const baseSystemPrompt = buildResearchChatAgentSystemPrompt(session.book_name || '', itemCount, maxToolIter);
+    // Figuren + Schauplätze vorladen, damit das Modell den Welt-Kontext schon in
+    // der ersten Web-Suche nutzen kann (ohne list_book_entities-Runde). Gleiche
+    // Quelle wie das Tool → kein Drift.
+    const entityCtx = { bookId: session.book_id, userEmail };
+    const figures = entityList('figur', entityCtx);
+    const locations = entityList('ort', entityCtx);
+    const baseSystemPrompt = buildResearchChatAgentSystemPrompt(session.book_name || '', itemCount, maxToolIter, figures, locations);
     // Per-Buch-Override (Buchtyp/Autoren-Freitext) als zusätzlichen Kontext anhängen.
     const systemPrompt = SYSTEM_BOOK_CHAT ? `${baseSystemPrompt}\n\n${SYSTEM_BOOK_CHAT}` : baseSystemPrompt;
 

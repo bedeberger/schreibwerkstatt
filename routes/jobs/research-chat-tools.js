@@ -198,4 +198,4 @@ async function executeResearchTool(name, input, ctx) {
   return _truncateResult(result);
 }
 
-module.exports = { executeResearchTool, TOOLS };
+module.exports = { executeResearchTool, TOOLS, entityList: _entityList };
