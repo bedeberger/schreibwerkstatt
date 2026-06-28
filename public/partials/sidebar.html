@@ -123,10 +123,10 @@
       <div x-show="item.solo || item.open" class="tree-chapter-pages">
         <template x-for="page in item.pages" :key="page.id">
           <div class="page-item"
-               :class="{ selected: currentPage?.id === page.id, 'page-item--empty': tokEsts[page.id] && tokEsts[page.id].words === 0, 'page-item--kb-active': _pageSearchActiveId === page.id, 'page-item--remote-edit': recentRemoteEdits.has(page.id) }"
+               :class="{ selected: currentPage?.id === page.id, 'page-item--empty': tokEsts[page.id] && tokEsts[page.id].words === 0, 'page-item--kb-active': _pageSearchActiveId === page.id, 'page-item--remote-edit': $store.collab.recentRemoteEdits.has(page.id) }"
                :data-page-id="page.id" role="button" tabindex="0"
                :aria-current="currentPage?.id === page.id ? 'page' : null"
-               :data-tip="recentRemoteEdits.has(page.id) ? t('collab.tree.remoteEditTip') : null"
+               :data-tip="$store.collab.recentRemoteEdits.has(page.id) ? t('collab.tree.remoteEditTip') : null"
                @click="selectPage(page); _clearRemoteEditMark(page.id)"
                @contextmenu="_openPagetreeContextMenu($event, { kind: 'page', id: page.id, name: page.name })">
             <span class="page-name">

@@ -46,14 +46,14 @@ export const appCollabMethods = {
   // Voller 5s-Collab-Poll (changes + page-presence). Startet, sobald eine zweite
   // Partei am Buch ist: anderer ACL-User ODER eigenes Zweit-Geraet. Idempotent.
   _ensureFullCollabPoll(bookId) {
-    if (this._collabPollTimer) return;
+    if (this.$store.collab._collabPollTimer) return;
     if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
     // Erster Tick holt sich den Server-Stempel als Baseline — sonst wuerden
     // historische Edits beim Buchwechsel als „neu" gemeldet.
-    this._collabSince = null;
+    this.$store.collab._collabSince = null;
     const tick = () => this._collabPollOnce(bookId);
     tick();
-    this._collabPollTimer = setInterval(tick, COLLAB_POLL_MS);
+    this.$store.collab._collabPollTimer = setInterval(tick, COLLAB_POLL_MS);
   },
 
   // Stoppt NUR den Poll + poll-abgeleiteten State. Der Presence-Heartbeat gehoert
@@ -62,14 +62,14 @@ export const appCollabMethods = {
   // koennte ein drittes Geraet nicht mehr erreichen. Echtes Teardown
   // (`_stopCollabPoll`) raeumt den Heartbeat separat ab.
   _stopFullCollabPoll() {
-    if (this._collabPollTimer) {
-      clearInterval(this._collabPollTimer);
-      this._collabPollTimer = null;
+    if (this.$store.collab._collabPollTimer) {
+      clearInterval(this.$store.collab._collabPollTimer);
+      this.$store.collab._collabPollTimer = null;
     }
-    this._collabSince = null;
-    this.recentRemoteEdits = new Set();
-    this.livePresenceByPage = {};
-    this.foreignEditLock = null;
+    this.$store.collab._collabSince = null;
+    this.$store.collab.recentRemoteEdits = new Set();
+    this.$store.collab.livePresenceByPage = {};
+    this.$store.collab.foreignEditLock = null;
     this._dismissCollabToast();
   },
 
@@ -77,21 +77,21 @@ export const appCollabMethods = {
   _startBookDevicePing(bookId) {
     this._stopBookDevicePing();
     if (!bookId) return;
-    this._bookDevicePingBookId = String(bookId);
+    this.$store.collab._bookDevicePingBookId = String(bookId);
     const tick = () => this._sendBookDevicePing(bookId);
     tick();
-    this._bookDevicePingTimer = setInterval(tick, BOOK_DEVICE_PING_MS);
+    this.$store.collab._bookDevicePingTimer = setInterval(tick, BOOK_DEVICE_PING_MS);
   },
 
   _stopBookDevicePing() {
-    if (this._bookDevicePingTimer) {
-      clearInterval(this._bookDevicePingTimer);
-      this._bookDevicePingTimer = null;
+    if (this.$store.collab._bookDevicePingTimer) {
+      clearInterval(this.$store.collab._bookDevicePingTimer);
+      this.$store.collab._bookDevicePingTimer = null;
     }
-    const bid = this._bookDevicePingBookId;
-    this._bookDevicePingBookId = null;
-    this._selfPageDeviceCount = 0;
-    this._selfBookDeviceCount = 0;
+    const bid = this.$store.collab._bookDevicePingBookId;
+    this.$store.collab._bookDevicePingBookId = null;
+    this.$store.collab._selfPageDeviceCount = 0;
+    this.$store.collab._selfBookDeviceCount = 0;
     if (bid) this._sendBookDeviceLeave(bid);
   },
 
@@ -108,15 +108,15 @@ export const appCollabMethods = {
       if (!r.ok) return;
       data = await r.json();
     } catch { return; }
-    this._selfPageDeviceCount = Number(data?.self_page_device_count) || 0;
-    this._selfBookDeviceCount = Number(data?.self_book_device_count) || 0;
+    this.$store.collab._selfPageDeviceCount = Number(data?.self_page_device_count) || 0;
+    this.$store.collab._selfBookDeviceCount = Number(data?.self_book_device_count) || 0;
     this._reconcileFullCollabPoll(bookId);
   },
 
   // Beim Seitenwechsel sofort neu pingen, damit die page-scoped Erkennung nicht
   // bis zum naechsten 40s-Tick wartet. Aufrufer: Seitenwechsel + Edit-Eintritt.
   _pingDevicePresenceNow() {
-    const bid = this._bookDevicePingBookId;
+    const bid = this.$store.collab._bookDevicePingBookId;
     if (bid) this._sendBookDevicePing(bid);
   },
 
@@ -129,8 +129,8 @@ export const appCollabMethods = {
     if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
     const id = String(bookId);
     const needFull = this.bookSharedFlags[id] === true
-      || this._selfBookDeviceCount > 1
-      || (this.currentPage?.id && this._selfPageDeviceCount > 1);
+      || this.$store.collab._selfBookDeviceCount > 1
+      || (this.currentPage?.id && this.$store.collab._selfPageDeviceCount > 1);
     if (needFull) this._ensureFullCollabPoll(id);
     else this._stopFullCollabPoll();
   },
@@ -155,16 +155,16 @@ export const appCollabMethods = {
   // verschwindet daraus). Re-Entry-Guard, weil changes+presence parallel feuern.
   _handleBookAccessLost(bookId) {
     if (!bookId || String(bookId) !== String(this.selectedBookId)) return;
-    if (this._bookAccessLostFor === String(bookId)) return;
-    this._bookAccessLostFor = String(bookId);
+    if (this.$store.collab._bookAccessLostFor === String(bookId)) return;
+    this.$store.collab._bookAccessLostFor = String(bookId);
     this._stopCollabPoll();
-    if (this._lockHeartbeatTimer) { clearInterval(this._lockHeartbeatTimer); this._lockHeartbeatTimer = null; }
-    this._currentEditLock = null;
+    if (this.$store.collab._lockHeartbeatTimer) { clearInterval(this.$store.collab._lockHeartbeatTimer); this.$store.collab._lockHeartbeatTimer = null; }
+    this.$store.collab._currentEditLock = null;
     this.selectedBookId = '';
     this.resetView();
     this.loadBooks?.();
     this.setStatus(this.t('collab.bookAccessLost'), false, 6000);
-    this._bookAccessLostFor = null;
+    this.$store.collab._bookAccessLostFor = null;
   },
 
   async _collabPollOnce(bookId) {
@@ -178,9 +178,9 @@ export const appCollabMethods = {
     // Stale-Cleanup fuer foreignEditLock: Wenn der gespeicherte fremde Lock
     // laut expires_at abgelaufen ist, null'en — Server-Cron purged nur 1x/Tag
     // und wir wollen das Banner nicht 24h zu lang stehen lassen.
-    if (this.foreignEditLock?.expires_at) {
-      const exp = Date.parse(this.foreignEditLock.expires_at);
-      if (Number.isFinite(exp) && exp < Date.now()) this.foreignEditLock = null;
+    if (this.$store.collab.foreignEditLock?.expires_at) {
+      const exp = Date.parse(this.$store.collab.foreignEditLock.expires_at);
+      if (Number.isFinite(exp) && exp < Date.now()) this.$store.collab.foreignEditLock = null;
     }
   },
 
@@ -188,7 +188,7 @@ export const appCollabMethods = {
     // device_id: macht den Feed geraete-bewusst — der Server filtert nur den Echo
     // DIESES Browsers aus, eigene Edits anderer Geraete (Mac-Client) bleiben.
     const params = new URLSearchParams({ device_id: getDeviceId() });
-    if (this._collabSince) params.set('since', this._collabSince);
+    if (this.$store.collab._collabSince) params.set('since', this.$store.collab._collabSince);
     const url = '/content/books/' + bookId + '/changes?' + params.toString();
     let data;
     try {
@@ -201,7 +201,7 @@ export const appCollabMethods = {
 
     // Server-„now"-Stempel als Baseline fuer den naechsten Tick. Server-Uhr,
     // nicht Client-Uhr — Clock-Skew vermeiden.
-    if (data.now) this._collabSince = data.now;
+    if (data.now) this.$store.collab._collabSince = data.now;
 
     const changes = Array.isArray(data.changes) ? data.changes : [];
     if (changes.length === 0) return;
@@ -232,7 +232,7 @@ export const appCollabMethods = {
         last_ping_at: p.last_ping_at,
       });
     }
-    this.livePresenceByPage = map;
+    this.$store.collab.livePresenceByPage = map;
   },
 
   _applyCollabChanges(changes) {
@@ -243,12 +243,12 @@ export const appCollabMethods = {
       if (this.currentPage?.id && ch.page_id === this.currentPage.id) {
         touchedCurrent = ch;
       } else {
-        this.recentRemoteEdits.add(ch.page_id);
+        this.$store.collab.recentRemoteEdits.add(ch.page_id);
         others.push(ch);
       }
     }
     // Set-Mutation: neue Reference triggert Alpine-Reaktivitaet.
-    this.recentRemoteEdits = new Set(this.recentRemoteEdits);
+    this.$store.collab.recentRemoteEdits = new Set(this.$store.collab.recentRemoteEdits);
 
     if (touchedCurrent) this._onCurrentPageRemoteEdit(touchedCurrent);
     if (others.length === 1) {
@@ -288,26 +288,26 @@ export const appCollabMethods = {
 
   _showCollabToast(payload) {
     this._dismissCollabToast();
-    this.collabToast = payload;
-    this._collabToastTimer = setTimeout(() => {
-      this.collabToast = null;
-      this._collabToastTimer = null;
+    this.$store.collab.collabToast = payload;
+    this.$store.collab._collabToastTimer = setTimeout(() => {
+      this.$store.collab.collabToast = null;
+      this.$store.collab._collabToastTimer = null;
     }, 7000);
   },
 
   _dismissCollabToast() {
-    if (this._collabToastTimer) {
-      clearTimeout(this._collabToastTimer);
-      this._collabToastTimer = null;
+    if (this.$store.collab._collabToastTimer) {
+      clearTimeout(this.$store.collab._collabToastTimer);
+      this.$store.collab._collabToastTimer = null;
     }
-    this.collabToast = null;
+    this.$store.collab.collabToast = null;
   },
 
   // Beim Klick auf eine im Tree markierte Seite → Marker droppen.
   _clearRemoteEditMark(pageId) {
-    if (!pageId || !this.recentRemoteEdits.has(pageId)) return;
-    this.recentRemoteEdits.delete(pageId);
-    this.recentRemoteEdits = new Set(this.recentRemoteEdits);
+    if (!pageId || !this.$store.collab.recentRemoteEdits.has(pageId)) return;
+    this.$store.collab.recentRemoteEdits.delete(pageId);
+    this.$store.collab.recentRemoteEdits = new Set(this.$store.collab.recentRemoteEdits);
   },
 
   // Liefert das Presence-Array fuer eine Seite. Eigene aktuelle Session ist
@@ -315,7 +315,7 @@ export const appCollabMethods = {
   // `is_self: true`. [] wenn niemand.
   presenceFor(pageId) {
     if (!pageId) return [];
-    return this.livePresenceByPage[String(pageId)] || [];
+    return this.$store.collab.livePresenceByPage[String(pageId)] || [];
   },
 
   // ── Eigener Heartbeat ──────────────────────────────────────────────────
@@ -329,28 +329,28 @@ export const appCollabMethods = {
     // so liegt die page_presence-Row sofort vor, wenn ein Zweit-Geraet das Buch
     // oeffnet und seinen vollen Poll startet. Gegated ist nur der teure 5s-Poll,
     // nicht dieser Heartbeat.
-    if (this._presencePingPageId && this._presencePingPageId !== pageId) {
-      this._sendPresenceLeave(this._presencePingPageId);
+    if (this.$store.collab._presencePingPageId && this.$store.collab._presencePingPageId !== pageId) {
+      this._sendPresenceLeave(this.$store.collab._presencePingPageId);
     }
-    this._presencePingPageId = pageId;
+    this.$store.collab._presencePingPageId = pageId;
     this._sendPresencePing(pageId);
     // Sofort die page-scoped Erkennung anstossen: meldet diese Seite ans
     // book_presence und holt den aktuellen Geraete-Zaehler — so erscheint das
     // Self-Banner gleich bei Edit-Eintritt, nicht erst nach dem 40s-Tick.
     this._pingDevicePresenceNow();
-    if (this._presencePingTimer) clearInterval(this._presencePingTimer);
-    this._presencePingTimer = setInterval(() => {
-      if (this._presencePingPageId) this._sendPresencePing(this._presencePingPageId);
+    if (this.$store.collab._presencePingTimer) clearInterval(this.$store.collab._presencePingTimer);
+    this.$store.collab._presencePingTimer = setInterval(() => {
+      if (this.$store.collab._presencePingPageId) this._sendPresencePing(this.$store.collab._presencePingPageId);
     }, 30 * 1000);
   },
 
   _stopPresenceHeartbeat() {
-    if (this._presencePingTimer) {
-      clearInterval(this._presencePingTimer);
-      this._presencePingTimer = null;
+    if (this.$store.collab._presencePingTimer) {
+      clearInterval(this.$store.collab._presencePingTimer);
+      this.$store.collab._presencePingTimer = null;
     }
-    const pid = this._presencePingPageId;
-    this._presencePingPageId = null;
+    const pid = this.$store.collab._presencePingPageId;
+    this.$store.collab._presencePingPageId = null;
     if (pid) this._sendPresenceLeave(pid);
   },
 
@@ -396,7 +396,7 @@ export const appCollabMethods = {
       });
       if (r.status === 423) {
         const body = await r.json().catch(() => ({}));
-        this.foreignEditLock = {
+        this.$store.collab.foreignEditLock = {
           user_email: body.locked_by_email || null,
           user_display_name: this.userDisplayName?.(body.locked_by_email) || body.locked_by_email,
           expires_at: body.expires_at || null,
@@ -406,18 +406,18 @@ export const appCollabMethods = {
       }
       if (!r.ok) return null;
       const data = await r.json();
-      this._currentEditLock = data?.lock || null;
-      this.foreignEditLock = null;
+      this.$store.collab._currentEditLock = data?.lock || null;
+      this.$store.collab.foreignEditLock = null;
       this._startLockHeartbeat(pageId);
-      return this._currentEditLock;
+      return this.$store.collab._currentEditLock;
     } catch { return null; }
   },
 
   _startLockHeartbeat(pageId) {
-    if (this._lockHeartbeatTimer) clearInterval(this._lockHeartbeatTimer);
+    if (this.$store.collab._lockHeartbeatTimer) clearInterval(this.$store.collab._lockHeartbeatTimer);
     // 5min-Tick — Server-TTL ist 30min, doppelt-sicher gegen verlorene Pings.
-    this._lockHeartbeatTimer = setInterval(() => {
-      if (!this._currentEditLock || !pageId) return;
+    this.$store.collab._lockHeartbeatTimer = setInterval(() => {
+      if (!this.$store.collab._currentEditLock || !pageId) return;
       this._sendLockHeartbeat(pageId);
     }, 5 * 60 * 1000);
   },
@@ -428,29 +428,29 @@ export const appCollabMethods = {
       if (r.status === 423) {
         // Anderer User hat in der Zwischenzeit (Hard-Pfad: 'lektorat') uebernommen.
         const body = await r.json().catch(() => ({}));
-        this.foreignEditLock = {
+        this.$store.collab.foreignEditLock = {
           user_email: body.locked_by_email || null,
           user_display_name: this.userDisplayName?.(body.locked_by_email) || body.locked_by_email,
           expires_at: body.expires_at || null,
           reason: body.reason || 'lektorat',
         };
-        this._currentEditLock = null;
-        if (this._lockHeartbeatTimer) clearInterval(this._lockHeartbeatTimer);
-        this._lockHeartbeatTimer = null;
+        this.$store.collab._currentEditLock = null;
+        if (this.$store.collab._lockHeartbeatTimer) clearInterval(this.$store.collab._lockHeartbeatTimer);
+        this.$store.collab._lockHeartbeatTimer = null;
         return;
       }
       if (!r.ok) return;
       const data = await r.json();
-      this._currentEditLock = data?.lock || this._currentEditLock;
+      this.$store.collab._currentEditLock = data?.lock || this.$store.collab._currentEditLock;
     } catch {}
   },
 
   _releaseEditLock(pageId) {
-    if (this._lockHeartbeatTimer) {
-      clearInterval(this._lockHeartbeatTimer);
-      this._lockHeartbeatTimer = null;
+    if (this.$store.collab._lockHeartbeatTimer) {
+      clearInterval(this.$store.collab._lockHeartbeatTimer);
+      this.$store.collab._lockHeartbeatTimer = null;
     }
-    this._currentEditLock = null;
+    this.$store.collab._currentEditLock = null;
     if (!pageId) return;
     try {
       fetch('/books/pages/' + pageId + '/lock', { method: 'DELETE' }).catch(() => {});

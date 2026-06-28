@@ -214,8 +214,8 @@ export const sttDictationMethods = {
     // = kein gueltiger Anker mehr; STT haengt wieder ans Editorende an, bis der
     // User erneut bewusst klickt).
     const stop = () => {
-      this.sttCaretUserSet = false;
-      if (this.sttRecording || this.sttPending) this._sttStop();
+      this.$store.stt.caretUserSet = false;
+      if (this.$store.stt.recording || this.$store.stt.pending) this._sttStop();
     };
     window.addEventListener(EVT.BOOK_CHANGED, stop, { signal });
     window.addEventListener(EVT.VIEW_RESET, stop, { signal });
@@ -227,13 +227,13 @@ export const sttDictationMethods = {
   // ── Toggle / Start / Stop ────────────────────────────────────────────────
 
   async toggleSttDictation() {
-    if (this.sttPending) return; // Re-Entry-Guard waehrend getUserMedia/Stop
-    if (this.sttRecording) { this._sttStop(); return; }
+    if (this.$store.stt.pending) return; // Re-Entry-Guard waehrend getUserMedia/Stop
+    if (this.$store.stt.recording) { this._sttStop(); return; }
     await this._sttStart();
   },
 
   async _sttStart() {
-    if (!this.sttEnabled || this.sttRecording || this.sttPending) return;
+    if (!this.$store.stt.enabled || this.$store.stt.recording || this.$store.stt.pending) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       this._showJobToast?.({ message: this.t('stt.error.unavailable'), severity: 'err', jobType: 'stt', bookId: null });
       return;
@@ -241,7 +241,7 @@ export const sttDictationMethods = {
     const mime = this._computeSttMime((m) => {
       try { return MediaRecorder.isTypeSupported(m); } catch { return false; }
     });
-    this.sttPending = true;
+    this.$store.stt.pending = true;
     let stream;
     try {
       // Mono + DSP-Filter: kleinere Segmente (Diktat = ein Sprecher) und weniger
@@ -251,7 +251,7 @@ export const sttDictationMethods = {
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       });
     } catch (e) {
-      this.sttPending = false;
+      this.$store.stt.pending = false;
       const key = e?.name === 'NotAllowedError' || e?.name === 'SecurityError'
         ? 'stt.error.permission' : 'stt.error.unavailable';
       this._showJobToast?.({ message: this.t(key), severity: 'err', jobType: 'stt', bookId: null });
@@ -263,7 +263,7 @@ export const sttDictationMethods = {
       rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
     } catch {
       stream.getTracks().forEach(t => t.stop());
-      this.sttPending = false;
+      this.$store.stt.pending = false;
       this._showJobToast?.({ message: this.t('stt.error.unavailable'), severity: 'err', jobType: 'stt', bookId: null });
       return;
     }
@@ -305,7 +305,7 @@ export const sttDictationMethods = {
       silenceCutAt: null, // Zeitpunkt des letzten silence-Cuts (fuer Pausenmessung)
       // VAD-Threshold dieser Session: startet beim Admin-Wert, wird durch die
       // Rausch-Kalibrierung ggf. angehoben.
-      threshold: this.sttVad.threshold,
+      threshold: this.$store.stt.vad.threshold,
       calibrating: true,
       calibStart: 0,
       noiseSum: 0,
@@ -327,7 +327,7 @@ export const sttDictationMethods = {
       rt.boundaryKindForNext = (rt.lastCutReason === 'silence') ? 'sentence' : 'none';
       rt.lastCutReason = null;
       // Naechstes Segment, falls noch aktiv.
-      if (!rt.stopping && this.sttRecording) {
+      if (!rt.stopping && this.$store.stt.recording) {
         rt.hasVoice = false;
         rt.segmentStart = this._sttNow();
         rt.lastVoiceTs = rt.segmentStart;
@@ -339,13 +339,13 @@ export const sttDictationMethods = {
     rt.lastVoiceTs = rt.segmentStart;
     rt.calibStart = rt.segmentStart;
     try { rec.start(); } catch { /* noop */ }
-    this.sttRecording = true;
-    this.sttPending = false;
+    this.$store.stt.recording = true;
+    this.$store.stt.pending = false;
     // Einfüge-Anker bestimmen: hat der User bewusst per Klick einen Caret im
     // Edit-Feld gesetzt (sttCaretUserSet) und steht dieser noch im Editor, wird
     // dort eingefügt (nur sichtbar scrollen). Sonst — z. B. blosser Mic-Klick
     // ohne Caret-Platzierung — hängt das Diktat ans Editorende an.
-    if (this.sttCaretUserSet && this._sttCaretInEditor()) {
+    if (this.$store.stt.caretUserSet && this._sttCaretInEditor()) {
       this._scrollEditCaretIntoView?.();
     } else {
       this._sttAnchorToEnd();
@@ -384,7 +384,7 @@ export const sttDictationMethods = {
 
   _sttVadTick() {
     const rt = this._sttRt;
-    if (!rt || !this.sttRecording) return;
+    if (!rt || !this.$store.stt.recording) return;
     rt.analyser.getByteTimeDomainData(rt.timeDomain);
     const rms = this._computeRms(rt.timeDomain);
     const now = this._sttNow();
@@ -398,7 +398,7 @@ export const sttDictationMethods = {
       if (!voiced) { rt.noiseSum += rms; rt.noiseCount++; }
       if (voiced || (now - rt.calibStart) >= STT_CALIB_MS) {
         if (rt.noiseCount >= 2) {
-          rt.threshold = this._computeNoiseThreshold(rt.noiseSum / rt.noiseCount, this.sttVad.threshold);
+          rt.threshold = this._computeNoiseThreshold(rt.noiseSum / rt.noiseCount, this.$store.stt.vad.threshold);
         }
         rt.calibrating = false;
       }
@@ -411,8 +411,8 @@ export const sttDictationMethods = {
       segmentStart: rt.segmentStart,
       lastVoiceTs: rt.lastVoiceTs,
       hasVoice: rt.hasVoice,
-      silenceMs: this.sttVad.silenceMs,
-      maxSegmentS: this.sttVad.maxSegmentS,
+      silenceMs: this.$store.stt.vad.silenceMs,
+      maxSegmentS: this.$store.stt.vad.maxSegmentS,
     });
     if (decision.voiced) { rt.hasVoice = true; rt.lastVoiceTs = now; }
 
@@ -421,8 +421,8 @@ export const sttDictationMethods = {
     // laenger als eine normale Sprechpause, wird die vorausgehende Grenze von
     // 'sentence' auf 'paragraph' hochgestuft (neuer Absatz statt nur ". ").
     if (decision.voiced && rt.silenceCutAt != null && rt.boundaryKindForNext === 'sentence') {
-      const totalPause = (now - rt.silenceCutAt) + this.sttVad.silenceMs;
-      if (totalPause >= this.sttVad.silenceMs * STT_PARAGRAPH_FACTOR) {
+      const totalPause = (now - rt.silenceCutAt) + this.$store.stt.vad.silenceMs;
+      if (totalPause >= this.$store.stt.vad.silenceMs * STT_PARAGRAPH_FACTOR) {
         rt.boundaryKindForNext = 'paragraph';
       }
       rt.silenceCutAt = null;
@@ -442,23 +442,23 @@ export const sttDictationMethods = {
   // verzoegert (600 ms), damit kurze Segmente den Status nicht aufblitzen
   // lassen.
   _sttBusyOn() {
-    this.sttTranscribing++;
-    this.sttBusy = true;
+    this.$store.stt.transcribing++;
+    this.$store.stt.busy = true;
     if (this._sttBusyTimer) { clearTimeout(this._sttBusyTimer); this._sttBusyTimer = null; }
   },
   _sttBusyOff() {
-    this.sttTranscribing = Math.max(0, this.sttTranscribing - 1);
-    if (this.sttTranscribing > 0) return;
+    this.$store.stt.transcribing = Math.max(0, this.$store.stt.transcribing - 1);
+    if (this.$store.stt.transcribing > 0) return;
     if (this._sttBusyTimer) clearTimeout(this._sttBusyTimer);
-    this._sttBusyTimer = setTimeout(() => { this.sttBusy = false; this._sttBusyTimer = null; }, 600);
+    this._sttBusyTimer = setTimeout(() => { this.$store.stt.busy = false; this._sttBusyTimer = null; }, 600);
   },
 
   _sttStop() {
     const rt = this._sttRt;
-    this.sttRecording = false;
-    this.sttPending = false;
-    this.sttBusy = false;
-    this.sttTranscribing = 0;
+    this.$store.stt.recording = false;
+    this.$store.stt.pending = false;
+    this.$store.stt.busy = false;
+    this.$store.stt.transcribing = 0;
     if (this._sttBusyTimer) { clearTimeout(this._sttBusyTimer); this._sttBusyTimer = null; }
     if (!rt) return;
     rt.stopping = true;

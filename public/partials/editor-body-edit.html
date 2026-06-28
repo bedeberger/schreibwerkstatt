@@ -32,24 +32,24 @@
 
   <!-- STT-Diktat: schwebender Mic-Button unten rechts im Editorfeld (analog
        zum LanguageTool-Badge oben rechts). Nur sichtbar, wenn Admin STT
-       aktiviert hat (sttEnabled = Root-State aus /config). Sprache loest der
+       aktiviert hat ($store.stt.enabled aus /config). Sprache loest der
        Proxy aus der Buch-Locale auf. -->
-  <template x-if="sttEnabled">
+  <template x-if="$store.stt.enabled">
     <div class="stt-dock" x-cloak>
       <!-- Live-Status links vom Mic: zwei ruhige Zustaende ohne Sub-Sekunden-
            Flackern — „Hört zu" (Aufnahme laeuft) bzw. „Transkribiert"
-           (Segment-Upload, mit Mindest-Standzeit ueber sttBusy). -->
+           (Segment-Upload, mit Mindest-Standzeit ueber $store.stt.busy). -->
       <span class="stt-status" aria-live="polite"
-            x-show="sttRecording || sttBusy"
-            :class="sttBusy ? 'is-transcribing' : 'is-listening'"
-            x-text="sttBusy ? t('stt.status.transcribing') : t('stt.status.hearing')"></span>
+            x-show="$store.stt.recording || $store.stt.busy"
+            :class="$store.stt.busy ? 'is-transcribing' : 'is-listening'"
+            x-text="$store.stt.busy ? t('stt.status.transcribing') : t('stt.status.hearing')"></span>
       <button type="button" class="stt-dock-btn"
-              :aria-pressed="sttRecording"
-              :class="{ 'is-recording': sttRecording, 'is-pending': sttPending }"
-              :disabled="sttPending"
-              :data-tip="sttRecording ? t('stt.stop') : t('stt.dictate')"
-              :aria-label="sttRecording ? t('stt.stop') : t('stt.dictate')"
-              @click="toggleSttDictation()">
+              :aria-pressed="$store.stt.recording"
+              :class="{ 'is-recording': $store.stt.recording, 'is-pending': $store.stt.pending }"
+              :disabled="$store.stt.pending"
+              :data-tip="$store.stt.recording ? t('stt.stop') : t('stt.dictate')"
+              :aria-label="$store.stt.recording ? t('stt.stop') : t('stt.dictate')"
+              @click="toggleSttDictation()"
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#mic"/></svg>
       </button>
     </div>

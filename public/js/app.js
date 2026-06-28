@@ -93,26 +93,6 @@ document.addEventListener('alpine:init', () => {
     get tree() { return Alpine.store('nav').tree; },
     set tree(v) { Alpine.store('nav').tree = v; },
 
-    // ── STT-Proxy ──────────────────────────────────────────────────────────────
-    // STT-Diktat-State lebt in Alpine.store('stt'). Root exponiert ihn unter den
-    // gewohnten Namen (this.sttRecording = …), damit stt-dictation.js/stt-time.js/
-    // Edit-Lifecycle/figur-lookup.js und die bare Template-Bindings unverändert
-    // bleiben (inkl. $watch('sttRecording')). Karten greifen via $store.stt zu.
-    get sttEnabled() { return Alpine.store('stt').enabled; },
-    set sttEnabled(v) { Alpine.store('stt').enabled = v; },
-    get sttVad() { return Alpine.store('stt').vad; },
-    set sttVad(v) { Alpine.store('stt').vad = v; },
-    get sttRecording() { return Alpine.store('stt').recording; },
-    set sttRecording(v) { Alpine.store('stt').recording = v; },
-    get sttPending() { return Alpine.store('stt').pending; },
-    set sttPending(v) { Alpine.store('stt').pending = v; },
-    get sttTranscribing() { return Alpine.store('stt').transcribing; },
-    set sttTranscribing(v) { Alpine.store('stt').transcribing = v; },
-    get sttBusy() { return Alpine.store('stt').busy; },
-    set sttBusy(v) { Alpine.store('stt').busy = v; },
-    get sttCaretUserSet() { return Alpine.store('stt').caretUserSet; },
-    set sttCaretUserSet(v) { Alpine.store('stt').caretUserSet = v; },
-
     // ── Config-Proxy ─────────────────────────────────────────────────────────
     // Read-only /config-Settings leben in Alpine.store('config') (einmalig in
     // app-init.js aus /config gesetzt). Root exponiert sie unter denselben Namen,

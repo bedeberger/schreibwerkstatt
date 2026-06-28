@@ -3,10 +3,11 @@
 // Store-Name liefert den Namespace, darum tragen die Keys kein `stt`-Präfix mehr
 // (Zugriff via `$store.stt.recording`).
 //
-// Der Root spiegelt die Felder via Getter/Setter-Proxy (app.js) als
-// `this.sttRecording`/`sttEnabled`/…, sodass stt-dictation.js, stt-time.js, der
-// Edit-Lifecycle, figur-lookup.js und die bare Template-Bindings in
-// editor-body-edit.html unverändert funktionieren (inkl. `$watch('sttRecording')`).
+// Konsumenten greifen direkt zu (kein Root-Proxy): stt-dictation.js/stt-time.js/
+// figur-lookup.js (in den Root gespreadet) via `this.$store.stt.*`, der
+// Edit-Lifecycle via `app.$store.stt.*`, app-init.js setzt beim Boot
+// `this.$store.stt.enabled/vad`, das Template editor-body-edit.html bindet
+// `$store.stt.*`. stt-time.js watcht `() => this.$store.stt.recording`.
 //
 // Feld-Bedeutung:
 //   enabled — /config `stt.enabled` (Admin enabled + Host gesetzt); blendet den

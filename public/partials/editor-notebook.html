@@ -346,12 +346,12 @@
   <!-- Soft-Edit-Lock-Hinweis: anderer User hatte Editor zuletzt offen
        (last_heartbeat <30min). Reine Info; kein Save-Block (OCC schuetzt). -->
   <div class="editor-presence-banner editor-presence-banner--lock"
-       x-show="foreignEditLock"
+       x-show="$store.collab.foreignEditLock"
        x-cloak>
     <span class="editor-presence-banner__text"
           x-text="t('collab.lock.banner', {
-            user: foreignEditLock?.user_display_name || t('edit.conflict.unknownUser'),
-            until: foreignEditLock?.expires_at ? formatDate(foreignEditLock.expires_at) : ''
+            user: $store.collab.foreignEditLock?.user_display_name || t('edit.conflict.unknownUser'),
+            until: $store.collab.foreignEditLock?.expires_at ? formatDate($store.collab.foreignEditLock.expires_at) : ''
           })"></span>
   </div>
 

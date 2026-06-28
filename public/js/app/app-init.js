@@ -71,7 +71,8 @@ export const appInitMethods = {
       }
       // Buch-Level-Geraete-Ping freigeben, damit das eigene Zweit-Geraet nicht
       // 90s lang einen verwaisten „auch hier offen"-Hinweis sieht.
-      if (this._bookDevicePingBookId) this._sendBookDeviceLeave?.(this._bookDevicePingBookId);
+      const bdpb = this.$store.collab._bookDevicePingBookId;
+      if (bdpb) this._sendBookDeviceLeave?.(bdpb);
     }, { signal });
     // Kapitel-Stats werden bei jeder tokEsts-Reassignment neu berechnet.
     // Mutationen via Index-Assign (this.tokEsts[id] = …) feuern den Watcher
@@ -176,12 +177,12 @@ export const appInitMethods = {
       if (Number.isFinite(cfg.languagetool?.debounceMs)) {
         this.languagetoolDebounceMs = cfg.languagetool.debounceMs;
       }
-      this.sttEnabled = !!cfg.stt?.enabled;
+      this.$store.stt.enabled = !!cfg.stt?.enabled;
       if (cfg.stt?.vad) {
-        this.sttVad = {
-          silenceMs:   Number(cfg.stt.vad.silenceMs)   || this.sttVad.silenceMs,
-          threshold:   Number(cfg.stt.vad.threshold)   || this.sttVad.threshold,
-          maxSegmentS: Number(cfg.stt.vad.maxSegmentS) || this.sttVad.maxSegmentS,
+        this.$store.stt.vad = {
+          silenceMs:   Number(cfg.stt.vad.silenceMs)   || this.$store.stt.vad.silenceMs,
+          threshold:   Number(cfg.stt.vad.threshold)   || this.$store.stt.vad.threshold,
+          maxSegmentS: Number(cfg.stt.vad.maxSegmentS) || this.$store.stt.vad.maxSegmentS,
         };
       }
       this.$store.tts.enabled = !!cfg.tts?.enabled;

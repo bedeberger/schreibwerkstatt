@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <title>TTS Proof-Listening Test Harness</title>
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <link rel="stylesheet" href="/public/css/page/page-view.css">
+  <style>
+    body { margin: 0; padding: 24px; font: 16px/1.6 system-ui, sans-serif; }
+    /* Lese-Container: eigener Scroll-Container wie in Prod (max-height + overflow). */
+    .page-content-view {
+      max-height: 240px; overflow-y: auto; padding: 12px;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+    .tts-dock { display: inline-flex; gap: 8px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <!-- #editor-card umschliesst die Leseansicht; _ttsGetReadEl sucht darunter
+       `.page-content-view:not(--editing)`. -->
+  <div id="editor-card">
+    <div class="page-content-view" id="readview">
+      <p>Der erste Satz steht hier und ist lang genug fuer ein eigenes Fragment.</p>
+      <p>Ein zweiter Absatz folgt mit einem zweiten ausreichend langen Satz darin.</p>
+    </div>
+  </div>
+  <div class="tts-dock" id="dock"></div>
+
+  <script type="module">
+    import { ttsProofMethods } from '/public/js/editor/notebook/tts-proof.js';
+
+    const params = new URLSearchParams(location.search);
+    const enabled = params.get('enabled') !== 'false';
+
+    // ── Test-Steuer-Globals ──────────────────────────────────────────────
+    window.__toasts = [];
+    window.__audioInstances = [];
+    window.__objUrlCreated = 0;
+    window.__objUrlRevoked = 0;
+    window.__ttsAudioMs = 60;        // Dauer bis 'ended' (ms)
+    window.__ttsBlockEnd = false;    // true -> Audio "spielt ewig" (kein 'ended')
+
+    // ── Audio-Mock (kein echtes Media-Decoding -> deterministisch, keine
+    //    Console-Decode-Fehler). play() resolved + plant 'ended'; pause()
+    //    bricht den geplanten 'ended' ab (wie ein echtes Media-Element). ──
+    class MockAudio {
+      constructor(src) {
+        this.src = src || '';
+        this.ended = false;
+        this.error = null;
+        this._l = {};
+        this._timer = null;
+        window.__audioInstances.push(this);
+      }
+      addEventListener(ev, cb) { (this._l[ev] = this._l[ev] || []).push(cb); }
+      _emit(ev) { (this._l[ev] || []).forEach((cb) => cb()); }
+      _schedule() {
+        clearTimeout(this._timer);
+        this._timer = setTimeout(() => {
+          if (window.__ttsBlockEnd || this.ended) return;
+          this.ended = true;
+          this._emit('ended');
+        }, window.__ttsAudioMs);
+      }
+      play() {
+        if (!this.src) {
+          const e = new Error('Empty src attribute'); e.name = 'NotSupportedError';
+          return Promise.reject(e);
+        }
+        this._schedule();
+        return Promise.resolve();
+      }
+      pause() { clearTimeout(this._timer); }
+    }
+    window.Audio = MockAudio;
+
+    // Object-URL zaehlen (Leak-Detection). Originale weiter nutzen.
+    const _create = URL.createObjectURL.bind(URL);
+    const _revoke = URL.revokeObjectURL.bind(URL);
+    URL.createObjectURL = (b) => { window.__objUrlCreated++; return _create(b); };
+    URL.revokeObjectURL = (u) => { window.__objUrlRevoked++; try { _revoke(u); } catch {} };
+
+    // ── Minimaler App-Kontext (Root-Stand-in mit echtem $store) ──────────
+    const app = {
+      ...ttsProofMethods,
+      uiLocale: 'de',
+      selectedBookId: 1,
+      currentPage: { id: 7 },
+      $store: {
+        tts: {
+          enabled,
+          // Pausen auf 0 -> Tests laufen schnell; Pause-Test setzt sie selbst.
+          pause: { fragmentMs: 0, paragraphMs: 0 },
+          playing: false, paused: false, loading: false, index: 0, total: 0,
+        },
+      },
+      $watch: () => {},
+      t: (k) => k,
+      _showJobToast: (o) => { window.__toasts.push(o); },
+    };
+    window.__ttsApp = app;
+    window.__store = app.$store.tts;
+
+    // ── Dock (nur bei enabled) + State->DOM-Spiegelung (Alpine-Ersatz) ────
+    if (enabled) {
+      const dock = document.getElementById('dock');
+      const mk = (id, label) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.id = id; b.textContent = label;
+        dock.appendChild(b);
+        return b;
+      };
+      const main = mk('tts-main', 'play');
+      const skip = mk('tts-skip', 'skip');
+      const stop = mk('tts-stop', 'stop');
+      const pill = document.createElement('span');
+      pill.id = 'tts-status'; dock.appendChild(pill);
+
+      main.addEventListener('click', () => app.toggleTtsProof());
+      skip.addEventListener('click', () => app.skipTtsProof());
+      stop.addEventListener('click', () => app.stopTtsProof());
+
+      const s = app.$store.tts;
+      setInterval(() => {
+        main.setAttribute('aria-pressed', String(s.playing && !s.paused));
+        main.textContent = !s.playing ? 'play' : (s.paused ? 'paused' : 'pause');
+        // Skip nur im laufenden, nicht-pausierten Zustand sichtbar (wie Prod).
+        skip.hidden = !(s.playing && !s.paused);
+        stop.hidden = !s.playing;
+        pill.textContent = s.loading ? 'loading'
+          : s.paused ? 'paused'
+          : s.playing ? `reading ${s.index}/${s.total}` : '';
+      }, 20);
+    }
+
+    window.__harnessReady = true;
+  </script>
+</body>
+</html>

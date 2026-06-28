@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "1d9a634252fc19f6";
+self.__SHELL_BUILD = "0ce1b9db0a264b02";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -234,6 +234,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/card-lifecycle.js",
   "/js/cards/catalog-store.js",
   "/js/cards/chat-card.js",
+  "/js/cards/collab-store.js",
   "/js/cards/config-store.js",
   "/js/cards/docx-export-card.js",
   "/js/cards/editor-comments-card.js",

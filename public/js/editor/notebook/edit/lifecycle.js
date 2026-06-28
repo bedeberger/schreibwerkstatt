@@ -55,7 +55,7 @@ export const lifecycleMethods = {
     // Auto-Fokus-Caret (setTimeout focus() weiter unten) ist KEIN bewusster
     // Anker — erst ein Klick ins Feld setzt sttCaretUserSet (STT haengt sonst
     // ans Editorende an).
-    app.sttCaretUserSet = false;
+    app.$store.stt.caretUserSet = false;
 
     // Chromium/Safari-Default ist 'div' → Enter an bare Text oder am
     // Editor-Root erzeugt <div> statt <p>, damit fehlt der Absatz-Abstand

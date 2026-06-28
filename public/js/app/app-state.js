@@ -51,10 +51,12 @@ const shellState = () => ({
   // Read-only /config-Settings (mapTiles, languagetoolEnabled,
   // languagetoolDebounceMs, researchChatEnabled) leben in Alpine.store('config')
   // (cards/config-store.js); der Root proxied sie unter denselben Namen (app.js).
-  // STT-Diktat State lebt in Alpine.store('stt') (cards/stt-store.js); der Root
-  // proxied es als this.sttEnabled/sttRecording/sttCaretUserSet/… (app.js).
+  // STT-Diktat State lebt in Alpine.store('stt') (cards/stt-store.js) und wird
+  // direkt via $store.stt / this.$store.stt gelesen (kein Root-Proxy).
   // TTS / Proof-Listening State lebt in Alpine.store('tts') (cards/tts-store.js)
   // und wird direkt via $store.tts / this.$store.tts gelesen (kein Root-Proxy).
+  // Collaboration/Presence/Soft-Lock State lebt in Alpine.store('collab')
+  // (cards/collab-store.js), ebenfalls direkt via $store.collab (kein Root-Proxy).
   // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
   // gesetzt; default true wäre auf Windows falsch, default false ist sichere
   // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).
@@ -549,43 +551,9 @@ const featuresUsageState = () => ({
   recentPageIds: [],
 });
 
-// Collaboration-Signal: Seiten dieses Buchs, die seit dem letzten Poll von
-// einem ANDEREN User editiert wurden. Quelle: GET /content/books/:id/changes.
-//   _collabSince:        Server-Stempel, gegen den der naechste Poll vergleicht.
-//   recentRemoteEdits:   Set von page_id, die der Tree als „extern geaendert"
-//                        markieren soll. Cleared beim Klick auf die Seite.
-//   collabToast:         { user, pageName, pageId, count?, currentPage? } | null
-const collabState = () => ({
-  _collabSince: null,
-  _collabPollTimer: null,
-  recentRemoteEdits: new Set(),
-  collabToast: null,
-  _collabToastTimer: null,
-  // Presence: Map<pageId, [{ user_email, user_display_name, device_id,
-  // device_label, is_self, last_ping_at }]> — andere User + eigene Sessions
-  // auf anderen Geraeten. Eigene aktuelle Session ist serverseitig gefiltert.
-  // Updated im gleichen Poll-Tick wie /changes.
-  livePresenceByPage: {},
-  // Eigener Heartbeat: aktiver Edit-Mode pingt den Server alle 30s.
-  _presencePingTimer: null,
-  _presencePingPageId: null,
-  // Geraete-Ping (Multi-Device-Erkennung): laeuft immer bei offenem Buch, meldet
-  // die aktuell offene Seite. _selfPageDeviceCount = eigene aktive Geraete auf
-  // DERSELBEN Seite (inkl. diesem); _selfBookDeviceCount = eigene Geraete im
-  // GANZEN Buch (seitenuebergreifend, fuer den nativen Mac-Client der eine
-  // beliebige Seite pusht). >1 bei einem der beiden schaltet den vollen
-  // Collab-Poll auch fuer Einzel-Owner-Buecher frei.
-  _bookDevicePingTimer: null,
-  _bookDevicePingBookId: null,
-  _selfPageDeviceCount: 0,
-  _selfBookDeviceCount: 0,
-  // Soft-Lock-State: eigener gehaltener Lock + fremder Lock auf der offenen
-  // Seite (Banner-Quelle). _currentEditLock haelt {expires_at, reason}; ein
-  // fremder Lock (foreignEditLock) ist {user_email, user_display_name, ...}.
-  _currentEditLock: null,
-  _lockHeartbeatTimer: null,
-  foreignEditLock: null,
-});
+// Collaboration-/Presence-/Soft-Lock-State lebt in Alpine.store('collab')
+// (cards/collab-store.js) und wird direkt via $store.collab / this.$store.collab
+// gelesen (kein Root-Proxy). Owner: app/app-collab.js.
 
 // Modal-State fuer Buch-Erstellung (Trigger: Combobox-Footer "+ Neues Buch").
 // Eigener Slice statt Inline in cardsState, weil Open/Close keine Show-Flag-
@@ -684,7 +652,6 @@ export function initialLektoratState() {
     ...chatsState(),
     ...featuresUsageState(),
     ...bookCreateState(),
-    ...collabState(),
     ...dailyProgressState(),
     ...entitiesState(),
     ...jobsState(),

@@ -16,7 +16,7 @@ export const sttTimeMethods = {
   _sttCharsPending: 0,
 
   _sttTimeActive() {
-    return !!(this.sttRecording
+    return !!(this.$store.stt.recording
       && this.selectedBookId
       && document.visibilityState === 'visible');
   },
@@ -27,7 +27,7 @@ export const sttTimeMethods = {
       if (this._sttTimeActive()) this._startSttHeartbeat();
       else this._stopSttHeartbeat(false);
     };
-    this.$watch('sttRecording',   sync);
+    this.$watch(() => this.$store.stt.recording, sync);
     this.$watch('selectedBookId', () => {
       this._stopSttHeartbeat(false);
       if (this._sttTimeActive()) this._startSttHeartbeat();
