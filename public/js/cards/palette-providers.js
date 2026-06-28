@@ -15,6 +15,7 @@
 // Modul-Layer kennt nur den Provider-Set + Limits.
 
 import { fuzzyMatch } from './palette-fuzzy.js';
+import { EVT } from '../events.js';
 
 const PER_PROVIDER_LIMIT = 8;
 
@@ -264,7 +265,7 @@ export const PROVIDERS = [
           // Re-Render der Palette anstossen — sonst zeigt sie das Cache-Miss-
           // Snapshot von vorhin bis zum naechsten Keystroke. palette-card
           // lauscht auf 'palette:rerender' und invalidiert Sections-Cache.
-          window.dispatchEvent(new CustomEvent('palette:rerender'));
+          window.dispatchEvent(new CustomEvent(EVT.PALETTE_RERENDER));
         })
         .catch(() => { this._cache = { q, book: bookId, items: [] }; })
         .finally(() => { if (this._inflight === cacheKey) this._inflight = null; });

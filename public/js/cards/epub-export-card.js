@@ -14,6 +14,7 @@
 // wird die EPUB-Datei via /jobs/epub-export/:id/file als Download geholt.
 
 import { startPoll } from './job-helpers.js';
+import { EVT } from '../events.js';
 
 const _EMPTY_META = () => ({
   author_name: '',
@@ -82,7 +83,7 @@ export function registerEpubExportCard() {
       this.$watch(() => window.__app?.currentPage?.id, () => this._ensureExportPicked());
 
       this._onExportPreset = (e) => this._applyExportPreset(e.detail);
-      window.addEventListener('export:epub:preset', this._onExportPreset);
+      window.addEventListener(EVT.EXPORT_EPUB_PRESET, this._onExportPreset);
       const pending = window.__app?.__epubExportPreset;
       if (pending) {
         this._applyExportPreset(pending);
@@ -101,7 +102,7 @@ export function registerEpubExportCard() {
         this.pubLoaded = false;
         if (window.__app?.showEpubExportCard) await this.loadPublication();
       };
-      window.addEventListener('book:changed', this._onBookChanged);
+      window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
 
       this._onViewReset = () => {
         this._stopPoll();
@@ -119,16 +120,16 @@ export function registerEpubExportCard() {
         this.exportPageId = null;
         this.activeTab = 'typography';
       };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
       this._stopPoll();
       if (this._savedAtTimer)      { clearTimeout(this._savedAtTimer);      this._savedAtTimer = null; }
       if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
-      if (this._onBookChanged)  window.removeEventListener('book:changed',       this._onBookChanged);
-      if (this._onViewReset)    window.removeEventListener('view:reset',         this._onViewReset);
-      if (this._onExportPreset) window.removeEventListener('export:epub:preset', this._onExportPreset);
+      if (this._onBookChanged)  window.removeEventListener(EVT.BOOK_CHANGED,       this._onBookChanged);
+      if (this._onViewReset)    window.removeEventListener(EVT.VIEW_RESET,         this._onViewReset);
+      if (this._onExportPreset) window.removeEventListener(EVT.EXPORT_EPUB_PRESET, this._onExportPreset);
     },
 
     // ── Publikations-Meta (book_publication, geteilt mit PDF + BookSettings) ──

@@ -6,6 +6,7 @@
 
 import { FEATURES, DEFAULT_RECENT_KEYS, featureByKey } from './cards/feature-registry.js';
 import { fetchJson } from './utils.js';
+import { EVT } from './events.js';
 
 export const featuresUsageMethods = {
   // Wird in init() aufgerufen, sobald Alpine $watch bereitsteht.
@@ -105,6 +106,6 @@ export const featuresUsageMethods = {
   },
 
   openPalette() {
-    window.dispatchEvent(new CustomEvent('palette:open'));
+    window.dispatchEvent(new CustomEvent(EVT.PALETTE_OPEN));
   },
 };

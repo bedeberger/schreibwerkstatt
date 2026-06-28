@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // URL-Hash-Permalinks + History-Management.
 // Schema: #profil | #admin/<users|settings|usage[/<tab>]> | #book/:bookId[/page/:pageId|/figur/:figId|/ort/:ortId|/werkstatt[/:draftId]|/kapitel[/:chapterId]|/<view>]
 // Views: figuren, werkstatt, orte, szenen, ereignisse, kontinuitaet, bewertung, kapitel, chat, stats, stil, fehler, einstellungen, finetune, export
@@ -278,7 +279,7 @@ export const appHashRouterMethods = {
         this._resetBookScopedState();
         await this.loadPages({ source: 'bookSwitch' });
       } else if (isInitialApply) {
-        window.dispatchEvent(new CustomEvent('book:changed', {
+        window.dispatchEvent(new CustomEvent(EVT.BOOK_CHANGED, {
           detail: { bookId: this.selectedBookId },
         }));
         // Initialer Bootstrap: _resetBookScopedState wird hier nicht gerufen,
@@ -343,7 +344,7 @@ export const appHashRouterMethods = {
             // Bei Deep-Link `#book/X/werkstatt/Y` ist die Sub evtl. noch nicht
             // gemountet — Event wird dann nach loadDrafts via _pendingDraftId
             // verarbeitet.
-            window.dispatchEvent(new CustomEvent('figur-werkstatt:select', { detail: { draftId: parseInt(arg) } }));
+            window.dispatchEvent(new CustomEvent(EVT.FIGUR_WERKSTATT_SELECT, { detail: { draftId: parseInt(arg) } }));
           } else {
             this.werkstattDraftId = null;
           }
@@ -376,7 +377,7 @@ export const appHashRouterMethods = {
           this.plotBeatId = arg ? String(arg) : null;
           if (!this.showPlotCard) await this.togglePlotCard();
           else { this._closeOtherMainCards('plot'); this._scrollToCardByKey('plot'); }
-          if (arg) window.dispatchEvent(new CustomEvent('plot:focus-beat', { detail: { beatId: arg } }));
+          if (arg) window.dispatchEvent(new CustomEvent(EVT.PLOT_FOCUS_BEAT, { detail: { beatId: arg } }));
           break;
         case 'fakten':
           if (!this.showWorldFactsCard) await this.toggleWorldFactsCard();

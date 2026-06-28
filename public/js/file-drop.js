@@ -1,3 +1,4 @@
+import { EVT } from './events.js';
 // Alpine.data('fileDrop') — Datei-Auswahl per Klick + Drag&Drop.
 //
 // Behaviorales Primitive (wie combobox/numInput): kapselt das versteckte
@@ -50,7 +51,7 @@ export function registerFileDrop() {
     _emit(fileList) {
       const files = Array.from(fileList || []);
       if (!files.length) return;
-      this.$el.dispatchEvent(new CustomEvent('file-drop', {
+      this.$el.dispatchEvent(new CustomEvent(EVT.FILE_DROP, {
         detail: { file: files[0], files },
       }));
     },

@@ -2,6 +2,7 @@
 // Lifecycle hier, Show-Flag (`showAdminCategoriesCard`) im Root.
 
 import { adminCategoriesMethods } from '../admin/admin-categories.js';
+import { EVT } from '../events.js';
 
 export function registerAdminCategoriesCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -19,11 +20,11 @@ export function registerAdminCategoriesCard() {
         await this.loadAll();
       });
       this._onViewReset = () => { this.error = ''; };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
-      if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
+      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     ...adminCategoriesMethods,

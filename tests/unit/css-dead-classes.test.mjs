@@ -39,16 +39,11 @@ const PUBLIC = join(ROOT, 'public');
 const ALLOW_PREFIXES = ['leaflet-'];
 
 // Escape hatch for individual classes that are genuinely live but defeat every
-// heuristic above (applied in manuscript content, a documented feature whose
-// markup is staged, or an intended badge not yet wired). Add with a one-liner.
+// heuristic above (e.g. applied only in manuscript content). Add with a one-line
+// justification.
 const ALLOW_CLASSES = new Set([
-  'pullquote',          // .callout.pullquote — Manuskript-Inhaltsstil, vom Autor im Buchtext gesetzt (DESIGN.md).
-  'stilbox--spaced',    // dokumentierte Stilbox-Variante (DESIGN.md), Geschwister von .stilbox--review-summary.
-  'token-setup-card',   // First-Run-Token-Setup-Modal (DESIGN.md), bewusst bereitgestellt.
-  'token-setup-desc',   // dito.
-  'token-setup-error',  // dito.
-  'token-setup-fields', // dito.
-  'tag--inherited',     // gedaempftes Plot-Vererbungs-Badge (docs/plot.md), Anzeige im Beat-Board-Grid.
+  'pullquote',       // .callout.pullquote — Manuskript-Inhaltsstil, vom Autor im Buchtext gesetzt (DESIGN.md).
+  'stilbox--spaced', // dokumentierte Stilbox-Variante (DESIGN.md), Geschwister von .stilbox--review-summary.
 ]);
 
 function walk(dir, exts) {

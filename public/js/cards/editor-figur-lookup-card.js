@@ -8,6 +8,7 @@
 //   und `editor:figur-lookup:close`; diese Sub hört darauf.
 
 import { figurLookupCardMethods } from '../editor/figur-lookup.js';
+import { EVT } from '../events.js';
 
 export function registerEditorFigurLookupCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -25,17 +26,17 @@ export function registerEditorFigurLookupCard() {
       this._figurLookupAbort = abort;
       const { signal } = abort;
 
-      window.addEventListener('editor:figur-lookup:open', (e) => {
+      window.addEventListener(EVT.EDITOR_FIGUR_LOOKUP_OPEN, (e) => {
         const { fig, x, y } = e.detail || {};
         if (!fig) return;
         this._openFigurLookup(fig, x, y);
       }, { signal });
-      window.addEventListener('editor:figur-lookup:close', () => this.closeFigurLookup(), { signal });
+      window.addEventListener(EVT.EDITOR_FIGUR_LOOKUP_CLOSE, () => this.closeFigurLookup(), { signal });
 
       // Bei Buchwechsel/View-Reset Popover hart schliessen — sonst bleibt der
       // capture-phase Scroll-Listener nach Buchwechsel-Wegnavigation am Window.
-      window.addEventListener('book:changed', () => this.closeFigurLookup?.(), { signal });
-      window.addEventListener('view:reset',   () => this.closeFigurLookup?.(), { signal });
+      window.addEventListener(EVT.BOOK_CHANGED, () => this.closeFigurLookup?.(), { signal });
+      window.addEventListener(EVT.VIEW_RESET,   () => this.closeFigurLookup?.(), { signal });
     },
 
     destroy() {

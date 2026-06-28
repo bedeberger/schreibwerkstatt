@@ -3,6 +3,7 @@
 // (`showAdminParseFailsCard`) im Root.
 
 import { adminParseFailsMethods } from '../admin/ai-parse-fails.js';
+import { EVT } from '../events.js';
 
 export function registerAdminParseFailsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -28,12 +29,12 @@ export function registerAdminParseFailsCard() {
         this.parseFailsError = '';
         this.parseFailsInitialized = false;
       };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
       this._parseFailsLeave();
-      if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
+      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     ...adminParseFailsMethods,

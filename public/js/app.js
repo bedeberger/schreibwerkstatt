@@ -109,6 +109,7 @@ import { appNavigationMethods } from './app/app-navigation.js';
 import { appHashRouterMethods } from './app/app-hash-router.js';
 import { bookCreateMethods } from './book/book-create.js';
 import { rootGetterDescriptors } from './app/app-root-getters.js';
+import { EVT } from './events.js';
 
 // Globaler fetch-Wrapper: fängt 401-Antworten ab und signalisiert Session-Ablauf
 // via 'session-expired'-Event. Alpine zeigt daraufhin einen Banner. Kein Auto-
@@ -118,7 +119,7 @@ window.fetch = async function(...args) {
   const res = await __origFetch(...args);
   if (res.status === 401 && !window.__sessionExpiredNotified) {
     window.__sessionExpiredNotified = true;
-    window.dispatchEvent(new CustomEvent('session-expired'));
+    window.dispatchEvent(new CustomEvent(EVT.SESSION_EXPIRED));
   }
   return res;
 };
@@ -155,7 +156,7 @@ if ('serviceWorker' in navigator) {
         const notify = (worker) => {
           if (!worker || !navigator.serviceWorker.controller) return;
           window.__pendingWorker = worker;
-          window.dispatchEvent(new CustomEvent('app:update-available'));
+          window.dispatchEvent(new CustomEvent(EVT.APP_UPDATE_AVAILABLE));
         };
         if (reg.waiting) notify(reg.waiting);
         reg.addEventListener('updatefound', () => {
@@ -746,8 +747,8 @@ document.addEventListener('alpine:init', () => {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         if (this.themePref === 'auto') this._applyTheme();
       }, { signal });
-      window.addEventListener('session-expired', () => { this.sessionExpired = true; }, { signal });
-      window.addEventListener('job:finished', (e) => this._onJobFinished(e.detail), { signal });
+      window.addEventListener(EVT.SESSION_EXPIRED, () => { this.sessionExpired = true; }, { signal });
+      window.addEventListener(EVT.JOB_FINISHED, (e) => this._onJobFinished(e.detail), { signal });
       this._initSttDictation?.(signal);
       this._initTtsProof?.(signal);
       // Sleep/Wake-Recovery: bei längerer Hide-Phase (>30 s) Daten neu laden,

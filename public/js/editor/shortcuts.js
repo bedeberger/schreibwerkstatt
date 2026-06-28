@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // Tastenkürzel-Overlay: globaler `?`-Hotkey + Modal (natives <dialog>).
 // Liste der Shortcuts kommt aus i18n (shortcuts.item.*), Bindings selbst leben
 // dort, wo sie gebraucht werden (index.html, editor/focus.js etc.) – das
@@ -70,7 +71,7 @@ export const shortcutsMethods = {
     // von Inputs/Editor — _shortcutHotkeyAllowed hat das bereits gefiltert.
     if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
-      window.dispatchEvent(new CustomEvent('palette:open'));
+      window.dispatchEvent(new CustomEvent(EVT.PALETTE_OPEN));
     }
   },
 
@@ -166,7 +167,7 @@ export const shortcutsMethods = {
       event.preventDefault();
     } else if (key === 'k') {
       event.preventDefault();
-      window.dispatchEvent(new CustomEvent('palette:open'));
+      window.dispatchEvent(new CustomEvent(EVT.PALETTE_OPEN));
     }
   },
 

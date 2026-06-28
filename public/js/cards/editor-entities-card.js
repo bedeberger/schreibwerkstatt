@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // editorEntitiesCard — Entity-Linking-Sub-Komponente (Notebook-Editor):
 //   - Inline-Highlights (Figuren, Orte) im contenteditable.
 //   - „Auf dieser Seite"-Collapsible ueber dem Editor-Body mit drei Reihen
@@ -93,7 +94,7 @@ export function registerEditorEntitiesCard() {
         if (id && String(id) !== String(window.__app?.selectedBookId)) return;
         recompute();
       };
-      window.addEventListener('book:settings:updated', this._onSettingsUpdated, { signal });
+      window.addEventListener(EVT.BOOK_SETTINGS_UPDATED, this._onSettingsUpdated, { signal });
 
       // Klick im Edit-Container — wenn auf eine highlighted Range, Popover.
       // Da CSS Custom Highlights kein eigenes Pointer-Target sind, koennen

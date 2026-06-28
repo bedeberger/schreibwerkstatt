@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // Format-Helper + Tile-Click-Handler (Cross-Card-Routings).
 export const formatMethods = {
   // Fehler-Typ-Label: i18n-Key versuchen; Fallback humanisiert.
@@ -25,7 +26,7 @@ export const formatMethods = {
 
   // ── Tile-Click-Handler ───────────────────────────────────────────────────
   _openLengthStats(range = 30, metric = 'chars') {
-    window.dispatchEvent(new CustomEvent('book-stats:select', { detail: { metric, range } }));
+    window.dispatchEvent(new CustomEvent(EVT.BOOK_STATS_SELECT, { detail: { metric, range } }));
     window.__app?.toggleBookStatsCard?.();
   },
 

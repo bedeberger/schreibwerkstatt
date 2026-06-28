@@ -11,6 +11,7 @@
 import { createSpellcheckController } from './controller.js';
 import { createFormFieldSpellcheck } from './form-controller.js';
 import { applySpellcheckReplacement } from '../../editor/shared/apply-replacement.js';
+import { EVT } from '../../events.js';
 
 const NOTEBOOK_SEL = '.page-content-view--editing';
 const FOCUS_SEL = '.focus-editor__content';
@@ -153,7 +154,7 @@ export function setupSpellcheckDispatch(app) {
 
   // Explizites Recheck-Signal (z.B. nach Quote-Normalisierung): aktiven
   // Controller debounced neu prüfen lassen, auch wenn der Text identisch ist.
-  window.addEventListener('languagetool:recheck', () => {
+  window.addEventListener(EVT.LANGUAGETOOL_RECHECK, () => {
     try { current?.ctl?.refresh?.(); } catch {}
   });
 

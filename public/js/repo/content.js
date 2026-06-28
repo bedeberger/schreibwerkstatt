@@ -11,6 +11,7 @@
 
 import { stripFocusArtefacts } from '../utils.js';
 import { getDeviceId } from '../device-id.js';
+import { EVT } from '../events.js';
 
 const GET_TIMEOUT_MS = 30000;
 const WRITE_TIMEOUT_MS = 90000;
@@ -157,7 +158,7 @@ export const contentRepo = {
     const inv = hasHtml ? ['pages/' + id, 'pages/' + id + '/revisions'] : ['pages/' + id];
     const out = await _write('PUT', 'pages/' + id, payload, inv);
     if (hasHtml && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('page-revisions:changed', { detail: { pageId: id } }));
+      window.dispatchEvent(new CustomEvent(EVT.PAGE_REVISIONS_CHANGED, { detail: { pageId: id } }));
     }
     return out;
   },

@@ -8,6 +8,7 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { fetchJson, tzOpts } from '../utils.js';
 import { copyText } from '../copy-button.js';
+import { EVT } from '../events.js';
 
 export function registerShareLinksCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -331,7 +332,7 @@ export function registerShareLinksCard() {
       if (link.kind === 'chapter' || link.kind === 'book') {
         if (!app.showBookEditorCard) await app.toggleBookEditorCard?.();
         // Ohne bid: Leiste nur öffnen (kein Sprung zu einer bestimmten Stelle).
-        window.dispatchEvent(new CustomEvent('book-editor:goto-comment'));
+        window.dispatchEvent(new CustomEvent(EVT.BOOK_EDITOR_GOTO_COMMENT));
         return;
       }
       // Seiten-Share: zur Seite navigieren, dann die Notebook-Leiste öffnen.
@@ -341,7 +342,7 @@ export function registerShareLinksCard() {
       // Verzögert, damit der Seitenwechsel-Reset der Leiste (commentRailVisible=false
       // im currentPage-Watcher) zuerst läuft und das Öffnen gewinnt.
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('comments-rail:goto'));
+        window.dispatchEvent(new CustomEvent(EVT.COMMENTS_RAIL_GOTO));
       }, 0);
     },
 

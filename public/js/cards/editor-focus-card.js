@@ -15,6 +15,7 @@
 
 import { focusCardMethods, readFocusSnapshot, clearFocusSnapshot } from '../editor/focus.js';
 import { readDraft } from '../editor/draft-storage.js';
+import { EVT } from '../events.js';
 
 export function registerEditorFocusCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -32,9 +33,9 @@ export function registerEditorFocusCard() {
       const abort = new AbortController();
       this._focusAbort = abort;
       const { signal } = abort;
-      window.addEventListener('editor:focus:enter',               () => this.enterFocusMode(),         { signal });
-      window.addEventListener('editor:focus:exit',                () => this.exitFocusMode(),          { signal });
-      window.addEventListener('editor:focus:enter-from-pageview', () => this.enterFocusFromPageview(), { signal });
+      window.addEventListener(EVT.EDITOR_FOCUS_ENTER,               () => this.enterFocusMode(),         { signal });
+      window.addEventListener(EVT.EDITOR_FOCUS_EXIT,                () => this.exitFocusMode(),          { signal });
+      window.addEventListener(EVT.EDITOR_FOCUS_ENTER_FROM_PAGEVIEW, () => this.enterFocusFromPageview(), { signal });
 
       // Live-Switch: User ändert Granularität in den Settings, während Focus
       // aktiv ist → Cardroot-Class + State sofort umstellen, ohne Exit/Re-Enter.

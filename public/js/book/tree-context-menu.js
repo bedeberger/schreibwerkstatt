@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // Pagetree-Rechtsklick-Menü. Aktionen pro Node-Typ:
 //   page    → Öffnen, Editieren (Notebook), Teilen, Exportieren
 //   chapter → Öffnen (Header-Activate = Toggle + ggf. Kapitel-Review), Teilen, Exportieren
@@ -122,7 +123,7 @@ export const treeContextMenuMethods = {
       : null;
     if (preset) {
       this.__exportPreset = preset;
-      window.dispatchEvent(new CustomEvent('export:preset', { detail: preset }));
+      window.dispatchEvent(new CustomEvent(EVT.EXPORT_PRESET, { detail: preset }));
     }
     if (!this.showExportCard) await this.toggleExportCard();
     else this._scrollToCardByKey('export');

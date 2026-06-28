@@ -1,6 +1,7 @@
 import { fetchJson } from '../utils.js';
 import { WORD_RE, attachReflow, positionPopupNearRect, rangeForWordAtClientPoint } from './utils.js';
 import { startPoll } from '../cards/job-helpers.js';
+import { EVT } from '../events.js';
 
 // Synonym-Ermittler für den contenteditable-Editor.
 // Cmd/Ctrl+Shift+S auf markiertem Wort (oder Cursor in Wort) → Custom-Menü →
@@ -70,7 +71,7 @@ export const synonymMethods = {
       return;
     }
     e.preventDefault();
-    window.dispatchEvent(new CustomEvent('editor:synonym:open', {
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_SYNONYM_OPEN, {
       detail: { range, word: wort },
     }));
   },
@@ -88,21 +89,21 @@ export const synonymMethods = {
     if (!text || !WORD_RE.test(text)) return;
     const r = sel.getRangeAt(0);
     if (!editEl.contains(r.commonAncestorContainer)) return;
-    window.dispatchEvent(new CustomEvent('editor:synonym:open', {
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_SYNONYM_OPEN, {
       detail: { range: r.cloneRange(), word: text },
     }));
   },
 
   // Trampoline für Legacy-Aufrufer.
   closeSynonymMenu() {
-    window.dispatchEvent(new CustomEvent('editor:synonym:close-menu'));
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_SYNONYM_CLOSE_MENU));
   },
   closeSynonymPicker() {
-    window.dispatchEvent(new CustomEvent('editor:synonym:close-picker'));
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_SYNONYM_CLOSE_PICKER));
   },
   // Wird vom Menü-Button im Partial aufgerufen (Root-Scope wegen Event-Bubble).
   requestSynonyms() {
-    window.dispatchEvent(new CustomEvent('editor:synonym:request'));
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_SYNONYM_REQUEST));
   },
 };
 

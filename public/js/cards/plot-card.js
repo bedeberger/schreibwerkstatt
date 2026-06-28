@@ -7,6 +7,7 @@ import { plotMethods } from '../book/plot.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
 import { loadSortable } from '../lazy-libs.js';
+import { EVT } from '../events.js';
 
 export function registerPlotCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -166,13 +167,13 @@ export function registerPlotCard() {
 
       // Deep-Link-Permalink #book/X/plot/<beatId>: Hash-Router dispatcht das Event;
       // _focusBeatById fokussiert den Beat (bzw. merkt ihn bis zum Board-Load vor).
-      window.addEventListener('plot:focus-beat', (e) => {
+      window.addEventListener(EVT.PLOT_FOCUS_BEAT, (e) => {
         this._focusBeatById(e.detail?.beatId);
       }, { signal: this._lifecycle.signal });
 
       // Cross-Feature: Navigation Werkstatt → Plot. Setzt den Werkstatt-Figur-Filter
       // (plotFilters überlebt den Board-Load, daher kein Parking nötig).
-      window.addEventListener('plot:filter-draft-figure', (e) => {
+      window.addEventListener(EVT.PLOT_FILTER_DRAFT_FIGURE, (e) => {
         this.applyDraftFigureFilter(e.detail?.draftId);
       }, { signal: this._lifecycle.signal });
     },

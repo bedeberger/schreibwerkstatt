@@ -3,6 +3,7 @@
 // (`showAdminDevicesCard`) im Root.
 
 import { adminDevicesMethods } from '../admin/admin-devices.js';
+import { EVT } from '../events.js';
 
 export function registerAdminDevicesCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -25,14 +26,14 @@ export function registerAdminDevicesCard() {
         this.devicesLatestVersion = null;
         this.devicesInitialized = false;
       };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
       this._onCardRefresh = (e) => { if (e.detail?.name === 'adminDevices') this.devicesRefresh(); };
-      window.addEventListener('card:refresh', this._onCardRefresh);
+      window.addEventListener(EVT.CARD_REFRESH, this._onCardRefresh);
     },
 
     destroy() {
-      if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
-      if (this._onCardRefresh) window.removeEventListener('card:refresh', this._onCardRefresh);
+      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      if (this._onCardRefresh) window.removeEventListener(EVT.CARD_REFRESH, this._onCardRefresh);
     },
 
     ...adminDevicesMethods,

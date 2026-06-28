@@ -4,6 +4,7 @@
 
 import { bookSettingsMethods } from '../book/book-settings.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { EVT } from '../events.js';
 
 // Vollständiges Default-Meta (alle book_publication-Felder). Der /publication-PUT
 // ist Full-Replace — ein unvollständiges Objekt setzt fehlende Felder serverseitig
@@ -197,7 +198,7 @@ export function registerBookSettingsCard() {
           window.__app.loadPages?.();
         }
       };
-      window.addEventListener('job:finished', this._onBlogJobFinished);
+      window.addEventListener(EVT.JOB_FINISHED, this._onBlogJobFinished);
 
       // HubSpot-Jobs: bei Import-/Push-Done Status nachladen, Sidebar-Tree
       // refreshen (Import legt Pages/Chapters an).
@@ -211,7 +212,7 @@ export function registerBookSettingsCard() {
           window.__app.loadPages?.();
         }
       };
-      window.addEventListener('job:finished', this._onHubspotJobFinished);
+      window.addEventListener(EVT.JOB_FINISHED, this._onHubspotJobFinished);
 
       // Stilprofil-Job: bei Done nur das Stilprofil-Feld aus dem Job-Result
       // übernehmen (nicht das ganze Formular neu laden → keine ungespeicherten
@@ -227,7 +228,7 @@ export function registerBookSettingsCard() {
           this.stilprofilError = window.__app.t('book.settings.stilprofil.genError');
         }
       };
-      window.addEventListener('job:finished', this._onStilprofilJobFinished);
+      window.addEventListener(EVT.JOB_FINISHED, this._onStilprofilJobFinished);
     },
 
     destroy() {
@@ -236,15 +237,15 @@ export function registerBookSettingsCard() {
       if (this._shareInviteMsgTimer) { clearTimeout(this._shareInviteMsgTimer); this._shareInviteMsgTimer = null; }
       if (this._pubSavedTimer) { clearTimeout(this._pubSavedTimer); this._pubSavedTimer = null; }
       if (this._onBlogJobFinished) {
-        window.removeEventListener('job:finished', this._onBlogJobFinished);
+        window.removeEventListener(EVT.JOB_FINISHED, this._onBlogJobFinished);
         this._onBlogJobFinished = null;
       }
       if (this._onHubspotJobFinished) {
-        window.removeEventListener('job:finished', this._onHubspotJobFinished);
+        window.removeEventListener(EVT.JOB_FINISHED, this._onHubspotJobFinished);
         this._onHubspotJobFinished = null;
       }
       if (this._onStilprofilJobFinished) {
-        window.removeEventListener('job:finished', this._onStilprofilJobFinished);
+        window.removeEventListener(EVT.JOB_FINISHED, this._onStilprofilJobFinished);
         this._onStilprofilJobFinished = null;
       }
       this._lifecycle?.destroy();

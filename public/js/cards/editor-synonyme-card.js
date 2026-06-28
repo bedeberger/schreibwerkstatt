@@ -11,6 +11,7 @@
 //   dispatchen an die Sub. `_startPoll` bleibt Root-Utility.
 
 import { synonymCardMethods } from '../editor/synonyme.js';
+import { EVT } from '../events.js';
 
 export function registerEditorSynonymeCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -37,10 +38,10 @@ export function registerEditorSynonymeCard() {
       const abort = new AbortController();
       this._synonymAbort = abort;
       const { signal } = abort;
-      window.addEventListener('editor:synonym:open',         (e) => this._openSynonymMenu(e.detail || {}), { signal });
-      window.addEventListener('editor:synonym:close-menu',   () => this.closeSynonymMenu(),               { signal });
-      window.addEventListener('editor:synonym:close-picker', () => this.closeSynonymPicker(),             { signal });
-      window.addEventListener('editor:synonym:request',      () => this.requestSynonyms(),                { signal });
+      window.addEventListener(EVT.EDITOR_SYNONYM_OPEN,         (e) => this._openSynonymMenu(e.detail || {}), { signal });
+      window.addEventListener(EVT.EDITOR_SYNONYM_CLOSE_MENU,   () => this.closeSynonymMenu(),               { signal });
+      window.addEventListener(EVT.EDITOR_SYNONYM_CLOSE_PICKER, () => this.closeSynonymPicker(),             { signal });
+      window.addEventListener(EVT.EDITOR_SYNONYM_REQUEST,      () => this.requestSynonyms(),                { signal });
     },
 
     destroy() {

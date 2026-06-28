@@ -1,3 +1,4 @@
+import { EVT } from '../../events.js';
 // Root-Trampoline: dispatcht Events an Alpine.data('editorFocusCard').
 // Root hält `focusActive` als sichtbare Flag (CSS, body-Class, Template-Checks)
 // und die Live-Counter `focusCountWords`/`focusCountChars`, die der Header im
@@ -6,11 +7,11 @@
 
 export const focusMethods = {
   enterFocusMode() {
-    window.dispatchEvent(new CustomEvent('editor:focus:enter'));
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_FOCUS_ENTER));
   },
 
   exitFocusMode() {
-    window.dispatchEvent(new CustomEvent('editor:focus:exit'));
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_FOCUS_EXIT));
   },
 
   // Page-View-Direkteinstieg: Sub-Karte trampolinet Edit-Mode hoch und tritt
@@ -19,7 +20,7 @@ export const focusMethods = {
   // Mode-Übergang als ein Ganzes verbuchen kann (keine Race zwischen
   // startEdit() und enterFocusMode()).
   enterFocusFromPageview() {
-    window.dispatchEvent(new CustomEvent('editor:focus:enter-from-pageview'));
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_FOCUS_ENTER_FROM_PAGEVIEW));
   },
 
   // Global Cmd/Ctrl+Shift+E-Hotkey. Läuft auf dem Body-Listener (siehe index.html),
@@ -33,11 +34,11 @@ export const focusMethods = {
     if (!this.showEditorCard) return;
     event.preventDefault();
     if (this.focusActive) {
-      window.dispatchEvent(new CustomEvent('editor:focus:exit'));
+      window.dispatchEvent(new CustomEvent(EVT.EDITOR_FOCUS_EXIT));
     } else if (this.editMode) {
-      window.dispatchEvent(new CustomEvent('editor:focus:enter'));
+      window.dispatchEvent(new CustomEvent(EVT.EDITOR_FOCUS_ENTER));
     } else {
-      window.dispatchEvent(new CustomEvent('editor:focus:enter-from-pageview'));
+      window.dispatchEvent(new CustomEvent(EVT.EDITOR_FOCUS_ENTER_FROM_PAGEVIEW));
     }
   },
 };

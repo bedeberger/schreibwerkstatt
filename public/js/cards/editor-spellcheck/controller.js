@@ -28,6 +28,7 @@
 // im DOM existieren.
 
 import { buildOffsetTable, rangeFromOffset } from './mapping.js';
+import { EVT } from '../../events.js';
 
 const DEFAULT_DEBOUNCE_MS = 1500;
 const POPOVER_MAX_REPLACEMENTS = 5;
@@ -654,10 +655,10 @@ export function createSpellcheckController({
       squiggles.clear();
       _closePopover();
       _updateBadge('extension');
-      window.dispatchEvent(new CustomEvent('languagetool:extension-detected'));
+      window.dispatchEvent(new CustomEvent(EVT.LANGUAGETOOL_EXTENSION_DETECTED));
     } else if (!present && extensionDetected) {
       extensionDetected = false;
-      window.dispatchEvent(new CustomEvent('languagetool:extension-cleared'));
+      window.dispatchEvent(new CustomEvent(EVT.LANGUAGETOOL_EXTENSION_CLEARED));
       // Highlights wurden bei Detect geleert -> Re-Check erzwingen, auch wenn
       // der Text seit dem letzten Render unveraendert ist.
       _scheduleCheck({ force: true });

@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // Shared lifecycle helper for Buch-scoped Karten.
 //
 // Most Cards duplicate the same Pattern: clear timers + reset Meta-Flags on
@@ -83,9 +84,9 @@ export function setupCardLifecycle(ctx, cfg) {
     else if (cfg.load) cfg.load(root());
   };
 
-  window.addEventListener('book:changed', onBookChanged, { signal });
-  window.addEventListener('view:reset', onViewReset, { signal });
-  if (cfg.name) window.addEventListener('card:refresh', onCardRefresh, { signal });
+  window.addEventListener(EVT.BOOK_CHANGED, onBookChanged, { signal });
+  window.addEventListener(EVT.VIEW_RESET, onViewReset, { signal });
+  if (cfg.name) window.addEventListener(EVT.CARD_REFRESH, onCardRefresh, { signal });
 
   for (const { type, handler } of (cfg.extraListeners || [])) {
     window.addEventListener(type, handler, { signal });

@@ -17,6 +17,7 @@ import { installEditCounter } from '../shared/edit-counter.js';
 import { writeNormalSnapshot, clearNormalSnapshot, readEditorPrefs, writeEditorPrefs } from './storage.js';
 import { runQuoteNormalize } from '../shared/quote-normalize.js';
 import { ensureTrailingParagraph } from '../shared/auto-slot.js';
+import { EVT } from '../../events.js';
 
 // Auto-Save nach BookStack: idle-debounce + max-Cap. Jede Schreibaktion
 // resettet den Idle-Timer; läuft der User durchgehend, greift der Max-Timer.
@@ -1022,7 +1023,7 @@ export const notebookEditMethods = {
       app.quotesNormalizedFlash = null;
       app._quotesFlashTimer = null;
     }, 1800);
-    window.dispatchEvent(new CustomEvent('languagetool:recheck'));
+    window.dispatchEvent(new CustomEvent(EVT.LANGUAGETOOL_RECHECK));
   },
 
   // Trennlinie (<hr>) am Caret einfügen + Folge-Absatz für Weiterschreiben.

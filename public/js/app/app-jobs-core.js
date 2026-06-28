@@ -1,6 +1,7 @@
 import { escHtml, fmtTok, fetchJson } from '../utils.js';
 import { startPoll as _startPollFn, runningJobStatus as _runningJobStatusFn } from '../cards/job-helpers.js';
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
+import { EVT } from '../events.js';
 
 // Auto-Open für Reconnect-Pfade: nur wenn keine Hauptkarte/Editor offen ist.
 // Verhindert, dass ein spät resolvender Reconnect den vom User geöffneten
@@ -214,7 +215,7 @@ export const appJobsCoreMethods = {
       if (!resp.ok) return;
       const job = await resp.json();
       if (job.status !== 'done' && job.status !== 'error' && job.status !== 'cancelled') return;
-      window.dispatchEvent(new CustomEvent('job:finished', {
+      window.dispatchEvent(new CustomEvent(EVT.JOB_FINISHED, {
         detail: { type: meta.type, jobId, job, dedupId: meta.dedupId, bookId: meta.bookId },
       }));
     } catch { /* ignore */ }
@@ -339,7 +340,7 @@ export const appJobsCoreMethods = {
     }, this._abortCtrl?.signal ? { signal: this._abortCtrl.signal } : false);
     // Sofort-Refresh: Feature-Module dispatchen `job:enqueued` nach POST,
     // damit der Footer den frischen Job nicht erst nach bis zu 5s sieht.
-    window.addEventListener('job:enqueued', () => poll());
+    window.addEventListener(EVT.JOB_ENQUEUED, () => poll());
   },
 
   async _pollJobQueue() {
@@ -419,7 +420,7 @@ export const appJobsCoreMethods = {
       const draftId = parseInt(draftPart, 10);
       if (!draftId) return;
       if (!this.showFigurWerkstattCard) await this.toggleFigurWerkstattCard();
-      window.dispatchEvent(new CustomEvent('figur-werkstatt:select', {
+      window.dispatchEvent(new CustomEvent(EVT.FIGUR_WERKSTATT_SELECT, {
         detail: { draftId, knotenId: knotenPart || null },
       }));
       return;
@@ -450,7 +451,7 @@ export const appJobsCoreMethods = {
   async checkPendingJobs(bookId) {
     await this._reconnectJob('lektorat_review_job_' + bookId, (job, jobId) => {
       if (canAutoOpenCard(this)) this.showBookReviewCard = true;
-      window.dispatchEvent(new CustomEvent('job:reconnect', {
+      window.dispatchEvent(new CustomEvent(EVT.JOB_RECONNECT, {
         detail: { type: 'review', jobId, job },
       }));
     });
@@ -483,7 +484,7 @@ export const appJobsCoreMethods = {
     if (winners.length > 0) {
       if (canAutoOpenCard(this)) this.showKapitelReviewCard = true;
       for (const w of winners) {
-        window.dispatchEvent(new CustomEvent('job:reconnect', {
+        window.dispatchEvent(new CustomEvent(EVT.JOB_RECONNECT, {
           detail: { type: 'kapitel-review', jobId: w.jobId, job: w.job, extra: { chapterId: w.chapterId } },
         }));
       }

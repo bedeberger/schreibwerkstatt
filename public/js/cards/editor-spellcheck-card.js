@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // Alpine.data('editorSpellcheckCard') — globale Sub-Komponente fuer den
 // LanguageTool-Konflikt-Banner. Der eigentliche Spellcheck-Controller wird
 // von den drei Editoren (Notebook, Focus, Bucheditor) instanziiert; dieses
@@ -22,13 +23,13 @@ export function registerEditorSpellcheckCard() {
       try { this.dismissed = sessionStorage.getItem(DISMISS_KEY) === '1'; } catch {}
       this._onDetected = () => { this.extensionDetected = true; };
       this._onCleared = () => { this.extensionDetected = false; };
-      window.addEventListener('languagetool:extension-detected', this._onDetected);
-      window.addEventListener('languagetool:extension-cleared', this._onCleared);
+      window.addEventListener(EVT.LANGUAGETOOL_EXTENSION_DETECTED, this._onDetected);
+      window.addEventListener(EVT.LANGUAGETOOL_EXTENSION_CLEARED, this._onCleared);
     },
 
     destroy() {
-      if (this._onDetected) window.removeEventListener('languagetool:extension-detected', this._onDetected);
-      if (this._onCleared) window.removeEventListener('languagetool:extension-cleared', this._onCleared);
+      if (this._onDetected) window.removeEventListener(EVT.LANGUAGETOOL_EXTENSION_DETECTED, this._onDetected);
+      if (this._onCleared) window.removeEventListener(EVT.LANGUAGETOOL_EXTENSION_CLEARED, this._onCleared);
     },
 
     dismissBanner() {

@@ -21,6 +21,7 @@ import { bookEditorCommentsMethods } from '../editor/book-editor-comments.js';
 import { stripFocusArtefacts, htmlToText, fetchJson, escHtml } from '../utils.js';
 import { handleEditorPaste, handleEditorCopy, handleEditorCut } from '../editor/shared/paste.js';
 import { savePage } from '../editor/shared/page-api.js';
+import { EVT } from '../events.js';
 
 const AUTOSAVE_IDLE_MS = 60000;
 const AUTOSAVE_MAX_MS = 120000;
@@ -193,13 +194,13 @@ export function registerBookEditorCard() {
 
       // Cmd/Ctrl+F-Routing via editor-find-card: dispatcht hierher, wenn die
       // Karte sichtbar ist (statt BookStack-Search zu fokussieren).
-      window.addEventListener('book-editor:open-find', () => {
+      window.addEventListener(EVT.BOOK_EDITOR_OPEN_FIND, () => {
         if (window.__app?.showBookEditorCard) this.openFind();
       }, { signal: this._lifecycle.signal });
 
       // Sprung aus der „Geteilte Links"-Karte (Buch-/Kapitel-Share): zur
       // kommentierten Stelle im Stream + Thread in der Leiste öffnen.
-      window.addEventListener('book-editor:goto-comment', (e) => {
+      window.addEventListener(EVT.BOOK_EDITOR_GOTO_COMMENT, (e) => {
         this.commentRailVisible = true;
         this._pendingGotoBid = e.detail?.bid || null;
         if (this.blocks.length) this._scheduleCommentRecompute();

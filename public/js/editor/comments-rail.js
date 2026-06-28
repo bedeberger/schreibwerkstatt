@@ -20,6 +20,7 @@
 // Blatt zur verankerten Stelle (comment-rail-layout.js wird hier nicht genutzt).
 
 import { createCommentRail } from './comment-rail-core.js';
+import { EVT } from '../events.js';
 
 // Read-Modus-Seitenansicht. Scope auf `.page-view-wrap`, weil der Edit-Modus
 // ein zweites, früher im DOM stehendes `.page-content-view--editing` (leerer
@@ -89,15 +90,15 @@ export const editorCommentsRailMethods = {
     this.$watch(() => window.__app?.editMode, () => this.scheduleRecompute());
     this.$watch(() => window.__app?.checkDone, () => this.scheduleRecompute());
     this.$watch(() => window.__app?.renderedPageHtml, () => this.scheduleRecompute());
-    window.addEventListener('view:reset', () => this._onBookChange(null), { signal: this._railAbort.signal });
+    window.addEventListener(EVT.VIEW_RESET, () => this._onBookChange(null), { signal: this._railAbort.signal });
     // Toggle-Button in den Seiten-Actions (Root-Scope) steuert die Sichtbarkeit
     // per Window-Event (Trampolin, da der Button nicht im Karten-Scope liegt).
-    window.addEventListener('comments-rail:toggle', () => this.toggleRail(), { signal: this._railAbort.signal });
+    window.addEventListener(EVT.COMMENTS_RAIL_TOGGLE, () => this.toggleRail(), { signal: this._railAbort.signal });
     // Klick ausserhalb des offenen Threads (Seitentext, Chrome) schliesst ihn wieder.
     document.addEventListener('click', (e) => this._railDeselectOutside(e), { signal: this._railAbort.signal });
     // Sprung aus der „Geteilte Links"-Karte (Seiten-Share): Leiste öffnen + Thread
     // zu diesem data-bid selektieren (Pendant zum Bucheditor-Sprung).
-    window.addEventListener('comments-rail:goto', (e) => {
+    window.addEventListener(EVT.COMMENTS_RAIL_GOTO, (e) => {
       this.commentRailVisible = true;
       this._pendingGotoBid = e.detail?.bid || null;
       this.scheduleRecompute();

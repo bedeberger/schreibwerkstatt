@@ -1,6 +1,7 @@
 import { htmlToText, CHARS_PER_TOKEN, fetchJson, localeTag, relativeDay, tzOpts } from '../utils.js';
 import { htmlToPlainText } from '../html-text.js';
 import { contentRepo } from '../repo/content.js';
+import { EVT } from '../events.js';
 
 // Buch-/Seiten-Lade-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.
@@ -369,7 +370,7 @@ export const treeMethods = {
         this.entitiesEnabledForCurrentBook = !next;
         throw new Error('HTTP ' + res.status);
       }
-      window.dispatchEvent(new CustomEvent('book:settings:updated', { detail: {
+      window.dispatchEvent(new CustomEvent(EVT.BOOK_SETTINGS_UPDATED, { detail: {
         bookId: id, entities_enabled: next ? 1 : 0,
       }}));
     } catch (e) {
@@ -654,7 +655,7 @@ export const treeMethods = {
       // explizit auf diesen Event statt auf einen $watch der Tree-Identität —
       // so können dieselben Karten auch In-Place-Mutationen am Tree machen,
       // ohne sich selbst rekursiv neu zu rendern.
-      window.dispatchEvent(new CustomEvent('pages:loaded', { detail: { bookId } }));
+      window.dispatchEvent(new CustomEvent(EVT.PAGES_LOADED, { detail: { bookId } }));
     } catch (e) {
       // AbortError = Buchwechsel hat laufenden Load gekillt — kein User-Fehler.
       // Nachfolge-Call managed treeLoading + Tree selbst, hier nichts touchen.

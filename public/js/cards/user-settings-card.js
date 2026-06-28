@@ -5,6 +5,7 @@
 // book:changed-Hook nötig.
 
 import { userSettingsMethods } from '../user-settings.js';
+import { EVT } from '../events.js';
 
 export function registerUserSettingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -56,7 +57,7 @@ export function registerUserSettingsCard() {
         this.userSettingsSaved = false;
         this.userSettingsError = '';
       };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     async loadDictEntries() {
@@ -84,7 +85,7 @@ export function registerUserSettingsCard() {
 
     destroy() {
       if (this._savedAtTimer) { clearTimeout(this._savedAtTimer); this._savedAtTimer = null; }
-      if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
+      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     ...userSettingsMethods,

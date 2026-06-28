@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // Interne Navigation zwischen Buch-Views. `_beginNavigation/_endNavigation`
 // klammern zusammengesetzte Karten-Öffnungen (z.B. openFigurById →
 // toggleFiguresCard → scrollIntoView), damit der Hash-Router nur EINEN
@@ -79,7 +80,7 @@ export const appNavigationMethods = {
       }
       // Sub übernimmt Draft-Wechsel via figur-werkstatt:select. Drafts evtl.
       // noch nicht geladen → Sub parkt _pendingDraftId und löst nach loadDrafts.
-      window.dispatchEvent(new CustomEvent('figur-werkstatt:select', {
+      window.dispatchEvent(new CustomEvent(EVT.FIGUR_WERKSTATT_SELECT, {
         detail: { draftId },
       }));
       this.werkstattDraftId = draftId;
@@ -97,7 +98,7 @@ export const appNavigationMethods = {
       if (!this.showPlotCard) {
         await this.togglePlotCard();
       }
-      window.dispatchEvent(new CustomEvent('plot:filter-draft-figure', {
+      window.dispatchEvent(new CustomEvent(EVT.PLOT_FILTER_DRAFT_FIGURE, {
         detail: { draftId },
       }));
     } finally {

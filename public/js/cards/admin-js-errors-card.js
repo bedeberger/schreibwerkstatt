@@ -3,6 +3,7 @@
 // (`showAdminJsErrorsCard`) im Root.
 
 import { adminJsErrorsMethods } from '../admin/js-errors.js';
+import { EVT } from '../events.js';
 
 export function registerAdminJsErrorsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -26,12 +27,12 @@ export function registerAdminJsErrorsCard() {
         this.jsErrorsError = '';
         this.jsErrorsInitialized = false;
       };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
       this._jsErrorsLeave();
-      if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
+      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     ...adminJsErrorsMethods,

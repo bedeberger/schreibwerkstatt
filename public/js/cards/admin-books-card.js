@@ -2,6 +2,7 @@
 // `showAdminBooksCard` und Toggle `toggleAdminBooksCard` leben im Root.
 
 import { adminBooksMethods } from '../admin/admin-books.js';
+import { EVT } from '../events.js';
 
 export function registerAdminBooksCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -20,11 +21,11 @@ export function registerAdminBooksCard() {
         await this.loadAll();
       });
       this._onViewReset = () => { this.error = ''; };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
-      if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
+      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     ...adminBooksMethods,

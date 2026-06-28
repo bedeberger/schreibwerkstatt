@@ -1,3 +1,4 @@
+import { EVT } from '../../events.js';
 'use strict';
 // STT-Diktat (nur Notebook-Editor). Mic-Button in der Notebook-Toolbar nimmt
 // kontinuierlich auf; browserseitiges VAD (WebAudio-RMS) schneidet an
@@ -216,8 +217,8 @@ export const sttDictationMethods = {
       this.sttCaretUserSet = false;
       if (this.sttRecording || this.sttPending) this._sttStop();
     };
-    window.addEventListener('book:changed', stop, { signal });
-    window.addEventListener('view:reset', stop, { signal });
+    window.addEventListener(EVT.BOOK_CHANGED, stop, { signal });
+    window.addEventListener(EVT.VIEW_RESET, stop, { signal });
     // Edit-Modus verlassen / Seite gewechselt -> Aufnahme beenden, Mic freigeben.
     this.$watch('editMode', (on) => { if (!on) stop(); });
     this.$watch(() => this.currentPage?.id, () => stop());

@@ -1,3 +1,4 @@
+import { EVT } from '../../events.js';
 'use strict';
 // Proof-Listening / Text-to-Speech (Notebook-Seitenansicht, Read-Modus). Liest
 // den gerenderten Seitentext satzweise vor: pro Satz ein POST /tts/speak, das
@@ -184,8 +185,8 @@ export const ttsProofMethods = {
     activeRt = null;
     this._ttsFailToasted = false; // Fehler-Toast nur einmal pro Session (kein Flood)
     const stop = () => { if (this.ttsPlaying) this._ttsStop(); };
-    window.addEventListener('book:changed', stop, { signal });
-    window.addEventListener('view:reset', stop, { signal });
+    window.addEventListener(EVT.BOOK_CHANGED, stop, { signal });
+    window.addEventListener(EVT.VIEW_RESET, stop, { signal });
     // In den Edit-Modus wechseln (Dock ist read-only) / Seite gewechselt ->
     // Vorlesen beenden, Audio freigeben.
     this.$watch('editMode', (on) => { if (on) stop(); });

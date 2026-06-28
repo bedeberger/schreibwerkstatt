@@ -3,6 +3,7 @@
 // (`showAdminLogsCard`) im Root.
 
 import { adminLogsMethods, ADMIN_LOGS_LEVELS } from '../admin/admin-logs.js';
+import { EVT } from '../events.js';
 
 export function registerAdminLogsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -39,12 +40,12 @@ export function registerAdminLogsCard() {
         this.adminLogsExpanded = {};
         this.adminLogsInitialized = false;
       };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
       this._adminLogsLeave();
-      if (this._onViewReset) window.removeEventListener('view:reset', this._onViewReset);
+      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     ...adminLogsMethods,

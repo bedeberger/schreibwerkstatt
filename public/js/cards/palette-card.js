@@ -19,6 +19,7 @@ import {
 } from './feature-registry.js';
 import { fuzzyMatch, highlight } from './palette-fuzzy.js';
 import { PROVIDERS, parseQuery } from './palette-providers.js';
+import { EVT } from '../events.js';
 
 // Score-Budget pro Query-Char für Provider-Treffer im Mix-Modus.
 // Höhere Query-Länge = grössere absolute fuzzyMatch-Scores (Gap-Penalty
@@ -49,12 +50,12 @@ export function registerPaletteCard() {
       this._paletteAbort = abort;
       const signal = abort.signal;
 
-      window.addEventListener('palette:open', () => this.openPalette(), { signal });
-      window.addEventListener('palette:close', () => this.closePalette(), { signal });
+      window.addEventListener(EVT.PALETTE_OPEN, () => this.openPalette(), { signal });
+      window.addEventListener(EVT.PALETTE_CLOSE, () => this.closePalette(), { signal });
       // Async-Provider (Fulltext) signalisiert via 'palette:rerender'
       // dass sich der Cache geaendert hat — Sections-Cache nullen, damit
       // paletteSections() neu rechnet.
-      window.addEventListener('palette:rerender', () => {
+      window.addEventListener(EVT.PALETTE_RERENDER, () => {
         this._sectionsCache = null;
         this._sectionsCacheKey = '';
         this._flatCache = null;

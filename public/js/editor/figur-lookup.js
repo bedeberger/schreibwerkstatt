@@ -14,6 +14,7 @@
 
 import { normalizeName, attachReflow, positionPopupNearRect, rangeForWordAtClientPoint } from './utils.js';
 import { getActiveEditorMode } from './shared/active-editor.js';
+import { EVT } from '../events.js';
 
 function extractYear(geburtstag) {
   if (!geburtstag) return null;
@@ -93,7 +94,7 @@ export const figurLookupMethods = {
     if (!fig) return false;
     e.preventDefault();
     e.stopPropagation();
-    window.dispatchEvent(new CustomEvent('editor:figur-lookup:open', {
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_FIGUR_LOOKUP_OPEN, {
       detail: { fig, x: e.clientX, y: e.clientY },
     }));
     return true;
@@ -102,7 +103,7 @@ export const figurLookupMethods = {
   // Trampolin — Legacy-Aufrufer (resetPage, cancelEdit, focus-mode,
   // synonyme-close) rufen `closeFigurLookup()` am Root. Dispatcht an die Sub.
   closeFigurLookup() {
-    window.dispatchEvent(new CustomEvent('editor:figur-lookup:close'));
+    window.dispatchEvent(new CustomEvent(EVT.EDITOR_FIGUR_LOOKUP_CLOSE));
   },
 };
 

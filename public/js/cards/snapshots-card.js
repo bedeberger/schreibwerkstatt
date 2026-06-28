@@ -11,6 +11,7 @@ import { fromSnapshotTree } from '../manuscript-stream.js';
 import { renderSideBySide, renderInline } from '../page-revision-diff.js';
 import { diffSnapshots } from '../book-snapshot-diff.js';
 import { startPoll } from './job-helpers.js';
+import { EVT } from '../events.js';
 
 export function registerSnapshotsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -62,15 +63,15 @@ export function registerSnapshotsCard() {
       };
       this._onBookChanged = () => this.reset();
       this._onViewReset = () => this.reset();
-      window.addEventListener('card:refresh', this._onRefresh);
-      window.addEventListener('book:changed', this._onBookChanged);
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
-      window.removeEventListener('card:refresh', this._onRefresh);
-      window.removeEventListener('book:changed', this._onBookChanged);
-      window.removeEventListener('view:reset', this._onViewReset);
+      window.removeEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
+      window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
       this._stopPdfPoll();
     },
 

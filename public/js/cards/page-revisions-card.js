@@ -8,6 +8,7 @@
 import { fetchJson } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
 import { renderSideBySide } from '../page-revision-diff.js';
+import { EVT } from '../events.js';
 
 export function registerPageRevisionsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -44,12 +45,12 @@ export function registerPageRevisionsCard() {
         if (!pid || pid !== this._pageId) return;
         this.loadRevisions(pid, { fresh: true });
       };
-      window.addEventListener('page-revisions:changed', this._onRevisionsChanged);
+      window.addEventListener(EVT.PAGE_REVISIONS_CHANGED, this._onRevisionsChanged);
     },
 
     destroy() {
       if (this._onRevisionsChanged) {
-        window.removeEventListener('page-revisions:changed', this._onRevisionsChanged);
+        window.removeEventListener(EVT.PAGE_REVISIONS_CHANGED, this._onRevisionsChanged);
       }
     },
 

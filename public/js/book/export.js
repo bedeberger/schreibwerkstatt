@@ -1,3 +1,4 @@
+import { EVT } from '../events.js';
 // Buch/Kapitel/Seite-Export. Methoden in Alpine.data('exportCard') gespreadet;
 // Root-Zugriffe via window.__app.
 
@@ -111,7 +112,7 @@ export const exportMethods = {
       preset = { kind: 'chapter', id: this.exportChapterId };
     if (preset) {
       app.__exportPreset = preset;
-      window.dispatchEvent(new CustomEvent('export:preset', { detail: preset }));
+      window.dispatchEvent(new CustomEvent(EVT.EXPORT_PRESET, { detail: preset }));
     }
     app.togglePdfExportCard();
   },
@@ -126,7 +127,7 @@ export const exportMethods = {
       preset = { kind: 'chapter', id: this.exportChapterId };
     if (preset) {
       app.__epubExportPreset = preset;
-      window.dispatchEvent(new CustomEvent('export:epub:preset', { detail: preset }));
+      window.dispatchEvent(new CustomEvent(EVT.EXPORT_EPUB_PRESET, { detail: preset }));
     }
     app.toggleEpubExportCard();
   },
@@ -141,7 +142,7 @@ export const exportMethods = {
       preset = { kind: 'chapter', id: this.exportChapterId };
     if (preset) {
       app.__docxExportPreset = preset;
-      window.dispatchEvent(new CustomEvent('export:docx:preset', { detail: preset }));
+      window.dispatchEvent(new CustomEvent(EVT.EXPORT_DOCX_PRESET, { detail: preset }));
     }
     app.toggleDocxExportCard();
   },

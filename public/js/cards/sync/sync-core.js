@@ -1,3 +1,4 @@
+import { EVT } from '../../events.js';
 // Sync-Core — gemeinsame Logik für externe Buch-Sync-Provider (WordPress-Blog,
 // HubSpot-Blog, künftige Provider). `createSyncCard(spec)` liefert ein
 // Alpine.data-Objekt mit Links-Loading, Per-Page-Status, Push-Job-Trigger,
@@ -77,18 +78,18 @@ export function createSyncCard(spec) {
           }
           else if (refreshTypes.has(t)) window.__app?.loadPages?.();
         };
-        window.addEventListener('pages:loaded', this._onPagesLoaded);
-        window.addEventListener('book:changed', this._onBookChanged);
-        window.addEventListener('job:finished', this._onJobFinished);
+        window.addEventListener(EVT.PAGES_LOADED, this._onPagesLoaded);
+        window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
+        window.addEventListener(EVT.JOB_FINISHED, this._onJobFinished);
         if (typeof extInit === 'function') extInit.call(this);
       },
 
       destroy() {
         for (const t of Object.values(this._pushTimers)) clearInterval(t);
         this._pushTimers = {};
-        window.removeEventListener('pages:loaded', this._onPagesLoaded);
-        window.removeEventListener('book:changed', this._onBookChanged);
-        window.removeEventListener('job:finished', this._onJobFinished);
+        window.removeEventListener(EVT.PAGES_LOADED, this._onPagesLoaded);
+        window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
+        window.removeEventListener(EVT.JOB_FINISHED, this._onJobFinished);
         if (window[globalWindowKey] === this) window[globalWindowKey] = null;
         if (typeof extDestroy === 'function') extDestroy.call(this);
       },
@@ -162,7 +163,7 @@ export function createSyncCard(spec) {
           const data = await res.json();
           if (!res.ok) throw new Error(data.error_code || spec.pushErrorCode || `${spec.key.toUpperCase()}_PUSH_FAILED`);
           if (data.jobId) {
-            window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: pushType, jobId: data.jobId } }));
+            window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: pushType, jobId: data.jobId } }));
             this._pollPush(pageId, data.jobId);
           }
         } catch (e) {

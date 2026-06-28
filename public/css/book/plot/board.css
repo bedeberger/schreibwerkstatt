@@ -325,21 +325,6 @@
   .plot-fig-chip.tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
   /* Werkstatt-Badge im Beat-Meta (Ansichtsmodus). */
   .plot-beat-meta .tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
-  /* Vom Strang geerbte Figur/Kapitel: gedämpft + gepunkteter Rahmen = „nicht
-     direkt am Beat gesetzt, sondern vom Strang vererbt" (live, nicht gespeichert). */
-  .plot-beat-meta .tag--inherited {
-    border: 1px dotted var(--color-border);
-    background: transparent;
-    color: var(--color-muted);
-    opacity: 0.85;
-  }
-  .plot-beat-meta .tag--inherited.tag--werkstatt { border-style: dotted; }
-  .plot-beat-meta .kapitel-badge--inherited {
-    border: 1px dotted var(--color-border);
-    background: transparent;
-    color: var(--color-muted);
-    opacity: 0.85;
-  }
   .plot-beat-edit-actions {
     display: flex;
     align-items: center;

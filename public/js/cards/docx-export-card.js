@@ -11,6 +11,7 @@
 // `showDocxExportCard` bleibt im Root (Hash-Router + Exklusivität).
 
 import { startPoll } from './job-helpers.js';
+import { EVT } from '../events.js';
 
 export function registerDocxExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -59,12 +60,12 @@ export function registerDocxExportCard() {
       this.$watch(() => window.__app?.currentPage?.id, () => this._ensureExportPicked());
 
       this._onExportPreset = (e) => this._applyExportPreset(e.detail);
-      window.addEventListener('export:docx:preset', this._onExportPreset);
+      window.addEventListener(EVT.EXPORT_DOCX_PRESET, this._onExportPreset);
       const pending = window.__app?.__docxExportPreset;
       if (pending) { this._applyExportPreset(pending); window.__app.__docxExportPreset = null; }
 
       this._onBookChanged = () => { this._resetExportState(); this._ensureExportPicked(); };
-      window.addEventListener('book:changed', this._onBookChanged);
+      window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
 
       this._onViewReset = () => {
         this._resetExportState();
@@ -74,16 +75,16 @@ export function registerDocxExportCard() {
         this.exportPageId = null;
         this.activeTab = 'layout';
       };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
       this._stopPoll();
       if (this._savedAtTimer)      { clearTimeout(this._savedAtTimer);      this._savedAtTimer = null; }
       if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
-      if (this._onBookChanged)  window.removeEventListener('book:changed',       this._onBookChanged);
-      if (this._onViewReset)    window.removeEventListener('view:reset',         this._onViewReset);
-      if (this._onExportPreset) window.removeEventListener('export:docx:preset', this._onExportPreset);
+      if (this._onBookChanged)  window.removeEventListener(EVT.BOOK_CHANGED,       this._onBookChanged);
+      if (this._onViewReset)    window.removeEventListener(EVT.VIEW_RESET,         this._onViewReset);
+      if (this._onExportPreset) window.removeEventListener(EVT.EXPORT_DOCX_PRESET, this._onExportPreset);
     },
 
     _resetExportState() {

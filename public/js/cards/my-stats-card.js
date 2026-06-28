@@ -6,6 +6,7 @@
 
 import { loadChart } from '../lazy-libs.js';
 import { tzOpts, localIsoDate, localIsoDaysAgo } from '../utils.js';
+import { EVT } from '../events.js';
 import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones,
          computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
          computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
@@ -72,11 +73,11 @@ export function registerMyStatsCard() {
       this._onRefresh = (ev) => {
         if (ev?.detail?.name === 'myStats') this.loadMyStats();
       };
-      window.addEventListener('card:refresh', this._onRefresh);
+      window.addEventListener(EVT.CARD_REFRESH, this._onRefresh);
     },
 
     destroy() {
-      if (this._onRefresh) window.removeEventListener('card:refresh', this._onRefresh);
+      if (this._onRefresh) window.removeEventListener(EVT.CARD_REFRESH, this._onRefresh);
       this._destroyChart();
       if (_themeObserver) { _themeObserver.disconnect(); _themeObserver = null; }
     },

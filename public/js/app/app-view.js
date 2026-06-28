@@ -5,6 +5,7 @@ import { contentRepo } from '../repo/content.js';
 import { readDraft, clearDraft } from '../editor/draft-storage.js';
 import { setLastPageId, getLastPageId, getFilters } from '../local-prefs.js';
 import { getDeviceId } from '../device-id.js';
+import { EVT } from '../events.js';
 
 // Karten-Scopes, deren Filter pro Buch im localStorage persistiert werden.
 // Defaults werden bei Buchwechsel angewandt; gespeicherte Werte überschreiben
@@ -26,7 +27,7 @@ export const FILTER_SCOPES = [
 async function _toggleCardGeneric(entry) {
   if (this[entry.flag]) {
     if (entry.onReclick === 'refresh') {
-      window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: entry.refreshName || entry.key } }));
+      window.dispatchEvent(new CustomEvent(EVT.CARD_REFRESH, { detail: { name: entry.refreshName || entry.key } }));
       this._scrollToCardByKey(entry.key);
     } else {
       this[entry.flag] = false;
@@ -40,7 +41,7 @@ async function _toggleCardGeneric(entry) {
   this._scrollToCardByKey(entry.key);
   if (entry.auditEvent) this.logAuditEvent?.(entry.auditEvent, { book: this.selectedBookId });
   if (entry.extraRefreshOnOpen) {
-    window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: entry.key } }));
+    window.dispatchEvent(new CustomEvent(EVT.CARD_REFRESH, { detail: { name: entry.key } }));
   }
   if (entry.loadDeps?.length) {
     const tasks = [];
@@ -382,7 +383,7 @@ export const appViewMethods = {
   openRueckblickFor(zeitraum) {
     if (!zeitraum) return;
     this.pendingRueckblickZeitraum = zeitraum;
-    window.dispatchEvent(new CustomEvent('rueckblick:select', { detail: { zeitraum } }));
+    window.dispatchEvent(new CustomEvent(EVT.RUECKBLICK_SELECT, { detail: { zeitraum } }));
     if (!this.showTagebuchRueckblickCard) this.toggleTagebuchRueckblickCard();
     else this._scrollToCardByKey('tagebuchRueckblick');
   },
@@ -545,7 +546,7 @@ export const appViewMethods = {
     await this._ensurePartial('recherche');
     // Filter-Event VOR dem Sichtbar-Schalten: bei frischem Öffnen liest der
     // Lifecycle-Load (rising edge) den schon gesetzten Filter → ein Fetch.
-    window.dispatchEvent(new CustomEvent('recherche:filter-page', { detail: { pageId: pid } }));
+    window.dispatchEvent(new CustomEvent(EVT.RECHERCHE_FILTER_PAGE, { detail: { pageId: pid } }));
     if (!this.showRechercheCard) {
       this._closeOtherMainCards('recherche');
       this.showRechercheCard = true;
@@ -558,7 +559,7 @@ export const appViewMethods = {
     const cid = parseInt(chapterId, 10);
     if (!cid) return;
     await this._ensurePartial('recherche');
-    window.dispatchEvent(new CustomEvent('recherche:filter-chapter', { detail: { chapterId: cid } }));
+    window.dispatchEvent(new CustomEvent(EVT.RECHERCHE_FILTER_CHAPTER, { detail: { chapterId: cid } }));
     if (!this.showRechercheCard) {
       this._closeOtherMainCards('recherche');
       this.showRechercheCard = true;
@@ -612,10 +613,10 @@ export const appViewMethods = {
   },
   // Seitenwechsel: Seiten-Chat resetten (Chat ist pro Seite).
   resetChat() {
-    window.dispatchEvent(new CustomEvent('chat:reset'));
+    window.dispatchEvent(new CustomEvent(EVT.CHAT_RESET));
   },
   resetBookChat() {
-    window.dispatchEvent(new CustomEvent('book-chat:reset'));
+    window.dispatchEvent(new CustomEvent(EVT.BOOK_CHAT_RESET));
   },
 
   async toggleTreeCard() {
@@ -709,7 +710,7 @@ export const appViewMethods = {
     // das neue Buch parallel lädt.
     this._bookLoadAbort?.abort(new DOMException('book switch', 'AbortError'));
     this._bookLoadAbort = null;
-    window.dispatchEvent(new CustomEvent('book:changed', {
+    window.dispatchEvent(new CustomEvent(EVT.BOOK_CHANGED, {
       detail: { bookId: this.selectedBookId },
     }));
     this._stopCollabPoll?.();
@@ -843,7 +844,7 @@ export const appViewMethods = {
       if (!needsRetry) {
         for (const c of EXCLUSIVE_CARDS) {
           if (this[c.flag]) {
-            window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: c.key } }));
+            window.dispatchEvent(new CustomEvent(EVT.CARD_REFRESH, { detail: { name: c.key } }));
           }
         }
       }
@@ -870,7 +871,7 @@ export const appViewMethods = {
   // Setzt alles zurück: Seiten-Level (via resetPage) + Buch-Level.
   // Sub-Komponenten hören auf `view:reset` und resetten eigenen State.
   async resetView() {
-    window.dispatchEvent(new CustomEvent('view:reset'));
+    window.dispatchEvent(new CustomEvent(EVT.VIEW_RESET));
     this.resetPage();
     // Kapitel in der Sidebar bleiben geöffnet (kein c.open = false)
     this.showTreeCard = true;
@@ -959,7 +960,7 @@ export const appViewMethods = {
       this._captureShareReturn();
       await this.toggleShareLinksCard();
     } else {
-      window.dispatchEvent(new CustomEvent('share:prefill', { detail: { kind: 'page', id: pageId } }));
+      window.dispatchEvent(new CustomEvent(EVT.SHARE_PREFILL, { detail: { kind: 'page', id: pageId } }));
       this._scrollToCardByKey('shareLinks');
     }
   },
@@ -970,7 +971,7 @@ export const appViewMethods = {
       this._captureShareReturn();
       await this.toggleShareLinksCard();
     } else {
-      window.dispatchEvent(new CustomEvent('share:prefill', { detail: { kind: 'chapter', id: chapterId } }));
+      window.dispatchEvent(new CustomEvent(EVT.SHARE_PREFILL, { detail: { kind: 'chapter', id: chapterId } }));
       this._scrollToCardByKey('shareLinks');
     }
   },
@@ -982,7 +983,7 @@ export const appViewMethods = {
       this._captureShareReturn();
       await this.toggleShareLinksCard();
     } else {
-      window.dispatchEvent(new CustomEvent('share:prefill', { detail: { kind: 'book' } }));
+      window.dispatchEvent(new CustomEvent(EVT.SHARE_PREFILL, { detail: { kind: 'book' } }));
       this._scrollToCardByKey('shareLinks');
     }
   },

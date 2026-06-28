@@ -1,4 +1,5 @@
 import { fetchJson, clearStatusAfter, formatLastRun } from '../utils.js';
+import { EVT } from '../events.js';
 
 // Komplett-Analyse-Pipeline-UI: Start, Polling, Phasen-Indikator,
 // Last-Run-Anzeige, Kapitel-Cache-Reset.
@@ -37,7 +38,7 @@ export const appKomplettMethods = {
       });
       // Sofort-Refresh des Footer-Polls, sonst sieht die Job-Queue-Bar den Job
       // erst nach bis zu 5 s und driftet so lange gegen die 2-s-Karten-Bar.
-      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'komplett-analyse', jobId } }));
+      window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: 'komplett-analyse', jobId } }));
       this._startKomplettPoll(jobId, bookId);
     } catch (e) {
       console.error('[alleAktualisieren]', e);
@@ -74,7 +75,7 @@ export const appKomplettMethods = {
         try {
           // _loadKontinuitaetHistory lebt auf kontinuitaetCard (nicht im Root) —
           // Card per card:refresh-Event reloaden lassen (Lifecycle hört darauf).
-          window.dispatchEvent(new CustomEvent('card:refresh', { detail: { name: 'kontinuitaet' } }));
+          window.dispatchEvent(new CustomEvent(EVT.CARD_REFRESH, { detail: { name: 'kontinuitaet' } }));
           await Promise.all([
             this.loadFiguren(bookId),
             this.loadOrte(bookId),

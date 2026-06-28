@@ -3,6 +3,7 @@
 // `showBookOverviewCard` lebt im Root (Hash-Router, Exklusivität).
 
 import { bookOverviewMethods } from '../book-overview.js';
+import { EVT } from '../events.js';
 
 export function registerBookOverviewCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -60,18 +61,18 @@ export function registerBookOverviewCard() {
         // loadBookOverview via overviewBookId-Guard verworfen.
         scheduleLoad();
       };
-      window.addEventListener('book:changed', this._onBookChanged);
+      window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
 
       // resetView setzt zuerst showBookOverviewCard=false, dann _maybeOpenBookOverview
       // wieder true — Alpine $watch coalesciert false→true zu no-op, daher
       // explizit nachschieben.
       this._onViewReset = () => { scheduleLoad(); };
-      window.addEventListener('view:reset', this._onViewReset);
+      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     destroy() {
-      if (this._onBookChanged) window.removeEventListener('book:changed', this._onBookChanged);
-      if (this._onViewReset)   window.removeEventListener('view:reset', this._onViewReset);
+      if (this._onBookChanged) window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
+      if (this._onViewReset)   window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
     },
 
     ...bookOverviewMethods,

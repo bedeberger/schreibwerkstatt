@@ -7,6 +7,7 @@
 //   _markEditDirty(). Zugriff via window.__app / $app.
 
 import { editorFindCardMethods } from '../editor/find.js';
+import { EVT } from '../events.js';
 
 export function registerEditorFindCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -42,15 +43,15 @@ export function registerEditorFindCard() {
           this.openFind();
         } else if (app.showBookEditorCard) {
           event.preventDefault();
-          window.dispatchEvent(new CustomEvent('book-editor:open-find'));
+          window.dispatchEvent(new CustomEvent(EVT.BOOK_EDITOR_OPEN_FIND));
         }
       }, { signal });
 
       // Find-Widget muss bei Buchwechsel/View-Reset geschlossen werden, sonst
       // bleibt der capture-phase Scroll-Listener am Window kleben (per Sub-
       // mount akkumuliert).
-      window.addEventListener('book:changed', () => this.closeFind?.(), { signal });
-      window.addEventListener('view:reset',   () => this.closeFind?.(), { signal });
+      window.addEventListener(EVT.BOOK_CHANGED, () => this.closeFind?.(), { signal });
+      window.addEventListener(EVT.VIEW_RESET,   () => this.closeFind?.(), { signal });
     },
 
     destroy() {

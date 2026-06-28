@@ -5,6 +5,7 @@
 import { fetchJson } from '../utils.js';
 import { contentRepo } from '../repo/content.js';
 import { countryOptions } from '../country-codes.js';
+import { EVT } from '../events.js';
 
 export const bookSettingsMethods = {
   async loadBookSettings() {
@@ -54,7 +55,7 @@ export const bookSettingsMethods = {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(window.__app.tError(data) || `HTTP ${res.status}`);
       this.stilprofilJobId = data.jobId;
-      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'stilprofil', jobId: data.jobId } }));
+      window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: 'stilprofil', jobId: data.jobId } }));
     } catch (e) {
       this.stilprofilGenerating = false;
       this.stilprofilError = e.message;
@@ -426,7 +427,7 @@ export const bookSettingsMethods = {
       if (String(window.__app.selectedBookId) === String(bookId)) {
         window.__app.pageHistory       = [];
         window.__app.bookReviewHistory = [];
-        window.dispatchEvent(new CustomEvent('chat:reset'));
+        window.dispatchEvent(new CustomEvent(EVT.CHAT_RESET));
       }
       if (this._resetMsgTimer) clearTimeout(this._resetMsgTimer);
       this._resetMsgTimer = setTimeout(() => { this.bookHistoryResetMessage = ''; this._resetMsgTimer = null; }, 6000);
@@ -773,7 +774,7 @@ export const bookSettingsMethods = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'BLOG_IMPORT_FAILED');
       this.blogImportJobId = data.jobId;
-      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'blog-import', jobId: data.jobId } }));
+      window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: 'blog-import', jobId: data.jobId } }));
     } catch (e) {
       this.blogError = window.__app.t('blog.error.' + e.message) || e.message;
     }
@@ -791,7 +792,7 @@ export const bookSettingsMethods = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'BLOG_PULL_FAILED');
       this.blogPullJobId = data.jobId;
-      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'blog-pull', jobId: data.jobId } }));
+      window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: 'blog-pull', jobId: data.jobId } }));
     } catch (e) {
       this.blogError = window.__app.t('blog.error.' + e.message) || e.message;
     }
@@ -810,7 +811,7 @@ export const bookSettingsMethods = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'BLOG_RECONCILE_FAILED');
       this.blogReconcileJobId = data.jobId;
-      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'blog-reconcile', jobId: data.jobId } }));
+      window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: 'blog-reconcile', jobId: data.jobId } }));
     } catch (e) {
       this.blogError = window.__app.t('blog.error.' + e.message) || e.message;
     }
@@ -978,7 +979,7 @@ export const bookSettingsMethods = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'HUBSPOT_IMPORT_FAILED');
       this.hubspotImportJobId = data.jobId;
-      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'hubspot-import', jobId: data.jobId } }));
+      window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: 'hubspot-import', jobId: data.jobId } }));
     } catch (e) {
       this.hubspotError = window.__app.t('hubspot.error.' + e.message) || e.message;
     }
@@ -997,7 +998,7 @@ export const bookSettingsMethods = {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_code || 'HUBSPOT_RECONCILE_FAILED');
       this.hubspotReconcileJobId = data.jobId;
-      window.dispatchEvent(new CustomEvent('job:enqueued', { detail: { type: 'hubspot-reconcile', jobId: data.jobId } }));
+      window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: 'hubspot-reconcile', jobId: data.jobId } }));
     } catch (e) {
       this.hubspotError = window.__app.t('hubspot.error.' + e.message) || e.message;
     }
