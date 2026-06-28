@@ -1789,6 +1789,7 @@
   "orte.map.clearAll": "Alle Georeferenzen löschen",
   "orte.map.clearAllConfirm": "Georeferenzen aller {n} verorteten Schauplätze entfernen? Die Schauplätze bleiben, nur die Koordinaten werden gelöscht.",
   "orte.map.allGeorefsCleared": "Georeferenzen von {n} Schauplätzen gelöscht.",
+  "orte.map.saveFailed": "Speichern fehlgeschlagen – die Änderung wurde verworfen.",
   "orte.col.typ": "Typ",
   "orte.col.name": "Name",
   "orte.col.land": "Land",

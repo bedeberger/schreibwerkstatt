@@ -1,12 +1,14 @@
 'use strict';
 const express = require('express');
-const { db, saveOrteToDb } = require('../db/schema');
+const { db, saveOrteToDb, patchOrtCoords } = require('../db/schema');
 const { toIntId, inClause } = require('../lib/validate');
 const { aclParamGuard } = require('../lib/acl');
+const { bookParamHandler } = require('../lib/log-context');
 const searchIndex = require('../lib/search');
 
 const router = express.Router();
 router.param('book_id', aclParamGuard('editor'));
+router.param('book_id', bookParamHandler);
 const jsonBody = express.json();
 
 // Schauplätze eines Buchs laden
@@ -98,6 +100,19 @@ router.put('/:book_id', jsonBody, (req, res) => {
   const locRows = db.prepare('SELECT id FROM locations WHERE book_id = ?').all(bookId);
   for (const r of locRows) searchIndex.upsertLocation(r.id);
   res.json({ ok: true });
+});
+
+// Nur Koordinaten einzelner Schauplätze patchen (Marker-Drag, Undo/Redo,
+// Georeferenz löschen). Kein Full-Replace → kollidiert nicht mit nebenläufigen
+// Edits und berührt FTS nicht (Index hängt an Name/Typ/Beschreibung, nicht an
+// lat/lng). Body: { patches: [{ id, lat, lng }] }.
+router.patch('/:book_id/coords', jsonBody, (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const userEmail = req.session?.user?.email || null;
+  const patches = Array.isArray(req.body.patches) ? req.body.patches : [];
+  const updated = patchOrtCoords(bookId, patches, userEmail);
+  res.json({ ok: true, updated });
 });
 
 module.exports = router;

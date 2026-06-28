@@ -21,7 +21,7 @@
                 @click="toggleRechercheFullscreen()"
                 :aria-label="rechercheFullscreen ? $app.t('recherche.fullscreenExit.tip') : $app.t('recherche.fullscreen.tip')"
                 :data-tip="rechercheFullscreen ? $app.t('recherche.fullscreenExit.tip') : $app.t('recherche.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="rechercheFullscreen ? '/icons.svg?v=693#minimize-2' : '/icons.svg?v=693#maximize-2'"/></svg></button>
-        <button type="button" class="icon-btn icon-btn--ghost" @click="$app.toggleBookStatsCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="$app.toggleRechercheCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
       </div>
     </div>
   </div>
@@ -322,7 +322,7 @@
             <!-- Tags -->
             <div class="research-tags" x-show="item.tags && item.tags.length">
               <template x-for="tag in item.tags" :key="tag">
-                <span class="research-tag" @click="filterTag = tag; applyFilters()" x-text="tag"></span>
+                <span class="research-tag internal-link" @click="filterTag = tag; applyFilters()" x-text="tag"></span>
               </template>
             </div>
 

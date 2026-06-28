@@ -42,6 +42,8 @@ export function registerWorldFactsCard() {
     wfFilters: { suche: '', kategorie: '', seite: '' },
     wfOpenGroups: {},
     _lifecycle: null,
+    // _memos: nicht-reaktiver Memo-Cache (lazy via _memo, Reset in loadWorldFacts) —
+    // bewusst nicht im reaktiven Initial-State, analog book-overview/load.js.
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
@@ -64,6 +66,11 @@ export function registerWorldFactsCard() {
         const data = await fetchJson('/world-facts/' + bookId);
         this.fakten = data?.fakten || [];
         this.wfUpdatedAt = data?.updated_at || null;
+        this._memos = {};
+        // Glossar startet aufgeklappt — reine Nachschlage-Ansicht, alle Gruppen offen.
+        const open = {};
+        for (const k of this.wfKategorieListe) open[k] = true;
+        this.wfOpenGroups = open;
       } catch (e) {
         console.error('[loadWorldFacts]', e);
       } finally {
@@ -71,10 +78,34 @@ export function registerWorldFactsCard() {
       }
     },
 
+    // Ein Memo-Helper pro Modul (Array-Deps, shallow ===). Reset bei Reload.
+    _memo(key, deps, compute) {
+      const memos = (this._memos ||= {});
+      const hit = memos[key];
+      if (hit && hit.deps.length === deps.length
+          && hit.deps.every((d, i) => d === deps[i])) {
+        return hit.value;
+      }
+      const value = compute();
+      memos[key] = { deps: [...deps], value };
+      return value;
+    },
+
+    // Einmal pro fakten-Satz: Counts je Kategorie + vorhandene Kategorien (kanonisch sortiert).
+    get _wfIndex() {
+      return this._memo('index', [this.fakten], () => {
+        const counts = {};
+        for (const f of this.fakten) {
+          const k = _normKat(f.kategorie);
+          counts[k] = (counts[k] || 0) + 1;
+        }
+        return { counts, present: KAT_ORDER.filter(k => counts[k]) };
+      });
+    },
+
     // Vorhandene Kategorien in kanonischer Reihenfolge (KAT_ORDER), nicht alphabetisch.
     get wfKategorieListe() {
-      const present = new Set(this.fakten.map(f => _normKat(f.kategorie)));
-      return KAT_ORDER.filter(k => present.has(k));
+      return this._wfIndex.present;
     },
 
     // i18n-Label + Lucide-Icon je Kategorie-Key (für Gruppen-Köpfe + Filter-Tabs).
@@ -85,8 +116,7 @@ export function registerWorldFactsCard() {
       return KAT_ICON[_normKat(key)] || KAT_ICON.sonstiges;
     },
     wfKatCount(key) {
-      const k = _normKat(key);
-      return this.fakten.reduce((n, f) => n + (_normKat(f.kategorie) === k ? 1 : 0), 0);
+      return this._wfIndex.counts[_normKat(key)] || 0;
     },
 
     wfToggleGroup(key) {
@@ -103,36 +133,45 @@ export function registerWorldFactsCard() {
     // Alle in Fakten referenzierten Kapitel-/Seitennamen (aus seite_label).
     // Fallback auf f.kapitel, falls die Junction-Tabelle befüllt ist.
     get wfSeiteListe() {
-      const refs = this.fakten.flatMap(f => f.seite ? [f.seite] : (f.kapitel || []));
-      return [...new Set(refs)].sort((a, b) => a.localeCompare(b));
+      return this._memo('seiten', [this.fakten], () => {
+        const refs = this.fakten.flatMap(f => f.seite ? [f.seite] : (f.kapitel || []));
+        return [...new Set(refs)].sort((a, b) => a.localeCompare(b));
+      });
     },
 
     get wfFiltered() {
-      const q = this.wfFilters.suche.trim().toLowerCase();
-      const kat = this.wfFilters.kategorie;
-      const seite = this.wfFilters.seite;
-      return this.fakten.filter(f => {
-        if (kat && _normKat(f.kategorie) !== kat) return false;
-        if (seite && f.seite !== seite && !(f.kapitel || []).includes(seite)) return false;
-        if (!q) return true;
-        return (f.fakt || '').toLowerCase().includes(q)
-          || (f.subjekt || '').toLowerCase().includes(q)
-          || this.wfKatLabel(f.kategorie).toLowerCase().includes(q);
+      const { suche, kategorie, seite } = this.wfFilters;
+      const locale = window.__app?.uiLocale;
+      return this._memo('filtered', [this.fakten, suche, kategorie, seite, locale], () => {
+        const q = suche.trim().toLowerCase();
+        return this.fakten.filter(f => {
+          if (kategorie && _normKat(f.kategorie) !== kategorie) return false;
+          if (seite && f.seite !== seite && !(f.kapitel || []).includes(seite)) return false;
+          if (!q) return true;
+          return (f.fakt || '').toLowerCase().includes(q)
+            || (f.subjekt || '').toLowerCase().includes(q)
+            || (f.seite || '').toLowerCase().includes(q)
+            || (f.kapitel || []).some(k => k.toLowerCase().includes(q))
+            || this.wfKatLabel(f.kategorie).toLowerCase().includes(q);
+        });
       });
     },
 
     // Gefilterte Fakten nach Kategorie gruppiert, in kanonischer Reihenfolge:
     // [{ kategorie (Key), fakten[] }].
     get wfGrouped() {
-      const groups = new Map();
-      for (const f of this.wfFiltered) {
-        const k = _normKat(f.kategorie);
-        if (!groups.has(k)) groups.set(k, []);
-        groups.get(k).push(f);
-      }
-      return KAT_ORDER
-        .filter(k => groups.has(k))
-        .map(k => ({ kategorie: k, fakten: groups.get(k) }));
+      const filtered = this.wfFiltered;
+      return this._memo('grouped', [filtered], () => {
+        const groups = new Map();
+        for (const f of filtered) {
+          const k = _normKat(f.kategorie);
+          if (!groups.has(k)) groups.set(k, []);
+          groups.get(k).push(f);
+        }
+        return KAT_ORDER
+          .filter(k => groups.has(k))
+          .map(k => ({ kategorie: k, fakten: groups.get(k) }));
+      });
     },
   }));
 }

@@ -55,11 +55,10 @@
       <div class="szenen-uebersicht-block">
         <div class="bewertung-section-title" x-text="$app.t('szenen.byFigur')"></div>
         <div class="szenen-count-badges">
-          <template x-for="f in $app.figuren" :key="f.id">
-            <span x-show="$app.szenen.some(s => s.fig_ids.includes(f.id))"
-              class="szenen-figur-count-badge"
-              :class="$app.szenen.filter(s => s.fig_ids.includes(f.id)).length < 3 ? 'szenen-figur-count-badge--wenig' : ''"
-              x-text="(f.kurzname || f.name) + ' · ' + $app.szenen.filter(s => s.fig_ids.includes(f.id)).length">
+          <template x-for="f in $app.szenenNachFigur" :key="f.id">
+            <span class="szenen-figur-count-badge"
+              :class="{ 'szenen-figur-count-badge--wenig': f.wenig }"
+              x-text="f.name + ' · ' + f.total">
             </span>
           </template>
         </div>
@@ -122,10 +121,10 @@
         <template x-for="w in ['stark','mittel','schwach']" :key="w">
           <button type="button" class="tabs-btn"
                   :class="{ 'tabs-btn--active': $app.szenenFilters.wertung === w }"
-                  :disabled="$app.szenen.filter(s => (s.wertung || 'mittel') === w).length === 0"
+                  :disabled="$app.szenenWertungCounts[w] === 0"
                   @click="$app.szenenFilters.wertung = $app.szenenFilters.wertung === w ? '' : w">
             <span x-text="$app.t('szenen.rating.' + w)"></span>
-            <span class="tabs-btn-count" x-text="$app.szenen.filter(s => (s.wertung || 'mittel') === w).length"></span>
+            <span class="tabs-btn-count" x-text="$app.szenenWertungCounts[w]"></span>
           </button>
         </template>
       </div>

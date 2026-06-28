@@ -8,8 +8,8 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('weltfakten.title')"></span>
-      <div class="card-subline" x-show="$app.alleAktualisierenLastRun && !wfLoading">
-        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.alleAktualisierenLastRun })"></span>
+      <div class="card-subline" x-show="wfUpdatedAt && !wfLoading">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $app.formatLastRun(wfUpdatedAt) })"></span>
       </div>
     </div>
   </div>
@@ -45,9 +45,10 @@
          x-data="combobox($app.t('weltfakten.filterKapitel'), $app.t('common.all'))"
          x-modelable="value" x-model="wfFilters.seite"
          x-effect="options = wfSeiteListe.map(s => ({ value: s, label: s }))"></div>
-    <div class="tabs tabs--scrollable" role="tablist" :aria-label="$app.t('weltfakten.title')">
+    <div class="tabs tabs--scrollable" role="group" :aria-label="$app.t('weltfakten.title')">
       <button type="button" class="tabs-btn"
               :class="{ 'tabs-btn--active': wfFilters.kategorie === '' }"
+              :aria-pressed="wfFilters.kategorie === ''"
               @click="wfFilters.kategorie = ''">
         <span x-text="$app.t('common.all')"></span>
         <span class="tabs-btn-count" x-text="fakten.length"></span>
@@ -55,6 +56,7 @@
       <template x-for="k in wfKategorieListe" :key="k">
         <button type="button" class="tabs-btn"
                 :class="{ 'tabs-btn--active': wfFilters.kategorie === k }"
+                :aria-pressed="wfFilters.kategorie === k"
                 @click="wfFilters.kategorie = wfFilters.kategorie === k ? '' : k">
           <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=636#' + wfKatIcon(k)"/></svg>
           <span x-text="wfKatLabel(k)"></span>
@@ -72,15 +74,16 @@
         <button type="button" class="collapsible-toggle weltfakten-group-head"
                 x-show="!wfFilters.kategorie"
                 @click="wfToggleGroup(g.kategorie)"
-                :aria-expanded="wfGroupOpen(g.kategorie)">
-          <span class="history-chevron" :class="{ open: wfGroupOpen(g.kategorie) }" aria-hidden="true">›</span>
+                :aria-expanded="wfGroupOpen(g.kategorie)"
+                :aria-controls="'wf-group-' + g.kategorie">
+          <span class="history-chevron" :class="{ open: wfGroupOpen(g.kategorie) }" aria-hidden="true"></span>
           <span class="tag entity-typ-tag weltfakten-kat-tag">
             <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=636#' + wfKatIcon(g.kategorie)"/></svg>
             <span x-text="wfKatLabel(g.kategorie)"></span>
           </span>
           <span class="weltfakten-group-count" x-text="g.fakten.length"></span>
         </button>
-        <div x-show="wfGroupOpen(g.kategorie)" x-cloak class="entity-list entity-list--accented">
+        <div x-show="wfGroupOpen(g.kategorie)" x-cloak :id="'wf-group-' + g.kategorie" class="entity-list entity-list--accented">
           <template x-for="f in g.fakten" :key="f.id">
             <div class="weltfakten-row" :class="{ 'weltfakten-row--nosubj': !f.subjekt }">
               <span x-show="f.subjekt" class="weltfakten-subjekt" x-text="f.subjekt"></span>

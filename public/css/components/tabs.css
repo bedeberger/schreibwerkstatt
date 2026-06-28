@@ -33,6 +33,8 @@
 
   .tabs-btn {
     position: relative;
+    display: inline-flex;
+    align-items: center;
     padding: var(--space-sm) 14px;
     font-size: var(--font-size-sm);
     font-weight: 500;

@@ -523,6 +523,32 @@ document.addEventListener('alpine:init', () => {
           return c !== 0 ? c : this._pageIdx(a.name) - this._pageIdx(b.name);
         });
     },
+    // Szenen-Anzahl pro Figur (nur Figuren mit ≥1 Szene), in Figuren-Reihenfolge.
+    // `wenig` markiert unterrepräsentierte Figuren (< 3 Szenen) für die
+    // Übersichts-Badges. Ersetzt die doppelte Inline-Filterung im Template.
+    get szenenNachFigur() {
+      const counts = new Map();
+      for (const s of this.szenen) {
+        for (const id of (s.fig_ids || [])) counts.set(id, (counts.get(id) || 0) + 1);
+      }
+      const out = [];
+      for (const f of this.figuren) {
+        const total = counts.get(f.id) || 0;
+        if (total === 0) continue;
+        out.push({ id: f.id, name: f.kurzname || f.name, total, wenig: total < 3 });
+      }
+      return out;
+    },
+    // Szenen-Anzahl pro Wertung (Default 'mittel' bei fehlender Wertung) für die
+    // Filter-Tabs. Ein Scan statt 6 Inline-Filter-Durchläufen pro Render.
+    get szenenWertungCounts() {
+      const c = { stark: 0, mittel: 0, schwach: 0 };
+      for (const s of this.szenen) {
+        const w = s.wertung || 'mittel';
+        if (w in c) c[w]++;
+      }
+      return c;
+    },
     get songsFiltered() {
       return applySongsFilters(this.songs, this.songsFilters).sort((a, b) => {
         const aK = Math.min(...(a.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
@@ -544,12 +570,30 @@ document.addEventListener('alpine:init', () => {
       return map;
     },
     get orteFiltered() {
-      const q = this.orteFilters.suche ? this.orteFilters.suche.toLowerCase() : '';
+      // Memo: Schlüssel aus den Eingaben, die das Ergebnis bestimmen (orte-/
+      // szenen-Referenz + Filterwerte). Bei Treffer dieselbe Array-Referenz →
+      // stabile x-for-Keys, und orteMapped()/unlocatedOrte() teilen sich das eine
+      // gefilterte Array statt es je neu zu rechnen. lat/lng-Mutationen ändern die
+      // Referenz nicht, fliessen aber als Live-Reads in die nachgelagerten Karten-
+      // Filter ein (kein Cache-Problem — Koordinaten sind hier kein Filterkriterium).
+      const f = this.orteFilters;
+      const sig = [this.orte, this.szenen, f.suche || '', f.figurId || '', f.kapitel || '', f.szeneId || ''];
+      const c = this._orteFilteredCache;
+      if (c && c.sig.length === sig.length && c.sig.every((v, i) => v === sig[i])) return c.val;
+      const val = this._computeOrteFiltered();
+      this._orteFilteredCache = { sig, val };
+      return val;
+    },
+    _computeOrteFiltered() {
+      const f = this.orteFilters;
+      const q = f.suche ? f.suche.toLowerCase() : '';
+      const matchText = (o) => !q || [o.name, o.typ, o.stimmung, o.beschreibung, o.land]
+        .some(v => v && String(v).toLowerCase().includes(q));
       return this.orte.filter(o =>
-        (!q || (o.name || '').toLowerCase().includes(q)) &&
-        (!this.orteFilters.figurId || (o.figuren || []).includes(this.orteFilters.figurId)) &&
-        (!this.orteFilters.kapitel || (o.kapitel || []).some(k => k.name === this.orteFilters.kapitel || String(k.chapter_id) === String(this.orteFilters.kapitel))) &&
-        (!this.orteFilters.szeneId || this.szenen.some(s => String(s.id) === String(this.orteFilters.szeneId) && (s.ort_ids || []).includes(o.id)))
+        matchText(o) &&
+        (!f.figurId || (o.figuren || []).includes(f.figurId)) &&
+        (!f.kapitel || (o.kapitel || []).some(k => k.name === f.kapitel || String(k.chapter_id) === String(f.kapitel))) &&
+        (!f.szeneId || this.szenen.some(s => String(s.id) === String(f.szeneId) && (s.ort_ids || []).includes(o.id)))
       ).sort((a, b) => {
         const aK = Math.min(...(a.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);
         const bK = Math.min(...(b.kapitel || []).map(k => this._chapterIdx(k.name)), 9999);

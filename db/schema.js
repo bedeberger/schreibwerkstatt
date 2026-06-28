@@ -457,6 +457,40 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
   }
 }
 
+// Koordinaten einzelner Schauplätze patchen (Marker-Drag, Undo/Redo, Georeferenz
+// löschen). Bewusst KEIN Full-Replace via saveOrteToDb: dort hängen Match-/
+// Reconcile-Heuristiken (clearedCoords, loc_id-Tausch) am ganzen Array — bei
+// nebenläufigen Einzel-Edits race-anfällig. Hier wird streng pro loc_id nur
+// lat/lng gesetzt; geht eine Koordinate auf NULL, wird zusätzlich der Geocode-
+// Resolve-Cache (geo_query/geo_land) genullt — der User signalisiert mit dem
+// Löschen „wieder von vorn geocodierbar". Andere Felder/Relationen unberührt.
+// patches: [{ id (=loc_id), lat, lng }]. Liefert die Zahl geänderter Rows.
+function patchOrtCoords(bookId, patches, userEmail) {
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal  = userEmail ? [userEmail] : [];
+  const upd = db.prepare(
+    `UPDATE locations SET lat=?, lng=?, updated_at=${NOW_ISO_SQL} WHERE book_id=? AND loc_id=? AND ${emailCond}`
+  );
+  const clearGeo = db.prepare(
+    `UPDATE locations SET geo_query=NULL, geo_land=NULL WHERE book_id=? AND loc_id=? AND ${emailCond}`
+  );
+  let changed = 0;
+  db.transaction(() => {
+    for (const p of (patches || [])) {
+      if (!p || p.id == null) continue;
+      const lat = _clampCoord(p.lat, 90);
+      const lng = _clampCoord(p.lng, 180);
+      const locId = String(p.id);
+      const info = upd.run(lat, lng, bookId, locId, ...emailVal);
+      if (info.changes) {
+        changed += info.changes;
+        if (lat == null || lng == null) clearGeo.run(bookId, locId, ...emailVal);
+      }
+    }
+  })();
+  return changed;
+}
+
 // ── Welt-Fakten ─────────────────────────────────────────────────────────────
 // Deklaratives Buch-Wissen aus der Komplettanalyse (Phase 1). Anders als Orte
 // haben Fakten keine stabile KI-ID → Full-Replace pro (book, user) statt Upsert
@@ -1348,6 +1382,7 @@ module.exports = {
   // local
   saveZeitstrahlEvents,
   saveOrteToDb,
+  patchOrtCoords,
   saveFaktenToDb,
   saveSongsToDb,
   backfillLocationChaptersFromScenes,

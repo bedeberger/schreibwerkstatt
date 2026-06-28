@@ -5,8 +5,10 @@
 //   - `orte` (im Store, als $root-Getter verfügbar)
 //   - `orteFilters` (app-navigation.js schreibt darauf)
 //   - `selectedOrtId` (Hash-Router)
-//   - `loadOrte`, `saveOrte`, `orteFiltered` (Root-Spread; von komplett-Job,
-//     Szenen-Trigger und _reloadVisibleBookCards genutzt)
+//   - `loadOrte`, `orteFiltered` (Root-Spread; von komplett-Job, Szenen-Trigger
+//     und _reloadVisibleBookCards genutzt)
+//   - `patchOrtCoords` (Koordinaten-Patch für Geo-Edits), `saveOrte` (Full-Save
+//     + FTS-Rebuild via PUT /locations/:id)
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { orteMapMethods } from '../book/orte-map.js';
 
@@ -31,8 +33,11 @@ export function registerOrteCard() {
     _map: null,               // Leaflet-Instanz (transienter Runtime-Handle)
     _markers: null,           // Leaflet-LayerGroup
     _markerById: {},          // ort-id → Leaflet-Marker (Cross-Highlight-Lookup)
+    _unlocatedLatLng: {},     // ort-id → { lat, lng }: stabile Raster-Position unverorteter Pins
+    _gridRowsCache: null,     // Memo fuer orteGridRows() (Land-Label-Sort im Grid)
     _ortePollTimer: null,
     _geocodeJobTimer: null,   // transienter Poll-Timer fuer den KI-Geocode-Fallback-Job
+    _orteMapStatusTimer: null,// Auto-Clear-Timer fuer orteMapStatus
     _lifecycle: null,
 
     init() {
@@ -53,7 +58,7 @@ export function registerOrteCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'orte',
         showFlag: 'showOrteCard',
-        timerKeys: ['_ortePollTimer', '_geocodeJobTimer'],
+        timerKeys: ['_ortePollTimer', '_geocodeJobTimer', '_orteMapStatusTimer'],
         resetState: { orteLoading: false, orteProgress: 0, orteStatus: '', orteRealEnabled: false, geocodingId: null, geocodingAll: false, highlightOrtId: null, orteMapStatus: '' },
         load: (root) => root.loadOrte(root.selectedBookId),
         onShow: async (root) => {

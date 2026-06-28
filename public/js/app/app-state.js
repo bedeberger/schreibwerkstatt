@@ -557,6 +557,11 @@ const orteState = () => ({
     szeneId: '',
     suche: '',
   },
+  // Memo für den orteFiltered-Getter: { sig, val }. Der Getter wird pro Render
+  // mehrfach gelesen (Liste, Grid, Karte) und filtert + sortiert je voll —
+  // Cache liefert bei unveränderten Eingaben dieselbe Array-Referenz zurück
+  // (stabile Keys, kein Doppel-Compute in der Karte).
+  _orteFilteredCache: null,
 });
 
 const songsState = () => ({

@@ -3,7 +3,7 @@
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-6);
   font-size: var(--font-size-sm);
   color: var(--color-muted);
   white-space: nowrap;
@@ -118,8 +118,8 @@
   width: 28px;
   height: 28px;
   padding: 0;
-  background: var(--color-surface);
-  border: 0.5px solid var(--color-border);
+  background: var(--icon-ghost-fill);
+  border: 0.5px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--color-text);
   font: inherit;
@@ -131,8 +131,8 @@
 }
 .avatar-btn:hover,
 .avatar-btn--active {
-  background: var(--color-hover);
-  border-color: var(--color-border-input);
+  background: var(--icon-ghost-fill-hover);
+  border-color: var(--color-border);
 }
 .avatar-btn-initials {
   text-transform: uppercase;

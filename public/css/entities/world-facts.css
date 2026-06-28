@@ -28,13 +28,9 @@
   flex-shrink: 0;
 }
 
-/* Filter-Tabs der Welt-Fakten tragen ein Kategorie-Icon — Button auf Flex
-   stellen, damit Icon, Label und Count sauber vertikal mitten sitzen. */
-.card--weltfakten .tabs-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
-}
+/* Filter-Tabs der Welt-Fakten tragen ein Kategorie-Icon — nur Gap zwischen
+   Icon, Label und Count; Flex/Zentrierung kommen aus der .tabs-btn-Basis. */
+.card--weltfakten .tabs-btn { gap: var(--space-2xs); }
 .card--weltfakten .tabs-btn-count { margin-left: 0; }
 .card--weltfakten .tabs-btn .icon { width: 0.9em; height: 0.9em; }
 

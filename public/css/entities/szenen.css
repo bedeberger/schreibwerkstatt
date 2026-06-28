@@ -60,15 +60,6 @@
   margin-top: var(--space-3);
 }
 
-/* === Szenen-Karte: Hinweis === */
-.szenen-empty-hint {
-  padding: var(--space-14) 16px;
-  font-size: var(--font-size-sm);
-  color: var(--color-muted);
-  background: var(--color-tag-bg);
-  margin: var(--space-sm) 0;
-}
-
 /* === Szenen-Karte: Übersichts-Grid (Figur / Kapitel / Seite, klappbar) === */
 .szenen-uebersicht {
   padding: var(--space-xs) 0 12px;
@@ -130,14 +121,6 @@
 .szenen-liste-section { padding: var(--space-xs) 0; }
 
 /* === Szenen-Übersicht: Zähler pro Figur === */
-.szenen-figur-counts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  margin-left: var(--space-sm);
-  flex: 1;
-}
-
 .szenen-figur-count-badge {
   font-size: var(--font-size-micro);
   font-weight: 400;

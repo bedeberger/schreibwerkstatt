@@ -137,9 +137,9 @@
   <div x-show="$app.orte.length > 0 && viewMode === 'grid'" class="table-scroll" x-cloak>
     <table class="entity-grid-table"
            x-data="sortableTable({
-             rows: () => window.__app.orteFiltered,
+             rows: () => orteGridRows(),
              defaultKey: 'name',
-             types: { typ: 'string', name: 'string', land: 'string', stimmung: 'string' },
+             types: { typ: 'string', name: 'string', landLabelText: 'string', stimmung: 'string' },
              persistKey: 'orte.grid',
            })">
       <thead>
@@ -148,8 +148,8 @@
               @click="sortBy('typ')" x-text="$app.t('orte.col.typ')"></th>
           <th class="sortable-th" :class="sortClass('name')" :aria-sort="ariaSort('name')"
               @click="sortBy('name')" x-text="$app.t('orte.col.name')"></th>
-          <th class="sortable-th" :class="sortClass('land')" :aria-sort="ariaSort('land')"
-              @click="sortBy('land')" x-text="$app.t('orte.col.land')"></th>
+          <th class="sortable-th" :class="sortClass('landLabelText')" :aria-sort="ariaSort('landLabelText')"
+              @click="sortBy('landLabelText')" x-text="$app.t('orte.col.land')"></th>
           <th class="sortable-th" :class="sortClass('stimmung')" :aria-sort="ariaSort('stimmung')"
               @click="sortBy('stimmung')" x-text="$app.t('orte.col.stimmung')"></th>
           <th x-text="$app.t('orte.col.kapitel')"></th>

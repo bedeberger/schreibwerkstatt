@@ -517,8 +517,6 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   .recherche-search { min-width: 0; }
   .research-item-actions { margin-left: 0; }
   .research-item-head { gap: var(--space-2xs); }
-  /* Eine Spalte auf dem Phone (sonst zu schmale Karten). */
-  .recherche-list { grid-template-columns: 1fr; }
   /* iOS-Zoom-Schutz: Prosa-Inputs ≥16px (Klassen-font-size kann darunter liegen). */
   .recherche-input { font-size: 16px; }
   .research-chat-proposal { flex-wrap: wrap; }

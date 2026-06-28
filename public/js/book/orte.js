@@ -21,8 +21,29 @@ export const orteMethods = {
         body: JSON.stringify({ orte: this.orte }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return true;
     } catch (e) {
       console.error('[saveOrte]', e);
+      return false;
+    }
+  },
+
+  // Nur Koordinaten patchen (Marker-Drag, Undo/Redo, Georef löschen) — leichter
+  // und race-frei gegenüber dem Full-Replace von saveOrte. patches: [{id,lat,lng}].
+  // Liefert true/false; Caller spiegeln optimistisch und rollen bei false zurück.
+  async patchOrtCoords(patches) {
+    if (!Array.isArray(patches) || !patches.length) return true;
+    try {
+      const r = await fetch('/locations/' + this.selectedBookId + '/coords', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patches }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return true;
+    } catch (e) {
+      console.error('[patchOrtCoords]', e);
+      return false;
     }
   },
 };

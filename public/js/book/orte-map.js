@@ -3,10 +3,12 @@
 // Wird in Alpine.data('orteCard') gespreadet; Root-Zugriffe via window.__app.
 //
 // Marker-Koordinaten leben auf den Orten selbst (o.lat/o.lng). Manuelle Aenderungen
-// (Marker-Drag, Undo/Redo, Georeferenz entfernen) persistiert der saveOrte-Pfad;
-// die KI-Verortung (_geocodeViaAI) persistiert der Geocode-Job serverseitig selbst
-// und spiegelt die Werte hier nur in-memory (kein saveOrte). _map/_markers sind
-// transiente Leaflet-Runtime-Handles (wie Timer), kein fachlicher State.
+// (Marker-Drag, Undo/Redo, Georeferenz entfernen) persistiert der Koordinaten-Patch
+// (app.patchOrtCoords → PATCH /locations/:id/coords) optimistisch: erst In-Memory
+// setzen, dann patchen, bei Fehler zuruecksetzen + Status. Die KI-Verortung
+// (_geocodeViaAI) persistiert der Geocode-Job serverseitig selbst und spiegelt die
+// Werte hier nur in-memory. _map/_markers sind transiente Leaflet-Runtime-Handles
+// (wie Timer), kein fachlicher State.
 
 import { fetchJson, escHtml } from '../utils.js';
 import { loadLeaflet } from '../lazy-libs.js';
@@ -45,6 +47,31 @@ export const orteMapMethods = {
     return window.__app.orteFiltered.filter(o => o.lat != null && o.lng != null);
   },
 
+  // Karten-Status setzen. Abschluss-/Fehlermeldungen leeren sich nach kurzer Zeit
+  // selbst (kein dauerhaftes Stehenbleiben); `persist=true` für Status, die bis
+  // zum nächsten Schritt sichtbar bleiben sollen (laufende Operation).
+  setOrteMapStatus(msg, persist = false) {
+    this.orteMapStatus = msg;
+    clearTimeout(this._orteMapStatusTimer);
+    if (msg && !persist) {
+      this._orteMapStatusTimer = setTimeout(() => { this.orteMapStatus = ''; }, 6000);
+    }
+  },
+
+  // Grid-Zeilen: orteFiltered mit vorab aufgelöstem Land-Label, damit die
+  // sortierbare Tabelle die Spalte „Land" nach dem sichtbaren Text sortiert
+  // (nicht nach dem ISO-Code). Memoized auf die orteFiltered-Referenz (stabil
+  // dank Getter-Memo) + Sprache → keine neue Array-/Objekt-Allokation pro Render.
+  orteGridRows() {
+    const list = window.__app.orteFiltered;
+    const lang = this._geoLang || 'de';
+    const c = this._gridRowsCache;
+    if (c && c.list === list && c.lang === lang) return c.val;
+    const val = list.map(o => ({ ...o, landLabelText: o.land ? this.landLabel(o.land) : '' }));
+    this._gridRowsCache = { list, lang, val };
+    return val;
+  },
+
   // Map lazy aufbauen + Marker rendern. Idempotent — mehrfaches Aufrufen
   // (Tab-Wechsel) erzeugt genau eine Instanz.
   async ensureOrteMap() {
@@ -80,7 +107,11 @@ export const orteMapMethods = {
     this._renderOrteMarkers(window.L);
   },
 
-  _renderOrteMarkers(L) {
+  // `fit` nur beim Erstaufbau / Filterwechsel / Batch-Geocode (zeigt bewusst den
+  // ganzen Treffer-Satz). In-Place-Updates (Einzel-Drag, Einzel-Geocode, Georef
+  // löschen, Undo/Redo) rendern mit fit=false → der vom User eingestellte Zoom/
+  // Pan bleibt erhalten, statt bei jeder Mikro-Änderung zurückzuspringen.
+  _renderOrteMarkers(L, fit = true) {
     if (!this._map || !this._markers) return;
     this._markers.clearLayers();
     this._markerById = {};
@@ -89,25 +120,35 @@ export const orteMapMethods = {
       this._addOrtMarker(L, o, [o.lat, o.lng], false);
       pts.push([o.lat, o.lng]);
     }
-    // Verortete Marker zuerst einpassen → die Pixel-Mitte liefert danach den
+    // Verortete Marker einpassen → die Pixel-Mitte liefert danach den
     // Ankerpunkt für die Orte ohne Georeferenz.
-    if (pts.length) this._map.fitBounds(pts, { padding: [30, 30], maxZoom: 13 });
+    if (fit && pts.length) this._map.fitBounds(pts, { padding: [30, 30], maxZoom: 13 });
     // Unverortete Orte als Raster UNTER der Kartenmitte verteilen (Pixel-Offsets,
     // zoom-unabhängig). Niemals alle auf denselben Punkt stapeln: gestapelte
     // draggable-Marker fangen den mousedown ab und blockieren das Map-Panning
     // (die Kartenmitte ist genau der natürliche Greifpunkt zum Verschieben).
+    // Einmal vergebene Pin-Positionen je Ort cachen (_unlocatedLatLng), damit ein
+    // bereits platzierter Pin beim nächsten Render nicht wegspringt, nur weil ein
+    // anderer Ort verortet wurde — nur neue Orte bekommen einen frischen Slot.
     const unlocated = this.unlocatedOrte();
     if (unlocated.length) {
       const size = this._map.getSize();
       const gap = 26;
       const cols = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(unlocated.length))));
-      unlocated.forEach((o, i) => {
-        const col = i % cols, row = Math.floor(i / cols);
-        const px = size.x / 2 + (col - (cols - 1) / 2) * gap;
-        const py = size.y / 2 + 48 + row * gap;
-        const ll = this._map.containerPointToLatLng([px, py]);
+      let slot = 0;
+      for (const o of unlocated) {
+        let ll = this._unlocatedLatLng[o.id];
+        if (!ll) {
+          const col = slot % cols, row = Math.floor(slot / cols);
+          const px = size.x / 2 + (col - (cols - 1) / 2) * gap;
+          const py = size.y / 2 + 48 + row * gap;
+          const p = this._map.containerPointToLatLng([px, py]);
+          ll = { lat: p.lat, lng: p.lng };
+          this._unlocatedLatLng[o.id] = ll;
+          slot++;
+        }
         this._addOrtMarker(L, o, [ll.lat, ll.lng], true);
-      });
+      }
     }
   },
 
@@ -123,19 +164,27 @@ export const orteMapMethods = {
     this._geoRedoStack = [];
   },
 
-  // Snapshot anwenden: aktuelle Position auf den Gegen-Stack legen, dann die
-  // gespeicherten Koordinaten zurückschreiben + persistieren + neu rendern.
+  // Snapshot anwenden: gespeicherte Koordinaten zurückschreiben + patchen + neu
+  // rendern. Schlägt der Patch fehl, Änderung verwerfen und den Gegen-Stack NICHT
+  // befüllen, damit Undo/Redo konsistent zum Serverstand bleiben.
   async _applyGeoSnapshot(snap, counterStack) {
     const app = window.__app;
     const target = app.orte.find(x => x.id === snap.id);
     if (!target) return; // Ort gelöscht → Eintrag verfällt still
-    counterStack.push({ id: snap.id, lat: target.lat, lng: target.lng });
+    const cur = { id: snap.id, lat: target.lat, lng: target.lng };
     target.lat = snap.lat;
     target.lng = snap.lng;
-    await app.saveOrte();
+    const ok = await app.patchOrtCoords([{ id: snap.id, lat: snap.lat, lng: snap.lng }]);
+    if (!ok) {
+      target.lat = cur.lat;
+      target.lng = cur.lng;
+      this.setOrteMapStatus(app.t('orte.map.saveFailed'));
+      return;
+    }
+    counterStack.push(cur);
     if (this.viewMode === 'map') {
       const L = await loadLeaflet();
-      this._renderOrteMarkers(L);
+      this._renderOrteMarkers(L, false);
     }
   },
 
@@ -171,18 +220,29 @@ export const orteMapMethods = {
     marker.on('click', () => this._selectFromMap(o.id));
     marker.on('dragend', async () => {
       const ll = marker.getLatLng();
-      const target = window.__app.orte.find(x => x.id === o.id);
-      if (target) {
-        // Vorherige Position auf den Undo-Stack legen, BEVOR sie überschrieben
-        // wird (bei „unlocated" Pins lat/lng=null → Undo macht ihn wieder rot).
-        this._pushGeoHistory({ id: o.id, lat: target.lat, lng: target.lng });
-        target.lat = ll.lat;
-        target.lng = ll.lng;
-        await window.__app.saveOrte();
-        // War der Pin „unlocated" (rot), wird er durch das Speichern verortet →
-        // neu rendern, damit er als regulärer (blauer) Marker erscheint.
-        if (unlocated) this._renderOrteMarkers(L);
+      const app = window.__app;
+      const target = app.orte.find(x => x.id === o.id);
+      if (!target) return;
+      const prev = { lat: target.lat, lng: target.lng };
+      // Vorherige Position auf den Undo-Stack legen, BEVOR sie überschrieben
+      // wird (bei „unlocated" Pins lat/lng=null → Undo macht ihn wieder rot).
+      this._pushGeoHistory({ id: o.id, lat: prev.lat, lng: prev.lng });
+      target.lat = ll.lat;
+      target.lng = ll.lng;
+      const ok = await app.patchOrtCoords([{ id: o.id, lat: ll.lat, lng: ll.lng }]);
+      if (!ok) {
+        // Patch fehlgeschlagen → Position + History-Eintrag zurücknehmen, Marker
+        // an die alte Stelle zurücksetzen (Re-Render bewahrt den Viewport).
+        this._geoUndoStack.pop();
+        target.lat = prev.lat;
+        target.lng = prev.lng;
+        this.setOrteMapStatus(app.t('orte.map.saveFailed'));
+        this._renderOrteMarkers(L, false);
+        return;
       }
+      // War der Pin „unlocated" (rot), wird er durch das Speichern verortet →
+      // neu rendern, damit er als regulärer (blauer) Marker erscheint.
+      if (unlocated) this._renderOrteMarkers(L, false);
     });
     marker.addTo(this._markers);
     this._markerById[o.id] = marker;
@@ -343,13 +403,13 @@ export const orteMapMethods = {
     if (this.geocodingId || this.geocodingAll) return;
     const app = window.__app;
     this.geocodingId = o.id;
-    this.orteMapStatus = app.t('orte.map.aiResolving', { name: o.name });
+    this.setOrteMapStatus(app.t('orte.map.aiResolving', { name: o.name }), true);
     try {
       const hit = (await this._geocodeViaAI([o])).has(o.id);
-      this.orteMapStatus = app.t(hit ? 'orte.map.geocoded' : 'orte.map.unresolved', { name: o.name });
+      this.setOrteMapStatus(app.t(hit ? 'orte.map.geocoded' : 'orte.map.unresolved', { name: o.name }));
       if (this.viewMode === 'map') {
         const L = await loadLeaflet();
-        this._renderOrteMarkers(L);
+        this._renderOrteMarkers(L, false);
         // Treffer → auf die neue Position zoomen. Kein Treffer → der rote
         // Mitte-Pin liegt bereits sichtbar in der Kartenmitte, kein setView.
         const target = app.orte.find(x => x.id === o.id);
@@ -370,14 +430,15 @@ export const orteMapMethods = {
     const todo = this.unlocatedOrte();
     if (!todo.length) return;
     this.geocodingAll = true;
-    this.orteMapStatus = app.t('orte.map.batchAi', { n: todo.length });
+    this.setOrteMapStatus(app.t('orte.map.batchAi', { n: todo.length }), true);
     try {
       const hits = (await this._geocodeViaAI(todo)).size;
       if (this.viewMode === 'map') {
         const L = await loadLeaflet();
-        this._renderOrteMarkers(L);
+        // Batch: fit=true zeigt bewusst den ganzen frisch verorteten Satz.
+        this._renderOrteMarkers(L, true);
       }
-      this.orteMapStatus = app.t('orte.map.batchDone', { hits, total: todo.length });
+      this.setOrteMapStatus(app.t('orte.map.batchDone', { hits, total: todo.length }));
     } finally {
       this.geocodingAll = false;
     }
@@ -389,13 +450,20 @@ export const orteMapMethods = {
     const app = window.__app;
     const target = app.orte.find(x => x.id === o.id);
     if (!target || (target.lat == null && target.lng == null)) return;
+    const prev = { lat: target.lat, lng: target.lng };
     target.lat = null;
     target.lng = null;
-    await app.saveOrte();
-    this.orteMapStatus = app.t('orte.map.georefCleared', { name: o.name });
+    const ok = await app.patchOrtCoords([{ id: o.id, lat: null, lng: null }]);
+    if (!ok) {
+      target.lat = prev.lat;
+      target.lng = prev.lng;
+      this.setOrteMapStatus(app.t('orte.map.saveFailed'));
+      return;
+    }
+    this.setOrteMapStatus(app.t('orte.map.georefCleared', { name: o.name }));
     if (this.viewMode === 'map') {
       const L = await loadLeaflet();
-      this._renderOrteMarkers(L);
+      this._renderOrteMarkers(L, false);
     }
   },
 
@@ -413,17 +481,29 @@ export const orteMapMethods = {
       danger: true,
     });
     if (!ok) return;
+    const prev = located.map(o => ({ id: o.id, lat: o.lat, lng: o.lng }));
     for (const o of located) { o.lat = null; o.lng = null; }
-    await app.saveOrte();
-    this.orteMapStatus = app.t('orte.map.allGeorefsCleared', { n: located.length });
+    const saved = await app.patchOrtCoords(located.map(o => ({ id: o.id, lat: null, lng: null })));
+    if (!saved) {
+      for (const p of prev) {
+        const t = app.orte.find(x => x.id === p.id);
+        if (t) { t.lat = p.lat; t.lng = p.lng; }
+      }
+      this.setOrteMapStatus(app.t('orte.map.saveFailed'));
+      return;
+    }
+    this.setOrteMapStatus(app.t('orte.map.allGeorefsCleared', { n: located.length }));
     if (this.viewMode === 'map') {
       const L = await loadLeaflet();
-      this._renderOrteMarkers(L);
+      this._renderOrteMarkers(L, false);
     }
   },
 
   _teardownMap() {
     this._resetGeoHistory();
+    this._unlocatedLatLng = {};
+    this._gridRowsCache = null;
+    clearTimeout(this._orteMapStatusTimer);
     if (this._map) {
       // Laufende Pan/Zoom-Anim hart stoppen + Marker abräumen, bevor remove()
       // die Panes nullt — sonst feuert ein queued Anim-Callback ins Leere.

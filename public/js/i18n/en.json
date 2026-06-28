@@ -1789,6 +1789,7 @@
   "orte.map.clearAll": "Clear all geo-references",
   "orte.map.clearAllConfirm": "Remove the geo-references of all {n} located places? The places themselves stay; only the coordinates are cleared.",
   "orte.map.allGeorefsCleared": "Geo-references of {n} places cleared.",
+  "orte.map.saveFailed": "Saving failed – the change was discarded.",
   "orte.col.typ": "Type",
   "orte.col.name": "Name",
   "orte.col.land": "Country",
