@@ -255,11 +255,12 @@ export const rechercheMethods = {
   removeUrlRow(draft, i) { (draft.urls || []).splice(i, 1); },
 
   // Klick auf den Eintrag öffnet den Edit-Modus — ausser auf interaktiven
-  // Elementen (Aktions-Buttons, Links, Datei-Inputs, Tag-/Link-Chips), die
-  // ihre eigene Aktion behalten.
+  // Elementen (Aktions-Buttons, Links, Datei-Inputs, Tag-/Link-Chips) sowie
+  // dem Verknüpfen-Picker (inkl. Combobox-Dropdown, dessen Optionen <li> sind
+  // und sonst durchblubbern würden), die ihre eigene Aktion behalten.
   onItemBodyClick(item, ev) {
     if (this.busy) return;
-    if (ev.target.closest('a, button, input, label, .research-tag, .research-link-chip')) return;
+    if (ev.target.closest('a, button, input, label, .research-tag, .research-link-chip, .recherche-linkpicker, .combobox-wrap')) return;
     this.startEdit(item);
   },
 
