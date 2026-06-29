@@ -74,7 +74,7 @@
   </div>
   <template x-for="item in filteredTree" :key="item.id">
     <div class="tree-chapter"
-         :class="{ ['tree-chapter--depth-' + (item.depth || 1)]: true, 'tree-chapter--solo': item.solo }"
+         :class="{ ['tree-chapter--depth-' + (item.depth || 1)]: true, 'tree-chapter--solo': item.solo, 'tree-chapter--excluded': item.excluded }"
          :style="{ '--depth': item.depth || 1 }">
       <div x-show="!item.solo"
            class="tree-chapter-header"
@@ -96,11 +96,13 @@
            @keydown.arrow-right.prevent="if ((item.pages.length > 0 || item.hasChildren) && !item.open) setChapterOpen(item, true)"
            @keydown.arrow-left.prevent="if ((item.pages.length > 0 || item.hasChildren) && item.open) setChapterOpen(item, false)"
            @click="_onChapterHeaderActivate(item)"
-           @contextmenu="_openPagetreeContextMenu($event, { kind: 'chapter', id: item.id, name: item.name })">
+           @contextmenu="_openPagetreeContextMenu($event, { kind: 'chapter', id: item.id, name: item.name, excluded: item.excluded })">
         <span class="history-chevron" :class="{ open: item.open }" x-show="item.pages.length > 0 || item.hasChildren"
               @click.stop="if (!pageSearch && (item.pages.length > 0 || item.hasChildren)) toggleChapterOpen(item)"></span>
         <span x-text="item.name"></span>
         <span class="tree-chapter-meta">
+          <span class="tag tree-chapter-excluded-tag" x-show="item.excluded" x-text="t('sidebar.excludedBadge')"
+                :data-tip="t('sidebar.excludedTitle', { name: item.name })"></span>
           <span class="tag" x-show="item.pages.length >= 1" x-text="item.pages.length === 1 ? t('sidebar.pagesCountOne') : t('sidebar.pagesCount', { n: item.pages.length })"></span>
           <template x-if="item.stats">
             <span class="tok-badge tok-neutral"
@@ -230,6 +232,16 @@
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#download"/></svg>
         <span x-text="t('pagetreeCtx.export')"></span>
       </button>
+      <template x-if="pageTreeMenuTarget.kind === 'chapter'">
+        <div>
+          <div class="context-menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                  @click="pagetreeCtxToggleExclude()">
+            <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=693#' + (pageTreeMenuTarget.excluded ? 'rotate-cw' : 'archive')"/></svg>
+            <span x-text="pageTreeMenuTarget.excluded ? t('pagetreeCtx.includeChapter') : t('pagetreeCtx.excludeChapter')"></span>
+          </button>
+        </div>
+      </template>
     </div>
   </template>
 </div>

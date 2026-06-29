@@ -48,6 +48,11 @@ async function loadOrderedBookContents(bookId, userToken) {
   const pages = [];
   function walk(chapters, prefix, parentId) {
     for (const c of chapters) {
+      // Ausgeschlossene Kapitel (chapters.excluded) komplett ueberspringen — inkl.
+      // ihrer Unterkapitel (kein rekursiver walk). Betrifft Buchbewertung +
+      // Komplettanalyse + Kontinuitaetscheck. Fassungen/Snapshots laufen nicht
+      // ueber diesen Loader und behalten ausgeschlossene Kapitel.
+      if (c.excluded) continue;
       const path = prefix ? `${prefix} › ${c.name}` : c.name;
       chMap[c.id] = path;
       chNameToId[c.name] = c.id;

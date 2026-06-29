@@ -19,6 +19,11 @@ schreibwerkstatt.db.*.bak
 # Verirrte SQLite-Dateien (nicht vom App-Pfad genutzt; Default ist schreibwerkstatt.db)
 app.db
 data.db
+db.sqlite3
+db/app.sqlite
+db/books.db
+*.sqlite
+*.sqlite3
 # Output-Intent-ICC: Binaerprofil, per Deploy-Migration geladen (assets/icc/README.md)
 assets/icc/*.icc
 

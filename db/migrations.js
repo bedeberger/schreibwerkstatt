@@ -8759,6 +8759,25 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 225 abgeschlossen (book_settings.exclude_from_stats — Buch aus persoenlicher Statistik ausnehmen).');
   }
 
+  if (version < 226) {
+    // chapters.excluded: 1 = Kapitel bleibt im Buch und voll editierbar (Lektorat,
+    // Fassungen/Snapshots), wird aber aus Custom-PDF/EPUB/DOCX-Export, Buchbewertung
+    // und Komplettanalyse (Figuren/Orte/Szenen/Ereignisse/Zeitstrahl/Kontinuitaet)
+    // herausgefiltert. Ausschluss kaskadiert auf Unterkapitel. Pro-Kapitel-Flag,
+    // im Sidebar-Kontextmenue schaltbar.
+    // Additiv: nicht-nullable Spalte mit Default, kein Recreate noetig.
+    const chCols226 = db.pragma('table_info(chapters)').map(c => c.name);
+    if (!chCols226.includes('excluded')) {
+      db.exec('ALTER TABLE chapters ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0');
+    }
+    const fkErrors226 = db.pragma('foreign_key_check');
+    if (fkErrors226.length) {
+      throw new Error(`Migration 226: foreign_key_check meldet ${fkErrors226.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 226').run();
+    logger.info('DB-Migration auf Version 226 abgeschlossen (chapters.excluded — Kapitel aus Export/Bewertung/Komplettanalyse ausschliessen).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

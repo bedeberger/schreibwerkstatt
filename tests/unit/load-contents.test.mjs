@@ -121,6 +121,44 @@ test('scope=page leer → PAGE_EMPTY', async () => {
   await assert.rejects(() => loadContents({ scope: 'page', id: 600 }, { id: 'x', pw: 'y' }), /PAGE_EMPTY/);
 });
 
+test('scope=book filtert ausgeschlossene Kapitel raus', async () => {
+  installFakeContentStore({
+    loadBook:    async () => fakeBook(7),
+    listChapters: async () => [
+      { ...fakeChapter(10, 7, 'A', 1), excluded: false },
+      { ...fakeChapter(20, 7, 'B', 2), excluded: true },
+    ],
+    listPages:   async () => [fakePage(101, 10, 'p1'), fakePage(102, 20, 'p2')],
+    loadChapter: async () => null,
+    loadPage:    async () => null,
+    loadPagesBatch: async (metas) => metas.map(m => ({ ...m, html: '<p>body</p>' })),
+  });
+  const { loadContents } = require_('../../lib/load-contents.js');
+  const out = await loadContents({ scope: 'book', id: 7 }, { id: 'x', pw: 'y' });
+  assert.equal(out.groups.length, 1);
+  assert.equal(out.groups[0].chapter.id, 10);
+});
+
+test('scope=book: ausgeschlossenes Elternkapitel kaskadiert auf Unterkapitel', async () => {
+  installFakeContentStore({
+    loadBook:    async () => fakeBook(7),
+    listChapters: async () => [
+      { ...fakeChapter(10, 7, 'Parent', 1), excluded: true, parent_chapter_id: null },
+      { ...fakeChapter(11, 7, 'Child', 2), excluded: false, parent_chapter_id: 10 },
+      { ...fakeChapter(20, 7, 'Other', 3), excluded: false, parent_chapter_id: null },
+    ],
+    listPages:   async () => [fakePage(101, 10, 'p1'), fakePage(102, 11, 'p2'), fakePage(103, 20, 'p3')],
+    loadChapter: async () => null,
+    loadPage:    async () => null,
+    loadPagesBatch: async (metas) => metas.map(m => ({ ...m, html: '<p>body</p>' })),
+  });
+  const { loadContents } = require_('../../lib/load-contents.js');
+  const out = await loadContents({ scope: 'book', id: 7 }, { id: 'x', pw: 'y' });
+  // Parent (excluded) + dessen Child raus → nur 'Other' bleibt.
+  assert.equal(out.groups.length, 1);
+  assert.equal(out.groups[0].chapter.id, 20);
+});
+
 test('bad scope/id → BAD_SCOPE / BAD_ID', async () => {
   installFakeContentStore({
     loadBook: async () => null, listChapters: async () => [], listPages: async () => [],

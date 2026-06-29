@@ -38,13 +38,14 @@ function register(router) {
     } catch (e) { _fail(res, e, 'POST /content/chapters'); }
   });
 
-  // PUT /content/chapters/:chapter_id — Kapitel-Update (rename / reorder).
+  // PUT /content/chapters/:chapter_id — Kapitel-Update (rename / reorder / exclude).
   router.put('/chapters/:chapter_id', jsonBody, async (req, res) => {
     const chapterId = toIntId(req.params.chapter_id);
     if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
     const hasName = typeof req.body?.name === 'string';
     const hasPos = Number.isFinite(req.body?.position);
-    if (!hasName && !hasPos) {
+    const hasExcluded = typeof req.body?.excluded === 'boolean';
+    if (!hasName && !hasPos && !hasExcluded) {
       return res.status(400).json({ error_code: 'EMPTY_BODY' });
     }
     if (_guardChapter(req, res, chapterId, 'editor') == null) return;

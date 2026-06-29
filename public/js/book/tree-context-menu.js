@@ -1,4 +1,5 @@
 import { EVT } from '../events.js';
+import { contentRepo } from '../repo/content.js';
 // Pagetree-Rechtsklick-Menü. Aktionen pro Node-Typ:
 //   page    → Öffnen, Editieren (Notebook), Teilen, Exportieren
 //   chapter → Öffnen (Header-Activate = Toggle + ggf. Kapitel-Review), Teilen, Exportieren
@@ -113,6 +114,24 @@ export const treeContextMenuMethods = {
     if (!target) return;
     if (target.kind === 'page') this.openShareLinksForPage(target.id);
     else this.openShareLinksForChapter(target.id);
+  },
+
+  // Kapitel aus Export/Bewertung/Komplettanalyse aus- bzw. wieder einschliessen.
+  // Lektorat + Fassungen bleiben unberuehrt. In-Place-Mirror auf nav.tree (flach,
+  // inkl. Sub-Kapitel) fuer sofortiges Greying.
+  async pagetreeCtxToggleExclude() {
+    const target = this.pageTreeMenuTarget;
+    this._hidePagetreeContextMenu();
+    if (!target || target.kind !== 'chapter') return;
+    const next = !target.excluded;
+    try {
+      await contentRepo.updateChapter(target.id, { excluded: next });
+      for (const it of (this.$store.nav.tree || [])) {
+        if (it.type === 'chapter' && !it.solo && String(it.id) === String(target.id)) it.excluded = next;
+      }
+    } catch (e) {
+      this.setStatus?.(this.t('bookOrganizer.saveFailed', { detail: e.message }));
+    }
   },
 
   async pagetreeCtxExport() {

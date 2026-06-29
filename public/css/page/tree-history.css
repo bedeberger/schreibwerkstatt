@@ -119,6 +119,15 @@
   padding-top: var(--space-2xs);
 }
 
+/* Ausgeschlossenes Kapitel (chapters.excluded): bleibt editierbar, wird aber
+   gedaempft dargestellt — Signal, dass es nicht in Export/Bewertung/Komplett-
+   analyse einfliesst. Hover stellt volle Lesbarkeit her. */
+.tree-chapter--excluded > .tree-chapter-header { color: var(--color-muted); }
+.tree-chapter--excluded > .tree-chapter-pages { opacity: var(--opacity-hint); }
+.tree-chapter--excluded > .tree-chapter-header:hover,
+.tree-chapter--excluded:hover > .tree-chapter-pages { opacity: 1; }
+.tree-chapter-excluded-tag { font-style: normal; text-transform: uppercase; letter-spacing: 0.04em; }
+
 /* === History === */
 .history-heading {
   font-weight: 400;
