@@ -136,34 +136,13 @@
                           x-text="row.lane.thread.chapter_name"></span>
                     <span class="plot-swim-lane-ownacts" x-show="threadHasOwnActs(row.lane.id)" x-text="$app.t('plot.thread.ownActs')"></span>
                   </div>
-                  <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-swim-lane-toggle"
-                          :class="{ 'plot-icon-btn--on': threadActionsOpenId === row.lane.id }"
-                          @click="toggleThreadActions(row.lane.id)"
-                          :aria-expanded="threadActionsOpenId === row.lane.id"
+                  <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn"
+                          :class="{ 'is-active': threadActionsOpenId === row.lane.id }"
+                          @click.stop="openThreadMenu($event, row.lane.id)"
+                          aria-haspopup="menu" :aria-expanded="threadActionsOpenId === row.lane.id"
                           :data-tip="$app.t('plot.thread.actions')" :aria-label="$app.t('plot.thread.actions')">
                     <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#more-horizontal"/></svg>
                   </button>
-                  <div class="plot-swim-lane-actions" :class="{ 'plot-swim-lane-actions--open': threadActionsOpenId === row.lane.id }">
-                    <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveThread(row.lane.thread, -1)" :data-tip="$app.t('plot.thread.moveUp')" :aria-label="$app.t('plot.thread.moveUp')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-up"/></svg>
-                    </button>
-                    <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveThread(row.lane.thread, 1)" :data-tip="$app.t('plot.thread.moveDown')" :aria-label="$app.t('plot.thread.moveDown')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-down"/></svg>
-                    </button>
-                    <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn"
-                            :class="{ 'plot-icon-btn--on': threadHasOwnActs(row.lane.id) }"
-                            @click="threadHasOwnActs(row.lane.id) ? unforkThreadActs(row.lane.thread) : forkThreadActs(row.lane.thread)"
-                            :data-tip="threadHasOwnActs(row.lane.id) ? $app.t('plot.thread.sharedActsTip') : $app.t('plot.thread.ownActsTip')"
-                            :aria-label="threadHasOwnActs(row.lane.id) ? $app.t('plot.thread.sharedActs') : $app.t('plot.thread.ownActs')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#git-fork"/></svg>
-                    </button>
-                    <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="startEditThread(row.lane.thread)" :data-tip="$app.t('plot.thread.rename')" :aria-label="$app.t('plot.thread.rename')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#pencil"/></svg>
-                    </button>
-                    <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger" @click="deleteThread(row.lane.thread)" :data-tip="$app.t('plot.thread.delete')" :aria-label="$app.t('plot.thread.delete')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
-                    </button>
-                  </div>
                 </div>
               </template>
 
@@ -282,4 +261,47 @@
       </div>
     </template>
   </div>
+
+  <!-- Strang-Aktions-Dropdown: ein einzelnes, nach <body> teleportiertes
+       .context-menu (JS-positioniert in openThreadMenu). Die Lane sitzt in einem
+       overflow-x/will-change-Scrollcontainer, in dem ein am Trigger verankertes
+       Popover geclippt bzw. eingesperrt würde. Die offene Lane via threadMenuLane(). -->
+  <template x-teleport="body">
+    <div class="context-menu" x-show="threadActionsOpenId !== null && !!threadMenuLane()" x-cloak
+         :style="`top:${threadMenuPos.top}px;left:${threadMenuPos.left}px`"
+         @click.outside="closeThreadMenu()" @keydown.escape.window="closeThreadMenu()" role="menu">
+      <template x-if="threadMenuLane()">
+        <div>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                  @click.stop="moveThread(threadMenuLane().thread, -1); closeThreadMenu()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-up"/></svg>
+            <span x-text="$app.t('plot.thread.moveUp')"></span>
+          </button>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                  @click.stop="moveThread(threadMenuLane().thread, 1); closeThreadMenu()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-down"/></svg>
+            <span x-text="$app.t('plot.thread.moveDown')"></span>
+          </button>
+          <div class="context-menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                  :class="{ 'context-menu-item--on': threadHasOwnActs(threadMenuLane().id) }"
+                  @click.stop="threadHasOwnActs(threadMenuLane().id) ? unforkThreadActs(threadMenuLane().thread) : forkThreadActs(threadMenuLane().thread); closeThreadMenu()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#git-fork"/></svg>
+            <span x-text="threadHasOwnActs(threadMenuLane().id) ? $app.t('plot.thread.sharedActs') : $app.t('plot.thread.ownActs')"></span>
+          </button>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                  @click.stop="startEditThread(threadMenuLane().thread); closeThreadMenu()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#pencil"/></svg>
+            <span x-text="$app.t('plot.thread.rename')"></span>
+          </button>
+          <div class="context-menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger"
+                  @click.stop="deleteThread(threadMenuLane().thread); closeThreadMenu()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+            <span x-text="$app.t('plot.thread.delete')"></span>
+          </button>
+        </div>
+      </template>
+    </div>
+  </template>
 </div>

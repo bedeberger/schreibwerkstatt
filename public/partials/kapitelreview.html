@@ -91,6 +91,7 @@
               <span x-text="$app.t('plot.title')"></span>
               <span class="btn-count" x-text="$store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('plot.chapterBeatsCountTitle', { n: $store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId] })"></span>
             </button>
+            <div class="context-menu-sep" role="separator" x-show="$app.canEdit() && $app.kapitelReviewChapterId"></div>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="$app.canEdit() && $app.kapitelReviewChapterId"
                     @click="$app.openShareLinksForChapter($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">

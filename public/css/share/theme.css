@@ -1,0 +1,87 @@
+/* Reader-View für geteilte Seiten/Kapitel.
+   Standalone (kein Alpine, kein SPA-Shell). Eigene Mini-Palette, damit der Reader
+   unabhängig vom Haupt-Bundle ist und ohne JS funktioniert.
+
+   Theme-Auflösung: Default ist Light (:root). Der Leser-Switcher setzt für eine
+   explizite Wahl `data-theme="light|dark"` am <html> (share-theme-init.js, vor
+   dem ersten Paint). Für die Wahl "Auto" wird KEIN Attribut gesetzt → die
+   prefers-color-scheme-Media-Query greift (auch komplett ohne JS). */
+
+:root {
+  /* Palette gespiegelt aus der App (SSoT: public/css/tokens/colors.css). Der
+     Reader ist standalone (lädt tokens.css nicht), hält die Werte aber
+     deckungsgleich zur Paper/Ink-Palette, damit die Leseansicht konsistent zur
+     App wirkt. Akzent = Marken-Blau (Buchrücken), zweiter Ton = Feder-Gold.
+     Bei Palette-Änderung in colors.css hier nachziehen. */
+  --share-bg: #faf7f2;
+  --share-surface: #ffffff;
+  --share-text: #1f1c18;
+  --share-muted: #6b6258;
+  --share-faint: #b8aea2;
+  /* Akzent = Marken-Blau — interaktive Elemente (Links, Buttons, Anker). */
+  --share-accent: #1d4b73;
+  /* Zweiter Ton = Feder-Gold (Autor-Stimme): markiert Autor-Antworten, damit der
+     Reviewer Leser-Kommentar vs. Autor-Stimme auf einen Blick unterscheidet. */
+  --share-accent-2: #8a6a20;
+  /* Text auf gefüllter Akzent-Fläche (Buttons). Light: weiss auf dunklem Blau.
+     Dark (s.u.): dunkle Tinte auf hellem Blau — analog --color-on-primary. */
+  --share-on-accent: #fff;
+  --share-border: rgba(0, 0, 0, 0.12);
+  --share-hover: rgba(0, 0, 0, 0.05);
+  --share-radius: 8px;
+  --share-radius-sm: 4px;
+  --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --share-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.16);
+  color-scheme: light;
+
+  /* Brücke auf den geteilten Manuskript-Stream-Look
+     (public/css/components/manuscript-stream.css). */
+  --ms-text: var(--share-text);
+  --ms-muted: var(--share-muted);
+  --ms-border: var(--share-border);
+  --ms-serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', serif;
+  --ms-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ms-chapter-size: 30px;
+  --ms-caption-size: 13px;
+  --ms-space-xs: 4px;
+  --ms-space: 12px;
+  --ms-space-md: 18px;
+  --ms-space-lg: 28px;
+}
+
+/* Explizite Dunkel-Wahl (Switcher). */
+html[data-theme="dark"] {
+  --share-bg: #1a1816;
+  --share-surface: #2a2722;
+  --share-text: #e6e2d9;
+  --share-muted: #9a948a;
+  --share-faint: #524d46;
+  --share-accent: #7aa3ca;
+  --share-accent-2: #e0c070;
+  --share-on-accent: #1a1816;
+  --share-border: rgba(255, 255, 255, 0.12);
+  --share-hover: rgba(255, 255, 255, 0.06);
+  --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --share-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* Auto (kein data-theme): Systempräferenz. Greift auch ohne JS. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    --share-bg: #1a1816;
+    --share-surface: #2a2722;
+    --share-text: #e6e2d9;
+    --share-muted: #9a948a;
+    --share-faint: #524d46;
+    --share-accent: #7aa3ca;
+    --share-accent-2: #e0c070;
+    --share-on-accent: #1a1816;
+    --share-border: rgba(255, 255, 255, 0.12);
+    --share-hover: rgba(255, 255, 255, 0.06);
+    --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --share-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
+

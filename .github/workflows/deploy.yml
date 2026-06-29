@@ -88,7 +88,8 @@ jobs:
           hits=$(grep -rln 'callAI(' routes lib 2>/dev/null \
                  | grep -v '^routes/jobs/' \
                  | grep -v '^routes/chat.js$' \
-                 | grep -v '^lib/ai.js$' || true)
+                 | grep -v '^lib/ai.js$' \
+                 | grep -v '^lib/ai/' || true)
           if [ -n "$hits" ]; then
             echo "::error::callAI ausserhalb Job-Queue/Chat — KI-Calls müssen als Job-Typ implementiert werden:"
             echo "$hits"

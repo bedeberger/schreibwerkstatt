@@ -74,10 +74,12 @@ export function registerPlotCard() {
     addingThread: false,
     newThreadName: '',
     threadColorPickerId: null,
-    // Mobile-only: ID der Lane, deren Aktions-Icons aufgeklappt sind (Kebab-Toggle,
-    // Single-Select wie die Color-Picker-IDs). Desktop zeigt die Aktionen via CSS
-    // immer; dort ist der Toggle ausgeblendet und dieser State unbenutzt.
+    // ID der Lane, deren Aktions-Dropdown (Kebab) offen ist (Single-Select wie die
+    // Color-Picker-IDs). Das Menü ist ein einzelnes, nach <body> teleportiertes
+    // .context-menu (JS-positioniert) — die Lane lebt in einem overflow/transform-
+    // Scrollcontainer, in dem ein verankertes Popover geclippt würde.
     threadActionsOpenId: null,
+    threadMenuPos: { top: 0, left: 0 },
 
     // Eingeklappte „verworfen"-Beats pro Akt ({ [actId]: true }).
     verworfenOpen: {},

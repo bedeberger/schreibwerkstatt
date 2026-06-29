@@ -1,0 +1,162 @@
+    <!-- API-Tab: Bearer-Tokens fuer Prometheus/HA/Grafana-Scraper -->
+    <section x-show="adminSettingsTab === 'api'" class="admin-settings-section">
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.api.intro')"></p>
+      <p class="muted-msg muted-msg--sm">
+        <strong x-text="$app.t('admin.settings.api.endpointLabel') + ': '"></strong>
+        <code x-text="location.origin + '/metrics'"></code>
+      </p>
+
+      <!-- Plain-Token-Anzeige direkt nach Create (NUR einmal sichtbar) -->
+      <div x-show="adminApiTokensJustCreated" class="success-msg admin-api-token-reveal">
+        <strong x-text="$app.t('admin.settings.api.justCreatedTitle')"></strong>
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.api.justCreatedHint')"></p>
+        <div class="admin-api-token-reveal-row">
+          <code class="admin-api-token-plain" x-text="adminApiTokensJustCreated?.plain_token"></code>
+          <button x-data="copyButton({ text: () => adminApiTokensJustCreated?.plain_token })"></button>
+          <button type="button" @click="adminApiTokensDismissPlain()" x-text="$app.t('common.hide')"></button>
+        </div>
+      </div>
+
+      <!-- Neues Token erstellen -->
+      <div class="admin-settings-subsection">
+        <h4 class="admin-settings-subheading" x-text="$app.t('admin.settings.api.createTitle')"></h4>
+        <label>
+          <span x-text="$app.t('admin.settings.api.nameLabel')"></span>
+          <input type="text" x-model="adminApiTokensNewName"
+                 :placeholder="$app.t('admin.settings.api.namePlaceholder')"
+                 maxlength="100">
+        </label>
+        <label>
+          <span x-text="$app.t('admin.settings.api.expiresLabel')"></span>
+          <input type="date" x-model="adminApiTokensNewExpiresAt">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.api.expiresHint')"></small>
+        </label>
+        <div class="admin-settings-actions">
+          <button type="button" @click="adminApiTokensCreate()"
+                  :disabled="adminApiTokensCreating || !adminApiTokensNewName.trim()">
+            <span x-show="adminApiTokensCreating" class="spinner"></span>
+            <span x-text="$app.t('admin.settings.api.createButton')"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Token-Liste -->
+      <div class="admin-settings-subsection">
+        <h4 class="admin-settings-subheading">
+          <span x-text="$app.t('admin.settings.api.listTitle')"></span>
+          <button type="button" class="admin-settings-refresh-inline icon-btn icon-btn--ghost"
+                  @click="adminApiTokensLoad()" :disabled="adminApiTokensLoading"
+                  :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
+        </h4>
+        <div x-show="adminApiTokensError" class="error-msg" x-text="adminApiTokensError"></div>
+        <div x-show="adminApiTokensLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+        <div x-show="!adminApiTokensLoading && adminApiTokensList.length === 0"
+             class="muted-msg" x-text="$app.t('admin.settings.api.empty')"></div>
+
+        <table x-show="!adminApiTokensLoading && adminApiTokensList.length > 0"
+               class="admin-api-tokens-table"
+               x-data="sortableTable({
+                 rows: () => adminApiTokensList,
+                 defaultKey: 'created_at',
+                 defaultDir: 'desc',
+                 types: { created_at: 'date', last_used_at: 'date', expires_at: 'date' },
+                 persistKey: 'adminApiTokens'
+               })">
+          <thead>
+            <tr>
+              <th class="sortable-th" :class="sortClass('display_name')" :aria-sort="ariaSort('display_name')" @click="sortBy('display_name')"
+                  x-text="$app.t('admin.settings.api.col.name')"></th>
+              <th class="sortable-th" :class="sortClass('scopes')" :aria-sort="ariaSort('scopes')" @click="sortBy('scopes')"
+                  x-text="$app.t('admin.settings.api.col.scopes')"></th>
+              <th class="sortable-th" :class="sortClass('created_at')" :aria-sort="ariaSort('created_at')" @click="sortBy('created_at')"
+                  x-text="$app.t('admin.settings.api.col.created')"></th>
+              <th class="sortable-th" :class="sortClass('last_used_at')" :aria-sort="ariaSort('last_used_at')" @click="sortBy('last_used_at')"
+                  x-text="$app.t('admin.settings.api.col.lastUsed')"></th>
+              <th class="sortable-th" :class="sortClass('expires_at')" :aria-sort="ariaSort('expires_at')" @click="sortBy('expires_at')"
+                  x-text="$app.t('admin.settings.api.col.expires')"></th>
+              <th x-text="$app.t('admin.settings.api.col.status')"></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="t in sorted" :key="t.id">
+              <tr :class="t.revoked_at ? 'is-revoked' : ''">
+                <td x-text="t.display_name"></td>
+                <td><code x-text="t.scopes"></code></td>
+                <td x-text="t.created_at ? new Date(t.created_at).toLocaleDateString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {}) : '–'"></td>
+                <td x-text="t.last_used_at ? new Date(t.last_used_at).toLocaleString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {}) : '–'"></td>
+                <td x-text="t.expires_at ? new Date(t.expires_at).toLocaleDateString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {}) : '–'"></td>
+                <td>
+                  <span class="badge"
+                        :class="t.revoked_at ? 'badge-err' : (t.expires_at && t.expires_at < new Date().toISOString() ? 'badge-warn' : 'badge-ok')"
+                        x-text="t.revoked_at ? $app.t('admin.settings.api.status.revoked') : (t.expires_at && t.expires_at < new Date().toISOString() ? $app.t('admin.settings.api.status.expired') : $app.t('admin.settings.api.status.active'))"></span>
+                </td>
+                <td>
+                  <button type="button" x-show="!t.revoked_at" @click="$root.adminApiTokensRevoke(t.id)"
+                          x-text="$app.t('admin.settings.api.revokeButton')"></button>
+                  <button type="button" x-show="t.revoked_at" @click="$root.adminApiTokensDelete(t.id)"
+                          x-text="$app.t('admin.settings.api.deleteButton')"></button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Scrape-Config Snippets -->
+      <div class="admin-settings-subsection">
+        <h4 class="admin-settings-subheading" x-text="$app.t('admin.settings.api.snippetsTitle')"></h4>
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.api.snippetsHint')"></p>
+        <div class="collapsible-wrap" x-data="collapsible()">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+          <span x-text="$app.t('admin.settings.api.snippetPrometheus')"></span>
+        </button>
+        <div x-bind="panel" x-cloak class="collapsible-section">
+<pre class="admin-api-snippet">scrape_configs:
+  - job_name: schreibwerkstatt
+    scheme: https
+    metrics_path: /metrics
+    static_configs:
+      - targets: [&apos;<span x-text="location.host"></span>&apos;]
+    authorization:
+      type: Bearer
+      credentials: sw_REPLACE_WITH_TOKEN</pre>
+        </div>
+        </div>
+        <div class="collapsible-wrap" x-data="collapsible()">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+          <span x-text="$app.t('admin.settings.api.snippetHomeAssistant')"></span>
+        </button>
+        <div x-bind="panel" x-cloak class="collapsible-section">
+<pre class="admin-api-snippet">rest:
+  - resource: <span x-text="location.origin"></span>/metrics
+    method: GET
+    headers:
+      Authorization: Bearer sw_REPLACE_WITH_TOKEN
+    scan_interval: 300
+    sensor:
+      - name: Schreibwerkstatt Zeichen
+        unique_id: schreibwerkstatt_chars
+        value_template: &quot;{{ value | regex_findall_index('sw_chars (\\d+)', 0) | int(0) }}&quot;
+        unit_of_measurement: chars
+        state_class: measurement
+        icon: mdi:format-letter-case
+      - name: Schreibwerkstatt Wörter
+        unique_id: schreibwerkstatt_words
+        value_template: &quot;{{ value | regex_findall_index('sw_words (\\d+)', 0) | int(0) }}&quot;
+        unit_of_measurement: words
+        state_class: measurement
+        icon: mdi:text
+      - name: Schreibwerkstatt Schreibzeit heute
+        unique_id: schreibwerkstatt_writing_seconds_today
+        value_template: &quot;{{ value | regex_findall_index('sw_writing_seconds_today (\\d+)', 0) | int(0) }}&quot;
+        unit_of_measurement: s
+        device_class: duration
+        state_class: measurement
+        icon: mdi:fountain-pen-tip</pre>
+        </div>
+        </div>
+      </div>
+    </section>

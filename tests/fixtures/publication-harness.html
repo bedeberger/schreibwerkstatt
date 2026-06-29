@@ -85,7 +85,25 @@
     const { registerBookSettingsCard } = await import('/public/js/cards/book-settings-card.js');
     registerBookSettingsCard();
 
-    const html = await fetch('/public/partials/book-settings.html').then(r => r.text());
+    // Fragment-Includes (`<!-- @include NAME -->`) wie der App-Loader auflösen,
+    // sonst bleiben die ausgelagerten Tab-Panels leer (app-ui.js#_resolveIncludes).
+    const resolveIncludes = async (src, seen = new Set()) => {
+      const re = /<!--\s*@include\s+([\w-]+)\s*-->/g;
+      const out = [];
+      let last = 0, m;
+      while ((m = re.exec(src))) {
+        out.push(src.slice(last, m.index));
+        const frag = m[1];
+        out.push(seen.has(frag) ? '' : await resolveIncludes(
+          await fetch(`/public/partials/${frag}.html`).then(r => r.text()),
+          new Set([...seen, frag]),
+        ));
+        last = re.lastIndex;
+      }
+      out.push(src.slice(last));
+      return out.join('');
+    };
+    const html = await resolveIncludes(await fetch('/public/partials/book-settings.html').then(r => r.text()));
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
     const slot = document.getElementById('partial-book-settings');

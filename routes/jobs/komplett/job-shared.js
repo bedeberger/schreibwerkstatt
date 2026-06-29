@@ -1,0 +1,231 @@
+'use strict';
+// Geteilte Bausteine der beiden Kontinuitäts-tragenden Jobs (Komplettanalyse +
+// Standalone-Kontinuitätscheck): Verify-Stufe (False-Positive-Filter gegen den
+// Originaltext), Anachronismus-Datenbasis, Per-Job-Claude-Overrides.
+
+const { db, getBookSettings } = require('../../../db/schema');
+const appSettings = require('../../../lib/app-settings');
+const { updateJob, settledAll } = require('../shared');
+const { _stelleQuote } = require('./utils');
+
+// ── Verify-Stufe für den Multi-Pass-Kontinuitätscheck ────────────────────────
+// Der Fakten-basierte Check sieht nur extrahierte Fakten, nicht den Volltext –
+// auflösender Kontext (Rückblende, Ironie, Konjunktiv, indirekte Rede) ist dort
+// schon weg und erzeugt systematisch False-Positives. Pro gemeldetem Problem
+// laden wir die Original-Textstellen nach und lassen das Modell den Widerspruch
+// mit echtem Kontext bestätigen oder verwerfen. Single-Pass braucht das nicht
+// (hat den Volltext bereits beim Check).
+const _VERIFY_RADIUS = 1500;
+
+// Textfenster rund um das Zitat aus den im Problem referenzierten Kapiteln.
+// Whitespace-normalisiert (matcht den Single-Pass-/Fakten-Textfluss); findet das
+// Zitat und schneidet ±_VERIFY_RADIUS Zeichen aus. Fallback: Kapitel-Anfang.
+function _verifyExcerpt(groups, groupOrder, kapitelNames, quote) {
+  const texts = [];
+  for (const key of groupOrder) {
+    const g = groups.get(key);
+    if (kapitelNames.includes(g.name)) texts.push(g.pages.map(p => p.text).join('\n'));
+  }
+  if (!texts.length) return '';
+  const full = texts.join('\n\n').replace(/\s+/g, ' ');
+  if (quote) {
+    const needle = quote.replace(/\s+/g, ' ').slice(0, 40);
+    const idx = full.indexOf(needle);
+    if (idx >= 0) return full.slice(Math.max(0, idx - _VERIFY_RADIUS), Math.min(full.length, idx + needle.length + _VERIFY_RADIUS));
+  }
+  return full.slice(0, _VERIFY_RADIUS * 2);
+}
+
+// Filtert die Probleme des Fakten-Checks: verwirft nur explizit als unecht
+// eingestufte (bestaetigt=false); nicht lokalisierbare/fehlgeschlagene bleiben
+// konservativ erhalten. Nur Claude (lokale Provider: zu kleines Kontextfenster
+// für zuverlässige Verify-Urteile, Mutex serialisiert zudem jeden Call).
+async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
+  const { call, prompts, sys, jobId, tok, bookName, groups, groupOrder, log } = ctx;
+  const probleme = Array.isArray(result?.probleme) ? result.probleme : [];
+  if (!probleme.length) return result;
+  updateJob(jobId, { progress: fromPct, statusText: 'job.phase.verifyContradictions' });
+  // Concurrency-Cap wie Phase 1 (settledAll + ai.claude.phase1_concurrency, Warmup gegen den
+  // gecachten Buchtext-Block): bei 40-60 Befunden würde Promise.all sonst Dutzende Claude-Calls
+  // gleichzeitig feuern → TPM-Burst (429/overloaded, auch auf andere Pipeline-Calls).
+  const claudeConcurrency = Math.max(1, parseInt(appSettings.get('ai.claude.phase1_concurrency'), 10) || 4);
+  const settled = await settledAll(probleme.map((p) => async () => {
+    const kap = Array.isArray(p.kapitel) ? p.kapitel : [];
+    if (!kap.length) return { p, keep: true };
+    const exA = _verifyExcerpt(groups, groupOrder, kap, _stelleQuote(p.stelle_a));
+    const exB = _verifyExcerpt(groups, groupOrder, kap, _stelleQuote(p.stelle_b));
+    if (!exA && !exB) return { p, keep: true };
+    try {
+      const v = await call(jobId, tok,
+        prompts.buildKontinuitaetVerifyPrompt(bookName, p, exA, exB),
+        sys.SYSTEM_KONTINUITAET_BLOCKS, null, null, 400, 0.3, 600, prompts.SCHEMA_KONTINUITAET_VERIFY);
+      return { p, keep: v?.bestaetigt !== false };
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      log.warn(`Kontinuität Verify übersprungen: ${e.message}`);
+      return { p, keep: true };
+    }
+  }), { concurrency: claudeConcurrency, warmup: true });
+  // Abbruch (AbortError in einem Verify-Call) muss den Job stoppen — settledAll fängt
+  // Rejects ab, darum gezielt re-raisen. Übrige Rejects konservativ als keep behandeln.
+  const aborted = settled.find(r => r.status === 'rejected' && r.reason?.name === 'AbortError');
+  if (aborted) throw aborted.reason;
+  const verdicts = settled.map((r, i) => r.status === 'fulfilled' ? r.value : { p: probleme[i], keep: true });
+  const kept = verdicts.filter(v => v.keep).map(v => v.p);
+  const dropped = probleme.length - kept.length;
+  if (dropped > 0) log.info(`Kontinuität Verify: ${dropped}/${probleme.length} False-Positive(s) verworfen.`);
+  updateJob(jobId, { progress: toPct });
+  return { ...result, probleme: kept };
+}
+
+// ── Anachronismus-Datenbasis für die Kontinuitätsprüfung ─────────────────────
+// Nur bei Romanen mit echter Zeitlinie (book_settings.zeitlinie_real). Liefert die
+// globale Erzählzeit-Spanne aus sicher datierten Figuren-/Zeitstrahl-Ereignissen plus
+// die im Buch erwähnten Songs und Welt-Fakten (Technik/Historie/Ereignis/Kultur). Jeder
+// Eintrag bekommt – soweit ableitbar – das Erzähljahr SEINER Erwähnung: Entität → Kapitel
+// (song_chapters / world_fact_chapters) → in diesem Kapitel datierte Ereignisse. So
+// vergleicht das Modell das reale Entstehungs-/Veröffentlichungsjahr (Eigenwissen) gegen
+// die lokale Szenen-Zeit statt nur gegen die Gesamtspanne (präzise bei Rückblenden/
+// Mehr-Epochen-Büchern). Auch Single-Pass-Fakten haben einen Kapitel-Link, weil
+// saveFaktenToDb dort über den Seitennamen (f.seite → page → chapter) backfillt. Fakten
+// ohne auflösbaren Kapitel-Link oder in undatierten Kapiteln tragen kein Per-Eintrag-Jahr
+// → Fallback auf die Gesamtspanne.
+// null, wenn die Zeitlinie aus ist, keine datierten Ereignisse vorliegen oder es nichts
+// Prüfbares gibt → der Prompt-Builder lässt die Anachronismus-Prüfung dann ganz weg.
+// Jahres-Spannen kommen kanonisch aus dem konsolidierten zeitstrahl_events (Fallback
+// figure_events, wenn noch nicht konsolidiert). Lesepfad-sicher in beiden Aufrufern: der
+// Komplett-Job ruft erst nach der Zeitstrahl-Konsolidierung (P6) auf, der Standalone-
+// Kontinuitätscheck gegen einen früher konsolidierten Zeitstrahl; songs (runPhase3Songs)
+// und world_facts (saveFaktenToDb) sind vor P8 ebenfalls persistiert.
+function buildAnachronismusData(bookIdInt, email) {
+  const { zeitlinie_real } = getBookSettings(bookIdInt, email);
+  if (!zeitlinie_real) return null;
+  // Kanonische Quelle ist der konsolidierte Zeitstrahl (zeitstrahl_events) — dieselbe
+  // Menge, aus der Ereignisse-Karte und Figuren-Jahr ableiten. Nur wenn (noch) kein
+  // Zeitstrahl konsolidiert wurde, Fallback auf die rohen figure_events, damit ein reiner
+  // Kontinuitäts-Lauf ohne vorherige Komplettanalyse nicht leer ausgeht.
+  const hasZeitstrahl = !!db.prepare(
+    'SELECT 1 FROM zeitstrahl_events WHERE book_id = ? AND user_email IS ? LIMIT 1'
+  ).get(bookIdInt, email);
+  // Globale Spanne (Header + Fallback) aus allen datierten Ereignissen – auch ohne Kapitel-Link.
+  const yearRow = hasZeitstrahl
+    ? db.prepare(`
+        SELECT MIN(datum_year) AS minY, MAX(COALESCE(datum_ende_year, datum_year)) AS maxY
+          FROM zeitstrahl_events
+         WHERE book_id = ? AND user_email IS ? AND datum_unsicher = 0 AND datum_year IS NOT NULL
+      `).get(bookIdInt, email)
+    : db.prepare(`
+        SELECT MIN(fe.datum_year) AS minY, MAX(COALESCE(fe.datum_ende_year, fe.datum_year)) AS maxY
+          FROM figure_events fe JOIN figures f ON f.id = fe.figure_id
+         WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0 AND fe.datum_year IS NOT NULL
+      `).get(bookIdInt, email);
+  if (!yearRow || yearRow.minY == null) return null;
+  const minYear = yearRow.minY, maxYear = yearRow.maxY;
+  // Kapitel → {minY, maxY} aus den datierten Ereignissen dieses Kapitels (Per-Eintrag-Jahr).
+  const chapterRows = hasZeitstrahl
+    ? db.prepare(`
+        SELECT zec.chapter_id AS chapter_id, MIN(ze.datum_year) AS minY,
+               MAX(COALESCE(ze.datum_ende_year, ze.datum_year)) AS maxY
+          FROM zeitstrahl_events ze JOIN zeitstrahl_event_chapters zec ON zec.event_id = ze.id
+         WHERE ze.book_id = ? AND ze.user_email IS ? AND ze.datum_unsicher = 0
+           AND ze.datum_year IS NOT NULL AND zec.chapter_id IS NOT NULL
+         GROUP BY zec.chapter_id
+      `).all(bookIdInt, email)
+    : db.prepare(`
+        SELECT fe.chapter_id AS chapter_id, MIN(fe.datum_year) AS minY,
+               MAX(COALESCE(fe.datum_ende_year, fe.datum_year)) AS maxY
+          FROM figure_events fe JOIN figures f ON f.id = fe.figure_id
+         WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0
+           AND fe.datum_year IS NOT NULL AND fe.chapter_id IS NOT NULL
+         GROUP BY fe.chapter_id
+      `).all(bookIdInt, email);
+  const chMap = new Map(chapterRows.map(r => [r.chapter_id, { minY: r.minY, maxY: r.maxY }]));
+
+  // Erzähljahr-Spanne über eine Menge Kapitel-IDs → "1985" | "1985–1986" | null.
+  const jahrFor = (chapterIds) => {
+    let lo = null, hi = null;
+    for (const cid of chapterIds) {
+      const ce = chMap.get(cid);
+      if (!ce) continue;
+      if (lo == null || ce.minY < lo) lo = ce.minY;
+      if (hi == null || ce.maxY > hi) hi = ce.maxY;
+    }
+    if (lo == null) return null;
+    return lo === hi ? String(lo) : `${lo}–${hi}`;
+  };
+  // Mehrere Bridge-Zeilen pro Entität (1 je Kapitel) zu {…, chapterIds[]} gruppieren.
+  const groupByEntity = (rows, baseOf) => {
+    const byId = new Map();
+    for (const r of rows) {
+      let e = byId.get(r.id);
+      if (!e) { e = { ...baseOf(r), chapterIds: [] }; byId.set(r.id, e); }
+      if (r.chapter_id != null) e.chapterIds.push(r.chapter_id);
+    }
+    return [...byId.values()];
+  };
+
+  const songRows = db.prepare(`
+    SELECT s.id, s.titel, s.interpret, sc.chapter_id
+      FROM songs s LEFT JOIN song_chapters sc ON sc.song_id = s.id
+     WHERE s.book_id = ? AND s.user_email IS ? ORDER BY s.sort_order
+  `).all(bookIdInt, email);
+  const songs = groupByEntity(songRows, s => ({ titel: s.titel, interpret: s.interpret || '' }))
+    .map(s => ({ titel: s.titel, interpret: s.interpret, jahr: jahrFor(s.chapterIds) }));
+
+  const factRows = db.prepare(`
+    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, wfc.chapter_id
+      FROM world_facts wf LEFT JOIN world_fact_chapters wfc ON wfc.fact_id = wf.id
+     WHERE wf.book_id = ? AND wf.user_email IS ?
+       AND wf.kategorie IN ('technik','historie','ereignis','kultur')
+     ORDER BY wf.sort_order
+  `).all(bookIdInt, email);
+  const facts = groupByEntity(factRows, f => ({
+    kategorie: f.kategorie,
+    text: `${f.subjekt ? f.subjekt + ': ' : ''}${f.fakt}`,
+  })).map(f => ({ kategorie: f.kategorie, text: f.text, jahr: jahrFor(f.chapterIds) }));
+  const technik = facts.filter(f => f.kategorie === 'technik').map(({ text, jahr }) => ({ text, jahr }));
+  const ereignisse = facts.filter(f => f.kategorie !== 'technik').map(({ text, jahr }) => ({ text, jahr }));
+
+  if (!songs.length && !technik.length && !ereignisse.length) return null;
+  return { minYear, maxYear, songs, technik, ereignisse };
+}
+
+// ── Per-Job-Claude-Overrides für die Komplettanalyse-Familie ──────────────────
+// Nur ai.provider = claude: Modell, Kontextfenster, Output-Cap und Hard-Timeout dürfen
+// eigenständig vom globalen ai.claude.* abweichen (z.B. Opus 4.8 mit 128K Output + längerem
+// Timeout für die gründlichere Extraktion, während global Sonnet 4.6 / 64K / 10min fürs
+// Lektorat läuft). Leer/0 = folgt global. Via ALS-Context an lib/ai.js gereicht → greift für
+// alle Claude-Calls dieses Jobs, ohne globale Calls zu beeinflussen.
+// Per-Call-Timeout-Default für die Komplettanalyse, wenn ein eigenes Komplett-Profil
+// (Modell/Kontext/Output) gesetzt ist, aber kein expliziter timeout_ms.komplett: 30 Min.
+// Begründung: (a) die globalen 10 Min sind für Opus-Single-Pass-Calls über ein ganzes Buch
+// zu knapp; (b) 30 Min < 1h-Prompt-Cache-TTL — aufeinanderfolgende Calls (P1…P8, alle auf
+// demselben gecachten 1h-Buchtext-Block) stossen den Cache so stets vor Ablauf neu an.
+const KOMPLETT_DEFAULT_TIMEOUT_MS = 1800000; // 30 min
+
+function _komplettClaudeOverrides(effectiveProvider) {
+  if (effectiveProvider !== 'claude') return null;
+  const model = String(appSettings.get('ai.claude.model.komplett') || '').trim();
+  const contextWindow = parseInt(appSettings.get('ai.claude.context_window.komplett'), 10) || 0;
+  const maxTokensOut = parseInt(appSettings.get('ai.claude.max_tokens_out.komplett'), 10) || 0;
+  const timeoutMs = parseInt(appSettings.get('ai.claude.timeout_ms.komplett'), 10) || 0;
+  const patch = {};
+  if (model) patch.claudeModel = model;
+  if (contextWindow > 0) patch.claudeContextWindow = contextWindow;
+  if (maxTokensOut > 0) patch.claudeMaxTokensOut = maxTokensOut;
+  // Eigenes Komplett-Profil aktiv? Dann den Timeout-Default greifen lassen (nie unter den
+  // expliziten globalen Wert senken). Ohne Profil bleibt es beim globalen Timeout.
+  const hasKomplettProfile = !!(model || contextWindow > 0 || maxTokensOut > 0);
+  if (timeoutMs > 0) {
+    patch.claudeTimeoutMs = timeoutMs;
+  } else if (hasKomplettProfile) {
+    const globalTimeoutMs = parseInt(appSettings.get('ai.claude.timeout_ms'), 10) || 600000;
+    patch.claudeTimeoutMs = Math.max(KOMPLETT_DEFAULT_TIMEOUT_MS, globalTimeoutMs);
+  }
+  return Object.keys(patch).length ? patch : null;
+}
+
+module.exports = {
+  _VERIFY_RADIUS, _verifyExcerpt, verifyKontinuitaetProbleme,
+  buildAnachronismusData, KOMPLETT_DEFAULT_TIMEOUT_MS, _komplettClaudeOverrides,
+};

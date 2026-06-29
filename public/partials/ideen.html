@@ -59,12 +59,13 @@
             <div class="idee-status-badge" x-text="$app.t('ideen.statusOpen')"></div>
             <div class="idee-menu" x-show="editingId !== idee.id && movingId !== idee.id">
               <button type="button"
-                class="idee-menu-btn"
+                class="icon-btn icon-btn--ghost"
                 @click.stop="openMenu($event, idee)"
                 :disabled="busy"
+                :data-tip="$app.t('ideen.actions')"
                 :aria-label="$app.t('ideen.actions')"
                 :aria-expanded="menuOpenId === idee.id"
-                aria-haspopup="menu">⋯</button>
+                aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg></button>
             </div>
             <template x-if="editingId !== idee.id">
               <div class="idee-content" :class="movingId === idee.id ? 'idee-content--moving' : ''" x-text="idee.content"></div>
@@ -91,33 +92,49 @@
          Scroll-Container darstellt (max-height + overflow-y) und ein
          lokales position:absolute-Popover dort abgeschnitten würde. -->
     <template x-teleport="body">
-      <div class="idee-menu-popover idee-menu-popover--portal"
+      <div class="context-menu"
            x-show="menuOpenId !== null && !!menuOpenIdee()" x-cloak
            :style="`top:${menuPos.top}px;left:${menuPos.left}px`"
            @click.outside="closeMenu()"
            @keydown.escape.window="closeMenu()"
            role="menu">
         <template x-if="menuOpenIdee()">
-          <div class="idee-menu-popover-inner">
-            <button type="button" role="menuitem"
+          <div>
+            <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                     x-show="!menuOpenIdee().erledigt"
                     @click.stop="toggleErledigtIdee(menuOpenIdee()); closeMenu()"
-                    :disabled="busy" x-text="$app.t('ideen.markDone')"></button>
-            <button type="button" role="menuitem"
+                    :disabled="busy">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+              <span x-text="$app.t('ideen.markDone')"></span>
+            </button>
+            <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                     x-show="menuOpenIdee().erledigt"
                     @click.stop="toggleErledigtIdee(menuOpenIdee()); closeMenu()"
-                    :disabled="busy" x-text="$app.t('ideen.markOpen')"></button>
-            <button type="button" role="menuitem"
+                    :disabled="busy">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#undo"/></svg>
+              <span x-text="$app.t('ideen.markOpen')"></span>
+            </button>
+            <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                     x-show="!menuOpenIdee().erledigt"
                     @click.stop="startEditIdee(menuOpenIdee()); closeMenu()"
-                    :disabled="busy" x-text="$app.t('ideen.edit')"></button>
-            <button type="button" role="menuitem"
+                    :disabled="busy">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+              <span x-text="$app.t('ideen.edit')"></span>
+            </button>
+            <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                     x-show="!menuOpenIdee().erledigt"
                     @click.stop="startMoveIdee(menuOpenIdee()); closeMenu()"
-                    :disabled="busy" x-text="$app.t('ideen.move')"></button>
-            <button type="button" role="menuitem" class="idee-menu-item--danger"
+                    :disabled="busy">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#move-horizontal"/></svg>
+              <span x-text="$app.t('ideen.move')"></span>
+            </button>
+            <div class="context-menu-sep" role="separator"></div>
+            <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger"
                     @click.stop="deleteIdee(menuOpenIdee()); closeMenu()"
-                    :disabled="busy" x-text="$app.t('ideen.delete')"></button>
+                    :disabled="busy">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+              <span x-text="$app.t('ideen.delete')"></span>
+            </button>
           </div>
         </template>
       </div>
@@ -132,12 +149,13 @@
             <div class="idee-status-badge idee-status-badge--erledigt" x-text="$app.t('ideen.statusDone')"></div>
             <div class="idee-menu">
               <button type="button"
-                class="idee-menu-btn"
+                class="icon-btn icon-btn--ghost"
                 @click.stop="openMenu($event, idee)"
                 :disabled="busy"
+                :data-tip="$app.t('ideen.actions')"
                 :aria-label="$app.t('ideen.actions')"
                 :aria-expanded="menuOpenId === idee.id"
-                aria-haspopup="menu">⋯</button>
+                aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg></button>
             </div>
             <div class="idee-content" x-text="idee.content"></div>
           </div>

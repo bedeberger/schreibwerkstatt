@@ -1,0 +1,43 @@
+    <div class="card-form-grid" x-bind="panel('danger')" x-cloak>
+
+    <div class="book-settings-danger-zone">
+      <div class="book-settings-danger-title">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#alert-triangle"/></svg>
+        <span x-text="$app.t('book.settings.dangerZone')"></span>
+      </div>
+
+      <div class="book-settings-danger-section">
+        <div class="book-settings-danger-row">
+          <div class="book-settings-danger-text" x-text="$app.t('book.settings.dangerText')"></div>
+          <div class="book-settings-danger-actions">
+            <button type="button"
+              class="book-settings-btn-danger"
+              @click="resetBookHistory()"
+              :disabled="bookHistoryResetLoading || !$store.nav.selectedBookId">
+              <span x-show="bookHistoryResetLoading" class="spinner"></span>
+              <span x-text="bookHistoryResetLoading ? $app.t('common.deleting') : $app.t('book.settings.dangerButton')"></span>
+            </button>
+          </div>
+        </div>
+        <p class="card-form-saved" x-show="bookHistoryResetMessage" x-cloak x-transition.opacity.duration.250ms x-text="bookHistoryResetMessage"></p>
+        <p class="card-form-error" x-show="bookHistoryResetError" x-text="bookHistoryResetError"></p>
+      </div>
+
+      <div class="book-settings-danger-section">
+        <div class="book-settings-danger-row">
+          <div class="book-settings-danger-text" x-text="$app.t('book.settings.deleteBookText')"></div>
+          <div class="book-settings-danger-actions">
+            <button type="button"
+              class="book-settings-btn-danger"
+              @click="deleteBook()"
+              :disabled="bookDeleteLoading || !$store.nav.selectedBookId">
+              <span x-show="bookDeleteLoading" class="spinner"></span>
+              <span x-text="bookDeleteLoading ? $app.t('common.deleting') : $app.t('book.settings.deleteBookButton')"></span>
+            </button>
+          </div>
+        </div>
+        <p class="card-form-error" x-show="bookDeleteError" x-text="bookDeleteError"></p>
+      </div>
+    </div>
+
+    </div><!-- /tab: danger -->

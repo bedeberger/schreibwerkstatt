@@ -200,6 +200,7 @@
                   <span x-text="t('plot.title')"></span>
                   <span class="btn-count" x-text="currentPagePlotBeatCount" :data-tip="t('plot.pageBeatsCountTitle', { n: currentPagePlotBeatCount })"></span>
                 </button>
+                <div class="context-menu-sep" role="separator" x-show="canEdit() && currentPage"></div>
                 <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="canEdit() && currentPage" :disabled="currentPageEmpty" @click="openShareLinksForPage(currentPage.id); pageActionsMenuOpen = false">
                   <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>
                   <span x-text="t('share.btn.sharePage')"></span>

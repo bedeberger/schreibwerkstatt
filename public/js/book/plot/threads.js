@@ -82,10 +82,47 @@ export const threadsMethods = {
     this.threadColorPickerId = this.threadColorPickerId === threadId ? null : threadId;
   },
 
-  // Mobile-Kebab: Lane-Aktionen auf-/zuklappen (Single-Select). Desktop blendet
-  // den Toggle aus und zeigt die Aktionen permanent (CSS).
-  toggleThreadActions(threadId) {
-    this.threadActionsOpenId = this.threadActionsOpenId === threadId ? null : threadId;
+  // Lane-Aktions-Dropdown (Kebab). Einzelnes, nach <body> teleportiertes
+  // .context-menu — die Lane sitzt in einem overflow-x/will-change-Scrollcontainer,
+  // in dem ein am Trigger verankertes Popover geclippt bzw. eingesperrt würde.
+  // JS-positioniert aus dem Trigger-Rect (Pattern wie das Ideen-Meatball-Menü).
+  openThreadMenu(ev, laneId) {
+    if (this.threadActionsOpenId === laneId) { this.closeThreadMenu(); return; }
+    const r = ev.currentTarget.getBoundingClientRect();
+    const PW = 220;
+    const PH = 240;
+    const left = Math.max(8, Math.min(window.innerWidth - PW - 8, r.right - PW));
+    const top = (r.bottom + PH + 8 > window.innerHeight)
+      ? Math.max(8, r.top - PH - 4)
+      : r.bottom + 4;
+    this.threadMenuPos = { top, left };
+    this.threadActionsOpenId = laneId;
+    this._attachThreadMenuListeners();
+  },
+
+  closeThreadMenu() {
+    this.threadActionsOpenId = null;
+    this._detachThreadMenuListeners();
+  },
+
+  // Die offene Lane (für das teleportierte Menü außerhalb der gridRows-Schleife).
+  threadMenuLane() {
+    if (this.threadActionsOpenId == null) return null;
+    return (this.threadLanes() || []).find(l => l.id === this.threadActionsOpenId) || null;
+  },
+
+  _attachThreadMenuListeners() {
+    if (this._threadMenuCloseHandler) return;
+    this._threadMenuCloseHandler = () => this.closeThreadMenu();
+    window.addEventListener('scroll', this._threadMenuCloseHandler, true);
+    window.addEventListener('resize', this._threadMenuCloseHandler);
+  },
+
+  _detachThreadMenuListeners() {
+    if (!this._threadMenuCloseHandler) return;
+    window.removeEventListener('scroll', this._threadMenuCloseHandler, true);
+    window.removeEventListener('resize', this._threadMenuCloseHandler);
+    this._threadMenuCloseHandler = null;
   },
 
   async setThreadColor(thread, key) {

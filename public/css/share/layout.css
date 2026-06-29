@@ -1,0 +1,259 @@
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body.share-page {
+  background: var(--share-bg);
+  color: var(--share-text);
+  font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', serif;
+  font-size: 18px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Theming-Brücke für die geteilten Kommentar-Karten
+     (public/css/components/comment-rail.css): mappt die --cr-*-Schnittstelle auf
+     das Share-Token-Universum. Page-weit, weil die Karten in zwei getrennten
+     Bereichen leben (.share-comments = verankert, .share-general = allgemein). */
+  --cr-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --cr-surface: var(--share-surface);
+  --cr-border: var(--share-border);
+  --cr-border-input: var(--share-border);
+  --cr-accent: var(--share-accent);
+  --cr-text: var(--share-text);
+  --cr-muted: var(--share-muted);
+  --cr-radius: var(--share-radius);
+  --cr-radius-sm: var(--share-radius-sm);
+  --cr-shadow: var(--share-shadow);
+  --cr-shadow-hover: var(--share-shadow-md);
+  --cr-tag-bg: var(--share-hover);
+  --cr-warn-bg: color-mix(in srgb, var(--share-accent-2) 18%, transparent);
+  --cr-warn-text: var(--share-accent-2);
+  --cr-ok-bg: color-mix(in srgb, #3a8f3e 22%, transparent);
+  --cr-ok-text: var(--share-text);
+  --cr-err-bg: color-mix(in srgb, #c43838 20%, transparent);
+  --cr-err-text: var(--share-muted);
+  /* Vom Reviewer erledigte Kommentare treten in der Leseansicht deutlicher
+     zurueck als in den Editor-Rails (default 0.62). */
+  --cr-resolved-opacity: 0.4;
+}
+
+.share-skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--share-accent);
+  color: var(--share-on-accent);
+  padding: 6px 12px;
+  text-decoration: none;
+  border-radius: var(--share-radius-sm);
+}
+.share-skip:focus { left: 8px; top: 8px; z-index: 100; }
+
+/* Lese-Fortschrittsbalken: ganz oben am Fensterrand, über dem Sticky-Header.
+   Breite aus --progress (von share-reader/progress.js gesetzt). */
+.share-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 20;
+  pointer-events: none;
+}
+.share-progress__bar {
+  height: 100%;
+  width: var(--progress, 0%);
+  background: var(--share-accent);
+  transition: width 80ms linear;
+}
+
+.share-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--share-surface) 95%, transparent);
+  backdrop-filter: saturate(140%) blur(10px);
+  border-bottom: 1px solid var(--share-border);
+}
+.share-header__inner {
+  max-width: 70ch;
+  margin: 0 auto;
+  padding: 18px 24px 16px;
+}
+.share-header__book {
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--share-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.share-header__title {
+  margin: 4px 0 6px;
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+.share-header__author {
+  font-size: 14px;
+  color: var(--share-muted);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Werkzeug-Cluster oben rechts: Optionen-Menü (⋯). Mobile-first im Header-Fluss
+   rechtsbündig; ab Tablet absolut oben rechts. */
+.share-header__tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 24px 12px;
+}
+/* #share-theme bleibt als leerer Template-Knoten zurück (Cluster montieren ins
+   Menü) — nicht als Flex-Item Platz beanspruchen lassen. */
+.share-theme:empty { display: none; }
+.share-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Optionen-Menü (Meatball ⋯): ein Trigger oben rechts öffnet ein Dropdown mit
+   allen sekundären Reader-Optionen (Identität, Farbschema, Inhaltsverzeichnis).
+   Standalone von share-reader.js gebaut — kein Alpine-Context-Menu. */
+.share-menu { position: relative; }
+.share-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--share-surface);
+  color: var(--share-muted);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  cursor: pointer;
+}
+.share-menu__trigger:hover { background: var(--share-hover); }
+.share-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: var(--share-surface);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius);
+  box-shadow: var(--share-shadow);
+  z-index: 20;
+  overflow: hidden;
+}
+.share-menu__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--share-border);
+}
+.share-menu__section:last-child { border-bottom: 0; }
+.share-menu__heading {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--share-faint);
+}
+
+/* Identitäts-Zeile im Menü: „Als <Name>" links, Ändern-Button rechts. */
+.share-menu__section .share-identity-bar {
+  justify-content: space-between;
+  width: 100%;
+}
+.share-menu__section .share-identity-bar__as { max-width: 16ch; }
+
+/* Aktions-Button (TOC-Toggle) als volle Menü-Zeile; aktiv = Akzent-Hintergrund. */
+.share-action-btn {
+  padding: 6px 12px;
+  background: var(--share-surface);
+  color: var(--share-muted);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+.share-action-btn:hover:not(.share-action-btn--active) { background: var(--share-hover); }
+.share-action-btn--active {
+  background: var(--share-accent);
+  border-color: var(--share-accent);
+  color: var(--share-on-accent);
+}
+
+/* Theme-Switcher (Auto / Hell / Dunkel) als segmentierte Zeile im Menü.
+   Progressive Enhancement — ohne JS folgt der Reader der Systempräferenz. */
+.share-theme__group {
+  display: flex;
+  background: var(--share-surface);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  overflow: hidden;
+}
+.share-theme__btn {
+  flex: 1;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--share-muted);
+  border: 0;
+  border-left: 1px solid var(--share-border);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+.share-theme__btn:first-child { border-left: 0; }
+.share-theme__btn:hover:not(.share-theme__btn--active) { background: var(--share-hover); }
+.share-theme__btn--active {
+  background: var(--share-accent);
+  color: var(--share-on-accent);
+}
+
+@media (min-width: 601px) {
+  .share-header__tools {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    padding: 0;
+  }
+}
+
+.share-main {
+  max-width: 70ch;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+.share-intro {
+  margin: 0 0 32px;
+  padding: 14px 18px;
+  border: 1px solid var(--share-border);
+  border-left: 4px solid var(--share-accent);
+  background: var(--share-hover);
+  border-radius: 0 var(--share-radius) var(--share-radius) 0;
+  color: var(--share-muted);
+}
+.share-intro__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--share-accent);
+  margin: 0 0 8px;
+}
+.share-intro__body { font-style: italic; }
+.share-intro__body p { margin: 0 0 8px; }
+.share-intro__body p:last-child { margin: 0; }
+

@@ -1,0 +1,13 @@
+    <!-- Analytics-Tab: Plausible (self-hosted) -->
+    <section x-show="adminSettingsTab === 'analytics'" class="admin-settings-section">
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['analytics.plausible.enabled'] === true || adminSettingsForm['analytics.plausible.enabled'] === 'true'"
+               @change="adminSettingsForm['analytics.plausible.enabled'] = $event.target.checked">
+        <span x-text="$app.t('admin.settings.analytics.enabledLabel')"></span>
+      </label>
+      <label>
+        <span x-text="$app.t('admin.settings.analytics.scriptUrlLabel')"></span>
+        <input type="url" x-model="adminSettingsForm['analytics.plausible.script_url']" placeholder="https://analytics.example.com/js/pa-XXXX.js">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.analytics.scriptUrlHint')"></small>
+      </label>
+    </section>

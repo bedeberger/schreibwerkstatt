@@ -1,0 +1,160 @@
+    <!-- Provider-Tab: Sub-Tabs pro Provider, aktiver markiert via Badge -->
+    <section x-show="adminSettingsTab === 'provider'" class="admin-settings-section">
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.providerChoice')"></p>
+
+      <nav class="admin-settings-subtabs" role="tablist">
+        <template x-for="p in ['claude','ollama','openai-compat']" :key="p">
+          <button type="button" role="tab"
+                  :class="['admin-settings-subtab', adminSettingsProviderSubtab === p ? 'is-active' : '', adminSettingsForm['ai.provider'] === p ? 'is-default-provider' : '']"
+                  @click="adminSettingsProviderSubtab = p">
+            <span x-text="$app.t('admin.settings.section.' + p)"></span>
+            <span x-show="adminSettingsForm['ai.provider'] === p" class="admin-settings-active-badge" x-text="$app.t('admin.settings.provider.active')"></span>
+          </button>
+        </template>
+      </nav>
+
+      <div x-show="adminSettingsProviderSubtab === 'claude'" class="admin-settings-subsection">
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.standardTitle')"></span></h4>
+        <label>ai.claude.api_key
+          <input type="password" x-model="adminSettingsForm['ai.claude.api_key']" :placeholder="$app.t('admin.settings.secret.masked')">
+          <small x-show="adminSettingsMap['ai.claude.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.claude.api_key']?.masked"></small>
+        </label>
+        <label>ai.claude.model
+          <input type="text" x-model="adminSettingsForm['ai.claude.model']" placeholder="claude-sonnet-4-6">
+        </label>
+        <label>ai.claude.context_window
+          <input type="text" x-data="numInput({ integer: true, min: 8000, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
+        </label>
+        <label>ai.claude.max_tokens_out
+          <input type="text" x-data="numInput({ integer: true, min: 1024, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
+        </label>
+
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.komplettTitle')"></span></h4>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.claude.komplettIntro')"></small>
+        <label>ai.claude.model.komplett
+          <input type="text" x-model="adminSettingsForm['ai.claude.model.komplett']" placeholder="claude-opus-4-8">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettModel')"></small>
+        </label>
+        <label>ai.claude.context_window.komplett
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window.komplett']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettContextWindow')"></small>
+        </label>
+        <label>ai.claude.max_tokens_out.komplett
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out.komplett']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettMaxTokensOut')"></small>
+        </label>
+        <label>ai.claude.timeout_ms.komplett
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms.komplett']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettTimeoutMs')"></small>
+        </label>
+        <label>ai.komplett.completeness_passes
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 3 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.completeness_passes']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>
+        </label>
+
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.bookchatTitle')"></span></h4>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.claude.bookchatIntro')"></small>
+        <label>ai.claude.model.bookchat
+          <input type="text" x-model="adminSettingsForm['ai.claude.model.bookchat']" placeholder="claude-opus-4-8">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.bookchatModel')"></small>
+        </label>
+        <label>ai.claude.context_window.bookchat
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window.bookchat']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.bookchatContextWindow')"></small>
+        </label>
+        <label>ai.claude.max_tokens_out.bookchat
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.max_tokens_out.bookchat']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.bookchatMaxTokensOut')"></small>
+        </label>
+        <label>ai.claude.timeout_ms.bookchat
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms.bookchat']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.bookchatTimeoutMs')"></small>
+        </label>
+
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.advancedTitle')"></span></h4>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedClaude')"></small>
+        <label>ai.claude.retry_max <input type="text" x-data="numInput({ step: 1, min: 0, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.retry_max']"></label>
+        <label>ai.claude.timeout_ms <input type="text" x-data="numInput({ step: 1, min: 1000, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms']"></label>
+        <label>ai.claude.phase1_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 16 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.phase1_concurrency']"></label>
+      </div>
+
+      <div x-show="adminSettingsProviderSubtab === 'ollama'" class="admin-settings-subsection">
+        <label>ai.ollama.host
+          <input type="url" x-model="adminSettingsForm['ai.ollama.host']" placeholder="http://localhost:11434">
+        </label>
+        <label>ai.ollama.model
+          <input type="text" x-model="adminSettingsForm['ai.ollama.model']">
+        </label>
+        <label>ai.ollama.temperature
+          <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.temperature']">
+        </label>
+        <label>ai.ollama.context_window
+          <input type="text" x-data="numInput({ integer: true, min: 2048, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.context_window']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
+        </label>
+        <label>ai.ollama.max_tokens_out
+          <input type="text" x-data="numInput({ integer: true, min: 512, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.max_tokens_out']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
+        </label>
+        <label>ai.ollama.repeat_penalty
+          <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.repeat_penalty']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['ai.ollama.think'] === true || adminSettingsForm['ai.ollama.think'] === 'true'"
+                 @change="adminSettingsForm['ai.ollama.think'] = $event.target.checked">
+          <span>ai.ollama.think</span>
+        </label>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.think')"></small>
+      </div>
+
+      <div x-show="adminSettingsProviderSubtab === 'openai-compat'" class="admin-settings-subsection">
+        <label>ai.openai-compat.host <input type="url" x-model="adminSettingsForm['ai.openai-compat.host']" placeholder="http://localhost:8080"></label>
+        <label>ai.openai-compat.model <input type="text" x-model="adminSettingsForm['ai.openai-compat.model']"></label>
+        <label>ai.openai-compat.api_key
+          <input type="password" x-model="adminSettingsForm['ai.openai-compat.api_key']" :placeholder="$app.t('admin.settings.secret.masked')">
+          <small x-show="adminSettingsMap['ai.openai-compat.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['ai.openai-compat.api_key']?.masked"></small>
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.openaiCompatApiKey')"></small>
+        </label>
+        <label>ai.openai-compat.temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.temperature']"></label>
+        <label>ai.openai-compat.context_window
+          <input type="text" x-data="numInput({ integer: true, min: 2048, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.context_window']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.contextWindow')"></small>
+        </label>
+        <label>ai.openai-compat.max_tokens_out
+          <input type="text" x-data="numInput({ integer: true, min: 512, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.max_tokens_out']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxTokensOut')"></small>
+        </label>
+        <label>ai.openai-compat.repeat_penalty
+          <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.repeat_penalty']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['ai.openai-compat.think'] === true || adminSettingsForm['ai.openai-compat.think'] === 'true'"
+                 @change="adminSettingsForm['ai.openai-compat.think'] = $event.target.checked">
+          <span>ai.openai-compat.think</span>
+        </label>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.thinkOpenaiCompat')"></small>
+      </div>
+
+      <template x-if="adminSettingsBudget(adminSettingsProviderSubtab)">
+        <div class="admin-settings-budget"
+             :class="{ 'is-warn': adminSettingsBudget(adminSettingsProviderSubtab).level === 'warn', 'is-bad': adminSettingsBudget(adminSettingsProviderSubtab).level === 'bad' }">
+          <strong x-text="$app.t('admin.settings.komplett.title')"></strong>
+          <p class="muted-msg muted-msg--sm"
+             x-text="$app.t('admin.settings.komplett.derived', adminSettingsBudget(adminSettingsProviderSubtab).f)"></p>
+          <p x-show="adminSettingsBudget(adminSettingsProviderSubtab).level !== 'ok'"
+             x-text="$app.t('admin.settings.komplett.' + adminSettingsBudget(adminSettingsProviderSubtab).level, adminSettingsBudget(adminSettingsProviderSubtab).f)"></p>
+        </div>
+      </template>
+
+      <div class="admin-settings-actions">
+        <button type="button"
+                @click="adminSettingsForm['ai.provider'] = adminSettingsProviderSubtab"
+                :disabled="adminSettingsForm['ai.provider'] === adminSettingsProviderSubtab"
+                x-text="$app.t('admin.settings.provider.makeActive')"></button>
+        <button type="button" @click="adminSettingsTest('provider')" x-text="$app.t('admin.settings.test.connection')"></button>
+      </div>
+    </section>

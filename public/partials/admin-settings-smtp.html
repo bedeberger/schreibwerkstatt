@@ -1,0 +1,74 @@
+    <!-- SMTP / Mailer-Tab -->
+    <section x-show="adminSettingsTab === 'smtp'" class="admin-settings-section">
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.smtp.hint')"></p>
+      <p class="muted-msg muted-msg--sm">
+        <span x-text="$app.t('admin.settings.smtp.appPasswordHint')"></span>
+        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">myaccount.google.com/apppasswords</a>
+      </p>
+
+      <label>smtp.gmail.user
+        <input type="email" x-model="adminSettingsForm['smtp.gmail.user']" placeholder="name@gmail.com" autocomplete="off">
+      </label>
+      <label>smtp.gmail.app_password
+        <input type="password" x-model="adminSettingsForm['smtp.gmail.app_password']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
+        <small x-show="adminSettingsMap['smtp.gmail.app_password']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['smtp.gmail.app_password']?.masked"></small>
+      </label>
+      <label>smtp.from_name
+        <input type="text" x-model="adminSettingsForm['smtp.from_name']" placeholder="Schreibwerkstatt">
+      </label>
+      <label>smtp.reply_to
+        <input type="email" x-model="adminSettingsForm['smtp.reply_to']" placeholder="(optional)">
+      </label>
+      <label>smtp.rate_limit_per_minute
+        <input type="text" x-data="numInput({ step: 1, min: 1, max: 500 })" x-modelable="value" x-model="adminSettingsForm['smtp.rate_limit_per_minute']">
+      </label>
+
+      <label>mail.notify.admin_recipient
+        <input type="email" x-model="adminSettingsForm['mail.notify.admin_recipient']" placeholder="(optional)" autocomplete="off">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.mail.adminRecipientHint')"></small>
+      </label>
+
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.mail.notifyTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.mail.notifyHint')"></p>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.admin_on_job_fail'] === true || adminSettingsForm['mail.notify.admin_on_job_fail'] === 'true'"
+               @change="adminSettingsForm['mail.notify.admin_on_job_fail'] = $event.target.checked">
+        <span>mail.notify.admin_on_job_fail</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.admin_on_token_cap'] === true || adminSettingsForm['mail.notify.admin_on_token_cap'] === 'true'"
+               @change="adminSettingsForm['mail.notify.admin_on_token_cap'] = $event.target.checked">
+        <span>mail.notify.admin_on_token_cap</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.user_on_budget_overrun'] === true || adminSettingsForm['mail.notify.user_on_budget_overrun'] === 'true'"
+               @change="adminSettingsForm['mail.notify.user_on_budget_overrun'] = $event.target.checked">
+        <span>mail.notify.user_on_budget_overrun</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.admin_on_budget_overrun'] === true || adminSettingsForm['mail.notify.admin_on_budget_overrun'] === 'true'"
+               @change="adminSettingsForm['mail.notify.admin_on_budget_overrun'] = $event.target.checked">
+        <span>mail.notify.admin_on_budget_overrun</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.owner_on_share_comment'] === true || adminSettingsForm['mail.notify.owner_on_share_comment'] === 'true'"
+               @change="adminSettingsForm['mail.notify.owner_on_share_comment'] = $event.target.checked">
+        <span>mail.notify.owner_on_share_comment</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['mail.notify.reader_on_owner_reply'] === true || adminSettingsForm['mail.notify.reader_on_owner_reply'] === 'true'"
+               @change="adminSettingsForm['mail.notify.reader_on_owner_reply'] = $event.target.checked">
+        <span>mail.notify.reader_on_owner_reply</span>
+      </label>
+      <label>mail.notify.job_fail_throttle_min
+        <input type="text" x-data="numInput({ integer: true, min: 0, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['mail.notify.job_fail_throttle_min']">
+      </label>
+      <label>mail.notify.skip_errors
+        <input type="text" x-model="adminSettingsForm['mail.notify.skip_errors']" placeholder="job.cancelled,BUDGET_EXCEEDED,…">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.mail.skipErrorsHint')"></small>
+      </label>
+
+      <div class="admin-settings-actions">
+        <button type="button" @click="adminSettingsTest('smtp')" x-text="$app.t('admin.settings.test.smtp')"></button>
+      </div>
+    </section>

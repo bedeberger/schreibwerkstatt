@@ -1,0 +1,28 @@
+    <!-- LanguageTool-Tab: self-hosted Spellcheck-Server -->
+    <section x-show="adminSettingsTab === 'languagetool'" class="admin-settings-section">
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.languagetool.hint')"></p>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['languagetool.enabled'] === true || adminSettingsForm['languagetool.enabled'] === 'true'"
+               @change="adminSettingsForm['languagetool.enabled'] = $event.target.checked">
+        <span x-text="$app.t('admin.settings.languagetool.enabled.label')"></span>
+      </label>
+      <label>
+        <span x-text="$app.t('admin.settings.languagetool.url.label')"></span>
+        <input type="url" x-model="adminSettingsForm['languagetool.url']" :placeholder="$app.t('admin.settings.languagetool.url.placeholder')">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.languagetool.url.help')"></small>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['languagetool.picky'] === true || adminSettingsForm['languagetool.picky'] === 'true'"
+               @change="adminSettingsForm['languagetool.picky'] = $event.target.checked">
+        <span x-text="$app.t('admin.settings.languagetool.picky.label')"></span>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.languagetool.picky.help')"></small>
+      </label>
+      <label>
+        <span x-text="$app.t('admin.settings.languagetool.debounce.label')"></span>
+        <input type="text" x-data="numInput({ integer: true, min: 200, max: 10000 })" x-modelable="value" x-model="adminSettingsForm['languagetool.debounce_ms']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.languagetool.debounce.help')"></small>
+      </label>
+      <div class="admin-settings-actions">
+        <button type="button" @click="adminSettingsTest('languagetool')" x-text="$app.t('admin.settings.test.languagetool')"></button>
+      </div>
+    </section>

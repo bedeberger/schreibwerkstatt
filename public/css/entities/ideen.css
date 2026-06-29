@@ -82,60 +82,13 @@
   font-size: var(--font-size-xs);
   padding: var(--space-3) 8px;
 }
+/* Trigger-Position in der Ideen-Karte; das Meatball-Menü selbst nutzt das
+   geteilte .context-menu-Vokabular (nach <body> teleportiert, JS-positioniert). */
 .idee-menu {
   position: absolute;
   top: 6px;
   right: 6px;
 }
-.idee-menu-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0.5px solid transparent;
-  background: transparent;
-  color: var(--color-muted);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-reading);
-  line-height: 1;
-  cursor: pointer;
-}
-.idee-menu-btn:hover:not(:disabled),
-.idee-menu-btn[aria-expanded="true"] {
-  background: var(--color-surface);
-  border-color: var(--color-border);
-  color: var(--color-text);
-}
-.idee-menu-btn:disabled { opacity: var(--opacity-hint); cursor: default; }
-.idee-menu-popover {
-  position: fixed;
-  min-width: 180px;
-  padding: var(--space-xs);
-  background: var(--color-surface);
-  border: 0.5px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
-  z-index: var(--z-popover);
-}
-.idee-menu-popover-inner {
-  display: flex;
-  flex-direction: column;
-}
-.idee-menu-popover button {
-  text-align: left;
-  background: transparent;
-  border: none;
-  padding: var(--space-6) 10px;
-  font-size: var(--font-size-xs);
-  color: var(--color-text);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.idee-menu-popover button:hover:not(:disabled) { background: var(--color-bg); }
-.idee-menu-popover button:disabled { opacity: var(--opacity-muted); cursor: default; }
-.idee-menu-popover .idee-menu-item--danger { color: var(--color-err-text); }
 .ideen-move-label {
   font-size: var(--font-size-xs);
   color: var(--color-subtle);

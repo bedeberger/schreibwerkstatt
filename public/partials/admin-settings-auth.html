@@ -1,0 +1,58 @@
+    <!-- Auth-Tab -->
+    <section x-show="adminSettingsTab === 'auth'" class="admin-settings-section">
+      <label>app.public_url
+        <input type="url" x-model="adminSettingsForm['app.public_url']" placeholder="https://app.example.com">
+      </label>
+      <label>auth.google.client_id
+        <input type="text" x-model="adminSettingsForm['auth.google.client_id']" :placeholder="$app.t('admin.settings.secret.masked')">
+        <small x-show="adminSettingsMap['auth.google.client_id']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_id']?.masked"></small>
+      </label>
+      <label>auth.google.client_secret
+        <input type="password" x-model="adminSettingsForm['auth.google.client_secret']" :placeholder="$app.t('admin.settings.secret.masked')">
+        <small x-show="adminSettingsMap['auth.google.client_secret']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['auth.google.client_secret']?.masked"></small>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['auth.allow_open_signup'] === true || adminSettingsForm['auth.allow_open_signup'] === 'true'"
+               @change="adminSettingsForm['auth.allow_open_signup'] = $event.target.checked">
+        <span>auth.allow_open_signup</span>
+      </label>
+      <label>auth.registration.expire_days
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 365 })" x-modelable="value" x-model="adminSettingsForm['auth.registration.expire_days']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.registrationExpireDays')"></small>
+      </label>
+
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.rateLimitTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.rateLimitHint')"></p>
+      <label>auth.register.rate_limit_max
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 1000 })" x-modelable="value" x-model="adminSettingsForm['auth.register.rate_limit_max']">
+      </label>
+      <label>auth.register.rate_limit_window_min
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['auth.register.rate_limit_window_min']">
+      </label>
+      <label>auth.admin_login.max_fails
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 1000 })" x-modelable="value" x-model="adminSettingsForm['auth.admin_login.max_fails']">
+      </label>
+      <label>auth.admin_login.window_min
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['auth.admin_login.window_min']">
+      </label>
+
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.captchaTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.captchaHint')"></p>
+      <label class="checkbox-row">
+        <input type="checkbox" :checked="adminSettingsForm['auth.altcha.enabled'] === true || adminSettingsForm['auth.altcha.enabled'] === 'true'"
+               @change="adminSettingsForm['auth.altcha.enabled'] = $event.target.checked">
+        <span>auth.altcha.enabled</span>
+      </label>
+      <label>auth.altcha.complexity
+        <input type="text" x-data="numInput({ integer: true, min: 1000, max: 5000000 })" x-modelable="value" x-model="adminSettingsForm['auth.altcha.complexity']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.altchaComplexity')"></small>
+      </label>
+      <label>auth.altcha.challenge_ttl_min
+        <input type="text" x-data="numInput({ integer: true, min: 1, max: 120 })" x-modelable="value" x-model="adminSettingsForm['auth.altcha.challenge_ttl_min']">
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.altchaChallengeTtl')"></small>
+      </label>
+
+      <div class="admin-settings-actions">
+        <button type="button" @click="adminSettingsTest('oauth')" x-text="$app.t('admin.settings.test.oauth')"></button>
+      </div>
+    </section>

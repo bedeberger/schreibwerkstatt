@@ -1,0 +1,42 @@
+    <!-- Erweitert-Tab: globale, provider-uebergreifende Tuning-Parameter (Claude-spezifische liegen im Provider-Tab) -->
+    <section x-show="adminSettingsTab === 'advanced'" class="admin-settings-section">
+      <p class="muted-msg" x-text="$app.t('admin.settings.advanced.disclaimer')"></p>
+
+      <div class="admin-settings-subsection">
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.section.global')"></span></h4>
+        <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedGlobal')"></p>
+        <label>app.name
+          <input type="text" x-model="adminSettingsForm['app.name']" placeholder="Schreibwerkstatt">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.appName')"></small>
+        </label>
+        <label>ai.chat_temperature <input type="text" x-data="numInput({ step: 0.01, decimals: 2, min: 0, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.chat_temperature']"></label>
+        <label>ai.lektorat_batch_concurrency <input type="text" x-data="numInput({ step: 1, min: 1, max: 8 })" x-modelable="value" x-model="adminSettingsForm['ai.lektorat_batch_concurrency']"></label>
+        <label>ai.komplett.extract_max_tokens
+          <input type="text" x-data="numInput({ integer: true, min: 1024, max: 200000 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.extract_max_tokens']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettExtractMaxTokens')"></small>
+        </label>
+        <label>ai.chars_per_token
+          <input type="text" x-data="numInput({ step: 0.1, min: 1, max: 10 })" x-modelable="value" x-model="adminSettingsForm['ai.chars_per_token']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.charsPerToken')"></small>
+        </label>
+        <label>app.page_revision_limit
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 500 })" x-modelable="value" x-model="adminSettingsForm['app.page_revision_limit']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.pageRevisionLimit')"></small>
+        </label>
+        <label>editor.lock_ttl_min
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['editor.lock_ttl_min']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.editorLockTtl')"></small>
+        </label>
+        <label>share.comment.rate_limit_max
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 1000 })" x-modelable="value" x-model="adminSettingsForm['share.comment.rate_limit_max']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.shareCommentRateLimit')"></small>
+        </label>
+        <label>share.comment.rate_limit_window_min
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 1440 })" x-modelable="value" x-model="adminSettingsForm['share.comment.rate_limit_window_min']">
+        </label>
+        <label>macclient.github_token
+          <input type="password" x-model="adminSettingsForm['macclient.github_token']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.macclientGithubToken')"></small>
+        </label>
+      </div>
+    </section>

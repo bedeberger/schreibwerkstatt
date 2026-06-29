@@ -1,0 +1,239 @@
+    <div class="card-form-grid" x-bind="panel('sync')" x-cloak>
+
+    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak
+             x-data="collapsible()" x-modelable="open" x-model="blogSectionOpen">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+        <span x-text="$app.t('blog.connect.title')"></span>
+      </button>
+
+      <div x-bind="panel" x-cloak>
+
+      <div class="card-form-row" x-show="blogConnection">
+        <label class="card-form-label" x-text="$app.t('blog.status.title')"></label>
+        <div class="blog-status-panel">
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.url')"></span>
+            <span class="blog-status-value" x-text="blogConnection?.baseUrl"></span>
+          </div>
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.user')"></span>
+            <span class="blog-status-value" x-text="blogConnection?.username"></span>
+          </div>
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.imported')"></span>
+            <span class="blog-status-value">
+              <template x-if="blogConnection?.initialImportDoneAt">
+                <span x-text="$app.formatLastRun(blogConnection.initialImportDoneAt)"></span>
+              </template>
+              <template x-if="!blogConnection?.initialImportDoneAt">
+                <span class="muted" x-text="$app.t('blog.status.notImported')"></span>
+              </template>
+            </span>
+          </div>
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.lastPull')"></span>
+            <span class="blog-status-value" x-text="blogConnection?.lastPullAt ? $app.formatLastRun(blogConnection.lastPullAt) : '—'"></span>
+          </div>
+          <div class="blog-status-row">
+            <span class="blog-status-label" x-text="$app.t('blog.status.lastPush')"></span>
+            <span class="blog-status-value" x-text="blogConnection?.lastPushAt ? $app.formatLastRun(blogConnection.lastPushAt) : '—'"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('blog.connect.url')"></label>
+        <input type="url" class="card-form-input"
+               x-model="blogForm.baseUrl"
+               :placeholder="'https://blog.example.com'"
+               :disabled="blogBusy">
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('blog.connect.user')"></label>
+        <input type="text" class="card-form-input"
+               x-model="blogForm.username"
+               autocomplete="username"
+               :disabled="blogBusy">
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('blog.connect.password')"></label>
+        <input type="password" class="card-form-input"
+               x-model="blogForm.password"
+               autocomplete="current-password"
+               :placeholder="blogConnection ? $app.t('blog.connect.passwordReplace') : ''"
+               :disabled="blogBusy">
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('blog.connect.defaultStatus')"></label>
+        <div x-data="combobox($app.t('blog.connect.defaultStatus'))"
+             x-modelable="value" x-model="blogForm.defaultStatus"
+             x-effect="options = blogStatusOptions()"></div>
+      </div>
+
+      <div class="card-form-row card-form-row--top">
+        <span class="card-form-label"></span>
+        <div class="blog-actions">
+          <button type="button"
+                  @click="testBlogConnection()"
+                  :disabled="blogBusy || !blogFormReady()">
+            <span x-show="blogBusy && blogAction === 'test'" class="spinner"></span>
+            <span x-text="$app.t('blog.connect.test')"></span>
+          </button>
+          <button type="button"
+                  @click="saveBlogConnection()"
+                  :disabled="blogBusy || !blogFormReady()">
+            <span x-show="blogBusy && blogAction === 'save'" class="spinner"></span>
+            <span x-text="blogConnection ? $app.t('blog.connect.update') : $app.t('blog.connect.save')"></span>
+          </button>
+          <button type="button"
+                  x-show="blogConnection && !blogConnection.initialImportDoneAt"
+                  @click="startBlogImport()"
+                  :disabled="blogBusy || blogImportJobId">
+            <span x-show="blogImportJobId" class="spinner"></span>
+            <span x-text="$app.t('blog.action.import')"></span>
+          </button>
+          <button type="button"
+                  x-show="blogConnection?.initialImportDoneAt"
+                  @click="startBlogPull()"
+                  :disabled="blogBusy || blogPullJobId">
+            <span x-show="blogPullJobId" class="spinner"></span>
+            <span x-text="$app.t('blog.action.pull')"></span>
+          </button>
+          <button type="button"
+                  x-show="blogConnection?.initialImportDoneAt"
+                  @click="startBlogReconcile()"
+                  :disabled="blogBusy || blogReconcileJobId"
+                  :data-tip="$app.t('blog.action.reconcileHint')">
+            <span x-show="blogReconcileJobId" class="spinner"></span>
+            <span x-text="$app.t('blog.action.reconcile')"></span>
+          </button>
+          <button type="button" class="book-settings-btn-danger"
+                  x-show="blogConnection"
+                  @click="disconnectBlog()"
+                  :disabled="blogBusy">
+            <span x-text="$app.t('blog.connect.disconnect')"></span>
+          </button>
+        </div>
+      </div>
+
+      <p class="card-form-saved" x-show="blogMessage" x-cloak x-transition.opacity.duration.250ms x-text="blogMessage"></p>
+      <p class="card-form-error" x-show="blogError" x-text="blogError"></p>
+
+      </div>
+    </section>
+
+    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak
+             x-data="collapsible()" x-modelable="open" x-model="hubspotSectionOpen">
+      <button type="button" class="collapsible-toggle" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+        <span x-text="$app.t('hubspot.connect.title')"></span>
+      </button>
+
+      <div x-bind="panel" x-cloak>
+
+      <div class="card-form-row" x-show="hubspotConnection">
+        <label class="card-form-label" x-text="$app.t('hubspot.status.title')"></label>
+        <div class="hubspot-status-panel">
+          <div class="hubspot-status-row">
+            <span class="hubspot-status-label" x-text="$app.t('hubspot.status.tokenSet')"></span>
+            <span class="hubspot-status-value">••••••••</span>
+          </div>
+          <div class="hubspot-status-row">
+            <span class="hubspot-status-label" x-text="$app.t('hubspot.status.blog')"></span>
+            <span class="hubspot-status-value" x-text="(hubspotBlogs.find(b => String(b.id) === String(hubspotConnection?.blogId))?.name) || hubspotConnection?.blogId"></span>
+          </div>
+          <div class="hubspot-status-row">
+            <span class="hubspot-status-label" x-text="$app.t('hubspot.status.author')"></span>
+            <span class="hubspot-status-value" x-text="(hubspotAuthors.find(a => String(a.id) === String(hubspotConnection?.authorId))?.name) || hubspotConnection?.authorId"></span>
+          </div>
+          <div class="hubspot-status-row">
+            <span class="hubspot-status-label" x-text="$app.t('hubspot.status.imported')"></span>
+            <span class="hubspot-status-value">
+              <template x-if="hubspotConnection?.initialImportDoneAt">
+                <span x-text="$app.formatLastRun(hubspotConnection.initialImportDoneAt)"></span>
+              </template>
+              <template x-if="!hubspotConnection?.initialImportDoneAt">
+                <span class="muted" x-text="$app.t('hubspot.status.notImported')"></span>
+              </template>
+            </span>
+          </div>
+          <div class="hubspot-status-row">
+            <span class="hubspot-status-label" x-text="$app.t('hubspot.status.lastPush')"></span>
+            <span class="hubspot-status-value" x-text="hubspotConnection?.lastPushAt ? $app.formatLastRun(hubspotConnection.lastPushAt) : '—'"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('hubspot.connect.token')"></label>
+        <input type="password" class="card-form-input"
+               x-model="hubspotForm.token"
+               autocomplete="new-password"
+               :placeholder="hubspotConnection ? $app.t('hubspot.connect.tokenReplace') : 'pat-eu1-…'"
+               :disabled="hubspotBusy">
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('hubspot.connect.blog')"></label>
+        <div x-data="combobox($app.t('hubspot.connect.blog'))"
+             x-modelable="value" x-model="hubspotForm.blogId"
+             x-effect="options = (hubspotBlogs || []).map(b => ({ value: b.id, label: b.name }))"></div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('hubspot.connect.author')"></label>
+        <div x-data="combobox($app.t('hubspot.connect.author'))"
+             x-modelable="value" x-model="hubspotForm.authorId"
+             x-effect="options = (hubspotAuthors || []).map(a => ({ value: a.id, label: a.email ? a.name + ' <' + a.email + '>' : a.name }))"></div>
+      </div>
+
+      <div class="card-form-row card-form-row--top">
+        <span class="card-form-label"></span>
+        <div class="hubspot-actions">
+          <button type="button"
+                  @click="testHubspotConnection()"
+                  :disabled="hubspotBusy">
+            <span x-show="hubspotBusy && hubspotAction === 'test'" class="spinner"></span>
+            <span x-text="$app.t('hubspot.connect.test')"></span>
+          </button>
+          <button type="button"
+                  @click="saveHubspotConnection()"
+                  :disabled="hubspotBusy || !hubspotFormReady()">
+            <span x-show="hubspotBusy && hubspotAction === 'save'" class="spinner"></span>
+            <span x-text="hubspotConnection ? $app.t('hubspot.connect.update') : $app.t('hubspot.connect.save')"></span>
+          </button>
+          <button type="button"
+                  x-show="hubspotConnection && !hubspotConnection.initialImportDoneAt"
+                  @click="startHubspotImport()"
+                  :disabled="hubspotBusy || hubspotImportJobId">
+            <span x-show="hubspotImportJobId" class="spinner"></span>
+            <span x-text="$app.t('hubspot.action.import')"></span>
+          </button>
+          <button type="button"
+                  x-show="hubspotConnection?.initialImportDoneAt"
+                  @click="startHubspotReconcile()"
+                  :disabled="hubspotBusy || hubspotReconcileJobId"
+                  :data-tip="$app.t('hubspot.action.reconcileHint')">
+            <span x-show="hubspotReconcileJobId" class="spinner"></span>
+            <span x-text="$app.t('hubspot.action.reconcile')"></span>
+          </button>
+          <button type="button" class="book-settings-btn-danger"
+                  x-show="hubspotConnection"
+                  @click="disconnectHubspot()"
+                  :disabled="hubspotBusy">
+            <span x-text="$app.t('hubspot.connect.disconnect')"></span>
+          </button>
+        </div>
+      </div>
+
+      <p class="card-form-saved" x-show="hubspotMessage" x-cloak x-transition.opacity.duration.250ms x-text="hubspotMessage"></p>
+      <p class="card-form-error" x-show="hubspotError" x-text="hubspotError"></p>
+
+      </div>
+    </section>
+
+    </div><!-- /tab: sync -->

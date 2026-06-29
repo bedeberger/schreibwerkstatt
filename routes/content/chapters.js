@@ -1,0 +1,67 @@
+'use strict';
+// Content-Routes: Kapitel-Ebene (Detail/Create/Update/Delete).
+
+const contentStore = require('../../lib/content-store');
+const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
+const { requireBookAccess, sendACLError } = require('../../lib/acl');
+const { jsonBody, _guardChapter, _fail } = require('./shared');
+
+function register(router) {
+  // GET /content/chapters/:chapter_id — Kapitel-Detail.
+  router.get('/chapters/:chapter_id', async (req, res) => {
+    const chapterId = toIntId(req.params.chapter_id);
+    if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
+    if (_guardChapter(req, res, chapterId, 'viewer') == null) return;
+    try { res.json(await contentStore.loadChapter(chapterId, req)); }
+    catch (e) { _fail(res, e, 'GET /content/chapters/:id'); }
+  });
+
+  // POST /content/chapters — Neues Kapitel. Body: { book_id, name, position?, parent_chapter_id? }.
+  router.post('/chapters', jsonBody, async (req, res) => {
+    const bookId = toIntId(req.body?.book_id);
+    const name = (req.body?.name || '').toString().trim();
+    if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+    if (!name) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
+    setContext({ book: bookId });
+    try { requireBookAccess(req, bookId, 'editor'); }
+    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    try {
+      const parentChapterId = Number.isFinite(req.body?.parent_chapter_id) ? req.body.parent_chapter_id : null;
+      const created = await contentStore.createChapter({
+        book_id: bookId,
+        name,
+        position: req.body?.position,
+        parent_chapter_id: parentChapterId,
+      }, req);
+      res.json(created);
+    } catch (e) { _fail(res, e, 'POST /content/chapters'); }
+  });
+
+  // PUT /content/chapters/:chapter_id — Kapitel-Update (rename / reorder).
+  router.put('/chapters/:chapter_id', jsonBody, async (req, res) => {
+    const chapterId = toIntId(req.params.chapter_id);
+    if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
+    const hasName = typeof req.body?.name === 'string';
+    const hasPos = Number.isFinite(req.body?.position);
+    if (!hasName && !hasPos) {
+      return res.status(400).json({ error_code: 'EMPTY_BODY' });
+    }
+    if (_guardChapter(req, res, chapterId, 'editor') == null) return;
+    try { res.json(await contentStore.updateChapter(chapterId, req.body || {}, req)); }
+    catch (e) { _fail(res, e, 'PUT /content/chapters/:id'); }
+  });
+
+  // DELETE /content/chapters/:chapter_id — Kapitel + seine Seiten in den Papierkorb.
+  router.delete('/chapters/:chapter_id', async (req, res) => {
+    const chapterId = toIntId(req.params.chapter_id);
+    if (!chapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
+    if (_guardChapter(req, res, chapterId, 'editor') == null) return;
+    try {
+      await contentStore.deleteChapter(chapterId, req);
+      res.json({ ok: true });
+    } catch (e) { _fail(res, e, 'DELETE /content/chapters/:id'); }
+  });
+}
+
+module.exports = { register };

@@ -13,7 +13,7 @@
 // Geprüfte Stellen:
 //  S1  routes/jobs/lektorat.js#runCheckJob — completeJob-Payload enthält
 //      `updatedAt: pd.updated_at`.
-//  S2  routes/jobs/chat.js#runChatJob — completeJob-Payload enthält
+//  S2  routes/jobs/chat/page-chat.js#runChatJob — completeJob-Payload enthält
 //      `updatedAt: pageUpdatedAt`.
 //  F1  public/js/editor/lektorat.js#startCheckPoll.onDone — Discard-Guard
 //      `r.updatedAt && this.currentPage?.updated_at && r.updatedAt !== ...`.
@@ -41,8 +41,8 @@ test('S1: routes/jobs/lektorat.js completeJob-Payload enthält updatedAt', () =>
     'runCheckJob completeJob muss `updatedAt: pd.updated_at` setzen — sonst kann Client Staleness nicht erkennen');
 });
 
-test('S2: routes/jobs/chat.js completeJob-Payload enthält updatedAt', () => {
-  const src = read('routes/jobs/chat.js');
+test('S2: routes/jobs/chat/page-chat.js completeJob-Payload enthält updatedAt', () => {
+  const src = read('routes/jobs/chat/page-chat.js');
   // Im Seiten-Chat-Pfad: `updatedAt: pageUpdatedAt` (Variable aus pd.updated_at).
   assert.match(src, /updatedAt\s*:\s*pageUpdatedAt/,
     'runChatJob completeJob muss `updatedAt: pageUpdatedAt` setzen');

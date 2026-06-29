@@ -1,0 +1,49 @@
+      <!-- Druck-Tab (Druckvorstufe / klassische Druckerei) -->
+      <div class="export-tab-panel" x-bind="panel('print')">
+        <p class="card-form-field-note" x-text="$app.t('pdfExport.print.hint')"></p>
+        <div class="card-form-grid">
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label" x-text="$app.t('pdfExport.print.trimPreset')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox($app.t('pdfExport.print.trimPresetPlaceholder'))"
+                   x-modelable="value" x-model="trimPresetSel"
+                   x-effect="options = trimPresetOptions()"
+                   @combobox-change="applyTrimPreset($event.detail)"
+></div>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.print.trimPresetHint')"></p>
+            </div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('pdfExport.print.bleedMm')"></label>
+            <div class="card-form-field">
+              <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 10 })" x-modelable="value" x-model="activeProfile.config.print.bleedMm" class="pdfx-num-input">
+            </div>
+          </div>
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label">&nbsp;</label>
+            <div class="card-form-field">
+              <label class="pdfx-check">
+                <input type="checkbox" x-model="activeProfile.config.print.cropMarks" :disabled="!(activeProfile.config.print.bleedMm > 0)">
+                <span x-text="$app.t('pdfExport.print.cropMarks')"></span>
+              </label>
+              <p class="card-form-field-note" x-show="!(activeProfile.config.print.bleedMm > 0)" x-text="$app.t('pdfExport.print.cropMarksNeedsBleed')"></p>
+            </div>
+          </div>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('pdfExport.print.dpiWarnThreshold')"></label>
+            <div class="card-form-field">
+              <input type="text" x-data="numInput({ step: 10, min: 72, max: 1200, integer: true })" x-modelable="value" x-model="activeProfile.config.print.dpiWarnThreshold" class="pdfx-num-input">
+            </div>
+          </div>
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label">&nbsp;</label>
+            <div class="card-form-field">
+              <label class="pdfx-check">
+                <input type="checkbox" x-model="activeProfile.config.print.blackTextKOnly">
+                <span x-text="$app.t('pdfExport.print.blackTextKOnly')"></span>
+              </label>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.print.blackTextKOnlyHint')"></p>
+            </div>
+          </div>
+        </div>
+      </div>

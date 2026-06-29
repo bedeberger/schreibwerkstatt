@@ -1,0 +1,134 @@
+      <!-- TOC-Tab -->
+      <div class="export-tab-panel" x-bind="panel('toc')">
+        <label class="pdfx-check pdfx-check--leading">
+          <input type="checkbox" x-model="activeProfile.config.toc.enabled">
+          <span x-text="$app.t('pdfExport.toc.enabled')"></span>
+        </label>
+        <template x-if="activeProfile.config.toc.enabled">
+          <div>
+            <div class="card-form-grid">
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.toc.title')"></label>
+                <div class="card-form-field">
+                  <input x-model="activeProfile.config.toc.title" class="pdfx-text-input">
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.toc.titleAlign')"></label>
+                <div class="card-form-field">
+                  <div x-data="combobox($app.t('pdfExport.toc.titleAlign'))"
+                       x-modelable="value" x-model="activeProfile.config.toc.titleAlign"
+                       x-effect="options = [{ value: 'left', label: $app.t('pdfExport.toc.alignLeft') }, { value: 'center', label: $app.t('pdfExport.toc.alignCenter') }, { value: 'right', label: $app.t('pdfExport.toc.alignRight') }]"
+></div>
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.toc.depth')"></label>
+                <div class="card-form-field">
+                  <div x-data="combobox($app.t('pdfExport.toc.depth'))"
+                       x-modelable="value" x-model="activeProfile.config.toc.depth"
+                       x-effect="options = [{ value: 1, label: $app.t('pdfExport.toc.depthChapters') }, { value: 2, label: $app.t('pdfExport.toc.depthChaptersSubs') }, { value: 3, label: $app.t('pdfExport.toc.depthAll') }]"
+></div>
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.toc.indentMm')"></label>
+                <div class="card-form-field">
+                  <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 40 })" x-modelable="value" x-model="activeProfile.config.toc.indentMm" class="pdfx-num-input">
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label" x-text="$app.t('pdfExport.toc.leader')"></label>
+                <div class="card-form-field">
+                  <div x-data="combobox($app.t('pdfExport.toc.leader'))"
+                       x-modelable="value" x-model="activeProfile.config.toc.leader"
+                       x-effect="options = [{ value: 'none', label: $app.t('pdfExport.toc.leaderNone') }, { value: 'dots', label: $app.t('pdfExport.toc.leaderDots') }, { value: 'line', label: $app.t('pdfExport.toc.leaderLine') }]"
+></div>
+                </div>
+              </div>
+              <div class="card-form-row">
+                <label class="card-form-label">&nbsp;</label>
+                <div class="card-form-field">
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.toc.showPageNumbers">
+                    <span x-text="$app.t('pdfExport.toc.showPageNumbers')"></span>
+                  </label>
+                </div>
+              </div>
+              <template x-if="activeProfile.config.toc.showPageNumbers">
+                <div class="card-form-row">
+                  <label class="card-form-label" x-text="$app.t('pdfExport.toc.pageNumReserveMm')"></label>
+                  <div class="card-form-field">
+                    <input type="text" x-data="numInput({ step: 0.5, min: 6, max: 40 })" x-modelable="value" x-model="activeProfile.config.toc.pageNumReserveMm" class="pdfx-num-input">
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <h4 class="pdfx-font-group-title" x-text="$app.t('pdfExport.toc.format.heading')"></h4>
+            <template x-for="role in ['tocTitle', 'toc']" :key="role">
+              <div class="pdfx-font-role collapsible-wrap" x-data="collapsible()">
+                <button type="button" class="collapsible-toggle pdfx-font-role-toggle" x-bind="trigger">
+                  <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+                  <span x-text="$app.t('pdfExport.toc.font.' + role)"></span>
+                  <span class="pdfx-font-role-summary"
+                        x-text="activeProfile.config.font[role].family + ' : ' + activeProfile.config.font[role].weight"></span>
+                </button>
+                <div x-bind="panel" x-cloak class="collapsible-section">
+                  <div class="card-form-row">
+                    <label class="card-form-label" x-text="$app.t('pdfExport.font.family')"></label>
+                    <div class="card-form-field">
+                      <div x-data="combobox($app.t('pdfExport.font.family'))"
+                           x-modelable="value" x-model="activeProfile.config.font[role].family"
+                           x-effect="options = fontList.map(f => ({ value: f.family, label: f.family }))"
+                           @combobox-change="onFontPick(role, $event.detail)"
+></div>
+                    </div>
+                  </div>
+                  <div class="card-form-row">
+                    <label class="card-form-label" x-text="$app.t('pdfExport.font.weight')"></label>
+                    <div class="card-form-field">
+                      <div x-data="combobox($app.t('pdfExport.font.weight'))"
+                           x-modelable="value" x-model="activeProfile.config.font[role].weight"
+                           x-effect="options = ((fontList.find(f => f.family === activeProfile?.config?.font?.[role]?.family)?.weights) || [400]).map(w => ({ value: w, label: String(w) }))"
+></div>
+                    </div>
+                  </div>
+                  <div class="card-form-row">
+                    <label class="card-form-label" x-text="$app.t('pdfExport.font.sizePt')"></label>
+                    <div class="card-form-field">
+                      <input type="text" x-data="numInput({ step: 1, min: 6, max: 72 })" x-modelable="value" x-model="activeProfile.config.font[role].sizePt" class="pdfx-num-input">
+                    </div>
+                  </div>
+                  <template x-if="role === 'toc'">
+                    <div>
+                      <div class="card-form-row">
+                        <label class="card-form-label" x-text="$app.t('pdfExport.font.lineHeight')"></label>
+                        <div class="card-form-field">
+                          <input type="text" x-data="numInput({ step: 0.05, min: 0.8, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.toc.lineHeight" class="pdfx-num-input">
+                        </div>
+                      </div>
+                      <div class="card-form-row">
+                        <label class="card-form-label" x-text="$app.t('pdfExport.font.paragraphGap')"></label>
+                        <div class="card-form-field">
+                          <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.toc.paragraphGap" class="pdfx-num-input">
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <div class="card-form-row">
+                    <label class="card-form-label" x-text="$app.t('pdfExport.font.color')"></label>
+                    <div class="card-form-field pdfx-color-field">
+                      <input type="color" class="pdfx-color-picker" x-model="activeProfile.config.font[role].color">
+                      <span class="pdfx-color-text" x-text="activeProfile.config.font[role].color"></span>
+                    </div>
+                  </div>
+                  <div class="pdfx-font-preview" :style="fontPreviewStyle(role)">
+                    <span x-text="$app.t('pdfExport.font.previewText')"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>

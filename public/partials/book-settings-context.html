@@ -1,0 +1,124 @@
+    <div class="card-form-grid" x-bind="panel('context')" x-cloak>
+
+    <section class="book-settings-section">
+      <h3 class="book-settings-section-title" x-text="$app.t('book.settings.section.context')"></h3>
+
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" for="bs-buchkontext" x-text="$app.t('book.settings.context')"></label>
+        <div class="book-settings-kontext-wrap">
+          <textarea
+            id="bs-buchkontext"
+            class="card-form-textarea"
+            x-model="bookSettingsBuchKontext"
+            :placeholder="$app.t('book.settings.contextPlaceholder')"
+            rows="4"
+            maxlength="1000"
+            data-spellcheck="spelling"
+          ></textarea>
+          <p class="card-form-hint" x-text="(bookSettingsBuchKontext || '').length + ' / 1000'"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" for="bs-stilprofil" x-text="$app.t('book.settings.stilprofil')"></label>
+        <div class="book-settings-kontext-wrap">
+          <p class="card-form-hint" x-text="$app.t('book.settings.stilprofil.hint')"></p>
+          <textarea
+            id="bs-stilprofil"
+            class="card-form-textarea"
+            x-model="bookSettingsStilprofil"
+            :placeholder="$app.t('book.settings.stilprofil.placeholder')"
+            rows="8"
+            maxlength="6000"
+            data-spellcheck="spelling"
+          ></textarea>
+          <div class="book-settings-stilprofil-actions">
+            <button type="button" class="btn-compact"
+                    @click="generateStilprofil()"
+                    :disabled="stilprofilGenerating"
+                    x-text="stilprofilGenerating ? $app.t('book.settings.stilprofil.generating') : $app.t('book.settings.stilprofil.generate')"></button>
+            <span class="card-form-hint" x-text="(bookSettingsStilprofil || '').length + ' / 6000'"></span>
+          </div>
+          <p class="card-form-error" x-show="stilprofilError" x-text="stilprofilError" x-cloak></p>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.status')"></label>
+        <div class="form-stack">
+          <label class="form-check">
+            <input type="checkbox" id="bs-finished" x-model="bookSettingsIsFinished">
+            <span>
+              <span class="form-check-title" x-text="$app.t('book.settings.finished')"></span>
+              <span class="form-check-desc" x-text="$app.t('book.settings.finished.desc')"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.dailyGoalChars')"></label>
+        <div class="card-form-field">
+          <input type="text" class="form-num"
+                 x-data="numInput({ step: 100, min: 100, max: 50000 })"
+                 x-modelable="value" x-model="bookSettingsDailyGoalChars">
+          <p class="card-form-field-note" x-text="$app.t('book.settings.dailyGoalCharsHint')"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.goalTargetChars')"></label>
+        <div class="card-form-field">
+          <input type="text" class="form-num"
+                 x-data="numInput({ step: 1000, min: 0, max: 20000000 })"
+                 x-modelable="value" x-model="bookSettingsGoalTargetChars">
+          <p class="card-form-field-note" x-text="$app.t('book.settings.goalTargetCharsHint')"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.goalDeadline')"></label>
+        <div class="card-form-field">
+          <input type="date" class="card-form-input" x-model="bookSettingsGoalDeadline">
+          <p class="card-form-field-note" x-text="$app.t('book.settings.goalDeadlineHint')"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.orte')"></label>
+        <div class="form-stack">
+          <label class="form-check">
+            <input type="checkbox" id="bs-orte-real" x-model="bookSettingsOrteReal">
+            <span>
+              <span class="form-check-title" x-text="$app.t('book.settings.orteReal')"></span>
+              <span class="form-check-desc" x-text="$app.t('book.settings.orteReal.desc')"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card-form-row" x-show="bookSettingsOrteReal" x-cloak>
+        <label class="card-form-label" x-text="$app.t('book.settings.schauplatzLand')"></label>
+        <div class="card-form-field">
+          <div x-data="combobox($app.t('book.settings.schauplatzLand.placeholder'), $app.t('book.settings.schauplatzLand.none'))"
+               x-modelable="value" x-model="bookSettingsSchauplatzLand"
+               x-effect="options = bookSettingsLandOptions()"></div>
+          <p class="card-form-field-note" x-text="$app.t('book.settings.schauplatzLand.hint')"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('book.settings.zeitlinie')"></label>
+        <div class="form-stack">
+          <label class="form-check">
+            <input type="checkbox" id="bs-zeitlinie-real" x-model="bookSettingsZeitlinieReal">
+            <span>
+              <span class="form-check-title" x-text="$app.t('book.settings.zeitlinieReal')"></span>
+              <span class="form-check-desc" x-text="$app.t('book.settings.zeitlinieReal.desc')"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    </div><!-- /tab: context -->

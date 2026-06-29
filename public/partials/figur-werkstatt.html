@@ -267,18 +267,34 @@
         </div>
 
         <!-- Rechtsklick-Menü, position:fixed via inline-style -->
-        <div class="werkstatt-context-menu"
+        <div class="context-menu werkstatt-context-menu"
              role="menu"
              x-show="contextMenuOpen"
              x-cloak
              :style="{ left: contextMenuPos.left + 'px', top: contextMenuPos.top + 'px' }"
              @click.stop>
-          <button type="button" role="menuitem" class="werkstatt-context-item" @click="ctxBrainstorm()" x-text="$app.t('werkstatt.action.brainstorm')"></button>
-          <button type="button" role="menuitem" class="werkstatt-context-item" @click="ctxRename()" x-text="$app.t('werkstatt.context.rename')"></button>
-          <button type="button" role="menuitem" class="werkstatt-context-item" @click="ctxAddChild()" x-text="$app.t('werkstatt.context.addChild')"></button>
-          <button type="button" role="menuitem" class="werkstatt-context-item" @click="ctxAddSibling()" x-text="$app.t('werkstatt.context.addSibling')"></button>
-          <div class="werkstatt-context-sep" role="separator"></div>
-          <button type="button" role="menuitem" class="werkstatt-context-item werkstatt-context-item--danger" @click="ctxDelete()" :disabled="contextMenuNodeId === 'root'" x-text="$app.t('werkstatt.context.delete')"></button>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon" @click="ctxBrainstorm()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
+            <span x-text="$app.t('werkstatt.action.brainstorm')"></span>
+          </button>
+          <div class="context-menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon" @click="ctxRename()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+            <span x-text="$app.t('werkstatt.context.rename')"></span>
+          </button>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon" @click="ctxAddChild()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#git-fork"/></svg>
+            <span x-text="$app.t('werkstatt.context.addChild')"></span>
+          </button>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon" @click="ctxAddSibling()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+            <span x-text="$app.t('werkstatt.context.addSibling')"></span>
+          </button>
+          <div class="context-menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger" @click="ctxDelete()" :disabled="contextMenuNodeId === 'root'">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+            <span x-text="$app.t('werkstatt.context.delete')"></span>
+          </button>
         </div>
       </section>
 

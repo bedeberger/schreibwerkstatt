@@ -1,0 +1,17 @@
+      <!-- Norm-Tab (PDF/A / PDF/X / kein) -->
+      <div class="export-tab-panel" x-bind="panel('pdfa')">
+        <div class="card-form-grid">
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('pdfExport.norm.standard')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox($app.t('pdfExport.norm.standard'))"
+                   x-modelable="value" x-model="activeProfile.config.pdfa.standard"
+                   x-effect="options = [{ value: 'pdfa', label: $app.t('pdfExport.norm.pdfa') }, { value: 'pdfx', label: $app.t('pdfExport.norm.pdfx') }, { value: 'none', label: $app.t('pdfExport.norm.none') }]"
+></div>
+            </div>
+          </div>
+        </div>
+        <p class="card-form-field-note" x-show="activeProfile.config.pdfa.standard === 'pdfa'" x-text="$app.t('pdfExport.norm.hintPdfa')"></p>
+        <p class="card-form-field-note" x-show="activeProfile.config.pdfa.standard === 'pdfx'" x-text="$app.t('pdfExport.norm.hintPdfx')"></p>
+        <p class="card-form-field-note" x-show="activeProfile.config.pdfa.standard === 'none'" x-text="$app.t('pdfExport.norm.hintNone')"></p>
+      </div>

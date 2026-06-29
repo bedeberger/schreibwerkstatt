@@ -1,0 +1,139 @@
+
+.share-content h1, .share-content h2, .share-content h3 {
+  font-family: inherit;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.5em 0 0.6em;
+}
+.share-content h1 { font-size: 26px; }
+.share-content h2 { font-size: 22px; }
+
+/* TOC-Sprungziele: Offset für den Sticky-Header + kurzes Aufleuchten beim
+   Anspringen (JS setzt .share-flash, share-reader.js#flashTarget). */
+.share-content [id^="sec"] { scroll-margin-top: 88px; }
+.share-flash {
+  animation: shareFlash 1.3s ease-out;
+  border-radius: var(--share-radius-sm);
+}
+@keyframes shareFlash {
+  0% { background: color-mix(in srgb, var(--share-accent) 20%, transparent); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .share-flash { animation-duration: 0.01ms; }
+}
+.share-content h3 { font-size: 19px; }
+.share-content p { margin: 0 0 1em; hyphens: auto; }
+.share-content blockquote {
+  margin: 1.2em 0;
+  padding: 6px 16px;
+  border-left: 3px solid var(--share-faint);
+  color: var(--share-muted);
+  font-style: italic;
+}
+.share-content ul, .share-content ol { padding-left: 1.6em; }
+.share-content img { max-width: 100%; height: auto; border-radius: var(--share-radius-sm); }
+.share-content a { color: var(--share-accent); }
+.share-content hr {
+  border: 0;
+  border-top: 1px solid var(--share-border);
+  margin: 2em 0;
+}
+.share-content pre {
+  overflow-x: auto;
+  background: var(--share-hover);
+  padding: 10px 14px;
+  border-radius: var(--share-radius);
+  font-size: 14px;
+}
+
+/* Prosa-Absatzmodell (Belletristik): Absätze (<p>) durch eine Leerzeile getrennt,
+   harte Umbrüche (<br>, Shift-Enter) ohne Zusatzabstand — so bleibt im Lesefluss
+   sichtbar, was ein neuer Absatz ist und was nur ein Zeilenumbruch. Aktiviert via
+   share-content--prose (für alle erzählenden Buchtypen; Sach-/Web-Text nutzt das
+   identische margin-Modell oben — siehe NON_PROSE_BUCHTYPEN in routes/share.js). */
+.share-content--prose p { margin: 0 0 1em; }
+/* Szenentrenner: <hr> als zentrierter Asterismus (* * *) statt technischer Rule —
+   in Prosa markiert ein <hr> fast immer einen Szenenwechsel. */
+.share-content--prose hr {
+  border: 0;
+  height: auto;
+  text-align: center;
+  margin: 1.8em 0;
+}
+.share-content--prose hr::before {
+  content: "* * *";
+  color: var(--share-muted);
+  letter-spacing: 0.5em;
+}
+
+/* Manuskript-Stream-Blöcke (.ms-chapter / .ms-page / .ms-page__title /
+   .ms-page__body) kommen aus dem geteilten manuscript-stream.css; die
+   Body-Typografie liefert .share-content (oben). Im Manuskript-Stream stehen
+   die Absätze dichter beieinander als im Body-Default (1.7), damit Seiten- und
+   Kapitelübergänge den Lesefluss tragen statt der reine Zeilenabstand. */
+.share-content .ms-page__body p { line-height: 1.55; }
+
+/* Inhaltsverzeichnis (optional, bei Buch-/Kapitel-Shares). Pendant zur
+   Bucheditor-Outline: im Grid (≥1100px) linke sticky Leiste, gestapelt (mobil)
+   als gerahmte Box über dem Inhalt. */
+.share-toc {
+  max-width: 70ch;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.share-toc__inner {
+  padding: 16px 20px;
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius);
+  background: var(--share-hover);
+}
+.share-toc__heading {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--share-muted);
+}
+/* Toggle (Aktions-Button oben rechts) blendet das ganze TOC-Panel aus. Im Grid
+   gibt die Layout-Klasse zusätzlich die linke Spalte frei (siehe ≥1100px). */
+.share-toc-collapsed .share-toc { display: none; }
+.share-toc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.share-toc__item { margin: 0; }
+.share-toc__item--l1 { font-weight: 600; margin-top: 6px; }
+.share-toc__item--l1:first-child { margin-top: 0; }
+.share-toc__item--l2 { padding-left: 18px; font-weight: 400; }
+/* Ruhefarbe neutral (Navigationsliste, kein Fliesstext-Link). Hover = dezenter
+   Hintergrund-Tint statt Underline — analog zur Bucheditor-Outline-Zeile. */
+.share-toc__link {
+  display: block;
+  padding: 3px 6px;
+  margin-inline: -6px;
+  border-radius: 3px;
+  color: var(--share-muted);
+  text-decoration: none;
+  line-height: 1.4;
+  font-size: 14px;
+}
+.share-toc__link:hover {
+  background: color-mix(in srgb, var(--share-accent) 6%, transparent);
+  color: var(--share-text);
+}
+
+/* Findings-Marks und Spellcheck-Squiggles aus Editor-Runtime neutralisieren:
+   landen nicht im persistierten HTML, aber falls Klassen doch durchblitzen
+   (Custom-Highlights API hat Browser-Quirks), keine farbigen Marker im Reader. */
+.share-content .finding-mark,
+.share-content .lt-squiggle,
+.share-content [data-finding] {
+  background: transparent !important;
+  border-bottom: none !important;
+  text-decoration: none !important;
+}
+

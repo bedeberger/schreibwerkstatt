@@ -311,50 +311,8 @@
   height: clamp(420px, 70vh, 1000px);
 }
 
-/* Rechtsklick-Menü auf Mindmap-Knoten */
-.werkstatt-context-menu {
-  position: fixed;
-  min-width: 220px;
-  background: var(--color-surface);
-  border: var(--border-thin) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
-  z-index: var(--z-popover);
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-xs) 0;
-}
-.werkstatt-context-item {
-  display: block;
-  width: 100%;
-  padding: var(--space-xs) var(--space-md);
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  text-align: left;
-  font-size: var(--font-size-base);
-  cursor: pointer;
-}
-.werkstatt-context-item:hover,
-.werkstatt-context-item:focus-visible {
-  background: var(--color-hover);
-  outline: none;
-}
-.werkstatt-context-item:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
-}
-.werkstatt-context-item--danger {
-  color: var(--color-err-text);
-}
-.werkstatt-context-item--danger:hover:not(:disabled) {
-  background: var(--color-err-bg);
-}
-.werkstatt-context-sep {
-  height: 1px;
-  background: var(--color-border);
-  margin: var(--space-xs) 0;
-}
+/* Rechtsklick-Menü auf Mindmap-Knoten nutzt das geteilte .context-menu-Vokabular
+   (components/context-menu.css), position:fixed via Inline-Style (contextMenuPos). */
 
 /* Mindmap-Container fokus-sichtbar (Tastatur-Nav-Indikator) */
 .werkstatt-mindmap:focus-within {
