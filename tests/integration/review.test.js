@@ -298,6 +298,41 @@ test('Kapitel-Review: 1 Kapitel → 1 AI-Call, chapter_reviews-Zeile', async () 
   assert.equal(stored.gesamtnote, 4.1);
 });
 
+test('Kapitel-Review: ausgeschlossenes Kapitel bleibt direkt bewertbar', async () => {
+  const BOOK_ID = 94;
+  const CHAPTER_ID = 9050;
+  ctx.dbSeed.setBook({
+    chapters: [{ id: CHAPTER_ID, book_id: BOOK_ID, name: 'Kap Excl' }],
+    pages: [
+      { id: 9060, book_id: BOOK_ID, chapter_id: CHAPTER_ID, name: 'S 1', priority: 0 },
+      { id: 9061, book_id: BOOK_ID, chapter_id: CHAPTER_ID, name: 'S 2', priority: 1 },
+    ],
+    pageBodies: {
+      9060: '<p>Anna ging in den Wald.</p>',
+      9061: '<p>Es war kalt.</p>',
+    },
+  });
+  // Kapitel ausschliessen — Buch-/Komplettanalyse wuerden es ueberspringen,
+  // die direkte Kapitelbewertung muss es trotzdem laden koennen.
+  ctx.dbSchema.db.prepare('UPDATE chapters SET excluded = 1 WHERE chapter_id = ?').run(CHAPTER_ID);
+
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('gesamtnote') && e.schemaKeys.includes('dramaturgie'),
+    chapterReviewResponse(3.7),
+  );
+
+  const jobId = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'Kap Excl', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+  );
+  const job = await waitForJob(ctx.shared, jobId);
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.notEqual(job.result.empty, true, 'ausgeschlossenes Kapitel darf nicht als leer durchfallen');
+  assert.equal(job.result.review.gesamtnote, 3.7);
+  assert.equal(job.result.pageCount, 2, 'beide Seiten des ausgeschlossenen Kapitels bewertet');
+  assert.equal(ctx.mockAi.log.length, 1);
+});
+
 test('Kapitel-Review Cache: Rerun trifft chapter_macro_review_cache → 0 AI-Calls', async () => {
   const BOOK_ID = 93;
   const CHAPTER_ID = 9800;

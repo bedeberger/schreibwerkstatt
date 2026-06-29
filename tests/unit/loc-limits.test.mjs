@@ -76,7 +76,6 @@ const CATEGORIES = [
       'public/partials/plot.html': 304,
       'public/partials/docx-export.html': 295,
       'public/partials/snapshots.html': 280,
-      'public/partials/kapitelreview.html': 280,
       'public/partials/user-settings.html': 268,
       'public/partials/szenen.html': 268,
       'public/partials/orte.html': 265,

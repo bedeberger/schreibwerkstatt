@@ -62,7 +62,10 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
       : new Set([String(chapterIdInt)]);
     // Tree-Walk liefert Pages in echter Buchorganizer-Reihenfolge (depth-first)
     // mit Sub-Kapitel-Pfad in chMap. Filter behält Tree-Order.
-    const { chMap, pages: allPages } = await loadOrderedBookContents(bookId, userToken)
+    // includeExcluded: ausgeschlossene Kapitel sind direkt in der Kapitel-
+    // bewertung bewertbar (anders als Buch-/Komplettanalyse) — der Filter unten
+    // beschränkt ohnehin auf die angeforderten chapterIds.
+    const { chMap, pages: allPages } = await loadOrderedBookContents(bookId, userToken, { includeExcluded: true })
       .catch(e => { throw contentHttpError(e); });
     const pages = allPages.filter(p => chapterIds.has(String(p.chapter_id || '')));
 

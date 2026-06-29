@@ -1,0 +1,33 @@
+<!--
+  Geteilte Seiten-Zeile der Kapitel-Review (Fragment-Include via `<!-- @include
+  kapitel-page-row -->`). Wird sowohl in der Haupt-Kapitel-Seitenliste als auch
+  in jeder Sub-Kapitel-Seitenliste pro `page`-Loop-Iteration geklont — Loop-Var
+  heisst in beiden Fällen `page`. SSoT, damit die tok-Badge-Statistik nicht
+  zwischen beiden Listen driftet.
+-->
+<div class="kapitel-page-row" @click="$app.selectPage(page)" :data-tip="$app.pageStatusTooltip(page).join(' · ')">
+  <span class="kapitel-page-name">
+    <span class="page-status-dot" :class="'page-status-' + $app.pageStatus(page)"></span>
+    <span x-text="page.name"></span>
+  </span>
+  <span class="kapitel-page-edited" x-show="page.updated_at" x-text="$app.formatDate(page.updated_at)"></span>
+  <span class="kapitel-page-stats">
+    <template x-if="$app.tokEsts[page.id] && $app.tokEsts[page.id].words > 0">
+      <span class="display-contents">
+        <span class="tok-badge tok-neutral"
+          x-text="$app.tokEsts[page.id].chars >= 1000 ? '~' + Math.round($app.tokEsts[page.id].chars / 1000) + 'k Z' : $app.tokEsts[page.id].chars + ' Z'"></span>
+        <span class="tok-badge tok-neutral"
+          :data-tip="$app.t('bookstats.metric.normseiten')"
+          x-text="(Math.round(($app.tokEsts[page.id].chars || 0) / 1500 * 10) / 10).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+        <span class="tok-badge tok-neutral"
+          x-text="$app.tokEsts[page.id].words >= 1000 ? '~' + Math.round($app.tokEsts[page.id].words / 1000) + 'k W' : $app.tokEsts[page.id].words + ' W'"></span>
+        <span class="tok-badge"
+          :class="$app.tokEsts[page.id].tok > 16000 ? 'tok-high' : $app.tokEsts[page.id].tok > 4000 ? 'tok-med' : 'tok-ok'"
+          x-text="$app.tokEsts[page.id].tok >= 1000 ? '~' + Math.round($app.tokEsts[page.id].tok / 1000) + 'k T' : '~' + $app.tokEsts[page.id].tok + ' T'"></span>
+      </span>
+    </template>
+    <template x-if="$app.tokEsts[page.id] && $app.tokEsts[page.id].words === 0">
+      <span class="tok-badge tok-empty" x-text="$app.t('sidebar.empty')"></span>
+    </template>
+  </span>
+</div>

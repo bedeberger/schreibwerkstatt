@@ -40,7 +40,7 @@ function chunkLimitsFor(provider) {
 // Reihenfolge (depth-first). Ersetzt parallele listChapters+listPages-Pfade,
 // die bucket-lokale pages.position interpretieren (Cross-Chapter-Order kaputt)
 // und Sub-Kapitel als Geschwister flachen.
-async function loadOrderedBookContents(bookId, userToken) {
+async function loadOrderedBookContents(bookId, userToken, { includeExcluded = false } = {}) {
   const tree = await contentStore.bookTree(bookId, userToken);
   const chMap = {};        // id → "Vorfahre › … › Kapitel"
   const chNameToId = {};   // raw chapter_name UND voller Pfad → id (AI-Output toleranter Lookup)
@@ -52,7 +52,11 @@ async function loadOrderedBookContents(bookId, userToken) {
       // ihrer Unterkapitel (kein rekursiver walk). Betrifft Buchbewertung +
       // Komplettanalyse + Kontinuitaetscheck. Fassungen/Snapshots laufen nicht
       // ueber diesen Loader und behalten ausgeschlossene Kapitel.
-      if (c.excluded) continue;
+      // Ausnahme: includeExcluded=true (Kapitel-Review) laedt den vollen Baum,
+      // sodass ein direkt bewertetes Kapitel auch dann bewertbar ist, wenn es
+      // (oder ein Vorfahre) ausgeschlossen ist — der Aufrufer filtert danach
+      // auf die explizit angeforderten chapter_ids.
+      if (c.excluded && !includeExcluded) continue;
       const path = prefix ? `${prefix} › ${c.name}` : c.name;
       chMap[c.id] = path;
       chNameToId[c.name] = c.id;
