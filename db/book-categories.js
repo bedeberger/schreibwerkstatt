@@ -89,6 +89,24 @@ function remove(id) {
   return _stmtDelete.run(parseInt(id, 10)).changes > 0;
 }
 
+// Kategorie je Buch fuer eine Buch-Menge (Map book_id → { id, name, color,
+// parent_id }). Buecher ohne Zuordnung fehlen in der Map. JOIN haelt die
+// books.category_id-Lese im Kategorie-Domaenen-File (analog setForBook).
+function getForBooks(bookIds) {
+  const ids = (bookIds || []).map(n => parseInt(n, 10)).filter(Number.isInteger);
+  if (!ids.length) return new Map();
+  const ph = ids.map(() => '?').join(',');
+  const rows = db.prepare(`
+    SELECT b.book_id, c.id, c.name, c.color, c.parent_id
+      FROM books b
+      JOIN book_categories c ON c.id = b.category_id
+     WHERE b.book_id IN (${ph})
+  `).all(...ids);
+  const m = new Map();
+  for (const r of rows) m.set(r.book_id, { id: r.id, name: r.name, color: r.color, parent_id: r.parent_id });
+  return m;
+}
+
 const _stmtSetForBook = db.prepare('UPDATE books SET category_id = ? WHERE book_id = ?');
 function setForBook(bookId, categoryId) {
   const bid = parseInt(bookId, 10);
@@ -98,4 +116,4 @@ function setForBook(bookId, categoryId) {
   return _stmtSetForBook.run(cid, bid).changes > 0;
 }
 
-module.exports = { list, get, create, update, remove, setForBook };
+module.exports = { list, get, create, update, remove, setForBook, getForBooks };

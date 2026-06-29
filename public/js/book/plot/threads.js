@@ -88,16 +88,26 @@ export const threadsMethods = {
   // JS-positioniert aus dem Trigger-Rect (Pattern wie das Ideen-Meatball-Menü).
   openThreadMenu(ev, laneId) {
     if (this.threadActionsOpenId === laneId) { this.closeThreadMenu(); return; }
-    const r = ev.currentTarget.getBoundingClientRect();
-    const PW = 220;
-    const PH = 240;
-    const left = Math.max(8, Math.min(window.innerWidth - PW - 8, r.right - PW));
-    const top = (r.bottom + PH + 8 > window.innerHeight)
-      ? Math.max(8, r.top - PH - 4)
-      : r.bottom + 4;
-    this.threadMenuPos = { top, left };
+    this._threadTriggerRect = ev.currentTarget.getBoundingClientRect();
+    // Schätzung vor dem Render; danach mit der echten Popover-Grösse nachjustieren,
+    // damit das Menü beim Hochklappen nicht mit einer festen Höhe über den Button
+    // geschoben wird (Pattern wie das Ideen-Meatball-Menü).
+    this.threadMenuPos = this._computeThreadMenuPos(this._threadTriggerRect, 220, 240);
     this.threadActionsOpenId = laneId;
     this._attachThreadMenuListeners();
+    this.$nextTick(() => {
+      const el = this.$refs.threadMenu;
+      if (!el || !this._threadTriggerRect) return;
+      this.threadMenuPos = this._computeThreadMenuPos(this._threadTriggerRect, el.offsetWidth, el.offsetHeight);
+    });
+  },
+
+  _computeThreadMenuPos(r, pw, ph) {
+    const left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.right - pw));
+    const top = (r.bottom + ph + 8 > window.innerHeight)
+      ? Math.max(8, r.top - ph - 4)
+      : r.bottom + 4;
+    return { top, left };
   },
 
   closeThreadMenu() {

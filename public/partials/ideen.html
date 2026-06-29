@@ -93,6 +93,7 @@
          lokales position:absolute-Popover dort abgeschnitten würde. -->
     <template x-teleport="body">
       <div class="context-menu"
+           x-ref="ideenMenu"
            x-show="menuOpenId !== null && !!menuOpenIdee()" x-cloak
            :style="`top:${menuPos.top}px;left:${menuPos.left}px`"
            @click.outside="closeMenu()"

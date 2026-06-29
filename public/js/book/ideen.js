@@ -51,16 +51,26 @@ export const ideenMethods = {
   // ── Meatball-Menu (Popover) ───────────────────────────────────────────────
   openMenu(ev, idee) {
     if (this.menuOpenId === idee.id) { this.closeMenu(); return; }
-    const r = ev.currentTarget.getBoundingClientRect();
-    const PW = 200;
-    const PH = 200;
-    const left = Math.max(8, Math.min(window.innerWidth - PW - 8, r.right - PW));
-    const top  = (r.bottom + PH + 8 > window.innerHeight)
-      ? Math.max(8, r.top - PH - 4)
-      : r.bottom + 4;
-    this.menuPos = { top, left };
+    this._triggerRect = ev.currentTarget.getBoundingClientRect();
+    // Schätzung vor dem Render; danach mit der echten Popover-Grösse nachjustieren.
+    // Erledigte Ideen haben ein kürzeres Menü (nur Wieder öffnen + Löschen) — eine
+    // feste Höhe würde es beim Hochklappen zu weit über den Button schieben.
+    this.menuPos = this._computeMenuPos(this._triggerRect, 220, 200);
     this.menuOpenId = idee.id;
     this._attachMenuListeners();
+    this.$nextTick(() => {
+      const el = this.$refs.ideenMenu;
+      if (!el || !this._triggerRect) return;
+      this.menuPos = this._computeMenuPos(this._triggerRect, el.offsetWidth, el.offsetHeight);
+    });
+  },
+
+  _computeMenuPos(r, pw, ph) {
+    const left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.right - pw));
+    const top  = (r.bottom + ph + 8 > window.innerHeight)
+      ? Math.max(8, r.top - ph - 4)
+      : r.bottom + 4;
+    return { top, left };
   },
 
   closeMenu() {

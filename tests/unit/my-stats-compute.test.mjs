@@ -11,6 +11,7 @@ const { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMile
         computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
         filterByWindow } =
   await import('../../public/js/cards/my-stats-compute.js');
+const { computeVolumeByCategory } = await import('../../public/js/cards/my-stats-category.js');
 
 import { localIsoDaysAgo } from '../../public/js/utils.js';
 const isoDaysAgo = (n) => localIsoDaysAgo(n);
@@ -557,4 +558,50 @@ test('computeBookGoals: erreichtes Ziel → keine Prognose', () => {
   assert.equal(r.reached, true);
   assert.equal(r.forecastDate, null);
   assert.equal(r.forecastStalled, false);
+});
+
+// ── computeVolumeByCategory (Umfang nach Buch-Kategorie) ─────────────────────
+test('computeVolumeByCategory: gruppiert + summiert je Kategorie, absteigend', () => {
+  const groups = computeVolumeByCategory([
+    { book_id: 1, chars: 30000, words: 5000, pages: 20, category: { id: 7, name: 'Krimi', color: '#f00' } },
+    { book_id: 2, chars: 15000, words: 2000, pages: 10, category: { id: 7, name: 'Krimi', color: '#f00' } },
+    { book_id: 3, chars: 60000, words: 9000, pages: 40, category: { id: 9, name: 'Sachbuch', color: null } },
+  ]);
+  assert.equal(groups.length, 2);
+  // Sachbuch (60k) vor Krimi (45k).
+  assert.equal(groups[0].categoryId, 9);
+  assert.equal(groups[0].chars, 60000);
+  assert.equal(groups[0].bookCount, 1);
+  assert.equal(groups[1].categoryId, 7);
+  assert.equal(groups[1].chars, 45000);
+  assert.equal(groups[1].bookCount, 2);
+  assert.equal(groups[1].normpages, 30); // 45000 / 1500
+  assert.equal(groups[0].pct, 100);      // Spitzenreiter
+});
+
+test('computeVolumeByCategory: Sammel-Bucket ohne Kategorie steht zuletzt', () => {
+  const groups = computeVolumeByCategory([
+    { book_id: 1, chars: 10000, category: null },
+    { book_id: 2, chars: 50000, category: { id: 3, name: 'Lyrik', color: '#0f0' } },
+  ]);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].categoryId, 3);
+  assert.equal(groups[1].categoryId, null);
+});
+
+test('computeVolumeByCategory: leere Bücher (chars=0) zählen nicht', () => {
+  const groups = computeVolumeByCategory([
+    { book_id: 1, chars: 0, category: { id: 1, name: 'X', color: null } },
+    { book_id: 2, chars: 5000, category: { id: 1, name: 'X', color: null } },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].bookCount, 1);
+  assert.equal(groups[0].chars, 5000);
+});
+
+test('computeBookGoals: reicht category durch', () => {
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 5000, category: { id: 2, name: 'Krimi', color: '#abc' } },
+  ]);
+  assert.deepEqual(rows[0].category, { id: 2, name: 'Krimi', color: '#abc' });
 });

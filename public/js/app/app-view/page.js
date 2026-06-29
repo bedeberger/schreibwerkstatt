@@ -204,6 +204,9 @@ export const pageMethods = {
         }
       };
       renameInTree(this.$store.nav.tree);
+      // nav.pages-Identität neu setzen → invalidiert den identity-gateten
+      // Diary-Kalender-Cache (er keyt auf den YYYY-MM-DD-Page-Namen).
+      this.$store.nav.pages = [...this.$store.nav.pages];
     } catch (e) {
       this.setStatus(this.t('bookOrganizer.saveFailed', { detail: e.message }));
       if (ev?.target) ev.target.value = oldName;

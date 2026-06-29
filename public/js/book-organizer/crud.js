@@ -69,6 +69,7 @@ export const crudMethods = {
       }
       // Pages-Maps neu aufbauen (Reihenfolge unverändert, aber Name-Index drin).
       this._rebuildPageOrderMaps();
+      this._invalidateDiaryCache();
       return true;
     } catch (e) {
       root.setStatus(root.t('bookOrganizer.saveFailed', { detail: e.message }));
@@ -192,6 +193,7 @@ export const crudMethods = {
     }
     root.tokEsts[newPage.id] = { tok: 0, words: 0, chars: 0 };
     this._rebuildPageOrderMaps();
+    this._invalidateDiaryCache();
     if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
   },
 
@@ -246,6 +248,7 @@ export const crudMethods = {
       }
       this._rebuildChapterOrderMap();
       this._rebuildPageOrderMaps();
+      this._invalidateDiaryCache();
       if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
       // Subchapter-Delete: Sidebar (flach) ist inkonsistent → fullReload.
       if (found.node.depth > 1) await root.loadPages?.();
@@ -388,6 +391,7 @@ export const crudMethods = {
         if (si >= 0) this.soloPages.splice(si, 1);
       }
       this._rebuildPageOrderMaps();
+      this._invalidateDiaryCache();
       if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
       await this.$nextTick();
       this._destroySortables();

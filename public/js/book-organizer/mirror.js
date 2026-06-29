@@ -120,4 +120,13 @@ export const mirrorMethods = {
     root._pageOrderMap = nameMap;
     root._pageIdOrderMap = idMap;
   },
+
+  // Setzt die nav.pages-Array-Identität neu (gleiche Elemente, neuer Container).
+  // Der Diary-Kalender-Cache invalidiert identity-gated (cache.pagesRef ===
+  // nav.pages) und keyt auf den YYYY-MM-DD-Page-Namen — nach Create/Delete/Rename
+  // einer Page muss er rebuilden. Nicht bei reinem Reorder/Move nötig (Namen
+  // unverändert), darum kein Aufruf aus den Mirror-Pfaden.
+  _invalidateDiaryCache() {
+    Alpine.store('nav').pages = [...Alpine.store('nav').pages];
+  },
 };

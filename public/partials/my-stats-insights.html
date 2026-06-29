@@ -156,6 +156,33 @@
   </div>
 </template>
 
+<!-- Umfang nach Kategorie: Zeichen-Bestand je Buch-Kategorie (lebenslang) -->
+<template x-if="myStatsHasCategories">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label">
+      <span x-text="$app.t('mystats.category.title')"></span>
+      <span class="mystats-alltime-tag" x-show="myStatsWindowActive" x-text="$app.t('mystats.allTimeTag')"></span>
+    </div>
+    <ul class="overview-chapter-list">
+      <template x-for="c in myStatsByCategory()" :key="c.categoryId == null ? '__none__' : c.categoryId">
+        <li class="overview-chapter-row">
+          <span class="overview-chapter-name mystats-cat-name">
+            <span class="mystats-cat-dot" :style="{ background: c.color }" aria-hidden="true"></span>
+            <span :data-tip="c.name" x-text="c.name"></span>
+          </span>
+          <div class="overview-chapter-bar-track">
+            <div class="overview-chapter-bar-fill" :style="{ width: c.pct + '%', background: c.color }"></div>
+          </div>
+          <span class="overview-chapter-meta">
+            <span class="overview-chapter-chars" x-text="$app.t('mystats.bookGoals.normpages', { n: _myStatsFmt(c.normpages) })"></span>
+            <span class="overview-chapter-chars mystats-goals-muted" x-text="$app.t('mystats.category.books', { n: _myStatsFmt(c.bookCount) })"></span>
+          </span>
+        </li>
+      </template>
+    </ul>
+  </div>
+</template>
+
 <!-- Wo deine Zeit hinfloss: Schreibzeit pro Buch -->
 <template x-if="myStatsHasPerBook">
   <div class="overview-tile overview-tile--medium">

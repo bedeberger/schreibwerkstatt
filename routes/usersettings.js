@@ -5,12 +5,29 @@ const { getUser, updateUserSettings } = appUsers;
 const deviceTokens = require('../db/device-tokens');
 const { db } = require('../db/schema');
 const { listBookIdsForUser } = require('../db/book-access');
+const bookCategories = require('../db/book-categories');
 const { setContext } = require('../lib/log-context');
 const { localIsoDate, localIsoDaysAgo } = require('../lib/local-date');
 const logger = require('../logger');
 
 const router = express.Router();
 const jsonBody = express.json();
+
+/** Eigene Buecher des Users (role=owner), bereinigt um Buecher mit
+ *  book_settings.exclude_from_stats=1 (z.B. Testbuecher). Basis fuer beide
+ *  Profile-Stats-Routen. */
+function ownedBooksForStats(email) {
+  const owned = listBookIdsForUser(email)
+    .filter(r => r.role === 'owner')
+    .map(r => r.book_id);
+  if (!owned.length) return owned;
+  const ph = owned.map(() => '?').join(',');
+  const excluded = new Set(
+    db.prepare(`SELECT book_id FROM book_settings WHERE exclude_from_stats = 1 AND book_id IN (${ph})`)
+      .all(...owned).map(r => r.book_id)
+  );
+  return owned.filter(id => !excluded.has(id));
+}
 
 // Audit-Log-Events (UI-Trigger ohne anderen Server-Roundtrip).
 // Allowlist verhindert beliebige Logs durch den Client.
@@ -94,9 +111,7 @@ router.get('/settings', (req, res) => {
  */
 router.get('/profile-stats', (req, res) => {
   const email = req.session.user.email;
-  const owned = listBookIdsForUser(email)
-    .filter(r => r.role === 'owner')
-    .map(r => r.book_id);
+  const owned = ownedBooksForStats(email);
   const goalMin = getUser(email)?.daily_goal_minutes ?? null;
   const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0, today_writing_seconds: 0, daily_goal_minutes: goalMin, by_hour: [], books_detail: [], lektorat: null };
   if (!owned.length) return res.json(empty);
@@ -207,9 +222,12 @@ router.get('/profile-stats', (req, res) => {
 
     const perBookMap = new Map(perBookRows.map(r => [r.book_id, r]));
     const goalMap = new Map(goalRows.map(r => [r.book_id, r]));
+    // Kategorie je Buch (book_categories-Pool, optional via books.category_id).
+    const catMap = bookCategories.getForBooks(owned);
     const booksDetail = owned.map((bid) => {
       const c = perBookMap.get(bid) || {};
       const g = goalMap.get(bid) || {};
+      const cat = catMap.get(bid) || null;
       return {
         book_id: bid,
         chars: c.chars || 0,
@@ -219,6 +237,7 @@ router.get('/profile-stats', (req, res) => {
         goal_target_chars: g.goal_target_chars ?? null,
         goal_deadline: g.goal_deadline ?? null,
         is_finished: !!g.is_finished,
+        category: cat ? { id: cat.id, name: cat.name, color: cat.color || null } : null,
       };
     });
     res.json({
@@ -255,9 +274,7 @@ router.get('/profile-stats', (req, res) => {
  */
 router.get('/profile-stats-history', (req, res) => {
   const email = req.session.user.email;
-  const owned = listBookIdsForUser(email)
-    .filter(r => r.role === 'owner')
-    .map(r => r.book_id);
+  const owned = ownedBooksForStats(email);
   if (!owned.length) return res.json({ history: [], writing: [] });
   try {
     const ph = owned.map(() => '?').join(',');

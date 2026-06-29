@@ -2219,6 +2219,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 | [components/toggle-switch.css](public/css/components/toggle-switch.css) | `.toggle-switch` (Track/Thumb/Label) für das `toggleSwitch`-Primitive — eckiger Boolean-Schalter, Ersatz für `.checkbox-row`. |
 | [components/file-drop.css](public/css/components/file-drop.css) | Generischer Baseline-Style (`cursor: pointer`) für das `fileDrop`-Primitive; Visuals + `is-drag`-Tönung beim Konsumenten. |
 | [components/folder-import.css](public/css/components/folder-import.css) | Folder-Import-Karte (Drop-Zone, Mode-Toggle, Progress, Result). |
+| [components/snapshots.css](public/css/components/snapshots.css) | Fassungen-Karte (`snapshotsCard`): Capture-Leiste + Fassungs-Liste + Buch-Level-Diff zweier Fassungen. Tabelle reuse `.entity-grid-table`; Diff-Zellen reuse `revision-diff-*` aus `page/page-revision-viewer.css` — hier nur snapshot-spezifische Zell-Tweaks. |
 
 ### page/
 | File | Inhalt |
@@ -2248,6 +2249,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [editor/notebook/entities.css](public/css/editor/notebook/entities.css) | Entity-Linking: `::highlight(entity-figure)` / `::highlight(entity-location)`, `.on-this-page-panel` (Collapsible mit drei Reihen Figuren/Szenen/Ereignisse, Stil wie `.figure-context-panel`), `.entity-popover`. |
 | [editor/synonym-menu.css](public/css/editor/synonym-menu.css) | Synonym-Kontextmenü + Picker. |
 | [editor/figur-lookup.css](public/css/editor/figur-lookup.css) | `.figur-lookup` Popover. |
+| [editor/spellcheck.css](public/css/editor/spellcheck.css) | LanguageTool-Squiggles + Popover, geteilt über Notebook-, Focus- und Bucheditor: `::highlight()`-Pseudos (Custom Highlight API), Tippfehler-Popover, `.lt-field-wrap`-Badge auf Form-Feldern. |
 
 ### entities/
 | File | Inhalt |
@@ -2261,6 +2263,8 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [entities/entity-list.css](public/css/entities/entity-list.css) | `.entity-list` / `-row`, `.severity-tag*`, `.collapsible-*`, Skeleton, `.ort-*` Schauplätze. |
 | [entities/orte-map.css](public/css/entities/orte-map.css) | Orte-Karte View-Mode `map` (Geo-Karte via Leaflet): `.ort-map*` Container + Geocode-Liste. Nur bei `book_settings.orte_real`. |
 | [entities/recherche.css](public/css/entities/recherche.css) | Recherche-/Wissensboard: Toolbar/Filter, Anlege-/Edit-Formular, einspaltige Schnipsel-Liste (`.recherche-list` + `.research-item`), Kind-Badges, Verknüpfungs-/Tag-Chips, KI-Vorschläge, Link-Picker. Native-Vollbild (`.card--recherche:fullscreen`, Toggle via `fullscreen.js` wie Plot-Board) → Liste zentriert mit Lese-Maximalbreite. |
+| [entities/ereignisse-subtyp.css](public/css/entities/ereignisse-subtyp.css) | Event-Subtyp-Badges + Marker-Farbe im Zeitstrahl: Mapping `.gz-item--subtyp-<typ>` auf die gemeinsame `--gz-subtyp-color`-Prop (SSoT der Hues = `--card-accent-event-*` in `tokens/colors.css`), konsumiert von Marker (`.gz-marker`) und Badge. |
+| [entities/ereignisse-span.css](public/css/entities/ereignisse-span.css) | Spannen-Events im Zeitstrahl: `.gz-item--span` verlängert den Marker vertikal proportional zur Jahr-Differenz (CSS-Custom-Prop `--span-years`); reine Punkt-Events unverändert. |
 
 ### analysis/
 | File | Inhalt |
@@ -2281,6 +2285,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [admin/admin-users.css](public/css/admin/admin-users.css) | Admin-Users-Tabelle. |
 | [admin/logs.css](public/css/admin/logs.css) | Admin-Logs: Filter-Toolbar, Log-Liste, Stack-Trace-Toggle. |
 | [admin/parse-fails.css](public/css/admin/parse-fails.css) | Admin-KI-Parse-Fehler: Dump-Liste mit aufklappbarem Rohtext. |
+| [admin/js-errors.css](public/css/admin/js-errors.css) | Admin-Client-JS-Fehler (`.card--admin-js-errors`): gemeldete Browser-Fehler mit aufklappbarem Detail (Stack, Quelle, User-Agent), Mobile via Container-Query. |
 
 ### book/
 | File | Inhalt |

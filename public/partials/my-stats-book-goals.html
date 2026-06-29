@@ -38,6 +38,12 @@
                 <span x-text="row.name"></span>
                 <span x-show="row.isFinished" class="mystats-goals-finished"
                       x-text="$app.t('mystats.bookGoals.finished')"></span>
+                <template x-if="row.category">
+                  <span class="mystats-cat-chip">
+                    <span class="mystats-cat-dot" :style="{ background: row.category.color || 'var(--color-muted)' }" aria-hidden="true"></span>
+                    <span x-text="row.category.name"></span>
+                  </span>
+                </template>
               </td>
               <td class="mystats-goals-num">
                 <span x-text="_myStatsFmt(row.chars)"></span>

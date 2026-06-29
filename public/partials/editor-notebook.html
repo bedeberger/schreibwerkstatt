@@ -156,7 +156,7 @@
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
             </button>
             <button type="button" class="icon-btn icon-btn--ghost" @click="enterFocusFromPageview()" :disabled="checkLoading || saveApplying != null || originalHtml === null" :data-tip="t('editor.btn.focusTitle')" :aria-label="t('editor.btn.focus')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#maximize"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#focus"/></svg>
             </button>
           </span>
           <span class="action-sep" aria-hidden="true"></span>
@@ -225,7 +225,7 @@
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
             <button type="button" class="icon-btn icon-btn--ghost" @click="focusActive ? exitFocusMode() : enterFocusMode()" :class="{ 'is-active': focusActive }" :aria-pressed="focusActive" :data-tip="focusActive ? t('editor.btn.leaveFocusTitle') : t('editor.btn.enterFocusTitle')" :aria-label="focusActive ? t('editor.btn.leaveFocus') : t('editor.btn.focusShort')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#maximize"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#focus"/></svg>
             </button>
           </span>
         </span>

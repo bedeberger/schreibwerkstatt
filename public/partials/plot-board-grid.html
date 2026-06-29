@@ -264,7 +264,7 @@
        overflow-x/will-change-Scrollcontainer, in dem ein am Trigger verankertes
        Popover geclippt bzw. eingesperrt würde. Die offene Lane via threadMenuLane(). -->
   <template x-teleport="body">
-    <div class="context-menu" x-show="threadActionsOpenId !== null && !!threadMenuLane()" x-cloak
+    <div class="context-menu" x-ref="threadMenu" x-show="threadActionsOpenId !== null && !!threadMenuLane()" x-cloak
          :style="`top:${threadMenuPos.top}px;left:${threadMenuPos.left}px`"
          @click.outside="closeThreadMenu()" @keydown.escape.window="closeThreadMenu()" role="menu">
       <template x-if="threadMenuLane()">

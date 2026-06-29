@@ -268,6 +268,38 @@
 }
 .mystats-goals-muted { color: var(--color-muted); }
 
+/* Kategorie-Chip neben dem Buchnamen (Bücher-&-Ziele-Tabelle): eckiges Badge
+   mit Farbpunkt der Kategorie. */
+.mystats-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin-left: var(--space-2xs);
+  padding: var(--pad-badge);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 1;
+  vertical-align: middle;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+/* Farbpunkt: kleines eckiges Quadrat (keine runden Pills, siehe DESIGN.md). */
+.mystats-cat-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-muted);
+}
+/* Kategorie-Zeile in der „Umfang nach Kategorie"-Liste: Punkt + Name. */
+.mystats-cat-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
 /* Fortschrittszelle: Balken + Prozentzahl nebeneinander. */
 .mystats-goals-progress {
   display: flex;

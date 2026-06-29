@@ -538,6 +538,7 @@ export function computeBookGoals(booksDetail, historyRows = [], todayLocal = new
     return {
       book_id: b.book_id,
       isFinished: !!b.is_finished,
+      category: b.category || null,
       chars,
       words: Number(b.words) || 0,
       pages: Number(b.pages) || 0,

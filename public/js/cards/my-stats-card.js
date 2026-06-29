@@ -11,6 +11,7 @@ import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMil
          computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
          computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
          filterByWindow, bucketizeIso, aggregateByBucket } from './my-stats-compute.js';
+import { computeVolumeByCategory } from './my-stats-category.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -301,6 +302,24 @@ export function registerMyStatsCard() {
           .map(r => ({ ...r, name: this._bookName(r.book_id) })));
     },
     get myStatsHasBookGoals() { return this.myStatsBookGoals().length > 0; },
+
+    // ── Umfang nach Kategorie ────────────────────────────────────────────────
+    // Lifetime-Bestand pro Kategorie (Live-Umfang aus books_detail; kein
+    // Zeitraum-Filter, analog Pro-Buch-Zielen). Sammel-Bucket „Ohne Kategorie"
+    // bekommt das Default-Label, Gruppen ohne eigene Farbe eine Palettenfarbe.
+    myStatsByCategory() {
+      return this._memo('byCategory', [this.myStatsData?.books_detail], () =>
+        computeVolumeByCategory(this.myStatsData?.books_detail).map((r, i) => ({
+          ...r,
+          name: r.categoryId == null ? window.__app.t('mystats.category.none') : r.name,
+          color: r.color || BOOK_COLORS[i % BOOK_COLORS.length],
+        })));
+    },
+    // Mindestens zwei Gruppen ODER eine echte Kategorie → Aufschluesselung lohnt.
+    get myStatsHasCategories() {
+      const g = this.myStatsByCategory();
+      return g.length > 1 || (g.length === 1 && g[0].categoryId != null);
+    },
 
     // Frist lesbar (oder Gedankenstrich, wenn keine gesetzt).
     myStatsDeadlineLabel(iso) { return iso ? this.myStatsDateLabel(iso) : '–'; },
