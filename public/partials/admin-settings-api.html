@@ -83,9 +83,9 @@
               <tr :class="t.revoked_at ? 'is-revoked' : ''">
                 <td x-text="t.display_name"></td>
                 <td><code x-text="t.scopes"></code></td>
-                <td x-text="t.created_at ? new Date(t.created_at).toLocaleDateString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {}) : '–'"></td>
-                <td x-text="t.last_used_at ? new Date(t.last_used_at).toLocaleString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {}) : '–'"></td>
-                <td x-text="t.expires_at ? new Date(t.expires_at).toLocaleDateString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {}) : '–'"></td>
+                <td x-text="t.created_at ? new Date(t.created_at).toLocaleDateString($store.shell.uiLocale, $app.tzOpts()) : '–'"></td>
+                <td x-text="t.last_used_at ? new Date(t.last_used_at).toLocaleString($store.shell.uiLocale, $app.tzOpts()) : '–'"></td>
+                <td x-text="t.expires_at ? new Date(t.expires_at).toLocaleDateString($store.shell.uiLocale, $app.tzOpts()) : '–'"></td>
                 <td>
                   <span class="badge"
                         :class="t.revoked_at ? 'badge-err' : (t.expires_at && t.expires_at < new Date().toISOString() ? 'badge-warn' : 'badge-ok')"

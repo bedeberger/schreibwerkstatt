@@ -88,14 +88,12 @@
       </template>
     </div>
     <label class="plot-edit-label" x-text="$app.t('plot.beat.chapter')"></label>
-    <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
-         x-modelable="value" x-model="beatDraft.chapter_id"
-         x-effect="options = $store.nav.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
+    <div x-data="entityPicker({ entity: 'chapter', placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
+         x-modelable="value" x-model="beatDraft.chapter_id"></div>
     <label class="plot-edit-label" x-show="$store.catalog.figuren.length" x-text="$app.t('plot.beat.figuren')"></label>
     <div x-show="$store.catalog.figuren.length"
-         x-data="combobox({ placeholder: $app.t('plot.beat.figurenPick'), multiple: true })"
-         x-modelable="value" x-model="beatDraft.figure_ids"
-         x-effect="options = ($store.catalog.figuren, beatFigureOptions())"></div>
+         x-data="entityPicker({ entity: 'figur', grouped: true, multiple: true, placeholder: $app.t('plot.beat.figurenPick'), noGroupLabel: $app.t('plot.beat.noChapterGroup') })"
+         x-modelable="value" x-model="beatDraft.figure_ids"></div>
     <div class="plot-fig-chips" x-show="beatFigureChips().length">
       <template x-for="chip in beatFigureChips()" :key="chip.id">
         <span class="tag plot-fig-chip">
@@ -109,9 +107,8 @@
     </div>
     <label class="plot-edit-label" x-show="draftFiguren.length" x-text="$app.t('plot.beat.werkstattFiguren')"></label>
     <div x-show="draftFiguren.length"
-         x-data="combobox({ placeholder: $app.t('plot.beat.werkstattPick'), multiple: true })"
-         x-modelable="value" x-model="beatDraft.draft_figure_ids"
-         x-effect="options = (draftFiguren, beatWerkstattOptions())"></div>
+         x-data="entityPicker({ entity: 'werkstatt', multiple: true, placeholder: $app.t('plot.beat.werkstattPick'), items: () => draftFiguren })"
+         x-modelable="value" x-model="beatDraft.draft_figure_ids"></div>
     <div class="plot-fig-chips" x-show="beatWerkstattChips().length">
       <template x-for="chip in beatWerkstattChips()" :key="'d' + chip.id">
         <span class="tag tag--werkstatt plot-fig-chip">

@@ -80,8 +80,12 @@ import { registerFileDrop } from '../file-drop.js';
 import { registerRadioGroup } from '../radio-group.js';
 import { registerSortableTable } from '../sortable-table.js';
 import { registerCatalogFilter } from '../catalog-filter.js';
+import { registerEntityPicker } from '../cards/entity-picker.js';
 import { registerCollapsible } from '../collapsible.js';
 import { registerTabs } from '../tabs.js';
+import { registerToggleSwitch } from '../toggle-switch.js';
+import { registerMenu } from '../menu.js';
+import { registerModal } from '../modal.js';
 
 // Magics, die Sub-Komponenten/Partials den Zugriff auf Root + Sync-Provider geben.
 export function registerAppMagics() {
@@ -193,6 +197,10 @@ export function registerAllCards() {
   registerRadioGroup();
   registerSortableTable();
   registerCatalogFilter();
+  registerEntityPicker();
   registerCollapsible();
   registerTabs();
+  registerToggleSwitch();
+  registerMenu();
+  registerModal();
 }

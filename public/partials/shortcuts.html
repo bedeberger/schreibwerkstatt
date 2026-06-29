@@ -1,11 +1,9 @@
-<!-- Tastenkürzel-Overlay (natives <dialog>) -->
+<!-- Tastenkürzel-Overlay (natives <dialog> via Alpine.data('modal')) -->
 <dialog id="shortcuts-dialog" class="shortcuts-panel"
-        x-ref="shortcutsDialog"
-        @cancel.prevent="closeShortcutsOverlay()"
-        @click="if ($event.target === $el) closeShortcutsOverlay()">
+        x-data="modal()" x-modelable="open" x-model="shortcutsOpen">
   <div class="shortcuts-header">
     <span class="shortcuts-title" x-text="t('shortcuts.title')"></span>
-    <button type="button" class="shortcuts-close" x-ref="shortcutsCloseBtn" @click="closeShortcutsOverlay()" :data-tip="t('common.close')" :aria-label="t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+    <button type="button" class="shortcuts-close" @click="close()" :data-tip="t('common.close')" :aria-label="t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
   </div>
 
     <div class="shortcuts-section">

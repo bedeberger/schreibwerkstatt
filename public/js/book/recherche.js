@@ -125,10 +125,8 @@ export const rechercheMethods = {
   applySort() { return this.loadRecherche(); },
 
   // Filter „nach Verknüpfung": Kategorie + konkreter Eintrag → filterLinked.
-  linkedFilterTargetOptions() {
-    const arr = (this.linkTargets || {})[this.filterLinkedKind] || [];
-    return arr.map(o => ({ value: String(o.id), label: o.label }));
-  },
+  // Die Ziel-Optionen baut die generische entityPicker-Komponente (entity
+  // 'target') aus `linkTargets[filterLinkedKind]`.
   onLinkedFilterKindChange() {
     this.filterLinkedTargetId = '';
     return this.applyLinkedFilter();
@@ -353,10 +351,8 @@ export const rechercheMethods = {
   },
   cancelLinkPicker() { this.linkPickerItemId = null; this.linkPickerTargetId = ''; },
 
-  linkTargetOptions() {
-    const arr = (this.linkTargets || {})[this.linkPickerKind] || [];
-    return arr.map(o => ({ value: String(o.id), label: o.label }));
-  },
+  // Ziel-Optionen des Link-Pickers baut die generische entityPicker-Komponente
+  // (entity 'target') aus `linkTargets[linkPickerKind]`.
 
   async addLink(itemId, targetKind, targetId) {
     const app = window.__app;

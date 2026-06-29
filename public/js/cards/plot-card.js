@@ -151,7 +151,7 @@ export function registerPlotCard() {
             this.loadBoard();
             // book:changed hat den Katalog-Store geleert; der Figuren-Picker
             // braucht ihn neu (analog loadDeps beim Toggle-Open).
-            if (!window.__app.figuren?.length) window.__app.loadFiguren(bookId);
+            if (!Alpine.store('catalog').figuren?.length) window.__app.loadFiguren(bookId);
           }
         },
         onViewReset: () => { this._destroySortables(); this.resetPlot(); },

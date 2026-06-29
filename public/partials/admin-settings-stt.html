@@ -1,11 +1,8 @@
     <!-- STT-Tab: Speech-to-Text-Diktat (Notebook-Editor) -->
     <section x-show="adminSettingsTab === 'stt'" class="admin-settings-section">
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.hint')"></p>
-      <label class="checkbox-row">
-        <input type="checkbox" :checked="adminSettingsForm['stt.enabled'] === true || adminSettingsForm['stt.enabled'] === 'true'"
-               @change="adminSettingsForm['stt.enabled'] = $event.target.checked">
-        <span x-text="$app.t('admin.settings.stt.enabled.label')"></span>
-      </label>
+      <div x-data="toggleSwitch({ label: () => $app.t('admin.settings.stt.enabled.label') })"
+           x-modelable="value" x-model="adminSettingsForm['stt.enabled']"></div>
       <label>
         <span x-text="$app.t('admin.settings.stt.host.label')"></span>
         <input type="url" x-model="adminSettingsForm['stt.host']" :placeholder="$app.t('admin.settings.stt.host.placeholder')">

@@ -81,6 +81,15 @@
   min-width: 200px;
 }
 
+/* Relativ-positionierter Wrapper für die verankerte Variante. Wird von
+   Alpine.data('menu') (menu.js) per init() gesetzt, sodass das per
+   `.context-menu--dropdown` (position: absolute) angehängte Popover an ihm
+   ausgerichtet wird. Trägt selbst kein sichtbares Styling. */
+.menu-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
 /* Menü-Eintrag mit führendem Icon (+ optionalem Count-Badge rechts). */
 .context-menu-item--icon {
   display: flex;

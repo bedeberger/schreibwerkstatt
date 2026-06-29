@@ -178,6 +178,13 @@ export const appUiMethods = {
     }));
   },
 
+  // Intl-Options mit der App-Timezone für Datums-Displays in Templates
+  // (`$app.tzOpts(opts)`). Spiegelt den Util, damit Alpine-Expressions die
+  // app.timezone-Setting anwenden können statt in Browser-TZ zu rendern.
+  tzOpts(opts) {
+    return tzOpts(opts);
+  },
+
   // Kurz-relative Zeit („vor 3 Minuten") für push-getriebene Hints wie den
   // „Zuletzt bearbeitet auf <Gerät>"-Banner. Lokalisierung via Intl in utils.
   formatRelativeShort(iso) {

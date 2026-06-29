@@ -54,43 +54,9 @@ export const boardMethods = {
   // Verwerfen-Achse). Eigene Liste, damit die Edit-Status-Tabs binär bleiben.
   distStatusList() { return DIST_SEGMENTS; },
 
-  // ── Figuren-Picker (gruppierte Combobox-Optionen) ───────────────────────────
-  // Katalog-Figuren als Multi-Select-Combobox-Optionen, gruppiert nach Kapitel
-  // (`opt.group`). Eine Figur erscheint unter jedem Kapitel, in dem sie auftritt
-  // (figuren[].kapitel via figure_appearances); Figuren ohne Auftritt landen in
-  // der „ohne Kapitel"-Gruppe. Gruppen in Buch-Kapitelreihenfolge ($app.tree),
-  // innerhalb nach Figurname. Liest bewusst `window.__app.*` (Root-Proxy) statt
-  // `this.*` — nur so trackt der combobox-`x-effect` die Reaktivität (DESIGN.md).
-  beatFigureOptions() {
-    const app = window.__app;
-    const figs = app?.figuren || [];
-    const tree = Alpine.store('nav').tree || [];
-    return this._memo('figOpts', [figs, tree], () => {
-      const order = new Map();
-      tree.filter(it => it.type === 'chapter').forEach((c, i) => order.set(c.name, i));
-      const noChapter = app?.t ? app.t('plot.beat.noChapterGroup') : '—';
-      const rows = [];
-      for (const f of figs) {
-        const label = f.kurzname || f.name;
-        const chapters = [...new Set((f.kapitel || []).map(k => k.name).filter(Boolean))];
-        if (!chapters.length) {
-          rows.push({ value: f.id, label, group: noChapter, _ord: Number.MAX_SAFE_INTEGER });
-        } else {
-          for (const ch of chapters) rows.push({ value: f.id, label, group: ch, _ord: order.has(ch) ? order.get(ch) : order.size });
-        }
-      }
-      rows.sort((a, b) => (a._ord - b._ord) || a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
-      return rows;
-    });
-  },
-
-  // Werkstatt-Figuren als (flache) Multi-Select-Optionen — keine Kapitel-Daten,
-  // daher ungruppiert. Quelle ist karten-lokal (`this.draftFiguren`); der
-  // combobox-`x-effect` berührt `draftFiguren` zusätzlich inline fürs Tracking.
-  beatWerkstattOptions() {
-    return this._memo('wFigOpts', [this.draftFiguren], () =>
-      (this.draftFiguren || []).map(d => ({ value: d.id, label: d.name })));
-  },
+  // Figuren-Picker-Optionen (Katalog gruppiert nach Kapitel, Werkstatt flach)
+  // baut die generische `entityPicker`-Komponente selbst — siehe
+  // public/js/cards/entity-picker.js (entity 'figur' mit grouped / 'werkstatt').
 
   // Aktuell gewählte Katalog-Figuren des Edit-Drafts als entfernbare Chips.
   beatFigureChips() {

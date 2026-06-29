@@ -56,37 +56,36 @@
           <span x-show="kapitelReviewLoading" class="spinner"></span>
           <svg x-show="!kapitelReviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
         </button>
-        <span class="action-overflow" @click.outside="kapitelReviewMenuOpen = false" @keydown.escape.window="kapitelReviewMenuOpen = false">
+        <span class="action-overflow" x-data="menu()">
           <span class="icon-btn-badge-wrap">
-            <button type="button" class="icon-btn icon-btn--ghost"
-                    :class="{ 'is-active': kapitelReviewMenuOpen }"
-                    @click="kapitelReviewMenuOpen = !kapitelReviewMenuOpen"
-                    aria-haspopup="menu" :aria-expanded="kapitelReviewMenuOpen"
+            <button type="button" class="icon-btn icon-btn--ghost" x-bind="trigger"
+                    :class="{ 'is-active': open }"
+                    aria-haspopup="menu"
                     :data-tip="$app.t('editor.btn.moreActions')" :aria-label="$app.t('editor.btn.moreActions')">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg>
             </button>
             <span class="icon-btn-badge" x-show="($store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
           </span>
-          <div class="context-menu context-menu--dropdown" x-show="kapitelReviewMenuOpen" x-cloak role="menu">
+          <div class="context-menu context-menu--dropdown" x-bind="panel" x-cloak>
             <button type="button" class="context-menu-item context-menu-item--icon"
                     :class="{ 'context-menu-item--on': $app.showIdeenCard && $app.ideenScope === 'chapter' }"
                     role="menuitem"
                     :disabled="!$app.kapitelReviewChapterId"
-                    @click="$app.toggleChapterIdeenCard($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">
+                    @click="$app.toggleChapterIdeenCard($app.kapitelReviewChapterId)">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
               <span x-text="$app.t('ideen.chapter.toggle')"></span>
               <span class="btn-count" x-show="($store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="($store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId] || 0) > 0"
-                    @click="$app.openRechercheForChapter($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">
+                    @click="$app.openRechercheForChapter($app.kapitelReviewChapterId)">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#book-open"/></svg>
               <span x-text="$app.t('recherche.title')"></span>
               <span class="btn-count" x-text="$store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('recherche.openCountTitle', { n: $store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId] })"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="($store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId] || 0) > 0"
-                    @click="$app.openPlotBoard(); kapitelReviewMenuOpen = false">
+                    @click="$app.openPlotBoard()">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
               <span x-text="$app.t('plot.title')"></span>
               <span class="btn-count" x-text="$store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('plot.chapterBeatsCountTitle', { n: $store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId] })"></span>
@@ -94,7 +93,7 @@
             <div class="context-menu-sep" role="separator" x-show="$app.canEdit() && $app.kapitelReviewChapterId"></div>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="$app.canEdit() && $app.kapitelReviewChapterId"
-                    @click="$app.openShareLinksForChapter($app.kapitelReviewChapterId); kapitelReviewMenuOpen = false">
+                    @click="$app.openShareLinksForChapter($app.kapitelReviewChapterId)">
               <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>
               <span x-text="$app.t('share.btn.shareChapter')"></span>
             </button>

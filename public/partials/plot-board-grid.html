@@ -154,20 +154,17 @@
                          @keydown.enter.prevent="saveEditThread(row.lane.thread)" @keydown.escape="cancelEditThread()">
                   <label class="plot-edit-label" x-show="$store.catalog.figuren.length" x-text="$app.t('plot.thread.bindFigure')"></label>
                   <div x-show="$store.catalog.figuren.length"
-                       x-data="combobox({ placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure') })"
+                       x-data="entityPicker({ entity: 'figur', placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure') })"
                        x-modelable="value" x-model="threadDraft.figure_id"
-                       @combobox-change="threadDraft.figure_id && (threadDraft.draft_figure_id = '')"
-                       x-effect="options = $store.catalog.figuren.map(f => ({ value: f.id, label: f.kurzname || f.name }))"></div>
+                       @combobox-change="threadDraft.figure_id && (threadDraft.draft_figure_id = '')"></div>
                   <label class="plot-edit-label" x-show="draftFiguren.length" x-text="$app.t('plot.thread.bindDraftFigure')"></label>
                   <div x-show="draftFiguren.length"
-                       x-data="combobox({ placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure') })"
+                       x-data="entityPicker({ entity: 'werkstatt', placeholder: $app.t('plot.thread.bindFigurePlaceholder'), emptyLabel: $app.t('plot.thread.noFigure'), items: () => draftFiguren })"
                        x-modelable="value" x-model="threadDraft.draft_figure_id"
-                       @combobox-change="threadDraft.draft_figure_id && (threadDraft.figure_id = '')"
-                       x-effect="options = draftFiguren.map(d => ({ value: d.id, label: d.name }))"></div>
+                       @combobox-change="threadDraft.draft_figure_id && (threadDraft.figure_id = '')"></div>
                   <label class="plot-edit-label" x-text="$app.t('plot.thread.bindChapter')"></label>
-                  <div x-data="combobox({ placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
-                       x-modelable="value" x-model="threadDraft.chapter_id"
-                       x-effect="options = $store.nav.tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name }))"></div>
+                  <div x-data="entityPicker({ entity: 'chapter', placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
+                       x-modelable="value" x-model="threadDraft.chapter_id"></div>
                   <div class="plot-beat-edit-actions">
                     <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditThread(row.lane.thread)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
                       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>

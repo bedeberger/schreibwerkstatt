@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "9c1d831b592d2b8b";
+self.__SHELL_BUILD = "4784c1ccd556482b";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -62,6 +62,7 @@ self.__SHELL_MANIFEST = [
   "/css/components/snapshots.css",
   "/css/components/sortable-table.css",
   "/css/components/tabs.css",
+  "/css/components/toggle-switch.css",
   "/css/components/tooltip.css",
   "/css/components/user-chip.css",
   "/css/editor/book/book-editor.css",
@@ -263,6 +264,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/editor-synonyme-card.js",
   "/js/cards/editor-synonyme/controller.js",
   "/js/cards/editor-toolbar-card.js",
+  "/js/cards/entity-picker.js",
   "/js/cards/epub-export-card.js",
   "/js/cards/ereignisse-card.js",
   "/js/cards/export-card-base.js",
@@ -399,6 +401,8 @@ self.__SHELL_MANIFEST = [
   "/js/local-prefs.js",
   "/js/manuscript-render.js",
   "/js/manuscript-stream.js",
+  "/js/menu.js",
+  "/js/modal.js",
   "/js/num-input.js",
   "/js/page-revision-diff.js",
   "/js/prompts.js",
@@ -446,6 +450,7 @@ self.__SHELL_MANIFEST = [
   "/js/tabs.js",
   "/js/theme-init.js",
   "/js/today-ring.js",
+  "/js/toggle-switch.js",
   "/js/tooltip.js",
   "/js/user-settings.js",
   "/js/utils.js",

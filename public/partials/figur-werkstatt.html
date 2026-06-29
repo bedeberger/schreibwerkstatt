@@ -55,14 +55,8 @@
     <div x-show="importablesLoading" class="card-status" x-text="$app.t('werkstatt.import.loading')"></div>
     <div x-show="!importablesLoading && importables.length === 0" class="card-status" x-text="$app.t('werkstatt.import.empty')"></div>
     <div x-show="!importablesLoading && importables.length > 0" class="form-stack">
-      <div x-data="combobox($app.t('werkstatt.import.placeholder'))"
-           x-modelable="value"
-           x-model="selectedImportFigureId"
-           x-effect="options = importables.map(f => ({
-             value: String(f.id),
-             label: f.name + (f.typ ? ' [' + f.typ + ']' : ''),
-             sublabel: importFigureContext(f)
-           }))"></div>
+      <div x-data="entityPicker({ entity: 'custom', placeholder: $app.t('werkstatt.import.placeholder'), items: () => importables.map(f => ({ value: String(f.id), label: f.name + (f.typ ? ' [' + f.typ + ']' : ''), sublabel: importFigureContext(f) })) })"
+           x-modelable="value" x-model="selectedImportFigureId"></div>
     </div>
     <div class="row">
       <button type="button" class="primary" :disabled="busy || !selectedImportFigureId" @click="runImport()" x-text="$app.t('werkstatt.import.confirm')"></button>
@@ -112,14 +106,8 @@
         <div x-show="importablesLoading" class="card-status" x-text="$app.t('werkstatt.import.loading')"></div>
         <div x-show="!importablesLoading && importables.length === 0" class="card-status" x-text="$app.t('werkstatt.import.empty')"></div>
         <div x-show="!importablesLoading && importables.length > 0" class="form-stack">
-          <div x-data="combobox($app.t('werkstatt.import.placeholder'))"
-               x-modelable="value"
-               x-model="selectedImportFigureId"
-               x-effect="options = importables.map(f => ({
-                 value: String(f.id),
-                 label: f.name + (f.typ ? ' [' + f.typ + ']' : ''),
-                 sublabel: importFigureContext(f)
-               }))"></div>
+          <div x-data="entityPicker({ entity: 'custom', placeholder: $app.t('werkstatt.import.placeholder'), items: () => importables.map(f => ({ value: String(f.id), label: f.name + (f.typ ? ' [' + f.typ + ']' : ''), sublabel: importFigureContext(f) })) })"
+               x-modelable="value" x-model="selectedImportFigureId"></div>
         </div>
         <div class="werkstatt-create-row">
           <button type="button" class="primary" :disabled="busy || !selectedImportFigureId" @click="runImport()" x-text="$app.t('werkstatt.import.confirm')"></button>

@@ -288,6 +288,9 @@ const cardsState = () => ({
   showAvatarMenu: false,
   // Overflow-Menü ("⋯") der Seiten-Action-Leiste (Notebook-Seitenansicht).
   pageActionsMenuOpen: false,
+  // Tastenkürzel-Overlay (natives <dialog> via Alpine.data('modal'), an dieses
+  // Flag gekoppelt). Toggle via toggleShortcutsOverlay() / `?`-Hotkey.
+  shortcutsOpen: false,
 });
 
 const statusState = () => ({

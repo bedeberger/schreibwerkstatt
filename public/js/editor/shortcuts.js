@@ -18,18 +18,11 @@ const FOCUSABLE = [
 const visible = (el) => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
 
 export const shortcutsMethods = {
+  // Overlay-Steuerung: nur Flag flippen. Das native <dialog> hängt via
+  // Alpine.data('modal') (x-model="shortcutsOpen") an diesem Boolean —
+  // showModal()/close(), ESC, Backdrop und Fokus-Restore macht das Primitiv.
   toggleShortcutsOverlay() {
-    const dlg = this.$refs?.shortcutsDialog;
-    if (!dlg) return;
-    if (dlg.open) dlg.close();
-    else {
-      dlg.showModal();
-      this.$nextTick(() => { this.$refs?.shortcutsCloseBtn?.focus(); });
-    }
-  },
-  closeShortcutsOverlay() {
-    const dlg = this.$refs?.shortcutsDialog;
-    if (dlg && dlg.open) dlg.close();
+    this.shortcutsOpen = !this.shortcutsOpen;
   },
 
   // Focus-Trap-Helper für Modal-Inline-Nutzung: in `<div @keydown="trapFocus($event, $el)">`
