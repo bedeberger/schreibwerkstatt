@@ -33,20 +33,7 @@
     <div id="partial-bookoverview-figpresence"></div>
     <div id="partial-bookoverview-chapter-quality"></div>
     <div id="partial-bookoverview-rueckblick-heatmap"></div>
+    <div id="partial-bookoverview-songs"></div>
     <div id="partial-bookoverview-recent"></div>
-
-    <!-- Quick-Actions: kein Daten-Tile, deshalb eigene Variante (kein Hover-Lift).
-         Span small (Buttons brauchen wenig Breite); Dense-Packing füllt Lücken. -->
-    <div class="overview-tile overview-tile--actions">
-      <div class="overview-tile-label" x-text="$app.t('overview.quickActions')"></div>
-      <div class="overview-actions">
-        <button type="button" class="btn-compact" @click="$app.toggleBookChatCard()" :disabled="!$store.nav.pages.length" x-text="$app.t('tile.bookchat')"></button>
-        <button type="button" class="btn-compact" @click="$app.toggleKontinuitaetCard()" :disabled="!$store.nav.pages.length" x-text="$app.t('tile.kontinuitaet')"></button>
-        <button type="button" class="btn-compact" @click="$app.toggleEreignisseCard()" :disabled="!$store.nav.pages.length" x-text="$app.t('tile.events')"></button>
-        <button type="button" class="btn-compact" @click="$app.toggleBookOrganizerCard()" x-text="$app.t('tile.bookOrganizer')"></button>
-        <button type="button" class="btn-compact" @click="$app.openShareLinksForBook()" :disabled="!$store.nav.pages.length" x-text="$app.t('share.create.book')"></button>
-        <button type="button" class="btn-compact" @click="$app.alleAktualisieren()" :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.pages.length" x-text="$app.t('palette.action.komplett')"></button>
-      </div>
-    </div>
   </div>
 </div>

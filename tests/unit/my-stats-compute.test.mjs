@@ -445,3 +445,116 @@ test('computeBookGoals: is_finished wird als isFinished durchgereicht', () => {
   assert.equal(byId[1].isFinished, true);
   assert.equal(byId[2].isFinished, false);
 });
+
+// ── Chart-Granularitaet: bucketizeIso + aggregateByBucket ────────────────────
+const { bucketizeIso, aggregateByBucket } = await import('../../public/js/cards/my-stats-compute.js');
+
+test('bucketizeIso: day = Identitaet', () => {
+  assert.equal(bucketizeIso('2026-06-29', 'day'), '2026-06-29');
+});
+
+test('bucketizeIso: week = Montag der Kalenderwoche', () => {
+  // 2026-06-29 ist ein Montag → bleibt; 2026-07-05 ist ein Sonntag → Montag 2026-06-29
+  assert.equal(bucketizeIso('2026-06-29', 'week'), '2026-06-29');
+  assert.equal(bucketizeIso('2026-07-05', 'week'), '2026-06-29');
+  assert.equal(bucketizeIso('2026-06-30', 'week'), '2026-06-29');
+});
+
+test('bucketizeIso: month = Monatserster', () => {
+  assert.equal(bucketizeIso('2026-06-29', 'month'), '2026-06-01');
+  assert.equal(bucketizeIso('2026-12-01', 'month'), '2026-12-01');
+});
+
+test('aggregateByBucket: day reicht sortiert durch', () => {
+  const pts = [{ date: '2026-06-02', value: 5 }, { date: '2026-06-01', value: 3 }];
+  assert.deepEqual(aggregateByBucket(pts, 'day', 'sum'), [
+    { bucket: '2026-06-01', value: 3 },
+    { bucket: '2026-06-02', value: 5 },
+  ]);
+});
+
+test('aggregateByBucket: sum addiert Tageswerte im Bucket (Schreibzeit)', () => {
+  const pts = [
+    { date: '2026-06-29', value: 10 }, // Mo
+    { date: '2026-06-30', value: 20 }, // Di → selbe Woche
+    { date: '2026-07-06', value: 7 },  // Mo → naechste Woche
+  ];
+  assert.deepEqual(aggregateByBucket(pts, 'week', 'sum'), [
+    { bucket: '2026-06-29', value: 30 },
+    { bucket: '2026-07-06', value: 7 },
+  ]);
+});
+
+test('aggregateByBucket: last nimmt juengsten Tageswert im Bucket (Snapshot)', () => {
+  const pts = [
+    { date: '2026-06-05', value: 1000 },
+    { date: '2026-06-20', value: 1800 }, // juengster im Juni → maßgeblich
+    { date: '2026-07-02', value: 2100 },
+  ];
+  assert.deepEqual(aggregateByBucket(pts, 'month', 'last'), [
+    { bucket: '2026-06-01', value: 1800 },
+    { bucket: '2026-07-01', value: 2100 },
+  ]);
+});
+
+// ── Fertigstellungs-Prognose in computeBookGoals ─────────────────────────────
+test('computeBookGoals: Prognose aus 30-Tage-Tempo', () => {
+  const today = new Date('2026-06-29T12:00:00');
+  // 1000 Zeichen/Tag: vor 30 Tagen 20000, heute 50000 → +30000/30. Ziel 110000 →
+  // remaining 60000 → 60 Tage → fertig 2026-08-28.
+  const history = [
+    { book_id: 1, recorded_at: isoDaysAgo(30), chars: 20000 },
+    { book_id: 1, recorded_at: isoDaysAgo(0), chars: 50000 },
+  ];
+  const rows = computeBookGoals(
+    [{ book_id: 1, chars: 50000, goal_target_chars: 110000, goal_deadline: null }],
+    history, today);
+  const r = rows[0];
+  assert.equal(r.recentDailyChars, 1000);
+  assert.equal(r.forecastDays, 60);
+  assert.equal(r.forecastDate, '2026-08-28');
+  assert.equal(r.forecastStalled, false);
+  assert.equal(r.onTrack, null); // keine Frist
+});
+
+test('computeBookGoals: onTrack false wenn Prognose nach Frist liegt + requiredPerDay', () => {
+  const today = new Date('2026-06-29T12:00:00');
+  const history = [
+    { book_id: 1, recorded_at: isoDaysAgo(30), chars: 20000 },
+    { book_id: 1, recorded_at: isoDaysAgo(0), chars: 50000 }, // 1000/Tag
+  ];
+  const rows = computeBookGoals(
+    [{ book_id: 1, chars: 50000, goal_target_chars: 110000, goal_deadline: '2026-07-29' }],
+    history, today);
+  const r = rows[0];
+  assert.equal(r.onTrack, false);            // fertig erst Ende August, Frist Ende Juli
+  assert.equal(r.daysRemaining, 30);
+  assert.equal(r.requiredPerDay, 2000);      // 60000 / 30
+});
+
+test('computeBookGoals: kein/negatives Tempo → forecastStalled', () => {
+  const today = new Date('2026-06-29T12:00:00');
+  const history = [{ book_id: 1, recorded_at: isoDaysAgo(0), chars: 50000 }]; // nur ein Snapshot
+  const rows = computeBookGoals(
+    [{ book_id: 1, chars: 50000, goal_target_chars: 110000, goal_deadline: null }],
+    history, today);
+  const r = rows[0];
+  assert.equal(r.recentDailyChars, 0);
+  assert.equal(r.forecastStalled, true);
+  assert.equal(r.forecastDate, null);
+});
+
+test('computeBookGoals: erreichtes Ziel → keine Prognose', () => {
+  const today = new Date('2026-06-29T12:00:00');
+  const history = [
+    { book_id: 1, recorded_at: isoDaysAgo(30), chars: 20000 },
+    { book_id: 1, recorded_at: isoDaysAgo(0), chars: 50000 },
+  ];
+  const rows = computeBookGoals(
+    [{ book_id: 1, chars: 50000, goal_target_chars: 40000, goal_deadline: null }],
+    history, today);
+  const r = rows[0];
+  assert.equal(r.reached, true);
+  assert.equal(r.forecastDate, null);
+  assert.equal(r.forecastStalled, false);
+});

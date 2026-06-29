@@ -16,6 +16,49 @@ function isoAddDays(iso, n) {
   return dt.toISOString().slice(0, 10);
 }
 
+// Tages-ISO → Bucket-Schluessel je Granularitaet. Der Schluessel ist selbst ein
+// sortierbares ISO-Datum (Monday-of-week bzw. Monatserster), damit X-Achse +
+// Label-Formatierung dieselbe Datumslogik wie der Tagesfall nutzen koennen.
+//   'day'   → das Datum selbst
+//   'week'  → Montag der Kalenderwoche
+//   'month' → erster Tag des Monats
+export function bucketizeIso(iso, gran) {
+  if (gran === 'month') return iso.slice(0, 7) + '-01';
+  if (gran === 'week') {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    const dow = (dt.getUTCDay() + 6) % 7; // Mo=0 .. So=6
+    dt.setUTCDate(dt.getUTCDate() - dow);
+    return dt.toISOString().slice(0, 10);
+  }
+  return iso;
+}
+
+// Zeitreihe { date, value } auf Buckets verdichten. mode='sum' summiert die
+// Werte je Bucket (Tages-Deltas wie Schreibminuten), mode='last' nimmt den Wert
+// des juengsten Tages je Bucket (kumulative Snapshot-Groessen wie Zeichen).
+// Liefert eine nach Bucket sortierte [{ bucket, value }]-Liste.
+export function aggregateByBucket(points, gran, mode) {
+  if (gran === 'day') {
+    return points.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+      .map(p => ({ bucket: p.date, value: p.value }));
+  }
+  const buckets = new Map(); // bucket → { sum, lastDate, lastVal }
+  for (const p of points) {
+    const key = bucketizeIso(p.date, gran);
+    const cur = buckets.get(key);
+    if (!cur) {
+      buckets.set(key, { sum: p.value, lastDate: p.date, lastVal: p.value });
+    } else {
+      cur.sum += p.value;
+      if (p.date >= cur.lastDate) { cur.lastDate = p.date; cur.lastVal = p.value; }
+    }
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([bucket, v]) => ({ bucket, value: mode === 'last' ? v.lastVal : v.sum }));
+}
+
 // Rows auf ein Zeitfenster [from, to] (inklusive, ISO-Strings) einschraenken.
 // from/to je null = unbegrenzt. dateField ist der Feldname mit dem Tagesdatum
 // (writing/lektorat: 'date', book_stats_history: 'recorded_at').
@@ -414,6 +457,12 @@ function isoDayDiff(aIso, bIso) {
 //   'open'     Ziel gesetzt, keine Frist
 //   'none'     kein Gesamtziel gesetzt
 // Namen werden im Card via _bookName aufgeloest (Content-Store-Regel).
+// Fenster (Tage) fuer die Tempo-Schaetzung der Fertigstellungs-Prognose: juengster
+// Snapshot je Buch minus Snapshot ~30 Tage zuvor → Zeichen-Zuwachs pro Kalendertag.
+const FORECAST_PACE_DAYS = 30;
+// Prognose nur ausweisen, wenn sie nicht ins Absurde laeuft (~14 Jahre).
+const FORECAST_MAX_DAYS = 5000;
+
 export function computeBookGoals(booksDetail, historyRows = [], todayLocal = new Date()) {
   const isoToday = localIsoDate(todayLocal);
   // Basis-Snapshot je Buch = letzter Snapshot strikt vor heute (= on-or-before
@@ -421,6 +470,11 @@ export function computeBookGoals(booksDetail, historyRows = [], todayLocal = new
   // analog computeCharsTodayDelta.
   const isoYesterday = localIsoDaysAgo(1, todayLocal);
   const baseSnap = snapshotPerBookOnOrBefore(historyRows, isoYesterday);
+
+  // Tempo-Basis fuer die Prognose: pro Buch der juengste Snapshot + der letzte
+  // Snapshot on-or-before (heute − FORECAST_PACE_DAYS). Daraus Zeichen/Tag.
+  const paceLatest = latestSnapshotPerBook(historyRows);
+  const pacePast = snapshotPerBookOnOrBefore(historyRows, localIsoDaysAgo(FORECAST_PACE_DAYS, todayLocal));
 
   const rows = (booksDetail || []).map((b) => {
     const chars = Number(b.chars) || 0;
@@ -445,6 +499,42 @@ export function computeBookGoals(booksDetail, historyRows = [], todayLocal = new
     // den vollen Bestand als „heute" zaehlen), analog today-ring.js.
     const charsToday = prevChars == null ? 0 : Math.max(0, chars - prevChars);
 
+    // ── Fertigstellungs-Prognose ─────────────────────────────────────────────
+    // Aktuelles Schreibtempo (Zeichen/Kalendertag) aus dem juengsten Snapshot
+    // gegen den ~30-Tage-Snapshot. Hat das Buch keinen so alten Snapshot, wird
+    // der aelteste verfuegbare als Basis genommen (kuerzeres Fenster). Daraus:
+    //   forecastDate     prognostiziertes Ziel-Erreichungs-Datum (ISO)
+    //   forecastStalled  Ziel offen, aber kein/negatives Tempo → keine Prognose
+    //   requiredPerDay   bei Frist: Zeichen/Tag, die ab heute noetig sind
+    //   onTrack          Prognose-Datum liegt am/vor der Frist
+    const latestSnap = paceLatest.get(b.book_id);
+    const pastSnap = pacePast.get(b.book_id);
+    let recentDailyChars = 0;
+    if (latestSnap && pastSnap && latestSnap.recorded_at > pastSnap.recorded_at) {
+      const span = Math.max(1, isoDayDiff(pastSnap.recorded_at, latestSnap.recorded_at));
+      recentDailyChars = Math.max(0, ((Number(latestSnap.chars) || 0) - (Number(pastSnap.chars) || 0)) / span);
+    }
+    const remainingChars = hasGoal ? Math.max(0, goal - chars) : 0;
+    let forecastDate = null, forecastStalled = false, forecastDays = null, onTrack = null;
+    if (hasGoal && !reached) {
+      if (recentDailyChars > 0) {
+        const days = Math.ceil(remainingChars / recentDailyChars);
+        if (days <= FORECAST_MAX_DAYS) {
+          forecastDays = days;
+          forecastDate = isoAddDays(isoToday, days);
+          if (deadline) onTrack = forecastDate <= deadline;
+        } else {
+          forecastStalled = true;
+        }
+      } else {
+        forecastStalled = true;
+      }
+    }
+    // Bei laufender Frist: noetiges Tempo, um sie noch zu halten (>= 1 Tag).
+    const requiredPerDay = (hasGoal && !reached && deadline && daysRemaining != null && daysRemaining >= 0)
+      ? Math.ceil(remainingChars / Math.max(1, daysRemaining))
+      : null;
+
     return {
       book_id: b.book_id,
       isFinished: !!b.is_finished,
@@ -463,6 +553,13 @@ export function computeBookGoals(booksDetail, historyRows = [], todayLocal = new
       deadline,
       daysRemaining,
       status,
+      // Fertigstellungs-Prognose.
+      recentDailyChars: Math.round(recentDailyChars),
+      forecastDate,
+      forecastDays,
+      forecastStalled,
+      requiredPerDay,
+      onTrack,
       // Tagesziel-Block.
       charsToday,
       dailyGoalChars: hasDailyGoal ? dailyGoal : null,

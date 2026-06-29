@@ -1722,7 +1722,6 @@ Bekannte Views: `figuren`, `orte`, `szenen`, `ereignisse`, `kontinuitaet`, `bewe
 - `.book-overview .overview-grid` — `repeat(auto-fit, minmax(220px, 1fr))` + `grid-auto-flow: row dense` (verhindert Whitespace-Inseln bei `--hero`/`--medium`/`--wide`-Spans)
 - `.overview-tile` — Basis-Tile, optional `.internal-link` für klickbar
 - Spans (≥720px): `.overview-tile--hero` (span 2), `.overview-tile--medium` (span 2), `.overview-tile--wide` (full-width)
-- `.overview-tile--actions` — Quick-Action-Container (gestrichelter Border, kein Hover-Lift, optisch von Daten-Tiles abgesetzt)
 - Tile-Innenleben: `.overview-tile-label` (Header), `.overview-hero-row`/`-num`/`-value`/`-unit`, `.overview-substats`/`-substat`, `.overview-sparkline`, `.overview-trend-meta`/`-pct` (`--up`/`--down`)
 - 7-Tage-Bars: `.overview-bars7` + `-col`/`-track`/`-fill` (`--pos`/`--neg`)/`-label`, `.overview-bars7-total`
 - Donut: `.overview-donut-row` + `.overview-donut` + `-text`/`-meta`
@@ -1731,6 +1730,7 @@ Bekannte Views: `figuren`, `orte`, `szenen`, `ereignisse`, `kontinuitaet`, `bewe
 - Fehler-Bars: `.overview-error-bars` + `-bar-item`/`-head`/`-typ`/`-count`/`-track`/`-fill`
 - Bewertung: `.overview-stars` + `.overview-star` (`--full`/`--half`), `.overview-review-meta`/`-date`/`-trend`
 - Figuren-Chips: `.overview-fig-row` + `-count`/`-count-unit`/`-chips`/`-chip`/`-name`/`-avatar` (Avatar-Farbe via `[data-idx="0|1|2"]`)
+- Soundtrack-Liste: `.overview-song-list` + `-item`/`-dot` (Akzent-Punkt via `--card-accent`)/`-titel`/`-interpret`/`-count` (Top-Songs nach Häufigkeit, Math via `overviewTopSongs()`/`overviewSongsCount()` in [public/js/book-overview/songs.js](public/js/book-overview/songs.js))
 
 **Klick-Verhalten:** `.overview-tile.internal-link` öffnet die zugehörige Karte (über globalen `.internal-link`-Handler aus app.js — nicht selbst verdrahten).
 
@@ -1759,7 +1759,7 @@ Verbindlich pro Tile-Typ. `grid-auto-flow: row dense` füllt mittlere Lücken, T
 | Lektorat-Findings pro Kapitel | `--medium` (2) | analog: Bar + Δ% + Count |
 | Lektoratszeit pro Kapitel | `--medium` (2) | analog: Bar + Δ% + Dauer |
 | Zuletzt bearbeitet (Page-Liste) | `--medium` (2) | Name + Z + NS + Kapitel-Tag pro Zeile |
-| Quick-Actions | small (1) | 4 Buttons mit Wrap, kein Daten-Tile |
+| Soundtrack (Top-Songs) | small (1) | Count + 6 Songs (Titel + Interpret + Häufigkeit) als kompakte Liste |
 
 **Regel:** Wer einen neuen Tile-Typ hinzufügt, ergänzt diese Tabelle und wählt Span nach demselben Prinzip — Content mit horizontaler Struktur (Bars/Liste/Matrix) → medium; Content mit vertikaler Struktur (Donut, Sparkline, Chip-Cluster) → small. Hero und full-width nur für die im Header dokumentierten Sonderfälle (Snapshot, Streak).
 

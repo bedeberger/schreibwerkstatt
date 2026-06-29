@@ -223,6 +223,13 @@
                       x-text="$app.t('mystats.chart.' + m.k)"></button>
             </template>
           </div>
+          <div class="btn-group">
+            <template x-for="g in [{v:'day',k:'day'},{v:'week',k:'week'},{v:'month',k:'month'}]" :key="g.v">
+              <button type="button" class="btn-compact" :class="{ primary: myStatsChartGran === g.v }"
+                      @click="myStatsChartGran = g.v; renderMyStatsChart()"
+                      x-text="$app.t('mystats.gran.' + g.k)"></button>
+            </template>
+          </div>
           <div x-data="combobox($app.t('mystats.metric'))"
                x-modelable="value" x-model="myStatsMetric"
                x-effect="options = [

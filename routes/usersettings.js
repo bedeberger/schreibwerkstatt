@@ -6,7 +6,7 @@ const deviceTokens = require('../db/device-tokens');
 const { db } = require('../db/schema');
 const { listBookIdsForUser } = require('../db/book-access');
 const { setContext } = require('../lib/log-context');
-const { localIsoDate } = require('../lib/local-date');
+const { localIsoDate, localIsoDaysAgo } = require('../lib/local-date');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -98,7 +98,7 @@ router.get('/profile-stats', (req, res) => {
     .filter(r => r.role === 'owner')
     .map(r => r.book_id);
   const goalMin = getUser(email)?.daily_goal_minutes ?? null;
-  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0, today_writing_seconds: 0, daily_goal_minutes: goalMin, by_hour: [], books_detail: [] };
+  const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0, today_writing_seconds: 0, daily_goal_minutes: goalMin, by_hour: [], books_detail: [], lektorat: null };
   if (!owned.length) return res.json(empty);
   try {
     const ph = owned.map(() => '?').join(',');
@@ -158,6 +158,53 @@ router.get('/profile-stats', (req, res) => {
       SELECT book_id, daily_goal_chars, goal_target_chars, goal_deadline, is_finished
       FROM book_settings WHERE book_id IN (${ph})
     `).all(...owned);
+    // Lektorat-Qualitaet: Fundstellen aus dem JEWEILS juengsten page_checks-Eintrag
+    // je Seite (= aktueller Befund des Manuskripts) ueber alle eigenen Buecher.
+    // Trend = Vergleich des Schnitts pro gepruefter Seite gegen den Stand vor 30
+    // Tagen (richtungsneutral, analog Lesbarkeit). `perNormpage` nutzt den
+    // aktuellen Zeichenstand (page_stats) als Naeherung.
+    const lektoratAgg = (cutoffIso) => {
+      const cond = cutoffIso ? 'AND checked_at <= ?' : '';
+      const innerArgs = cutoffIso ? [...owned, cutoffIso] : [...owned];
+      const outerArgs = cutoffIso ? [...owned, cutoffIso] : [...owned];
+      return db.prepare(`
+        SELECT COUNT(*) AS pages,
+               COALESCE(SUM(lc.error_count), 0) AS findings,
+               COALESCE(SUM(ps.chars), 0)       AS chars
+        FROM (
+          SELECT pc.page_id, pc.error_count
+          FROM page_checks pc
+          JOIN (
+            SELECT page_id, MAX(checked_at) AS mx
+            FROM page_checks WHERE book_id IN (${ph}) ${cond}
+            GROUP BY page_id
+          ) m ON m.page_id = pc.page_id AND m.mx = pc.checked_at
+          WHERE pc.book_id IN (${ph}) ${cond}
+        ) lc
+        LEFT JOIN page_stats ps ON ps.page_id = lc.page_id
+      `).get(...innerArgs, ...outerArgs);
+    };
+    const ltNow = lektoratAgg(null);
+    let lektorat = null;
+    if (ltNow && ltNow.pages > 0) {
+      const avgPerPage = ltNow.findings / ltNow.pages;
+      const perNormpage = ltNow.chars > 0 ? ltNow.findings / (ltNow.chars / 1500) : null;
+      const ltPast = lektoratAgg(localIsoDaysAgo(30));
+      let trend = 0;
+      if (ltPast && ltPast.pages > 0) {
+        const pastAvg = ltPast.findings / ltPast.pages;
+        const d = avgPerPage - pastAvg;
+        trend = d > 0.2 ? 1 : d < -0.2 ? -1 : 0;
+      }
+      lektorat = {
+        pagesChecked: ltNow.pages,
+        totalFindings: ltNow.findings,
+        avgPerPage,
+        perNormpage,
+        trend,
+      };
+    }
+
     const perBookMap = new Map(perBookRows.map(r => [r.book_id, r]));
     const goalMap = new Map(goalRows.map(r => [r.book_id, r]));
     const booksDetail = owned.map((bid) => {
@@ -188,6 +235,7 @@ router.get('/profile-stats', (req, res) => {
       daily_goal_minutes: goalMin,
       by_hour:          byHour,
       books_detail:     booksDetail,
+      lektorat,
     });
   } catch (e) {
     logger.error('[me/profile-stats] DB-Fehler: ' + e.message, { user: email });

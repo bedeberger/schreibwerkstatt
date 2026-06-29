@@ -88,6 +88,52 @@
 .overview-ort-dot[data-typ="landschaft"] { background: var(--ort-typ-landschaft); }
 .overview-ort-dot[data-typ="region"]     { background: var(--ort-typ-region); }
 
+/* ── Soundtrack: Top-Songs-Liste ─────────────────────────────────────────── */
+.overview-song-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+.overview-song-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  min-width: 0;
+}
+.overview-song-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--card-accent, var(--color-accent));
+  flex: 0 0 auto;
+}
+.overview-song-titel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: 500;
+}
+.overview-song-interpret {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-muted);
+}
+.overview-song-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
 /* ── Szenen: Stacked-Bar Wertungs-Verteilung ─────────────────────────────── */
 .overview-stacked-bar {
   display: flex;

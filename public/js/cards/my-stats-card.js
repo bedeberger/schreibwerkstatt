@@ -10,7 +10,7 @@ import { EVT } from '../events.js';
 import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMilestones,
          computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
          computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
-         filterByWindow } from './my-stats-compute.js';
+         filterByWindow, bucketizeIso, aggregateByBucket } from './my-stats-compute.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -60,6 +60,7 @@ export function registerMyStatsCard() {
     myStatsFrom: '',
     myStatsTo: '',
     myStatsChartMode: 'total', // 'total' | 'byBook'
+    myStatsChartGran: 'day',   // 'day' | 'week' | 'month' — Zeitachsen-Granularitaet
     myStatsCumulative: false,  // nur fuer Metrik 'writing' (kumulierte Schreibzeit)
     myStatsLoading: false,
     myStatsError: '',
@@ -258,6 +259,12 @@ export function registerMyStatsCard() {
         computePerBookTime(win).map(r => ({ ...r, name: this._bookName(r.book_id) })));
     },
 
+    // ── Lektorat-Qualitaet (Fundstellen-Dichte + 30-Tage-Trend) ─────────────
+    // Server liefert vorab aggregiert (myStatsData.lektorat) — Lifetime-Befund,
+    // kein Zeitraum-Filter (analog Lesbarkeit).
+    myStatsQuality() { return this.myStatsData?.lektorat || null; },
+    get myStatsHasQuality() { return !!this.myStatsData?.lektorat; },
+
     get myStatsHasReadability() { return this.myStatsReadability().hasData; },
     get myStatsHasPerBook() { return this.myStatsPerBookTime().length > 1; },
 
@@ -306,6 +313,15 @@ export function registerMyStatsCard() {
       if (row.status === 'due')     return t('mystats.bookGoals.due', { n: row.daysRemaining });
       if (row.status === 'open')    return t('mystats.bookGoals.open');
       return t('mystats.bookGoals.none');
+    },
+
+    // Fertigstellungs-Prognose in Klartext: „fertig ~ 12. Aug 2026" bzw. bei
+    // fehlendem/zu langsamem Tempo der Stillstand-Hinweis.
+    myStatsForecastLabel(row) {
+      const t = window.__app.t;
+      if (row.forecastStalled) return t('mystats.bookGoals.forecastStalled');
+      if (row.forecastDate) return t('mystats.bookGoals.forecast', { date: this.myStatsDateLabel(row.forecastDate) });
+      return '';
     },
 
     // Zahl mit einer Nachkommastelle (Lesbarkeitswerte), Locale-aware.
@@ -406,12 +422,23 @@ export function registerMyStatsCard() {
         return Number(raw[metric]) || 0;
       };
 
-      // X-Achse = sortierte eindeutige Tage über alle Bücher.
-      const dates = [...new Set(rows.map(r => r.date))].sort();
-      const labels = dates.map(d => { const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y.slice(2)}`; });
+      // Zeitachsen-Granularitaet: Tag/Woche/Monat. Schreibzeit-Tageswerte werden
+      // im Bucket summiert ('sum'); Inhalts-Snapshots (kumulative Groessen) nehmen
+      // den juengsten Tageswert je Bucket ('last').
+      const gran = this.myStatsChartGran;
+      const aggMode = isWriting ? 'sum' : 'last';
+
+      // X-Achse = sortierte eindeutige Buckets über alle Bücher.
+      const buckets = [...new Set(rows.map(r => bucketizeIso(r.date, gran)))].sort();
+
+      const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
+      const labels = buckets.map(b => {
+        if (gran === 'month') return new Date(b + 'T12:00:00').toLocaleDateString(localeTag, tzOpts({ month: 'short', year: '2-digit' }));
+        const [y, m, dd] = b.split('-');
+        return `${dd}.${m}.${y.slice(2)}`;
+      });
 
       const metricLabel = window.__app.t(METRIC_KEYS[metric] || metric);
-      const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
       const isDecimal = metric === 'normseiten';
       const fmt = v => (v == null) ? '' : (isDecimal
         ? v.toLocaleString(localeTag, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -425,17 +452,17 @@ export function registerMyStatsCard() {
       if (byBook) {
         // Eine Linie pro Buch (Reihenfolge nach erstem Auftreten = stabile Farbe).
         const order = [];
-        const perBook = new Map(); // book_id → Map(date → value)
+        const perBook = new Map(); // book_id → [{ date, value }]
         for (const r of rows) {
-          if (!perBook.has(r.book_id)) { perBook.set(r.book_id, new Map()); order.push(r.book_id); }
-          perBook.get(r.book_id).set(r.date, valOf(r.raw));
+          if (!perBook.has(r.book_id)) { perBook.set(r.book_id, []); order.push(r.book_id); }
+          perBook.get(r.book_id).push({ date: r.date, value: valOf(r.raw) });
         }
         datasets = order.map((bid, i) => {
           const color = BOOK_COLORS[i % BOOK_COLORS.length];
-          const dmap = perBook.get(bid);
+          const bmap = new Map(aggregateByBucket(perBook.get(bid), gran, aggMode).map(x => [x.bucket, x.value]));
           return {
             label: this._bookName(bid),
-            data: dates.map(d => dmap.has(d) ? dmap.get(d) : null),
+            data: buckets.map(b => bmap.has(b) ? bmap.get(b) : null),
             borderColor: color,
             backgroundColor: color,
             pointBackgroundColor: color,
@@ -448,11 +475,13 @@ export function registerMyStatsCard() {
           };
         });
       } else {
-        // Gesamt: Summe pro Tag über alle Bücher.
-        const sumByDate = new Map();
-        for (const r of rows) sumByDate.set(r.date, (sumByDate.get(r.date) || 0) + valOf(r.raw));
-        let series = dates.map(d => sumByDate.has(d) ? sumByDate.get(d) : 0);
-        // Kumuliert nur fuer Schreibzeit sinnvoll (Tages-Deltas aufsummiert →
+        // Gesamt: erst Summe pro Tag über alle Bücher, dann auf Buckets verdichten.
+        const totalByDate = new Map();
+        for (const r of rows) totalByDate.set(r.date, (totalByDate.get(r.date) || 0) + valOf(r.raw));
+        const points = [...totalByDate.entries()].map(([date, value]) => ({ date, value }));
+        const bmap = new Map(aggregateByBucket(points, gran, aggMode).map(x => [x.bucket, x.value]));
+        let series = buckets.map(b => bmap.has(b) ? bmap.get(b) : 0);
+        // Kumuliert nur fuer Schreibzeit sinnvoll (Bucket-Deltas aufsummiert →
         // total investierte Zeit). Inhaltsmetriken sind bereits kumulative
         // Snapshot-Groessen, daher dort kein Cumulative-Toggle im UI.
         if (this.myStatsCumulative && isWriting) {

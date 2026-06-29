@@ -70,6 +70,13 @@
                       x-text="myStatsGoalStatusLabel(row)"></span>
                 <span class="mystats-goals-sub" x-show="row.deadline"
                       x-text="myStatsDeadlineLabel(row.deadline)"></span>
+                <!-- Fertigstellungs-Prognose (Tempo der letzten ~30 Tage) -->
+                <span class="mystats-goals-forecast"
+                      :class="row.onTrack === false ? 'mystats-goals-forecast--behind' : (row.onTrack === true ? 'mystats-goals-forecast--ontrack' : '')"
+                      x-show="row.forecastDate || row.forecastStalled"
+                      x-text="myStatsForecastLabel(row)"></span>
+                <span class="mystats-goals-sub" x-show="row.requiredPerDay"
+                      x-text="$app.t('mystats.bookGoals.requiredPerDay', { n: _myStatsFmt(row.requiredPerDay) })"></span>
               </td>
               <td class="mystats-goals-num">
                 <template x-if="row.hasDailyGoal">

@@ -137,9 +137,13 @@
 }
 /* Höhe + Metrik exakt wie .btn-compact, damit Presets und Datumsfelder auf
    gleicher Höhe sitzen (gleiche Token für Font/Padding/Border, gleiche 0.5px-
-   Border wie button-Basis). */
-.mystats-date-input {
+   Border wie button-Basis). Selektor bewusst auf .mystats-range-custom (0,2,0)
+   gescoped: die generische Form-Regel listet input[type=date] mit (card-form.css,
+   0,1,1) und würde die Felder sonst in voller Feldgrösse rendern → höher als die
+   Compact-Presets (dokumentierte Spezifitäts-Falle, siehe DESIGN.md Filter-Bar). */
+.mystats-range-custom .mystats-date-input {
   box-sizing: border-box;
+  width: auto;
   padding: var(--size-compact-padding);
   border: 0.5px solid var(--color-border-input);
   border-radius: var(--radius-md);
@@ -147,7 +151,7 @@
   background: var(--color-surface);
   color: var(--color-text);
 }
-.mystats-date-input:focus {
+.mystats-range-custom .mystats-date-input:focus {
   outline: none;
   border-color: var(--color-border-focus);
 }
@@ -287,12 +291,26 @@
 .mystats-goals-status--open { color: var(--color-text); }
 .mystats-goals-status--none { color: var(--color-muted); font-weight: 400; }
 
+/* Fertigstellungs-Prognose (Tempo der letzten ~30 Tage) als Status-Sub-Zeile. */
+.mystats-goals-forecast {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.mystats-goals-forecast--ontrack { color: var(--color-success); }
+.mystats-goals-forecast--behind { color: var(--color-schwach); }
+
+/* iOS: >= 16px verhindert Zoom-in beim Fokus der Datumsfelder. Gleicher 768px-
+   Breakpoint + gleiche (0,2,0)-Spezifität wie die Desktop-Compact-Regel oben,
+   damit sie diese auf Mobile überstimmt (sonst bliebe 12px → iOS-Zoom). */
+@media (max-width: 768px) {
+  .mystats-range-custom .mystats-date-input { font-size: var(--font-size-reading); }
+}
+
 @media (max-width: 600px) {
   .mystats-chart-wrap {
     height: 200px;
   }
-  /* iOS: >= 16px verhindert Zoom-in beim Fokus der Datumsfelder. */
-  .mystats-date-input { font-size: var(--font-size-reading); }
   /* Tabelle scrollt horizontal (.table-scroll) statt zu quetschen. */
   .mystats-goals-progress { min-width: 110px; }
 }
