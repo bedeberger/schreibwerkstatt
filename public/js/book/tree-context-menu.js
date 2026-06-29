@@ -118,20 +118,25 @@ export const treeContextMenuMethods = {
 
   // Kapitel aus Export/Bewertung/Komplettanalyse aus- bzw. wieder einschliessen.
   // Lektorat + Fassungen bleiben unberuehrt. In-Place-Mirror auf nav.tree (flach,
-  // inkl. Sub-Kapitel) fuer sofortiges Greying.
-  async pagetreeCtxToggleExclude() {
-    const target = this.pageTreeMenuTarget;
-    this._hidePagetreeContextMenu();
-    if (!target || target.kind !== 'chapter') return;
-    const next = !target.excluded;
+  // inkl. Sub-Kapitel) fuer sofortiges Greying. Geteilt zwischen Sidebar-Kontext-
+  // menue und Kapitelbewertungs-Meatball.
+  async setChapterExcluded(chapterId, next) {
+    if (chapterId == null) return;
     try {
-      await contentRepo.updateChapter(target.id, { excluded: next });
+      await contentRepo.updateChapter(chapterId, { excluded: !!next });
       for (const it of (this.$store.nav.tree || [])) {
-        if (it.type === 'chapter' && !it.solo && String(it.id) === String(target.id)) it.excluded = next;
+        if (it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId)) it.excluded = !!next;
       }
     } catch (e) {
       this.setStatus?.(this.t('bookOrganizer.saveFailed', { detail: e.message }));
     }
+  },
+
+  pagetreeCtxToggleExclude() {
+    const target = this.pageTreeMenuTarget;
+    this._hidePagetreeContextMenu();
+    if (!target || target.kind !== 'chapter') return;
+    this.setChapterExcluded(target.id, !target.excluded);
   },
 
   async pagetreeCtxExport() {
