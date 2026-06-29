@@ -13,6 +13,13 @@
 //      (app-state.js). Kein Root-Proxy mehr — Konsumenten lesen direkt
 //      $store.nav / this.$store.nav / Alpine.store('nav').
 //
+//   3. Kein Root-Proxy fuer IRGENDEINEN Store: das Root-Component (app.js) liest
+//      geteilten State ausschliesslich via this.$store.<name> — nie ueber einen
+//      Getter/Setter-Shim, der Store-Felder unter alten Root-Namen spiegelt
+//      (`get books() { return Alpine.store('nav').books }`). Erkennungs-Smell:
+//      jeder `Alpine.store(`-Aufruf in app.js. Die Store-Liste wird dynamisch
+//      aus cards/*-store.js gezogen → neuer Store ist automatisch abgedeckt.
+//
 // Prosa-Regel = Vorschlag, Test = Gesetz. Neuer Verstoss → CI rot.
 
 import { test } from 'node:test';
@@ -22,10 +29,27 @@ import { join, relative } from 'node:path';
 
 const REPO_ROOT = new URL('../../', import.meta.url).pathname;
 const JS_DIR = join(REPO_ROOT, 'public', 'js');
+const CARDS_DIR = join(JS_DIR, 'cards');
 const EVENTS_FILE = join(JS_DIR, 'events.js');
 const NAV_STORE = join(JS_DIR, 'cards', 'nav-store.js');
 const APP_STATE = join(JS_DIR, 'app', 'app-state.js');
 const APP_JS = join(JS_DIR, 'app.js');
+
+// Kommentare entfernen (Block + Zeile), damit Doku-Kommentare keine Treffer
+// erzeugen. Reicht fuer Token-Suche nach `Alpine.store(` — String-Literale
+// enthalten den Token nicht.
+function stripComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+}
+
+// Store-Namen dynamisch aus cards/*-store.js ziehen (drift-frei: neuer Store
+// ist automatisch abgedeckt).
+const storeNames = new Set();
+for (const entry of readdirSync(CARDS_DIR)) {
+  if (!entry.endsWith('-store.js')) continue;
+  const src = readFileSync(join(CARDS_DIR, entry), 'utf8');
+  for (const m of src.matchAll(/Alpine\.store\(\s*'([a-z]+)'\s*,/g)) storeNames.add(m[1]);
+}
 
 const rel = (p) => relative(REPO_ROOT, p);
 function walk(dir, ext, out = []) {
@@ -105,10 +129,24 @@ test('Nav-State NICHT in app-state.js (lebt im Store)', () => {
     `Diese Nav-Felder gehoeren in cards/nav-store.js, nicht in app-state.js: ${offenders.join(', ')}`);
 });
 
-test('Kein Root-Proxy mehr fuer Nav-Felder (app.js): Konsumenten lesen $store.nav', () => {
-  const appSrc = readFileSync(APP_JS, 'utf8');
-  for (const f of NAV_FIELDS) {
-    assert.doesNotMatch(appSrc, new RegExp(`get ${f}\\(\\)\\s*\\{[^}]*store\\(\\s*'nav'\\s*\\)`),
-      `app.js darf keinen Nav-Proxy mehr haben — get ${f}() → Alpine.store('nav') entfernen; Konsumenten lesen $store.nav.${f}`);
+// ───────────────────────────────────────────────────────────
+// REGEL 3: Kein Root-Proxy fuer IRGENDEINEN Store (app.js)
+// ───────────────────────────────────────────────────────────
+test('Store-Discovery: cards/*-store.js registriert die erwarteten Stores', () => {
+  assert.ok(storeNames.size >= 10,
+    `cards/*-store.js sollte die Stores listen (gefunden: ${storeNames.size}: ${[...storeNames].join(', ')})`);
+  assert.ok(storeNames.has('nav'), 'nav-Store muss existieren');
+});
+
+test('Kein Root-Proxy in app.js: Root liest via this.$store, nie ueber Alpine.store(...)', () => {
+  const code = stripComments(readFileSync(APP_JS, 'utf8'));
+  const hits = [];
+  for (const m of code.matchAll(/Alpine\.store\(\s*'([a-z]+)'/g)) {
+    const name = m[1];
+    if (storeNames.has(name)) hits.push(name);
   }
+  assert.deepEqual([...new Set(hits)], [],
+    `app.js darf keinen Root-Proxy fuer Stores haben (gefunden fuer: ${[...new Set(hits)].join(', ')}). `
+    + `Das Root-Component liest geteilten State via this.$store.<name>, nie ueber einen Getter/Setter-Shim auf Alpine.store('<name>'). `
+    + `Store-Registrierung lebt in cards/*-store.js + register-cards.js.`);
 });
