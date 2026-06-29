@@ -157,10 +157,10 @@
     </button>
     <div class="plot-tension-body" x-bind="panel" x-cloak>
       <!-- Figur-Fokus: hebt die Beats einer Figur auf der Kurve hervor (Figurenbogen) -->
-      <div class="plot-tension-focus" x-show="tensionFigurOptions().length">
+      <div class="plot-tension-focus" x-show="(beats, threads, draftFiguren, tensionFigurOptions().length)">
         <div x-data="combobox($app.t('plot.tension.focusPlaceholder'), $app.t('plot.tension.focusAll'))"
              x-modelable="value" x-model="tensionFocusFigur"
-             x-effect="options = tensionFigurOptions()"></div>
+             x-effect="options = (beats, threads, draftFiguren, tensionFigurOptions())"></div>
       </div>
       <div class="plot-tension-chart" :class="{ 'plot-tension-chart--focused': tensionFocusActive() }">
         <span class="plot-tension-axis plot-tension-axis--high" x-text="$app.t('plot.tension.high')"></span>

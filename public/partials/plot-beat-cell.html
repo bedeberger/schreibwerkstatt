@@ -95,7 +95,7 @@
     <div x-show="$store.catalog.figuren.length"
          x-data="combobox({ placeholder: $app.t('plot.beat.figurenPick'), multiple: true })"
          x-modelable="value" x-model="beatDraft.figure_ids"
-         x-effect="options = beatFigureOptions()"></div>
+         x-effect="options = ($store.catalog.figuren, beatFigureOptions())"></div>
     <div class="plot-fig-chips" x-show="beatFigureChips().length">
       <template x-for="chip in beatFigureChips()" :key="chip.id">
         <span class="tag plot-fig-chip">

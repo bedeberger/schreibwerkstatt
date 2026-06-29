@@ -211,11 +211,11 @@ export function registerEditorEntitiesCard() {
       const app = window.__app;
       const pid = app?.currentPage?.id;
       const cid = app?.currentPage?.chapter_id;
-      const len = (app?.szenen || []).length;
-      const key = pid + '|' + cid + '|' + len;
+      const szenen = app?.$store?.catalog?.szenen || [];
+      const key = pid + '|' + cid + '|' + szenen.length;
       if (this._scenesKey !== key) {
         this._scenesKey = key;
-        this._scenesVal = selectScenesForView(app?.szenen || [], pid, cid);
+        this._scenesVal = selectScenesForView(szenen, pid, cid);
       }
       return this._scenesVal;
     },
@@ -224,11 +224,11 @@ export function registerEditorEntitiesCard() {
       const app = window.__app;
       const pid = app?.currentPage?.id;
       const cid = app?.currentPage?.chapter_id;
-      const len = (app?.figuren || []).length;
-      const key = pid + '|' + cid + '|' + len;
+      const figuren = app?.$store?.catalog?.figuren || [];
+      const key = pid + '|' + cid + '|' + figuren.length;
       if (this._eventsKey !== key) {
         this._eventsKey = key;
-        this._eventsVal = selectEventsForView(app?.figuren || [], pid, cid);
+        this._eventsVal = selectEventsForView(figuren, pid, cid);
       }
       return this._eventsVal;
     },
@@ -241,11 +241,12 @@ export function registerEditorEntitiesCard() {
     },
 
     extractionEmpty() {
-      const app = window.__app;
-      const f = (app?.figuren || []).length;
-      const o = (app?.orte || []).length;
-      const s = (app?.szenen || []).length;
-      const e = (app?.figuren || []).reduce((n, x) => n + (Array.isArray(x?.lebensereignisse) ? x.lebensereignisse.length : 0), 0);
+      const cat = window.__app?.$store?.catalog;
+      const figuren = cat?.figuren || [];
+      const f = figuren.length;
+      const o = (cat?.orte || []).length;
+      const s = (cat?.szenen || []).length;
+      const e = figuren.reduce((n, x) => n + (Array.isArray(x?.lebensereignisse) ? x.lebensereignisse.length : 0), 0);
       return f === 0 && o === 0 && s === 0 && e === 0;
     },
 

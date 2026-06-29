@@ -146,7 +146,13 @@ export function registerPlotCard() {
         onBookChanged: () => {
           this._destroySortables();
           this.resetPlot();
-          if (window.__app.showPlotCard && Alpine.store('nav').selectedBookId) this.loadBoard();
+          const bookId = Alpine.store('nav').selectedBookId;
+          if (window.__app.showPlotCard && bookId) {
+            this.loadBoard();
+            // book:changed hat den Katalog-Store geleert; der Figuren-Picker
+            // braucht ihn neu (analog loadDeps beim Toggle-Open).
+            if (!window.__app.figuren?.length) window.__app.loadFiguren(bookId);
+          }
         },
         onViewReset: () => { this._destroySortables(); this.resetPlot(); },
         onCardRefresh: () => this.loadBoard(),
