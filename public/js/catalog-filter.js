@@ -9,7 +9,7 @@
 // Verwendung:
 //
 //   <div x-data="catalogFilter('figur')"
-//        x-modelable="value" x-model="$app.szenenFilters.figurId"
+//        x-modelable="value" x-model="$store.catalogUi.szenenFilters.figurId"
 //        x-effect="options = $store.catalog.figuren.filter(...).map(...)"></div>
 //
 // Erweiterung: neue Filter-Typen (z. B. 'tag', 'datum') hier ergänzen,

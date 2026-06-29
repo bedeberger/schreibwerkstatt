@@ -22,9 +22,9 @@ export const FEATURE_BLOCK_MERGE = true;
 //     uiLocale, defaultRegion, appTimezone, appName, appVersion, isMac,
 //     promptConfig) leben in Alpine.store('shell') (cards/shell-store.js),
 //     ebenfalls direkt via $store.shell (kein Root-Proxy).
-//   - Read-only /config-Settings (mapTiles, languagetoolEnabled, …) →
-//     Alpine.store('config'); STT → $store.stt; TTS → $store.tts; Collab →
-//     $store.collab; Jobs → $store.jobs.
+//   - Read-only /config-Settings (mapTiles, languagetoolEnabled, apiProvider +
+//     Modell-IDs, …) → Alpine.store('config'); STT → $store.stt; TTS → $store.tts;
+//     Collab → $store.collab; Jobs → $store.jobs.
 //
 // Hier bleiben nur die Felder, die der Editor-Kern über den editor-host-Vertrag
 // (shared/editor-host.js) direkt von `window.__app` liest und die der
@@ -43,14 +43,6 @@ const shellState = () => ({
   // nicht bei jeder Property-Zugriffsfolge feuert.
   _usersByEmail: null,
   _usersByEmailLoading: false,
-});
-
-const aiProviderState = () => ({
-  claudeModel: 'claude-sonnet-4-6',
-  claudeMaxTokens: 64000,
-  apiProvider: 'claude',
-  ollamaModel: 'llama3.2',
-  openaiCompatModel: 'llama3.2',
 });
 
 const navigationState = () => ({
@@ -391,105 +383,24 @@ const kapitelReviewState = () => ({
   kapitelReviewChapterId: '',
 });
 
-// Zeitraum-Vorauswahl beim Sprung Overview-Heatmap → Tagebuch-Rückblick-Karte.
-// Beim Cold-Open (Karte noch nicht gemountet) liest der onOpen-Hook der Karte
-// diesen Wert; beim warmen Fall greift der `rueckblick:select`-Event-Listener.
-// rueckblickEntryId ist der Hash-Router-SSoT für den gerade geöffneten
-// History-Eintrag (Permalink #book/<id>/rueckblick/<entryId>). Die Sub-Card
-// spiegelt selectedRueckblickId hierher; der Hash-Router liest/schreibt nur hier.
-const tagebuchRueckblickNavState = () => ({
-  pendingRueckblickZeitraum: null,
-  rueckblickEntryId: null,
-});
+// Permalink-Spiegel der Werkstatt-/Plot-/Rückblick-Karten (werkstattDraftId,
+// werkstattDrafts, plotBeatId, rueckblickEntryId, pendingRueckblickZeitraum) leben
+// in Alpine.store('nav') (cards/nav-store.js). Die jeweilige Karte hält ihren SSoT
+// (selectedDraftId/editingBeatId/selectedRueckblickId) und spiegelt per $watch in den
+// Store; der Hash-Router liest/schreibt dort, weil er sie beim Cold-Open eines
+// Permalinks braucht, BEVOR die Karte gemountet ist.
 
-// Hash-Router-SSoT für Figuren-Werkstatt-Draft. Sub-Card spiegelt
-// selectedDraftId in dieses Feld; Hash-Router liest/schreibt nur hier.
-// werkstattDrafts: Spiegel der Sub-Card-Liste, damit die Command-Palette die
-// Drafts auch indizieren kann, wenn die Werkstatt-Karte nie geöffnet wurde.
-// Sub-Card hat $watch auf this.drafts → schreibt hierher; Palette-Provider
-// triggert bei Bedarf ein einmaliges /draft-figures-Fetch.
-const figurWerkstattState = () => ({
-  werkstattDraftId: null,
-  werkstattDrafts: [],
-});
-
-// Hash-Router-SSoT für die Plot-Werkstatt: der gerade bearbeitete Beat
-// (Permalink #book/<id>/plot/<beatId>). Die plotCard-Sub spiegelt ihren
-// editingBeatId hierher; der Hash-Router liest/schreibt nur hier.
-const plotNavState = () => ({
-  plotBeatId: null,
-});
-
-// Root-seitig: figurenLoading/Progress/Status, selectedFigurId, Filters —
-// gebraucht von Hash-Router, app-navigation, checkPendingJobs-Reconnect.
+// Katalog-UI-State (Filter/Selektion/Lade-Stempel für figuren/ereignisse/szenen/
+// orte/songs/kontinuitaet, deren Daten in Alpine.store('catalog') liegen) lebt in
+// Alpine.store('catalogUi') (cards/catalog-ui-store.js) und wird direkt via
+// $store.catalogUi / this.$store.catalogUi gelesen (kein Root-Proxy).
+// Owner-Schreibpfade: app-navigation (Filter/Selektion bei Deep-Link-Sprüngen),
+// app-hash-router (selectedXxxId als Hash-Router-SSoT), app-jobs-core + tree
+// (figurenLoading/Progress/Status), app-view/bookscope + app-init
+// (FILTER_SCOPES-Persist/Restore/Reset). Hier bleibt nur der reconnect-relevante
+// Figuren-Poll-Timer am Root.
 const figurenState = () => ({
-  figurenLoading: false,
-  figurenProgress: 0,
-  figurenStatus: '',
-  selectedFigurId: null,
-  figurenFilters: {
-    kapitel: '',
-    seite: '',
-    suche: '',
-  },
   _figuresPollTimer: null,
-});
-
-// Filters bleiben am Root — app-navigation schreibt sie.
-const ereignisseState = () => ({
-  ereignisseFilters: {
-    figurId: '',
-    kapitel: '',
-    seite: '',
-    subtyp: '',
-    suche: '',
-  },
-});
-
-const szenenState = () => ({
-  szenenUpdatedAt: null,
-  selectedSzeneId: null,
-  szenenFilters: {
-    wertung: '',
-    figurId: '',
-    kapitel: '',
-    ortId: '',
-    suche: '',
-  },
-});
-
-const orteState = () => ({
-  orteUpdatedAt: null,
-  selectedOrtId: null,
-  orteFilters: {
-    figurId: '',
-    kapitel: '',
-    szeneId: '',
-    suche: '',
-  },
-});
-
-const songsState = () => ({
-  songsUpdatedAt: null,
-  selectedSongId: null,
-  songsFilters: {
-    figurId: '',
-    kapitel: '',
-    szeneId: '',
-    genre: '',
-    kontextTyp: '',
-    suche: '',
-  },
-});
-
-// Kontinuitäts-Filter am Root (analog figuren/ereignisse/…), damit der
-// FILTER_SCOPES-Persist-/Restore-/Reset-Pfad sie pro Buch im localStorage hält.
-const kontinuitaetState = () => ({
-  kontinuitaetFilters: {
-    figurId: '',
-    kapitel: '',
-    schwere: '',
-  },
 });
 
 // _checkDoneBeforeChat wird von toggleChatCard + resetPage verwendet (Editor-nah).
@@ -509,29 +420,14 @@ const featuresUsageState = () => ({
 // (cards/collab-store.js) und wird direkt via $store.collab / this.$store.collab
 // gelesen (kein Root-Proxy). Owner: app/app-collab.js.
 
-// Modal-State fuer Buch-Erstellung (Trigger: Combobox-Footer "+ Neues Buch").
-// Eigener Slice statt Inline in cardsState, weil Open/Close keine Show-Flag-
-// Exklusivitaet braucht — Modal liegt ueber allem (natives <dialog>).
-const bookCreateState = () => ({
-  bookCreateName: '',
-  bookCreateBuchtyp: '',
-  bookCreateCategoryId: '',
-  bookCreateCategoryPool: [],
-  bookCreateBusy: false,
-  bookCreateError: '',
-});
+// Buch-Erstellungs-Modal (Trigger: Combobox-Footer "+ Neues Buch") ist eine eigene
+// Karte Alpine.data('bookCreateCard') auf dem <dialog> (cards/book-create-card.js) —
+// State + Methoden leben dort, nicht mehr im Root.
 
-// Tages-Schreibziel im Header: Donut links neben Avatar. Pulsiert bei aktivem
-// Schreibtag. Daten leben am Root, damit der Donut unabhaengig von der
-// Buch-Overview-Karte sichtbar ist. `dailyProgressStats` ist die rohe
-// /history/book-stats/:bookId-Liste; Tagesdelta berechnet `headerTodayRing()`.
-const dailyProgressState = () => ({
-  dailyProgressBookId: null,
-  dailyProgressStats: [],
-  dailyProgressIsFinished: false,
-  dailyProgressDailyGoalChars: null,
-  _dailyProgressLoadingBookId: null,
-});
+// Tages-Schreibziel-Donut im Header lebt in Alpine.store('progress')
+// (cards/progress-store.js) — Daten im Store statt am Root, weil der Donut im
+// Root-Header rendert und es keine Karte gibt, die ihn hosten könnte.
+// Loader/Reset/headerTodayRing bleiben Root-Methoden (app-view/bookscope.js).
 
 // Entity-Linking pro Buch (Figuren-/Orte-Highlights + Szenen-/Ereignisse-Panel
 // im Notebook-Editor). Source-of-Truth ist book_settings.entities_enabled —
@@ -559,7 +455,6 @@ const entitiesState = () => {
 export function initialLektoratState() {
   return {
     ...shellState(),
-    ...aiProviderState(),
     ...navigationState(),
     ...pageState(),
     ...notebookState(),
@@ -571,19 +466,9 @@ export function initialLektoratState() {
     ...lektoratState(),
     ...bookReviewState(),
     ...kapitelReviewState(),
-    ...tagebuchRueckblickNavState(),
-    ...figurWerkstattState(),
-    ...plotNavState(),
     ...figurenState(),
-    ...ereignisseState(),
-    ...szenenState(),
-    ...orteState(),
-    ...songsState(),
-    ...kontinuitaetState(),
     ...chatsState(),
     ...featuresUsageState(),
-    ...bookCreateState(),
-    ...dailyProgressState(),
     ...entitiesState(),
   };
 }

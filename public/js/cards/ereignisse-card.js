@@ -1,9 +1,10 @@
 // Alpine.data('ereignisseCard') — Sub-Komponente der Zeitstrahl-Karte.
 //
 // Eigener State: Meta-Flags (Loading/Status/Progress/PollTimer) + UI-Helper.
+// Geteilt:
+//   - `globalZeitstrahl` (Alpine.store('catalog'))
+//   - `ereignisseFilters` (Alpine.store('catalogUi') — app-navigation schreibt darauf)
 // Root behält:
-//   - `globalZeitstrahl` (im Store, via $root-Getter auch am Root sichtbar)
-//   - `ereignisseFilters` (app-navigation.js schreibt darauf)
 //   - `_buildGlobalZeitstrahl` (wird aus figuren.js / loadFiguren gerufen)
 //   - `_reloadZeitstrahl` (wird aus app-komplett.js gerufen)
 import { setupCardLifecycle } from './card-lifecycle.js';
@@ -420,7 +421,7 @@ export function registerEreignisseCard() {
     ereignisseSeitenListe() {
       return window.__app._deriveSeiten(
         Alpine.store('catalog').globalZeitstrahl,
-        window.__app.ereignisseFilters.kapitel,
+        Alpine.store('catalogUi').ereignisseFilters.kapitel,
         ev => ev.kapitel,
         ev => Array.isArray(ev.seiten) ? ev.seiten : ev.seite,
       );
@@ -461,7 +462,7 @@ export function registerEreignisseCard() {
 
     filteredEreignisse() {
       const root = window.__app;
-      const f = root.ereignisseFilters;
+      const f = Alpine.store('catalogUi').ereignisseFilters;
       return this._memoFiltered([
         root.$store.catalog.globalZeitstrahl,
         f.suche  ?? '',

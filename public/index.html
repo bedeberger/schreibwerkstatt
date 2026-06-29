@@ -359,7 +359,7 @@
     <!-- Heute-Ring im Header: Donut links neben Avatar. Pulsiert bei aktivem
          Schreibtag, fuellt sich gegen book_settings.daily_goal_chars (per Buch).
          Klick oeffnet Meine Statistik. -->
-    <template x-if="$store.session.currentUser && !isAdminOnly && $store.nav.selectedBookId && dailyProgressBookId == $store.nav.selectedBookId && !dailyProgressIsFinished">
+    <template x-if="$store.session.currentUser && !isAdminOnly && $store.nav.selectedBookId && $store.progress.dailyProgressBookId == $store.nav.selectedBookId && !$store.progress.dailyProgressIsFinished">
       <button type="button"
               class="header-today-ring"
               :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached, 'header-today-ring--empty': !headerTodayRing().active }"
@@ -585,28 +585,29 @@
 
 <!-- Buch-erstellen-Modal (Trigger: Combobox-Footer "+ Neues Buch …") -->
 <dialog id="book-create-dialog" class="book-create-dialog"
+        x-data="bookCreateCard"
         x-ref="bookCreateDialog"
         @cancel.prevent="if (!bookCreateBusy) cancelCreateBook()"
         @click="if ($event.target === $el && !bookCreateBusy) cancelCreateBook()">
-  <div class="book-create-title" x-text="t('book.create.title')"></div>
+  <div class="book-create-title" x-text="$app.t('book.create.title')"></div>
   <input type="text"
          class="book-create-input"
          x-ref="bookCreateInput"
          x-model="bookCreateName"
          maxlength="255"
-         :placeholder="t('book.create.namePlaceholder')"
-         :aria-label="t('book.create.nameLabel')"
+         :placeholder="$app.t('book.create.namePlaceholder')"
+         :aria-label="$app.t('book.create.nameLabel')"
          :disabled="bookCreateBusy"
          @keydown.enter.prevent="submitCreateBook()">
   <div class="book-create-field">
-    <label class="book-create-label" x-text="t('book.create.buchtypLabel')"></label>
-    <div x-data="combobox(() => t('book.create.buchtypLabel'))"
+    <label class="book-create-label" x-text="$app.t('book.create.buchtypLabel')"></label>
+    <div x-data="combobox(() => $app.t('book.create.buchtypLabel'))"
          x-modelable="value" x-model="bookCreateBuchtyp"
          x-effect="options = bookCreateBuchtypOptions()"></div>
   </div>
   <div class="book-create-field" x-show="bookCreateCategoryPool.length > 0" x-cloak>
-    <label class="book-create-label" x-text="t('book.create.categoryLabel')"></label>
-    <div x-data="combobox(() => t('book.create.categoryLabel'))"
+    <label class="book-create-label" x-text="$app.t('book.create.categoryLabel')"></label>
+    <div x-data="combobox(() => $app.t('book.create.categoryLabel'))"
          x-modelable="value" x-model="bookCreateCategoryId"
          x-effect="options = bookCreateCategoryOptions()"></div>
   </div>
@@ -615,12 +616,12 @@
     <button type="button" class="book-create-btn book-create-btn--cancel"
             :disabled="bookCreateBusy"
             @click="cancelCreateBook()"
-            x-text="t('book.create.cancel')"></button>
+            x-text="$app.t('book.create.cancel')"></button>
     <button type="button" class="book-create-btn book-create-btn--primary"
             :disabled="bookCreateBusy || !bookCreateName.trim()"
             @click="submitCreateBook()">
-      <span x-show="!bookCreateBusy" x-text="t('book.create.submit')"></span>
-      <span x-show="bookCreateBusy" x-cloak x-text="t('book.create.submitting')"></span>
+      <span x-show="!bookCreateBusy" x-text="$app.t('book.create.submit')"></span>
+      <span x-show="bookCreateBusy" x-cloak x-text="$app.t('book.create.submitting')"></span>
     </button>
   </div>
 </dialog>

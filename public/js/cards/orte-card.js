@@ -1,10 +1,11 @@
 // Alpine.data('orteCard') — Sub-Komponente der Schauplatz-Karte.
 //
 // Eigener State: Meta-Flags (Loading/Progress/Status/PollTimer).
+// Geteilt:
+//   - `orte` (Alpine.store('catalog'))
+//   - `orteFilters`/`selectedOrtId` (Alpine.store('catalogUi') —
+//     app-navigation/Hash-Router schreiben darauf)
 // Root behält:
-//   - `orte` (im Store, als $root-Getter verfügbar)
-//   - `orteFilters` (app-navigation.js schreibt darauf)
-//   - `selectedOrtId` (Hash-Router)
 //   - `loadOrte` (Root-Spread; von komplett-Job, Szenen-Trigger
 //     und _reloadVisibleBookCards genutzt)
 //   - `patchOrtCoords` (Koordinaten-Patch für Geo-Edits), `saveOrte` (Full-Save
@@ -90,7 +91,7 @@ export function registerOrteCard() {
     // Karten-State (eine Referenz pro unveränderter Eingabe → stabile Keys).
     get orteFiltered() {
       const root = window.__app;
-      const f = root.orteFilters;
+      const f = Alpine.store('catalogUi').orteFilters;
       const sig = [root.$store.catalog.orte, root.$store.catalog.szenen, f.suche || '', f.figurId || '', f.kapitel || '', f.szeneId || ''];
       const c = this._orteFilteredCache;
       if (c && c.sig.length === sig.length && c.sig.every((v, i) => v === sig[i])) return c.val;
@@ -100,7 +101,7 @@ export function registerOrteCard() {
     },
     _computeOrteFiltered() {
       const root = window.__app;
-      const f = root.orteFilters;
+      const f = Alpine.store('catalogUi').orteFilters;
       const q = f.suche ? f.suche.toLowerCase() : '';
       const matchText = (o) => !q || [o.name, o.typ, o.stimmung, o.beschreibung, o.land]
         .some(v => v && String(v).toLowerCase().includes(q));

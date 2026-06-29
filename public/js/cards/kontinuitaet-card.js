@@ -20,8 +20,9 @@ export function registerKontinuitaetCard() {
     _lifecycle: null,
 
     init() {
-      // kontinuitaetFilters lebt am Root (FILTER_SCOPES, localStorage-Persist).
-      // Reset/Restore übernimmt der Root via book:changed / view:reset.
+      // kontinuitaetFilters lebt in Alpine.store('catalogUi') (FILTER_SCOPES,
+      // localStorage-Persist). Reset/Restore übernimmt der Root via
+      // book:changed / view:reset.
       const doReset = (ctx) => {
         ctx.kontinuitaetResult = null;
         ctx.kontinuitaetLoading = false;

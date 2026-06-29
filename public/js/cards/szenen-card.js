@@ -1,9 +1,10 @@
 // Alpine.data('szenenCard') — Sub-Komponente der Szenen-Karte.
 //
 // Eigener State: Meta-Flags (Loading/Progress/Status/PollTimer).
+// Geteilt:
+//   - `szenen` (Alpine.store('catalog'))
+//   - `szenenFilters`/`selectedSzeneId`/`szenenUpdatedAt` (Alpine.store('catalogUi'))
 // Root behält:
-//   - `szenen` (im Store, als $root-Getter verfügbar)
-//   - `szenenFilters` (Cross-Cutting via Alpine-Scope-Resolution)
 //   - `loadSzenen`, `szenenNachKapitel`, `szenenNachSeite`
 //     (Root-Spread; von komplett-Job und anderen genutzt)
 import { setupCardLifecycle } from './card-lifecycle.js';
@@ -19,11 +20,11 @@ export function registerSzenenCard() {
     _szenenPollTimer: null,
     _lifecycle: null,
 
-    // Gefilterte + sortierte Szenen für Liste/Grid. Filter-State + Kapitel-/
-    // Seiten-Order leben am Root, darum via window.__app gelesen.
+    // Gefilterte + sortierte Szenen für Liste/Grid. Filter-State in
+    // Alpine.store('catalogUi'), Kapitel-/Seiten-Order am Root (via window.__app).
     get szenenFiltered() {
       const root = window.__app;
-      return applySzenenFilters(root.$store.catalog.szenen, root.szenenFilters).sort((a, b) => {
+      return applySzenenFilters(root.$store.catalog.szenen, Alpine.store('catalogUi').szenenFilters).sort((a, b) => {
         const c = root._chapterIdx(a.kapitel) - root._chapterIdx(b.kapitel);
         if (c !== 0) return c;
         const p = root._pageIdx(a.seite) - root._pageIdx(b.seite);

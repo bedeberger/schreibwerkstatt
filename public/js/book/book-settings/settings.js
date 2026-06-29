@@ -188,11 +188,12 @@ export const settingsMethods = {
         await window.__app.loadBooks?.({ skipPages: !buchtypChanged, fresh: true });
       }
       // Header-Donut konsumiert dailyProgressIsFinished + dailyProgressDailyGoalChars
-      // am Root — direkt spiegeln, damit Toggle Buch-Abschluss und neues Tagesziel
-      // ohne Reload greifen.
-      if (window.__app) {
-        window.__app.dailyProgressIsFinished = !!this.bookSettingsIsFinished;
-        window.__app.dailyProgressDailyGoalChars = Number.isFinite(Number(this.bookSettingsDailyGoalChars))
+      // aus Alpine.store('progress') — direkt spiegeln, damit Toggle Buch-Abschluss
+      // und neues Tagesziel ohne Reload greifen.
+      if (window.Alpine) {
+        const progress = window.Alpine.store('progress');
+        progress.dailyProgressIsFinished = !!this.bookSettingsIsFinished;
+        progress.dailyProgressDailyGoalChars = Number.isFinite(Number(this.bookSettingsDailyGoalChars))
           ? Number(this.bookSettingsDailyGoalChars) : null;
       }
       if (this._savedAtTimer) clearTimeout(this._savedAtTimer);

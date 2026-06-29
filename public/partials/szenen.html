@@ -108,39 +108,39 @@
     <!-- Filter-Leiste -->
     <div class="filter-bar">
       <span class="filter-search-wrap">
-        <input type="text" x-model="$app.szenenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-        <button type="button" class="search-clear--icon" x-show="$app.szenenFilters.suche" @click="$app.szenenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+        <input type="text" x-model="$store.catalogUi.szenenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+        <button type="button" class="search-clear--icon" x-show="$store.catalogUi.szenenFilters.suche" @click="$store.catalogUi.szenenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
       </span>
       <div class="tabs">
         <button type="button" class="tabs-btn"
-                :class="{ 'tabs-btn--active': $app.szenenFilters.wertung === '' }"
-                @click="$app.szenenFilters.wertung = ''">
+                :class="{ 'tabs-btn--active': $store.catalogUi.szenenFilters.wertung === '' }"
+                @click="$store.catalogUi.szenenFilters.wertung = ''">
           <span x-text="$app.t('common.all')"></span>
           <span class="tabs-btn-count" x-text="$store.catalog.szenen.length"></span>
         </button>
         <template x-for="w in ['stark','mittel','schwach']" :key="w">
           <button type="button" class="tabs-btn"
-                  :class="{ 'tabs-btn--active': $app.szenenFilters.wertung === w }"
+                  :class="{ 'tabs-btn--active': $store.catalogUi.szenenFilters.wertung === w }"
                   :disabled="$app.szenenWertungCounts[w] === 0"
-                  @click="$app.szenenFilters.wertung = $app.szenenFilters.wertung === w ? '' : w">
+                  @click="$store.catalogUi.szenenFilters.wertung = $store.catalogUi.szenenFilters.wertung === w ? '' : w">
             <span x-text="$app.t('szenen.rating.' + w)"></span>
             <span class="tabs-btn-count" x-text="$app.szenenWertungCounts[w]"></span>
           </button>
         </template>
       </div>
       <div x-data="catalogFilter('figur')"
-           x-modelable="value" x-model="$app.szenenFilters.figurId"
+           x-modelable="value" x-model="$store.catalogUi.szenenFilters.figurId"
            x-effect="options = $store.catalog.figuren.filter(f => $store.catalog.szenen.some(s => s.fig_ids.includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
            >
       </div>
       <div x-data="catalogFilter('chapter')"
-           x-modelable="value" x-model="$app.szenenFilters.kapitel"
+           x-modelable="value" x-model="$store.catalogUi.szenenFilters.kapitel"
            x-effect="options = $app.szenenKapitelListe().map(k => ({value: k, label: k}))"
            >
       </div>
       <div x-show="$store.catalog.orte.length > 0"
            x-data="catalogFilter('ort')"
-           x-modelable="value" x-model="$app.szenenFilters.ortId"
+           x-modelable="value" x-model="$store.catalogUi.szenenFilters.ortId"
            x-effect="options = $store.catalog.orte.filter(o => $store.catalog.szenen.some(s => (s.ort_ids||[]).includes(o.id))).map(o => ({value: o.id, label: o.name}))"
            >
       </div>
@@ -153,8 +153,8 @@
         <div>
           <div class="entity-row"
                :data-szeneid="s.id"
-               :class="{ 'entity-row--selected': $app.selectedSzeneId === s.id, 'entity-row--stale': s.stale }"
-               @click="$app.selectedSzeneId = $app.selectedSzeneId === s.id ? null : s.id">
+               :class="{ 'entity-row--selected': $store.catalogUi.selectedSzeneId === s.id, 'entity-row--stale': s.stale }"
+               @click="$store.catalogUi.selectedSzeneId = $store.catalogUi.selectedSzeneId === s.id ? null : s.id">
             <span class="severity-tag"
                   :class="'severity-tag--' + (s.wertung || 'mittel')"
                   x-text="$app.t('szenen.rating.' + (s.wertung || 'mittel'))"></span>
@@ -170,9 +170,9 @@
                       x-text="s.seite"></span>
               </template>
             </span>
-            <span class="history-chevron" :class="{ open: $app.selectedSzeneId === s.id }">›</span>
+            <span class="history-chevron" :class="{ open: $store.catalogUi.selectedSzeneId === s.id }">›</span>
           </div>
-          <div x-show="$app.selectedSzeneId === s.id" class="entity-detail" x-cloak>
+          <div x-show="$store.catalogUi.selectedSzeneId === s.id" class="entity-detail" x-cloak>
             <p x-show="s.kommentar" x-text="s.kommentar" class="entity-detail-text"></p>
             <div x-show="(s.fig_ids || []).length > 0" class="entity-meta-row">
               <span class="entity-meta-label" x-text="$app.t('orte.figuren')"></span>

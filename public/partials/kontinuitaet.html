@@ -57,28 +57,28 @@
   <div x-show="kontinuitaetResult?.issues?.length > 0" class="filter-bar" x-cloak>
     <div class="tabs">
       <button type="button" class="tabs-btn"
-              :class="{ 'tabs-btn--active': $app.kontinuitaetFilters.schwere === '' }"
-              @click="$app.kontinuitaetFilters.schwere = ''">
+              :class="{ 'tabs-btn--active': $store.catalogUi.kontinuitaetFilters.schwere === '' }"
+              @click="$store.catalogUi.kontinuitaetFilters.schwere = ''">
         <span x-text="$app.t('common.all')"></span>
         <span class="tabs-btn-count" x-text="(kontinuitaetResult?.issues || []).length"></span>
       </button>
       <template x-for="sev in ['kritisch','mittel','niedrig']" :key="sev">
         <button type="button" class="tabs-btn"
-                :class="{ 'tabs-btn--active': $app.kontinuitaetFilters.schwere === sev }"
+                :class="{ 'tabs-btn--active': $store.catalogUi.kontinuitaetFilters.schwere === sev }"
                 :disabled="(kontinuitaetResult?.issues || []).filter(i => i.schwere === sev).length === 0"
-                @click="$app.kontinuitaetFilters.schwere = $app.kontinuitaetFilters.schwere === sev ? '' : sev">
+                @click="$store.catalogUi.kontinuitaetFilters.schwere = $store.catalogUi.kontinuitaetFilters.schwere === sev ? '' : sev">
           <span x-text="$app.t('kontinuitaet.severity.' + sev)"></span>
           <span class="tabs-btn-count" x-text="(kontinuitaetResult?.issues || []).filter(i => i.schwere === sev).length"></span>
         </button>
       </template>
     </div>
     <div x-data="catalogFilter('figur')"
-         x-modelable="value" x-model="$app.kontinuitaetFilters.figurId"
+         x-modelable="value" x-model="$store.catalogUi.kontinuitaetFilters.figurId"
          x-effect="options = $store.catalog.figuren.filter(f => (kontinuitaetResult?.issues||[]).some(i => i.fig_ids?.length ? i.fig_ids.includes(f.id) : (i.figuren||[]).includes(f.name))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
          >
     </div>
     <div x-data="catalogFilter('chapter')"
-         x-modelable="value" x-model="$app.kontinuitaetFilters.kapitel"
+         x-modelable="value" x-model="$store.catalogUi.kontinuitaetFilters.kapitel"
          x-effect="options = kontinuitaetKapitelListe().map(k => ({value: k, label: k}))"
          >
     </div>

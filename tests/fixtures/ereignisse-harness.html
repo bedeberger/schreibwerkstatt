@@ -22,7 +22,7 @@
   <div id="root" x-data="ereignisseCard" x-show="$app.showEreignisseCard">
     <div class="filter-bar">
       <label>Subtyp:
-        <select data-test="subtyp-filter" x-model="$app.ereignisseFilters.subtyp">
+        <select data-test="subtyp-filter" x-model="$store.catalogUi.ereignisseFilters.subtyp">
           <option value="">(alle)</option>
           <template x-for="s in ereignisseSubtypListe()" :key="s">
             <option :value="s" x-text="s"></option>
@@ -72,6 +72,7 @@
     //     bevor unser Listener da ist.
     const { registerEreignisseCard } = await import('/public/js/cards/ereignisse-card.js');
     const { registerJobsStore } = await import('/public/js/cards/jobs-store.js');
+    const { registerCatalogUiStore } = await import('/public/js/cards/catalog-ui-store.js');
 
     const MOCK_EVENTS = [
       {
@@ -121,7 +122,6 @@
         showEreignisseCard: true,
         figuren: [],
         globalZeitstrahl: MOCK_EVENTS,
-        ereignisseFilters: { suche: '', figurId: '', kapitel: '', seite: '', subtyp: '' },
         t: (k, params) => params ? `${k} ${JSON.stringify(params)}` : k,
         _deriveKapitel: () => [],
         _deriveSeiten: () => [],
@@ -134,10 +134,15 @@
         figuren: [], orte: [], szenen: [], globalZeitstrahl: MOCK_EVENTS,
       });
       registerJobsStore();
+      registerCatalogUiStore();
       // window.__app ist hier ein plain reactive Objekt (kein Alpine-Component),
       // hat also kein $store-Magic. Karten-JS liest Fach-Daten via
       // root.$store.catalog → hier explizit auf die registrierten Stores spiegeln.
-      window.__app.$store = { catalog: window.Alpine.store('catalog'), jobs: window.Alpine.store('jobs') };
+      window.__app.$store = {
+        catalog: window.Alpine.store('catalog'),
+        catalogUi: window.Alpine.store('catalogUi'),
+        jobs: window.Alpine.store('jobs'),
+      };
       registerEreignisseCard();
     });
 

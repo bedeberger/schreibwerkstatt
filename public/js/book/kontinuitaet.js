@@ -21,7 +21,7 @@ export const kontinuitaetMethods = {
   // ginge verloren, und der Wert wäre zur Spread-Zeit `[]`.
   kontinuitaetIssuesFiltered() {
     const root = window.__app;
-    const filters = root.kontinuitaetFilters;
+    const filters = Alpine.store('catalogUi').kontinuitaetFilters;
     const chapters = (Alpine.store('nav').tree || []).filter(t => t.type === 'chapter');
     const chapterNames = new Set(chapters.map(t => t.name));
     const fromStelle = (s) => {

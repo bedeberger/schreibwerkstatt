@@ -24,8 +24,8 @@ export const bookscopeMethods = {
     this.$store.catalog.szenen = [];
     this.$store.catalog.globalZeitstrahl = [];
     this.$store.catalog.zeitstrahlChronology = null;
-    this.werkstattDrafts = [];
-    this.werkstattDraftId = null;
+    this.$store.nav.werkstattDrafts = [];
+    this.$store.nav.werkstattDraftId = null;
     this.bookReviewHistory = [];
     this.newPageTitle = '';
     this.newPageCreating = false;
@@ -58,15 +58,15 @@ export const bookscopeMethods = {
     this._tokenEstGen++;
     if (typeof this._teardownStatsObserver === 'function') this._teardownStatsObserver();
 
-    this.selectedFigurId = null;
-    this.selectedOrtId = null;
-    this.selectedSongId = null;
-    this.selectedSzeneId = null;
+    this.$store.catalogUi.selectedFigurId = null;
+    this.$store.catalogUi.selectedOrtId = null;
+    this.$store.catalogUi.selectedSongId = null;
+    this.$store.catalogUi.selectedSzeneId = null;
     this.lastCheckId = null;
 
-    this.szenenUpdatedAt = null;
-    this.orteUpdatedAt = null;
-    this.songsUpdatedAt = null;
+    this.$store.catalogUi.szenenUpdatedAt = null;
+    this.$store.catalogUi.orteUpdatedAt = null;
+    this.$store.catalogUi.songsUpdatedAt = null;
 
     this.recentPageIds = [];
     if (typeof this.loadRecentPages === 'function' && this.$store.nav.selectedBookId) {
@@ -104,7 +104,7 @@ export const bookscopeMethods = {
   _restoreBookPrefs(bookId) {
     const email = this.$store.session.currentUser?.email;
     for (const [stateKey, defaults] of FILTER_SCOPES) {
-      const target = this[stateKey];
+      const target = this.$store.catalogUi[stateKey];
       if (!target) continue;
       const saved = bookId ? getFilters(email, bookId, stateKey) : null;
       for (const k of Object.keys(defaults)) {
@@ -192,22 +192,22 @@ export const bookscopeMethods = {
     this.batchLoading = false;
     this.batchProgress = 0;
     this.batchStatus = '';
-    this.figurenStatus = '';
-    this.figurenProgress = 0;
-    this.selectedFigurId = null;
+    this.$store.catalogUi.figurenStatus = '';
+    this.$store.catalogUi.figurenProgress = 0;
+    this.$store.catalogUi.selectedFigurId = null;
     this.$store.catalog.globalZeitstrahl = [];
     this.$store.catalog.zeitstrahlChronology = null;
     this.showGlobalZeitstrahl = false;
     this.$store.catalog.szenen = [];
-    this.szenenUpdatedAt = null;
-    this.selectedSzeneId = null;
+    this.$store.catalogUi.szenenUpdatedAt = null;
+    this.$store.catalogUi.selectedSzeneId = null;
     this.$store.catalog.orte = [];
     this.$store.catalog.songs = [];
-    this.selectedSongId = null;
+    this.$store.catalogUi.selectedSongId = null;
     // Filter-Reset einheitlich über FILTER_SCOPES — deckt auch `suche`-Keys
     // ab, die früher nur teilweise gesetzt wurden (drift-freie SSoT).
     for (const [stateKey, defaults] of FILTER_SCOPES) {
-      const target = this[stateKey];
+      const target = this.$store.catalogUi[stateKey];
       if (!target) continue;
       for (const k of Object.keys(defaults)) target[k] = defaults[k];
     }
@@ -236,39 +236,42 @@ export const bookscopeMethods = {
   // stale Responses (Buch waehrend des Loads gewechselt) werden verworfen.
   async loadDailyProgress(bookId) {
     if (!bookId) return;
-    if (this._dailyProgressLoadingBookId === bookId) return;
-    this._dailyProgressLoadingBookId = bookId;
+    const progress = this.$store.progress;
+    if (progress._dailyProgressLoadingBookId === bookId) return;
+    progress._dailyProgressLoadingBookId = bookId;
     try {
       const [stats, settings] = await Promise.all([
         fetchJson(`/history/book-stats/${bookId}`).catch(() => []),
         fetchJson(`/booksettings/${bookId}`).catch(() => null),
       ]);
       if (this.$store.nav.selectedBookId != bookId) return;
-      this.dailyProgressStats = Array.isArray(stats) ? stats : [];
-      this.dailyProgressIsFinished = !!settings?.is_finished;
-      this.dailyProgressDailyGoalChars = settings?.daily_goal_chars != null ? Number(settings.daily_goal_chars) : null;
-      this.dailyProgressBookId = bookId;
+      progress.dailyProgressStats = Array.isArray(stats) ? stats : [];
+      progress.dailyProgressIsFinished = !!settings?.is_finished;
+      progress.dailyProgressDailyGoalChars = settings?.daily_goal_chars != null ? Number(settings.daily_goal_chars) : null;
+      progress.dailyProgressBookId = bookId;
     } finally {
-      if (this._dailyProgressLoadingBookId === bookId) this._dailyProgressLoadingBookId = null;
+      if (progress._dailyProgressLoadingBookId === bookId) progress._dailyProgressLoadingBookId = null;
     }
   },
 
 
   resetDailyProgress() {
-    this.dailyProgressStats = [];
-    this.dailyProgressIsFinished = false;
-    this.dailyProgressDailyGoalChars = null;
-    this.dailyProgressBookId = null;
+    const progress = this.$store.progress;
+    progress.dailyProgressStats = [];
+    progress.dailyProgressIsFinished = false;
+    progress.dailyProgressDailyGoalChars = null;
+    progress.dailyProgressBookId = null;
   },
 
 
   // Header-Today-Ring: kleiner Donut (r=14). Shared Math mit Overview-Tile in
   // [public/js/today-ring.js] — beide Donuts driften nie auseinander.
   headerTodayRing() {
+    const progress = this.$store.progress;
     return computeTodayRing({
-      stats: this.dailyProgressStats,
+      stats: progress.dailyProgressStats,
       tokEsts: this.tokEsts,
-      goalChars: this.dailyProgressDailyGoalChars || 1500,
+      goalChars: progress.dailyProgressDailyGoalChars || 1500,
       r: 14,
     });
   },

@@ -7,7 +7,7 @@ export const szenenMethods = {
     try {
       const data = await fetchJson('/figures/scenes/' + bookId);
       this.$store.catalog.szenen = data?.szenen || [];
-      this.szenenUpdatedAt = data?.updated_at || null;
+      this.$store.catalogUi.szenenUpdatedAt = data?.updated_at || null;
     } catch (e) {
       console.error('[loadSzenen]', e);
     }

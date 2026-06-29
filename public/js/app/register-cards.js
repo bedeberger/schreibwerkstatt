@@ -6,6 +6,7 @@ import { registerKapitelReviewCard } from '../cards/kapitel-review-card.js';
 import { registerBookOverviewCard } from '../cards/book-overview-card.js';
 import { registerBookStatsCard } from '../cards/book-stats-card.js';
 import { registerCatalogStore } from '../cards/catalog-store.js';
+import { registerCatalogUiStore } from '../cards/catalog-ui-store.js';
 import { registerNavStore } from '../cards/nav-store.js';
 import { registerSessionStore } from '../cards/session-store.js';
 import { registerShellStore } from '../cards/shell-store.js';
@@ -15,6 +16,7 @@ import { registerConfigStore } from '../cards/config-store.js';
 import { registerCollabStore } from '../cards/collab-store.js';
 import { registerJobsStore } from '../cards/jobs-store.js';
 import { registerBadgesStore } from '../cards/badges-store.js';
+import { registerProgressStore } from '../cards/progress-store.js';
 import { registerEreignisseCard } from '../cards/ereignisse-card.js';
 import { registerOrteCard } from '../cards/orte-card.js';
 import { registerSongsCard } from '../cards/songs-card.js';
@@ -69,6 +71,7 @@ import { registerPageRevisionsCard } from '../cards/page-revisions-card.js';
 import { registerSnapshotsCard } from '../cards/snapshots-card.js';
 import { registerPaletteCard } from '../cards/palette-card.js';
 import { registerBlogSyncCard } from '../cards/blog-sync-card.js';
+import { registerBookCreateCard } from '../cards/book-create-card.js';
 import { registerHubspotSyncCard } from '../cards/hubspot-sync-card.js';
 import { registerNumInput } from '../num-input.js';
 import { registerCombobox } from '../combobox.js';
@@ -112,6 +115,7 @@ export function registerAppMagics() {
 // Stores + alle Sub-Komponenten-Karten + generischen Alpine-Daten-Helfer.
 export function registerAllCards() {
   registerCatalogStore();
+  registerCatalogUiStore();
   registerNavStore();
   registerSessionStore();
   registerShellStore();
@@ -121,6 +125,7 @@ export function registerAllCards() {
   registerCollabStore();
   registerJobsStore();
   registerBadgesStore();
+  registerProgressStore();
   registerStilCard();
   registerFehlerHeatmapCard();
   registerBookOverviewCard();
@@ -180,6 +185,7 @@ export function registerAllCards() {
   registerPaletteCard();
   registerBlogSyncCard();
   registerHubspotSyncCard();
+  registerBookCreateCard();
   registerNumInput();
   registerCombobox();
   registerCopyButton();

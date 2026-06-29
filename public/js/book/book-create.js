@@ -4,6 +4,11 @@
 // Kategorie persistieren → Liste neu laden + neues Buch selektieren + Book-
 // Settings-Karte öffnen. Buchtyp ist Pflicht, weil alle KI-Jobs den Genre-Kontext
 // über getBookPrompts ziehen; Kategorie analog zur Save-Pflicht in den Settings.
+//
+// Methods der Karte Alpine.data('bookCreateCard') (cards/book-create-card.js) auf
+// dem <dialog>: State + Methoden leben in der Karte, nicht am Root. Root-Methoden
+// (loadBooks/toggleBookSettingsCard/t) laufen über window.__app; der Trigger im
+// Root-Header dispatcht `book-create:open`, die Karte hört darauf.
 
 import { contentRepo } from '../repo/content.js';
 import { fetchJson } from '../utils.js';
@@ -56,17 +61,18 @@ export const bookCreateMethods = {
 
   async submitCreateBook() {
     if (this.bookCreateBusy) return;
+    const app = window.__app;
     const name = (this.bookCreateName || '').trim();
     if (!name) {
-      this.bookCreateError = this.t('book.create.errorEmpty');
+      this.bookCreateError = app.t('book.create.errorEmpty');
       return;
     }
     if (!this.bookCreateBuchtyp) {
-      this.bookCreateError = this.t('book.settings.buchtypRequired');
+      this.bookCreateError = app.t('book.settings.buchtypRequired');
       return;
     }
     if ((this.bookCreateCategoryPool || []).length > 0 && !this.bookCreateCategoryId) {
-      this.bookCreateError = this.t('book.category.required');
+      this.bookCreateError = app.t('book.category.required');
       return;
     }
     this.bookCreateBusy = true;
@@ -99,14 +105,14 @@ export const bookCreateMethods = {
       this.bookCreateName = '';
       this.bookCreateBuchtyp = '';
       this.bookCreateCategoryId = '';
-      await this.loadBooks({ fresh: true });
+      await app.loadBooks({ fresh: true });
       this.$store.nav.selectedBookId = String(created.id);
-      if (this.toggleBookSettingsCard) {
-        if (!this.showBookSettingsCard) this.toggleBookSettingsCard();
+      if (app.toggleBookSettingsCard) {
+        if (!app.showBookSettingsCard) app.toggleBookSettingsCard();
       }
     } catch (e) {
       const msg = e.detail || e.code || e.message || String(e);
-      this.bookCreateError = this.t('book.create.errorGeneric', { msg });
+      this.bookCreateError = app.t('book.create.errorGeneric', { msg });
     } finally {
       this.bookCreateBusy = false;
     }

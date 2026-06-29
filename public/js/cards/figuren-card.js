@@ -5,11 +5,12 @@
 //   - vis-network-Internals (_figurenNetwork, _figurenHash, _figurenNodes, _figurenEdges)
 //   - figurenUpdatedAt (Render-Timestamp im Card-Header)
 //
+// Geteilt:
+//   - `figuren` (Alpine.store('catalog'))
+//   - `figurenFilters`/`selectedFigurId`/`figurenLoading/Progress/Status`
+//     (Alpine.store('catalogUi') — app-navigation/Hash-Router/checkPendingJobs
+//     schreiben darauf)
 // Root behält:
-//   - `figuren` (im Store, via $root-Proxy)
-//   - `figurenFilters` (app-navigation schreibt darauf)
-//   - `selectedFigurId` (Hash-Router)
-//   - `figurenLoading/Progress/Status` (checkPendingJobs schreibt darauf)
 //   - `loadFiguren`, `saveFiguren` (von vielen Modulen gerufen)
 
 import { graphMethods } from '../graph.js';
@@ -172,12 +173,12 @@ export function registerFigurenCard() {
 
     figurenSeitenListe() {
       // seiten = Array {kapitel, seite} — eigener Iterator (keine 1:1-Relation).
-      return this._memoSeiten([Alpine.store('catalog').figuren, window.__app.figurenFilters.kapitel]);
+      return this._memoSeiten([Alpine.store('catalog').figuren, Alpine.store('catalogUi').figurenFilters.kapitel]);
     },
 
     filteredFiguren() {
       const root = window.__app;
-      const f = root.figurenFilters;
+      const f = Alpine.store('catalogUi').figurenFilters;
       return this._memoFiltered([
         root.$store.catalog.figuren,
         root._chapterOrderMap,

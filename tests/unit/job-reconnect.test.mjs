@@ -42,6 +42,9 @@ function makeCtx() {
   // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr): nav-Objekt
   // unter $store.nav + Aliasse fuer direkte c.selectedBookId/tree-Zugriffe.
   const nav = { selectedBookId: 42, books: [], pages: [], tree: [] };
+  // figurenLoading/Progress/Status leben in Alpine.store('catalogUi'); Aliasse
+  // halten die bestehenden c.figurenLoading-Zugriffe am Leben.
+  const catalogUi = { figurenLoading: false, figurenProgress: 0, figurenStatus: '' };
   return {
     get selectedBookId() { return nav.selectedBookId; },
     set selectedBookId(v) { nav.selectedBookId = v; },
@@ -51,14 +54,19 @@ function makeCtx() {
     set pages(v) { nav.pages = v; },
     get books() { return nav.books; },
     set books(v) { nav.books = v; },
+    get figurenLoading() { return catalogUi.figurenLoading; },
+    set figurenLoading(v) { catalogUi.figurenLoading = v; },
+    get figurenProgress() { return catalogUi.figurenProgress; },
+    set figurenProgress(v) { catalogUi.figurenProgress = v; },
+    get figurenStatus() { return catalogUi.figurenStatus; },
+    set figurenStatus(v) { catalogUi.figurenStatus = v; },
     figuren: [],
-    figurenLoading: false, figurenProgress: 0, figurenStatus: '',
     showFiguresCard: false, showBookReviewCard: false, showKapitelReviewCard: false,
     batchLoading: false, batchProgress: 0, batchStatus: '',
     showKomplettStatus: false,
     // alleAktualisieren* leben in Alpine.store('jobs'); Plain-Stub, da
     // checkPendingJobs via this.$store.jobs.alleAktualisierenLoading gatet.
-    $store: { nav, jobs: {
+    $store: { nav, catalogUi, jobs: {
       alleAktualisierenLoading: false, alleAktualisierenProgress: 0,
       alleAktualisierenTokIn: 0, alleAktualisierenTokOut: 0, alleAktualisierenTps: null,
       alleAktualisierenStatus: '',

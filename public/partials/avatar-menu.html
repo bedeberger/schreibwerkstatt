@@ -99,7 +99,7 @@
 
     <div class="avatar-menu-provider" :data-tip="t('header.providerTitle')">
       <span class="avatar-menu-provider-dot"></span>
-      <span x-text="apiProvider === 'ollama' ? 'Ollama · ' + ollamaModel : apiProvider === 'openai-compat' ? 'OpenAI · ' + openaiCompatModel : 'Claude · ' + claudeModel"></span>
+      <span x-text="$store.config.apiProvider === 'ollama' ? 'Ollama · ' + $store.config.ollamaModel : $store.config.apiProvider === 'openai-compat' ? 'OpenAI · ' + $store.config.openaiCompatModel : 'Claude · ' + $store.config.claudeModel"></span>
     </div>
 
     <a href="/auth/logout" class="avatar-menu-item avatar-menu-item--logout" role="menuitem" x-text="t('header.logout')" @click="logout($event)" x-show="!$store.session.devMode"></a>

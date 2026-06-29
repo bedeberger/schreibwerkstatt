@@ -39,7 +39,10 @@ function makeCtx({ hash = '', books = [{ id: 42 }, { id: 99 }] } = {}) {
   // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr). Im Test
   // spiegelt ein internes nav-Objekt unter $store.nav; Getter/Setter-Aliasse
   // halten die bestehenden c.selectedBookId-Mutationen am Leben.
-  const nav = { selectedBookId: null, books, pages: [], tree: [] };
+  const nav = { selectedBookId: null, books, pages: [], tree: [], werkstattDraftId: null, plotBeatId: null, rueckblickEntryId: null };
+  // selectedXxxId leben in Alpine.store('catalogUi'). Getter/Setter-Aliasse
+  // halten die bestehenden c.selectedFigurId-Mutationen am Leben.
+  const catalogUi = { selectedFigurId: null, selectedOrtId: null, selectedSongId: null, selectedSzeneId: null };
   return {
     get selectedBookId() { return nav.selectedBookId; },
     set selectedBookId(v) { nav.selectedBookId = v; },
@@ -49,12 +52,23 @@ function makeCtx({ hash = '', books = [{ id: 42 }, { id: 99 }] } = {}) {
     set pages(v) { nav.pages = v; },
     get tree() { return nav.tree; },
     set tree(v) { nav.tree = v; },
-    $store: { nav },
+    get werkstattDraftId() { return nav.werkstattDraftId; },
+    set werkstattDraftId(v) { nav.werkstattDraftId = v; },
+    get plotBeatId() { return nav.plotBeatId; },
+    set plotBeatId(v) { nav.plotBeatId = v; },
+    get rueckblickEntryId() { return nav.rueckblickEntryId; },
+    set rueckblickEntryId(v) { nav.rueckblickEntryId = v; },
+    get selectedFigurId() { return catalogUi.selectedFigurId; },
+    set selectedFigurId(v) { catalogUi.selectedFigurId = v; },
+    get selectedOrtId() { return catalogUi.selectedOrtId; },
+    set selectedOrtId(v) { catalogUi.selectedOrtId = v; },
+    get selectedSongId() { return catalogUi.selectedSongId; },
+    set selectedSongId(v) { catalogUi.selectedSongId = v; },
+    get selectedSzeneId() { return catalogUi.selectedSzeneId; },
+    set selectedSzeneId(v) { catalogUi.selectedSzeneId = v; },
+    $store: { nav, catalogUi },
     currentPage: null,
-    selectedFigurId: null,
-    selectedOrtId: null,
     kapitelReviewChapterId: null,
-    werkstattDraftId: null,
     showEditorCard: false,
     showFiguresCard: false,
     showFigurWerkstattCard: false,

@@ -24,6 +24,12 @@
 //             nutzen eigene Defaults und ignorieren den Wert.
 //   researchChatEnabled — Recherche-Chat-Umschalter (/config `researchChat.enabled`,
 //             true wenn effektiver Provider Claude + API-Key + Kill-Switch an).
+//   apiProvider — effektiver KI-Provider ('claude'/'ollama'/'openai-compat'), aus
+//             /config (globaler ai.provider bzw. Per-User-Override). Steuert die
+//             Provider-Anzeige im Avatar-Menü; configurePrompts liest den Wert
+//             beim Boot separat aus cfg.
+//   claudeModel / claudeMaxTokens / ollamaModel / openaiCompatModel — Modell-IDs
+//             + Output-Cap des jeweiligen Providers, rein fürs Avatar-Menü-Label.
 
 export function registerConfigStore() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -32,5 +38,10 @@ export function registerConfigStore() {
     languagetoolEnabled: false,
     languagetoolDebounceMs: 1500,
     researchChatEnabled: false,
+    apiProvider: 'claude',
+    claudeModel: 'claude-sonnet-4-6',
+    claudeMaxTokens: 64000,
+    ollamaModel: 'llama3.2',
+    openaiCompatModel: 'llama3.2',
   });
 }

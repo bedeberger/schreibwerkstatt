@@ -35,7 +35,6 @@ import { appCollabMethods } from './app/app-collab.js';
 import { appViewMethods } from './app/app-view.js';
 import { appNavigationMethods } from './app/app-navigation.js';
 import { appHashRouterMethods } from './app/app-hash-router.js';
-import { bookCreateMethods } from './book/book-create.js';
 import { rootGetterDescriptors } from './app/app-root-getters.js';
 import { appInitMethods } from './app/app-init.js';
 import { installFetchGuard } from './app/boot/fetch-guard.js';
@@ -304,7 +303,6 @@ document.addEventListener('alpine:init', () => {
     ...appNavigationMethods,
     ...appHashRouterMethods,
     ...featuresUsageMethods,
-    ...bookCreateMethods,
     });
     Object.defineProperties(obj, rootGetterDescriptors);
     return obj;

@@ -446,9 +446,9 @@ export const treeMethods = {
     // Laufenden Figuren-Job-Poll abbrechen (Buch könnte gewechselt haben).
     // checkPendingJobs am Ende reconnectet korrekt für das neue Buch.
     if (this._figuresPollTimer) { clearInterval(this._figuresPollTimer); this._figuresPollTimer = null; }
-    this.figurenLoading = false;
-    this.figurenProgress = 0;
-    this.figurenStatus = '';
+    this.$store.catalogUi.figurenLoading = false;
+    this.$store.catalogUi.figurenProgress = 0;
+    this.$store.catalogUi.figurenStatus = '';
     // Vorherigen Buch-Load abbrechen (Buchwechsel während laufendem bookTree
     // bei grossem Buch sonst: Request hängt 30s am Netz, Server verarbeitet
     // weiter, Browser-Slot blockiert). Stale-Guards verwerfen zwar Resultate,

@@ -7,7 +7,7 @@ export const orteMethods = {
     try {
       const data = await fetchJson('/locations/' + bookId);
       this.$store.catalog.orte = data?.orte || [];
-      this.orteUpdatedAt = data?.updated_at || null;
+      this.$store.catalogUi.orteUpdatedAt = data?.updated_at || null;
     } catch (e) {
       console.error('[loadOrte]', e);
     }

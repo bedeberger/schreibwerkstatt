@@ -1,10 +1,11 @@
 // Alpine.data('songsCard') — Sub-Komponente der Musik-Karte.
 //
 // Eigener State: Meta-Flags (Loading/Progress/Status/PollTimer).
+// Geteilt:
+//   - `songs` (Alpine.store('catalog'))
+//   - `songsFilters`/`selectedSongId` (Alpine.store('catalogUi') —
+//     app-navigation/Hash-Router schreiben darauf)
 // Root behält:
-//   - `songs` (im Store)
-//   - `songsFilters` (app-navigation.js schreibt darauf)
-//   - `selectedSongId` (Hash-Router)
 //   - `loadSongs`, `saveSongs` (Root-Spread)
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { applySongsFilters } from '../app/app-ui.js';
@@ -23,7 +24,7 @@ export function registerSongsCard() {
     // Order-Map), darum via window.__app gelesen.
     get songsFiltered() {
       const root = window.__app;
-      return applySongsFilters(root.$store.catalog.songs, root.songsFilters).sort((a, b) => {
+      return applySongsFilters(root.$store.catalog.songs, Alpine.store('catalogUi').songsFilters).sort((a, b) => {
         const aK = Math.min(...(a.kapitel || []).map(k => root._chapterIdx(k.name)), 9999);
         const bK = Math.min(...(b.kapitel || []).map(k => root._chapterIdx(k.name)), 9999);
         if (aK !== bK) return aK - bK;

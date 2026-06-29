@@ -57,6 +57,9 @@ export const EVT = {
   LANGUAGETOOL_EXTENSION_CLEARED: 'languagetool:extension-cleared',   // kein detail
   PAGE_REVISIONS_CHANGED: 'page-revisions:changed',                   // detail: { pageId }
 
+  // ── Buch-Erstellung ──────────────────────────────────────────────────────
+  BOOK_CREATE_OPEN: 'book-create:open',         // kein detail (Root-Trigger → Karte)
+
   // ── Chats ────────────────────────────────────────────────────────────────
   CHAT_RESET: 'chat:reset',                     // kein detail
   BOOK_CHAT_RESET: 'book-chat:reset',           // kein detail

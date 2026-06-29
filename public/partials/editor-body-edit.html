@@ -49,7 +49,7 @@
               :disabled="$store.stt.pending"
               :data-tip="$store.stt.recording ? t('stt.stop') : t('stt.dictate')"
               :aria-label="$store.stt.recording ? t('stt.stop') : t('stt.dictate')"
-              @click="toggleSttDictation()"
+              @click="toggleSttDictation()">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#mic"/></svg>
       </button>
     </div>

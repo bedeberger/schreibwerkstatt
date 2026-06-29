@@ -63,28 +63,28 @@
   <!-- Filter -->
   <div x-show="$store.catalog.globalZeitstrahl.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
-      <input type="text" x-model="$app.ereignisseFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <button type="button" class="search-clear--icon" x-show="$app.ereignisseFilters.suche" @click="$app.ereignisseFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+      <input type="text" x-model="$store.catalogUi.ereignisseFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+      <button type="button" class="search-clear--icon" x-show="$store.catalogUi.ereignisseFilters.suche" @click="$store.catalogUi.ereignisseFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
-         x-modelable="value" x-model="$app.ereignisseFilters.figurId"
+         x-modelable="value" x-model="$store.catalogUi.ereignisseFilters.figurId"
          x-effect="options = $store.catalog.figuren.filter(f => $store.catalog.globalZeitstrahl.some(ev => ev.figuren.some(fr => fr.id === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
          >
     </div>
     <div x-data="catalogFilter('subtyp')"
-         x-modelable="value" x-model="$app.ereignisseFilters.subtyp"
+         x-modelable="value" x-model="$store.catalogUi.ereignisseFilters.subtyp"
          x-effect="options = ereignisseSubtypListe().map(s => ({value: s, label: $app.t('events.subtyp.' + s)}))"
          >
     </div>
     <div x-data="catalogFilter('chapter')"
-         x-modelable="value" x-model="$app.ereignisseFilters.kapitel"
+         x-modelable="value" x-model="$store.catalogUi.ereignisseFilters.kapitel"
          x-effect="options = ereignisseKapitelListe().map(k => ({value: k, label: k}))"
-         @combobox-change="$app.ereignisseFilters.seite = ''"
+         @combobox-change="$store.catalogUi.ereignisseFilters.seite = ''"
          >
     </div>
     <div x-data="catalogFilter('page')"
-         x-modelable="value" x-model="$app.ereignisseFilters.seite"
-         x-effect="_disabled = !$app.ereignisseFilters.kapitel || ereignisseSeitenListe().length === 0; options = ereignisseSeitenListe().map(s => ({value: s, label: s}))"
+         x-modelable="value" x-model="$store.catalogUi.ereignisseFilters.seite"
+         x-effect="_disabled = !$store.catalogUi.ereignisseFilters.kapitel || ereignisseSeitenListe().length === 0; options = ereignisseSeitenListe().map(s => ({value: s, label: s}))"
          :class="{'combobox-wrap--disabled': _disabled}"
          >
     </div>

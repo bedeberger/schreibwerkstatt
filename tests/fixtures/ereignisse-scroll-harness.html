@@ -55,6 +55,7 @@
   <script type="module">
     const { registerEreignisseCard } = await import('/public/js/cards/ereignisse-card.js');
     const { registerJobsStore } = await import('/public/js/cards/jobs-store.js');
+    const { registerCatalogUiStore } = await import('/public/js/cards/catalog-ui-store.js');
 
     // 20 dated + 78 undated events.
     const MOCK = [];
@@ -73,7 +74,6 @@
       window.__app = window.Alpine.reactive({
         selectedBookId: 1, selectedBookName: 'Testbuch', showEreignisseCard: true,
         figuren: [], globalZeitstrahl: MOCK,
-        ereignisseFilters: { suche: '', figurId: '', kapitel: '', seite: '', subtyp: '' },
         t: (k, params) => params ? `${k} ${JSON.stringify(params)}` : k,
         _deriveKapitel: () => [], _deriveSeiten: () => [], _reloadZeitstrahl: () => {},
         gotoStelle: () => {}, openFigurById: () => {}, gotoPageById: () => {},
@@ -81,10 +81,15 @@
       window.Alpine.magic('app', () => window.__app);
       window.Alpine.store('catalog', { figuren: [], orte: [], szenen: [], globalZeitstrahl: MOCK });
       registerJobsStore();
+      registerCatalogUiStore();
       // window.__app ist hier ein plain reactive Objekt (kein Alpine-Component),
       // hat also kein $store-Magic. Karten-JS liest Fach-Daten via
       // root.$store.catalog → hier explizit auf die registrierten Stores spiegeln.
-      window.__app.$store = { catalog: window.Alpine.store('catalog'), jobs: window.Alpine.store('jobs') };
+      window.__app.$store = {
+        catalog: window.Alpine.store('catalog'),
+        catalogUi: window.Alpine.store('catalogUi'),
+        jobs: window.Alpine.store('jobs'),
+      };
       registerEreignisseCard();
     });
     document.addEventListener('alpine:initialized', () => {

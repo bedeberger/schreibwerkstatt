@@ -44,23 +44,23 @@
   <!-- Filter-Leiste -->
   <div x-show="$store.catalog.songs.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
-      <input type="text" x-model="$app.songsFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <button type="button" class="search-clear--icon" x-show="$app.songsFilters.suche" @click="$app.songsFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+      <input type="text" x-model="$store.catalogUi.songsFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+      <button type="button" class="search-clear--icon" x-show="$store.catalogUi.songsFilters.suche" @click="$store.catalogUi.songsFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
-         x-modelable="value" x-model="$app.songsFilters.figurId"
+         x-modelable="value" x-model="$store.catalogUi.songsFilters.figurId"
          x-effect="options = $store.catalog.figuren.filter(f => $store.catalog.songs.some(s => (s.figuren || []).some(x => (x.fig_id || x) === f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))">
     </div>
     <div x-data="catalogFilter('chapter')"
-         x-modelable="value" x-model="$app.songsFilters.kapitel"
+         x-modelable="value" x-model="$store.catalogUi.songsFilters.kapitel"
          x-effect="options = $app.songsKapitelListe().map(k => ({value: k, label: k}))">
     </div>
     <div x-data="combobox($app.t('songs.filter.genre'), $app.t('songs.filter.allGenres'))"
-         x-modelable="value" x-model="$app.songsFilters.genre"
+         x-modelable="value" x-model="$store.catalogUi.songsFilters.genre"
          x-effect="options = $app.songsGenreListe().map(g => ({value: g, label: g}))">
     </div>
     <div x-data="combobox($app.t('songs.filter.kontextTyp'), $app.t('songs.filter.allKontextTypen'))"
-         x-modelable="value" x-model="$app.songsFilters.kontextTyp"
+         x-modelable="value" x-model="$store.catalogUi.songsFilters.kontextTyp"
          x-effect="options = $app.songsKontextTypListe().map(k => ({value: k, label: $app.t('songs.kontextTyp.' + k, { _default: k })}))">
     </div>
     <span class="filter-count" x-text="songsFiltered.length + ' / ' + $store.catalog.songs.length"></span>
@@ -70,7 +70,7 @@
   <div x-show="$store.catalog.songs.length > 0" class="entity-list entity-list--accented song-list">
     <template x-for="s in songsFiltered" :key="s.id">
       <div>
-        <div class="entity-row" :data-song-id="s.id" @click="$app.selectedSongId = $app.selectedSongId === s.id ? null : s.id">
+        <div class="entity-row" :data-song-id="s.id" @click="$store.catalogUi.selectedSongId = $store.catalogUi.selectedSongId === s.id ? null : s.id">
           <span x-show="s.kontext_typ" class="tag entity-typ-tag" x-text="$app.t('songs.kontextTyp.' + s.kontext_typ, { _default: s.kontext_typ })"></span>
           <span class="entity-row-title">
             <span x-text="s.titel"></span>
@@ -85,9 +85,9 @@
               </template>
             </span>
           </template>
-          <span class="history-chevron" :class="{ open: $app.selectedSongId === s.id }">›</span>
+          <span class="history-chevron" :class="{ open: $store.catalogUi.selectedSongId === s.id }">›</span>
         </div>
-        <div x-show="$app.selectedSongId === s.id" class="entity-detail">
+        <div x-show="$store.catalogUi.selectedSongId === s.id" class="entity-detail">
           <p x-show="s.beschreibung" x-text="s.beschreibung" class="entity-detail-text"></p>
           <div x-show="s.stimmung" class="entity-meta-row">
             <span class="entity-meta-label" x-text="$app.t('songs.stimmung')"></span>

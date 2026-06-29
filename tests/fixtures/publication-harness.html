@@ -48,14 +48,15 @@
       formatLastRun: (iso) => iso || '',
       async loadBooks() {},
       async loadPages() {},
-      dailyProgressIsFinished: false,
-      dailyProgressDailyGoalChars: null,
     };
     window.Alpine.magic('app', () => window.__app);
 
     // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr) — die Karte
     // liest selectedBookId/books direkt via $store.nav / Alpine.store('nav').
     window.Alpine.store('nav', { books: [{ id: 102, name: 'Test-Buch' }], selectedBookId: 102, pages: [], tree: [] });
+    // Header-Donut-State lebt in Alpine.store('progress') — book-settings/settings.js
+    // spiegelt is_finished + daily_goal_chars beim Speichern dorthin.
+    window.Alpine.store('progress', { dailyProgressBookId: null, dailyProgressStats: [], dailyProgressIsFinished: false, dailyProgressDailyGoalChars: null, _dailyProgressLoadingBookId: null });
     // Shell-State (App-Meta) lebt in Alpine.store('shell') — book-settings/settings.js
     // liest Alpine.store('shell').promptConfig (Buchtyp-Combobox) + appTimezone.
     window.Alpine.store('shell', { uiLocale: 'de', appTimezone: 'Europe/Zurich', promptConfig: { buchtypen: { de: {} } } });

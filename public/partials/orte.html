@@ -57,22 +57,22 @@
   <!-- Filter-Leiste -->
   <div x-show="$store.catalog.orte.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
-      <input type="text" x-model="$app.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <button type="button" class="search-clear--icon" x-show="$app.orteFilters.suche" @click="$app.orteFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+      <input type="text" x-model="$store.catalogUi.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+      <button type="button" class="search-clear--icon" x-show="$store.catalogUi.orteFilters.suche" @click="$store.catalogUi.orteFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
-         x-modelable="value" x-model="$app.orteFilters.figurId"
+         x-modelable="value" x-model="$store.catalogUi.orteFilters.figurId"
          x-effect="options = $store.catalog.figuren.filter(f => $store.catalog.orte.some(o => (o.figuren || []).includes(f.id))).map(f => ({value: f.id, label: f.kurzname || f.name}))"
          >
     </div>
     <div x-data="catalogFilter('chapter')"
-         x-modelable="value" x-model="$app.orteFilters.kapitel"
+         x-modelable="value" x-model="$store.catalogUi.orteFilters.kapitel"
          x-effect="options = $app.orteKapitelListe().map(k => ({value: k, label: k}))"
          >
     </div>
     <div x-show="$store.catalog.szenen.length > 0"
          x-data="catalogFilter('szene')"
-         x-modelable="value" x-model="$app.orteFilters.szeneId"
+         x-modelable="value" x-model="$store.catalogUi.orteFilters.szeneId"
          x-effect="options = $store.catalog.szenen.map(s => ({value: String(s.id), label: s.titel}))"
          >
     </div>
@@ -83,7 +83,7 @@
   <div x-show="$store.catalog.orte.length > 0 && viewMode === 'list'" class="entity-list entity-list--accented ort-list">
     <template x-for="o in orteFiltered" :key="o.id">
       <div>
-        <div class="entity-row" :class="{ 'entity-row--stale': o.stale }" :data-ortid="o.id" @click="$app.selectedOrtId = $app.selectedOrtId === o.id ? null : o.id">
+        <div class="entity-row" :class="{ 'entity-row--stale': o.stale }" :data-ortid="o.id" @click="$store.catalogUi.selectedOrtId = $store.catalogUi.selectedOrtId === o.id ? null : o.id">
           <span class="tag entity-typ-tag" x-text="o.typ || $app.t('orte.typAndere')"></span>
           <span class="entity-row-title" x-text="o.name"></span>
           <span x-show="o.stale" class="tag tag--stale" :data-tip="$app.t('orte.staleHint')" x-text="$app.t('orte.staleBadge')"></span>
@@ -97,9 +97,9 @@
               </template>
             </span>
           </template>
-          <span class="history-chevron" :class="{ open: $app.selectedOrtId === o.id }">›</span>
+          <span class="history-chevron" :class="{ open: $store.catalogUi.selectedOrtId === o.id }">›</span>
         </div>
-        <div x-show="$app.selectedOrtId === o.id" class="entity-detail">
+        <div x-show="$store.catalogUi.selectedOrtId === o.id" class="entity-detail">
           <p x-show="o.beschreibung" x-text="o.beschreibung" class="entity-detail-text"></p>
           <div x-show="o.erste_erwaehnung" class="entity-meta-row">
             <span class="entity-meta-label" x-text="$app.t('orte.firstMention')"></span>

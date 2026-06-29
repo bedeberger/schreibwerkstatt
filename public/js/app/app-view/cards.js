@@ -20,15 +20,23 @@ export const cardsMethods = {
 
   // Sprung Overview-Rückblick-Heatmap → Tagebuch-Rückblick-Karte mit
   // vorausgewähltem Zeitraum (kein Auto-Run). `rueckblick:select` versorgt den
-  // warmen Fall (Karte schon offen); für den Cold-Open hält `pendingRueckblickZeitraum`
-  // den Wert, bis der onOpen-Hook der Karte ihn übernimmt. Scroll-to + Partial-Load
-  // erledigt der generische Toggle-Pfad.
+  // warmen Fall (Karte schon offen); für den Cold-Open hält
+  // `$store.nav.pendingRueckblickZeitraum` den Wert, bis der onOpen-Hook der Karte
+  // ihn übernimmt. Scroll-to + Partial-Load erledigt der generische Toggle-Pfad.
   openRueckblickFor(zeitraum) {
     if (!zeitraum) return;
-    this.pendingRueckblickZeitraum = zeitraum;
+    this.$store.nav.pendingRueckblickZeitraum = zeitraum;
     window.dispatchEvent(new CustomEvent(EVT.RUECKBLICK_SELECT, { detail: { zeitraum } }));
     if (!this.showTagebuchRueckblickCard) this.toggleTagebuchRueckblickCard();
     else this._scrollToCardByKey('tagebuchRueckblick');
+  },
+
+
+  // Root-Trigger (Welcome-CTA + Buchwahl-Combobox-Footer "+ Neues Buch") → das
+  // Buch-Erstellungs-Modal. Der Dialog ist eine eigene Karte (bookCreateCard) und
+  // hört auf `book-create:open`; State/Logik leben dort, nicht am Root.
+  openCreateBook() {
+    window.dispatchEvent(new CustomEvent(EVT.BOOK_CREATE_OPEN));
   },
 
 

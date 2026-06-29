@@ -10,20 +10,20 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('figuren.title')"></span>
-      <div class="card-subline" x-show="$store.jobs.alleAktualisierenLastRun && !$app.figurenLoading">
+      <div class="card-subline" x-show="$store.jobs.alleAktualisierenLastRun && !$store.catalogUi.figurenLoading">
         <span class="card-timestamp" x-text="$app.t('common.asOf', { date: $store.jobs.alleAktualisierenLastRun })"></span>
       </div>
     </div>
   </div>
 
   <!-- Fortschritt -->
-  <div x-show="$app.figurenProgress > 0" class="progress-bar-wrap">
-    <div class="progress-bar" :style="{ '--progress': $app.figurenProgress + '%' }"></div>
+  <div x-show="$store.catalogUi.figurenProgress > 0" class="progress-bar-wrap">
+    <div class="progress-bar" :style="{ '--progress': $store.catalogUi.figurenProgress + '%' }"></div>
   </div>
-  <div x-show="$app.figurenStatus" class="card-status" x-html="$app.figurenStatus"></div>
+  <div x-show="$store.catalogUi.figurenStatus" class="card-status" x-html="$store.catalogUi.figurenStatus"></div>
 
   <!-- Leer-Hinweis mit CTA -->
-  <div x-show="$store.catalog.figuren.length === 0 && !$app.figurenLoading && !$app.figurenStatus" class="card-empty">
+  <div x-show="$store.catalog.figuren.length === 0 && !$store.catalogUi.figurenLoading && !$store.catalogUi.figurenStatus" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('common.noAnalysisYet')"></p>
     <p class="card-empty-hint" x-text="$app.t('empty.figuren.hint')"></p>
     <button type="button" class="primary card-empty-cta"
@@ -122,19 +122,19 @@
      <!-- Filter -->
     <div x-show="$store.catalog.figuren.length > 0 && figurenKapitelListe().length > 0" class="filter-bar">
       <span class="filter-search-wrap">
-        <input type="text" x-model="$app.figurenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-        <button type="button" class="search-clear--icon" x-show="$app.figurenFilters.suche" @click="$app.figurenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+        <input type="text" x-model="$store.catalogUi.figurenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
+        <button type="button" class="search-clear--icon" x-show="$store.catalogUi.figurenFilters.suche" @click="$store.catalogUi.figurenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
       </span>
       <div x-data="catalogFilter('chapter')"
-          x-modelable="value" x-model="$app.figurenFilters.kapitel"
+          x-modelable="value" x-model="$store.catalogUi.figurenFilters.kapitel"
           x-effect="options = figurenKapitelListe().map(k => ({value: k, label: k}))"
-          @combobox-change="$app.figurenFilters.seite = ''; $app.selectedFigurId = null"
+          @combobox-change="$store.catalogUi.figurenFilters.seite = ''; $store.catalogUi.selectedFigurId = null"
           >
       </div>
       <div x-data="catalogFilter('page')"
-          x-modelable="value" x-model="$app.figurenFilters.seite"
-          x-effect="_disabled = !$app.figurenFilters.kapitel || figurenSeitenListe().length === 0; options = figurenSeitenListe().map(s => ({value: s, label: s}))"
-          @combobox-change="$app.selectedFigurId = null"
+          x-modelable="value" x-model="$store.catalogUi.figurenFilters.seite"
+          x-effect="_disabled = !$store.catalogUi.figurenFilters.kapitel || figurenSeitenListe().length === 0; options = figurenSeitenListe().map(s => ({value: s, label: s}))"
+          @combobox-change="$store.catalogUi.selectedFigurId = null"
           :class="{'combobox-wrap--disabled': _disabled}"
           >
       </div>
@@ -143,7 +143,7 @@
 
     <template x-for="f in filteredFiguren()" :key="f.id">
       <div>
-        <div class="figur-item" :class="{ 'figur-item--stale': f.stale }" :data-figid="f.id" @click="$app.selectedFigurId = $app.selectedFigurId === f.id ? null : f.id;">
+        <div class="figur-item" :class="{ 'figur-item--stale': f.stale }" :data-figid="f.id" @click="$store.catalogUi.selectedFigurId = $store.catalogUi.selectedFigurId === f.id ? null : f.id;">
           <span class="figur-typ-dot" :class="'figur-typ-dot--' + (f.typ || 'unknown')"></span>
           <span class="figur-name" x-text="f.name"></span>
           <span x-show="f.stale" class="tag tag--stale" :data-tip="$app.t('figuren.staleHint')" x-text="$app.t('figuren.staleBadge')"></span>
@@ -159,9 +159,9 @@
               </template>
             </span>
           </template>
-          <span class="history-chevron" :class="{ open: $app.selectedFigurId === f.id }">›</span>
+          <span class="history-chevron" :class="{ open: $store.catalogUi.selectedFigurId === f.id }">›</span>
         </div>
-        <div x-show="$app.selectedFigurId === f.id" class="figur-detail">
+        <div x-show="$store.catalogUi.selectedFigurId === f.id" class="figur-detail">
           <p x-show="f.beschreibung" x-text="f.beschreibung" class="figur-beschreibung"></p>
 
           <!-- ===== Gruppe: Steckbrief (objektive Fakten) ===== -->
@@ -290,7 +290,7 @@
               <div class="bewertung-section-title" x-text="$app.t('figuren.field.kapitelauftritte')"></div>
               <div class="figur-tags-row">
                 <template x-for="(k, ki) in (f.kapitel || [])" :key="ki">
-                  <span class="tag internal-link" @click="$app.figurenFilters.kapitel = k.name; $app.figurenFilters.seite = ''" x-text="ki === 0 ? k.name : k.name + (k.haeufigkeit > 1 ? ' ×' + k.haeufigkeit : '')"></span>
+                  <span class="tag internal-link" @click="$store.catalogUi.figurenFilters.kapitel = k.name; $store.catalogUi.figurenFilters.seite = ''" x-text="ki === 0 ? k.name : k.name + (k.haeufigkeit > 1 ? ' ×' + k.haeufigkeit : '')"></span>
                 </template>
               </div>
             </div>

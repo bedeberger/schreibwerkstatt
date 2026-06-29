@@ -72,12 +72,13 @@ export function registerTagebuchRueckblickCard() {
         ],
       });
 
-      // Permalink-Spiegel: lokaler selectedRueckblickId → Root-SSoT (Hash-Router).
+      // Permalink-Spiegel: lokaler selectedRueckblickId → Alpine.store('nav')
+      // (Hash-Router liest von dort).
       this.$watch('selectedRueckblickId', (id) => {
-        if (window.__app) window.__app.rueckblickEntryId = id || null;
+        if (window.Alpine) window.Alpine.store('nav').rueckblickEntryId = id || null;
       });
       // Permalink-Eingang: Klick auf #…/rueckblick/<id> bei offener Karte.
-      this.$watch(() => window.__app?.rueckblickEntryId, (id) => {
+      this.$watch(() => window.Alpine?.store('nav').rueckblickEntryId, (id) => {
         if (!window.__app?.showTagebuchRueckblickCard) return;
         if (id && String(id) !== String(this.selectedRueckblickId)) this._openRueckblickEntryById(id);
       });
@@ -155,12 +156,13 @@ export function registerTagebuchRueckblickCard() {
         if (fresh) this.selectedRueckblickId = fresh.id;
       },
       async onOpen() {
+        const nav = window.Alpine.store('nav');
         // Permalink (#…/rueckblick/<entryId>) gewinnt vor allem anderen.
-        const entryId = window.__app.rueckblickEntryId;
+        const entryId = nav.rueckblickEntryId;
         // Cold-Open via Overview-Heatmap: pending-Zeitraum übernehmen (gewinnt
         // vor dem Default). Sonst jüngster Monat als Default.
-        const pending = window.__app.pendingRueckblickZeitraum;
-        if (pending) { window.__app.pendingRueckblickZeitraum = null; this.rueckblickZeitraum = pending; }
+        const pending = nav.pendingRueckblickZeitraum;
+        if (pending) { nav.pendingRueckblickZeitraum = null; this.rueckblickZeitraum = pending; }
         if (!this.rueckblickZeitraum) this.rueckblickZeitraum = this.defaultZeitraum();
         await this.loadRueckblickHistory();
         if (entryId) {

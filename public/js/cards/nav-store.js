@@ -13,6 +13,16 @@
 //
 // Bewusst NICHT hier: booksLoaded/bookRoles/treeLoading u.ä. — das ist
 // Lade-Mechanik, eng an Root-Methoden gekoppelt und nicht cross-card gelesen.
+//
+// Permalink-Spiegel (werkstattDraftId/plotBeatId/rueckblickEntryId): die jeweilige
+// Karte hält ihren eigenen SSoT (selectedDraftId/editingBeatId/selectedRueckblickId)
+// und spiegelt ihn per $watch hierher. Sie liegen im Store statt in der Karte, weil
+// der Hash-Router (Root-Singleton) sie beim Cold-Open eines Permalinks lesen/schreiben
+// muss, BEVOR die Karte gemountet ist — eine Karten-lokale Heimat wäre dann unsichtbar.
+// Der Hash-Router watcht sie per Getter (`() => this.$store.nav.X`), nicht per String-Pfad.
+// werkstattDrafts: Spiegel der Werkstatt-Draft-Liste, damit die Command-Palette sie
+// auch indizieren kann, ohne dass die Werkstatt je geöffnet wurde.
+// pendingRueckblickZeitraum: Cold-Open-Handoff Overview-Heatmap → Rückblick-Karte.
 
 export function registerNavStore() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -21,5 +31,10 @@ export function registerNavStore() {
     selectedBookId: '',
     pages: [],
     tree: [],
+    werkstattDraftId: null,
+    werkstattDrafts: [],
+    plotBeatId: null,
+    rueckblickEntryId: null,
+    pendingRueckblickZeitraum: null,
   });
 }

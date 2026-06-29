@@ -491,10 +491,10 @@ export const appJobsCoreMethods = {
     }
 
     await this._reconnectJob('lektorat_figures_job_' + bookId, (job, jobId) => {
-      this.figurenLoading = true;
-      this.figurenProgress = job.progress || 0;
+      this.$store.catalogUi.figurenLoading = true;
+      this.$store.catalogUi.figurenProgress = job.progress || 0;
       if (canAutoOpenCard(this)) this.showFiguresCard = true;
-      this.figurenStatus = job.statusText ? this.t(job.statusText, job.statusParams) : this.t('common.analysisRunning');
+      this.$store.catalogUi.figurenStatus = job.statusText ? this.t(job.statusText, job.statusParams) : this.t('common.analysisRunning');
       this.startFiguresPoll(jobId);
     });
 

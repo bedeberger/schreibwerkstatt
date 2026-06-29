@@ -119,8 +119,9 @@ export const beatsMethods = {
 
   startEditBeat(beat) {
     this.editingBeatId = beat.id;
-    // Root-SSoT für den Beat-Permalink (#book/X/plot/<beatId>) spiegeln.
-    if (window.__app) window.__app.plotBeatId = beat.id;
+    // Permalink-Spiegel für den Beat (#book/X/plot/<beatId>): Hash-Router liest
+    // Alpine.store('nav').plotBeatId. editingBeatId bleibt SSoT in der Karte.
+    if (window.Alpine) window.Alpine.store('nav').plotBeatId = beat.id;
     this.beatDraft = {
       titel: beat.titel || '',
       beschreibung: beat.beschreibung || '',
@@ -131,7 +132,7 @@ export const beatsMethods = {
       draft_figure_ids: [...(beat.draft_fig_ids || [])],
     };
   },
-  cancelEditBeat() { this.editingBeatId = null; if (window.__app) window.__app.plotBeatId = null; },
+  cancelEditBeat() { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; },
 
   // Klick ausserhalb des Edit-Panels: Änderungen committen (wie Save) und dann
   // schliessen. Leerer Titel → nichts Sinnvolles zu speichern, einfach verwerfen
@@ -193,7 +194,7 @@ export const beatsMethods = {
       });
       this._replaceBeat(updated);
       this.editingBeatId = null;
-      if (window.__app) window.__app.plotBeatId = null;
+      if (window.Alpine) window.Alpine.store('nav').plotBeatId = null;
       this.errorMessage = '';
       // Kapitel-Zuweisung kann sich geändert haben → Editor-Indikator syncen.
       app.refreshPlotBeatCounts?.();
@@ -230,7 +231,7 @@ export const beatsMethods = {
       await fetchJson(`/plot/beats/${beat.id}`, { method: 'DELETE' });
       this.beats = this.beats.filter(b => b.id !== beat.id);
       this._memos = {};
-      if (this.editingBeatId === beat.id) { this.editingBeatId = null; if (window.__app) window.__app.plotBeatId = null; }
+      if (this.editingBeatId === beat.id) { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; }
       this.errorMessage = '';
       // Gelöschter Beat kann ein Kapitel-Count gewesen sein → Indikator syncen.
       app.refreshPlotBeatCounts?.();

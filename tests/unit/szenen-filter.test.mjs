@@ -14,8 +14,10 @@ function makeCtx(overrides = {}) {
   // lesen via this.$store.catalog.* — das Mock spiegelt diese Struktur.
   const { szenen = [], orte = [], ...rest } = overrides;
   return {
-    $store: { catalog: { szenen, orte } },
-    szenenFilters: { wertung: '', figurId: '', kapitel: '', ortId: '', suche: '' },
+    $store: {
+      catalog: { szenen, orte },
+      catalogUi: { szenenFilters: { wertung: '', figurId: '', kapitel: '', ortId: '', suche: '' } },
+    },
     _chapterOrderMap: new Map(),
     ...rest,
     szenenKapitelListe: appUiMethods.szenenKapitelListe,

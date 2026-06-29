@@ -32,6 +32,7 @@ const JS_DIR = join(REPO_ROOT, 'public', 'js');
 const CARDS_DIR = join(JS_DIR, 'cards');
 const EVENTS_FILE = join(JS_DIR, 'events.js');
 const NAV_STORE = join(JS_DIR, 'cards', 'nav-store.js');
+const CATALOG_UI_STORE = join(JS_DIR, 'cards', 'catalog-ui-store.js');
 const APP_STATE = join(JS_DIR, 'app', 'app-state.js');
 const APP_JS = join(JS_DIR, 'app.js');
 
@@ -48,7 +49,7 @@ const storeNames = new Set();
 for (const entry of readdirSync(CARDS_DIR)) {
   if (!entry.endsWith('-store.js')) continue;
   const src = readFileSync(join(CARDS_DIR, entry), 'utf8');
-  for (const m of src.matchAll(/Alpine\.store\(\s*'([a-z]+)'\s*,/g)) storeNames.add(m[1]);
+  for (const m of src.matchAll(/Alpine\.store\(\s*'([a-zA-Z]+)'\s*,/g)) storeNames.add(m[1]);
 }
 
 const rel = (p) => relative(REPO_ROOT, p);
@@ -130,6 +131,33 @@ test('Nav-State NICHT in app-state.js (lebt im Store)', () => {
 });
 
 // ───────────────────────────────────────────────────────────
+// REGEL 2b: Katalog-UI-State lebt im Store, nicht in der Root-God-State
+// ───────────────────────────────────────────────────────────
+const CATALOG_UI_FIELDS = [
+  'figurenLoading', 'figurenProgress', 'figurenStatus', 'selectedFigurId', 'figurenFilters',
+  'ereignisseFilters',
+  'szenenUpdatedAt', 'selectedSzeneId', 'szenenFilters',
+  'orteUpdatedAt', 'selectedOrtId', 'orteFilters',
+  'songsUpdatedAt', 'selectedSongId', 'songsFilters',
+  'kontinuitaetFilters',
+];
+
+test('CatalogUi-Store: definiert Filter/Selektion/Lade-Stempel der Katalog-Karten', () => {
+  const src = readFileSync(CATALOG_UI_STORE, 'utf8');
+  assert.match(src, /Alpine\.store\(\s*'catalogUi'/, "catalog-ui-store.js muss Alpine.store('catalogUi') registrieren");
+  for (const f of CATALOG_UI_FIELDS) {
+    assert.match(src, new RegExp(`\\b${f}\\s*:`), `catalog-ui-store.js muss '${f}' definieren`);
+  }
+});
+
+test('CatalogUi-State NICHT in app-state.js (lebt im Store)', () => {
+  const stateSrc = readFileSync(APP_STATE, 'utf8');
+  const offenders = CATALOG_UI_FIELDS.filter((f) => new RegExp(`^\\s{2,}${f}\\s*:`, 'm').test(stateSrc));
+  assert.deepEqual(offenders, [],
+    `Diese Katalog-UI-Felder gehoeren in cards/catalog-ui-store.js, nicht in app-state.js: ${offenders.join(', ')}`);
+});
+
+// ───────────────────────────────────────────────────────────
 // REGEL 3: Kein Root-Proxy fuer IRGENDEINEN Store (app.js)
 // ───────────────────────────────────────────────────────────
 test('Store-Discovery: cards/*-store.js registriert die erwarteten Stores', () => {
@@ -141,7 +169,7 @@ test('Store-Discovery: cards/*-store.js registriert die erwarteten Stores', () =
 test('Kein Root-Proxy in app.js: Root liest via this.$store, nie ueber Alpine.store(...)', () => {
   const code = stripComments(readFileSync(APP_JS, 'utf8'));
   const hits = [];
-  for (const m of code.matchAll(/Alpine\.store\(\s*'([a-z]+)'/g)) {
+  for (const m of code.matchAll(/Alpine\.store\(\s*'([a-zA-Z]+)'/g)) {
     const name = m[1];
     if (storeNames.has(name)) hits.push(name);
   }

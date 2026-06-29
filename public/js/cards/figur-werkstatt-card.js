@@ -65,18 +65,18 @@ export function registerFigurWerkstattCard() {
     _lifecycle: null,
 
     init() {
-      // Sub → Root spiegeln: Hash-Router liest werkstattDraftId vom Root.
-      // selectedDraftId bleibt SSoT in der Sub; jede Mutation (selectDraft,
-      // resetState bei book:changed/view:reset, _doDelete) wird via Watcher
-      // auf den Root durchgereicht.
+      // Sub → Store spiegeln: Hash-Router liest werkstattDraftId aus
+      // Alpine.store('nav'). selectedDraftId bleibt SSoT in der Sub; jede Mutation
+      // (selectDraft, resetState bei book:changed/view:reset, _doDelete) wird via
+      // Watcher in den Store durchgereicht.
       this.$watch('selectedDraftId', (id) => {
-        if (window.__app) window.__app.werkstattDraftId = id || null;
+        if (window.Alpine) window.Alpine.store('nav').werkstattDraftId = id || null;
       });
-      // Drafts-Liste auf den Root spiegeln, damit die Command-Palette
+      // Drafts-Liste in den Store spiegeln, damit die Command-Palette
       // (figuren-Provider) auch werkstatt-Drafts findet, ohne selbst zu fetchen,
       // sobald die Karte mindestens einmal geladen hat.
       this.$watch('drafts', (list) => {
-        if (window.__app) window.__app.werkstattDrafts = Array.isArray(list) ? list : [];
+        if (window.Alpine) window.Alpine.store('nav').werkstattDrafts = Array.isArray(list) ? list : [];
       });
 
       // Hash-Router → Sub: Permalink `#book/:b/werkstatt/:draftId` dispatcht

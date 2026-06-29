@@ -117,15 +117,15 @@
         // Flanke (wie im echten App-Pfad: Partial-Inject vor Flag-Set) und ruft
         // onShow → onOpen (Default-Zeitraum).
         showTagebuchRueckblickCard: false,
-        rueckblickEntryId: null,
         uiLocale: 'de',
         pages: PAGES,
         t: (k, params) => params ? `${k} ${JSON.stringify(params)}` : k,
         selectPage: (p) => { window.__selectedTag = p?.name || null; },
       });
       window.Alpine.magic('app', () => window.__app);
-      // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr).
-      window.Alpine.store('nav', { books: [], selectedBookId: 1, pages: PAGES, tree: [] });
+      // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr). Die Permalink-
+      // Spiegel rueckblickEntryId/pendingRueckblickZeitraum liegen ebenfalls hier.
+      window.Alpine.store('nav', { books: [], selectedBookId: 1, pages: PAGES, tree: [], rueckblickEntryId: null, pendingRueckblickZeitraum: null });
       // Shell-State (App-Meta) lebt in Alpine.store('shell') — tagebuch-rueckblick.js
       // liest Alpine.store('shell').uiLocale (Datums-Locale).
       window.Alpine.store('shell', { uiLocale: 'de' });

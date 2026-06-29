@@ -7,7 +7,7 @@ export const songsMethods = {
     try {
       const data = await fetchJson('/songs/' + bookId);
       this.$store.catalog.songs = data?.songs || [];
-      this.songsUpdatedAt = data?.updated_at || null;
+      this.$store.catalogUi.songsUpdatedAt = data?.updated_at || null;
     } catch (e) {
       console.error('[loadSongs]', e);
     }
@@ -55,8 +55,8 @@ export const songsMethods = {
   openSongById(id) {
     if (!this.$store.catalog.songs.some(s => s.id === id)) return;
     if (typeof this.toggleSongsCard === 'function' && !this.showSongsCard) this.toggleSongsCard();
-    this.songsFilters = { suche: '', figurId: '', kapitel: '', szeneId: '', genre: '', kontextTyp: '' };
-    this.selectedSongId = id;
+    this.$store.catalogUi.songsFilters = { suche: '', figurId: '', kapitel: '', szeneId: '', genre: '', kontextTyp: '' };
+    this.$store.catalogUi.selectedSongId = id;
     setTimeout(() => {
       const el = document.querySelector(`[data-song-id="${id}"]`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });

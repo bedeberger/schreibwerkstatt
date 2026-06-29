@@ -144,7 +144,8 @@ export const PROVIDERS = [
       return Array.isArray(root.$store.catalog.figuren) ? root.$store.catalog.figuren : [];
     },
     drafts(root) {
-      return Array.isArray(root.werkstattDrafts) ? root.werkstattDrafts : [];
+      const list = root.$store.nav.werkstattDrafts;
+      return Array.isArray(list) ? list : [];
     },
     // Defensive: Falls beim Buch-Wechsel der Reset durchläuft bevor loadFiguren
     // fertig ist. Werkstatt-Drafts werden ebenfalls einmal pro Buch nachgeladen,
@@ -160,7 +161,7 @@ export const PROVIDERS = [
             const r = await fetch(`/draft-figures/${Alpine.store('nav').selectedBookId}`, { credentials: 'same-origin' });
             if (!r.ok) return;
             const data = await r.json();
-            root.werkstattDrafts = Array.isArray(data) ? data : [];
+            root.$store.nav.werkstattDrafts = Array.isArray(data) ? data : [];
           } catch { /* still searchable nach Karten-Open */ }
         });
       }

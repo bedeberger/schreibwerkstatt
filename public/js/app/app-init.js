@@ -132,11 +132,11 @@ export const appInitMethods = {
         this.$store.shell.uiLocale = locale;
       }
       document.documentElement.setAttribute('lang', `${locale}-${region}`);
-      if (cfg.claudeModel) this.claudeModel = cfg.claudeModel;
-      if (cfg.claudeMaxTokens) this.claudeMaxTokens = cfg.claudeMaxTokens;
-      if (cfg.apiProvider) this.apiProvider = cfg.apiProvider;
-      if (cfg.ollamaModel) this.ollamaModel = cfg.ollamaModel;
-      if (cfg.openaiCompatModel) this.openaiCompatModel = cfg.openaiCompatModel;
+      if (cfg.claudeModel) this.$store.config.claudeModel = cfg.claudeModel;
+      if (cfg.claudeMaxTokens) this.$store.config.claudeMaxTokens = cfg.claudeMaxTokens;
+      if (cfg.apiProvider) this.$store.config.apiProvider = cfg.apiProvider;
+      if (cfg.ollamaModel) this.$store.config.ollamaModel = cfg.ollamaModel;
+      if (cfg.openaiCompatModel) this.$store.config.openaiCompatModel = cfg.openaiCompatModel;
       this.$store.session.currentUser = cfg.user || null;
       this.$store.session.devMode = !!cfg.devMode;
       this.$store.shell.promptConfig = cfg.promptConfig || {};
@@ -246,10 +246,13 @@ export const appInitMethods = {
       // im Hash-Router (isInitialApply-Branch), bevor View-Argumente Filter
       // setzen.
       for (const [key] of FILTER_SCOPES) {
-        this.$watch(key, (val) => {
+        // Filter leben in Alpine.store('catalogUi') → Getter-Watch statt
+        // String-Pfad. Alpine.watch JSON.stringifyt den Getter-Wert → deep,
+        // also feuert es auch bei verschachtelten Filter-Mutationen.
+        this.$watch(() => this.$store.catalogUi[key], (val) => {
           if (!this.$store.nav.selectedBookId) return;
           setFilters(this.$store.session.currentUser?.email, this.$store.nav.selectedBookId, key, val);
-        }, { deep: true });
+        });
       }
 
       this.$watch('entityPanelOpen', (val) => {

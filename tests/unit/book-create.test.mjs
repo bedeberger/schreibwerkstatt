@@ -78,6 +78,11 @@ function makeCtx(overrides = {}) {
     submitCreateBook: bookCreateMethods.submitCreateBook,
     _loadBookCreateCategories: bookCreateMethods._loadBookCreateCategories,
   };
+  // submitCreateBook liest Root-Methoden (t/loadBooks/toggleBookSettingsCard/
+  // showBookSettingsCard) ueber window.__app — in der Karte ist das der Root, im
+  // Test faellt Root + Karte auf denselben ctx zusammen.
+  globalThis.window = globalThis.window || {};
+  globalThis.window.__app = ctx;
   return ctx;
 }
 

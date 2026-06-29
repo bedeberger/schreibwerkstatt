@@ -37,22 +37,22 @@ export const appHashRouterMethods = {
     const parts = ['book', this.$store.nav.selectedBookId];
     if (this.showEditorCard && this.currentPage?.id) {
       parts.push('page', String(this.currentPage.id));
-    } else if (this.showFiguresCard && this.selectedFigurId) {
-      parts.push('figur', String(this.selectedFigurId));
-    } else if (this.showOrteCard && this.selectedOrtId) {
-      parts.push('ort', String(this.selectedOrtId));
-    } else if (this.showSongsCard && this.selectedSongId) {
-      parts.push('song', String(this.selectedSongId));
-    } else if (this.showSzenenCard && this.selectedSzeneId) {
-      parts.push('szene', String(this.selectedSzeneId));
+    } else if (this.showFiguresCard && this.$store.catalogUi.selectedFigurId) {
+      parts.push('figur', String(this.$store.catalogUi.selectedFigurId));
+    } else if (this.showOrteCard && this.$store.catalogUi.selectedOrtId) {
+      parts.push('ort', String(this.$store.catalogUi.selectedOrtId));
+    } else if (this.showSongsCard && this.$store.catalogUi.selectedSongId) {
+      parts.push('song', String(this.$store.catalogUi.selectedSongId));
+    } else if (this.showSzenenCard && this.$store.catalogUi.selectedSzeneId) {
+      parts.push('szene', String(this.$store.catalogUi.selectedSzeneId));
     } else if (this.showKapitelReviewCard && this.kapitelReviewChapterId) {
       parts.push('kapitel', String(this.kapitelReviewChapterId));
-    } else if (this.showFigurWerkstattCard && this.werkstattDraftId) {
-      parts.push('werkstatt', String(this.werkstattDraftId));
-    } else if (this.showTagebuchRueckblickCard && this.rueckblickEntryId) {
-      parts.push('rueckblick', String(this.rueckblickEntryId));
-    } else if (this.showPlotCard && this.plotBeatId) {
-      parts.push('plot', String(this.plotBeatId));
+    } else if (this.showFigurWerkstattCard && this.$store.nav.werkstattDraftId) {
+      parts.push('werkstatt', String(this.$store.nav.werkstattDraftId));
+    } else if (this.showTagebuchRueckblickCard && this.$store.nav.rueckblickEntryId) {
+      parts.push('rueckblick', String(this.$store.nav.rueckblickEntryId));
+    } else if (this.showPlotCard && this.$store.nav.plotBeatId) {
+      parts.push('plot', String(this.$store.nav.plotBeatId));
     } else if (this.showFiguresCard) parts.push('figuren');
     else if (this.showFigurWerkstattCard) parts.push('werkstatt');
     else if (this.showOrteCard) parts.push('orte');
@@ -306,7 +306,7 @@ export const appHashRouterMethods = {
         case 'figur':
           if (arg) await this.openFigurById(arg);
           else {
-            this.selectedFigurId = null;
+            this.$store.catalogUi.selectedFigurId = null;
             if (!this.showFiguresCard) await this.toggleFiguresCard();
             else { this._closeOtherMainCards('figures'); this._scrollToCardByKey('figures'); }
           }
@@ -314,7 +314,7 @@ export const appHashRouterMethods = {
         case 'ort':
           if (arg) await this.openOrtById(arg);
           else {
-            this.selectedOrtId = null;
+            this.$store.catalogUi.selectedOrtId = null;
             if (!this.showOrteCard) await this.toggleOrteCard();
             else { this._closeOtherMainCards('orte'); this._scrollToCardByKey('orte'); }
           }
@@ -322,18 +322,18 @@ export const appHashRouterMethods = {
         case 'song':
           if (arg) await this.openSongById(arg);
           else {
-            this.selectedSongId = null;
+            this.$store.catalogUi.selectedSongId = null;
             if (!this.showSongsCard) await this.toggleSongsCard();
             else { this._closeOtherMainCards('songs'); this._scrollToCardByKey('songs'); }
           }
           break;
         case 'songs':
-          this.selectedSongId = null;
+          this.$store.catalogUi.selectedSongId = null;
           if (!this.showSongsCard) await this.toggleSongsCard();
           else { this._closeOtherMainCards('songs'); this._scrollToCardByKey('songs'); }
           break;
         case 'figuren':
-          this.selectedFigurId = null;
+          this.$store.catalogUi.selectedFigurId = null;
           if (!this.showFiguresCard) await this.toggleFiguresCard();
           else { this._closeOtherMainCards('figures'); this._scrollToCardByKey('figures'); }
           break;
@@ -346,24 +346,24 @@ export const appHashRouterMethods = {
             // verarbeitet.
             window.dispatchEvent(new CustomEvent(EVT.FIGUR_WERKSTATT_SELECT, { detail: { draftId: parseInt(arg) } }));
           } else {
-            this.werkstattDraftId = null;
+            this.$store.nav.werkstattDraftId = null;
           }
           break;
         case 'orte':
-          this.selectedOrtId = null;
+          this.$store.catalogUi.selectedOrtId = null;
           if (!this.showOrteCard) await this.toggleOrteCard();
           else { this._closeOtherMainCards('orte'); this._scrollToCardByKey('orte'); }
           break;
         case 'szene':
           if (arg) await this.openSzeneById(arg);
           else {
-            this.selectedSzeneId = null;
+            this.$store.catalogUi.selectedSzeneId = null;
             if (!this.showSzenenCard) await this.toggleSzenenCard();
             else { this._closeOtherMainCards('szenen'); this._scrollToCardByKey('szenen'); }
           }
           break;
         case 'szenen':
-          this.selectedSzeneId = null;
+          this.$store.catalogUi.selectedSzeneId = null;
           if (!this.showSzenenCard) await this.toggleSzenenCard();
           else { this._closeOtherMainCards('szenen'); this._scrollToCardByKey('szenen'); }
           break;
@@ -374,7 +374,7 @@ export const appHashRouterMethods = {
           // Optionaler Beat-Permalink (#…/plot/<beatId>). Root-SSoT vor dem Toggle
           // setzen; die plotCard fokussiert den Beat nach dem Board-Load (bzw.
           // sofort, falls schon geladen) via `plot:focus-beat` + _pendingFocusBeatId.
-          this.plotBeatId = arg ? String(arg) : null;
+          this.$store.nav.plotBeatId = arg ? String(arg) : null;
           if (!this.showPlotCard) await this.togglePlotCard();
           else { this._closeOtherMainCards('plot'); this._scrollToCardByKey('plot'); }
           if (arg) window.dispatchEvent(new CustomEvent(EVT.PLOT_FOCUS_BEAT, { detail: { beatId: arg } }));
@@ -393,8 +393,8 @@ export const appHashRouterMethods = {
         case 'rueckblick':
           // Optionaler History-Eintrag-Permalink (#…/rueckblick/<entryId>). Root-
           // SSoT vor Toggle setzen; die Sub-Card öffnet den Eintrag im onOpen-Hook
-          // bzw. via $watch auf window.__app.rueckblickEntryId.
-          this.rueckblickEntryId = arg ? String(arg) : null;
+          // bzw. via $watch auf Alpine.store('nav').rueckblickEntryId.
+          this.$store.nav.rueckblickEntryId = arg ? String(arg) : null;
           if (!this.showTagebuchRueckblickCard) await this.toggleTagebuchRueckblickCard();
           else this._scrollToCardByKey('tagebuchRueckblick');
           break;
@@ -468,12 +468,10 @@ export const appHashRouterMethods = {
     this._teardownHashRouting();
     const watchers = [
       'currentPage', 'showEditorCard',
-      'selectedFigurId', 'selectedOrtId', 'selectedSongId', 'selectedSzeneId',
       'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showWorldFactsCard',
       'showRechercheCard',
-      'showKontinuitaetCard', 'showTagebuchRueckblickCard', 'rueckblickEntryId', 'showBookReviewCard', 'showBookChatCard',
+      'showKontinuitaetCard', 'showTagebuchRueckblickCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
-      'werkstattDraftId', 'plotBeatId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
       'showBookSettingsCard', 'showUserSettingsCard', 'showMyStatsCard', 'showHelpCard',
       'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
@@ -497,10 +495,20 @@ export const appHashRouterMethods = {
       const off = this.$watch(prop, () => this._updateHash());
       if (typeof off === 'function') this._hashWatcherTeardowns.push(off);
     }
-    // selectedBookId lebt in Alpine.store('nav') (kein Root-Property mehr) →
-    // Getter-Watch statt String-Pfad, sonst feuert der Hash-Update nie.
-    const offBook = this.$watch(() => this.$store.nav.selectedBookId, () => this._updateHash());
-    if (typeof offBook === 'function') this._hashWatcherTeardowns.push(offBook);
+    // selectedBookId + selectedXxxId leben in Stores (nav / catalogUi, keine
+    // Root-Properties mehr) → Getter-Watch statt String-Pfad, sonst feuert der
+    // Hash-Update nie.
+    const storeWatched = [
+      () => this.$store.nav.selectedBookId,
+      () => this.$store.catalogUi.selectedFigurId,
+      () => this.$store.catalogUi.selectedOrtId,
+      () => this.$store.catalogUi.selectedSongId,
+      () => this.$store.catalogUi.selectedSzeneId,
+    ];
+    for (const getter of storeWatched) {
+      const off = this.$watch(getter, () => this._updateHash());
+      if (typeof off === 'function') this._hashWatcherTeardowns.push(off);
+    }
     window.addEventListener('hashchange', () => this._applyHash(), { signal: this._abortCtrl?.signal });
   },
 

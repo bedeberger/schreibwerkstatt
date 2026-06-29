@@ -7,12 +7,12 @@ export const appNavigationMethods = {
   async openFigurById(figId) {
     this._beginNavigation();
     try {
-      this.figurenFilters.kapitel = '';
-      this.figurenFilters.seite = '';
+      this.$store.catalogUi.figurenFilters.kapitel = '';
+      this.$store.catalogUi.figurenFilters.seite = '';
       if (!this.showFiguresCard) {
         await this.toggleFiguresCard();
       }
-      this.selectedFigurId = figId;
+      this.$store.catalogUi.selectedFigurId = figId;
       await this.$nextTick();
       document.querySelector(`.figur-item[data-figid="${figId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } finally {
@@ -23,12 +23,12 @@ export const appNavigationMethods = {
   async openFigurMitKapitel(figId, kapitelName) {
     this._beginNavigation();
     try {
-      this.figurenFilters.kapitel = kapitelName || '';
-      this.figurenFilters.seite = '';
+      this.$store.catalogUi.figurenFilters.kapitel = kapitelName || '';
+      this.$store.catalogUi.figurenFilters.seite = '';
       if (!this.showFiguresCard) {
         await this.toggleFiguresCard();
       }
-      this.selectedFigurId = figId;
+      this.$store.catalogUi.selectedFigurId = figId;
       await this.$nextTick();
       document.querySelector(`.figur-item[data-figid="${figId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } finally {
@@ -39,14 +39,14 @@ export const appNavigationMethods = {
   async openOrtById(ortId) {
     this._beginNavigation();
     try {
-      this.orteFilters.suche = '';
-      this.orteFilters.figurId = '';
-      this.orteFilters.kapitel = '';
-      this.orteFilters.szeneId = '';
+      this.$store.catalogUi.orteFilters.suche = '';
+      this.$store.catalogUi.orteFilters.figurId = '';
+      this.$store.catalogUi.orteFilters.kapitel = '';
+      this.$store.catalogUi.orteFilters.szeneId = '';
       if (!this.showOrteCard) {
         await this.toggleOrteCard();
       }
-      this.selectedOrtId = ortId;
+      this.$store.catalogUi.selectedOrtId = ortId;
       await this.$nextTick();
       document.querySelector(`[data-ortid="${ortId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } finally {
@@ -57,14 +57,14 @@ export const appNavigationMethods = {
   async openOrtMitKapitel(ortId, kapitelName) {
     this._beginNavigation();
     try {
-      this.orteFilters.suche = '';
-      this.orteFilters.figurId = '';
-      this.orteFilters.kapitel = kapitelName || '';
-      this.orteFilters.szeneId = '';
+      this.$store.catalogUi.orteFilters.suche = '';
+      this.$store.catalogUi.orteFilters.figurId = '';
+      this.$store.catalogUi.orteFilters.kapitel = kapitelName || '';
+      this.$store.catalogUi.orteFilters.szeneId = '';
       if (!this.showOrteCard) {
         await this.toggleOrteCard();
       }
-      this.selectedOrtId = ortId;
+      this.$store.catalogUi.selectedOrtId = ortId;
       await this.$nextTick();
       document.querySelector(`[data-ortid="${ortId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } finally {
@@ -83,7 +83,7 @@ export const appNavigationMethods = {
       window.dispatchEvent(new CustomEvent(EVT.FIGUR_WERKSTATT_SELECT, {
         detail: { draftId },
       }));
-      this.werkstattDraftId = draftId;
+      this.$store.nav.werkstattDraftId = draftId;
     } finally {
       this._endNavigation();
     }
@@ -109,15 +109,15 @@ export const appNavigationMethods = {
   async openSzeneById(szeneId) {
     this._beginNavigation();
     try {
-      this.szenenFilters.suche = '';
-      this.szenenFilters.wertung = '';
-      this.szenenFilters.figurId = '';
-      this.szenenFilters.kapitel = '';
-      this.szenenFilters.ortId = '';
+      this.$store.catalogUi.szenenFilters.suche = '';
+      this.$store.catalogUi.szenenFilters.wertung = '';
+      this.$store.catalogUi.szenenFilters.figurId = '';
+      this.$store.catalogUi.szenenFilters.kapitel = '';
+      this.$store.catalogUi.szenenFilters.ortId = '';
       if (!this.showSzenenCard) {
         await this.toggleSzenenCard();
       }
-      this.selectedSzeneId = szeneId;
+      this.$store.catalogUi.selectedSzeneId = szeneId;
       await this.$nextTick();
       document.querySelector(`[data-szeneid="${szeneId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } finally {
@@ -131,7 +131,7 @@ export const appNavigationMethods = {
       if (!this.showEreignisseCard) {
         await this.toggleEreignisseCard();
       }
-      this.ereignisseFilters.kapitel = kapitel;
+      this.$store.catalogUi.ereignisseFilters.kapitel = kapitel;
     } finally {
       this._endNavigation();
     }
@@ -143,10 +143,10 @@ export const appNavigationMethods = {
       if (!this.showEreignisseCard) {
         await this.toggleEreignisseCard();
       }
-      this.ereignisseFilters.figurId = figurId;
-      this.ereignisseFilters.kapitel = '';
-      this.ereignisseFilters.seite = '';
-      this.ereignisseFilters.suche = '';
+      this.$store.catalogUi.ereignisseFilters.figurId = figurId;
+      this.$store.catalogUi.ereignisseFilters.kapitel = '';
+      this.$store.catalogUi.ereignisseFilters.seite = '';
+      this.$store.catalogUi.ereignisseFilters.suche = '';
     } finally {
       this._endNavigation();
     }
