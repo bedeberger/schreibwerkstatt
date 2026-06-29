@@ -2,7 +2,7 @@
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/admin-devices-card.js.
   `showAdminDevicesCard` + `toggleAdminDevicesCard` im Root. Nur sichtbar bei
-  $app.currentUser.role === 'admin'. Listet alle device_tokens mit gemeldeter
+  $store.session.currentUser.role === 'admin'. Listet alle device_tokens mit gemeldeter
   Client-Version (X-Client-Version), Nutzungszaehler und letzter Aktivitaet.
   Read-only: Tokens ausstellen/widerrufen passiert beim User unter /me.
 -->

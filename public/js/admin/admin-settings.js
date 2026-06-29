@@ -248,7 +248,7 @@ export const adminSettingsMethods = {
     const perChunk = Math.max(10000, Math.min(200000, Math.floor(inputBudgetChars * 0.35)));
     const RECOMMENDED = 128000;
     const level = ctx >= RECOMMENDED ? 'ok' : (ctx >= 64000 ? 'warn' : 'bad');
-    const tag = localeTagFromUi(window.__app?.uiLocale);
+    const tag = localeTagFromUi(Alpine.store('shell').uiLocale);
     const fmt = (n) => formatNum(n, { localeTag: tag, decimals: 0 });
     return {
       level,

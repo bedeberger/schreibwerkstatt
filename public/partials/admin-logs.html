@@ -2,7 +2,7 @@
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/admin-logs-card.js.
   `showAdminLogsCard` + `toggleAdminLogsCard` im Root. Nur sichtbar bei
-  $app.currentUser.role === 'admin'.
+  $store.session.currentUser.role === 'admin'.
 -->
 <div class="card card--admin-logs" x-data="adminLogsCard" x-show="$app.showAdminLogsCard" x-cloak>
   <div class="card-header">

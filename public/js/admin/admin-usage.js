@@ -33,7 +33,7 @@ export const adminUsageMethods = {
   adminUsageInt(n)   { return _int(n,   this._adminUsageLocale()); },
   adminUsageHhmm(seconds) { return _hhmm(seconds); },
   _adminUsageLocale() {
-    return (window.__app?.uiLocale === 'en') ? 'en-US' : 'de-CH';
+    return (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
   },
   // Job-Typ-String (DB-Wert aus job_runs.type) → übersetztes Label. Fallback: roher Typ.
   _adminUsageTypeLabel(type) {

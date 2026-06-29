@@ -169,14 +169,14 @@ export const diaryCalendarMethods = {
   },
 
   _formatYearMonth(year, month) {
-    const locale = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
     const dt = new Date(Date.UTC(year, month - 1, 15));
     return dt.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   },
 
   // Wochentags-Header lokalisiert (Mo Di Mi … / Mon Tue Wed …).
   diaryCalendarWeekdayLabels() {
-    const locale = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
     const labels = [];
     // 2024-01-01 ist ein Montag; davon ausgehend 7 Tage.
     for (let i = 0; i < 7; i++) {
@@ -435,13 +435,13 @@ export const diaryCalendarMethods = {
 
   // Wochentag (lang) eines `YYYY-MM-DD`. Noon-UTC + tzOpts → kein TZ-Tagessprung.
   _diaryWeekdayLabel(dateIso) {
-    const locale = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
     return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString(locale, tzOpts({ weekday: 'long' }));
   },
 
   // Volles Datum (z.B. „3. Juni 2025") eines `YYYY-MM-DD`.
   _diaryDateLabel(dateIso) {
-    const locale = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
     return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString(
       locale, tzOpts({ day: 'numeric', month: 'long', year: 'numeric' }));
   },
@@ -455,7 +455,7 @@ export const diaryCalendarMethods = {
   // `_loadDiaryAnniversaryOpen` ruft tree.js#loadPages bei jedem Buchwechsel.
   _diaryAnniversaryStorageKey(bookId) {
     if (!bookId) return '';
-    return `sw:diaryAnniversaryOpen:${this.currentUser?.email || ''}:${bookId}`;
+    return `sw:diaryAnniversaryOpen:${this.$store.session.currentUser?.email || ''}:${bookId}`;
   },
   _loadDiaryAnniversaryOpen() {
     try {

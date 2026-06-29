@@ -97,6 +97,20 @@
     // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr) — book-create
     // setzt nach Anlage this.$store.nav.selectedBookId.
     window.Alpine.store('nav', { books: [], selectedBookId: '', pages: [], tree: [] });
+    // Shell-State (App-Meta) lebt in Alpine.store('shell') — book-create.js liest
+    // this.$store.shell.uiLocale/promptConfig (Buchtyp-Liste + Locale).
+    window.Alpine.store('shell', {
+      uiLocale: 'de',
+      promptConfig: {
+        buchtypen: {
+          de: {
+            roman: { label: 'Roman' },
+            krimi: { label: 'Krimi / Thriller' },
+            sachbuch: { label: 'Sachbuch' },
+          },
+        },
+      },
+    });
 
     // bookCreateRoot = Root-Felder + Methoden, die das Modal aus index.html
     // erwartet. Stubs für alles über das Modal hinaus (loadBooks,

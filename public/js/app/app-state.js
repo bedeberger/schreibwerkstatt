@@ -13,58 +13,29 @@ export const FEATURE_BLOCK_MERGE = true;
 // zusammengehören. Neue Felder kommen in den passenden Slice.
 
 
+// Residual-Root-State, der NICHT in einen benannten Store gewandert ist:
+//   - Auth/Session (currentUser, sessionExpired, serverOffline, isOffline,
+//     devMode) leben in Alpine.store('session') (cards/session-store.js) und
+//     werden direkt via $store.session / this.$store.session gelesen (kein
+//     Root-Proxy).
+//   - App-Meta/Shell (appReady, updateAvailable, bossScreenActive, themePref,
+//     uiLocale, defaultRegion, appTimezone, appName, appVersion, isMac,
+//     promptConfig) leben in Alpine.store('shell') (cards/shell-store.js),
+//     ebenfalls direkt via $store.shell (kein Root-Proxy).
+//   - Read-only /config-Settings (mapTiles, languagetoolEnabled, …) →
+//     Alpine.store('config'); STT → $store.stt; TTS → $store.tts; Collab →
+//     $store.collab; Jobs → $store.jobs.
+//
+// Hier bleiben nur die Felder, die der Editor-Kern über den editor-host-Vertrag
+// (shared/editor-host.js) direkt von `window.__app` liest und die der
+// Standalone-Host (Mac-Client) als eigene Felder spiegelt — ein Store-Zugriff
+// stünde dort nicht zur Verfügung — plus die internen Root-Lazy-Caches.
 const shellState = () => ({
-  currentUser: null,
-  devMode: false,
-  // Single Source of Truth für „Boot komplett". Wird am Ende von init()
-  // (try/finally) auf true gesetzt, parallel zum Entfernen von
-  // `html[data-app-loading]`. Templates können `appReady` als Reveal-Gate
-  // nutzen, der CSS-Selektor übernimmt den Hauptjob.
-  appReady: false,
-  sessionExpired: false,
-  serverOffline: false,
-  isOffline: false,
-  updateAvailable: false,
-  // Chef-Taste (Boss-Key): true blendet einen schwarzen Vollbild-Vorhang über
-  // allem ein. F9 im Seiten-Editor (Notebook/Focus) schaltet ein, beliebige
-  // Taste oder Klick wieder aus. Logik in editor/shortcuts.js#handleBossKey.
-  bossScreenActive: false,
-  themePref: 'auto',
   focusGranularity: 'paragraph',
   // Vertikale Anker-Position des Typewriter-Scrollings im Focus-Editor
   // (0 = oben, 0.5 = Mitte, 0.33 = oberes Drittel). Default 0.5 = unveraendertes
   // Verhalten. Primaer fuer fremde Schalen (macOS-Client via Bridge) gedacht.
   typewriterAnchor: 0.5,
-  uiLocale: '',
-  defaultRegion: '',
-  // App-weite Zeitzone (vom Server via /config → app_settings.app.timezone).
-  // In Templates ueber `$app.appTimezone` lesbar; gilt fuer Datums-Buckets +
-  // alle Date-Display-Formatter (toLocaleString, Intl.DateTimeFormat).
-  appTimezone: 'Europe/Zurich',
-  // App-Name (vom Server via /config → app_settings.app.name). Quelle fuer
-  // <title>, apple-mobile-web-app-title, Site-Header-H1 und Locale-Platzhalter
-  // `{appName}`. Default deckt Hard-Refresh ab, bevor /config geladen ist.
-  appName: 'Schreibwerkstatt',
-  // App-Version (vom Server via /config → VERSION-Datei). Manuell vor jedem
-  // Commit gepflegt; SSoT ist lib/version.js. Anzeige in den UserSettings.
-  appVersion: '',
-  // Read-only /config-Settings (mapTiles, languagetoolEnabled,
-  // languagetoolDebounceMs, researchChatEnabled) leben in Alpine.store('config')
-  // (cards/config-store.js) und werden direkt via $store.config gelesen (kein
-  // Root-Proxy).
-  // STT-Diktat State lebt in Alpine.store('stt') (cards/stt-store.js) und wird
-  // direkt via $store.stt / this.$store.stt gelesen (kein Root-Proxy).
-  // TTS / Proof-Listening State lebt in Alpine.store('tts') (cards/tts-store.js)
-  // und wird direkt via $store.tts / this.$store.tts gelesen (kein Root-Proxy).
-  // Collaboration/Presence/Soft-Lock State lebt in Alpine.store('collab')
-  // (cards/collab-store.js), ebenfalls direkt via $store.collab (kein Root-Proxy).
-  // Job-Infrastruktur (Queue-Footer, Job-Toast, „Alle aktualisieren"-Status)
-  // lebt in Alpine.store('jobs') (cards/jobs-store.js), direkt via $store.jobs.
-  // Plattform-Detect für Tasten-Hint-Anzeige (⌘ vs. Ctrl). Wird in init()
-  // gesetzt; default true wäre auf Windows falsch, default false ist sichere
-  // Annahme bevor JS gelaufen ist (Hero erscheint mit Ctrl, dann snap auf ⌘ falls Mac).
-  isMac: false,
-  promptConfig: {},
   _abortCtrl: null,
   // Email → Display-Name-Map fuer Revision-Listen, Tree-Toasts, Konflikt-Hinweise.
   // Lazy gefuellt via `/me/users-light` beim ersten Zugriff in `userDisplayName`.

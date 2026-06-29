@@ -1,5 +1,5 @@
 // Alpine-Sub-Komponente fuer die Admin-Geraete-Karte (native Mac-Focus-Clients).
-// Sichtbarkeit ueber $app.currentUser.isAdmin; State + Lifecycle hier, Show-Flag
+// Sichtbarkeit ueber $store.session.currentUser.isAdmin; State + Lifecycle hier, Show-Flag
 // (`showAdminDevicesCard`) im Root.
 
 import { adminDevicesMethods } from '../admin/admin-devices.js';

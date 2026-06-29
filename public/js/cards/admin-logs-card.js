@@ -1,5 +1,5 @@
 // Alpine-Sub-Komponente fuer die Admin-Logs-Karte. Sichtbarkeit ueber
-// $app.currentUser.isAdmin; State + Lifecycle hier, Show-Flag
+// $store.session.currentUser.isAdmin; State + Lifecycle hier, Show-Flag
 // (`showAdminLogsCard`) im Root.
 
 import { adminLogsMethods, ADMIN_LOGS_LEVELS } from '../admin/admin-logs.js';

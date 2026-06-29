@@ -66,7 +66,7 @@ export const coreMethods = {
       const bz  = (f.beziehungen || []).map(b => b.figur_id + b.typ + (b.machtverhaltnis ?? '')).join(',');
       return [f.id, f.typ || '', f.sozialschicht || '', kap, bz].join('::');
     }).join('|');
-    const hash = sig + '|' + this.figurenGraphModus + '|' + window.__app.uiLocale;
+    const hash = sig + '|' + this.figurenGraphModus + '|' + Alpine.store('shell').uiLocale;
     if (this._figurenNetwork && this._figurenHash === hash) return;
     this._figurenHash = hash;
 

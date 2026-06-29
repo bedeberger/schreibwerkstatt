@@ -171,7 +171,7 @@ export const appUiMethods = {
   // ── Datum / Save-Status ─────────────────────────────────────────────────
   formatDate(iso) {
     if (!iso) return '';
-    const tag = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const tag = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
     return new Date(iso).toLocaleString(tag, tzOpts({
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
@@ -181,7 +181,7 @@ export const appUiMethods = {
   // Kurz-relative Zeit („vor 3 Minuten") für push-getriebene Hints wie den
   // „Zuletzt bearbeitet auf <Gerät>"-Banner. Lokalisierung via Intl in utils.
   formatRelativeShort(iso) {
-    return formatRelativeShort(iso, this.uiLocale);
+    return formatRelativeShort(iso, this.$store.shell.uiLocale);
   },
 
   escPreserveStrong,
@@ -212,7 +212,7 @@ export const appUiMethods = {
   _formatSaveTs(ts) {
     if (!ts) return '';
     const d = new Date(ts);
-    const tag = this.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const tag = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
     const sameDay = d.toDateString() === new Date().toDateString();
     if (sameDay) {
       return d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));

@@ -1,5 +1,5 @@
 // Alpine-Sub-Komponente fuer die Client-JS-Fehler-Karte. Sichtbarkeit ueber
-// $app.currentUser.isAdmin; State + Lifecycle hier, Show-Flag
+// $store.session.currentUser.isAdmin; State + Lifecycle hier, Show-Flag
 // (`showAdminJsErrorsCard`) im Root.
 
 import { adminJsErrorsMethods } from '../admin/js-errors.js';

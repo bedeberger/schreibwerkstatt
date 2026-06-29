@@ -102,15 +102,15 @@ export const ACTIONS = [
   { key: 'action.theme.cycle',    kind: 'action', group: 'app', labelKey: 'palette.action.theme',     descKey: 'palette.action.theme.desc',
     aliases: ['dark','light','hell','dunkel','mode','farbe','color','design'],
     run: (root) => {
-      const next = root.themePref === 'auto' ? 'light'
-                 : root.themePref === 'light' ? 'dark'
+      const next = root.$store.shell.themePref === 'auto' ? 'light'
+                 : root.$store.shell.themePref === 'light' ? 'dark'
                  : 'auto';
       root.setTheme(next);
     } },
   { key: 'action.locale.toggle',  kind: 'action', group: 'app', labelKey: 'palette.action.locale',    descKey: 'palette.action.locale.desc',
     aliases: ['language','sprache','english','deutsch','en','de','i18n'],
     run: (root) => {
-      const next = root.uiLocale === 'de' ? 'en' : 'de';
+      const next = root.$store.shell.uiLocale === 'de' ? 'en' : 'de';
       root.changeLocale(next);
     } },
   { key: 'action.shortcuts',      kind: 'action', group: 'app', labelKey: 'palette.action.shortcuts', descKey: 'palette.action.shortcuts.desc',

@@ -36,7 +36,7 @@ export const pageMethods = {
     if (typeof this._trackPageUsage === 'function' && this.$store.nav.selectedBookId) {
       this._trackPageUsage(p.id, this.$store.nav.selectedBookId);
     }
-    setLastPageId(this.currentUser?.email, this.$store.nav.selectedBookId, p.id);
+    setLastPageId(this.$store.session.currentUser?.email, this.$store.nav.selectedBookId, p.id);
 
     this._loadPageBadgeCounts(p.id);
 

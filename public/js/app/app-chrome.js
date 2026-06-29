@@ -6,21 +6,21 @@ import { bindScrollFade } from '../scroll-fade.js';
 export const appChromeMethods = {
   // ── Theme (Hell/Dunkel/Auto) ─────────────────────────────────────────────
   _applyTheme() {
-    const resolved = this.themePref === 'auto'
+    const resolved = this.$store.shell.themePref === 'auto'
       ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-      : this.themePref;
+      : this.$store.shell.themePref;
     document.documentElement.setAttribute('data-theme', resolved);
   },
   setTheme(pref) {
     if (pref !== 'auto' && pref !== 'light' && pref !== 'dark') return;
-    if (this.themePref === pref) return;
-    this.themePref = pref;
-    try { localStorage.setItem('theme', this.themePref); } catch (e) {}
+    if (this.$store.shell.themePref === pref) return;
+    this.$store.shell.themePref = pref;
+    try { localStorage.setItem('theme', this.$store.shell.themePref); } catch (e) {}
     this._applyTheme();
     fetch('/me/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ theme: this.themePref }),
+      body: JSON.stringify({ theme: this.$store.shell.themePref }),
     }).catch(e => console.error('[theme] Persist fehlgeschlagen:', e));
   },
   // Logout: SW-Caches dropen, bevor der Browser zum Login redirected. Sonst
@@ -148,7 +148,7 @@ export const appChromeMethods = {
   },
 
   _avatarInitials() {
-    const src = (this.currentUser && (this.currentUser.name || this.currentUser.email)) || '';
+    const src = (this.$store.session.currentUser && (this.$store.session.currentUser.name || this.$store.session.currentUser.email)) || '';
     if (!src) return '·';
     const local = src.split('@')[0];
     // Erstes alphanumerisches Zeichen pro Wort — ignoriert Klammern/Satzzeichen

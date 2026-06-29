@@ -495,7 +495,7 @@ export const lifecycleMethods = {
       // navigator.onLine ist hier nur noch Hinweis fuer die Wortwahl, kein Gate:
       // bei echtem Offline die freundlichere Meldung, sonst generischer Retry-Hinweis.
       if (!navigator.onLine) {
-        const localeTag = (app.uiLocale === 'en') ? 'en-US' : 'de-CH';
+        const localeTag = (app.$store.shell.uiLocale === 'en') ? 'en-US' : 'de-CH';
         app.setStatus(app.t('edit.offlineSavedAt', { time: new Date().toLocaleTimeString(localeTag, tzOpts()) }), false, 3000);
       } else {
         app.setStatus(app.t('edit.saveFailedRetry'), false, 6000);

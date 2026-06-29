@@ -100,7 +100,7 @@ export function registerNumInput() {
 
     _decimals() { return inferDecimals(this._cfg); },
     _isInteger() { return this._decimals() === 0; },
-    _localeTag() { return localeTagFromUi(window.__app?.uiLocale); },
+    _localeTag() { return localeTagFromUi(Alpine.store('shell')?.uiLocale); },
 
     _fmt(n) {
       return formatNum(n, {
@@ -150,7 +150,7 @@ export function registerNumInput() {
       });
 
       // Locale-Switch (uiLocale-Wechsel im User-Settings) reformatieren.
-      this.$watch(() => window.__app?.uiLocale, () => {
+      this.$watch(() => Alpine.store('shell')?.uiLocale, () => {
         if (this._focused) return;
         el.value = this._fmt(this.value);
       });

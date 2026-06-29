@@ -141,7 +141,7 @@ export function registerWorldFactsCard() {
 
     get wfFiltered() {
       const { suche, kategorie, seite } = this.wfFilters;
-      const locale = window.__app?.uiLocale;
+      const locale = Alpine.store('shell').uiLocale;
       return this._memo('filtered', [this.fakten, suche, kategorie, seite, locale], () => {
         const q = suche.trim().toLowerCase();
         return this.fakten.filter(f => {

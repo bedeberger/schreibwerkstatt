@@ -4,9 +4,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// book-overview.js liest window.__app?.uiLocale für Wochentag-Labels.
-// In Node ohne DOM stubben wir window minimal vor dem Import.
+// book-overview.js liest die UI-Locale aus Alpine.store('shell').uiLocale
+// (Wochentag-Labels) und nav-Daten aus Alpine.store('nav'). In Node ohne DOM
+// stubben wir window + Alpine minimal vor dem Import; 'nav' delegiert an
+// window.__app (Tests setzen dort tokEsts), 'shell' liefert die Locale.
 globalThis.window = { __app: { uiLocale: 'de' } };
+globalThis.Alpine = { store: (n) => (n === 'nav' ? (globalThis.window?.__app || {}) : (n === 'shell' ? { uiLocale: 'de' } : {})) };
 
 const { bookOverviewMethods } = await import('../../public/js/book-overview.js');
 

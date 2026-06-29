@@ -1,5 +1,5 @@
 <!-- Admin-Landing: Tile-Grid mit Direkt-Einstiegen in die Admin-Karten.
-     Erscheint nur für plain Admin (currentUser.isAdmin && !devMode), wenn
+     Erscheint nur für plain Admin ($store.session.currentUser.isAdmin && !$store.session.devMode), wenn
      keine andere Admin-/Profil-Karte offen ist. Sidebar + Buchwahl sind in
      diesem Modus ausgeblendet — die App reduziert sich auf reine Verwaltung. -->
 <div class="card card--bookoverview book-overview"

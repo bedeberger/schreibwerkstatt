@@ -31,7 +31,7 @@
       <label class="card-form-label" x-text="$app.t('profile.uiLanguage')"></label>
       <div class="card-form-field">
         <div x-data="radioGroup()"
-             x-effect="value = $app.uiLocale; options = userSettingsUiLangOptions()"
+             x-effect="value = $store.shell.uiLocale; options = userSettingsUiLangOptions()"
              @radio-change="$app.changeLocale($event.detail)"></div>
         <p class="card-form-field-note" x-text="$app.t('profile.uiLanguageHint')"></p>
       </div>
@@ -184,7 +184,7 @@
               </div>
               <span class="device-tokens-meta muted-msg muted-msg--sm">
                 <span x-text="$app.t('profile.devices.lastUsed') + ': '"></span>
-                <span x-text="t.last_used_at ? new Date(t.last_used_at).toLocaleString($app.uiLocale, $app.tzOpts ? $app.tzOpts() : {}) : $app.t('profile.devices.never')"></span>
+                <span x-text="t.last_used_at ? new Date(t.last_used_at).toLocaleString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {}) : $app.t('profile.devices.never')"></span>
               </span>
               <button type="button" class="device-tokens-action"
                       x-show="!t.revoked_at" @click="deviceTokensRevoke(t.id)"
@@ -212,7 +212,7 @@
           <span x-text="$app.t('profile.macApp.version') + ': ' + macRelease.version"></span>
           <span x-show="macReleaseSizeMb()" x-text="' · ' + macReleaseSizeMb() + ' MB'"></span>
           <span x-show="macRelease.publishedAt"
-                x-text="' · ' + new Date(macRelease.publishedAt).toLocaleDateString($app.uiLocale, $app.tzOpts ? $app.tzOpts() : {})"></span>
+                x-text="' · ' + new Date(macRelease.publishedAt).toLocaleDateString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {})"></span>
         </div>
 
         <p x-show="macRelease.notes" class="mac-app-notes muted-msg muted-msg--sm" x-text="macRelease.notes"></p>
@@ -240,7 +240,7 @@
           <span x-text="$app.t('profile.androidApp.version') + ': ' + androidRelease.version"></span>
           <span x-show="androidReleaseSizeMb()" x-text="' · ' + androidReleaseSizeMb() + ' MB'"></span>
           <span x-show="androidRelease.publishedAt"
-                x-text="' · ' + new Date(androidRelease.publishedAt).toLocaleDateString($app.uiLocale, $app.tzOpts ? $app.tzOpts() : {})"></span>
+                x-text="' · ' + new Date(androidRelease.publishedAt).toLocaleDateString($store.shell.uiLocale, $app.tzOpts ? $app.tzOpts() : {})"></span>
         </div>
 
         <p x-show="androidRelease.notes" class="mac-app-notes muted-msg muted-msg--sm" x-text="androidRelease.notes"></p>
@@ -255,9 +255,9 @@
     </div>
 
     <!-- App-Version (SSoT: VERSION-Datei, vom Server via /config) -->
-    <div class="card-form-row" x-show="$app.appVersion" x-cloak>
+    <div class="card-form-row" x-show="$store.shell.appVersion" x-cloak>
       <p class="muted-msg muted-msg--sm">
-        <span x-text="$app.t('profile.appVersion') + ': v' + $app.appVersion"></span>
+        <span x-text="$app.t('profile.appVersion') + ': v' + $store.shell.appVersion"></span>
         <span> · </span>
         <a href="https://github.com/bedeberger/schreibwerkstatt"
            target="_blank" rel="noopener noreferrer"

@@ -40,12 +40,12 @@ export const appInitMethods = {
     // Plattform-Detect für Tasten-Hints (⌘ vs. Ctrl).
     const ua = navigator.userAgent || '';
     const plat = navigator.platform || '';
-    this.isMac = /Mac|iPhone|iPad|iPod/.test(plat) || /Mac OS X/.test(ua);
-    this.themePref = window.__themePref || 'auto';
+    this.$store.shell.isMac = /Mac|iPhone|iPad|iPod/.test(plat) || /Mac OS X/.test(ua);
+    this.$store.shell.themePref = window.__themePref || 'auto';
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      if (this.themePref === 'auto') this._applyTheme();
+      if (this.$store.shell.themePref === 'auto') this._applyTheme();
     }, { signal });
-    window.addEventListener(EVT.SESSION_EXPIRED, () => { this.sessionExpired = true; }, { signal });
+    window.addEventListener(EVT.SESSION_EXPIRED, () => { this.$store.session.sessionExpired = true; }, { signal });
     window.addEventListener(EVT.JOB_FINISHED, (e) => this._onJobFinished(e.detail), { signal });
     this._initSttDictation?.(signal);
     this._initTtsProof?.(signal);
@@ -104,7 +104,7 @@ export const appInitMethods = {
     try {
     try {
       await configureI18n(fallbackLocale);
-      this.uiLocale = fallbackLocale;
+      this.$store.shell.uiLocale = fallbackLocale;
       document.documentElement.setAttribute('lang', fallbackLocale);
       await this._loadEssentialPartials();
       this._initSidebarResize();
@@ -118,7 +118,7 @@ export const appInitMethods = {
       cfg = await fetchJson('/config');
     } catch (e) {
       console.error('[init:config]', e);
-      this.serverOffline = true;
+      this.$store.session.serverOffline = true;
       return;
     }
 
@@ -126,10 +126,10 @@ export const appInitMethods = {
       const preferred = cfg.userSettings?.locale || browserLoc || 'de';
       const locale = supported.includes(preferred) ? preferred : 'de';
       const region = cfg.userSettings?.default_region || (locale === 'en' ? 'US' : 'CH');
-      this.defaultRegion = region;
-      if (locale !== this.uiLocale) {
+      this.$store.shell.defaultRegion = region;
+      if (locale !== this.$store.shell.uiLocale) {
         await configureI18n(locale);
-        this.uiLocale = locale;
+        this.$store.shell.uiLocale = locale;
       }
       document.documentElement.setAttribute('lang', `${locale}-${region}`);
       if (cfg.claudeModel) this.claudeModel = cfg.claudeModel;
@@ -137,12 +137,12 @@ export const appInitMethods = {
       if (cfg.apiProvider) this.apiProvider = cfg.apiProvider;
       if (cfg.ollamaModel) this.ollamaModel = cfg.ollamaModel;
       if (cfg.openaiCompatModel) this.openaiCompatModel = cfg.openaiCompatModel;
-      this.currentUser = cfg.user || null;
-      this.devMode = !!cfg.devMode;
-      this.promptConfig = cfg.promptConfig || {};
-      if (cfg.userSettings?.theme && cfg.userSettings.theme !== this.themePref) {
-        this.themePref = cfg.userSettings.theme;
-        try { localStorage.setItem('theme', this.themePref); } catch (e) {}
+      this.$store.session.currentUser = cfg.user || null;
+      this.$store.session.devMode = !!cfg.devMode;
+      this.$store.shell.promptConfig = cfg.promptConfig || {};
+      if (cfg.userSettings?.theme && cfg.userSettings.theme !== this.$store.shell.themePref) {
+        this.$store.shell.themePref = cfg.userSettings.theme;
+        try { localStorage.setItem('theme', this.$store.shell.themePref); } catch (e) {}
         this._applyTheme();
       }
       const fg = cfg.userSettings?.focus_granularity;
@@ -152,14 +152,14 @@ export const appInitMethods = {
       configurePrompts(cfg.promptConfig, cfg.apiProvider || 'claude');
       configureTokenEstimate(cfg.charsPerToken);
       configureAppTimezone(cfg.appTimezone);
-      if (cfg.appTimezone) this.appTimezone = cfg.appTimezone;
+      if (cfg.appTimezone) this.$store.shell.appTimezone = cfg.appTimezone;
       if (cfg.appName) {
-        this.appName = cfg.appName;
+        this.$store.shell.appName = cfg.appName;
         document.title = cfg.appName;
         const meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
         if (meta) meta.setAttribute('content', cfg.appName);
       }
-      if (cfg.appVersion) this.appVersion = cfg.appVersion;
+      if (cfg.appVersion) this.$store.shell.appVersion = cfg.appVersion;
       // Build-Guard: window.__SHELL_BUILD ist der Build, mit dem DIESE Shell
       // ausgeliefert wurde (aus dem gecachten /sw-manifest.js); cfg.shellBuild
       // ist der aktuelle Server-Build. Weichen sie ab, ist eine neue Generation
@@ -232,7 +232,7 @@ export const appInitMethods = {
       this._applyingHash = false;
       if (this.$store.nav.selectedBookId) {
         try {
-          localStorage.setItem(`sw:lastBookId:${this.currentUser?.email || ''}`, String(this.$store.nav.selectedBookId));
+          localStorage.setItem(`sw:lastBookId:${this.$store.session.currentUser?.email || ''}`, String(this.$store.nav.selectedBookId));
         } catch (_) {}
       }
       this._setupHashRouting();
@@ -248,7 +248,7 @@ export const appInitMethods = {
       for (const [key] of FILTER_SCOPES) {
         this.$watch(key, (val) => {
           if (!this.$store.nav.selectedBookId) return;
-          setFilters(this.currentUser?.email, this.$store.nav.selectedBookId, key, val);
+          setFilters(this.$store.session.currentUser?.email, this.$store.nav.selectedBookId, key, val);
         }, { deep: true });
       }
 
@@ -264,7 +264,7 @@ export const appInitMethods = {
         // also überspringen.
         if (String(newVal) === String(oldVal)) return;
         try {
-          localStorage.setItem(`sw:lastBookId:${this.currentUser?.email || ''}`, String(newVal));
+          localStorage.setItem(`sw:lastBookId:${this.$store.session.currentUser?.email || ''}`, String(newVal));
         } catch (_) {}
         this._resetBookScopedState();
         this._loadBookRole(newVal);
@@ -286,7 +286,7 @@ export const appInitMethods = {
     }
     } finally {
       document.documentElement.removeAttribute('data-app-loading');
-      this.appReady = true;
+      this.$store.shell.appReady = true;
     }
   },
 };

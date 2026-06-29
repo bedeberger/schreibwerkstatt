@@ -36,7 +36,7 @@ const SLASH_ITEMS = [
 // liest live aus dem Root.
 function _formatStamp(kind) {
   const app = window.__app;
-  const tag = localeTag(app?.uiLocale);
+  const tag = localeTag(Alpine.store('shell').uiLocale);
   const d = new Date();
   if (kind === 'date') {
     return d.toLocaleDateString(tag, tzOpts({ day: '2-digit', month: '2-digit', year: 'numeric' }));

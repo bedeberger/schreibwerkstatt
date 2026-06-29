@@ -51,7 +51,7 @@ export const cardsMethods = {
     // Letzte Seite restaurieren, falls vorhanden und im aktuellen Buch noch
     // existiert. Bei explizitem Home-Klick (resetView) übersprungen.
     if (restoreLastPage) {
-      const lastId = getLastPageId(this.currentUser?.email, this.$store.nav.selectedBookId);
+      const lastId = getLastPageId(this.$store.session.currentUser?.email, this.$store.nav.selectedBookId);
       if (lastId && Array.isArray(this.$store.nav.pages) && this.$store.nav.pages.length) {
         const page = this.$store.nav.pages.find(p => p.id === lastId);
         if (page) {

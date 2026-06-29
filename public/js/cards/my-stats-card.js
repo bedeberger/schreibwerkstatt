@@ -211,7 +211,7 @@ export function registerMyStatsCard() {
 
     // Wochentags-Kurzlabels Mo..So (Locale-aware, TZ-bereinigt).
     myStatsWeekdayLabels() {
-      const tag = window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       const fmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
       const monRef = new Date(2027, 0, 4); // 2027-01-04 ist ein Montag
       return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(monRef.getTime() + i * 86400000)));
@@ -220,7 +220,7 @@ export function registerMyStatsCard() {
     // Datum eines Streak-/Bestleistungs-Tages lesbar formatieren.
     myStatsDateLabel(iso) {
       if (!iso) return '';
-      const tag = window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       return new Date(iso + 'T12:00:00').toLocaleDateString(tag, tzOpts({ day: 'numeric', month: 'short', year: 'numeric' }));
     },
 
@@ -311,7 +311,7 @@ export function registerMyStatsCard() {
     // Zahl mit einer Nachkommastelle (Lesbarkeitswerte), Locale-aware.
     myStatsDec(n) {
       if (n == null) return '–';
-      const loc = window.__app.uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
       return Number(n).toLocaleString(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     },
 
@@ -411,7 +411,7 @@ export function registerMyStatsCard() {
       const labels = dates.map(d => { const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y.slice(2)}`; });
 
       const metricLabel = window.__app.t(METRIC_KEYS[metric] || metric);
-      const localeTag = (window.__app.uiLocale === 'en') ? 'en-US' : 'de-CH';
+      const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
       const isDecimal = metric === 'normseiten';
       const fmt = v => (v == null) ? '' : (isDecimal
         ? v.toLocaleString(localeTag, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -509,7 +509,7 @@ export function registerMyStatsCard() {
 
     // Locale-aware Tausender-Trennung (Swiss: de-CH = Apostroph).
     _myStatsFmt(n) {
-      const loc = window.__app.uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
       return Number(n || 0).toLocaleString(loc);
     },
 

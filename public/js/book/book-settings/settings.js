@@ -352,7 +352,7 @@ export const settingsMethods = {
   /** Gibt die Buchtyp-Liste für die aktuelle Sprache zurück (aus promptConfig). */
   bookSettingsBuchtypen() {
     const lang = this.bookSettingsLanguage || 'de';
-    const typen = window.__app.promptConfig?.buchtypen?.[lang] || {};
+    const typen = Alpine.store('shell').promptConfig?.buchtypen?.[lang] || {};
     return Object.entries(typen).map(([key, val]) => ({ key, label: val.label }));
   },
 

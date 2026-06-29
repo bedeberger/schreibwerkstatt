@@ -4,29 +4,29 @@
           class="avatar-btn"
           :class="{ 'avatar-btn--active': showAvatarMenu }"
           @click="showAvatarMenu = !showAvatarMenu"
-          :data-tip="currentUser?.name || currentUser?.email || ''"
-          :aria-label="currentUser?.name || currentUser?.email || ''"
+          :data-tip="$store.session.currentUser?.name || $store.session.currentUser?.email || ''"
+          :aria-label="$store.session.currentUser?.name || $store.session.currentUser?.email || ''"
           aria-haspopup="menu"
           :aria-expanded="showAvatarMenu">
-    <template x-if="currentUser?.picture">
-      <img class="avatar-btn-img" :src="currentUser.picture" :alt="currentUser?.name || currentUser?.email || ''" referrerpolicy="no-referrer" @error="currentUser.picture = null">
+    <template x-if="$store.session.currentUser?.picture">
+      <img class="avatar-btn-img" :src="$store.session.currentUser.picture" :alt="$store.session.currentUser?.name || $store.session.currentUser?.email || ''" referrerpolicy="no-referrer" @error="$store.session.currentUser.picture = null">
     </template>
-    <template x-if="!currentUser?.picture">
+    <template x-if="!$store.session.currentUser?.picture">
       <span class="avatar-btn-initials" x-text="_avatarInitials()"></span>
     </template>
   </button>
 
   <div class="avatar-menu-panel" x-show="showAvatarMenu" x-cloak role="menu">
     <div class="avatar-menu-header">
-      <template x-if="currentUser?.picture">
-        <img class="avatar-menu-header-img" :src="currentUser.picture" :alt="currentUser?.name || currentUser?.email || ''" referrerpolicy="no-referrer" @error="currentUser.picture = null">
+      <template x-if="$store.session.currentUser?.picture">
+        <img class="avatar-menu-header-img" :src="$store.session.currentUser.picture" :alt="$store.session.currentUser?.name || $store.session.currentUser?.email || ''" referrerpolicy="no-referrer" @error="$store.session.currentUser.picture = null">
       </template>
-      <template x-if="!currentUser?.picture">
+      <template x-if="!$store.session.currentUser?.picture">
         <span class="avatar-menu-header-avatar" x-text="_avatarInitials()"></span>
       </template>
       <div class="avatar-menu-header-text">
-        <div class="avatar-menu-name" x-text="currentUser?.name || currentUser?.email"></div>
-        <div class="avatar-menu-email" x-show="currentUser?.name && currentUser?.email && currentUser.name !== currentUser.email" x-text="currentUser?.email"></div>
+        <div class="avatar-menu-name" x-text="$store.session.currentUser?.name || $store.session.currentUser?.email"></div>
+        <div class="avatar-menu-email" x-show="$store.session.currentUser?.name && $store.session.currentUser?.email && $store.session.currentUser.name !== $store.session.currentUser.email" x-text="$store.session.currentUser?.email"></div>
       </div>
     </div>
 
@@ -36,9 +36,9 @@
         <template x-for="opt in ['auto','light','dark']" :key="opt">
           <button type="button"
                   class="theme-segmented-btn"
-                  :class="{ 'is-active': themePref === opt }"
+                  :class="{ 'is-active': $store.shell.themePref === opt }"
                   @click="setTheme(opt)"
-                  :aria-pressed="themePref === opt"
+                  :aria-pressed="$store.shell.themePref === opt"
                   x-text="t({ auto: 'theme.auto', light: 'theme.light', dark: 'theme.dark' }[opt])"></button>
         </template>
       </div>
@@ -60,37 +60,37 @@
     </button>
 
     <button type="button" class="avatar-menu-item" role="menuitem"
-            x-show="currentUser?.role === 'admin'"
+            x-show="$store.session.currentUser?.role === 'admin'"
             @click="showAvatarMenu = false; toggleAdminUsersCard()">
       <span class="avatar-menu-item-label" x-text="t('admin.users.title')"></span>
     </button>
 
     <button type="button" class="avatar-menu-item" role="menuitem"
-            x-show="currentUser?.role === 'admin'"
+            x-show="$store.session.currentUser?.role === 'admin'"
             @click="showAvatarMenu = false; toggleAdminSettingsCard()">
       <span class="avatar-menu-item-label" x-text="t('admin.settings.title')"></span>
     </button>
 
     <button type="button" class="avatar-menu-item" role="menuitem"
-            x-show="currentUser?.role === 'admin'"
+            x-show="$store.session.currentUser?.role === 'admin'"
             @click="showAvatarMenu = false; toggleAdminUsageCard()">
       <span class="avatar-menu-item-label" x-text="t('admin.usage.title')"></span>
     </button>
 
     <button type="button" class="avatar-menu-item" role="menuitem"
-            x-show="currentUser?.role === 'admin'"
+            x-show="$store.session.currentUser?.role === 'admin'"
             @click="showAvatarMenu = false; toggleAdminCategoriesCard()">
       <span class="avatar-menu-item-label" x-text="t('admin.categories.title')"></span>
     </button>
 
     <button type="button" class="avatar-menu-item" role="menuitem"
-            x-show="currentUser?.role === 'admin'"
+            x-show="$store.session.currentUser?.role === 'admin'"
             @click="showAvatarMenu = false; toggleAdminBooksCard()">
       <span class="avatar-menu-item-label" x-text="t('admin.books.title')"></span>
     </button>
 
     <button type="button" class="avatar-menu-item" role="menuitem"
-            x-show="currentUser?.role === 'admin'"
+            x-show="$store.session.currentUser?.role === 'admin'"
             @click="showAvatarMenu = false; toggleAdminLogsCard()">
       <span class="avatar-menu-item-label" x-text="t('admin.logs.title')"></span>
     </button>
@@ -102,6 +102,6 @@
       <span x-text="apiProvider === 'ollama' ? 'Ollama · ' + ollamaModel : apiProvider === 'openai-compat' ? 'OpenAI · ' + openaiCompatModel : 'Claude · ' + claudeModel"></span>
     </div>
 
-    <a href="/auth/logout" class="avatar-menu-item avatar-menu-item--logout" role="menuitem" x-text="t('header.logout')" @click="logout($event)" x-show="!devMode"></a>
+    <a href="/auth/logout" class="avatar-menu-item avatar-menu-item--logout" role="menuitem" x-text="t('header.logout')" @click="logout($event)" x-show="!$store.session.devMode"></a>
   </div>
 </div>

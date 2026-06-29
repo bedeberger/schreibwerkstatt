@@ -39,7 +39,7 @@ export const adminDevicesMethods = {
     if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString(window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH',
+    return d.toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
       tzOpts({ dateStyle: 'medium', timeStyle: 'short' }));
   },
 

@@ -45,7 +45,7 @@ export const accessMethods = {
 
 
   shareCanInvite() {
-    return !!window.__app.currentUser?.can_invite_users;
+    return !!Alpine.store('session').currentUser?.can_invite_users;
   },
 
 

@@ -2,7 +2,7 @@
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/admin-parse-fails-card.js.
   `showAdminParseFailsCard` + `toggleAdminParseFailsCard` im Root. Nur sichtbar
-  bei $app.currentUser.role === 'admin'. Listet die Rohtext-Dumps aus
+  bei $store.session.currentUser.role === 'admin'. Listet die Rohtext-Dumps aus
   ai_parse_fails/ (lib/ai.js#_dumpParseFail).
 -->
 <div class="card card--admin-parse-fails" x-data="adminParseFailsCard" x-show="$app.showAdminParseFailsCard" x-cloak>

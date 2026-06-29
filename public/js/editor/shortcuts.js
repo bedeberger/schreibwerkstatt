@@ -246,10 +246,10 @@ export const shortcutsMethods = {
   // (siehe index.html `@keydown.capture.window`), damit es vor der regulären
   // Hotkey-Kette greift und sie via stopImmediatePropagation abklemmen kann.
   handleBossKey(event) {
-    if (this.bossScreenActive) {
+    if (this.$store.shell.bossScreenActive) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      this.bossScreenActive = false;
+      this.$store.shell.bossScreenActive = false;
       return;
     }
     const plainF9 = event.key === 'F9'
@@ -259,6 +259,6 @@ export const shortcutsMethods = {
     // editMode ebenfalls true (Focus läuft auf der Notebook-Save-Pipeline).
     if (!this.editMode) return;
     event.preventDefault();
-    this.bossScreenActive = true;
+    this.$store.shell.bossScreenActive = true;
   },
 };

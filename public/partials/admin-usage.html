@@ -2,7 +2,7 @@
 <!--
   Sub-Komponente — siehe public/js/cards/admin-usage-card.js.
   `showAdminUsageCard` + `toggleAdminUsageCard` im Root. Sichtbar nur bei
-  $app.currentUser.isAdmin (Frontend-Guard zusaetzlich zum Server-side
+  $store.session.currentUser.isAdmin (Frontend-Guard zusaetzlich zum Server-side
   requireAdmin). Privacy-Boundary: keine Buchtitel, kein Inhalt — Admin
   sieht USD/Tokens + anonyme book_id.
 -->
@@ -172,7 +172,7 @@
             <td x-text="adminUsageInt(r.cacheCreationIn)"></td>
             <td x-text="adminUsageMoney(r.usd)"></td>
             <td x-text="r.bookId ? ('#' + r.bookId) : '—'"></td>
-            <td x-text="new Date(r.queuedAt).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $app.appTimezone })"></td>
+            <td x-text="new Date(r.queuedAt).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $store.shell.appTimezone })"></td>
           </tr>
         </template>
       </tbody>
@@ -244,7 +244,7 @@
             <td x-text="adminUsageInt(r.cacheReadIn)"></td>
             <td x-text="adminUsageMoney(r.usd)"></td>
             <td x-text="r.bookId ? ('#' + r.bookId) : '—'"></td>
-            <td x-text="new Date(r.createdAt).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $app.appTimezone })"></td>
+            <td x-text="new Date(r.createdAt).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $store.shell.appTimezone })"></td>
           </tr>
         </template>
       </tbody>
@@ -359,7 +359,7 @@
             <td x-text="r.email"></td>
             <td x-text="r.featureKey"></td>
             <td x-text="adminUsageInt(r.count)"></td>
-            <td x-text="r.lastUsed ? new Date(r.lastUsed).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $app.appTimezone }) : '—'"></td>
+            <td x-text="r.lastUsed ? new Date(r.lastUsed).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { timeZone: $store.shell.appTimezone }) : '—'"></td>
           </tr>
         </template>
       </tbody>

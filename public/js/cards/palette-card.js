@@ -163,7 +163,7 @@ export function registerPaletteCard() {
         (Alpine.store('nav').tree || []).length,
         (root.recentFeatureKeys || []).join(','),
         (root.recentPageIds || []).join(','),
-        root.uiLocale || '',
+        root.$store.shell.uiLocale || '',
       ].join('|');
       if (this._sectionsCache && this._sectionsCacheKey === cacheKey) {
         return this._sectionsCache;
@@ -198,7 +198,7 @@ export function registerPaletteCard() {
         return [{ key: parsed.provider.key, labelKey: parsed.provider.sectionKey, items }];
       }
 
-      const availableActions = root.devMode ? ACTIONS.filter(a => a.key !== 'action.logout') : ACTIONS;
+      const availableActions = root.$store.session.devMode ? ACTIONS.filter(a => a.key !== 'action.logout') : ACTIONS;
 
       // Befehls-Modus: nur Aktionen.
       if (parsed.mode === 'commands') {
@@ -463,7 +463,7 @@ export function registerPaletteCard() {
       if (idx >= 0) this.paletteIdx = idx;
     },
 
-    // t() darf nicht aus dem Root extrahiert werden — i18n.t liest `this.uiLocale`,
+    // t() darf nicht aus dem Root extrahiert werden — i18n.t liest `this.$store.shell.uiLocale`,
     // ein unbound-Aufruf wirft TypeError und kappt das gesamte Alpine-Rendering.
     _t(key, params) {
       const root = window.__app;

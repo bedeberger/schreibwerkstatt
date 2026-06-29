@@ -35,8 +35,8 @@ export const bookCreateMethods = {
 
   // Buchtyp-Labels in der UI-Sprache; Keys sind sprachübergreifend identisch.
   bookCreateBuchtypOptions() {
-    const lang = this.uiLocale || 'de';
-    const typen = this.promptConfig?.buchtypen?.[lang] || this.promptConfig?.buchtypen?.de || {};
+    const lang = this.$store.shell.uiLocale || 'de';
+    const typen = this.$store.shell.promptConfig?.buchtypen?.[lang] || this.$store.shell.promptConfig?.buchtypen?.de || {};
     return Object.entries(typen).map(([key, val]) => ({ value: key, label: val.label }));
   },
 
@@ -77,8 +77,8 @@ export const bookCreateMethods = {
       // schlägt es fehl, existiert das Buch trotzdem und die Werte lassen sich in
       // den Settings nachpflegen (wohin wir gleich navigieren) — kein Doppelanlegen.
       try {
-        const lang = this.uiLocale || 'de';
-        const region = this.uiLocale === 'en' ? 'US' : 'CH';
+        const lang = this.$store.shell.uiLocale || 'de';
+        const region = this.$store.shell.uiLocale === 'en' ? 'US' : 'CH';
         await fetch(`/booksettings/${created.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },

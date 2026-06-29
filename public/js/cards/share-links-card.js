@@ -357,7 +357,7 @@ export function registerShareLinksCard() {
       if (!iso) return '';
       try {
         const d = new Date(iso);
-        return d.toLocaleString(window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH', tzOpts({
+        return d.toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH', tzOpts({
           dateStyle: 'medium',
           timeStyle: 'short',
         }));
@@ -390,7 +390,7 @@ export function registerShareLinksCard() {
     // Intl.RelativeTimeFormat. Unter 1 Minute auf 1 geklemmt, damit nie
     // „in 0 Minuten" erscheint.
     _relFuture(d) {
-      const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       const rtf = new Intl.RelativeTimeFormat(tag, { numeric: 'auto' });
       const diffMin = Math.round((d.getTime() - Date.now()) / 60000);
       if (diffMin < 60) return rtf.format(Math.max(diffMin, 1), 'minute');

@@ -56,6 +56,9 @@
     // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr) — die Karte
     // liest selectedBookId/books direkt via $store.nav / Alpine.store('nav').
     window.Alpine.store('nav', { books: [{ id: 102, name: 'Test-Buch' }], selectedBookId: 102, pages: [], tree: [] });
+    // Shell-State (App-Meta) lebt in Alpine.store('shell') — book-settings/settings.js
+    // liest Alpine.store('shell').promptConfig (Buchtyp-Combobox) + appTimezone.
+    window.Alpine.store('shell', { uiLocale: 'de', appTimezone: 'Europe/Zurich', promptConfig: { buchtypen: { de: {} } } });
 
     // Combobox-Stub (echte Impl lebt mid-file in app.js). Tests interagieren
     // nicht mit Comboboxes; Stub verhindert nur Expression-Errors.

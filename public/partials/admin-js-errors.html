@@ -2,7 +2,7 @@
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/admin-js-errors-card.js.
   `showAdminJsErrorsCard` + `toggleAdminJsErrorsCard` im Root. Nur sichtbar bei
-  $app.currentUser.role === 'admin'. Listet die vom Browser gemeldeten Fehler
+  $store.session.currentUser.role === 'admin'. Listet die vom Browser gemeldeten Fehler
   aus js_errors (public/js/client-error.js → /telemetry/js-error).
 -->
 <div class="card card--admin-js-errors" x-data="adminJsErrorsCard" x-show="$app.showAdminJsErrorsCard" x-cloak>

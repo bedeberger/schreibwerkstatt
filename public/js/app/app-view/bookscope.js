@@ -102,7 +102,7 @@ export const bookscopeMethods = {
   // gespeicherte Werte aus localStorage. Wird bei Buchwechsel und beim
   // initialen Bootstrap aufgerufen.
   _restoreBookPrefs(bookId) {
-    const email = this.currentUser?.email;
+    const email = this.$store.session.currentUser?.email;
     for (const [stateKey, defaults] of FILTER_SCOPES) {
       const target = this[stateKey];
       if (!target) continue;
@@ -136,7 +136,7 @@ export const bookscopeMethods = {
     try {
       try { await fetch('/config', { credentials: 'same-origin' }); }
       catch (e) { if (isNetErr(e)) needsRetry = true; }
-      if (this.sessionExpired) return;
+      if (this.$store.session.sessionExpired) return;
       if (this.isAdminOnly) return;
       if (this.editMode || this.editDirty) return;
       try {

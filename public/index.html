@@ -296,7 +296,7 @@
       @keydown.meta.s.prevent.window="if (editMode) quickSave()"
       @keydown.capture.window="handleBossKey($event)"
       @keydown.window="handleShortcutsHotkey($event); handleFocusHotkey($event); handleNavHotkey($event); handleFindingsHotkey($event); handleTreeKeydown($event); handleSynonymHotkey($event)"
-      @app-update-available.window="updateAvailable = true">
+      @app-update-available.window="$store.shell.updateAvailable = true">
 
 <!-- Blog-Sync-Card (WordPress): headless State-Anker, via $blog-Magic erreichbar. -->
 <div x-data="blogSyncCard" class="display-contents"></div>
@@ -306,27 +306,27 @@
 
 <!-- Chef-Taste (Boss-Key): schwarzer Privacy-Vorhang. F9 im Seiten-Editor blendet ein
      (handleBossKey), beliebige Taste oder Klick blendet wieder aus. -->
-<div class="boss-screen" x-show="bossScreenActive" x-cloak
-     @click.prevent.stop="bossScreenActive = false"
+<div class="boss-screen" x-show="$store.shell.bossScreenActive" x-cloak
+     @click.prevent.stop="$store.shell.bossScreenActive = false"
      aria-hidden="true"></div>
 
 <a class="skip-link" href="#main-content" x-text="t('a11y.skipToMain')"></a>
 
-<div class="session-banner" x-show="sessionExpired" x-cloak>
+<div class="session-banner" x-show="$store.session.sessionExpired" x-cloak>
   <span class="session-banner-text" x-text="t('session.expired')"></span>
   <a class="session-banner-btn" :href="'/login?returnTo=' + encodeURIComponent(location.pathname + location.search)" x-text="t('session.relogin')"></a>
 </div>
 
-<div class="session-banner" x-show="serverOffline && !sessionExpired" x-cloak>
+<div class="session-banner" x-show="$store.session.serverOffline && !$store.session.sessionExpired" x-cloak>
   <span class="session-banner-text" x-text="t('session.serverOffline')"></span>
   <button type="button" class="session-banner-btn" @click="location.reload()" x-text="t('session.retry')"></button>
 </div>
 
-<div class="session-banner session-banner--offline" x-show="isOffline && !sessionExpired && !serverOffline" x-cloak>
+<div class="session-banner session-banner--offline" x-show="$store.session.isOffline && !$store.session.sessionExpired && !$store.session.serverOffline" x-cloak>
   <span class="session-banner-text" x-text="t('session.offlineMode')"></span>
 </div>
 
-<div class="session-banner" x-show="updateAvailable && !sessionExpired" x-cloak>
+<div class="session-banner" x-show="$store.shell.updateAvailable && !$store.session.sessionExpired" x-cloak>
   <span class="session-banner-text" x-text="t('session.updateAvailable')"></span>
   <button type="button" class="session-banner-btn" @click="applyUpdate()" x-text="t('session.applyUpdate')"></button>
 </div>
@@ -348,24 +348,24 @@
   <div class="site-header-center">
     <h1 @click="resetView()" class="site-title" :data-tip="t('app.titleReset')">
       <img src="schreibwerkstatt_icon.svg" alt="" class="site-logo" width="64" height="64">
-      <span x-text="appName"></span>
+      <span x-text="$store.shell.appName"></span>
     </h1>
     <p class="subtitle"><span x-text="t('app.subtitle')"></span></p>
   </div>
-  <div class="header-actions" x-show="currentUser">
-    <div class="header-action-cluster" x-show="currentUser && !isAdminOnly" x-cloak>
+  <div class="header-actions" x-show="$store.session.currentUser">
+    <div class="header-action-cluster" x-show="$store.session.currentUser && !isAdminOnly" x-cloak>
       <div id="partial-komplett-status"></div>
     </div>
     <!-- Heute-Ring im Header: Donut links neben Avatar. Pulsiert bei aktivem
          Schreibtag, fuellt sich gegen book_settings.daily_goal_chars (per Buch).
          Klick oeffnet Meine Statistik. -->
-    <template x-if="currentUser && !isAdminOnly && $store.nav.selectedBookId && dailyProgressBookId == $store.nav.selectedBookId && !dailyProgressIsFinished">
+    <template x-if="$store.session.currentUser && !isAdminOnly && $store.nav.selectedBookId && dailyProgressBookId == $store.nav.selectedBookId && !dailyProgressIsFinished">
       <button type="button"
               class="header-today-ring"
               :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached, 'header-today-ring--empty': !headerTodayRing().active }"
               @click="toggleMyStatsCard()"
               :data-tip="headerTodayRing().active
-                ? t('overview.today.meta', { chars: headerTodayRing().chars.toLocaleString(uiLocale === 'de' ? 'de-CH' : 'en-US'), goal: headerTodayRing().goal.toLocaleString(uiLocale === 'de' ? 'de-CH' : 'en-US') })
+                ? t('overview.today.meta', { chars: headerTodayRing().chars.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US'), goal: headerTodayRing().goal.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US') })
                 : t('overview.today.idle')"
               :aria-label="t('overview.today.aria', { chars: headerTodayRing().chars, goal: headerTodayRing().goal, pct: headerTodayRing().pct })">
         <svg viewBox="0 0 36 36" aria-hidden="true">
@@ -381,7 +381,7 @@
     </template>
     <button type="button"
             class="icon-btn icon-btn--ghost header-help-btn"
-            x-show="currentUser && !isAdminOnly"
+            x-show="$store.session.currentUser && !isAdminOnly"
             x-cloak
             :aria-pressed="showHelpCard"
             @click="toggleHelpCard()"
@@ -392,11 +392,11 @@
     <div id="partial-avatar-menu"></div>
   </div>
 </div>
-<div class="dev-banner" x-show="devMode" x-cloak x-text="t('dev.banner')"></div>
+<div class="dev-banner" x-show="$store.session.devMode" x-cloak x-text="t('dev.banner')"></div>
 
 <!-- Welcome-Empty-State: neuer User ohne Buch. Ersetzt die Buch-Auswahl, solange
      kein einziges Buch existiert. Einziger sichtbarer CTA → Buch anlegen. -->
-<div class="card card--welcome" x-show="currentUser && !isAdminOnly && booksLoaded && $store.nav.books.length === 0" x-cloak>
+<div class="card card--welcome" x-show="$store.session.currentUser && !isAdminOnly && booksLoaded && $store.nav.books.length === 0" x-cloak>
   <div class="card-empty">
     <p class="card-empty-text" x-text="t('welcome.title')"></p>
     <p class="card-empty-hint" x-text="t('welcome.hint')"></p>
@@ -435,7 +435,7 @@
      Dropdown) statt einer separaten Filter-Zeile. Umbruch nur bei schmalem
      Viewport. -->
 <div class="card card--book-selector"
-     x-show="currentUser && showBookCard && !isAdminOnly && $store.nav.books.length > 0"
+     x-show="$store.session.currentUser && showBookCard && !isAdminOnly && $store.nav.books.length > 0"
      x-cloak>
   <div class="book-selector-bar">
     <div class="book-selector-combo"
@@ -452,15 +452,15 @@
             @click="openPalette()"
             :data-tip="t('palette.openHint')"
             :aria-label="t('palette.openHint')">
-      <span class="palette-hero-icon" aria-hidden="true" x-text="isMac ? '⌘' : 'Ctrl'"></span>
+      <span class="palette-hero-icon" aria-hidden="true" x-text="$store.shell.isMac ? '⌘' : 'Ctrl'"></span>
       <span class="palette-hero-text" x-text="t('palette.hero.text')"></span>
-      <kbd class="palette-hero-kbd" x-text="isMac ? '⌘K' : 'Ctrl+K'"></kbd>
+      <kbd class="palette-hero-kbd" x-text="$store.shell.isMac ? '⌘K' : 'Ctrl+K'"></kbd>
     </button>
   </div>
 </div>
 
 <div class="layout" :class="{ 'layout--no-sidebar': isAdminOnly }">
-<div class="layout-sidebar" x-show="currentUser && !isAdminOnly" x-cloak>
+<div class="layout-sidebar" x-show="$store.session.currentUser && !isAdminOnly" x-cloak>
   <div id="partial-sidebar"></div>
 </div><!-- end layout-sidebar -->
 <div class="layout-main" id="main-content" tabindex="-1">

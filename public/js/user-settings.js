@@ -44,9 +44,9 @@ export const userSettingsMethods = {
         throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
       }
       window.__app.focusGranularity = this.userSettingsFocusGranularity || 'paragraph';
-      const region = this.userSettingsDefaultRegion || (window.__app.uiLocale === 'en' ? 'US' : 'CH');
-      window.__app.defaultRegion = region;
-      document.documentElement.setAttribute('lang', `${window.__app.uiLocale || 'de'}-${region}`);
+      const region = this.userSettingsDefaultRegion || (Alpine.store('shell').uiLocale === 'en' ? 'US' : 'CH');
+      Alpine.store('shell').defaultRegion = region;
+      document.documentElement.setAttribute('lang', `${Alpine.store('shell').uiLocale || 'de'}-${region}`);
       this.userSettingsSaved = true;
       if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
       this._savedAtTimer = setTimeout(() => { this.userSettingsSaved = false; this._savedAtTimer = null; }, 2500);
@@ -60,7 +60,7 @@ export const userSettingsMethods = {
   /** Buchtyp-Liste abhängig von der gewählten Default-Sprache (fallback: de). */
   userSettingsBuchtypen() {
     const lang = this.userSettingsDefaultLanguage || 'de';
-    const typen = window.__app.promptConfig?.buchtypen?.[lang] || {};
+    const typen = Alpine.store('shell').promptConfig?.buchtypen?.[lang] || {};
     return Object.entries(typen).map(([key, val]) => ({ key, label: val.label }));
   },
 
@@ -178,7 +178,7 @@ export const userSettingsMethods = {
   macReleaseSizeMb() {
     const bytes = this.macRelease?.dmg?.sizeBytes || 0;
     if (!bytes) return '';
-    return (bytes / 1048576).toLocaleString(window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
+    return (bytes / 1048576).toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
   },
 
   /** Dezent erkennen, ob der Besucher auf macOS ist (nur für einen Hinweis). */
@@ -203,7 +203,7 @@ export const userSettingsMethods = {
   androidReleaseSizeMb() {
     const bytes = this.androidRelease?.apk?.sizeBytes || 0;
     if (!bytes) return '';
-    return (bytes / 1048576).toLocaleString(window.__app.uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
+    return (bytes / 1048576).toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
   },
 
   /** Dezent erkennen, ob der Besucher auf Android ist (nur für einen Hinweis). */

@@ -41,15 +41,15 @@ export const adminBooksMethods = {
   },
 
   fmtChars(n) {
-    return formatNumber(Number(n) || 0, window.__app?.uiLocale, 0);
+    return formatNumber(Number(n) || 0, Alpine.store('shell').uiLocale, 0);
   },
 
   fmtNormseiten(chars) {
-    return formatNumber(charsToNormseiten(chars), window.__app?.uiLocale, 1);
+    return formatNumber(charsToNormseiten(chars), Alpine.store('shell').uiLocale, 1);
   },
 
   fmtBytes(n) {
-    return _fmtBytes(n, window.__app?.uiLocale);
+    return _fmtBytes(n, Alpine.store('shell').uiLocale);
   },
 
   async assignOwner(book) {

@@ -107,7 +107,7 @@ export const bookstatsMethods = {
     try {
       const result = await fetchJson('/sync/book/' + Alpine.store('nav').selectedBookId, { method: 'POST' });
       if (result.error) throw new Error(result.error);
-      const localeTag = (window.__app.uiLocale === 'en') ? 'en-US' : 'de-CH';
+      const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
       const now = new Date().toLocaleTimeString(localeTag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
       this.bookStatsSyncStatus = window.__app.t('bookstats.syncDone', { time: now });
       await this.loadBookStats(Alpine.store('nav').selectedBookId);
@@ -201,7 +201,7 @@ export const bookstatsMethods = {
 
     const metricLabel = METRIC_KEYS[metric] ? window.__app.t(METRIC_KEYS[metric]) : metric;
 
-    const localeTag = (window.__app.uiLocale === 'en') ? 'en-US' : 'de-CH';
+    const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
     const isDecimal = isPpc || isCum || metric === 'avg_sentence_len' || metric === 'avg_lix' || metric === 'avg_flesch_de' || metric === 'normseiten';
     const fmt = v => isDecimal ? v.toLocaleString(localeTag, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
       : Math.round(v).toLocaleString(localeTag);

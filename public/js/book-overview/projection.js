@@ -135,7 +135,7 @@ export const projectionMethods = {
   // wird hier nicht gebraucht — Datum ohne Uhrzeit, lokaler Kalendertag).
   overviewGoalDateLabel(iso) {
     if (!iso) return '';
-    const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
     return new Date(iso + 'T12:00:00').toLocaleDateString(tag, { day: 'numeric', month: 'short', year: 'numeric' });
   },
 };

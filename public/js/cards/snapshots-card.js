@@ -426,14 +426,14 @@ export function registerSnapshotsCard() {
 
     formatNum(n) {
       const app = window.__app;
-      const locale = app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       return Number(n || 0).toLocaleString(locale);
     },
 
     formatDelta(d) {
       if (d == null) return '';
       const app = window.__app;
-      const locale = app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       return Number(d).toLocaleString(locale, { signDisplay: 'exceptZero' });
     },
 
@@ -446,7 +446,7 @@ export function registerSnapshotsCard() {
     },
 
     isOwn(snap) {
-      const me = window.__app?.currentUser?.email;
+      const me = Alpine.store('session').currentUser?.email;
       return !!me && !!snap?.user_email && String(me).toLowerCase() === String(snap.user_email).toLowerCase();
     },
 

@@ -71,7 +71,7 @@ document.addEventListener('alpine:init', () => {
     // als Landing. Dev-Mode-Admin (LOCAL_DEV_MODE) bleibt davon ausgenommen,
     // damit lokale Entwicklung mit Admin-Konto die volle UI behält.
     get isAdminOnly() {
-      return !!this.currentUser?.isAdmin && !this.devMode;
+      return !!this.$store.session.currentUser?.isAdmin && !this.$store.session.devMode;
     },
     // O(1)-Lookup-Maps für Figuren/Orte. Rebuild nur bei Referenz-Wechsel
     // (loadFiguren/loadOrte reassignen, pushen nie). In Render-Loops
@@ -203,8 +203,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     get _numLocale() {
-      const region = this.defaultRegion || (this.uiLocale === 'en' ? 'US' : 'CH');
-      const lang = this.uiLocale || 'de';
+      const region = this.$store.shell.defaultRegion || (this.$store.shell.uiLocale === 'en' ? 'US' : 'CH');
+      const lang = this.$store.shell.uiLocale || 'de';
       return `${lang}-${region}`;
     },
 

@@ -349,7 +349,7 @@ export const appJobsCoreMethods = {
       this._detectFinishedJobs(items);
       this.$store.jobs.jobQueueItems = items;
       this._jobQueueFailures = 0;
-      if (this.serverOffline) this.serverOffline = false;
+      if (this.$store.session.serverOffline) this.$store.session.serverOffline = false;
     } catch (e) {
       // Ein Setzer schlägt fehl, wenn der Server down ist oder die Session
       // abgelaufen ist – kein Grund für dauerndes Poll-Spam. Nach 2 Fehlern
@@ -363,8 +363,8 @@ export const appJobsCoreMethods = {
       // sobald der User zum Tab zurückkehrt.
       if (document.hidden) return;
       this._jobQueueFailures = (this._jobQueueFailures || 0) + 1;
-      if (this._jobQueueFailures >= 2 && !this.serverOffline && !this.sessionExpired) {
-        this.serverOffline = true;
+      if (this._jobQueueFailures >= 2 && !this.$store.session.serverOffline && !this.$store.session.sessionExpired) {
+        this.$store.session.serverOffline = true;
       }
       if (this._jobQueueFailures >= 5 && this.$store.jobs._jobQueueTimer) {
         clearInterval(this.$store.jobs._jobQueueTimer);

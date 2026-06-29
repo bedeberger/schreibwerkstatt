@@ -47,9 +47,9 @@ export const treeMethods = {
   // `rel` kommt aus Intl.RelativeTimeFormat (heute / gestern / vor N Tagen).
   _fmtRelativeLine(d, prefix) {
     const diff = Math.max(0, _diffDays(d));
-    const time = _fmtTime(d, this.uiLocale);
-    if (diff < 7) return this.t(`${prefix}Rel`, { rel: relativeDay(diff, this.uiLocale), time });
-    return this.t(`${prefix}On`, { date: _fmtDateShort(d, this.uiLocale), time });
+    const time = _fmtTime(d, this.$store.shell.uiLocale);
+    if (diff < 7) return this.t(`${prefix}Rel`, { rel: relativeDay(diff, this.$store.shell.uiLocale), time });
+    return this.t(`${prefix}On`, { date: _fmtDateShort(d, this.$store.shell.uiLocale), time });
   },
 
   pageStatusTooltip(page) {
@@ -68,7 +68,7 @@ export const treeMethods = {
     if (editedSince) lines.push(this.t('sidebar.status.editedSince'));
     else if (rec.pending) lines.push(this.t('sidebar.status.pending'));
     lines.push(lektLine);
-    const myEmail = this.currentUser?.email || null;
+    const myEmail = this.$store.session.currentUser?.email || null;
     if (rec.by && myEmail && rec.by !== myEmail) {
       lines.push(this.t('sidebar.status.lektoratBy', { user: rec.by }));
     }
@@ -83,7 +83,7 @@ export const treeMethods = {
       [pageId]: {
         at: new Date().toISOString(),
         pending: !!pending,
-        by: this.currentUser?.email || null,
+        by: this.$store.session.currentUser?.email || null,
       },
     };
   },
@@ -200,7 +200,7 @@ export const treeMethods = {
   // sie sind reine Page-Wrapper ohne Toggle.
   _treeOpenStorageKey(bookId) {
     if (!bookId) return '';
-    return `sw:treeOpen:${this.currentUser?.email || ''}:${bookId}`;
+    return `sw:treeOpen:${this.$store.session.currentUser?.email || ''}:${bookId}`;
   },
   _loadTreeOpenState(bookId) {
     try {
@@ -289,7 +289,7 @@ export const treeMethods = {
       if (!this.$store.nav.selectedBookId || !this.$store.nav.books.some(b => String(b.id) === String(this.$store.nav.selectedBookId))) {
         let restored = '';
         try {
-          const key = `sw:lastBookId:${this.currentUser?.email || ''}`;
+          const key = `sw:lastBookId:${this.$store.session.currentUser?.email || ''}`;
           const stored = localStorage.getItem(key);
           if (stored && this.$store.nav.books.some(b => String(b.id) === String(stored))) restored = String(stored);
         } catch (_) {}

@@ -70,7 +70,7 @@
                         :class="{ 'internal-link': ch.chapter_id != null }"
                         @click="ch.chapter_id != null && fehlerHeatmapJumpToChapter(ch)"
                         x-text="fehlerHeatmapChapterName(ch)"></span>
-                  <span class="heatmap-rowhead-sub" x-text="$app.t('fehlerHeatmap.words', { n: (ch.words || 0).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH') })"></span>
+                  <span class="heatmap-rowhead-sub" x-text="$app.t('fehlerHeatmap.words', { n: (ch.words || 0).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH') })"></span>
                 </th>
                 <td class="heatmap-numcol">
                   <span x-text="$app.t('fehlerHeatmap.coverageLabel', { checked: ch.pages_checked, total: ch.pages_total })"></span>

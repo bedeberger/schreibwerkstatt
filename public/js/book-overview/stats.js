@@ -59,7 +59,7 @@ export const statsMethods = {
     return this._memo('last7Days', [a, tokEsts], () => {
       const charsByDate = new Map();
       for (const s of a) charsByDate.set(s.recorded_at, Number(s.chars) || 0);
-      const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       const fmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
       const todayIso = localIsoDate();
       const todayDelta = this._charsTodayDelta();
@@ -143,7 +143,7 @@ export const statsMethods = {
                   :                'var(--color-accent)';
       const endX = pts[pts.length - 1][0];
       const endY = pts[pts.length - 1][1];
-      const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       const dateFmt = new Intl.DateTimeFormat(tag, tzOpts({ day: 'numeric', month: 'short', year: 'numeric' }));
       const numFmt = (n) => Number(n || 0).toLocaleString(tag);
       const unit = window.__app?.t?.('bookstats.unit.z') || 'Z';
@@ -271,7 +271,7 @@ export const statsMethods = {
       }
       const totalActiveDays = linear.filter(x => x.delta != null && x.delta > 0).length;
 
-      const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       const dayFmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
       const dayLabels = [];
       // Wochenstart Mo: nehme einen Mo als Referenz (z.B. 4. Jan 2027 ist Mo)

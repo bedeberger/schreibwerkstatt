@@ -126,6 +126,9 @@
       window.Alpine.magic('app', () => window.__app);
       // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr).
       window.Alpine.store('nav', { books: [], selectedBookId: 1, pages: PAGES, tree: [] });
+      // Shell-State (App-Meta) lebt in Alpine.store('shell') — tagebuch-rueckblick.js
+      // liest Alpine.store('shell').uiLocale (Datums-Locale).
+      window.Alpine.store('shell', { uiLocale: 'de' });
       registerTagebuchRueckblickCard();
     });
 

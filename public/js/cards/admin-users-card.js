@@ -1,5 +1,5 @@
 // Alpine-Sub-Komponente fuer die Admin-User-Liste. Sichtbarkeit ueber
-// $app.currentUser.role; State + Lifecycle hier, Show-Flag
+// $store.session.currentUser.role; State + Lifecycle hier, Show-Flag
 // (`showAdminUsersCard`) im Root.
 
 import { adminUsersMethods } from '../admin/admin-users.js';

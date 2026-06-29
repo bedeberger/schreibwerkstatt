@@ -112,14 +112,14 @@ export const fehlerHeatmapMethods = {
     return window.__app.t('fehlerHeatmap.cellTooltip', {
       count: cell.count,
       pages: cell.pages,
-      per1k: formatNumber(cell.per1k, window.__app.uiLocale, 1),
+      per1k: formatNumber(cell.per1k, Alpine.store('shell').uiLocale, 1),
     });
   },
 
   fehlerHeatmapCellLabel(chapterKey, typ) {
     const cell = this.fehlerHeatmapData?.matrix?.[chapterKey]?.[typ];
     if (!cell || !cell.count) return '–';
-    return formatNumber(cell.count, window.__app.uiLocale, 0);
+    return formatNumber(cell.count, Alpine.store('shell').uiLocale, 0);
   },
 
   toggleFehlerHeatmapDetail(chapterKey, typ) {

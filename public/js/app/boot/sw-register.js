@@ -74,7 +74,7 @@ export function registerServiceWorker() {
         // Fokusmodus liest/schreibt. Auto-Save kann editDirty zwischendurch
         // auf false flippen — focusActive/editMode als härteres Signal.
         if (app?.editMode || app?.focusActive || app?.editDirty) {
-          app.updateAvailable = true;
+          app.$store.shell.updateAvailable = true;
           return;
         }
         // Offline nicht reloaden: der frisch aktivierte SW hat die alte
@@ -84,7 +84,7 @@ export function registerServiceWorker() {
         // dem data-app-loading-Gate unsichtbar (schwarz). Stattdessen Banner;
         // Reload kommt beim nächsten Online-Wechsel.
         if (!navigator.onLine) {
-          if (app) app.updateAvailable = true;
+          if (app) app.$store.shell.updateAvailable = true;
           window.addEventListener('online', () => location.reload(), { once: true });
           return;
         }
@@ -100,11 +100,11 @@ export function registerServiceWorker() {
       const requestCoherentReload = () => {
         const app = window.__app;
         if (app?.editMode || app?.focusActive || app?.editDirty) {
-          if (app) app.updateAvailable = true;
+          if (app) app.$store.shell.updateAvailable = true;
           return;
         }
         if (!navigator.onLine) {
-          if (app) app.updateAvailable = true;
+          if (app) app.$store.shell.updateAvailable = true;
           window.addEventListener('online', () => location.reload(), { once: true });
           return;
         }
@@ -112,7 +112,7 @@ export function registerServiceWorker() {
         try { last = Number(sessionStorage.getItem('sw-coherent-reload') || 0); } catch {}
         const now = Date.now();
         if (now - last < 30_000) {
-          if (app) app.updateAvailable = true;
+          if (app) app.$store.shell.updateAvailable = true;
           return;
         }
         try { sessionStorage.setItem('sw-coherent-reload', String(now)); } catch {}

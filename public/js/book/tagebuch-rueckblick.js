@@ -30,7 +30,7 @@ export const tagebuchRueckblickMethods = {
   // absteigend (neueste zuerst). Format: [{ value, label }].
   availableZeitraeume() {
     const pages = Alpine.store('nav').pages || [];
-    return this._memo('zeitraeume', [pages, window.__app?.uiLocale],
+    return this._memo('zeitraeume', [pages, Alpine.store('shell').uiLocale],
       () => this._computeZeitraeume(pages));
   },
 
@@ -56,7 +56,7 @@ export const tagebuchRueckblickMethods = {
     if (mm) {
       const d = new Date(Date.UTC(parseInt(mm[1], 10), parseInt(mm[2], 10) - 1, 1));
       try {
-        return d.toLocaleDateString(window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH',
+        return d.toLocaleDateString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
           tzOpts({ year: 'numeric', month: 'long' }));
       } catch { return v; }
     }
@@ -149,7 +149,7 @@ export const tagebuchRueckblickMethods = {
     if (!m) return String(datum || '');
     const d = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12));
     try {
-      return d.toLocaleDateString(window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH',
+      return d.toLocaleDateString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
         tzOpts({ weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }));
     } catch { return String(datum); }
   },
@@ -201,7 +201,7 @@ export const tagebuchRueckblickMethods = {
   filteredRueckblickHistory() {
     const all = this.rueckblickHistory || [];
     const q = String(this.rbHistorySearch || '').trim().toLowerCase();
-    return this._memo('histFilter', [all, q, window.__app?.uiLocale], () => {
+    return this._memo('histFilter', [all, q, Alpine.store('shell').uiLocale], () => {
       if (!q) return all;
       return all.filter(e => this._rueckblickHaystack(e).includes(q));
     });
@@ -265,7 +265,7 @@ export const tagebuchRueckblickMethods = {
   rueckblickEntryDate(iso) {
     if (!iso) return '';
     try {
-      return new Date(iso).toLocaleString(window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH',
+      return new Date(iso).toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
         tzOpts({ day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
     } catch { return iso; }
   },

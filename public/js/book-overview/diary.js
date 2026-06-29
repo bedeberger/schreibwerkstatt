@@ -125,7 +125,7 @@ export const diaryMethods = {
         if (!m) continue;
         entries.push({ iso: `${m[1]}-${m[2]}-${m[3]}`, chars: Number(tokEsts[p.id]?.chars || 0) });
       }
-      const en = app?.uiLocale === 'en';
+      const en = Alpine.store('shell').uiLocale === 'en';
       const rows = this._computeDiaryWeekdayRhythm(entries, !en);
       const tag = en ? 'en-US' : 'de-CH';
       const fmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
@@ -201,7 +201,7 @@ export const diaryMethods = {
 
   // 12 lokalisierte Kurz-Monatsnamen (Spaltenköpfe + Tooltip-Zeitraum).
   rueckblickMonthLabels() {
-    const locale = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
     return this._memo('rbMonthLabels', [locale], () => {
       const fmt = new Intl.DateTimeFormat(locale, tzOpts({ month: 'short' }));
       const out = [];
@@ -212,7 +212,7 @@ export const diaryMethods = {
 
   rueckblickCreatedLabel(iso) {
     if (!iso) return '';
-    const locale = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
     try {
       return new Date(iso).toLocaleDateString(locale, tzOpts({ day: '2-digit', month: '2-digit', year: 'numeric' }));
     } catch { return ''; }

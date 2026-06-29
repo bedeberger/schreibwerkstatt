@@ -90,6 +90,9 @@
         // Nav-State lebt in Alpine.store('nav') — tts-proof.js liest
         // this.$store.nav.selectedBookId (Log + Speak-Params).
         nav: { selectedBookId: 1, pages: [], tree: [] },
+        // Shell-State (App-Meta) lebt in Alpine.store('shell') — tts-proof.js
+        // liest this.$store.shell.uiLocale (Speak-Sprache).
+        shell: { uiLocale: 'de' },
         tts: {
           enabled,
           // Pausen auf 0 -> Tests laufen schnell; Pause-Test setzt sie selbst.

@@ -45,7 +45,9 @@ function makeCtx(overrides = {}) {
     set pages(v) { nav.pages = v; },
     get tree() { return nav.tree; },
     set tree(v) { nav.tree = v; },
-    $store: { nav },
+    // Shell-State (App-Meta) lebt in Alpine.store('shell'): book-create.js liest
+    // this.$store.shell.uiLocale (Region) + .promptConfig (Buchtyp-Liste).
+    $store: { nav, shell: { uiLocale: 'de', promptConfig: { buchtypen: { de: {} } } } },
     bookCreateName: '',
     bookCreateBuchtyp: '',
     bookCreateCategoryId: '',

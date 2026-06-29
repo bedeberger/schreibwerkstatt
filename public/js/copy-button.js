@@ -77,7 +77,7 @@ export function registerCopyButton() {
         this._timer = setTimeout(() => { this._copied = false; this._render(); }, this._cfg.duration);
       });
       // Locale-Switch (uiLocale-Wechsel im User-Settings) re-rendert das Label.
-      this.$watch(() => window.__app?.uiLocale, () => this._render());
+      this.$watch(() => Alpine.store('shell')?.uiLocale, () => this._render());
       this._render();
     },
 

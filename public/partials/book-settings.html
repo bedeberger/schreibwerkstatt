@@ -507,12 +507,12 @@
         <label class="card-form-label" x-text="$app.t('book.share.membersLabel')"></label>
         <div class="book-share-list">
           <template x-for="entry in bookAccessList" :key="entry.user_email">
-            <div class="book-share-row" :class="{ 'book-share-row--self': entry.user_email === $app.currentUser?.email }">
+            <div class="book-share-row" :class="{ 'book-share-row--self': entry.user_email === $store.session.currentUser?.email }">
               <span class="book-share-avatar" :style="`--avatar-hue: ${$app.userAvatarHue(entry.user_email)}`" x-text="shareInitials(entry)" aria-hidden="true"></span>
               <div class="book-share-row-main">
                 <span class="book-share-displayname">
                   <span x-text="entry.display_name || entry.user_email"></span>
-                  <span class="book-share-you-tag" x-show="entry.user_email === $app.currentUser?.email" x-text="$app.t('book.share.youTag')"></span>
+                  <span class="book-share-you-tag" x-show="entry.user_email === $store.session.currentUser?.email" x-text="$app.t('book.share.youTag')"></span>
                 </span>
                 <span class="book-share-email muted" x-show="entry.display_name" x-text="entry.user_email"></span>
               </div>

@@ -2,7 +2,7 @@
 //
 // Ablauf:
 //   1. configureI18n(locale) lädt de.json als Fallback + die Ziel-Locale.
-//   2. Alpine-Methoden (i18nMethods) liefern `t()` reaktiv über `this.uiLocale`.
+//   2. Alpine-Methoden (i18nMethods) liefern `t()` reaktiv über `this.$store.shell.uiLocale`.
 //   3. changeLocale(loc) lädt neu + persistiert via PATCH /me/settings.
 //
 // Key-Konvention: 'bereich.feld' (z.B. 'header.logout', 'profile.title').
@@ -65,7 +65,7 @@ export function tErrorRaw(response) {
   return tRaw('common.unknownError');
 }
 
-// Alpine-Methoden: `t` referenziert `this.uiLocale`, damit Alpine bei Sprachwechsel re-evaluiert.
+// Alpine-Methoden: `t` referenziert `this.$store.shell.uiLocale`, damit Alpine bei Sprachwechsel re-evaluiert.
 // `this?.` ist Pflicht: Wird die Methode aus einem Scope aufgerufen, in dem Alpine
 // den Receiver verliert (z. B. via `window.__app.t()` aus einer x-effect-Expression
 // einer spät hydratisierten Combobox), wäre `this` undefined und der reine
@@ -73,29 +73,29 @@ export function tErrorRaw(response) {
 // fällt dann auf die globale `_locale` zurück (tRaw), statt die Karte zu killen.
 export const i18nMethods = {
   t(key, params) {
-    void this?.uiLocale;
+    void this?.$store?.shell?.uiLocale;
     return tRaw(key, params);
   },
 
   /** Backend-Fehler übersetzen. Siehe tErrorRaw für Schema. */
   tError(response) {
-    void this?.uiLocale;
+    void this?.$store?.shell?.uiLocale;
     return tErrorRaw(response);
   },
 
   /** ISO-Timestamp → relativer Lokalisiertext. Lazy-Import um Zykel zu vermeiden. */
   formatLastRun(isoStr) {
     if (!isoStr) return '';
-    return _formatLastRunImpl(isoStr, (k, p) => tRaw(k, p), this?.uiLocale);
+    return _formatLastRunImpl(isoStr, (k, p) => tRaw(k, p), this?.$store?.shell?.uiLocale);
   },
 
   /** Sprache wechseln, neue Messages laden und auf Server persistieren. */
   async changeLocale(locale) {
     if (!SUPPORTED_LOCALES.includes(locale)) return;
-    if (locale === this.uiLocale) return;
+    if (locale === this.$store.shell.uiLocale) return;
     await configureI18n(locale);
-    this.uiLocale = locale;
-    const region = this.defaultRegion || (locale === 'en' ? 'US' : 'CH');
+    this.$store.shell.uiLocale = locale;
+    const region = this.$store.shell.defaultRegion || (locale === 'en' ? 'US' : 'CH');
     document.documentElement.setAttribute('lang', `${locale}-${region}`);
     fetch('/me/settings', {
       method: 'PATCH',

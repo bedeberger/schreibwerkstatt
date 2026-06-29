@@ -56,7 +56,7 @@
                         x-text="c.name"></span>
                   <span class="heatmap-rowhead-sub" x-text="$app.t('stil.pagesCount', { n: c.pageCount })"></span>
                 </th>
-                <td class="heatmap-numcol" x-text="(c.words || 0).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH')"></td>
+                <td class="heatmap-numcol" x-text="(c.words || 0).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH')"></td>
                 <template x-for="m in stilMetricDefs" :key="m.key">
                   <td class="heatmap-cell"
                       :class="[

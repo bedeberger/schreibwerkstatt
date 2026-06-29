@@ -259,7 +259,7 @@ export const viewMethods = {
   },
 
   _fmtNum(n) {
-    const tag = window.__app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
     return Number(n || 0).toLocaleString(tag);
   },
 

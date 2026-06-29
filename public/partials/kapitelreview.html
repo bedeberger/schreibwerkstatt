@@ -22,7 +22,7 @@
               x-text="kapitelReviewChapterStats().chars >= 1000 ? '~' + Math.round(kapitelReviewChapterStats().chars/1000) + 'k Z' : kapitelReviewChapterStats().chars + ' Z'"></span>
             <span class="tok-badge tok-neutral"
               :data-tip="$app.t('bookstats.metric.normseiten')"
-              x-text="(Math.round((kapitelReviewChapterStats().chars || 0) / 1500 * 10) / 10).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+              x-text="(Math.round((kapitelReviewChapterStats().chars || 0) / 1500 * 10) / 10).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
             <span class="tok-badge tok-neutral"
               x-text="kapitelReviewChapterStats().words >= 1000 ? '~' + Math.round(kapitelReviewChapterStats().words/1000) + 'k W' : kapitelReviewChapterStats().words + ' W'"></span>
             <span class="tok-badge"
@@ -125,7 +125,7 @@
                     x-text="$app.tokEsts[page.id].chars >= 1000 ? '~' + Math.round($app.tokEsts[page.id].chars / 1000) + 'k Z' : $app.tokEsts[page.id].chars + ' Z'"></span>
                   <span class="tok-badge tok-neutral"
                     :data-tip="$app.t('bookstats.metric.normseiten')"
-                    x-text="(Math.round(($app.tokEsts[page.id].chars || 0) / 1500 * 10) / 10).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+                    x-text="(Math.round(($app.tokEsts[page.id].chars || 0) / 1500 * 10) / 10).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
                   <span class="tok-badge tok-neutral"
                     x-text="$app.tokEsts[page.id].words >= 1000 ? '~' + Math.round($app.tokEsts[page.id].words / 1000) + 'k W' : $app.tokEsts[page.id].words + ' W'"></span>
                   <span class="tok-badge"
@@ -185,7 +185,7 @@
                               x-text="$app.tokEsts[page.id].chars >= 1000 ? '~' + Math.round($app.tokEsts[page.id].chars / 1000) + 'k Z' : $app.tokEsts[page.id].chars + ' Z'"></span>
                             <span class="tok-badge tok-neutral"
                               :data-tip="$app.t('bookstats.metric.normseiten')"
-                              x-text="(Math.round(($app.tokEsts[page.id].chars || 0) / 1500 * 10) / 10).toLocaleString($app.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+                              x-text="(Math.round(($app.tokEsts[page.id].chars || 0) / 1500 * 10) / 10).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
                             <span class="tok-badge tok-neutral"
                               x-text="$app.tokEsts[page.id].words >= 1000 ? '~' + Math.round($app.tokEsts[page.id].words / 1000) + 'k W' : $app.tokEsts[page.id].words + ' W'"></span>
                             <span class="tok-badge"

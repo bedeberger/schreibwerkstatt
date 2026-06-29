@@ -2,7 +2,7 @@
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/admin-users-card.js.
   `showAdminUsersCard` + `toggleAdminUsersCard` im Root. Nur sichtbar bei
-  $app.currentUser.role === 'admin' — Frontend-Guard zusaetzlich zum
+  $store.session.currentUser.role === 'admin' — Frontend-Guard zusaetzlich zum
   Server-side requireAdmin (lib/admin-mw.js).
 -->
 <div class="card card--admin-users" x-data="adminUsersCard" x-show="$app.showAdminUsersCard" x-cloak>
@@ -118,7 +118,7 @@
               <span class="badge" :class="'badge--status-' + u.status" x-text="$app.t('admin.users.status.' + u.status)"></span>
             </td>
             <td>
-              <span class="muted-msg muted-msg--sm" x-text="u.last_seen_at ? new Date(u.last_seen_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) : '—'"></span>
+              <span class="muted-msg muted-msg--sm" x-text="u.last_seen_at ? new Date(u.last_seen_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) : '—'"></span>
             </td>
             <td class="admin-users-actions">
               <button type="button"
@@ -127,7 +127,7 @@
               <button type="button" @click="adminUsersToggleAudit(u)"
                       x-text="adminUsersAuditEmail === u.email ? $app.t('admin.users.auditClose') : $app.t('admin.users.audit')"></button>
               <button type="button" class="danger" @click="adminUsersDelete(u)"
-                      x-show="u.email !== $app.currentUser?.email"
+                      x-show="u.email !== $store.session.currentUser?.email"
                       x-text="$app.t('admin.users.delete')"></button>
             </td>
           </tr>
@@ -143,7 +143,7 @@
         <template x-for="ev in adminUsersAuditEvents" :key="ev.id">
           <li>
             <span class="badge" :class="'badge--event-' + ev.event" x-text="ev.event"></span>
-            <span class="muted-msg muted-msg--sm" x-text="new Date(ev.created_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone })"></span>
+            <span class="muted-msg muted-msg--sm" x-text="new Date(ev.created_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone })"></span>
             <span class="muted-msg" x-show="ev.ip" x-text="' • ' + ev.ip"></span>
             <pre class="admin-users-meta" x-show="ev.meta_json" x-text="ev.meta_json"></pre>
           </li>
@@ -211,21 +211,21 @@
             </td>
             <td><span class="badge" x-text="$app.t('admin.users.role.' + inv.global_role)"></span></td>
             <td>
-              <span class="muted-msg muted-msg--sm" x-text="inv.invited_at ? new Date(inv.invited_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) : '—'"></span>
+              <span class="muted-msg muted-msg--sm" x-text="inv.invited_at ? new Date(inv.invited_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) : '—'"></span>
             </td>
             <td>
               <span class="badge" :class="inv.expired ? 'badge--status-suspended' : ''"
-                    x-text="inv.expires_at ? new Date(inv.expires_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) : '—'"></span>
+                    x-text="inv.expires_at ? new Date(inv.expires_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) : '—'"></span>
             </td>
             <td>
               <span x-show="!inv.last_clicked_at" class="badge" x-text="$app.t('admin.users.invites.click.never')"></span>
               <span x-show="inv.last_clicked_at" class="badge badge--status-active"
-                    x-text="$app.t('admin.users.invites.click.clicked', { count: inv.click_count, at: new Date(inv.last_clicked_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) })"></span>
+                    x-text="$app.t('admin.users.invites.click.clicked', { count: inv.click_count, at: new Date(inv.last_clicked_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) })"></span>
             </td>
             <td>
               <span x-show="!inv.last_reminder_at" class="muted-msg muted-msg--sm" x-text="$app.t('admin.users.invites.reminder.never')"></span>
               <span x-show="inv.last_reminder_at" class="muted-msg muted-msg--sm"
-                    x-text="$app.t('admin.users.invites.reminder.last', { count: inv.reminder_count, at: new Date(inv.last_reminder_at).toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) })"></span>
+                    x-text="$app.t('admin.users.invites.reminder.last', { count: inv.reminder_count, at: new Date(inv.last_reminder_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) })"></span>
             </td>
             <td class="admin-users-actions">
               <button x-data="copyButton({ text: () => inv.invite_url?.startsWith('http') ? inv.invite_url : location.origin + inv.invite_url, label: () => window.__app.t('admin.users.invites.copyUrl') })"></button>
@@ -312,7 +312,7 @@
               <pre class="admin-users-meta" x-show="req.message" x-text="req.message"></pre>
             </td>
             <td>
-              <span class="muted-msg muted-msg--sm" x-text="new Date(req.created_at + 'Z').toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone })"></span>
+              <span class="muted-msg muted-msg--sm" x-text="new Date(req.created_at + 'Z').toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone })"></span>
               <span class="muted-msg muted-msg--sm" x-show="req.ip" x-text="' • ' + req.ip"></span>
             </td>
             <td>
@@ -334,7 +334,7 @@
               <template x-if="req.status !== 'pending'">
                 <span class="muted-msg muted-msg--sm">
                   <span x-show="req.reviewed_at"
-                        x-text="new Date(req.reviewed_at + 'Z').toLocaleString(($app.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $app.appTimezone }) + (req.reviewed_by ? ' · ' + req.reviewed_by : '')"></span>
+                        x-text="new Date(req.reviewed_at + 'Z').toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) + (req.reviewed_by ? ' · ' + req.reviewed_by : '')"></span>
                   <span x-show="req.review_reason" x-text="' · ' + req.review_reason"></span>
                 </span>
               </template>

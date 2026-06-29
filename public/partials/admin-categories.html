@@ -2,7 +2,7 @@
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/admin-categories-card.js.
   `showAdminCategoriesCard` + `toggleAdminCategoriesCard` im Root. Nur sichtbar
-  bei $app.currentUser.role === 'admin'.
+  bei $store.session.currentUser.role === 'admin'.
 -->
 <div class="card card--admin-categories" x-data="adminCategoriesCard" x-show="$app.showAdminCategoriesCard" x-cloak>
   <div class="card-header">

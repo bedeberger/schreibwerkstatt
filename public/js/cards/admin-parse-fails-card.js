@@ -1,5 +1,5 @@
 // Alpine-Sub-Komponente fuer die KI-Parse-Fehler-Karte. Sichtbarkeit ueber
-// $app.currentUser.isAdmin; State + Lifecycle hier, Show-Flag
+// $store.session.currentUser.isAdmin; State + Lifecycle hier, Show-Flag
 // (`showAdminParseFailsCard`) im Root.
 
 import { adminParseFailsMethods } from '../admin/ai-parse-fails.js';

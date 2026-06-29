@@ -175,7 +175,7 @@ export const stilMethods = {
     if (!iso) return '';
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
-    const tag = localeTag(window.__app.uiLocale);
+    const tag = localeTag(Alpine.store('shell').uiLocale);
     const date = d.toLocaleDateString(tag, tzOpts({ year: 'numeric', month: '2-digit', day: '2-digit' }));
     const time = d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
     return window.__app.t('stil.lastUpdated', { date, time });
@@ -183,7 +183,7 @@ export const stilMethods = {
 
   stilFormat(value, metricKey) {
     const def = STIL_METRICS.find(m => m.key === metricKey);
-    return formatNumber(value, window.__app.uiLocale, def?.decimals ?? 1);
+    return formatNumber(value, Alpine.store('shell').uiLocale, def?.decimals ?? 1);
   },
 
   // Drilldown: welche Metrik-Spalten zeigen Beispiele, wenn man auf die Zelle klickt.

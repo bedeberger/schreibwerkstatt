@@ -131,7 +131,7 @@ export function registerFigurenCard() {
       });
 
       // Sprachwechsel → Graph-Labels neu rendern (uiLocale Teil des Hash).
-      this.$watch(() => window.__app.uiLocale, () => {
+      this.$watch(() => Alpine.store('shell').uiLocale, () => {
         if (window.__app.showFiguresCard && Alpine.store('catalog').figuren?.length) {
           this.renderFigurGraph();
         }

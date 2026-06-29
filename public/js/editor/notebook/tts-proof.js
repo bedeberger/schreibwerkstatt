@@ -194,7 +194,7 @@ export const ttsProofMethods = {
   },
 
   _ttsLocaleCode() {
-    return String(this.uiLocale || 'de').split('-')[0].trim().toLowerCase() || 'de';
+    return String(this.$store.shell.uiLocale || 'de').split('-')[0].trim().toLowerCase() || 'de';
   },
 
   // Container der Leseansicht (Read-Modus). Bewusst nicht der Edit-Container

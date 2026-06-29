@@ -1,4 +1,4 @@
-// Alpine-Sub-Komponente fuer Admin-Settings. Sichtbarkeit ueber $app.currentUser.role;
+// Alpine-Sub-Komponente fuer Admin-Settings. Sichtbarkeit ueber $store.session.currentUser.role;
 // State + Lifecycle hier, Show-Flag (`showAdminSettingsCard`) im Root.
 
 import { adminSettingsMethods } from '../admin/admin-settings.js';

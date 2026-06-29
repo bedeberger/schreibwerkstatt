@@ -81,7 +81,7 @@ export function registerPageRevisionsCard() {
 
     isOwnRevision(rev) {
       if (!rev?.user_email) return false;
-      const me = window.__app?.currentUser?.email;
+      const me = Alpine.store('session').currentUser?.email;
       return !!me && String(me).toLowerCase() === String(rev.user_email).toLowerCase();
     },
 
@@ -101,7 +101,7 @@ export function registerPageRevisionsCard() {
 
     formatChars(n) {
       const app = window.__app;
-      const locale = app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       return Number(n || 0).toLocaleString(locale);
     },
 
@@ -119,7 +119,7 @@ export function registerPageRevisionsCard() {
     formatDelta(d) {
       if (d == null) return '';
       const app = window.__app;
-      const locale = app?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       return Number(d).toLocaleString(locale, { signDisplay: 'exceptZero' });
     },
 

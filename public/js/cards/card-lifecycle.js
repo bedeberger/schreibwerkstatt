@@ -53,7 +53,7 @@ export function setupCardLifecycle(ctx, cfg) {
   if (cfg.showFlag && (cfg.load || cfg.onShow)) {
     ctx.$watch(() => root()[cfg.showFlag], async (visible) => {
       if (!visible) return;
-      if (cfg.showNeedsBookId !== false && !root().selectedBookId) return;
+      if (cfg.showNeedsBookId !== false && !Alpine.store('nav').selectedBookId) return;
       if (cfg.onShow) await cfg.onShow(root());
       else await cfg.load(root());
     });
@@ -63,7 +63,7 @@ export function setupCardLifecycle(ctx, cfg) {
     clearTimers();
     applyReset('book');
     if (cfg.showFlag && !root()[cfg.showFlag]) return;
-    if (!root().selectedBookId) return;
+    if (!Alpine.store('nav').selectedBookId) return;
     if (cfg.load) await cfg.load(root());
   };
   const defaultViewReset = () => {
@@ -79,7 +79,7 @@ export function setupCardLifecycle(ctx, cfg) {
     : defaultViewReset;
   const onCardRefresh = (e) => {
     if (e.detail?.name !== cfg.name) return;
-    if (cfg.refreshNeedsBookId !== false && !root().selectedBookId) return;
+    if (cfg.refreshNeedsBookId !== false && !Alpine.store('nav').selectedBookId) return;
     if (cfg.onCardRefresh) cfg.onCardRefresh(e, ctx, root());
     else if (cfg.load) cfg.load(root());
   };

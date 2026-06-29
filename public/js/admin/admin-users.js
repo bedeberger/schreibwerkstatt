@@ -152,7 +152,7 @@ export const adminUsersMethods = {
   },
 
   async adminUsersDelete(user) {
-    const me = window.__app?.currentUser?.email;
+    const me = Alpine.store('session').currentUser?.email;
     if (user.email === me) { this.adminUsersError = 'CANNOT_DELETE_SELF'; return; }
     if (!confirm(window.__app?.t?.('admin.users.confirmDelete', { email: user.email }) || `Soft-Delete ${user.email}?`)) return;
     this.adminUsersError = '';

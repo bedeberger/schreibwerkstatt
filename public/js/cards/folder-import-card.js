@@ -88,7 +88,7 @@ export function registerFolderImportCard() {
 
     fmtLogTime(iso) {
       if (!iso) return '';
-      const tag = localeTag(window.__app?.uiLocale);
+      const tag = localeTag(Alpine.store('shell').uiLocale);
       return new Date(iso).toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     },
 
