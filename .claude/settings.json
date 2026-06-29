@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/style-guard.js",
+            "statusMessage": "Style-/SQL-Regeln pruefen"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/regen-sw-manifest.js",
+            "statusMessage": "sw-manifest aktualisieren"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/hooks/drift-reminders.js",
+            "statusMessage": "Drift-Artefakte pruefen"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/hooks/i18n-check.js",
+            "statusMessage": "i18n-Locales pruefen"
+          }
+        ]
+      }
+    ]
+  }
+}

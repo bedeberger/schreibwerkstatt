@@ -1,7 +1,8 @@
 .env
 .env.local
 .env.*.local
-.claude/
+.claude/*
+!.claude/settings.json
 node_modules/
 schreibwerkstatt-history.json
 schreibwerkstatt.db
