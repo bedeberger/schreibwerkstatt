@@ -2222,6 +2222,7 @@
   "mystats.bookGoals.due": "{n} Tage übrig",
   "mystats.bookGoals.open": "Ziel gesetzt",
   "mystats.bookGoals.none": "kein Ziel",
+  "mystats.bookGoals.finished": "Fertig",
   "mystats.bookGoals.today": "Heute",
   "mystats.bookGoals.todayOf": "{n} / {goal}",
   "mystats.thisWeek": "diese Woche",

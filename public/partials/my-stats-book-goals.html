@@ -34,7 +34,11 @@
         <tbody>
           <template x-for="row in sorted" :key="row.book_id">
             <tr>
-              <td class="mystats-goals-book" x-text="row.name"></td>
+              <td class="mystats-goals-book">
+                <span x-text="row.name"></span>
+                <span x-show="row.isFinished" class="mystats-goals-finished"
+                      x-text="$app.t('mystats.bookGoals.finished')"></span>
+              </td>
               <td class="mystats-goals-num">
                 <span x-text="_myStatsFmt(row.chars)"></span>
                 <span class="mystats-goals-sub" x-text="$app.t('mystats.bookGoals.normpages', { n: _myStatsFmt(row.normpages) })"></span>

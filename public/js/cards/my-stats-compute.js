@@ -402,7 +402,7 @@ function isoDayDiff(aIso, bIso) {
 // `booksDetail` (aus /me/profile-stats): pro eigenem Buch der live geschriebene
 // Umfang (chars/words/pages) + die Ziel-Felder aus book_settings
 // (goal_target_chars = Gesamtziel, goal_deadline = Frist, daily_goal_chars =
-// Tagesziel). `historyRows` (book_stats_history, aus /me/profile-stats-history)
+// Tagesziel) + `is_finished` (Buch als fertig markiert → Badge in der Tabelle). `historyRows` (book_stats_history, aus /me/profile-stats-history)
 // liefert die Vortags-Snapshots fuer den Tagesziel-Fortschritt: heute
 // geschrieben = Live-Stand minus letzter Snapshot strikt vor heute, auf >= 0
 // geklemmt (gleiche Regel wie der Heute-Ring der Buch-Uebersicht, today-ring.js).
@@ -447,6 +447,7 @@ export function computeBookGoals(booksDetail, historyRows = [], todayLocal = new
 
     return {
       book_id: b.book_id,
+      isFinished: !!b.is_finished,
       chars,
       words: Number(b.words) || 0,
       pages: Number(b.pages) || 0,

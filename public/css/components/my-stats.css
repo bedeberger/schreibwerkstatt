@@ -244,6 +244,19 @@
 .mystats-goals-num { text-align: right; white-space: nowrap; }
 .mystats-goals-table th.mystats-goals-num { text-align: right; }
 .mystats-goals-book { font-weight: 500; color: var(--color-text); }
+/* „Fertig"-Markierung: eckiges Badge neben dem Buchnamen (success-getintet). */
+.mystats-goals-finished {
+  display: inline-block;
+  margin-left: var(--space-2xs);
+  padding: var(--pad-badge);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+}
 .mystats-goals-sub {
   display: block;
   font-size: var(--font-size-xs);

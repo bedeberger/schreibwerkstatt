@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "46d1ae7a6c97cffe";
+self.__SHELL_BUILD = "3d39752f76e0764e";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",

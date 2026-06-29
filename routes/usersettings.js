@@ -155,7 +155,7 @@ router.get('/profile-stats', (req, res) => {
       FROM page_stats WHERE book_id IN (${ph}) GROUP BY book_id
     `).all(...owned);
     const goalRows = db.prepare(`
-      SELECT book_id, daily_goal_chars, goal_target_chars, goal_deadline
+      SELECT book_id, daily_goal_chars, goal_target_chars, goal_deadline, is_finished
       FROM book_settings WHERE book_id IN (${ph})
     `).all(...owned);
     const perBookMap = new Map(perBookRows.map(r => [r.book_id, r]));
@@ -171,6 +171,7 @@ router.get('/profile-stats', (req, res) => {
         daily_goal_chars: g.daily_goal_chars ?? null,
         goal_target_chars: g.goal_target_chars ?? null,
         goal_deadline: g.goal_deadline ?? null,
+        is_finished: !!g.is_finished,
       };
     });
     res.json({

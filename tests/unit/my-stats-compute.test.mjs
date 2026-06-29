@@ -435,3 +435,13 @@ test('computeBookGoals: leere Bücher ohne Ziel fallen raus, Ziel-Bücher zuerst
   ]);
   assert.deepEqual(rows.map(r => r.book_id), [4, 3, 2]); // Ziele zuerst (nach %), dann Rest
 });
+
+test('computeBookGoals: is_finished wird als isFinished durchgereicht', () => {
+  const rows = computeBookGoals([
+    { book_id: 1, chars: 20000, goal_target_chars: null, goal_deadline: null, is_finished: 1 },
+    { book_id: 2, chars: 20000, goal_target_chars: null, goal_deadline: null },
+  ]);
+  const byId = Object.fromEntries(rows.map(r => [r.book_id, r]));
+  assert.equal(byId[1].isFinished, true);
+  assert.equal(byId[2].isFinished, false);
+});
