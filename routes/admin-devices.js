@@ -2,13 +2,15 @@
 // Admin-Tab „Geraete": listet alle Device-Tokens (native Mac-Focus-Clients)
 // user-uebergreifend mit gemeldeter Client-Version, Nutzungszaehler und letzter
 // Aktivitaet. Read-only — Ausstellen/Widerrufen bleibt beim User unter /me.
-// Die installierten Versionen sind gegen das neueste GitHub-Release (latestVersion)
-// abgleichbar, damit veraltete Clients sichtbar werden.
+// Die installierten Versionen sind gegen das neueste GitHub-Release der jeweiligen
+// Plattform (macOS- bzw. Android-Client) abgleichbar, damit veraltete Clients
+// sichtbar werden — getrennt, weil beide Repos eigene Versionsstraenge haben.
 
 const express = require('express');
 const { requireAdmin } = require('../lib/admin-mw');
 const deviceTokens = require('../db/device-tokens');
 const macclientRelease = require('../lib/macclient-release');
+const androidclientRelease = require('../lib/androidclient-release');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -17,12 +19,18 @@ router.use(requireAdmin);
 router.get('/', async (req, res) => {
   try {
     const devices = deviceTokens.listAllDeviceTokens();
-    let latestVersion = null;
+    // Pro Plattform die neueste Version separat — ein Android-Client darf nicht
+    // gegen die macOS-Version verglichen werden (sonst falsches „veraltet").
+    const latestVersions = { macos: null, android: null };
     try {
-      const rel = await macclientRelease.getLatestRelease();
-      if (rel && rel.available) latestVersion = rel.version;
+      const [mac, android] = await Promise.all([
+        macclientRelease.getLatestRelease(),
+        androidclientRelease.getLatestRelease(),
+      ]);
+      if (mac && mac.available) latestVersions.macos = mac.version;
+      if (android && android.available) latestVersions.android = android.version;
     } catch { /* Release-Abruf nie den Tab blockieren lassen */ }
-    res.json({ devices, latestVersion });
+    res.json({ devices, latestVersions });
   } catch (e) {
     logger.error(`admin-devices list failed: ${e.message}`);
     res.status(500).json({ error_code: 'LIST_FAILED', message: e.message });

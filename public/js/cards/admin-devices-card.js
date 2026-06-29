@@ -12,7 +12,7 @@ export function registerAdminDevicesCard() {
     devicesLoading: false,
     devicesError: '',
     devicesList: [],
-    devicesLatestVersion: null,
+    devicesLatestVersions: {},
     _onViewReset: null,
     _onCardRefresh: null,
 
@@ -23,7 +23,7 @@ export function registerAdminDevicesCard() {
       this._onViewReset = () => {
         this.devicesList = [];
         this.devicesError = '';
-        this.devicesLatestVersion = null;
+        this.devicesLatestVersions = {};
         this.devicesInitialized = false;
       };
       window.addEventListener(EVT.VIEW_RESET, this._onViewReset);

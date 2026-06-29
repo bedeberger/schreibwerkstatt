@@ -21,7 +21,7 @@ export const adminDevicesMethods = {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       this.devicesList = data.devices || [];
-      this.devicesLatestVersion = data.latestVersion || null;
+      this.devicesLatestVersions = data.latestVersions || {};
     } catch (e) {
       this.devicesError = e.message;
     } finally {
@@ -50,11 +50,19 @@ export const adminDevicesMethods = {
     return window.__app.t('admin.devices.statusActive');
   },
 
-  // Ist die installierte Version aelter als das neueste Release? (Reiner
-  // String-Vergleich der dotted-Version; nur bei sauberem semver aussagekraeftig.)
+  // Neueste Version fuer die Plattform dieses Geraets (Android vs. macOS getrennt).
+  _devicesLatestForPlatform(d) {
+    const v = this.devicesLatestVersions || {};
+    return /android/i.test(d.platform || '') ? (v.android || null) : (v.macos || null);
+  },
+
+  // Ist die installierte Version aelter als das neueste Release der jeweiligen
+  // Plattform? (Reiner String-Vergleich der dotted-Version; nur bei sauberem
+  // semver aussagekraeftig.)
   devicesIsOutdated(d) {
-    if (!this.devicesLatestVersion || !d.client_version) return false;
-    return this._devicesCmpVersion(d.client_version, this.devicesLatestVersion) < 0;
+    const latest = this._devicesLatestForPlatform(d);
+    if (!latest || !d.client_version) return false;
+    return this._devicesCmpVersion(d.client_version, latest) < 0;
   },
 
   _devicesCmpVersion(a, b) {

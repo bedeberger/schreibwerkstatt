@@ -15,9 +15,11 @@
   </div>
 
   <p class="muted-msg" x-text="$app.t('admin.devices.intro')"></p>
-  <p class="muted-msg muted-msg--sm" x-show="devicesLatestVersion">
+  <p class="muted-msg muted-msg--sm" x-show="devicesLatestVersions.macos || devicesLatestVersions.android">
     <span x-text="$app.t('admin.devices.latestRelease')"></span>
-    <code x-text="devicesLatestVersion"></code>
+    <span x-show="devicesLatestVersions.macos">macOS <code x-text="devicesLatestVersions.macos"></code></span>
+    <span x-show="devicesLatestVersions.macos && devicesLatestVersions.android"> · </span>
+    <span x-show="devicesLatestVersions.android">Android <code x-text="devicesLatestVersions.android"></code></span>
   </p>
 
   <div x-show="devicesLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
