@@ -21,7 +21,7 @@ const hubspot = require('../../db/hubspot');
 const contentStore = require('../../lib/content-store');
 const { createHubspotClient } = require('../../lib/hubspot-client');
 const { hubspotToAppHtml, appToHubspotHtml } = require('../../lib/hubspot-html');
-const { getBookSettings } = require('../../db/schema');
+const { assertBlogBook } = require('../../lib/buchtyp');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
@@ -74,13 +74,7 @@ function _resolveHubConn(bookId) {
 }
 
 function _requireBlogBook(bookId, userEmail) {
-  const settings = getBookSettings(bookId, userEmail);
-  if (!settings || settings.buchtyp !== 'blog') {
-    const err = new Error('HUBSPOT_REQUIRES_BLOG_TYPE');
-    err.code = 'HUBSPOT_REQUIRES_BLOG_TYPE';
-    throw err;
-  }
-  return settings;
+  return assertBlogBook(bookId, userEmail, 'HUBSPOT_REQUIRES_BLOG_TYPE');
 }
 
 async function runHubspotImportJob(jobId, bookId, userEmail) {

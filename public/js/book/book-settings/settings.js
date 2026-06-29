@@ -365,6 +365,14 @@ export const settingsMethods = {
   },
 
 
+  // Gate für die Blog-/HubSpot-Sync-Sections: liest den im Formular gewählten
+  // Buchtyp (nicht den gespeicherten Nav-Wert), damit die Sections live auf die
+  // Combobox-Auswahl reagieren. SSoT für das 'blog'-Literal im Settings-Scope.
+  bookSettingsIsBlog() {
+    return this.bookSettingsBuchtyp === 'blog';
+  },
+
+
   bookSettingsLangOptions() {
     const app = window.__app;
     return [

@@ -14,7 +14,7 @@ const blogs = require('../../db/blogs');
 const contentStore = require('../../lib/content-store');
 const { createWpClient } = require('../../lib/wp-client');
 const { wpToAppHtml, appToWpHtml } = require('../../lib/wp-html');
-const { getBookSettings } = require('../../db/schema');
+const { assertBlogBook } = require('../../lib/buchtyp');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
@@ -74,13 +74,7 @@ function _resolveBlogConn(bookId) {
 }
 
 function _requireBlogBook(bookId, userEmail) {
-  const settings = getBookSettings(bookId, userEmail);
-  if (!settings || settings.buchtyp !== 'blog') {
-    const err = new Error('BLOG_REQUIRES_BLOG_TYPE');
-    err.code = 'BLOG_REQUIRES_BLOG_TYPE';
-    throw err;
-  }
-  return settings;
+  return assertBlogBook(bookId, userEmail, 'BLOG_REQUIRES_BLOG_TYPE');
 }
 
 async function runBlogImportJob(jobId, bookId, userEmail) {

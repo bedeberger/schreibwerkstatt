@@ -36,7 +36,7 @@
       <button class="tabs-btn" x-bind="tabBtn('publication')"
               x-text="$app.t('book.settings.tab.publication')"></button>
       <button class="tabs-btn" x-bind="tabBtn('sync')"
-              x-show="bookSettingsBuchtyp === 'blog'" x-cloak
+              x-show="bookSettingsIsBlog()" x-cloak
               x-text="$app.t('book.settings.tab.sync')"></button>
       <button class="tabs-btn" x-bind="tabBtn('stats')"
               x-text="$app.t('book.settings.tab.stats')"></button>

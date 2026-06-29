@@ -12,6 +12,7 @@ const express = require('express');
 const { aclParamGuard } = require('../lib/acl');
 const { bookParamHandler } = require('../lib/log-context');
 const { getBookSettings } = require('../db/schema');
+const { isBlogBook, requireBlogTypeRoute } = require('../lib/buchtyp');
 const blogs = require('../db/blogs');
 const { createWpClient, validateBaseUrl } = require('../lib/wp-client');
 const logger = require('../logger');
@@ -22,19 +23,13 @@ const jsonBody = express.json();
 router.param('book_id', bookParamHandler);
 
 function _requireBlogType(req, res) {
-  const bookId = req.bookId;
-  const settings = getBookSettings(bookId, req.session?.user?.email || null);
-  if (!settings || settings.buchtyp !== 'blog') {
-    res.status(400).json({ error_code: 'BLOG_REQUIRES_BLOG_TYPE' });
-    return false;
-  }
-  return true;
+  return requireBlogTypeRoute(req, res, 'BLOG_REQUIRES_BLOG_TYPE');
 }
 
 router.get('/:book_id/status', aclParamGuard('viewer'), (req, res) => {
   const bookId = req.bookId;
   const settings = getBookSettings(bookId, req.session?.user?.email || null);
-  const isBlogType = settings && settings.buchtyp === 'blog';
+  const isBlogType = isBlogBook(settings);
   const conn = blogs.getConnectionPublic(bookId);
   res.json({
     isBlogType: !!isBlogType,

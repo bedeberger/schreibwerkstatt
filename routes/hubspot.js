@@ -15,6 +15,7 @@ const express = require('express');
 const { aclParamGuard } = require('../lib/acl');
 const { bookParamHandler } = require('../lib/log-context');
 const { getBookSettings } = require('../db/schema');
+const { isBlogBook, requireBlogTypeRoute } = require('../lib/buchtyp');
 const hubspot = require('../db/hubspot');
 const { createHubspotClient } = require('../lib/hubspot-client');
 const logger = require('../logger');
@@ -27,13 +28,7 @@ router.param('book_id', bookParamHandler);
 const KEEP_TOKEN = '__keep__';
 
 function _requireBlogType(req, res) {
-  const bookId = req.bookId;
-  const settings = getBookSettings(bookId, req.session?.user?.email || null);
-  if (!settings || settings.buchtyp !== 'blog') {
-    res.status(400).json({ error_code: 'HUBSPOT_REQUIRES_BLOG_TYPE' });
-    return false;
-  }
-  return true;
+  return requireBlogTypeRoute(req, res, 'HUBSPOT_REQUIRES_BLOG_TYPE');
 }
 
 function _resolveToken(req, bookId) {
@@ -56,7 +51,7 @@ function _mapHubspotError(res, e) {
 router.get('/:book_id/status', aclParamGuard('viewer'), (req, res) => {
   const bookId = req.bookId;
   const settings = getBookSettings(bookId, req.session?.user?.email || null);
-  const isBlogType = settings && settings.buchtyp === 'blog';
+  const isBlogType = isBlogBook(settings);
   const conn = hubspot.getConnectionPublic(bookId);
   res.json({
     isBlogType: !!isBlogType,

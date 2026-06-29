@@ -1,6 +1,6 @@
     <div class="card-form-grid" x-bind="panel('sync')" x-cloak>
 
-    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak
+    <section class="book-settings-section" x-show="bookSettingsIsBlog()" x-cloak
              x-data="collapsible()" x-modelable="open" x-model="blogSectionOpen">
       <button type="button" class="collapsible-toggle" x-bind="trigger">
         <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
@@ -126,7 +126,7 @@
       </div>
     </section>
 
-    <section class="book-settings-section" x-show="bookSettingsBuchtyp === 'blog'" x-cloak
+    <section class="book-settings-section" x-show="bookSettingsIsBlog()" x-cloak
              x-data="collapsible()" x-modelable="open" x-model="hubspotSectionOpen">
       <button type="button" class="collapsible-toggle" x-bind="trigger">
         <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
