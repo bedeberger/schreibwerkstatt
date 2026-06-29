@@ -10,9 +10,11 @@
 //
 // Render-Job läuft über die Standard-Job-Queue (/jobs/pdf-export). Sobald done,
 // wird das PDF-File via /jobs/pdf-export/:id/file als Download geholt.
+// Scope-Auswahl, Job-Polling/Download und Kapitel-Chips kommen aus
+// export-card-base.js (geteilt mit EPUB + DOCX).
 
-import { startPoll } from './job-helpers.js';
 import { EVT } from '../events.js';
+import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice } from './export-card-base.js';
 
 // Druckerei-Trim-Presets (mm). Setzen pageSize='custom' + Masse. Decken die
 // gängigen Buchformate ab, die A4/A5/A6/Letter nicht abbilden.
@@ -26,13 +28,35 @@ const TRIM_PRESETS = [
 export function registerPdfExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('pdfExportCard', () => ({
+    ...exportScopeSlice(),
+    ...exportJobSlice({
+      jobPath: '/jobs/pdf-export',
+      defaultFilename: 'book.pdf',
+      i18nPrefix: 'pdfExport',
+      // PDF mappt Fehler-Codes in den karteneigenen Namespace `pdfExport.error.*`
+      // (nicht den globalen `tError`-Namespace `error.*` wie EPUB/DOCX).
+      errorFor: (self, d) => window.__app.t(d.error_code ? 'pdfExport.error.' + d.error_code : 'pdfExport.error.startFailed'),
+      resolveDone: (self, result) => {
+        self.exportLowRes = result.lowResImages || 0;
+        const pdfaWarn = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
+        const pdfxWarn = result.pdfx?.requested && !result.pdfx.applied;
+        const coverWarn = !!result.coverInInterior;
+        const isWarning = pdfaWarn || pdfxWarn || coverWarn;
+        const statusKey = pdfxWarn ? 'pdfExport.pdfxWarning'
+          : pdfaWarn ? 'pdfExport.pdfaWarning'
+          : coverWarn ? 'pdfExport.coverInInteriorWarning'
+          : 'pdfExport.done';
+        return { statusKey, ttl: isWarning ? 8000 : 3500 };
+      },
+    }),
+    ...unnumberedChipsSlice({
+      getIds: (s) => s.activeProfile?.config?.chapter?.unnumberedChapterIds || [],
+      setIds: (s, arr) => { s.activeProfile.config.chapter.unnumberedChapterIds = arr; },
+    }),
+
     profiles: [],
     activeProfileId: null,
     activeProfile: null,        // { id, name, config, has_cover, ... }
-    exportScope: 'book',
-    exportChapterId: null,
-    exportPageId: null,
-    exportIncludeSubchapters: false,
     // Form-Mount-Gate: getrennt von activeProfile, damit Alpine die x-if-DOM
     // sicher unmounten kann, BEVOR activeProfile auf null/neuen Wert wechselt.
     // Sonst feuern x-model/x-effect-Closures (combobox-x-data) noch ein Mal mit
@@ -51,14 +75,8 @@ export function registerPdfExportCard() {
     saving: false,
     savedAt: null,
     _savedAtTimer: null,
-    _exportStatusTimer: null,
 
-    exporting: false,
-    exportProgress: 0,
-    exportStatus: '',
-    exportError: '',
     exportLowRes: 0,
-    currentJobId: null,
     trimPresetSel: '',
 
     // coverPreviewVersion bustet den Cache der Rückseiten-Bild-Vorschau
@@ -69,10 +87,8 @@ export function registerPdfExportCard() {
     backCoverUploading: false,
     backCoverError: '',
 
-    _pollTimer: null,
     _onBookChanged: null,
     _onViewReset: null,
-    _onExportPreset: null,
 
     init() {
       this.$watch(() => window.__app.showPdfExportCard, async (visible) => {
@@ -82,35 +98,18 @@ export function registerPdfExportCard() {
         // Wechsel triggert KEINE Neuladung.
         if (!this.profiles.length) await this.loadProfiles();
       });
-      this.$watch(() => this.exportScope, () => this._ensureExportPicked());
-      this.$watch(() => this.exportChapterId, () => { this.exportIncludeSubchapters = false; });
-      this.$watch(() => window.__app?.currentPage?.id, () => this._ensureExportPicked());
-
-      this._onExportPreset = (e) => this._applyExportPreset(e.detail);
-      window.addEventListener(EVT.EXPORT_PRESET, this._onExportPreset);
-      const pending = window.__app?.__exportPreset;
-      if (pending) {
-        this._applyExportPreset(pending);
-        window.__app.__exportPreset = null;
-      }
+      this._initScopeWatches();
+      this._bindPreset(EVT.EXPORT_PRESET, '__exportPreset');
 
       // book:changed räumt nur den laufenden Export-State (Buchwechsel = neuer
       // Render-Kontext). Profile-Liste bleibt erhalten.
-      this._onBookChanged = () => {
-        this._stopPoll();
-        if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
-        this.exporting = false;
-        this.exportProgress = 0;
-        this.exportStatus = '';
-        this.exportError = '';
-        this.currentJobId = null;
-      };
+      this._onBookChanged = () => { this._resetExportRun(); };
       window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
 
       // view:reset (Logout / User-Settings-Danger-Reset) räumt ALLES inkl.
       // Profile-Liste — könnte anderer User sein nach Re-Login.
       this._onViewReset = async () => {
-        this._onBookChanged();
+        this._resetExportRun();
         await this._unmountFormThen(() => {
           this.profiles = [];
           this.activeProfile = null;
@@ -125,9 +124,9 @@ export function registerPdfExportCard() {
       this._stopPoll();
       if (this._savedAtTimer)     { clearTimeout(this._savedAtTimer);     this._savedAtTimer = null; }
       if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
-      if (this._onBookChanged)  window.removeEventListener(EVT.BOOK_CHANGED,  this._onBookChanged);
-      if (this._onViewReset)    window.removeEventListener(EVT.VIEW_RESET,    this._onViewReset);
-      if (this._onExportPreset) window.removeEventListener(EVT.EXPORT_PRESET, this._onExportPreset);
+      if (this._onBookChanged)  window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
+      if (this._onViewReset)    window.removeEventListener(EVT.VIEW_RESET,   this._onViewReset);
+      this._unbindPreset();
     },
 
     // ── Profile-Liste / Auswahl ──────────────────────────────────────────
@@ -363,162 +362,22 @@ export function registerPdfExportCard() {
       // Vor Export speichern (Config könnte ungespeichert sein).
       await this.saveActiveProfile();
       if (this.exportError) return;
-      if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
-      this.exporting = true;
-      this.exportProgress = 0;
-      this.exportStatus = window.__app.t('pdfExport.starting');
-      this.exportError = '';
+      // Umschlag-PDF immer Buch-scoped; sonst der gewählte Scope.
+      const ref = target === 'cover'
+        ? (Alpine.store('nav').selectedBookId ? { scope: 'book', id: parseInt(Alpine.store('nav').selectedBookId) } : null)
+        : this._exportEntity();
+      if (!ref) { this.exportError = window.__app.t('pdfExport.error.startFailed'); return; }
       this.exportLowRes = 0;
-      try {
-        // Umschlag-PDF immer Buch-scoped; sonst der gewählte Scope.
-        const ref = target === 'cover'
-          ? (Alpine.store('nav').selectedBookId ? { scope: 'book', id: parseInt(Alpine.store('nav').selectedBookId) } : null)
-          : this._exportEntity();
-        if (!ref) { this.exportError = window.__app.t('pdfExport.error.startFailed'); this.exporting = false; return; }
-        const r = await fetch('/jobs/pdf-export', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scope: ref.scope,
-            entityId: ref.id,
-            profile_id: this.activeProfile.id,
-            target,
-            ...(target === 'interior' && ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
-          }),
-        });
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          this.exportError = window.__app.t(d.error_code ? 'pdfExport.error.' + d.error_code : 'pdfExport.error.startFailed');
-          this.exporting = false;
-          return;
-        }
-        const { jobId } = await r.json();
-        this.currentJobId = jobId;
-        this._startPoll(jobId);
-      } catch (e) {
-        this.exportError = window.__app.t('pdfExport.error.network');
-        this.exporting = false;
-      }
-    },
-
-    _startPoll(jobId) {
-      this._stopPoll();
-      startPoll(this, {
-        timerProp: '_pollTimer',
-        jobId,
-        progressProp: 'exportProgress',
-        intervalMs: 1000,
-        onProgress: (job) => {
-          this.exportStatus = job.statusText
-            ? window.__app.t(job.statusText, job.statusParams)
-            : '';
-        },
-        onError: (job) => {
-          this.exporting = false;
-          this.exportError = job.error
-            ? window.__app.t(job.error, job.errorParams)
-            : window.__app.t('pdfExport.error.generic');
-        },
-        onDone: (job) => {
-          this.exporting = false;
-          this.exportProgress = 100;
-          const result = job.result || {};
-          this.exportLowRes = result.lowResImages || 0;
-          const pdfaWarn = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
-          const pdfxWarn = result.pdfx?.requested && !result.pdfx.applied;
-          const coverWarn = !!result.coverInInterior;
-          const isWarning = pdfaWarn || pdfxWarn || coverWarn;
-          this.exportStatus = window.__app.t(
-            pdfxWarn ? 'pdfExport.pdfxWarning'
-              : pdfaWarn ? 'pdfExport.pdfaWarning'
-              : coverWarn ? 'pdfExport.coverInInteriorWarning'
-              : 'pdfExport.done');
-          this._triggerDownload(jobId, result.filename);
-          if (this._exportStatusTimer) clearTimeout(this._exportStatusTimer);
-          const ttl = isWarning ? 8000 : 3500;
-          this._exportStatusTimer = setTimeout(() => {
-            this.exportStatus = '';
-            this.exportProgress = 0;
-            this._exportStatusTimer = null;
-          }, ttl);
-        },
+      await this._runExportJob({
+        scope: ref.scope,
+        entityId: ref.id,
+        profile_id: this.activeProfile.id,
+        target,
+        ...(target === 'interior' && ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
       });
     },
 
-    _stopPoll() {
-      if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
-    },
-
-    _triggerDownload(jobId, filename) {
-      const a = document.createElement('a');
-      a.href = `/jobs/pdf-export/${jobId}/file`;
-      a.download = filename || 'book.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    },
-
-    async cancelExport() {
-      if (!this.currentJobId) return;
-      try { await fetch(`/jobs/${this.currentJobId}`, { method: 'DELETE' }); } catch {}
-      // Poll deckt das `cancelled`-Status-Update bereits ab; UI-Reset im Polling.
-    },
-
-    // ── Scope-Auswahl (Buch/Kapitel/Seite) ───────────────────────────────
-    exportScopeOptions() {
-      const app = window.__app;
-      const opts = [{ value: 'book', label: app?.t?.('export.scope.book') || 'Buch' }];
-      if (this.exportChapterOptions().length) opts.push({ value: 'chapter', label: app.t('export.scope.chapter') });
-      if (this.exportPageOptions().length)    opts.push({ value: 'page',    label: app.t('export.scope.page') });
-      return opts;
-    },
-    exportChapterOptions() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
-      return Alpine.store('nav').tree
-        .filter(c => c.type === 'chapter' && !c.solo)
-        .map(c => ({ value: c.id, label: c.name }));
-    },
-    selectedChapterHasSubs() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').tree) || !this.exportChapterId) return false;
-      const ch = Alpine.store('nav').tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
-      return !!ch?.hasChildren;
-    },
-    exportPageOptions() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
-      return Alpine.store('nav').pages.map(p => ({ value: p.id, label: p.name }));
-    },
-
-    // Optionen fuer Kapitel-ohne-Nummer-Auswahl (Multi-Combobox).
-    // Tiefen werden via Einrueckung im Label sichtbar — Cascade-Hinweis: ist
-    // ein Top-Kapitel hier gewaehlt, sind auch alle Subs automatisch unnumbered.
-    unnumberedChapterPickOptions() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
-      return Alpine.store('nav').tree
-        .filter(c => c.type === 'chapter' && !c.solo)
-        .map(c => ({
-          value: c.id,
-          label: ((c.depth || 1) > 1 ? '— '.repeat((c.depth || 1) - 1) : '') + c.name,
-        }));
-    },
-    unnumberedChapterChips() {
-      const ids = this.activeProfile?.config?.chapter?.unnumberedChapterIds || [];
-      const opts = this.unnumberedChapterPickOptions();
-      return ids
-        .map(id => {
-          const o = opts.find(x => x.value === id);
-          return o ? { id, label: o.label } : { id, label: '#' + id };
-        });
-    },
-    removeUnnumberedChapter(id) {
-      if (!this.activeProfile) return;
-      const arr = this.activeProfile.config.chapter.unnumberedChapterIds || [];
-      this.activeProfile.config.chapter.unnumberedChapterIds = arr.filter(v => v !== id);
-    },
-
+    // ── PDF-eigene Picker (Seitenzähler-Skip) ─────────────────────────────
     // Picker fuer Seitenzaehler-Skip: gleicher Tree-Lookup wie bei
     // unnumberedChapterPickOptions; Kapitel-Auswahl ohne Numbering-Mode-Gate
     // (gilt auch wenn Kapitel-Titel-Nummern aus sind).
@@ -568,38 +427,6 @@ export function registerPdfExportCard() {
       if (!this.activeProfile) return;
       const arr = this.activeProfile.config.chapter.skipPageCounterPageIds || [];
       this.activeProfile.config.chapter.skipPageCounterPageIds = arr.filter(v => v !== id);
-    },
-    _applyExportPreset({ kind, id } = {}) {
-      if (kind === 'page' && id != null) {
-        this.exportPageId = id;
-        this.exportScope = 'page';
-      } else if (kind === 'chapter' && id != null) {
-        this.exportChapterId = id;
-        this.exportScope = 'chapter';
-      }
-    },
-    _ensureExportPicked() {
-      const app = window.__app;
-      const cur = app?.currentPage;
-      if (this.exportScope === 'chapter') {
-        const opts = this.exportChapterOptions();
-        const valid = opts.some(o => o.value === this.exportChapterId);
-        if (!valid) this.exportChapterId = cur?.chapter_id || opts[0]?.value || null;
-      }
-      if (this.exportScope === 'page') {
-        const opts = this.exportPageOptions();
-        const valid = opts.some(o => o.value === this.exportPageId);
-        if (!valid) this.exportPageId = cur?.id || opts[0]?.value || null;
-      }
-    },
-    _exportEntity() {
-      const app = window.__app;
-      if (!app) return null;
-      const scope = this.exportScope || 'book';
-      if (scope === 'page' && this.exportPageId) return { scope: 'page', id: this.exportPageId };
-      if (scope === 'chapter' && this.exportChapterId) return { scope: 'chapter', id: this.exportChapterId };
-      const bid = Alpine.store('nav').selectedBookId;
-      return bid ? { scope: 'book', id: parseInt(bid) } : null;
     },
 
     // ── Helpers fürs Template ────────────────────────────────────────────

@@ -1,6 +1,7 @@
 'use strict';
 
 const { _refToString } = require('./utils');
+const { normName: _normalizeName, nameTokens: _nameTokens } = require('../../../lib/name-normalize');
 
 /** Mergt duplizierte Figuren anhand des normalisierten Namens (case-insensitive).
  *  Fängt Fälle ab, in denen kleine Modelle (Ollama/llama) die Dedup-Regel in
@@ -11,21 +12,8 @@ const { _refToString } = require('./utils');
  *    Stufe 2: Teilname-Match (ein Name ist Teilmenge des anderen) plus mind. 2 Indizien
  *             (Beruf, Geburtsjahr, gemeinsames Kapitel, gleiches Geschlecht, geteilte Beziehung).
  *             Strenger Schutz: verschiedene Vornamen mit gleichem Nachnamen («Paul Schmidt»
- *             vs. «Marta Schmidt») werden NICHT zusammengeführt. */
-const TITLE_PREFIX_RE = /^(?:dr\.?|doktor|prof\.?|professor|herrn?|hr\.?|frau|fr\.?|fräulein)\s+/;
-const NAME_STOPWORDS = new Set(['von', 'zu', 'van', 'der', 'die', 'das', 'den', 'dem', 'de', 'la']);
-
-function _normalizeName(s) {
-  let r = (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
-  while (TITLE_PREFIX_RE.test(r)) r = r.replace(TITLE_PREFIX_RE, '');
-  return r;
-}
-
-function _nameTokens(name) {
-  return _normalizeName(name)
-    .split(/[\s\-\.]+/)
-    .filter(t => t.length > 1 && !NAME_STOPWORDS.has(t));
-}
+ *             vs. «Marta Schmidt») werden NICHT zusammengeführt.
+ *  Namens-Normalisierung (_normalizeName/_nameTokens) kommt aus lib/name-normalize. */
 
 /** Fasst zwei Figuren zu einer kanonischen Figur zusammen. `canon` wird mutiert.
  *  Gibt nichts zurück – Caller kümmert sich um idRemap. */

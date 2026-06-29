@@ -12,9 +12,11 @@
 //
 // Render-Job läuft über die Standard-Job-Queue (/jobs/epub-export). Sobald done,
 // wird die EPUB-Datei via /jobs/epub-export/:id/file als Download geholt.
+// Scope-Auswahl, Job-Polling/Download und Kapitel-Chips kommen aus
+// export-card-base.js (geteilt mit PDF + DOCX).
 
-import { startPoll } from './job-helpers.js';
 import { EVT } from '../events.js';
+import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice } from './export-card-base.js';
 
 const _EMPTY_META = () => ({
   author_name: '',
@@ -41,10 +43,23 @@ const _EMPTY_META = () => ({
 export function registerEpubExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('epubExportCard', () => ({
-    exportScope: 'book',
-    exportChapterId: null,
-    exportPageId: null,
-    exportIncludeSubchapters: false,
+    ...exportScopeSlice(),
+    ...exportJobSlice({
+      jobPath: '/jobs/epub-export',
+      defaultFilename: 'book.epub',
+      i18nPrefix: 'epubExport',
+      errorFor: (self, d) => window.__app.tError(d) || window.__app.t('epubExport.error.startFailed'),
+      // epubcheck non-fatal: lief der Validator und meldet er Fehler, Warnung
+      // zeigen (Datei wird trotzdem geliefert), sonst Standard-Done.
+      resolveDone: (self, result) => {
+        const checkWarn = result.epubcheck?.validatorAvailable && !result.epubcheck.passed;
+        return { statusKey: checkWarn ? 'epubExport.checkWarning' : 'epubExport.done', ttl: checkWarn ? 8000 : 3500 };
+      },
+    }),
+    ...unnumberedChipsSlice({
+      getIds: (s) => s.pub?.epub_unnumbered_chapter_ids || [],
+      setIds: (s, arr) => { s.pub.epub_unnumbered_chapter_ids = arr; },
+    }),
 
     activeTab: 'typography',
 
@@ -54,18 +69,8 @@ export function registerEpubExportCard() {
     saving: false,
     savedAt: null,
     _savedAtTimer: null,
-
-    exporting: false,
-    exportProgress: 0,
-    exportStatus: '',
-    exportError: '',
-    currentJobId: null,
-
-    _pollTimer: null,
-    _exportStatusTimer: null,
     _onBookChanged: null,
     _onViewReset: null,
-    _onExportPreset: null,
 
     init() {
       this.$watch(() => window.__app.showEpubExportCard, async (visible) => {
@@ -78,41 +83,20 @@ export function registerEpubExportCard() {
         await this.loadPublication();
         this._ensureExportPicked();
       });
-      this.$watch(() => this.exportScope, () => this._ensureExportPicked());
-      this.$watch(() => this.exportChapterId, () => { this.exportIncludeSubchapters = false; });
-      this.$watch(() => window.__app?.currentPage?.id, () => this._ensureExportPicked());
-
-      this._onExportPreset = (e) => this._applyExportPreset(e.detail);
-      window.addEventListener(EVT.EXPORT_EPUB_PRESET, this._onExportPreset);
-      const pending = window.__app?.__epubExportPreset;
-      if (pending) {
-        this._applyExportPreset(pending);
-        window.__app.__epubExportPreset = null;
-      }
+      this._initScopeWatches();
+      this._bindPreset(EVT.EXPORT_EPUB_PRESET, '__epubExportPreset');
 
       // book:changed: laufenden Export räumen + Publikations-Meta neu laden.
       this._onBookChanged = async () => {
-        this._stopPoll();
-        if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
-        this.exporting = false;
-        this.exportProgress = 0;
-        this.exportStatus = '';
-        this.exportError = '';
-        this.currentJobId = null;
+        this._resetExportRun();
         this.pubLoaded = false;
         if (window.__app?.showEpubExportCard) await this.loadPublication();
       };
       window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
 
       this._onViewReset = () => {
-        this._stopPoll();
-        if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
+        this._resetExportRun();
         if (this._savedAtTimer) { clearTimeout(this._savedAtTimer); this._savedAtTimer = null; }
-        this.exporting = false;
-        this.exportProgress = 0;
-        this.exportStatus = '';
-        this.exportError = '';
-        this.currentJobId = null;
         this.pub = _EMPTY_META();
         this.pubLoaded = false;
         this.exportScope = 'book';
@@ -127,9 +111,9 @@ export function registerEpubExportCard() {
       this._stopPoll();
       if (this._savedAtTimer)      { clearTimeout(this._savedAtTimer);      this._savedAtTimer = null; }
       if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
-      if (this._onBookChanged)  window.removeEventListener(EVT.BOOK_CHANGED,       this._onBookChanged);
-      if (this._onViewReset)    window.removeEventListener(EVT.VIEW_RESET,         this._onViewReset);
-      if (this._onExportPreset) window.removeEventListener(EVT.EXPORT_EPUB_PRESET, this._onExportPreset);
+      if (this._onBookChanged)  window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
+      if (this._onViewReset)    window.removeEventListener(EVT.VIEW_RESET,   this._onViewReset);
+      this._unbindPreset();
     },
 
     // ── Publikations-Meta (book_publication, geteilt mit PDF + BookSettings) ──
@@ -235,32 +219,6 @@ export function registerEpubExportCard() {
       ];
     },
 
-    // ── Kapitel ohne Nummer (Pendant zur PDF-Option) ──────────────────────
-    // Optionen aus dem Buch-Tree; Tiefe via Einrueckung im Label sichtbar.
-    // Cascade-Hinweis: ein gewaehltes Top-Kapitel macht auch alle Subs unnumeriert.
-    unnumberedChapterPickOptions() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
-      return Alpine.store('nav').tree
-        .filter(c => c.type === 'chapter' && !c.solo)
-        .map(c => ({
-          value: c.id,
-          label: ((c.depth || 1) > 1 ? '— '.repeat((c.depth || 1) - 1) : '') + c.name,
-        }));
-    },
-    unnumberedChapterChips() {
-      const ids = this.pub?.epub_unnumbered_chapter_ids || [];
-      const opts = this.unnumberedChapterPickOptions();
-      return ids.map(id => {
-        const o = opts.find(x => x.value === id);
-        return o ? { id, label: o.label } : { id, label: '#' + id };
-      });
-    },
-    removeUnnumberedChapter(id) {
-      const arr = this.pub?.epub_unnumbered_chapter_ids || [];
-      this.pub.epub_unnumbered_chapter_ids = arr.filter(v => v !== id);
-    },
-
     // Tab-State (activeTab) lebt über die `tabs`-Komponente im Markup
     // (x-modelable an activeTab gekoppelt) — kein setTab/isTab mehr hier.
 
@@ -277,148 +235,13 @@ export function registerEpubExportCard() {
         await this.savePublication();
         if (this.exportError) return;
       }
-      if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
       const ref = this._exportEntity();
       if (!ref) { this.exportError = window.__app.t('epubExport.error.startFailed'); return; }
-      this.exporting = true;
-      this.exportProgress = 0;
-      this.exportStatus = window.__app.t('epubExport.starting');
-      this.exportError = '';
-      try {
-        const r = await fetch('/jobs/epub-export', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scope: ref.scope,
-            entityId: ref.id,
-            ...(ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
-          }),
-        });
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          this.exportError = window.__app.tError(d) || window.__app.t('epubExport.error.startFailed');
-          this.exporting = false;
-          return;
-        }
-        const { jobId } = await r.json();
-        this.currentJobId = jobId;
-        this._startPoll(jobId);
-      } catch {
-        this.exportError = window.__app.t('epubExport.error.network');
-        this.exporting = false;
-      }
-    },
-
-    _startPoll(jobId) {
-      this._stopPoll();
-      startPoll(this, {
-        timerProp: '_pollTimer',
-        jobId,
-        progressProp: 'exportProgress',
-        intervalMs: 1000,
-        onProgress: (job) => {
-          this.exportStatus = job.statusText ? window.__app.t(job.statusText, job.statusParams) : '';
-        },
-        onError: (job) => {
-          this.exporting = false;
-          this.exportError = job.error
-            ? window.__app.t(job.error, job.errorParams)
-            : window.__app.t('epubExport.error.generic');
-        },
-        onDone: (job) => {
-          this.exporting = false;
-          this.exportProgress = 100;
-          const result = job.result || {};
-          // epubcheck non-fatal: lief der Validator und meldet er Fehler, Warnung
-          // zeigen (Datei wird trotzdem geliefert), sonst Standard-Done.
-          const checkWarn = result.epubcheck?.validatorAvailable && !result.epubcheck.passed;
-          this.exportStatus = window.__app.t(checkWarn ? 'epubExport.checkWarning' : 'epubExport.done');
-          this._triggerDownload(jobId, result.filename);
-          if (this._exportStatusTimer) clearTimeout(this._exportStatusTimer);
-          this._exportStatusTimer = setTimeout(() => {
-            this.exportStatus = '';
-            this.exportProgress = 0;
-            this._exportStatusTimer = null;
-          }, checkWarn ? 8000 : 3500);
-        },
+      await this._runExportJob({
+        scope: ref.scope,
+        entityId: ref.id,
+        ...(ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
       });
-    },
-
-    _stopPoll() {
-      if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
-    },
-
-    _triggerDownload(jobId, filename) {
-      const a = document.createElement('a');
-      a.href = `/jobs/epub-export/${jobId}/file`;
-      a.download = filename || 'book.epub';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    },
-
-    async cancelExport() {
-      if (!this.currentJobId) return;
-      try { await fetch(`/jobs/${this.currentJobId}`, { method: 'DELETE' }); } catch {}
-    },
-
-    // ── Scope-Auswahl (Buch/Kapitel/Seite) ───────────────────────────────
-    exportScopeOptions() {
-      const app = window.__app;
-      const opts = [{ value: 'book', label: app?.t?.('export.scope.book') || 'Buch' }];
-      if (this.exportChapterOptions().length) opts.push({ value: 'chapter', label: app.t('export.scope.chapter') });
-      if (this.exportPageOptions().length)    opts.push({ value: 'page',    label: app.t('export.scope.page') });
-      return opts;
-    },
-    exportChapterOptions() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').tree)) return [];
-      return Alpine.store('nav').tree
-        .filter(c => c.type === 'chapter' && !c.solo)
-        .map(c => ({ value: c.id, label: c.name }));
-    },
-    selectedChapterHasSubs() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').tree) || !this.exportChapterId) return false;
-      const ch = Alpine.store('nav').tree.find(c => c.type === 'chapter' && c.id === this.exportChapterId);
-      return !!ch?.hasChildren;
-    },
-    exportPageOptions() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
-      return Alpine.store('nav').pages.map(p => ({ value: p.id, label: p.name }));
-    },
-    _applyExportPreset({ kind, id } = {}) {
-      if (kind === 'page' && id != null) {
-        this.exportPageId = id;
-        this.exportScope = 'page';
-      } else if (kind === 'chapter' && id != null) {
-        this.exportChapterId = id;
-        this.exportScope = 'chapter';
-      }
-    },
-    _ensureExportPicked() {
-      const app = window.__app;
-      const cur = app?.currentPage;
-      if (this.exportScope === 'chapter') {
-        const opts = this.exportChapterOptions();
-        const valid = opts.some(o => o.value === this.exportChapterId);
-        if (!valid) this.exportChapterId = cur?.chapter_id || opts[0]?.value || null;
-      }
-      if (this.exportScope === 'page') {
-        const opts = this.exportPageOptions();
-        const valid = opts.some(o => o.value === this.exportPageId);
-        if (!valid) this.exportPageId = cur?.id || opts[0]?.value || null;
-      }
-    },
-    _exportEntity() {
-      const app = window.__app;
-      if (!app) return null;
-      const scope = this.exportScope || 'book';
-      if (scope === 'page' && this.exportPageId) return { scope: 'page', id: this.exportPageId };
-      if (scope === 'chapter' && this.exportChapterId) return { scope: 'chapter', id: this.exportChapterId };
-      const bid = Alpine.store('nav').selectedBookId;
-      return bid ? { scope: 'book', id: parseInt(bid) } : null;
     },
   }));
 }

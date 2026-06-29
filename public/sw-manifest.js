@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "dc7479aaf710c2f4";
+self.__SHELL_BUILD = "1d4d561f6e32fff1";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -211,6 +211,11 @@ self.__SHELL_MANIFEST = [
   "/js/book/tagebuch-rueckblick.js",
   "/js/book/tree-context-menu.js",
   "/js/book/tree.js",
+  "/js/book/tree/load.js",
+  "/js/book/tree/open-state.js",
+  "/js/book/tree/permissions.js",
+  "/js/book/tree/stats.js",
+  "/js/book/tree/ui.js",
   "/js/book/writing-time.js",
   "/js/cards/admin-books-card.js",
   "/js/cards/admin-categories-card.js",
@@ -256,6 +261,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/editor-toolbar-card.js",
   "/js/cards/epub-export-card.js",
   "/js/cards/ereignisse-card.js",
+  "/js/cards/export-card-base.js",
   "/js/cards/export-card.js",
   "/js/cards/feature-registry.js",
   "/js/cards/fehler-heatmap-card.js",

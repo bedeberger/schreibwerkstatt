@@ -1,5 +1,6 @@
 const { db } = require('./connection');
 const { NOW_ISO_SQL } = require('./now');
+const { normName: _normName, nameTokens: _nameTok } = require('../lib/name-normalize');
 require('./migrations');
 
 // Gerichtete Beziehungstypen und ihre Inverse. A→B elternteil ≡ B→A kind,
@@ -117,20 +118,9 @@ function _arcToFlat(arc) {
   return parts.join(' → ');
 }
 
-// Namens-Normalisierung fürs Cross-Run-Matching. Synchron mit
-// routes/jobs/komplett/figuren-merge.js#_normalizeName (dort kanonisch für den
-// Intra-Run-Dedup). Hier lokal dupliziert, um keine Layering-Inversion
-// (db/ → routes/) einzuführen.
-const _TITLE_PREFIX_RE = /^(?:dr\.?|doktor|prof\.?|professor|herrn?|hr\.?|frau|fr\.?|fräulein)\s+/;
-const _NAME_STOPWORDS = new Set(['von', 'zu', 'van', 'der', 'die', 'das', 'den', 'dem', 'de', 'la']);
-function _normName(s) {
-  let r = (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
-  while (_TITLE_PREFIX_RE.test(r)) r = r.replace(_TITLE_PREFIX_RE, '');
-  return r;
-}
-function _nameTok(name) {
-  return _normName(name).split(/[\s\-\.]+/).filter(t => t.length > 1 && !_NAME_STOPWORDS.has(t));
-}
+// Namens-Normalisierung fürs Cross-Run-Matching (_normName/_nameTok) kommt aus
+// lib/name-normalize — dieselbe SSoT wie der Intra-Run-Dedup in
+// routes/jobs/komplett/figuren-merge.js.
 
 // Indizien-Score zwischen einer Bestands-Figur (DB) und einer neuen Analyse-Figur.
 // Nur lauf-stabile Signale (Beruf/Geburtstag/Geschlecht/Typ/gemeinsames Kapitel) —

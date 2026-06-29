@@ -66,39 +66,6 @@ export function fmtExactDuration(seconds) {
   return parts.join(' ');
 }
 
-// Identity-cache memo für teure Filter/Sort-Computations in Alpine-Karten.
-// `compute(deps)` läuft nur, wenn das Deps-Array sich per `===`-Identität
-// gegenüber dem letzten Aufruf unterscheidet. Längen-Mismatch zählt als Diff.
-//
-// Use-Case: filteredXxx()/xxxKapitelListe()-Helper, die Alpine pro Render
-// mehrfach aufruft. Ohne Memo läuft Filter+Sort jeden Tick — kostet bei
-// langen Listen (Figuren mit Sort) merklich Zeit.
-//
-// Beispiel:
-//   const memo = memoizeByIdentity((deps) => {
-//     const [items, suche, kapitel] = deps;
-//     return items.filter(...).sort(...);
-//   });
-//   filteredItems() {
-//     return memo([this.items, this.filters.suche, this.filters.kapitel]);
-//   }
-export function memoizeByIdentity(compute) {
-  let cachedDeps = null;
-  let cachedResult;
-  return function (deps) {
-    if (cachedDeps && deps.length === cachedDeps.length) {
-      let same = true;
-      for (let i = 0; i < deps.length; i++) {
-        if (deps[i] !== cachedDeps[i]) { same = false; break; }
-      }
-      if (same) return cachedResult;
-    }
-    cachedDeps = deps;
-    cachedResult = compute(deps);
-    return cachedResult;
-  };
-}
-
 // Min/Max über `items`. `getValue` liefert Zahl oder null/NaN.
 // Leere Menge → { min: 0, max: 0 } (konsistent mit den Heatmap-Callern).
 export function minMaxBy(items, getValue) {

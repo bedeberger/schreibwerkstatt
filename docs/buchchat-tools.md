@@ -37,7 +37,7 @@ Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([l
 
 ## Tools
 
-33 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read) und `generate_image` (Seiteneffekt + externer Bild-Call — bewusste Ausnahme zum Read-Only-/deterministisch-/kein-KI-Call-Vertrag, siehe unten).
+34 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read) und `generate_image` (Seiteneffekt + externer Bild-Call — bewusste Ausnahme zum Read-Only-/deterministisch-/kein-KI-Call-Vertrag, siehe unten).
 
 ### Buch/Kapitel-Überblick
 

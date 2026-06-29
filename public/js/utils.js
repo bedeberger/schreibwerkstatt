@@ -1,7 +1,7 @@
 // Facade für die geteilten Frontend-Utilities. Sehr breit importiert (Dutzende
 // Konsumenten) — alle bisherigen Named-Exports MÜSSEN hier unverändert
 // re-exportiert werden. Interne Aufteilung nach Domäne unter `utils/`:
-//   format.js    — Zahlen/Dauer/Token/Umfang/Locale + Compute-Helper (Memo, Min/Max, Heatmap)
+//   format.js    — Zahlen/Dauer/Token/Umfang/Locale + Compute-Helper (Min/Max, Heatmap)
 //   date.js      — Zeitzone (appTimezone/tzOpts) + ISO-Datum + relative Zeit-Formatter
 //   escape.js    — HTML-Escape-Atome (escHtml/escMd/escPreserveStrong)
 //   net.js       — Fetch-Wrapper + Status-Reset

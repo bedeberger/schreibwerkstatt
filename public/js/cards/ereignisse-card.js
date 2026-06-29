@@ -8,7 +8,6 @@
 //   - `_buildGlobalZeitstrahl` (wird aus figuren.js / loadFiguren gerufen)
 //   - `_reloadZeitstrahl` (wird aus app-komplett.js gerufen)
 import { setupCardLifecycle } from './card-lifecycle.js';
-import { memoizeByIdentity } from '../utils.js';
 
 // Pure Filter-Logik. Aus dem memoized Wrapper extrahiert, damit sie ohne
 // Alpine-Root testbar ist (siehe tests/unit/ereignisse-card-filter.test.mjs).
@@ -34,16 +33,6 @@ export function applyEreignisseFilters(events, { suche = '', figurId = '', subty
   }
   return result;
 }
-
-const _memoEreignisse = () => memoizeByIdentity(([events, suche, figurId, kapitel, seite, subtyp]) =>
-  applyEreignisseFilters(events, { suche, figurId, kapitel, seite, subtyp })
-);
-
-// Band-Modell (Achsen-Ticks + Lane-gepackte Marker) gecacht über die Identität
-// der gefilterten Liste — filteredEreignisse() liefert dieselbe Array-Referenz
-// solange Daten/Filter unverändert, also rechnet das Layout nur bei echtem
-// Wechsel neu (Template ruft bandModel() mehrfach pro Render).
-const _memoBandModel = () => memoizeByIdentity(([events, bandWidthPx]) => buildBandModel(events, bandWidthPx));
 
 // Baut ein Date aus den strukturierten Jahr/Monat/Tag-Feldern. setFullYear
 // (statt new Date(year,…)) vermeidet das 0–99-Jahr-Mapping auf 1900+year und
@@ -268,7 +257,7 @@ export function bandAxisTicks(bounds, { targetTicks = 6 } = {}) {
 // Pure: komplettes Anzeige-Modell des Jahres-Bands aus der (gefilterten) Event-
 // Liste. itemCount = Anzahl datierter Items (achsen-fähig; undatierte bleiben nur
 // in der Liste), lanes/markers fürs Layout, ticks für die Achse. Extrahiert für
-// Tests; in der Karte via memoizeByIdentity über die gefilterte Liste gecacht.
+// Tests; in der Karte via _memo('band') über die gefilterte Liste gecacht.
 export function buildBandModel(events, bandWidthPx = 0) {
   const items = buildTimelineItems(events);
   const { lanes, markers, bounds } = layoutBandItems(items, { bandWidthPx });
@@ -359,8 +348,10 @@ export function registerEreignisseCard() {
     _consolidatePollTimer: null,
     _ereignisseExtractPollTimer: null,
     _lifecycle: null,
-    _memoFiltered: _memoEreignisse(),
-    _memoBand: _memoBandModel(),
+    // Ein Memo-Helper pro Modul (CLAUDE.md): filteredEreignisse()/bandModel()
+    // werden im Template mehrfach pro Render gelesen → Cache mit shallow-Array-
+    // Deps. Reset bei jedem Daten-Reload via this._memos = {} im load-Pfad.
+    _memos: {},
     _bandRO: null,
     // Gerenderte Track-Breite (px, auf 16er gerundet gegen Resize-Thrashing).
     // Speist die Chip-Kollisionsauflösung in bandModel(); 0 = noch nicht gemessen.
@@ -383,7 +374,7 @@ export function registerEreignisseCard() {
           zeitstrahlStatus: '',
           selectedEventIndex: null,
         },
-        load: (root) => root._reloadZeitstrahl(),
+        load: (root) => { this._memos = {}; return root._reloadZeitstrahl(); },
         refreshNeedsBookId: false,
       });
       // Das Jahres-Band rendert deklarativ aus bandModel() (reaktiv über
@@ -411,6 +402,20 @@ export function registerEreignisseCard() {
       this._bandRO?.disconnect();
       this._bandRO = null;
       this._lifecycle?.destroy();
+    },
+
+    // Ein Memo-Helper pro Modul (CLAUDE.md): Cache mit shallow-Array-Deps-
+    // Vergleich (`===`). Cache hit nur wenn ALLE Deps identisch zur letzten
+    // Compute. Reset über this._memos = {} (load-Pfad).
+    _memo(key, deps, compute) {
+      const memos = (this._memos ||= {});
+      const hit = memos[key];
+      if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
+        return hit.value;
+      }
+      const value = compute();
+      memos[key] = { deps: [...deps], value };
+      return value;
     },
 
     // UI-Helper. Lesen $root-Filter + -Daten.
@@ -461,16 +466,12 @@ export function registerEreignisseCard() {
     },
 
     filteredEreignisse() {
-      const root = window.__app;
+      const events = Alpine.store('catalog').globalZeitstrahl;
       const f = Alpine.store('catalogUi').ereignisseFilters;
-      return this._memoFiltered([
-        root.$store.catalog.globalZeitstrahl,
-        f.suche  ?? '',
-        f.figurId ?? '',
-        f.kapitel ?? '',
-        f.seite   ?? '',
-        f.subtyp  ?? '',
-      ]);
+      const suche = f.suche ?? '', figurId = f.figurId ?? '', kapitel = f.kapitel ?? '',
+        seite = f.seite ?? '', subtyp = f.subtyp ?? '';
+      return this._memo('filtered', [events, suche, figurId, kapitel, seite, subtyp],
+        () => applyEreignisseFilters(events, { suche, figurId, kapitel, seite, subtyp }));
     },
 
     // Scrollt das Event am Listen-Index ins Sichtfeld (Klick auf Timeline-Item).
@@ -527,10 +528,14 @@ export function registerEreignisseCard() {
 
     // --- Jahres-Band ---------------------------------------------------------
     // Anzeige-Modell (Achsen-Ticks + Lane-gepackte Marker), gecacht über die
-    // Identität der gefilterten Liste. Das Template ruft bandModel() mehrfach
-    // pro Render (Höhe, Tick-Loop, Marker-Loop) — Memo hält das Layout stabil.
+    // Identität der gefilterten Liste — filteredEreignisse() liefert dieselbe
+    // Array-Referenz solange Daten/Filter unverändert, also rechnet das Layout
+    // nur bei echtem Wechsel neu. Das Template ruft bandModel() mehrfach pro
+    // Render (Höhe, Tick-Loop, Marker-Loop) — Memo hält das Layout stabil.
     bandModel() {
-      return this._memoBand([this.filteredEreignisse(), this._bandWidth]);
+      const events = this.filteredEreignisse();
+      return this._memo('band', [events, this._bandWidth],
+        () => buildBandModel(events, this._bandWidth));
     },
 
     // Anzahl datierter Events (auf der Achse). Treibt die Sichtbarkeit des Bands

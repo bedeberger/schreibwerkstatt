@@ -15,6 +15,7 @@ const appUsersDevices = require('../db/app-users-devices');
 const bookOrder = require('../db/book-order');
 const { toIntId } = require('../lib/validate');
 const { setContext, bookParamHandler } = require('../lib/log-context');
+const { resolvePageBookId, resolveChapterBookId } = require('../lib/content-ownership');
 const { aclParamGuard, requireBookAccess, sendACLError, ACLError } = require('../lib/acl');
 const bookAccess = require('../db/book-access');
 const { db } = require('../db/connection');
@@ -55,18 +56,8 @@ function _deviceTokenLabel(req) {
   } catch { return null; }
 }
 
-function _pageBookId(pageId) {
-  const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
-  return r?.book_id || null;
-}
-
-function _chapterBookId(chapterId) {
-  const r = db.prepare('SELECT book_id FROM chapters WHERE chapter_id = ?').get(parseInt(chapterId, 10));
-  return r?.book_id || null;
-}
-
 function _guardPage(req, res, pageId, minRole) {
-  const bookId = _pageBookId(pageId);
+  const bookId = resolvePageBookId(pageId);
   if (!bookId) { res.status(404).json({ error_code: 'PAGE_NOT_FOUND' }); return null; }
   setContext({ book: bookId });
   try { requireBookAccess(req, bookId, minRole); return bookId; }
@@ -74,7 +65,7 @@ function _guardPage(req, res, pageId, minRole) {
 }
 
 function _guardChapter(req, res, chapterId, minRole) {
-  const bookId = _chapterBookId(chapterId);
+  const bookId = resolveChapterBookId(chapterId);
   if (!bookId) { res.status(404).json({ error_code: 'CHAPTER_NOT_FOUND' }); return null; }
   setContext({ book: bookId });
   try { requireBookAccess(req, bookId, minRole); return bookId; }
@@ -403,7 +394,7 @@ router.post('/books/:book_id/device-ping', aclParamGuard('viewer'), jsonBody, (r
   // page_id optional. Nur akzeptieren, wenn die Seite zu DIESEM Buch gehoert —
   // sonst null (verhindert fremde page_id im eigenen Praesenz-Zaehler).
   let pageId = toIntId(req.body?.page_id);
-  if (pageId && _pageBookId(pageId) !== req.bookId) pageId = null;
+  if (pageId && resolvePageBookId(pageId) !== req.bookId) pageId = null;
   try {
     appUsersDevices.upsertDevice(deviceId, email, req.get('user-agent') || '');
     bookPresence.ping(req.bookId, email, deviceId, pageId);
@@ -524,7 +515,7 @@ router.post('/pages', jsonBody, async (req, res) => {
   const name = (req.body?.name || '').toString().trim();
   if (!name) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
   if (!bookIdRaw && !chapterIdRaw) return res.status(400).json({ error_code: 'BOOK_OR_CHAPTER_REQUIRED' });
-  const effBookId = bookIdRaw || _chapterBookId(chapterIdRaw);
+  const effBookId = bookIdRaw || resolveChapterBookId(chapterIdRaw);
   if (!effBookId) return res.status(404).json({ error_code: 'BOOK_NOT_FOUND' });
   setContext({ book: effBookId });
   try { requireBookAccess(req, effBookId, 'editor'); }

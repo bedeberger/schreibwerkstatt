@@ -4,6 +4,7 @@ const { toIntId } = require('../lib/validate');
 const { localIsoDate, localHour } = require('../lib/local-date');
 const { setContext } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
+const { resolvePageBookId } = require('../lib/content-ownership');
 const { buildRueckblickCoverage } = require('./jobs/rueckblick-dates');
 const logger = require('../logger');
 
@@ -12,10 +13,6 @@ const router = express.Router();
 router.param('book_id', aclParamGuard('viewer'));
 const jsonBody = express.json();
 
-function _pageBookId(pageId) {
-  const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
-  return r?.book_id || null;
-}
 function _guardBook(req, res, bookId, minRole) {
   setContext({ book: bookId });
   try { requireBookAccess(req, bookId, minRole); return true; }
@@ -74,7 +71,7 @@ router.get('/page/:page_id', (req, res) => {
   const user_email = req.session?.user?.email || null;
   const pageId = toIntId(req.params.page_id);
   if (!pageId) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const bookId = _pageBookId(pageId);
+  const bookId = resolvePageBookId(pageId);
   if (!bookId) return res.status(404).json({ error_code: 'PAGE_NOT_FOUND' });
   if (!_guardBook(req, res, bookId, 'viewer')) return;
   const rows = db.prepare(`
@@ -713,7 +710,7 @@ router.post('/lektorat-time', jsonBody, (req, res) => {
   if (!book_id) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   if (!page_id) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
   if (!_guardBook(req, res, book_id, 'viewer')) return;
-  if (_pageBookId(page_id) !== book_id) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
+  if (resolvePageBookId(page_id) !== book_id) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
   if (!Number.isFinite(secondsRaw) || secondsRaw <= 0) return res.json({ ok: true, added: 0 });
   const seconds = Math.min(Math.round(secondsRaw), 3600);
   const date = localIsoDate();

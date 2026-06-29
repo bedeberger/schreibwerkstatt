@@ -12,6 +12,7 @@ const { db } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
+const { resolvePageBookId, resolveChapterBookId } = require('../lib/content-ownership');
 const searchIndex = require('../lib/search');
 const logger = require('../logger');
 
@@ -31,16 +32,6 @@ const SELECT_ROW = `
 
 function userEmailOrNull(req) {
   return req.session?.user?.email || null;
-}
-
-function _pageBookId(pageId) {
-  const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
-  return r?.book_id || null;
-}
-
-function _chapterBookId(chapterId) {
-  const r = db.prepare('SELECT book_id FROM chapters WHERE chapter_id = ?').get(parseInt(chapterId, 10));
-  return r?.book_id || null;
 }
 
 function _guard(req, res, bookId, minRole) {
@@ -85,7 +76,7 @@ router.get('/', (req, res) => {
   let bookId;
   let rows;
   if (pageId) {
-    bookId = _pageBookId(pageId);
+    bookId = resolvePageBookId(pageId);
     if (!bookId) return res.status(404).json({ error_code: 'PAGE_NOT_FOUND' });
     if (!_guard(req, res, bookId, 'editor')) return;
     rows = db.prepare(`
@@ -94,7 +85,7 @@ router.get('/', (req, res) => {
       ORDER BY i.erledigt ASC, i.created_at DESC
     `).all(pageId, userEmail);
   } else {
-    bookId = _chapterBookId(chapterId);
+    bookId = resolveChapterBookId(chapterId);
     if (!bookId) return res.status(404).json({ error_code: 'CHAPTER_NOT_FOUND' });
     if (!_guard(req, res, bookId, 'editor')) return;
     rows = db.prepare(`
@@ -124,11 +115,9 @@ router.post('/', jsonBody, (req, res) => {
 
   // Cross-Check: page/chapter muss zum Buch gehoeren.
   if (pageId) {
-    const owner = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(pageId);
-    if (!owner || owner.book_id !== bookId) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
+    if (resolvePageBookId(pageId) !== bookId) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
   } else {
-    const owner = db.prepare('SELECT book_id FROM chapters WHERE chapter_id = ?').get(chapterId);
-    if (!owner || owner.book_id !== bookId) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
+    if (resolveChapterBookId(chapterId) !== bookId) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
   }
 
   const now = new Date().toISOString();
@@ -180,8 +169,7 @@ router.patch('/:id', jsonBody, (req, res) => {
     if (!newPageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
     if (existing.erledigt) return res.status(400).json({ error_code: 'IDEE_DONE' });
     if (existing.page_id === null) return res.status(400).json({ error_code: 'KIND_MISMATCH' });
-    const target = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(newPageId);
-    if (!target || target.book_id !== existing.book_id) {
+    if (resolvePageBookId(newPageId) !== existing.book_id) {
       return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
     }
     movedFrom = existing.page_id;
@@ -193,8 +181,7 @@ router.patch('/:id', jsonBody, (req, res) => {
     if (!newChapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
     if (existing.erledigt) return res.status(400).json({ error_code: 'IDEE_DONE' });
     if (existing.chapter_id === null) return res.status(400).json({ error_code: 'KIND_MISMATCH' });
-    const target = db.prepare('SELECT book_id FROM chapters WHERE chapter_id = ?').get(newChapterId);
-    if (!target || target.book_id !== existing.book_id) {
+    if (resolveChapterBookId(newChapterId) !== existing.book_id) {
       return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
     }
     movedFrom = existing.chapter_id;

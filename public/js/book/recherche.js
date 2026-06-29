@@ -261,6 +261,10 @@ export const rechercheMethods = {
   onItemBodyClick(item, ev) {
     if (this.busy) return;
     if (ev.target.closest('a, button, input, label, .research-tag, .research-link-chip, .recherche-linkpicker, .combobox-wrap')) return;
+    // Textselektion nicht abwürgen: hat der User Text markiert (Drag löst am
+    // Ende ebenfalls ein click aus), nicht in den Edit-Modus wechseln.
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().trim()) return;
     this.startEdit(item);
   },
 

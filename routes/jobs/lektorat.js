@@ -29,13 +29,9 @@ const { narrativeLabels } = require('./narrative-labels');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
+const { resolvePageBookId } = require('../../lib/content-ownership');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
-
-function _pageBookId(pageId) {
-  const r = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
-  return r?.book_id || null;
-}
 
 // Lokale Provider (ollama/llama) bekommen einen deutlich abgespeckten Lektorat-Prompt:
 // kein Vorseiten-Kontext (BookStack-Roundtrip gespart), keine Figuren-Beziehungen,
@@ -457,7 +453,7 @@ lektoratRouter.post('/check', jsonBody, (req, res) => {
   const page_id = toIntId(req.body?.page_id);
   let book_id = toIntId(req.body?.book_id);
   if (!page_id) return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
-  if (!book_id) book_id = _pageBookId(page_id);
+  if (!book_id) book_id = resolvePageBookId(page_id);
   if (!book_id) return res.status(404).json({ error_code: 'BOOK_NOT_FOUND' });
   setContext({ book: book_id });
   try { requireBookAccess(req, book_id, 'lektor'); }

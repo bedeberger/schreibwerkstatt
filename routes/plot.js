@@ -7,9 +7,10 @@
 // (routes/jobs/plot.js), nicht hier.
 
 const express = require('express');
-const { db, getDraftFigure } = require('../db/schema');
+const { getDraftFigure } = require('../db/schema');
 const plotDb = require('../db/plot');
 const { toIntId } = require('../lib/validate');
+const { resolveChapterBookId } = require('../lib/content-ownership');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
 const logger = require('../logger');
@@ -53,8 +54,7 @@ function _loadOwned(req, res, getFn, notFoundCode) {
 // chapter_id muss zum Buch gehören, sonst NULL (kein Fremd-Verweis).
 function _validChapterId(bookId, chapterId) {
   if (!chapterId) return null;
-  const r = db.prepare('SELECT book_id FROM chapters WHERE chapter_id = ?').get(parseInt(chapterId));
-  return (r && r.book_id === bookId) ? parseInt(chapterId) : null;
+  return resolveChapterBookId(chapterId) === bookId ? parseInt(chapterId, 10) : null;
 }
 
 // Ein Akt passt zu einem Strang, wenn er GETEILT ist (thread_id NULL) ODER genau

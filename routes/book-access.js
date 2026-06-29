@@ -8,6 +8,7 @@ const bookAccess = require('../db/book-access');
 const bookCategories = require('../db/book-categories');
 const books = require('../db/books');
 const { aclParamGuard, requireBookAccess, ACLError, sendACLError } = require('../lib/acl');
+const { resolvePageBookId } = require('../lib/content-ownership');
 const { db } = require('../db/connection');
 const { NOW_ISO_SQL } = require('../db/now');
 const logger = require('../logger');
@@ -191,13 +192,8 @@ router.put('/:book_id/category', aclParamGuard('editor'), jsonBody, (req, res) =
 // um Findings sicher anzuwenden; Editor/Owner ebenfalls). Buch-ID wird per
 // Page-ID nachgeladen.
 
-function _pageOwnerBookId(pageId) {
-  const row = db.prepare('SELECT book_id FROM pages WHERE page_id = ?').get(parseInt(pageId, 10));
-  return row?.book_id || null;
-}
-
 function _resolvePageRole(req, pageId, minRole) {
-  const bookId = _pageOwnerBookId(pageId);
+  const bookId = resolvePageBookId(pageId);
   if (!bookId) throw new ACLError('PAGE_NOT_FOUND', 404);
   const role = requireBookAccess(req, bookId, minRole);
   return { bookId, role };

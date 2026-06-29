@@ -16,12 +16,14 @@
 import { graphMethods } from '../graph.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
-import { memoizeByIdentity } from '../utils.js';
 
 const FIGUR_TYP_ORDER = { hauptfigur: 0, antagonist: 1, mentor: 2, nebenfigur: 3, randfigur: 4, andere: 5 };
 
-const _memoFiguren = () => memoizeByIdentity(([figuren, chapterMap, suche, kapitel, seite]) => {
-  let result = figuren;
+// Pure Filter+Sort der Figurenliste. Aus dem memoized Wrapper extrahiert, damit
+// sie ohne Alpine-Root testbar bleibt. `chapterMap` = Kapitel-Name → Reihenfolge-
+// Index (root._chapterOrderMap).
+export function computeFilteredFiguren(figuren, chapterMap, { suche = '', kapitel = '', seite = '' } = {}) {
+  let result = figuren ?? [];
   const q = (suche || '').toLowerCase();
   if (q) result = result.filter(f => (f.name ?? '').toLowerCase().includes(q));
   if (kapitel) result = result.filter(f => (f.kapitel ?? []).some(k => k.name === kapitel));
@@ -51,21 +53,18 @@ const _memoFiguren = () => memoizeByIdentity(([figuren, chapterMap, suche, kapit
     if (aT !== bT) return aT - bT;
     return (a.name ?? '').localeCompare(b.name ?? '', 'de');
   });
-});
+}
 
-const _memoFigurenKapitel = () => memoizeByIdentity(([figuren]) =>
-  window.__app._deriveKapitel(figuren, f => f.kapitel));
-
-const _memoFigurenSeiten = () => memoizeByIdentity(([figuren, kapitel]) => {
-  if (!kapitel) return [];
+// Pure: sichtbare Seiten-Namen eines Kapitels über alle Figuren (Filter-Combobox).
+export function computeFigurenSeiten(figuren, kapitel) {
   const names = new Set();
   for (const f of (figuren || [])) {
     for (const s of (f.seiten || [])) {
       if (s.kapitel === kapitel && s.seite) names.add(s.seite);
     }
   }
-  return window.__app._sortByPageOrder([...names]);
-});
+  return names;
+}
 
 export function registerFigurenCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -78,9 +77,10 @@ export function registerFigurenCard() {
     _figurenHash: null,
     _figurenNodes: null,
     _figurenEdges: null,
-    _memoFiltered: _memoFiguren(),
-    _memoKapitel: _memoFigurenKapitel(),
-    _memoSeiten: _memoFigurenSeiten(),
+    // Ein Memo-Helper pro Modul (CLAUDE.md): filteredFiguren()/figurenKapitelListe()/
+    // figurenSeitenListe() werden im Template (inkl. Combobox-x-effect) mehrfach pro
+    // Render gelesen → Cache mit shallow-Array-Deps. Reset via this._memos = {} im load-Pfad.
+    _memos: {},
     _lifecycle: null,
 
     init() {
@@ -97,6 +97,7 @@ export function registerFigurenCard() {
         name: 'figuren',
         showFlag: 'showFiguresCard',
         load: async (root) => {
+          this._memos = {};
           await root.loadFiguren(Alpine.store('nav').selectedBookId);
           await this.$nextTick();
           this.renderFigurGraph();
@@ -110,6 +111,7 @@ export function registerFigurenCard() {
         // explizit awaiten (idempotent zum loadPages-Load) und erst dann rendern.
         onBookChanged: async (e, ctx, root) => {
           destroyNet();
+          ctx._memos = {};
           ctx.figurenUpdatedAt = null;
           ctx.figurenGraphKapitel = null;
           if (!root.showFiguresCard) return;
@@ -165,27 +167,46 @@ export function registerFigurenCard() {
       if (this._figurenNetwork) { this._figurenNetwork.destroy(); this._figurenNetwork = null; }
     },
 
+    // Ein Memo-Helper pro Modul (CLAUDE.md): Cache mit shallow-Array-Deps-
+    // Vergleich (`===`). Cache hit nur wenn ALLE Deps identisch zur letzten
+    // Compute. Reset über this._memos = {} (load-Pfad / book:changed).
+    _memo(key, deps, compute) {
+      const memos = (this._memos ||= {});
+      const hit = memos[key];
+      if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
+        return hit.value;
+      }
+      const value = compute();
+      memos[key] = { deps: [...deps], value };
+      return value;
+    },
+
     // UI-Helper: aus Comboboxen via x-effect mehrfach pro Render gerufen
     // (für _disabled + options). Memo auf Identität der Quell-Daten.
     figurenKapitelListe() {
-      return this._memoKapitel([Alpine.store('catalog').figuren]);
+      const figuren = Alpine.store('catalog').figuren;
+      return this._memo('kapitel', [figuren],
+        () => window.__app._deriveKapitel(figuren, f => f.kapitel));
     },
 
     figurenSeitenListe() {
       // seiten = Array {kapitel, seite} — eigener Iterator (keine 1:1-Relation).
-      return this._memoSeiten([Alpine.store('catalog').figuren, Alpine.store('catalogUi').figurenFilters.kapitel]);
+      const figuren = Alpine.store('catalog').figuren;
+      const kapitel = Alpine.store('catalogUi').figurenFilters.kapitel;
+      return this._memo('seiten', [figuren, kapitel], () => {
+        if (!kapitel) return [];
+        return window.__app._sortByPageOrder([...computeFigurenSeiten(figuren, kapitel)]);
+      });
     },
 
     filteredFiguren() {
       const root = window.__app;
       const f = Alpine.store('catalogUi').figurenFilters;
-      return this._memoFiltered([
-        root.$store.catalog.figuren,
-        root._chapterOrderMap,
-        f.suche ?? '',
-        f.kapitel ?? '',
-        f.seite ?? '',
-      ]);
+      const figuren = root.$store.catalog.figuren;
+      const chapterMap = root._chapterOrderMap;
+      const suche = f.suche ?? '', kapitel = f.kapitel ?? '', seite = f.seite ?? '';
+      return this._memo('filtered', [figuren, chapterMap, suche, kapitel, seite],
+        () => computeFilteredFiguren(figuren, chapterMap, { suche, kapitel, seite }));
     },
 
     ...graphMethods,
