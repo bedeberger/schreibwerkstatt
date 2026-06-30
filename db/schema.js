@@ -1372,6 +1372,7 @@ module.exports = {
   getChapterFigures:        figures.getChapterFigures,
   getChapterFigureRelations: figures.getChapterFigureRelations,
   getFigureWithDetails:     figures.getFigureWithDetails,
+  backfillAppearancesFromScenesEvents: figures.backfillAppearancesFromScenesEvents,
   // locations
   getChapterLocations,
   // pages

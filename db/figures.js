@@ -806,6 +806,41 @@ function getChapterFigures(bookId, chapterId, userEmail) {
   `).all(bookId, userEmail || null);
 }
 
+/** Ergänzt figure_appearances um Kapitel-Auftritte, die aus den übrigen KI-Signalen
+ *  der Komplettanalyse ableitbar sind, im selbstgemeldeten `kapitel`-Feld der Figur
+ *  aber fehlen: Szenen (scene_figures → figure_scenes.chapter_id) und Lebensereignisse
+ *  (figure_events.chapter_id). Schliesst die Single-Pass-Recall-Lücke (KI meldet pro
+ *  Figur nicht jedes Kapitel) und füllt Backfill-Figuren ohne `kapitel`.
+ *  INSERT OR IGNORE: bestehende Paare behalten ihre KI-Häufigkeit, nur fehlende
+ *  Kapitel kommen mit einer aus Szenen/Events abgeleiteten Häufigkeit hinzu. Reiner
+ *  SQL-Schritt aus bereits berechneten Daten, kein KI-Call. Läuft nach
+ *  saveSzenenAndEvents, sobald Szenen + Events persistiert sind.
+ *  Rückgabe: Anzahl neu ergänzter (figure, chapter)-Paare. */
+function backfillAppearancesFromScenesEvents(bookId, userEmail) {
+  if (!bookId) return 0;
+  const em = userEmail || null;
+  let added = 0;
+  db.transaction(() => {
+    added += db.prepare(`
+      INSERT OR IGNORE INTO figure_appearances (figure_id, chapter_id, haeufigkeit)
+      SELECT sf.figure_id, fs.chapter_id, COUNT(*)
+      FROM scene_figures sf
+      JOIN figure_scenes fs ON fs.id = sf.scene_id
+      WHERE fs.book_id = ? AND fs.user_email IS ? AND fs.chapter_id IS NOT NULL AND fs.stale = 0
+      GROUP BY sf.figure_id, fs.chapter_id
+    `).run(bookId, em).changes;
+    added += db.prepare(`
+      INSERT OR IGNORE INTO figure_appearances (figure_id, chapter_id, haeufigkeit)
+      SELECT fe.figure_id, fe.chapter_id, COUNT(*)
+      FROM figure_events fe
+      JOIN figures f ON f.id = fe.figure_id
+      WHERE f.book_id = ? AND f.user_email IS ? AND fe.chapter_id IS NOT NULL
+      GROUP BY fe.figure_id, fe.chapter_id
+    `).run(bookId, em).changes;
+  })();
+  return added;
+}
+
 /** Beziehungen zwischen Figuren, die im gegebenen Kapitel gemeinsam auftreten.
  *  Liefert: [{ von, zu, typ, beschreibung }] mit Namen (nicht fig_ids).
  *  Ohne chapterId: alle Beziehungen des Buchs. */
@@ -885,4 +920,5 @@ module.exports = {
   getChapterFigures,
   getChapterFigureRelations,
   getFigureWithDetails,
+  backfillAppearancesFromScenesEvents,
 };
