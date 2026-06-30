@@ -10,7 +10,7 @@ Bump-Argument: `$ARGUMENTS` (leer = `patch`).
 
 ## Vorprüfung
 
-1. `git status --porcelain` lesen. Es darf **kein** uncommitteter Stand an `VERSION` oder `package.json` vorliegen. Andere uncommittete Änderungen sind erlaubt, werden aber **nicht** mit-committet — der Release-Commit enthält ausschliesslich `VERSION` + `package.json`.
+1. `git status --porcelain` lesen. **Der gesamte Working Tree wird mit dem Release committet** — egal was drin liegt. Es darf nur kein laufender Merge/Rebase-Konflikt (ungemergte Pfade) vorliegen; falls doch: abbrechen und melden.
 2. Aktuelle Version aus `VERSION` lesen.
 3. Neue Version berechnen:
    - `patch` → letzte Stelle +1 (1.2.3 → 1.2.4)
@@ -23,8 +23,8 @@ Bump-Argument: `$ARGUMENTS` (leer = `patch`).
 
 5. Neue Version in `VERSION` schreiben (nur die Zahl + Newline).
 6. `npm run version:sync` ausführen (schreibt `package.json#version`).
-7. **Nur** die beiden Dateien stagen: `git add VERSION package.json`.
-8. Committen mit Message `release: v<neueVersion>`. Commit-Trailer wie üblich (`Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`).
+7. **Gesamten** Working Tree stagen: `git add -A` (inkl. `VERSION` + `package.json`).
+8. Committen mit Message `release: v<neueVersion>`. Liegen ausser dem Versions-Bump noch andere Änderungen im Tree, eine kurze, sinnvolle Zusammenfassung dieser Änderungen als zweite Zeile (Body) ergänzen. Commit-Trailer wie üblich (`Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`).
 9. Annotated Tag setzen: `git tag -a v<neueVersion> -m "v<neueVersion>"`.
 10. Pushen: `git push origin HEAD` und `git push origin v<neueVersion>`.
 11. GitHub-Release erstellen:
