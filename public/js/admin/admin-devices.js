@@ -65,10 +65,18 @@ export const adminDevicesMethods = {
     return m ? m[0] : '';
   },
 
+  // Erkennt ein Android-Geraet. Das `platform`-Feld ist Freitext (vom User beim
+  // Ausstellen des Tokens eingegeben → evtl. „Pixel", „Samsung", leer); darum
+  // primaer am `client_version`-Prefix (`android/…`, vom Client gemeldet)
+  // festmachen, das `platform`-Feld nur als Fallback.
+  _devicesIsAndroid(d) {
+    return /android/i.test(d.client_version || '') || /android/i.test(d.platform || '');
+  },
+
   // Neueste Version fuer die Plattform dieses Geraets (Android vs. macOS getrennt).
   _devicesLatestForPlatform(d) {
     const v = this.devicesLatestVersions || {};
-    return /android/i.test(d.platform || '') ? (v.android || null) : (v.macos || null);
+    return this._devicesIsAndroid(d) ? (v.android || null) : (v.macos || null);
   },
 
   // Ist die installierte Version aelter als das neueste Release der jeweiligen
