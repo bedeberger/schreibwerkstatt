@@ -98,6 +98,12 @@
               <span x-text="$app.t('share.btn.shareChapter')"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+                    x-show="$app.kapitelReviewChapterId"
+                    @click="$app.openExportFor('chapter', $app.kapitelReviewChapterId)">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#download"/></svg>
+              <span x-text="$app.t('pagetreeCtx.export')"></span>
+            </button>
+            <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="$app.canEdit() && $app.kapitelReviewChapterId"
                     :class="{ 'context-menu-item--on': kapitelReviewSelectedChapter()?.excluded }"
                     @click="$app.setChapterExcluded($app.kapitelReviewChapterId, !kapitelReviewSelectedChapter()?.excluded)">

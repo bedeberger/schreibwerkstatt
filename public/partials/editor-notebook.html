@@ -206,6 +206,10 @@
                   <span x-text="t('share.btn.sharePage')"></span>
                   <span class="btn-count" x-show="currentPageShareLinkCount > 0" x-text="currentPageShareLinkCount" :data-tip="t('share.pageLinkCountTitle', { n: currentPageShareLinkCount })"></span>
                 </button>
+                <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="currentPage" @click="openExportFor('page', currentPage.id); pageActionsMenuOpen = false">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#download"/></svg>
+                  <span x-text="t('pagetreeCtx.export')"></span>
+                </button>
               </div>
             </span>
           </span>

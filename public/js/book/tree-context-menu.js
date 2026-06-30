@@ -142,8 +142,19 @@ export const treeContextMenuMethods = {
   async pagetreeCtxExport() {
     const target = this.pageTreeMenuTarget;
     this._hidePagetreeContextMenu();
-    const preset = (target?.kind === 'page' || target?.kind === 'chapter')
-      ? { kind: target.kind, id: target.id }
+    if (target?.kind === 'page' || target?.kind === 'chapter') {
+      await this.openExportFor(target.kind, target.id);
+    } else {
+      await this.openExportFor();
+    }
+  },
+
+  // Export-Karte öffnen, optional mit Seiten-/Kapitel-Preset. Geteilt zwischen
+  // Sidebar-Kontextmenue und den Meatball-Menues (Notebook-Seitenaktionen +
+  // Kapitelbewertung).
+  async openExportFor(kind, id) {
+    const preset = (kind === 'page' || kind === 'chapter') && id != null
+      ? { kind, id }
       : null;
     if (preset) {
       this.__exportPreset = preset;
