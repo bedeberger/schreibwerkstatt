@@ -35,9 +35,12 @@ function _runFulltextHit(root, hit) {
       if (ch?.pages?.[0]) return root.selectPage(ch.pages[0]);
       return;
     }
-    case 'book':
-      if (hit.book_id && Alpine.store('nav').selectedBookId !== hit.book_id) Alpine.store('nav').selectedBookId = hit.book_id;
+    case 'book': {
+      // FTS5 liefert book_id als String, selectedBookId ist numerisch.
+      const bid = Number(hit.book_id);
+      if (Number.isFinite(bid) && Alpine.store('nav').selectedBookId !== bid) Alpine.store('nav').selectedBookId = bid;
       return root.toggleBookOverviewCard?.();
+    }
     case 'figure':   return root.openFigurById?.(hit.entity_id);
     case 'location': return root.openOrtById?.(hit.entity_id);
     case 'scene':    return root.openSzeneById?.(hit.entity_id);

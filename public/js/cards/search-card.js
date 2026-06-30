@@ -159,12 +159,17 @@ export function registerSearchCard() {
             if (ch?.pages?.[0]) return root.selectPage(ch.pages[0]);
             return;
           }
-          case 'book':
-            if (hit.book_id && Alpine.store('nav').selectedBookId !== hit.book_id) {
-              Alpine.store('nav').selectedBookId = hit.book_id;
+          case 'book': {
+            // FTS5 liefert book_id als String, selectedBookId ist numerisch →
+            // sonst greift der strikte Vergleich nie und reassignt bei jedem
+            // Treffer einen String.
+            const bid = Number(hit.book_id);
+            if (Number.isFinite(bid) && Alpine.store('nav').selectedBookId !== bid) {
+              Alpine.store('nav').selectedBookId = bid;
             }
             root.toggleBookOverviewCard?.();
             return;
+          }
           case 'figure':
             return root.openFigurById?.(hit.entity_id);
           case 'location':
