@@ -504,8 +504,8 @@ test('computeBookGoals: Prognose aus 30-Tage-Tempo', () => {
   // 1000 Zeichen/Tag: vor 30 Tagen 20000, heute 50000 → +30000/30. Ziel 110000 →
   // remaining 60000 → 60 Tage → fertig 2026-08-28.
   const history = [
-    { book_id: 1, recorded_at: isoDaysAgo(30), chars: 20000 },
-    { book_id: 1, recorded_at: isoDaysAgo(0), chars: 50000 },
+    { book_id: 1, recorded_at: localIsoDaysAgo(30, today), chars: 20000 },
+    { book_id: 1, recorded_at: localIsoDaysAgo(0, today), chars: 50000 },
   ];
   const rows = computeBookGoals(
     [{ book_id: 1, chars: 50000, goal_target_chars: 110000, goal_deadline: null }],
@@ -521,8 +521,8 @@ test('computeBookGoals: Prognose aus 30-Tage-Tempo', () => {
 test('computeBookGoals: onTrack false wenn Prognose nach Frist liegt + requiredPerDay', () => {
   const today = new Date('2026-06-29T12:00:00');
   const history = [
-    { book_id: 1, recorded_at: isoDaysAgo(30), chars: 20000 },
-    { book_id: 1, recorded_at: isoDaysAgo(0), chars: 50000 }, // 1000/Tag
+    { book_id: 1, recorded_at: localIsoDaysAgo(30, today), chars: 20000 },
+    { book_id: 1, recorded_at: localIsoDaysAgo(0, today), chars: 50000 }, // 1000/Tag
   ];
   const rows = computeBookGoals(
     [{ book_id: 1, chars: 50000, goal_target_chars: 110000, goal_deadline: '2026-07-29' }],

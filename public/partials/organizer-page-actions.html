@@ -43,9 +43,11 @@
      x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
      x-effect="options = chapterMoveOptions(page.chapter_id || 0)"
      @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
-<div class="organizer-move-combo" x-show="bookMoveOptions().length"
-     x-data="combobox({ placeholder: $app.t('bookOrganizer.moveToBook'), transient: true })"
-     x-effect="options = bookMoveOptions()"
-     @combobox-change="movePageToBook(page.id, $event.detail)"></div>
+<template x-if="bookMoveOptions().length">
+  <div class="organizer-move-combo"
+       x-data="combobox({ placeholder: $app.t('bookOrganizer.moveToBook'), transient: true })"
+       x-effect="options = bookMoveOptions()"
+       @combobox-change="movePageToBook(page.id, $event.detail)"></div>
+</template>
 <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
         :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>

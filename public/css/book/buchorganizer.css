@@ -234,15 +234,16 @@
   flex-shrink: 0;
 }
 .organizer-move-combo {
-  min-width: 140px;
+  min-width: 110px;
   flex-shrink: 0;
 }
-/* Trigger an Seitentitel-Input-Höhe angleichen (Row-Alignment). */
+/* Kompakt halten wie die übrigen --compact-Comboboxen (12px), nur die Höhe an
+   die Seitentitel-Input-Höhe angleichen (Row-Alignment). */
 .organizer-move-combo .combobox-trigger {
   box-sizing: border-box;
   height: 28px;
   line-height: 1.2;
-  font-size: var(--font-size-base);
+  font-size: var(--size-compact-font-size);
   padding: var(--space-xs) 8px;
 }
 
