@@ -114,18 +114,15 @@
   cursor: default;
 }
 
-/* Header mit Subline: Title oben, Meta-Zeile (Timestamp/Save-Indicator/Links) darunter,
-   Aside (optionale Badges + Buttons) rechts. Genutzt vom Editor und allen Karten mit
-   Stand-/Timestamp-Info (figuren, orte, szenen, ereignisse, kontinuitaet, bookstats, stil). */
+/* Header mit Subline: Title oben, Meta-Zeile (Timestamp/Save-Indicator/Links) darunter, Aside
+   (Badges + Buttons) rechts. Genutzt vom Editor + Karten mit Stand-/Timestamp-Info (figuren, orte, …). */
 .card-header--subline { align-items: flex-start; }
 .card-header-titlebar {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
   min-width: 0;
-  /* basis 0 (nicht auto): mit flex-wrap am .card-header wrappt der Close-Button
-     sonst unter die Subline, weil die auto-Basis = max-content der langen
-     Subline-Zeile zusammen mit dem Button die Zeile sprengt. */
+  /* basis 0 (nicht auto): sonst sprengt die max-content-Subline samt Close-Button die flex-wrap-Zeile. */
   flex: 1 1 0;
 }
 .card-header-titlebar .card-title { line-height: 1.2; }

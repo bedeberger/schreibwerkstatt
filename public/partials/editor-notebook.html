@@ -1,9 +1,8 @@
 <!-- Seiteneditor & Lektorat -->
 <!-- Notebook-Sub-Komponenten-Anker: hostet Snapshot-Restore + Trampoline-Events
-     (Pendant zu editor-focus.html#editorFocusCard). Eigener x-data wäre an der
-     #editor-card-Karte unsauber, weil die Karte selbst alle Root-Felder
-     (editMode, currentPage, ...) via Body-Scope braucht. Lebt unsichtbar als
-     display-contents-Anker am Anfang des Notebook-Partials. -->
+     (Pendant zu editor-focus.html#editorFocusCard). Eigener x-data an der #editor-card-Karte
+     waere unsauber, weil die Karte alle Root-Felder (editMode, currentPage, ...) via Body-Scope
+     braucht. Lebt unsichtbar als display-contents-Anker am Anfang des Notebook-Partials. -->
 <div x-data="editorNotebookCard" class="display-contents"></div>
 
 <div class="card" id="editor-card"
@@ -317,11 +316,9 @@
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=692#pilcrow"/></svg>
     </button>
     <span class="action-sep" aria-hidden="true"></span>
-    <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel).
-         Aendert nur die Buch-Setting; der Auf/Zu-Zustand der Klappschiene
-         (entityPanelOpen) bleibt User-Wahl und wird nicht uebersteuert.
-         Pure Buch-Setting (book_settings.entities_enabled) — Schreib-Pfad ist
-         PUT /booksettings/:id/entities-enabled, Event book:settings:updated. -->
+    <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel). Aendert nur die
+         Buch-Setting (book_settings.entities_enabled, PUT /booksettings/:id/entities-enabled, Event
+         book:settings:updated); der Auf/Zu-Zustand der Klappschiene (entityPanelOpen) bleibt User-Wahl. -->
     <button type="button" class="icon-btn"
             :aria-pressed="entitiesEnabledForCurrentBook"
             :data-tip="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
@@ -389,10 +386,9 @@
             x-text="t('edit.conflict.resolveBtn')"></button>
   </div>
 
-  <!-- „Auf dieser Seite"-Panel (Entity-Linking + Kapitel-Figuren konsolidiert).
-       Eine Collapsible mit drei Sektionen: Figuren (Kapitel-Scope), Szenen,
-       Ereignisse. Stil + Hover-Tooltips wie .figure-context-panel. Lebt im
-       Partial editor-entities-panel.html. -->
+  <!-- „Auf dieser Seite"-Panel (Entity-Linking + Kapitel-Figuren konsolidiert): eine Collapsible
+       mit drei Sektionen (Figuren Kapitel-Scope, Szenen, Ereignisse). Stil + Hover-Tooltips wie
+       .figure-context-panel. Lebt im Partial editor-entities-panel.html. -->
   <div id="partial-editor-entities-panel" class="display-contents"></div>
 
   <!-- Preview + optional Befunde: Layout wird zum Split, sobald geprüft wurde.
