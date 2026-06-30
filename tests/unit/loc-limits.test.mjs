@@ -52,7 +52,6 @@ const CATEGORIES = [
       'public/js/cards/editor-spellcheck/controller.js': 773,
       'public/js/editor/notebook/stt-dictation.js': 769,
       'public/js/editor/notebook/toolbar.js': 743,
-      'public/js/prompts/chat.js': 723,
       'public/js/share-reader.js': 658,
       'public/js/editor/focus/card.js': 601,
     },
