@@ -195,6 +195,42 @@ function register(router) {
     } catch (e) { _fail(res, e, 'POST /content/pages'); }
   });
 
+  // POST /content/pages/:page_id/move — Seite in ein anderes Buch verschieben.
+  // Body: { target_book_id, target_chapter_id? }. minRole editor auf BEIDEN
+  // Buechern. Blockiert durch fremden Page-Lock (lektorat-Session) wie der Save-
+  // Pfad. Buchwelt-Analyse der Quelle wird gekappt (siehe contentStore.movePage).
+  router.post('/pages/:page_id/move', jsonBody, async (req, res) => {
+    const pageId = toIntId(req.params.page_id);
+    if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
+    const sourceBookId = _guardPage(req, res, pageId, 'editor');
+    if (sourceBookId == null) return;
+    const targetBookId = toIntId(req.body?.target_book_id);
+    if (!targetBookId) return res.status(400).json({ error_code: 'INVALID_TARGET_BOOK_ID' });
+    if (targetBookId === sourceBookId) return res.status(400).json({ error_code: 'SAME_BOOK' });
+    const hasChap = req.body?.target_chapter_id !== undefined
+      && req.body?.target_chapter_id !== null && req.body?.target_chapter_id !== 0;
+    const targetChapterId = hasChap ? toIntId(req.body.target_chapter_id) : null;
+    // editor-Recht auf dem Ziel-Buch erzwingen.
+    try { requireBookAccess(req, targetBookId, 'editor'); }
+    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    const email = _userEmail(req);
+    const blocking = bookAccess.getBlockingLockFor(pageId, email);
+    if (blocking) return res.status(423).json({
+      error_code: 'PAGE_LOCKED',
+      locked_by_email: blocking.locked_by_email,
+      expires_at: blocking.expires_at,
+    });
+    try {
+      const result = await contentStore.movePage(pageId, { targetBookId, targetChapterId }, req);
+      res.json(result);
+    } catch (e) {
+      if (e.code === 'SAME_BOOK') return res.status(400).json({ error_code: 'SAME_BOOK' });
+      if (e.code === 'TARGET_BOOK_NOT_FOUND') return res.status(404).json({ error_code: 'TARGET_BOOK_NOT_FOUND' });
+      if (e.code === 'CHAPTER_NOT_IN_TARGET') return res.status(400).json({ error_code: 'CHAPTER_NOT_IN_TARGET' });
+      _fail(res, e, 'POST /content/pages/:id/move');
+    }
+  });
+
   // DELETE /content/pages/:page_id — Seite in den Papierkorb. minRole editor.
   router.delete('/pages/:page_id', async (req, res) => {
     const pageId = toIntId(req.params.page_id);

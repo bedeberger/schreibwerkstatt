@@ -1,0 +1,51 @@
+<!--
+  Geteilte Aktions-Spalte einer Organizer-Seitenzeile: Sync-Provider-Badges,
+  „Verschieben nach Kapitel", „In anderes Buch" und Löschen. Identisch in der
+  Solo-Liste und allen drei Kapitel-Tiefen → SSoT als string-seitiger Fragment-
+  Include (Marker @include organizer-page-actions, app-ui.js#_resolveIncludes),
+  pro x-for-Iteration geklont. `page` + `$syncProviders` stammen aus dem
+  umschliessenden x-for-Scope; das aktuelle Kapitel kommt aus `page.chapter_id`
+  (0 = Top-Level), damit das Markup tiefenunabhängig ist.
+-->
+<template x-for="prov in $syncProviders" :key="prov.key">
+  <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
+    <template x-if="prov.card.statusFor(page)">
+      <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
+            :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
+            x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
+    </template>
+    <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
+      <button type="button" class="btn-compact organizer-sync-push"
+              @click="prov.card.push(page.id)"
+              :disabled="!!prov.card.pushBusy[page.id]"
+              :data-tip="$app.t(prov.key + '.action.push')"
+              :aria-label="$app.t(prov.key + '.action.push')">
+        <template x-if="!prov.card.pushBusy[page.id]">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
+        </template>
+        <template x-if="prov.card.pushBusy[page.id]">
+          <span class="display-contents">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
+          </span>
+        </template>
+      </button>
+    </template>
+    <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
+      <button type="button" class="btn-compact organizer-sync-conflict"
+              @click="prov.card.openConflict(page.id)"
+              :data-tip="$app.t(prov.key + '.action.resolveConflict')"
+              x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
+    </template>
+  </span>
+</template>
+<div class="organizer-move-combo"
+     x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
+     x-effect="options = chapterMoveOptions(page.chapter_id || 0)"
+     @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
+<div class="organizer-move-combo" x-show="bookMoveOptions().length"
+     x-data="combobox({ placeholder: $app.t('bookOrganizer.moveToBook'), transient: true })"
+     x-effect="options = bookMoveOptions()"
+     @combobox-change="movePageToBook(page.id, $event.detail)"></div>
+<button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
+        :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>

@@ -362,40 +362,87 @@ export const crudMethods = {
   },
 
   async _deletePageRaw(id) {
-    const root = window.__app;
     return await this._runMutation(async () => {
       await contentRepo.deletePage(id);
-      const pi = Alpine.store('nav').pages.findIndex(p => p.id === id);
-      if (pi >= 0) Alpine.store('nav').pages.splice(pi, 1);
-      for (let i = Alpine.store('nav').tree.length - 1; i >= 0; i--) {
-        const it = Alpine.store('nav').tree[i];
-        if (it.type !== 'chapter') continue;
-        if (it.solo && it.pages?.[0]?.id === id) {
-          Alpine.store('nav').tree.splice(i, 1);
-        } else if (!it.solo) {
-          const j = it.pages.findIndex(p => p.id === id);
-          if (j >= 0) it.pages.splice(j, 1);
-        }
-      }
-      // Rekursiv durch workTree.subchapters — sonst bleiben Sub-Kapitel-Pages sichtbar.
-      const removeFromTree = (list) => {
-        for (const c of list) {
-          const j = c.pages.findIndex(p => p.id === id);
-          if (j >= 0) { c.pages.splice(j, 1); return true; }
-          if (removeFromTree(c.subchapters || [])) return true;
-        }
-        return false;
-      };
-      if (!removeFromTree(this.workTree)) {
-        const si = this.soloPages.findIndex(p => p.id === id);
-        if (si >= 0) this.soloPages.splice(si, 1);
-      }
-      this._rebuildPageOrderMaps();
-      this._invalidateDiaryCache();
-      if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+      this._forgetPageLocally(id);
       await this.$nextTick();
       this._destroySortables();
       this._initSortables();
     }, 'bookOrganizer.deleteFailed');
+  },
+
+  // Entfernt eine Seite aus dem lokalen Store/Tree + Maps, OHNE Server-Call.
+  // Geteilt von _deletePageRaw (Seite geloescht) und movePageToBook (Seite hat
+  // dieses Buch verlassen). Rebuild der Maps + Chapter-Stats inklusive.
+  _forgetPageLocally(id) {
+    const root = window.__app;
+    const pi = Alpine.store('nav').pages.findIndex(p => p.id === id);
+    if (pi >= 0) Alpine.store('nav').pages.splice(pi, 1);
+    for (let i = Alpine.store('nav').tree.length - 1; i >= 0; i--) {
+      const it = Alpine.store('nav').tree[i];
+      if (it.type !== 'chapter') continue;
+      if (it.solo && it.pages?.[0]?.id === id) {
+        Alpine.store('nav').tree.splice(i, 1);
+      } else if (!it.solo) {
+        const j = it.pages.findIndex(p => p.id === id);
+        if (j >= 0) it.pages.splice(j, 1);
+      }
+    }
+    // Rekursiv durch workTree.subchapters — sonst bleiben Sub-Kapitel-Pages sichtbar.
+    const removeFromTree = (list) => {
+      for (const c of list) {
+        const j = c.pages.findIndex(p => p.id === id);
+        if (j >= 0) { c.pages.splice(j, 1); return true; }
+        if (removeFromTree(c.subchapters || [])) return true;
+      }
+      return false;
+    };
+    if (!removeFromTree(this.workTree)) {
+      const si = this.soloPages.findIndex(p => p.id === id);
+      if (si >= 0) this.soloPages.splice(si, 1);
+    }
+    this._rebuildPageOrderMaps();
+    this._invalidateDiaryCache();
+    if (typeof root._refreshChapterStats === 'function') root._refreshChapterStats();
+  },
+
+  // Seite in ein anderes Buch verschieben. Bestaetigung mit Warnung (Buchwelt-
+  // Analyse der Seite wird gekappt), dann Server-Move + lokale Entfernung aus
+  // diesem Buch. Die Seite landet im Zielbuch top-level — Einsortierung in ein
+  // Kapitel erfolgt dort im Organizer. Nicht via History rueckgaengig.
+  async movePageToBook(pageId, targetBookIdRaw) {
+    const root = window.__app;
+    if (this.organizerSaving) return;
+    const targetBookId = parseInt(targetBookIdRaw, 10);
+    if (!targetBookId) return;
+    const page = this._findPage(pageId);
+    if (!page) return;
+    if (root.currentPage && root.currentPage.id === pageId) {
+      root.setStatus(root.t('bookOrganizer.pageInEditorWarn'));
+      return;
+    }
+    const book = (Alpine.store('nav').books || []).find(b => String(b.id) === String(targetBookId));
+    const bookName = book?.name || ('#' + targetBookId);
+    const ok = await root.appConfirm({
+      message: root.t('bookOrganizer.moveToBookConfirm', { page: page.name, book: bookName }),
+      confirmLabel: root.t('bookOrganizer.moveToBookConfirmLabel'),
+      cancelLabel: root.t('common.cancel'),
+      danger: true,
+    });
+    if (!ok) return;
+    const sourceBookId = parseInt(Alpine.store('nav').selectedBookId, 10);
+    const pageName = page.name;
+    const done = await this._runMutation(async () => {
+      await contentRepo.movePage(pageId, { target_book_id: targetBookId }, { sourceBookId });
+      this._forgetPageLocally(pageId);
+      await this.$nextTick();
+      this._destroySortables();
+      this._initSortables();
+    }, 'bookOrganizer.moveToBookFailed');
+    if (done) {
+      // Cross-Book-Move ist nicht reversibel → History invalidieren.
+      this._clearHistory();
+      root.setStatus(root.t('bookOrganizer.moveToBookSuccess', { page: pageName, book: bookName }));
+    }
   },
 };

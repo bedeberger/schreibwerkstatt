@@ -109,6 +109,10 @@ Der drift-anfällige SortableJS-Kern (Prototype-Patch, Revert, Präzisions-Tunin
 
 `movePageToChapter` (Combobox-Pfad) nutzt dieselbe Mutations-/Persist-Sequenz wie `_onPageDrop`, inkl. History-Push.
 
+## Seite in anderes Buch verschieben (`movePageToBook`)
+
+Zweite Combobox „In anderes Buch…" pro Seitenzeile (`bookMoveOptions()` = alle zugänglichen Bücher ausser dem aktuellen). Re-Parent unter Beibehaltung der `page_id` über `POST /content/pages/:id/move` (Facade `contentStore.movePage` → `localdb.movePage`, eine Transaction): `pages.book_id`/`chapter_id` umgehängt, seiten-intrinsische Daten ziehen mit (Revisionen/Stats/Lektorat-Befunde/Schreibzeit/Seiten-Chat/Page-Share — `book_id` nachgeführt), **buchwelt-bezogene Analyse der Quelle wird gekappt** (Figuren-Erwähnungen/Zeitstrahl-Links/Erst-Erwähnungen/Szenen-+Event-Anker/Recherche-Links/Lektorat-Cache; im Zielbuch via Komplettanalyse neu aufgebaut), Integrations-Spiegel (Blog/HubSpot) + Locks/Presence gelöscht. `book_order` beider Bücher heilt der Facade-Wrapper via `ensureTree`/`reconcile` (gleiche Konvention wie create/delete). Editor-Recht auf **beiden** Büchern + fremder Page-Lock blockiert (423). UI: Bestätigungs-Modal mit Kappen-Warnung; danach lokales `_forgetPageLocally` (geteilt mit Delete) — die Seite verlässt dieses Buch, landet im Zielbuch top-level. **Nicht** via Undo/Redo reversibel → History-Clear. Die geteilte Aktions-Spalte (Sync-Badges + beide Move-Comboboxen + Löschen) ist SSoT in [public/partials/organizer-page-actions.html](../public/partials/organizer-page-actions.html) (string-Include `<!-- @include organizer-page-actions -->`, 4× geklont über Solo-Liste + 3 Kapitel-Tiefen; aktuelles Kapitel aus `page.chapter_id`).
+
 ## Undo/Redo
 
 Records (siehe `history.js`):

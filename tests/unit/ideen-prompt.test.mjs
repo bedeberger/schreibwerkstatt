@@ -1,13 +1,17 @@
 // buildChatSystemPrompt: offene Ideen werden als eigene Section eingespielt.
 // Wenn keine Ideen vorhanden sind, darf die Section nicht erscheinen.
+// Der Builder liefert ein Array von System-Cache-Blöcken ([{text, ttl?}]) — für
+// die Assertions joinen wir die Block-Texte zum Gesamt-Prompt.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const { buildChatSystemPrompt } = await import('../../public/js/prompts.js');
 
+const joinBlocks = (blocks) => blocks.map(b => b.text).join('\n');
+
 test('Ideen-Section: ohne Ideen kein Block', () => {
-  const out = buildChatSystemPrompt('Seite A', 'Inhalt.', [], null);
+  const out = joinBlocks(buildChatSystemPrompt('Seite A', 'Inhalt.', [], null));
   assert.ok(!out.includes('OFFENE IDEEN'));
 });
 
@@ -16,7 +20,7 @@ test('Ideen-Section: mit Ideen erscheint Block + Hinweis', () => {
     { scope: 'page',    content: 'Szene mit Storm einfügen.',          created_at: '2026-04-25T10:00:00.000Z' },
     { scope: 'chapter', content: 'Verbindung zu Kapitel 3 hinterfragen.', created_at: '2026-04-25T11:00:00.000Z' },
   ];
-  const out = buildChatSystemPrompt('Seite A', 'Inhalt.', [], null, null, null, ideen);
+  const out = joinBlocks(buildChatSystemPrompt('Seite A', 'Inhalt.', [], null, null, null, ideen));
   assert.ok(out.includes('=== OFFENE IDEEN (Notizen des Autors für diese Seite + das umliegende Kapitel) ==='));
   assert.ok(out.includes('[Seite] Szene mit Storm einfügen.'));
   assert.ok(out.includes('[Kapitel] Verbindung zu Kapitel 3 hinterfragen.'));
@@ -25,6 +29,6 @@ test('Ideen-Section: mit Ideen erscheint Block + Hinweis', () => {
 });
 
 test('Ideen-Section: leeres Array erzeugt keinen Block', () => {
-  const out = buildChatSystemPrompt('Seite A', 'Inhalt.', [], null, null, null, []);
+  const out = joinBlocks(buildChatSystemPrompt('Seite A', 'Inhalt.', [], null, null, null, []));
   assert.ok(!out.includes('OFFENE IDEEN'));
 });

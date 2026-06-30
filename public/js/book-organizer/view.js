@@ -177,6 +177,15 @@ export const viewMethods = {
     return opts;
   },
 
+  // Options-Array fuer die „In anderes Buch"-Combobox: alle zugaenglichen
+  // Buecher ausser dem aktuellen. ACL aufs Ziel erzwingt der Server (editor).
+  bookMoveOptions() {
+    const cur = String(Alpine.store('nav').selectedBookId);
+    return (Alpine.store('nav').books || [])
+      .filter(b => String(b.id) !== cur)
+      .map(b => ({ value: b.id, label: b.name || ('#' + b.id) }));
+  },
+
   // Alle Top-Level-Kapitel als Optionen fuer die Jump-Combobox (rekursiv).
   jumpChapterOptions() {
     const opts = [];

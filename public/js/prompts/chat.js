@@ -25,16 +25,38 @@ import { SYSTEM_CHAT, SYSTEM_BOOK_CHAT } from './core.js';
  *                                      ({ checked_at, fehler, stilanalyse, fazit }).
  *                                      Kann gegenüber pageText veraltet sein.
  */
+// Rückgabe: Array von System-Cache-Blöcken (für callAIChat → Claude separate
+// cache_control-Blöcke; lokale Provider flatten sie auf einen String).
+//   Block 1 (ttl '1h'): buch-stabiler Anteil (System + Figuren + Review) — ändert
+//     sich weder über die Turns derselben Seite noch beim Seitenwechsel innerhalb
+//     des Buchs. Der grosse SYSTEM_CHAT + die Figuren-JSON werden so über alle
+//     Seiten-Chats eines Buchs aus dem Cache gelesen.
+//   Block 2 (5min): seiten-spezifischer Anteil (Seitenname/-inhalt + Ideen +
+//     Lektorat + JSON-Format-Trailer) — stabil über die Turns einer Seiten-Session,
+//     invalidiert beim Seitenwechsel oder wenn der Autor die Seite editiert.
 export function buildChatSystemPrompt(pageName, pageText, figuren, review, systemOverride = null, openingPageText = null, ideen = null, lektorat = null) {
-  const parts = [
-    systemOverride ?? SYSTEM_CHAT,
-    '',
+  const stable = [systemOverride ?? SYSTEM_CHAT];
+
+  if (figuren && figuren.length > 0) {
+    stable.push('', '=== FIGUREN DES BUCHS ===', JSON.stringify(figuren, null, 2));
+  }
+
+  if (review) {
+    stable.push('', '=== LETZTE BUCHBEWERTUNG ===', JSON.stringify({
+      gesamtnote:  review.gesamtnote,
+      fazit:       review.fazit,
+      staerken:    review.staerken,
+      schwaechen:  review.schwaechen,
+    }, null, 2));
+  }
+
+  const page = [
     `Aktuelle Seite: «${pageName}»`,
     '',
   ];
 
   if (openingPageText) {
-    parts.push(
+    page.push(
       '=== SEITENINHALT BEIM CHAT-START ===',
       openingPageText,
       '',
@@ -45,7 +67,7 @@ export function buildChatSystemPrompt(pageName, pageText, figuren, review, syste
       '',
     );
   } else {
-    parts.push(
+    page.push(
       '=== SEITENINHALT ===',
       pageText,
       '',
@@ -53,48 +75,31 @@ export function buildChatSystemPrompt(pageName, pageText, figuren, review, syste
   }
 
   if (Array.isArray(ideen) && ideen.length > 0) {
-    parts.push('=== OFFENE IDEEN (Notizen des Autors für diese Seite + das umliegende Kapitel) ===');
+    page.push('=== OFFENE IDEEN (Notizen des Autors für diese Seite + das umliegende Kapitel) ===');
     for (const i of ideen) {
       const datum = i.created_at ? ` (${i.created_at.slice(0, 10)})` : '';
       const tag = i.scope === 'chapter' ? '[Kapitel] ' : '[Seite] ';
-      parts.push(`- ${tag}${i.content}${datum}`);
+      page.push(`- ${tag}${i.content}${datum}`);
     }
-    parts.push('');
-    parts.push('Hinweis: Diese Ideen sind Notizen des Autors zu möglichen Fortsetzungen, Szenen oder inhaltlichen Ankern. [Kapitel]-Notizen gelten fürs ganze Kapitel, [Seite]-Notizen nur für diese Seite. Greife sie auf, hinterfrage oder ergänze sie konversationell — wandle sie aber nicht eigenmächtig in vorschlaege-Einträge um, solange der Autor nicht danach fragt.');
-    parts.push('');
-  }
-
-  if (figuren && figuren.length > 0) {
-    parts.push('=== FIGUREN DES BUCHS ===');
-    parts.push(JSON.stringify(figuren, null, 2));
-    parts.push('');
-  }
-
-  if (review) {
-    parts.push('=== LETZTE BUCHBEWERTUNG ===');
-    parts.push(JSON.stringify({
-      gesamtnote:  review.gesamtnote,
-      fazit:       review.fazit,
-      staerken:    review.staerken,
-      schwaechen:  review.schwaechen,
-    }, null, 2));
-    parts.push('');
+    page.push('');
+    page.push('Hinweis: Diese Ideen sind Notizen des Autors zu möglichen Fortsetzungen, Szenen oder inhaltlichen Ankern. [Kapitel]-Notizen gelten fürs ganze Kapitel, [Seite]-Notizen nur für diese Seite. Greife sie auf, hinterfrage oder ergänze sie konversationell — wandle sie aber nicht eigenmächtig in vorschlaege-Einträge um, solange der Autor nicht danach fragt.');
+    page.push('');
   }
 
   if (lektorat && ((Array.isArray(lektorat.fehler) && lektorat.fehler.length > 0) || lektorat.stilanalyse || lektorat.fazit)) {
     const datum = lektorat.checked_at ? lektorat.checked_at.slice(0, 16).replace('T', ' ') : null;
-    parts.push(`=== LETZTES LEKTORAT DIESER SEITE${datum ? ` (Stand ${datum})` : ''} ===`);
-    parts.push(JSON.stringify({
+    page.push(`=== LETZTES LEKTORAT DIESER SEITE${datum ? ` (Stand ${datum})` : ''} ===`);
+    page.push(JSON.stringify({
       ...(Array.isArray(lektorat.fehler) && lektorat.fehler.length > 0 ? { fehler: lektorat.fehler } : {}),
       ...(lektorat.stilanalyse ? { stilanalyse: lektorat.stilanalyse } : {}),
       ...(lektorat.fazit ? { fazit: lektorat.fazit } : {}),
     }, null, 2));
-    parts.push('');
-    parts.push('Hinweis: Diese Beanstandungen stammen aus einem früheren Lektoratslauf. Der Seitentext kann seitdem überarbeitet worden sein — prüfe gegen den aktuellen Seiteninhalt, bevor du dich darauf beziehst. Wiederhole bereits erledigte Punkte nicht; greife noch offene Beanstandungen auf, wenn der Autor danach fragt oder daran arbeitet.');
-    parts.push('');
+    page.push('');
+    page.push('Hinweis: Diese Beanstandungen stammen aus einem früheren Lektoratslauf. Der Seitentext kann seitdem überarbeitet worden sein — prüfe gegen den aktuellen Seiteninhalt, bevor du dich darauf beziehst. Wiederhole bereits erledigte Punkte nicht; greife noch offene Beanstandungen auf, wenn der Autor danach fragt oder daran arbeitet.');
+    page.push('');
   }
 
-  parts.push(
+  page.push(
     'Antworte immer im folgenden JSON-Format:',
     '{',
     '  "antwort": "Deine Antwort als Freitext (Markdown erlaubt)",',
@@ -115,7 +120,10 @@ export function buildChatSystemPrompt(pageName, pageText, figuren, review, syste
     ...(_isLocal ? [] : ['', JSON_ONLY]),
   );
 
-  return parts.join('\n');
+  return [
+    { text: stable.join('\n'), ttl: '1h' },
+    { text: page.join('\n') },
+  ];
 }
 
 /**
@@ -640,41 +648,46 @@ export const BOOK_CHAT_TOOLS = [
   },
 ];
 
+// Rückgabe: Array von System-Cache-Blöcken (für callAIChat → Claude separate
+// cache_control-Blöcke; lokale Provider flatten sie auf einen String).
+//   Block 1 (ttl '1h'): buch-stabiler Anteil (System + Buchname + Figuren +
+//     Review) — ändert sich über die Turns einer Session nicht. Der potenziell
+//     grosse Figuren-/Review-Kontext wird so über alle Turns aus dem Cache gelesen.
+//   Block 2 (cache:false): die pro Query neu keyword-selektierten Buchseiten +
+//     JSON-Format-Trailer. Bewusst OHNE Breakpoint, weil der Block jede Runde
+//     andere Seiten trägt — ein Breakpoint wäre ein cache_write ohne je gelesen
+//     zu werden. Steht am Ende, damit Block 1 ein stabiler Präfix bleibt.
 export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, review, systemOverride = null) {
-  const parts = [
+  const stable = [
     systemOverride ?? SYSTEM_BOOK_CHAT,
     '',
     `Buch: «${bookName}»`,
-    '',
   ];
 
-  if (relevantPages && relevantPages.length > 0) {
-    parts.push('=== RELEVANTE BUCHSEITEN ===');
-    for (const page of relevantPages) {
-      parts.push(`--- Seite: ${page.name} ---`);
-      parts.push(page.text);
-      parts.push('');
-    }
-  }
-
   if (figuren && figuren.length > 0) {
-    parts.push('=== FIGUREN DES BUCHS ===');
-    parts.push(JSON.stringify(figuren, null, 2));
-    parts.push('');
+    stable.push('', '=== FIGUREN DES BUCHS ===', JSON.stringify(figuren, null, 2));
   }
 
   if (review) {
-    parts.push('=== LETZTE BUCHBEWERTUNG ===');
-    parts.push(JSON.stringify({
+    stable.push('', '=== LETZTE BUCHBEWERTUNG ===', JSON.stringify({
       gesamtnote:  review.gesamtnote,
       fazit:       review.fazit,
       staerken:    review.staerken,
       schwaechen:  review.schwaechen,
     }, null, 2));
-    parts.push('');
   }
 
-  parts.push(
+  const volatil = [];
+  if (relevantPages && relevantPages.length > 0) {
+    volatil.push('=== RELEVANTE BUCHSEITEN ===');
+    for (const page of relevantPages) {
+      volatil.push(`--- Seite: ${page.name} ---`);
+      volatil.push(page.text);
+      volatil.push('');
+    }
+  }
+
+  volatil.push(
     'Antworte immer im folgenden JSON-Format:',
     '{',
     '  "antwort": "Deine Antwort als Freitext (Markdown erlaubt)"',
@@ -682,7 +695,10 @@ export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, revi
     ...(_isLocal ? [] : ['', JSON_ONLY]),
   );
 
-  return parts.join('\n');
+  return [
+    { text: stable.join('\n'), ttl: '1h' },
+    { text: volatil.join('\n'), cache: false },
+  ];
 }
 
 // ── Chat-Titel ────────────────────────────────────────────────────────────────

@@ -183,6 +183,16 @@ export const contentRepo = {
     return _write('DELETE', 'pages/' + id);
   },
 
+  // POST /content/pages/:id/move — Seite in anderes Buch verschieben.
+  // body: { target_book_id, target_chapter_id? }. Invalidiert die Tree-Listings
+  // BEIDER Buecher (Quelle via sourceBookId-Opt, Ziel via target_book_id).
+  async movePage(id, body, { sourceBookId } = {}) {
+    const inv = ['pages/' + id];
+    if (sourceBookId) inv.push('books/' + sourceBookId + '/tree');
+    if (body?.target_book_id) inv.push('books/' + body.target_book_id + '/tree');
+    return _write('POST', 'pages/' + id + '/move', body, inv);
+  },
+
   // POST /content/chapters mit `{ book_id, name, position?, description? }`.
   async createChapter(body) {
     const inv = ['chapters'];

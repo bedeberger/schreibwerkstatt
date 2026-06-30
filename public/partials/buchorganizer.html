@@ -83,44 +83,7 @@
                  :disabled="organizerSaving"
                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                  :aria-label="$app.t('bookOrganizer.renamePage')">
-          <template x-for="prov in $syncProviders" :key="prov.key">
-            <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
-              <template x-if="prov.card.statusFor(page)">
-                <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
-                      :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
-                      x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
-              </template>
-              <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
-                <button type="button" class="btn-compact organizer-sync-push"
-                        @click="prov.card.push(page.id)"
-                        :disabled="!!prov.card.pushBusy[page.id]"
-                        :data-tip="$app.t(prov.key + '.action.push')"
-                        :aria-label="$app.t(prov.key + '.action.push')">
-                  <template x-if="!prov.card.pushBusy[page.id]">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
-                  </template>
-                  <template x-if="prov.card.pushBusy[page.id]">
-                    <span class="display-contents">
-                      <span class="spinner" aria-hidden="true"></span>
-                      <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
-                    </span>
-                  </template>
-                </button>
-              </template>
-              <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
-                <button type="button" class="btn-compact organizer-sync-conflict"
-                        @click="prov.card.openConflict(page.id)"
-                        :data-tip="$app.t(prov.key + '.action.resolveConflict')"
-                        x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
-              </template>
-            </span>
-          </template>
-          <div class="organizer-move-combo"
-               x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
-               x-effect="options = chapterMoveOptions(0)"
-               @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
-          <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-                  :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+          <!-- @include organizer-page-actions -->
         </li>
       </template>
       <li class="organizer-empty" x-show="filteredSoloPages().length === 0 && !organizerSearch" x-text="$app.t('bookOrganizer.noSoloPages')"></li>
@@ -185,44 +148,7 @@
                      :disabled="organizerSaving"
                      autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                      :aria-label="$app.t('bookOrganizer.renamePage')">
-              <template x-for="prov in $syncProviders" :key="prov.key">
-                <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
-                  <template x-if="prov.card.statusFor(page)">
-                    <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
-                          :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
-                          x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
-                  </template>
-                  <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
-                    <button type="button" class="btn-compact organizer-sync-push"
-                            @click="prov.card.push(page.id)"
-                            :disabled="!!prov.card.pushBusy[page.id]"
-                            :data-tip="$app.t(prov.key + '.action.push')"
-                            :aria-label="$app.t(prov.key + '.action.push')">
-                      <template x-if="!prov.card.pushBusy[page.id]">
-                        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
-                      </template>
-                      <template x-if="prov.card.pushBusy[page.id]">
-                        <span class="display-contents">
-                          <span class="spinner" aria-hidden="true"></span>
-                          <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
-                        </span>
-                      </template>
-                    </button>
-                  </template>
-                  <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
-                    <button type="button" class="btn-compact organizer-sync-conflict"
-                            @click="prov.card.openConflict(page.id)"
-                            :data-tip="$app.t(prov.key + '.action.resolveConflict')"
-                            x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
-                  </template>
-                </span>
-              </template>
-              <div class="organizer-move-combo"
-                   x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
-                   x-effect="options = chapterMoveOptions(ch.id)"
-                   @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
-              <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-                      :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+              <!-- @include organizer-page-actions -->
             </li>
           </template>
           <li class="organizer-empty" x-show="ch.pages.length === 0 && !(ch.subchapters?.length)" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
@@ -285,44 +211,7 @@
                            :disabled="organizerSaving"
                            autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                            :aria-label="$app.t('bookOrganizer.renamePage')">
-                    <template x-for="prov in $syncProviders" :key="prov.key">
-                      <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
-                        <template x-if="prov.card.statusFor(page)">
-                          <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
-                                :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
-                                x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
-                        </template>
-                        <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
-                          <button type="button" class="btn-compact organizer-sync-push"
-                                  @click="prov.card.push(page.id)"
-                                  :disabled="!!prov.card.pushBusy[page.id]"
-                                  :data-tip="$app.t(prov.key + '.action.push')"
-                                  :aria-label="$app.t(prov.key + '.action.push')">
-                            <template x-if="!prov.card.pushBusy[page.id]">
-                              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
-                            </template>
-                            <template x-if="prov.card.pushBusy[page.id]">
-                              <span class="display-contents">
-                                <span class="spinner" aria-hidden="true"></span>
-                                <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
-                              </span>
-                            </template>
-                          </button>
-                        </template>
-                        <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
-                          <button type="button" class="btn-compact organizer-sync-conflict"
-                                  @click="prov.card.openConflict(page.id)"
-                                  :data-tip="$app.t(prov.key + '.action.resolveConflict')"
-                                  x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
-                        </template>
-                      </span>
-                    </template>
-                    <div class="organizer-move-combo"
-                         x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
-                         x-effect="options = chapterMoveOptions(sub.id)"
-                         @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
-                    <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-                            :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+                    <!-- @include organizer-page-actions -->
                   </li>
                 </template>
                 <li class="organizer-empty" x-show="sub.pages.length === 0 && !(sub.subchapters?.length)" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
@@ -375,44 +264,7 @@
                                  :disabled="organizerSaving"
                                  autocomplete="off" data-bwignore data-1p-ignore data-lpignore="true" data-form-type="other" data-spellcheck="spelling"
                                  :aria-label="$app.t('bookOrganizer.renamePage')">
-                          <template x-for="prov in $syncProviders" :key="prov.key">
-                            <span class="sync-provider display-contents" :class="'sync-provider--' + prov.key">
-                              <template x-if="prov.card.statusFor(page)">
-                                <span class="badge" :class="'badge--sync-' + prov.card.statusFor(page)"
-                                      :data-tip="prov.card.statusLabel(prov.card.statusFor(page))"
-                                      x-text="prov.card.statusLabel(prov.card.statusFor(page))"></span>
-                              </template>
-                              <template x-if="prov.card.canPush(page) || prov.card.pushBusy[page.id]">
-                                <button type="button" class="btn-compact organizer-sync-push"
-                                        @click="prov.card.push(page.id)"
-                                        :disabled="!!prov.card.pushBusy[page.id]"
-                                        :data-tip="$app.t(prov.key + '.action.push')"
-                                        :aria-label="$app.t(prov.key + '.action.push')">
-                                  <template x-if="!prov.card.pushBusy[page.id]">
-                                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
-                                  </template>
-                                  <template x-if="prov.card.pushBusy[page.id]">
-                                    <span class="display-contents">
-                                      <span class="spinner" aria-hidden="true"></span>
-                                      <span class="organizer-sync-push-pct" x-text="(prov.card.pushProgress[page.id] || 0) + '%'"></span>
-                                    </span>
-                                  </template>
-                                </button>
-                              </template>
-                              <template x-if="prov.card.hasConflict && prov.card.statusFor(page) === 'conflict'">
-                                <button type="button" class="btn-compact organizer-sync-conflict"
-                                        @click="prov.card.openConflict(page.id)"
-                                        :data-tip="$app.t(prov.key + '.action.resolveConflict')"
-                                        x-text="$app.t(prov.key + '.action.resolveConflict')"></button>
-                              </template>
-                            </span>
-                          </template>
-                          <div class="organizer-move-combo"
-                               x-data="combobox({ placeholder: $app.t('bookOrganizer.moveTo'), transient: true })"
-                               x-effect="options = chapterMoveOptions(subsub.id)"
-                               @combobox-change="movePageToChapter(page.id, $event.detail)"></div>
-                          <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-                                  :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+                          <!-- @include organizer-page-actions -->
                         </li>
                       </template>
                       <li class="organizer-empty" x-show="subsub.pages.length === 0" x-text="$app.t('bookOrganizer.noPagesInChapter')"></li>
