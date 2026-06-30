@@ -20,6 +20,8 @@ const { getOwnerEmail } = require('../../db/book-access');
 const { getUser } = require('../../db/app-users');
 const bp = require('../../db/book-publication');
 const { loadContents } = require('../../lib/load-contents');
+const { getSnapshot } = require('../../db/book-snapshots');
+const { snapshotToBundle } = require('../../lib/snapshot-export');
 const { buildDocxProfile, DOCX_MIME } = require('../../lib/export-builders/docx');
 const { buildExportFilename } = require('../../lib/filenames');
 const { resolveSlug } = require('../../lib/export-builders/shared');
@@ -45,7 +47,7 @@ function _resolveAuthor(bookId) {
   return '';
 }
 
-async function runDocxExportJob(jobId, { scope, entityId, profileId, includeSubchapters, userEmail, userToken }) {
+async function runDocxExportJob(jobId, { scope, entityId, profileId, includeSubchapters, snapshotId = null, userEmail, userToken }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
   try {
@@ -55,7 +57,21 @@ async function runDocxExportJob(jobId, { scope, entityId, profileId, includeSubc
     if (profile.user_email !== userEmail) throw i18nError('job.error.forbidden');
 
     updateJob(jobId, { progress: 20, statusText: 'job.phase.loadBook' });
-    const bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+    // snapshotId gesetzt → Bundle aus dem selbsttragenden Fassungs-Stand bauen
+    // (scope ist dann immer 'book', entityId = bookId). Titelei kommt weiter
+    // buch-weit aus book_publication. Sonst Live-Buchinhalt.
+    let bundle;
+    if (snapshotId) {
+      const snap = getSnapshot(entityId, snapshotId);
+      if (!snap) throw i18nError('job.error.snapshotNotFound');
+      let content;
+      try { content = JSON.parse(snap.content_json); }
+      catch { throw i18nError('job.error.snapshotCorrupt'); }
+      bundle = snapshotToBundle(content, { bookId: entityId });
+      if (!bundle.groups.length) throw i18nError('job.error.snapshotCorrupt');
+    } else {
+      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+    }
     const { book } = bundle;
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
@@ -81,7 +97,7 @@ async function runDocxExportJob(jobId, { scope, entityId, profileId, includeSubc
     docxResults.set(jobId, { buffer, mime: DOCX_MIME, filename });
     _scheduleResultCleanup(jobId);
 
-    log.info(`Word-Dokument generiert «${filename}» (${Math.round(buffer.length / 1024)} KB, scope=${scope}, profile=${profile.name})`);
+    log.info(`Word-Dokument generiert «${filename}» (${Math.round(buffer.length / 1024)} KB, scope=${scope}${snapshotId ? `, fassungId=${snapshotId}` : ''}, profile=${profile.name})`);
     completeJob(jobId, {
       ready: true, size: buffer.length, mime: DOCX_MIME, filename, scope, profileName: profile.name,
     });
@@ -98,7 +114,10 @@ async function runDocxExportJob(jobId, { scope, entityId, profileId, includeSubc
 router.post('/docx-export', jsonBody, async (req, res) => {
   const userEmail = req.session?.user?.email || null;
 
-  const rawScope = String(req.body?.scope || 'book').toLowerCase();
+  // Fassungs-Export: snapshotId gesetzt → immer ganzes Buch.
+  const snapshotId = toIntId(req.body?.snapshot_id || req.body?.snapshotId);
+
+  const rawScope = snapshotId ? 'book' : String(req.body?.scope || 'book').toLowerCase();
   const scope = VALID_SCOPES.has(rawScope) ? rawScope : null;
   if (!scope) return res.status(400).json({ error_code: 'BAD_SCOPE' });
 
@@ -110,6 +129,11 @@ router.post('/docx-export', jsonBody, async (req, res) => {
   const profile = getProfile(profileId);
   if (!profile) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
   if (profile.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+
+  // Fassung muss existieren (entityId ist bei snapshotId immer die bookId).
+  if (snapshotId && !getSnapshot(entityId, snapshotId)) {
+    return res.status(404).json({ error_code: 'SNAPSHOT_NOT_FOUND' });
+  }
 
   // Buch-ID fuer Logging + ACL ableiten.
   let bookId = entityId;
@@ -131,12 +155,12 @@ router.post('/docx-export', jsonBody, async (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
 
-  const dedupId = `${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}`;
+  const dedupId = `${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}`;
   const existing = findActiveJobId('docx-export', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('docx-export', bookId, userEmail, 'job.label.docxExport', { profile: profile.name }, dedupId);
-  enqueueJob(jobId, () => runDocxExportJob(jobId, { scope, entityId, profileId, includeSubchapters, userEmail, userToken: null }));
+  enqueueJob(jobId, () => runDocxExportJob(jobId, { scope, entityId, profileId, includeSubchapters, snapshotId, userEmail, userToken: null }));
   res.status(202).json({ jobId });
 });
 

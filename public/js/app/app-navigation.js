@@ -1,4 +1,25 @@
 import { EVT } from '../events.js';
+
+// Figuren/Orte/Szenen-IDs sind INTEGER-PKs; aus Volltext-Treffern (FTS5
+// liefert entity_id als String) und aus Deep-Link-Hashes kommen sie als
+// String. Der Listen-Expand vergleicht strikt (`selectedFigurId === f.id`,
+// f.id = Number), darum hier auf Number normalisieren — sonst scrollt die
+// Liste zwar (data-attr ist String), klappt das Element aber nie auf.
+function _coerceId(id) {
+  return (typeof id === 'string' && /^\d+$/.test(id)) ? Number(id) : id;
+}
+
+// Wartet, bis das Ziel-Element im DOM ist, und scrollt es zentriert ins Bild.
+// Cold-Open: toggleXxxCard öffnet die Karte, deren Lifecycle-Load aber async
+// läuft und vom Toggle nicht awaited wird → bei $nextTick fehlt die erst nach
+// dem Fetch gerenderte Listenzeile noch.
+function _scrollToWhenReady(selector, tries = 60) {
+  const el = document.querySelector(selector);
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (tries <= 0) return;
+  requestAnimationFrame(() => _scrollToWhenReady(selector, tries - 1));
+}
+
 // Interne Navigation zwischen Buch-Views. `_beginNavigation/_endNavigation`
 // klammern zusammengesetzte Karten-Öffnungen (z.B. openFigurById →
 // toggleFiguresCard → scrollIntoView), damit der Hash-Router nur EINEN
@@ -7,14 +28,15 @@ export const appNavigationMethods = {
   async openFigurById(figId) {
     this._beginNavigation();
     try {
+      const fid = _coerceId(figId);
       this.$store.catalogUi.figurenFilters.kapitel = '';
       this.$store.catalogUi.figurenFilters.seite = '';
       if (!this.showFiguresCard) {
         await this.toggleFiguresCard();
       }
-      this.$store.catalogUi.selectedFigurId = figId;
+      this.$store.catalogUi.selectedFigurId = fid;
       await this.$nextTick();
-      document.querySelector(`.figur-item[data-figid="${figId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      _scrollToWhenReady(`.figur-item[data-figid="${fid}"]`);
     } finally {
       this._endNavigation();
     }
@@ -23,14 +45,15 @@ export const appNavigationMethods = {
   async openFigurMitKapitel(figId, kapitelName) {
     this._beginNavigation();
     try {
+      const fid = _coerceId(figId);
       this.$store.catalogUi.figurenFilters.kapitel = kapitelName || '';
       this.$store.catalogUi.figurenFilters.seite = '';
       if (!this.showFiguresCard) {
         await this.toggleFiguresCard();
       }
-      this.$store.catalogUi.selectedFigurId = figId;
+      this.$store.catalogUi.selectedFigurId = fid;
       await this.$nextTick();
-      document.querySelector(`.figur-item[data-figid="${figId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      _scrollToWhenReady(`.figur-item[data-figid="${fid}"]`);
     } finally {
       this._endNavigation();
     }
@@ -39,6 +62,7 @@ export const appNavigationMethods = {
   async openOrtById(ortId) {
     this._beginNavigation();
     try {
+      const oid = _coerceId(ortId);
       this.$store.catalogUi.orteFilters.suche = '';
       this.$store.catalogUi.orteFilters.figurId = '';
       this.$store.catalogUi.orteFilters.kapitel = '';
@@ -46,9 +70,9 @@ export const appNavigationMethods = {
       if (!this.showOrteCard) {
         await this.toggleOrteCard();
       }
-      this.$store.catalogUi.selectedOrtId = ortId;
+      this.$store.catalogUi.selectedOrtId = oid;
       await this.$nextTick();
-      document.querySelector(`[data-ortid="${ortId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      _scrollToWhenReady(`[data-ortid="${oid}"]`);
     } finally {
       this._endNavigation();
     }
@@ -57,6 +81,7 @@ export const appNavigationMethods = {
   async openOrtMitKapitel(ortId, kapitelName) {
     this._beginNavigation();
     try {
+      const oid = _coerceId(ortId);
       this.$store.catalogUi.orteFilters.suche = '';
       this.$store.catalogUi.orteFilters.figurId = '';
       this.$store.catalogUi.orteFilters.kapitel = kapitelName || '';
@@ -64,9 +89,9 @@ export const appNavigationMethods = {
       if (!this.showOrteCard) {
         await this.toggleOrteCard();
       }
-      this.$store.catalogUi.selectedOrtId = ortId;
+      this.$store.catalogUi.selectedOrtId = oid;
       await this.$nextTick();
-      document.querySelector(`[data-ortid="${ortId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      _scrollToWhenReady(`[data-ortid="${oid}"]`);
     } finally {
       this._endNavigation();
     }
@@ -109,6 +134,7 @@ export const appNavigationMethods = {
   async openSzeneById(szeneId) {
     this._beginNavigation();
     try {
+      const sid = _coerceId(szeneId);
       this.$store.catalogUi.szenenFilters.suche = '';
       this.$store.catalogUi.szenenFilters.wertung = '';
       this.$store.catalogUi.szenenFilters.figurId = '';
@@ -117,9 +143,9 @@ export const appNavigationMethods = {
       if (!this.showSzenenCard) {
         await this.toggleSzenenCard();
       }
-      this.$store.catalogUi.selectedSzeneId = szeneId;
+      this.$store.catalogUi.selectedSzeneId = sid;
       await this.$nextTick();
-      document.querySelector(`[data-szeneid="${szeneId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      _scrollToWhenReady(`[data-szeneid="${sid}"]`);
     } finally {
       this._endNavigation();
     }

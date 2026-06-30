@@ -112,6 +112,64 @@ export function exportScopeSlice() {
   };
 }
 
+// ── Fassungs-Quelle (book_snapshots) ──────────────────────────────────────────
+// Optional auf Buch-Scope: statt des Live-Buchs eine gespeicherte Fassung als
+// Export-Quelle wählen. Fassungen sind ganze-Buch-Snapshots — daher nur bei
+// exportScope === 'book' relevant; bei Kapitel/Seite ignoriert. exportSnapshotId
+// === '' bedeutet „aktueller Stand" (Live-Buch). Die Karten laden die Liste in
+// ihrem Visibility-Watch + book:changed-Handler via _loadExportSnapshots().
+export function exportSnapshotSlice() {
+  return {
+    exportSnapshots: [],
+    exportSnapshotId: '',   // '' = aktueller Stand (Live-Buch)
+
+    async _loadExportSnapshots() {
+      const bid = Alpine.store('nav').selectedBookId;
+      if (!bid) { this.exportSnapshots = []; this.exportSnapshotId = ''; return; }
+      try {
+        const r = await fetch(`/snapshots/${parseInt(bid)}`);
+        if (!r.ok) { this.exportSnapshots = []; this.exportSnapshotId = ''; return; }
+        const d = await r.json();
+        this.exportSnapshots = Array.isArray(d.snapshots) ? d.snapshots : [];
+        // Auswahl invalidieren, wenn die gemerkte Fassung nicht mehr existiert.
+        if (this.exportSnapshotId && !this.exportSnapshots.some(s => String(s.id) === String(this.exportSnapshotId))) {
+          this.exportSnapshotId = '';
+        }
+      } catch {
+        this.exportSnapshots = [];
+        this.exportSnapshotId = '';
+      }
+    },
+
+    // Server persistiert Auto-Sicherungs-Labels als __i18n:key__-Marker — in der
+    // Locale des Betrachters auflösen (analog snapshots-card).
+    _exportSnapLabel(snap) {
+      const app = window.__app;
+      const base = app.t('snapshots.fassung', { n: snap.seq });
+      const m = /^__i18n:([a-zA-Z0-9_.-]+)__$/.exec(snap.label || '');
+      const label = m ? app.t(m[1]) : snap.label;
+      const when = app.formatDate ? app.formatDate(snap.created_at) : snap.created_at;
+      const head = label ? `${base} · ${label}` : base;
+      return `${head} — ${when}`;
+    },
+
+    exportSnapshotOptions() {
+      const app = window.__app;
+      const opts = [{ value: '', label: app?.t?.('export.snapshot.current') || 'Current version' }];
+      for (const s of this.exportSnapshots) opts.push({ value: String(s.id), label: this._exportSnapLabel(s) });
+      return opts;
+    },
+
+    // Submit-Helper: liefert die zu sendende snapshot_id (Number) oder null.
+    // Nur auf Buch-Scope; bei Kapitel/Seite immer null.
+    _exportSnapshotIdForSubmit() {
+      if (this.exportScope !== 'book') return null;
+      const id = parseInt(this.exportSnapshotId);
+      return Number.isFinite(id) && id > 0 ? id : null;
+    },
+  };
+}
+
 // ── Job-Submit + Polling + Download ───────────────────────────────────────────
 // cfg:
 //   jobPath          — POST-Endpunkt + Datei-Basis (`${jobPath}/${id}/file`)

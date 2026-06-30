@@ -17,6 +17,10 @@
         <div x-data="combobox({ placeholder: $app.t('export.scope.label'), compact: false })"
              x-modelable="value" x-model="exportScope"
              x-effect="options = exportScopeOptions()"></div>
+        <div x-show="exportScope === 'book' && exportSnapshots.length"
+             x-data="combobox({ placeholder: $app.t('export.snapshot.label'), compact: false })"
+             x-modelable="value" x-model="exportSnapshotId"
+             x-effect="options = exportSnapshotOptions()"></div>
         <div x-show="exportScope === 'chapter'"
              x-data="combobox({ placeholder: $app.t('export.scope.pickChapter'), compact: false })"
              x-modelable="value" x-model="exportChapterId"

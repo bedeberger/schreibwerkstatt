@@ -16,7 +16,7 @@
 // export-card-base.js (geteilt mit PDF + DOCX).
 
 import { EVT } from '../events.js';
-import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice } from './export-card-base.js';
+import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice } from './export-card-base.js';
 
 const _EMPTY_META = () => ({
   author_name: '',
@@ -44,6 +44,7 @@ export function registerEpubExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('epubExportCard', () => ({
     ...exportScopeSlice(),
+    ...exportSnapshotSlice(),
     ...exportJobSlice({
       jobPath: '/jobs/epub-export',
       defaultFilename: 'book.epub',
@@ -82,6 +83,7 @@ export function registerEpubExportCard() {
         // mit veralteten Werten überschreiben.
         await this.loadPublication();
         this._ensureExportPicked();
+        await this._loadExportSnapshots();
       });
       this._initScopeWatches();
       this._bindPreset(EVT.EXPORT_EPUB_PRESET, '__epubExportPreset');
@@ -90,7 +92,9 @@ export function registerEpubExportCard() {
       this._onBookChanged = async () => {
         this._resetExportRun();
         this.pubLoaded = false;
-        if (window.__app?.showEpubExportCard) await this.loadPublication();
+        this.exportSnapshotId = '';
+        if (window.__app?.showEpubExportCard) { await this.loadPublication(); await this._loadExportSnapshots(); }
+        else { this.exportSnapshots = []; }
       };
       window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
 
@@ -102,6 +106,8 @@ export function registerEpubExportCard() {
         this.exportScope = 'book';
         this.exportChapterId = null;
         this.exportPageId = null;
+        this.exportSnapshots = [];
+        this.exportSnapshotId = '';
         this.activeTab = 'typography';
       };
       window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
@@ -237,9 +243,11 @@ export function registerEpubExportCard() {
       }
       const ref = this._exportEntity();
       if (!ref) { this.exportError = window.__app.t('epubExport.error.startFailed'); return; }
+      const snapId = this._exportSnapshotIdForSubmit();
       await this._runExportJob({
         scope: ref.scope,
         entityId: ref.id,
+        ...(snapId ? { snapshot_id: snapId } : {}),
         ...(ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
       });
     },

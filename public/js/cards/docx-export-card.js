@@ -13,12 +13,13 @@
 // export-card-base.js (geteilt mit PDF + EPUB).
 
 import { EVT } from '../events.js';
-import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice } from './export-card-base.js';
+import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice } from './export-card-base.js';
 
 export function registerDocxExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('docxExportCard', () => ({
     ...exportScopeSlice(),
+    ...exportSnapshotSlice(),
     ...exportJobSlice({
       jobPath: '/jobs/docx-export',
       defaultFilename: 'book.docx',
@@ -53,11 +54,18 @@ export function registerDocxExportCard() {
         if (!visible) return;
         if (!this.profiles.length) await this.loadProfiles();
         this._ensureExportPicked();
+        await this._loadExportSnapshots();
       });
       this._initScopeWatches();
       this._bindPreset(EVT.EXPORT_DOCX_PRESET, '__docxExportPreset');
 
-      this._onBookChanged = () => { this._resetExportRun(); this._ensureExportPicked(); };
+      this._onBookChanged = () => {
+        this._resetExportRun();
+        this._ensureExportPicked();
+        this.exportSnapshotId = '';
+        if (window.__app?.showDocxExportCard) this._loadExportSnapshots();
+        else { this.exportSnapshots = []; }
+      };
       window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
 
       this._onViewReset = () => {
@@ -66,6 +74,8 @@ export function registerDocxExportCard() {
         this.exportScope = 'book';
         this.exportChapterId = null;
         this.exportPageId = null;
+        this.exportSnapshots = [];
+        this.exportSnapshotId = '';
         this.activeTab = 'layout';
       };
       window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
@@ -237,8 +247,10 @@ export function registerDocxExportCard() {
       }
       const ref = this._exportEntity();
       if (!ref || !this.activeProfile) { this.exportError = window.__app.t('docxExport.error.startFailed'); return; }
+      const snapId = this._exportSnapshotIdForSubmit();
       await this._runExportJob({
         scope: ref.scope, entityId: ref.id, profile_id: this.activeProfile.id,
+        ...(snapId ? { snapshot_id: snapId } : {}),
         ...(ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
       });
     },

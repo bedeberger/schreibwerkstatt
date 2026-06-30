@@ -775,8 +775,12 @@ function cleanupDuplicateFiguren(bookId, userEmail, onProgress = null) {
   return stats;
 }
 
-/** Figuren eines Kapitels laden (via figure_appearances).
- *  Fallback: alle Buchfiguren, wenn keine Kapitelzuordnung existiert.
+/** Figuren eines Kapitels laden — gleiche Quelle wie die Figurenliste
+ *  ([routes/figures.js] `/:book_id`): `figure_appearances` (KI-Auftritte im Kapitel).
+ *  Die KI unterscheidet die Figur von gleichnamigen, nur erwähnten realen Personen;
+ *  reine Namensnennungen (page_figure_mentions) zählen bewusst nicht mit.
+ *  Sortierung: Häufigkeit DESC. Fallback: alle Buchfiguren, wenn keine Kapitel-
+ *  zuordnung existiert (z.B. vor der ersten Komplettanalyse).
  *  Gibt kompakte Objekte zurück: { name, kurzname, geschlecht, beruf, wohnadresse, beschreibung, typ } */
 function getChapterFigures(bookId, chapterId, userEmail) {
   if (!bookId) return [];
@@ -784,10 +788,15 @@ function getChapterFigures(bookId, chapterId, userEmail) {
   if (chapterId) {
     const rows = db.prepare(`
       SELECT ${cols} FROM figures f
-      JOIN figure_appearances fa ON fa.figure_id = f.id
-      WHERE f.book_id = ? AND fa.chapter_id = ? AND f.user_email IS ?
-      ORDER BY fa.haeufigkeit DESC, f.sort_order, f.id
-    `).all(bookId, chapterId, userEmail || null);
+      JOIN (
+        SELECT figure_id AS fid, SUM(haeufigkeit) AS h
+        FROM figure_appearances
+        WHERE chapter_id = ?
+        GROUP BY figure_id
+      ) a ON a.fid = f.id
+      WHERE f.book_id = ? AND f.user_email IS ?
+      ORDER BY a.h DESC, f.sort_order, f.id
+    `).all(chapterId, bookId, userEmail || null);
     if (rows.length > 0) return rows;
   }
   return db.prepare(`

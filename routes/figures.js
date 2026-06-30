@@ -418,30 +418,17 @@ router.get('/:book_id', (req, res) => {
 
   const tagMap = {};
   for (const t of tags) (tagMap[t.figure_id] ??= []).push(t.tag);
-  // Kapitel-Auftritte: primäre Quelle page_figure_mentions (dicht + selbstheilend
-  // bei jedem Sync, deckt auch Nebenfiguren ab, die im KI-„kapitel"-Aggregat fehlen),
-  // ergänzt um Kapitel aus figure_appearances, in denen die KI Präsenz ohne
-  // Namensnennung kennt (z.B. nur per Pronomen/Rolle). Sortierung: Häufigkeit DESC.
-  const mentionChaps = db.prepare(`
-    SELECT pfm.figure_id, p.chapter_id, c.chapter_name, SUM(pfm.count) AS haeufigkeit
-    FROM page_figure_mentions pfm
-    JOIN figures   f ON f.id = pfm.figure_id
-    JOIN pages     p ON p.page_id = pfm.page_id
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id
-    WHERE f.book_id = ? AND f.user_email = ? AND p.chapter_id IS NOT NULL
-    GROUP BY pfm.figure_id, p.chapter_id`).all(bookId, userEmail);
+  // Kapitel-Auftritte: alleinige Quelle figure_appearances (KI). Die KI erkennt die
+  // Figur im Kontext und unterscheidet sie von gleichnamigen, im Text nur erwähnten
+  // realen Personen (z.B. Figur „Pamela" vs. „Pamela Anderson"). Reine Namensnennungen
+  // (page_figure_mentions) zählen hier bewusst nicht mit. Sortierung: Häufigkeit DESC.
+  // Erst nach einer Komplettanalyse befüllt.
   const kapMap = {};
-  for (const r of mentionChaps) {
-    (kapMap[r.figure_id] ??= new Map()).set(r.chapter_id, {
-      chapter_id: r.chapter_id, name: r.chapter_name, haeufigkeit: r.haeufigkeit || 1,
-    });
-  }
   for (const a of apps) {
     if (a.chapter_id == null) continue;
-    const m = (kapMap[a.figure_id] ??= new Map());
-    if (!m.has(a.chapter_id)) {
-      m.set(a.chapter_id, { chapter_id: a.chapter_id, name: a.chapter_name, haeufigkeit: a.haeufigkeit || 1 });
-    }
+    (kapMap[a.figure_id] ??= new Map()).set(a.chapter_id, {
+      chapter_id: a.chapter_id, name: a.chapter_name, haeufigkeit: a.haeufigkeit || 1,
+    });
   }
   const kapitelFor = (figId) => {
     const m = kapMap[figId];

@@ -58,6 +58,7 @@
         <div class="search-hit-row">
           <span class="search-hit-kind" :data-kind="hit.kind" x-text="hitKindLabel(hit.kind)"></span>
           <span class="search-hit-title" x-text="hit.title || $app.t('search.untitled')"></span>
+          <span class="search-hit-chapter" x-show="hit.chapter" x-text="hit.chapter"></span>
         </div>
         <div class="search-hit-snippet" x-show="hit.snippet" x-html="hit.snippet"></div>
       </li>

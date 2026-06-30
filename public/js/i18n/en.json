@@ -457,6 +457,8 @@
   "export.scope.page": "Page",
   "export.scope.pickChapter": "Pick chapter",
   "export.scope.pickPage": "Pick page",
+  "export.snapshot.label": "Source",
+  "export.snapshot.current": "Current version",
   "export.error.chapterEmpty": "Chapter has no content.",
   "export.error.pageEmpty": "Page has no content.",
   "export.error.bookEmpty": "Book has no content.",

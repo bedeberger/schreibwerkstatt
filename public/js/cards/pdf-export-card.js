@@ -14,7 +14,7 @@
 // export-card-base.js (geteilt mit EPUB + DOCX).
 
 import { EVT } from '../events.js';
-import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice } from './export-card-base.js';
+import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice } from './export-card-base.js';
 
 // Druckerei-Trim-Presets (mm). Setzen pageSize='custom' + Masse. Decken die
 // gängigen Buchformate ab, die A4/A5/A6/Letter nicht abbilden.
@@ -29,6 +29,7 @@ export function registerPdfExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('pdfExportCard', () => ({
     ...exportScopeSlice(),
+    ...exportSnapshotSlice(),
     ...exportJobSlice({
       jobPath: '/jobs/pdf-export',
       defaultFilename: 'book.pdf',
@@ -97,19 +98,28 @@ export function registerPdfExportCard() {
         // Profile sind user-scoped → einmal geladen reicht; selectedBookId-
         // Wechsel triggert KEINE Neuladung.
         if (!this.profiles.length) await this.loadProfiles();
+        // Fassungen sind buch-scoped → bei jedem Öffnen frisch ziehen.
+        await this._loadExportSnapshots();
       });
       this._initScopeWatches();
       this._bindPreset(EVT.EXPORT_PRESET, '__exportPreset');
 
       // book:changed räumt nur den laufenden Export-State (Buchwechsel = neuer
       // Render-Kontext). Profile-Liste bleibt erhalten.
-      this._onBookChanged = () => { this._resetExportRun(); };
+      this._onBookChanged = () => {
+        this._resetExportRun();
+        this.exportSnapshotId = '';
+        if (window.__app?.showPdfExportCard) this._loadExportSnapshots();
+        else { this.exportSnapshots = []; }
+      };
       window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
 
       // view:reset (Logout / User-Settings-Danger-Reset) räumt ALLES inkl.
       // Profile-Liste — könnte anderer User sein nach Re-Login.
       this._onViewReset = async () => {
         this._resetExportRun();
+        this.exportSnapshots = [];
+        this.exportSnapshotId = '';
         await this._unmountFormThen(() => {
           this.profiles = [];
           this.activeProfile = null;
@@ -367,12 +377,16 @@ export function registerPdfExportCard() {
         ? (Alpine.store('nav').selectedBookId ? { scope: 'book', id: parseInt(Alpine.store('nav').selectedBookId) } : null)
         : this._exportEntity();
       if (!ref) { this.exportError = window.__app.t('pdfExport.error.startFailed'); return; }
+      // Fassungs-Quelle nur für den Innenteil des ganzen Buchs (Umschlag + Live-Cover
+      // kommen weiterhin aus book_publication).
+      const snapId = target === 'interior' ? this._exportSnapshotIdForSubmit() : null;
       this.exportLowRes = 0;
       await this._runExportJob({
         scope: ref.scope,
         entityId: ref.id,
         profile_id: this.activeProfile.id,
         target,
+        ...(snapId ? { snapshot_id: snapId } : {}),
         ...(target === 'interior' && ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
       });
     },

@@ -238,6 +238,15 @@
   font-weight: 500;
   color: var(--color-text);
 }
+.search-hit-chapter {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+.search-hit-chapter::before {
+  content: "—";
+  margin-right: var(--space-1);
+}
 .search-hit-snippet {
   font-size: var(--font-size-sm);
   color: var(--color-muted);

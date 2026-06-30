@@ -14,12 +14,13 @@
         <div x-data="combobox({ placeholder: $app.t('export.scope.label'), compact: false })"
              x-modelable="value" x-model="exportScope"
              x-effect="options = exportScopeOptions()"></div>
-        <div x-show="exportScope === 'chapter'"
-             x-data="combobox({ placeholder: $app.t('export.scope.pickChapter'), compact: false })"
+        <div x-show="exportScope === 'book' && exportSnapshots.length" x-data="combobox({ placeholder: $app.t('export.snapshot.label'), compact: false })"
+             x-modelable="value" x-model="exportSnapshotId"
+             x-effect="options = exportSnapshotOptions()"></div>
+        <div x-show="exportScope === 'chapter'" x-data="combobox({ placeholder: $app.t('export.scope.pickChapter'), compact: false })"
              x-modelable="value" x-model="exportChapterId"
              x-effect="options = exportChapterOptions()"></div>
-        <button type="button"
-                class="kapitel-include-subs-btn"
+        <button type="button" class="kapitel-include-subs-btn"
                 x-show="exportScope === 'chapter' && selectedChapterHasSubs()"
                 @click="exportIncludeSubchapters = !exportIncludeSubchapters"
                 :class="{ primary: exportIncludeSubchapters }"
@@ -28,8 +29,7 @@
           <svg class="icon" aria-hidden="true"><use :href="exportIncludeSubchapters ? '/icons.svg?v=690#check' : '/icons.svg?v=690#chevron-down'"/></svg>
           <span x-text="$app.t('docxExport.includeSubchapters')"></span>
         </button>
-        <div x-show="exportScope === 'page'"
-             x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
+        <div x-show="exportScope === 'page'" x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
              x-modelable="value" x-model="exportPageId"
              x-effect="options = exportPageOptions()"></div>
       </div>

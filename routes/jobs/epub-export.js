@@ -19,6 +19,8 @@ const { getUser } = require('../../db/app-users');
 const appSettings = require('../../lib/app-settings');
 const bp = require('../../db/book-publication');
 const { loadContents } = require('../../lib/load-contents');
+const { getSnapshot } = require('../../db/book-snapshots');
+const { snapshotToBundle } = require('../../lib/snapshot-export');
 const { buildEpub } = require('../../lib/export-builders/epub');
 const { validateEpub } = require('../../lib/epubcheck-validate');
 const { buildExportFilename } = require('../../lib/filenames');
@@ -45,12 +47,26 @@ function _resolveAuthor(bookId) {
   return '';
 }
 
-async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, userEmail, userToken }) {
+async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, snapshotId = null, userEmail, userToken }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
   try {
     updateJob(jobId, { progress: 10, statusText: 'job.phase.loadBook' });
-    const bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+    // snapshotId gesetzt → Bundle aus dem selbsttragenden Fassungs-Stand bauen
+    // (scope ist dann immer 'book', entityId = bookId). Cover/Titelei kommen
+    // weiter buch-weit aus book_publication. Sonst Live-Buchinhalt.
+    let bundle;
+    if (snapshotId) {
+      const snap = getSnapshot(entityId, snapshotId);
+      if (!snap) throw i18nError('job.error.snapshotNotFound');
+      let content;
+      try { content = JSON.parse(snap.content_json); }
+      catch { throw i18nError('job.error.snapshotCorrupt'); }
+      bundle = snapshotToBundle(content, { bookId: entityId });
+      if (!bundle.groups.length) throw i18nError('job.error.snapshotCorrupt');
+    } else {
+      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+    }
     const { book } = bundle;
 
     if (ctrl?.signal.aborted) throw new Error('job.cancelled');
@@ -113,7 +129,7 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, us
     const checkLog = validation.available
       ? (validation.passed ? 'epubcheck=pass' : `epubcheck=fail(${validation.errors}E/${validation.fatals}F)`)
       : 'epubcheck=skipped';
-    log.info(`EPUB generiert «${filename}» (${Math.round(buffer.length / 1024)} KB, scope=${scope}, ${checkLog})`);
+    log.info(`EPUB generiert «${filename}» (${Math.round(buffer.length / 1024)} KB, scope=${scope}${snapshotId ? `, fassungId=${snapshotId}` : ''}, ${checkLog})`);
     completeJob(jobId, {
       ready: true, size: buffer.length, mime: 'application/epub+zip', filename, scope,
       epubcheck: {
@@ -141,13 +157,21 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, us
 router.post('/epub-export', jsonBody, async (req, res) => {
   const userEmail = req.session?.user?.email || null;
 
-  const rawScope = String(req.body?.scope || 'book').toLowerCase();
+  // Fassungs-Export: snapshotId gesetzt → immer ganzes Buch.
+  const snapshotId = toIntId(req.body?.snapshot_id || req.body?.snapshotId);
+
+  const rawScope = snapshotId ? 'book' : String(req.body?.scope || 'book').toLowerCase();
   const scope = VALID_SCOPES.has(rawScope) ? rawScope : null;
   if (!scope) return res.status(400).json({ error_code: 'BAD_SCOPE' });
 
   const entityId = toIntId(req.body?.entityId ?? req.body?.entity_id ?? req.body?.book_id ?? req.body?.bookId);
   if (!entityId) return res.status(400).json({ error_code: 'ENTITY_REQUIRED' });
   const includeSubchapters = scope === 'chapter' && (req.body?.include_subchapters === true || req.body?.includeSubchapters === true);
+
+  // Fassung muss existieren (entityId ist bei snapshotId immer die bookId).
+  if (snapshotId && !getSnapshot(entityId, snapshotId)) {
+    return res.status(404).json({ error_code: 'SNAPSHOT_NOT_FOUND' });
+  }
 
   // Buch-ID fuer Logging + ACL ableiten.
   let bookId = entityId;
@@ -169,12 +193,12 @@ router.post('/epub-export', jsonBody, async (req, res) => {
     catch (e) { if (sendACLError(res, e)) return; throw e; }
   }
 
-  const dedupId = `${scope}:${entityId}${includeSubchapters ? ':sub' : ''}`;
+  const dedupId = `${scope}:${entityId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}`;
   const existing = findActiveJobId('epub-export', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('epub-export', bookId, userEmail, 'job.label.epubExport', {}, dedupId);
-  enqueueJob(jobId, () => runEpubExportJob(jobId, { scope, entityId, includeSubchapters, userEmail, userToken: null }));
+  enqueueJob(jobId, () => runEpubExportJob(jobId, { scope, entityId, includeSubchapters, snapshotId, userEmail, userToken: null }));
   res.status(202).json({ jobId });
 });
 
