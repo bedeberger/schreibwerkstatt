@@ -58,7 +58,7 @@
             <td x-text="d.device_name"></td>
             <td x-text="d.platform || '—'"></td>
             <td>
-              <code x-show="d.client_version" x-text="d.client_version"></code>
+              <code x-show="d.client_version" x-text="devicesVersionLabel(d)"></code>
               <span x-show="!d.client_version" class="muted-msg muted-msg--sm">—</span>
               <span x-show="devicesIsOutdated(d)" class="badge badge-warn"
                     :data-tip="$app.t('admin.devices.outdatedTip')"

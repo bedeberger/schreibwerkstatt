@@ -50,6 +50,21 @@ export const adminDevicesMethods = {
     return window.__app.t('admin.devices.statusActive');
   },
 
+  // Anzeige-Label: der Android-Client meldet seine Version als `android/2.0.0`
+  // (Plattform-Prefix), der macOS-Client als reines `2.9`. Prefix fuer Anzeige
+  // und Vergleich wegnormalisieren — wir wollen nur den dotted-Numeric-Teil.
+  devicesVersionLabel(d) {
+    return this._devicesCleanVersion(d.client_version) || d.client_version || '';
+  },
+
+  // Extrahiert den dotted-Numeric-Versionsteil aus einem evtl. praefixierten
+  // String (`android/2.0.0` → `2.0.0`, `2.9` → `2.9`).
+  _devicesCleanVersion(v) {
+    if (!v) return '';
+    const m = String(v).match(/\d+(?:\.\d+)*/);
+    return m ? m[0] : '';
+  },
+
   // Neueste Version fuer die Plattform dieses Geraets (Android vs. macOS getrennt).
   _devicesLatestForPlatform(d) {
     const v = this.devicesLatestVersions || {};
@@ -61,13 +76,14 @@ export const adminDevicesMethods = {
   // semver aussagekraeftig.)
   devicesIsOutdated(d) {
     const latest = this._devicesLatestForPlatform(d);
-    if (!latest || !d.client_version) return false;
-    return this._devicesCmpVersion(d.client_version, latest) < 0;
+    const installed = this._devicesCleanVersion(d.client_version);
+    if (!latest || !installed) return false;
+    return this._devicesCmpVersion(installed, latest) < 0;
   },
 
   _devicesCmpVersion(a, b) {
-    const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
-    const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+    const pa = this._devicesCleanVersion(a).split('.').map(n => parseInt(n, 10) || 0);
+    const pb = this._devicesCleanVersion(b).split('.').map(n => parseInt(n, 10) || 0);
     const len = Math.max(pa.length, pb.length);
     for (let i = 0; i < len; i++) {
       const da = pa[i] || 0, db = pb[i] || 0;

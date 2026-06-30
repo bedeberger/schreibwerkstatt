@@ -123,3 +123,70 @@ test('alle drei Editoren oeffnen ohne Konsolenfehler', async ({ page }) => {
 
   expect(failures, `Editoren mit Fehlern:\n${failures.join('\n')}`).toEqual([]);
 });
+
+// Anlege-Pfade gegen den ECHTEN Root + Alpine.store('nav') + Backend. Regress-
+// Guard fuer den nav-store-Migrations-Skew: createKapitelPage() las frueher
+// `root.pages` (existiert seit der Migration nicht mehr → „root.pages is not
+// iterable"). Die Methoden laufen hier am realen Card-/Root-Scope, schreiben in
+// den echten Store und treffen das echte /content-Backend (Wegwerf-DB).
+test('neue Seite + neues Kapitel anlegen ohne Konsolenfehler', async ({ page }) => {
+  const guard = attachConsoleGuard(page);
+  await bootApp(page);
+  await selectSeededBook(page);
+
+  // Kapitel-Bewertung oeffnen — _openKapitelReview() waehlt das erste eligible
+  // Kapitel (Seed-Buch qualifiziert: 2 Kapitel, eines mehrseitig).
+  await page.evaluate(() => window.__app.toggleKapitelReviewCard());
+  await page.waitForFunction(
+    () => document.querySelector('.card--kapitel') && window.__app.kapitelReviewChapterId,
+    null,
+    { timeout: 10000 },
+  );
+
+  // Neue Seite im Kapitel anlegen (Card-Methode am echten Scope).
+  const pageResult = await page.evaluate(async () => {
+    const card = window.Alpine.$data(document.querySelector('.card--kapitel'));
+    const store = window.Alpine.store('nav');
+    const chapterId = window.__app.kapitelReviewChapterId;
+    const chBefore = store.tree.find(
+      (i) => i.type === 'chapter' && !i.solo && String(i.id) === String(chapterId),
+    ).pages.length;
+    const pagesBefore = store.pages.length;
+    window.__app.newPageTitle = 'Smoke-Testseite';
+    await card.createKapitelPage();
+    const chItem = store.tree.find(
+      (i) => i.type === 'chapter' && !i.solo && String(i.id) === String(chapterId),
+    );
+    return {
+      pagesDelta: store.pages.length - pagesBefore,
+      chapterPagesDelta: chItem.pages.length - chBefore,
+      hasNew: store.pages.some((p) => p.name === 'Smoke-Testseite'),
+      error: window.__app.newPageError,
+    };
+  });
+  expect(pageResult.error, 'kein newPageError').toBeFalsy();
+  expect(pageResult.pagesDelta, 'Seite in store.pages eingehaengt').toBe(1);
+  expect(pageResult.chapterPagesDelta, 'Seite in Tree-Kapitel eingehaengt').toBe(1);
+  expect(pageResult.hasNew, 'neue Seite per Name auffindbar').toBe(true);
+
+  // Neues Geschwister-Kapitel anlegen (createSiblingChapter → root.createChapter).
+  const chapterResult = await page.evaluate(async () => {
+    const card = window.Alpine.$data(document.querySelector('.card--kapitel'));
+    const store = window.Alpine.store('nav');
+    const isChapter = (i) => i.type === 'chapter' && !i.solo;
+    const before = store.tree.filter(isChapter).length;
+    window.__app.newChapterTitle = 'Smoke-Testkapitel';
+    await card.createSiblingChapter();
+    return {
+      chaptersDelta: store.tree.filter(isChapter).length - before,
+      hasNew: store.tree.some((i) => isChapter(i) && i.name === 'Smoke-Testkapitel'),
+      error: window.__app.newChapterError,
+    };
+  });
+  expect(chapterResult.error, 'kein newChapterError').toBeFalsy();
+  expect(chapterResult.chaptersDelta, 'Kapitel im Tree eingehaengt').toBe(1);
+  expect(chapterResult.hasNew, 'neues Kapitel per Name auffindbar').toBe(true);
+
+  await page.waitForTimeout(300);
+  guard.assertClean('Seite + Kapitel anlegen');
+});

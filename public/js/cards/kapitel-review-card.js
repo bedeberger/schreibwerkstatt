@@ -449,7 +449,7 @@ export function registerKapitelReviewCard() {
           priority: created.position, // legacy Sort-Alias wie decoratePage
           chapterName: chapter.name,
         };
-        Alpine.store('nav').pages = [...root.pages, newPage];
+        Alpine.store('nav').pages = [...Alpine.store('nav').pages, newPage];
         const chapterItem = Alpine.store('nav').tree.find(i =>
           i.type === 'chapter' && !i.solo && String(i.id) === String(chapter.id)
         );
