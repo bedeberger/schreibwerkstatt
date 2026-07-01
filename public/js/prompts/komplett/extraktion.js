@@ -460,6 +460,59 @@ Der Text ist in Kapitel-Sektionen gegliedert (## Kapitelname) mit Seiten darunte
 <text>Der Buchtext steht im System-Prompt oben.</text>`;
 }
 
+/** Multi-Pass Completeness-Gap (Claude, grosse Bücher): kombinierter Nachzieh-Pass pro
+ *  Chunk. Im Gegensatz zum Single-Pass-Gap (der den 1h-gecachten Buchtext-Block nutzt)
+ *  liegt der Chunk-Text NICHT in einem persistenten System-Block → er wird hier inline
+ *  mitgegeben. Reuse von SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS + SCHEMA_KOMPLETT_EXTRAKTION.
+ *  `known` = { figuren, orte, fakten, szenen } (Anzeige-Strings), gesät aus dem GLOBAL
+ *  bereits gefundenen Katalog aller Chunks → das Modell zieht nur den Long-Tail nach, der
+ *  in DIESEM Kapitel fehlt. songs/assignments/lebensereignisse als leere Arrays. */
+export function buildChunkGapPrompt(chapterName, bookName, pageCount, chText, known = {}) {
+  const sect = (title, arr) => `<bereits_erfasste_${title}>\n${_knownList(arr)}\n</bereits_erfasste_${title}>`;
+  return `<aufgabe>
+Du hast das Kapitel «${chapterName}» des Buchs «${bookName}» bereits einmal analysiert. Unten stehen die im GESAMTEN Buch bereits erfassten Figuren, Schauplätze, Fakten und Szenen. Durchsuche den Kapiteltext GRÜNDLICH ERNEUT und gib AUSSCHLIESSLICH Einträge aus, die in diesen Listen FEHLEN – besonders Nebenfiguren, nur kurz auftretende Personen mit eigenem Namen, einmal erwähnte Schauplätze, beiläufige Welt-Fakten und übergangene Handlungsabschnitte. Bereits erfasste Einträge NICHT erneut ausgeben. songs, assignments und lebensereignisse als leere Arrays zurückgeben (in diesem Pass nicht gefragt). Wenn nichts fehlt: alle Arrays leer.
+</aufgabe>
+
+${sect('figuren', known.figuren)}
+
+${sect('schauplaetze', known.orte)}
+
+${sect('fakten', known.fakten)}
+
+${sect('szenen', known.szenen)}
+
+Für alle Kapitel-Felder immer genau «${chapterName}» verwenden – die ### Überschriften im Text sind Seitentitel, keine Kapitelnamen.
+
+<kapiteltext seiten="${pageCount}">
+${chText}
+</kapiteltext>`;
+}
+
+/** Coverage-Self-Audit (F2): misst den Extraktions-Recall an einer Kapitel-Stichprobe.
+ *  Das Modell bekommt den Kapiteltext + die im GESAMTEN Katalog bekannten Figuren-/Ort-Namen
+ *  und meldet, wie viele es im Passus wiedererkannt hat (erkannte_*) und welche NAMENTLICH
+ *  genannten FEHLEN (fehlende_*). Der Score wird im Job berechnet. Kein Katalog-Eingriff. */
+export function buildCoverageAuditPrompt(bookName, chapterName, chText, knownFiguren, knownOrte) {
+  return `<aufgabe>
+Prüfe die Vollständigkeit der bisherigen Analyse des Buchs «${bookName}» an diesem Kapitel-Ausschnitt. Unten stehen die bereits im Katalog erfassten Figuren und Schauplätze. Lies den Kapiteltext GENAU und melde:
+- erkannte_figuren / erkannte_orte: Anzahl der bereits erfassten Figuren/Schauplätze, die in diesem Ausschnitt tatsächlich vorkommen.
+- fehlende_figuren / fehlende_orte: NAMENTLICH genannte Figuren/Schauplätze, die im Ausschnitt vorkommen, aber NICHT im Katalog stehen. Nur echte Eigennamen — keine generischen Rollen («der Wirt», «die Stadt») ohne Eigennamen.
+Wenn nichts fehlt: leere Arrays. Zähle konservativ und nenne keine Namen doppelt.
+</aufgabe>
+
+<katalog_figuren>
+${_knownList(knownFiguren)}
+</katalog_figuren>
+
+<katalog_schauplaetze>
+${_knownList(knownOrte)}
+</katalog_schauplaetze>
+
+<kapiteltext kapitel="${chapterName}">
+${chText}
+</kapiteltext>`;
+}
+
 /** Claude-Single-Pass C: nur Fakten – eigener Call gegen den gecachten Buchtext-Block. */
 export function buildExtraktionFaktenPassPrompt(chapterName, bookName, pageCount, chText) {
   const isSinglePass = chapterName === 'Gesamtbuch';

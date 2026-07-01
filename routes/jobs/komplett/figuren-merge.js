@@ -445,9 +445,45 @@ function ensureUniqueFigIds(figuren, log = null) {
   return reassigned;
 }
 
+/** Alias-Cluster (F3) auf die (pre-merged) Kapitel-Figuren anwenden: Namensvarianten, die laut
+ *  Alias-Pass dieselbe Figur bezeichnen (Epitheta/Spitznamen/Umbenennungen), auf den kanonischen
+ *  Namen umschreiben — der Originalname bleibt als kurzname erhalten, falls noch keiner gesetzt
+ *  ist. Die nachfolgende KI-Konsolidierung + mergeDuplicateFiguren führen die nun gleichnamigen
+ *  Einträge zusammen. Gibt `{ renamed, aliasMap }` zurück; aliasMap (lowercased Alias →
+ *  kanonischer Name) geht in buildFigNameLookup, damit Szenen/Events mit dem Alias-Namen weiter
+ *  auf die kanonische Figur auflösen (kein Drop). Mutiert die übergebenen figuren in place.
+ *  Pure, testbar. */
+function applyAliasClusters(chapterFiguren, clusters, log = null) {
+  const aliasMap = {};
+  for (const c of (clusters || [])) {
+    const canon = _refToString(c?.kanonisch);
+    if (!canon) continue;
+    for (const a of (c?.aliase || [])) {
+      const alias = _refToString(a);
+      if (!alias || _normalizeName(alias) === _normalizeName(canon)) continue;
+      aliasMap[alias.toLowerCase()] = canon;
+    }
+  }
+  if (!Object.keys(aliasMap).length) return { renamed: 0, aliasMap };
+  let renamed = 0;
+  for (const ch of (chapterFiguren || [])) {
+    for (const f of (ch.figuren || [])) {
+      const canon = aliasMap[String(f.name || '').toLowerCase()];
+      if (canon && canon !== f.name) {
+        if (!f.kurzname || f.kurzname === f.name) f.kurzname = f.name;
+        f.name = canon;
+        renamed++;
+      }
+    }
+  }
+  if (renamed && log) log.info(`Alias-Cluster: ${renamed} Figuren-Nennung(en) auf kanonische Namen vereinheitlicht (${Object.keys(aliasMap).length} Aliasse).`);
+  return { renamed, aliasMap };
+}
+
 module.exports = {
   preMergeChapterFiguren, applySozialschichtModeVote,
   mergeDuplicateFiguren, validateBeziehungenDescriptions,
   mergeBeziehungenIntoFiguren, backfillFiguren, ensureUniqueFigIds,
+  applyAliasClusters,
   _normalizeName,
 };

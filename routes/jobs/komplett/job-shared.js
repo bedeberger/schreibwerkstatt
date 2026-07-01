@@ -190,6 +190,129 @@ function buildAnachronismusData(bookIdInt, email) {
   return { minYear, maxYear, songs, technik, ereignisse };
 }
 
+// ── Attribut-Widerspruchs-Detektor (F4) ─────────────────────────────────────
+// Der fakten-basierte Multi-Pass-Kontinuitätscheck sieht Fakten nur pro Kapitel → Cross-Chapter-
+// Widersprüche (Kapitel 2 vs. 40) fallen strukturell durch. Dieser Detektor baut aus bereits
+// persistierten, per-Kapitel-strukturierten Daten (figure_events, world_facts) deterministisch
+// Kandidatenpaare mit divergenten Werten desselben Attributs und lässt das Modell nur diese
+// beurteilen. Ergänzt P8 (ersetzt nichts). Rein lesend.
+const _ATTR_CANDIDATE_CAP = 15;
+const _SINGULAR_EVENT_LABEL = { geburt: 'Geburtsjahr', tod: 'Todesjahr', hochzeit: 'Hochzeitsjahr' };
+
+function _factNorm(s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+
+/** Deterministische Kandidatenpaare (KEIN KI-Call). Zwei Detektoren:
+ *  A) Singuläre Lebensereignisse (geburt/tod/hochzeit) einer Figur mit ≥2 verschiedenen sicheren
+ *     Jahren → jemand kann nicht in zwei Jahren geboren sein/sterben/heiraten.
+ *  B) Welt-Fakten mit gleichem subjekt, aber divergentem fakt-Text in verschiedenen Kapiteln.
+ *  Gibt `[{ typ, entity, entityFigName, attribut, wertA:{wert,kapitel,beleg}, wertB:{…} }]`,
+ *  gedeckelt auf _ATTR_CANDIDATE_CAP (Datums-Konflikte priorisiert). */
+function buildAttributeContradictions(bookIdInt, email) {
+  const candidates = [];
+  // A) Singuläre Lebensereignisse mit Jahres-Konflikt.
+  const evRows = db.prepare(`
+    SELECT fe.figure_id, f.name AS fig_name, fe.subtyp, fe.datum_year AS year, fe.ereignis, c.chapter_name
+      FROM figure_events fe
+      JOIN figures f ON f.id = fe.figure_id
+      LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
+     WHERE f.book_id = ? AND f.user_email IS ? AND fe.datum_unsicher = 0
+       AND fe.datum_year IS NOT NULL AND fe.subtyp IN ('geburt','tod','hochzeit')
+  `).all(bookIdInt, email);
+  const byFigSubtyp = new Map();
+  for (const r of evRows) {
+    const key = `${r.figure_id}|${r.subtyp}`;
+    if (!byFigSubtyp.has(key)) byFigSubtyp.set(key, []);
+    byFigSubtyp.get(key).push(r);
+  }
+  for (const rows of byFigSubtyp.values()) {
+    const years = [...new Set(rows.map(r => r.year))];
+    if (years.length < 2) continue;
+    const lo = rows.reduce((a, b) => a.year <= b.year ? a : b);
+    const hi = rows.reduce((a, b) => a.year >= b.year ? a : b);
+    candidates.push({
+      typ: 'zeitlinie',
+      entity: lo.fig_name,
+      entityFigName: lo.fig_name,
+      attribut: _SINGULAR_EVENT_LABEL[lo.subtyp] || lo.subtyp,
+      wertA: { wert: String(lo.year), kapitel: lo.chapter_name || '', beleg: lo.ereignis || '' },
+      wertB: { wert: String(hi.year), kapitel: hi.chapter_name || '', beleg: hi.ereignis || '' },
+      _priority: 0,
+    });
+  }
+  // B) Welt-Fakten: gleiches subjekt, divergenter fakt in verschiedenen Kapiteln.
+  const wfRows = db.prepare(`
+    SELECT wf.id, wf.subjekt, wf.kategorie, wf.fakt, c.chapter_name
+      FROM world_facts wf
+      LEFT JOIN world_fact_chapters wfc ON wfc.fact_id = wf.id
+      LEFT JOIN chapters c ON c.chapter_id = wfc.chapter_id
+     WHERE wf.book_id = ? AND wf.user_email IS ? AND wf.subjekt IS NOT NULL AND TRIM(wf.subjekt) != ''
+  `).all(bookIdInt, email);
+  const bySubjekt = new Map();
+  for (const r of wfRows) {
+    const key = _factNorm(r.subjekt);
+    if (!key) continue;
+    if (!bySubjekt.has(key)) bySubjekt.set(key, []);
+    bySubjekt.get(key).push(r);
+  }
+  for (const rows of bySubjekt.values()) {
+    // Erste zwei Fakten mit unterschiedlichem normalisiertem Text UND verschiedenem Kapitel.
+    let a = null, b = null;
+    for (const r of rows) {
+      if (!a) { a = r; continue; }
+      if (_factNorm(r.fakt) !== _factNorm(a.fakt) && (r.chapter_name || '') !== (a.chapter_name || '')) { b = r; break; }
+    }
+    if (a && b) {
+      candidates.push({
+        typ: 'objekt',
+        entity: a.subjekt,
+        entityFigName: null,
+        attribut: a.subjekt,
+        wertA: { wert: a.fakt, kapitel: a.chapter_name || '', beleg: '' },
+        wertB: { wert: b.fakt, kapitel: b.chapter_name || '', beleg: '' },
+        _priority: 1,
+      });
+    }
+  }
+  candidates.sort((x, y) => x._priority - y._priority);
+  return candidates.slice(0, _ATTR_CANDIDATE_CAP);
+}
+
+/** Beurteilt die Kandidaten aus buildAttributeContradictions per KI (Konsolidierungs-Tier,
+ *  kein extractModel-Override) und gibt bestätigte Widersprüche in Problem-Form zurück
+ *  (kompatibel zu kontResult.probleme → wird dort eingemischt und mit gespeichert). stelle_a/
+ *  stelle_b bewusst OHNE «»-Zitate, damit die Beleg-Prüfung (requireQuoteEvidence) sie nicht als
+ *  erfundenes Zitat verwirft. Concurrency-Cap + Warmup wie die Verify-Stufe. Non-fatal. */
+async function runAttributeContradictionCheck(ctx, fromPct, toPct) {
+  const { call, prompts, sys, jobId, tok, bookName, bookIdInt, email, log } = ctx;
+  const candidates = buildAttributeContradictions(bookIdInt, email);
+  if (!candidates.length) return [];
+  updateJob(jobId, { progress: fromPct, statusText: 'job.phase.checkAttributes' });
+  const claudeConcurrency = Math.max(1, parseInt(appSettings.get('ai.claude.phase1_concurrency'), 10) || 4);
+  const settled = await settledAll(candidates.map((cand) => async () => {
+    const v = await call(jobId, tok,
+      prompts.buildAttributeContradictionJudgePrompt(bookName, cand),
+      sys.SYSTEM_KONTINUITAET_BLOCKS, null, null, 600, 0.3, 900, prompts.SCHEMA_ATTR_CONTRADICTION);
+    if (v?.widerspruch !== true) return null;
+    const stelle = (w) => `${cand.attribut}: ${w.wert}${w.kapitel ? ` (Kapitel ${w.kapitel})` : ''}`;
+    return {
+      schwere: v.schwere || 'mittel',
+      typ: cand.typ,
+      beschreibung: v.beschreibung || '',
+      stelle_a: stelle(cand.wertA),
+      stelle_b: stelle(cand.wertB),
+      empfehlung: v.empfehlung || '',
+      figuren: cand.entityFigName ? [cand.entityFigName] : [],
+      kapitel: [cand.wertA.kapitel, cand.wertB.kapitel].filter(Boolean),
+    };
+  }), { concurrency: claudeConcurrency, warmup: true });
+  const aborted = settled.find(r => r.status === 'rejected' && r.reason?.name === 'AbortError');
+  if (aborted) throw aborted.reason;
+  const findings = settled.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value);
+  if (toPct != null) updateJob(jobId, { progress: toPct });
+  log.info(`Attribut-Widerspruchs-Detektor: ${findings.length}/${candidates.length} Kandidaten als echter Widerspruch bestätigt.`);
+  return findings;
+}
+
 // ── Per-Job-Claude-Overrides für die Komplettanalyse-Familie ──────────────────
 // Nur ai.provider = claude: Modell, Kontextfenster, Output-Cap und Hard-Timeout dürfen
 // eigenständig vom globalen ai.claude.* abweichen (z.B. Opus 4.8 mit 128K Output + längerem
@@ -228,4 +351,5 @@ function _komplettClaudeOverrides(effectiveProvider) {
 module.exports = {
   _VERIFY_RADIUS, _verifyExcerpt, verifyKontinuitaetProbleme,
   buildAnachronismusData, KOMPLETT_DEFAULT_TIMEOUT_MS, _komplettClaudeOverrides,
+  buildAttributeContradictions, runAttributeContradictionCheck,
 };

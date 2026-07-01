@@ -45,6 +45,36 @@ ${FIGUREN_BASIS_SCHEMA}
 ${figurenBasisRules(buchKontext)}`;
 }
 
+// ── Alias-Cluster (F3, Claude Multi-Pass, VOR der Konsolidierung) ─────────────
+// Cross-Chunk-Figuren zerfallen bei rein namensbasiertem Merge (Epitheta, Spitznamen,
+// Umbenennungen «der Alte» ↔ «Gregor»). Dieser Pass bekommt die Kandidatennamen +
+// Kurzbeschreibungen + Kapitel und clustert Namensvarianten derselben Figur, damit die
+// nachfolgende Konsolidierung sie zusammenführt statt als Dubletten zu behalten.
+export function buildAliasClusterPrompt(bookName, candidates) {
+  const list = candidates.map(c =>
+    `- ${c.name}${c.kapitel ? ` | Kapitel: ${c.kapitel}` : ''}${c.beschreibung ? `\n  ${c.beschreibung}` : ''}`
+  ).join('\n');
+  return `Buch: «${bookName}»
+
+Unten stehen aus verschiedenen Kapiteln extrahierte Figuren-KANDIDATEN. Manche Namen bezeichnen dieselbe Figur (Vollname vs. Vorname vs. Spitzname vs. Epitheton wie «der Alte», oder eine im Buch umbenannte Figur). Bilde Cluster von Namen, die SICHER dieselbe Figur meinen.
+
+Kandidaten:
+${list}
+
+Antworte mit diesem JSON-Schema:
+{
+  "cluster": [
+    { "kanonisch": "bevorzugter, vollständigster Name aus der Liste", "aliase": ["weitere Namen aus der Liste, die dieselbe Figur bezeichnen"] }
+  ]
+}
+
+Regeln:
+- NUR Namen aus der obigen Kandidatenliste verwenden (exakte Schreibweise), keine erfundenen.
+- Nur clustern, wenn Beschreibung/Kapitel/Kontext die Identität eindeutig stützen – KONSERVATIV, im Zweifel getrennt lassen. Zwei Figuren mit ähnlichem Namen aber verschiedenen Rollen NICHT zusammenlegen.
+- Jeder Alias erscheint in HÖCHSTENS einem Cluster. Der kanonische Name selbst nicht zusätzlich in aliase.
+- Nur Cluster mit mindestens einem Alias ausgeben (Einzelnamen ohne Variante weglassen). Leeres Array, wenn keine Varianten existieren.`;
+}
+
 // ── Kapitelübergreifende Beziehungen ──────────────────────────────────────────
 export function buildKapiteluebergreifendeBeziehungenPrompt(bookName, figurenList, bookText) {
   const idToName = Object.fromEntries(figurenList.map(f => [f.id, f.name]));

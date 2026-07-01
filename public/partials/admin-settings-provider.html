@@ -37,6 +37,10 @@
           <input type="text" x-model="adminSettingsForm['ai.claude.model.komplett']" placeholder="claude-opus-4-8">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettModel')"></small>
         </label>
+        <label>ai.claude.model.komplett.extract
+          <input type="text" x-model="adminSettingsForm['ai.claude.model.komplett.extract']" placeholder="claude-sonnet-5">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettModelExtract')"></small>
+        </label>
         <label>ai.claude.context_window.komplett
           <input type="text" x-data="numInput({ integer: true, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.context_window.komplett']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettContextWindow')"></small>
@@ -52,6 +56,19 @@
         <label>ai.komplett.completeness_passes
           <input type="text" x-data="numInput({ integer: true, min: 0, max: 3 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.completeness_passes']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>
+        </label>
+        <label>ai.komplett.coverage_audit_chapters
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 20 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.coverage_audit_chapters']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.coverageAuditChapters')"></small>
+        </label>
+        <label>ai.komplett.coverage_min_score
+          <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 1 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.coverage_min_score']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.coverageMinScore')"></small>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['ai.komplett.attribute_check'] === true || adminSettingsForm['ai.komplett.attribute_check'] === 'true'"
+                 @change="adminSettingsForm['ai.komplett.attribute_check'] = $event.target.checked">
+          <span x-text="$app.t('admin.settings.help.attributeCheck')"></span>
         </label>
 
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.bookchatTitle')"></span></h4>

@@ -2,6 +2,7 @@
 const express = require('express');
 const {
   deleteChapterExtractCache,
+  deleteCheckpoint,
   getLatestContinuityCheck,
   getContinuityIssueBookId,
   setContinuityIssueResolved,
@@ -81,6 +82,9 @@ komplettRouter.delete('/chapter-cache/:book_id', (req, res) => {
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   const userEmail = req.session?.user?.email || '';
   const deleted = deleteChapterExtractCache(bookId, userEmail);
+  // F5: den Konsolidierungs-Checkpoint mitlöschen — sonst würde ein Re-Run nach dem Cache-Leeren
+  // zwar Phase 1 neu extrahieren, aber (bei gleichem Inhalt) P2–P8 weiterhin überspringen.
+  deleteCheckpoint('komplett-consolidation', bookId, userEmail);
   res.json({ ok: true, deleted });
 });
 

@@ -26,6 +26,7 @@ export const appKomplettMethods = {
     this.$store.jobs.alleAktualisierenTps = null;
     this.$store.jobs.alleAktualisierenPassMode = null;
     this.$store.jobs.alleAktualisierenWarnings = [];
+    this.$store.jobs.alleAktualisierenCoverage = null;
     this.showKomplettStatus = true;
     const bookId = this.$store.nav.selectedBookId;
     const bookName = this.selectedBookName;
@@ -73,6 +74,8 @@ export const appKomplettMethods = {
         // Non-critical-Degradierungen (Soziogramm/P3b/Kontinuität) persistent im
         // Status-Panel zeigen – sonst ununterscheidbar von „alles ok".
         this.$store.jobs.alleAktualisierenWarnings = Array.isArray(job?.result?.warnings) ? job.result.warnings : [];
+        // Coverage-Self-Audit (F2): Recall-Score der Stichprobe im Status-Panel zeigen.
+        this.$store.jobs.alleAktualisierenCoverage = job?.result?.coverage || null;
         try {
           // _loadKontinuitaetHistory lebt auf kontinuitaetCard (nicht im Root) —
           // Card per card:refresh-Event reloaden lassen (Lifecycle hört darauf).

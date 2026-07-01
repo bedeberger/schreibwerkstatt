@@ -295,3 +295,34 @@ export const SCHEMA_KONTINUITAET_PROBLEME = _obj({
   },
   zusammenfassung: _str,
 });
+
+// Coverage-Self-Audit (F2): pro gesampeltem Kapitel meldet das Modell, wie viele der
+// bekannten Figuren/Orte es im Passus wiedererkannt hat und welche NAMENTLICH genannten
+// FEHLEN. Der Score wird im Job aus (erkannt / (erkannt + fehlend)) berechnet.
+export const SCHEMA_COVERAGE_AUDIT = _obj({
+  erkannte_figuren: _num,
+  fehlende_figuren: { type: 'array', items: _str },
+  erkannte_orte: _num,
+  fehlende_orte: { type: 'array', items: _str },
+});
+
+// Alias-Cluster (F3): Cluster von Namensvarianten, die dieselbe Figur bezeichnen
+// (Epitheta, Spitznamen, Umbenennungen). `kanonisch` = bevorzugter Name; `aliase` =
+// die übrigen Namen aus der Kandidatenliste, die zu derselben Figur gehören.
+export const SCHEMA_FIGUREN_ALIAS_CLUSTER = _obj({
+  cluster: {
+    type: 'array',
+    items: _obj({ kanonisch: _str, aliase: { type: 'array', items: _str } }),
+  },
+});
+
+// Attribut-Widerspruch-Urteil (F4): pro deterministisch gefundenem Kandidatenpaar
+// entscheidet das Modell, ob ein echter Kontinuitätswiderspruch vorliegt. Reasoning-First
+// als False-Positive-Abwehr (analog SCHEMA_KONTINUITAET_PROBLEME).
+export const SCHEMA_ATTR_CONTRADICTION = _obj({
+  _reasoning: _str,
+  widerspruch: { type: 'boolean' },
+  schwere: { type: 'string', enum: ['kritisch', 'mittel', 'niedrig'] },
+  beschreibung: _str,
+  empfehlung: _str,
+});

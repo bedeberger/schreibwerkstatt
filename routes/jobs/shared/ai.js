@@ -202,7 +202,7 @@ const PROGRESS_THROTTLE_MS = 200;
 //   Sobald tokIn bekannt ist (Claude: message_start; Ollama: erster Chunk), wird dynExpectedChars
 //   auf max(staticFallback, tokIn * 4 * outputRatio) gesetzt.
 // maxTokens: explizites Token-Limit (überschreibt die expectedChars-Formel). null = globalMax.
-async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars = 3000, outputRatio = 0.2, maxTokens = null, provider = undefined, jsonSchema = null) {
+async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars = 3000, outputRatio = 0.2, maxTokens = null, provider = undefined, jsonSchema = null, modelOverride = undefined) {
   let dynExpectedChars = expectedChars;
   let calibrated = false;
   // Eindeutige ID für diesen Call – wird in tok.inflight eingetragen wenn vorhanden
@@ -257,7 +257,7 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
     ? Math.min(maxTokens, providerMaxOut)
     : providerMaxOut;
   const signal = jobAbortControllers.get(jobId)?.signal;
-  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, cacheCreation1hIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, effProvider, jsonSchema);
+  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, cacheCreation1hIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, effProvider, jsonSchema, modelOverride);
   tok.inflight?.delete(callId);
   tok.in += tokensIn;
   tok.out += tokensOut;

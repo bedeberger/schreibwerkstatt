@@ -23,6 +23,11 @@ test.beforeEach(() => {
   // Completeness-Test schaltet sie gezielt ein. Lazy require: app-settings öffnet
   // die DB-Connection beim Laden – darf erst NACH bootstrap() (DB_PATH gesetzt) passieren.
   require('../../lib/app-settings').set('ai.komplett.completeness_passes', 0);
+  // Coverage-Self-Audit (F2) und Attribut-Widerspruchs-Detektor (F4) defaultmässig AUS —
+  // beide fügen KI-Calls hinzu und würden die Kernpfad-Call-Counts verfälschen. Dedizierte
+  // Tests schalten sie gezielt ein.
+  require('../../lib/app-settings').set('ai.komplett.coverage_audit_chapters', 0);
+  require('../../lib/app-settings').set('ai.komplett.attribute_check', false);
 });
 
 function seedTinyBook(bookId) {
@@ -464,6 +469,13 @@ test('Komplettanalyse Delta-Cache: Touch einer Seite → nur dieser Chunk re-ext
   };
   ctx.dbSeed.setBook({ chapters, pages, pageBodies: bodies });
 
+  // Dieser Test isoliert die DELTA-CACHE-Granularität der Extraktion (nur der berührte Chunk
+  // re-extrahiert). Der Mock liefert pro Kapitel deterministisch dieselbe Extraktion → der
+  // re-extrahierte Katalog ist byte-identisch → der F5-Konsolidierungs-Checkpoint würde P2–P8
+  // korrekt überspringen. Da hier NICHT F5, sondern die Extraktions-Granularität gemessen wird,
+  // den Marker vor Run 2 löschen (entspricht dem realen Fall, dass sich Inhalt geändert hätte).
+  ctx.dbSchema.deleteCheckpoint('komplett-consolidation', BOOK_ID, 'tester@test.dev');
+
   // Run 2: only chunk for page 3001 should re-extract.
   const jobId2 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId2, () =>
@@ -690,7 +702,9 @@ test('Komplettanalyse: Cache-Hit Phase 1 → nur P8 ruft AI', async () => {
   await waitForJob(ctx.shared, jobId1, { timeoutMs: 8000 });
   assert.equal(ctx.mockAi.log.length, 6, 'run 1: 6 AI calls (A1+B+C+E+A2+P8)');
 
-  // Run 2: same book, cache should hit Phase 1 → only P8 calls AI.
+  // Run 2: same book. Phase-1-Delta-Cache HIT → identischer Katalog → identische
+  // Konsolidierungs-Sig → F5-Konsolidierungs-Checkpoint HIT → P2–P8 (inkl. P8) komplett
+  // übersprungen. Erwartung daher 0 KI-Calls (unter dem Vor-F5-Design war es 1 = nur P8).
   const callsBeforeRun2 = ctx.mockAi.log.length;
   const jobId2 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId2, () =>
@@ -698,8 +712,9 @@ test('Komplettanalyse: Cache-Hit Phase 1 → nur P8 ruft AI', async () => {
   );
   const job2 = await waitForJob(ctx.shared, jobId2, { timeoutMs: 8000 });
   assert.equal(job2.status, 'done');
+  assert.equal(job2.result?.consolidationSkipped, true, 'run 2 should short-circuit via consolidation checkpoint');
   const run2Calls = ctx.mockAi.log.length - callsBeforeRun2;
-  assert.equal(run2Calls, 1, `cache-hit run: expected 1 AI call (P8 only), got ${run2Calls}`);
+  assert.equal(run2Calls, 0, `cache-hit + consolidation-checkpoint run: expected 0 AI calls, got ${run2Calls}`);
 });
 
 // ── Konsolidierungs-Phasen (Multi-Pass): P2 Soziogramm, P3 Orte, P6 Zeitstrahl ──
@@ -1138,4 +1153,72 @@ test('Komplettanalyse Phase 6 Zeitstrahl <5 Events: Direkt-Speichern ohne KI-Cal
     'SELECT COUNT(*) AS n FROM zeitstrahl_events WHERE book_id = ? AND user_email = ?'
   ).get(BOOK_ID, 'tester@test.dev');
   assert.equal(rows.n, 3, 'expected 3 directly-saved timeline events');
+});
+
+// ── F2: Coverage-Self-Audit ──────────────────────────────────────────────────
+test('Komplettanalyse F2: Coverage-Self-Audit schreibt Score + fehlende Namen ins Job-Result', async () => {
+  const BOOK_ID = 90;
+  seedTinyBook(BOOK_ID);
+  const appSettings = require('../../lib/app-settings');
+  appSettings.set('ai.komplett.coverage_audit_chapters', 1); // beforeEach setzt 0 → hier gezielt an
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'), ortePassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'), eventsPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'), kontinuitaetResponse());
+  // Coverage-Audit-Call (SCHEMA_COVERAGE_AUDIT).
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('erkannte_figuren') && e.schemaKeys.includes('fehlende_figuren'),
+    { erkannte_figuren: 3, fehlende_figuren: ['Uebersehene Figur'], erkannte_orte: 1, fehlende_orte: [] },
+  );
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+  assert.equal(job.status, 'done');
+  assert.ok(job.result.coverage, 'coverage im Job-Result');
+  // Score = erkannt/(erkannt+fehlend) = 4/5 = 0.8.
+  assert.equal(job.result.coverage.score, 0.8);
+  assert.deepEqual(job.result.coverage.missingFiguren, ['Uebersehene Figur']);
+  assert.equal(job.result.coverage.sampledChapters, 1);
+});
+
+// ── F4: Attribut-Widerspruchs-Detektor (deterministische Kandidaten aus figure_events) ──
+// Lässt einen echten Single-Pass-Job zwei widersprüchliche Geburts-Events für Anna persistieren
+// (valide FK-Kette via Pipeline), dann prüft der Detektor den Jahres-Konflikt.
+test('Komplettanalyse F4: buildAttributeContradictions findet Jahres-Konflikt eines singulären Events', async () => {
+  const BOOK_ID = 91;
+  const email = 'tester@test.dev';
+  seedTinyBook(BOOK_ID);
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'), ortePassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  // E: zwei widersprüchliche Geburts-Events (verschiedene Jahre) für Anna.
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'), {
+    assignments: [{ figur_name: 'Anna', lebensereignisse: [
+      { subtyp: 'geburt', datum: '1970', datum_year: 1970, datum_unsicher: false, typ: 'persoenlich', ereignis: 'Anna wird 1970 geboren', kapitel: 'Kapitel Eins' },
+      { subtyp: 'geburt', datum: '1975', datum_year: 1975, datum_unsicher: false, typ: 'persoenlich', ereignis: 'Rueckblick: Annas Geburt 1975', kapitel: 'Kapitel Eins' },
+    ] }],
+  });
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'), kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+  assert.equal(job.status, 'done');
+
+  const { buildAttributeContradictions } = require('../../routes/jobs/komplett/job-shared.js');
+  const cands = buildAttributeContradictions(BOOK_ID, email);
+  const geburt = cands.find(c => c.entity === 'Anna' && c.attribut === 'Geburtsjahr');
+  assert.ok(geburt, 'Geburtsjahr-Konflikt als Kandidat erkannt');
+  assert.equal(geburt.typ, 'zeitlinie');
+  assert.deepEqual([geburt.wertA.wert, geburt.wertB.wert].sort(), ['1970', '1975']);
 });

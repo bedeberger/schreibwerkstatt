@@ -64,6 +64,13 @@
         <li class="komplett-warning-item" x-text="t(w.key, w.params)"></li>
       </template>
     </ul>
+    <div class="komplett-coverage" x-cloak
+         x-show="!$store.jobs.alleAktualisierenLoading && $store.jobs.alleAktualisierenCoverage && $store.jobs.alleAktualisierenCoverage.score !== null"
+         :class="{ 'komplett-coverage--low': ($store.jobs.alleAktualisierenCoverage?.score ?? 1) < 0.8 }"
+         :data-tip="t('komplett.coverageTip', { erkannt: $store.jobs.alleAktualisierenCoverage?.erkannt || 0, fehlend: $store.jobs.alleAktualisierenCoverage?.fehlend || 0, chapters: $store.jobs.alleAktualisierenCoverage?.sampledChapters || 0 })">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+      <span x-text="t('komplett.coverageLabel', { score: Math.round(($store.jobs.alleAktualisierenCoverage?.score || 0) * 100) })"></span>
+    </div>
     <div class="komplett-status-actions">
       <button type="button"
               class="komplett-status-action-btn"

@@ -155,6 +155,35 @@ Antworte mit diesem JSON-Schema:
 }`;
 }
 
+// ── Attribut-Widerspruch-Urteil (F4) ─────────────────────────────────────────
+// Deterministisch (im Job) gefundenes Kandidatenpaar: dasselbe Attribut einer Entität
+// trägt in verschiedenen Kapiteln divergente Werte. Das Modell urteilt, ob ein echter
+// Kontinuitätswiderspruch vorliegt (Reasoning-First als False-Positive-Abwehr). Kein
+// Originaltext nötig – die Kandidaten kommen aus bereits strukturierten Daten
+// (Lebensereignisse/Welt-Fakten). Belege werden als Kontext mitgegeben.
+export function buildAttributeContradictionJudgePrompt(bookName, candidate) {
+  const { entity, attribut, wertA, wertB } = candidate;
+  const side = (w) => `${w.wert || '(leer)'}${w.kapitel ? ` — Kapitel «${w.kapitel}»` : ''}${w.beleg ? `\n  Kontext: ${w.beleg}` : ''}`;
+  return `Im Buch «${bookName}» tragen zwei Stellen für dieselbe Entität denselben Attributtyp mit UNTERSCHIEDLICHEN Werten. Prüfe, ob das ein echter Kontinuitätswiderspruch ist.
+
+Entität: ${entity}
+Attribut: ${attribut}
+
+Wert A: ${side(wertA)}
+Wert B: ${side(wertB)}
+
+Berücksichtige auflösende Erklärungen: legitime Entwicklung über die Zeit (Alter, Beruf, Wohnort ändern sich real), Rückblende/Vorausblende, verschiedene Figuren mit ähnlichem Namen, Schätz-/Näherungsangaben, bewusst gesetzte erzählerische Mehrdeutigkeit. Nur wenn die beiden Werte im selben Erzählkontext UNVEREINBAR sind, ist es ein echter Widerspruch (widerspruch=true). Im Zweifel widerspruch=false.
+
+Antworte mit diesem JSON-Schema:
+{
+  "_reasoning": "kurze Abwägung: welcher Kontext den Widerspruch auflöst oder warum er echt ist",
+  "widerspruch": true,
+  "schwere": "kritisch|mittel|niedrig",
+  "beschreibung": "1 Satz: worin der Widerspruch besteht (nur wenn widerspruch=true, sonst leer)",
+  "empfehlung": "1 Satz Korrekturvorschlag (nur wenn widerspruch=true, sonst leer)"
+}`;
+}
+
 export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null } = {}, anachronismus = null) {
   const figurenStr = figurenKompakt && figurenKompakt.length
     ? '\n\n## Bekannte Figuren\n' + figurenKompakt.map(f => `${f.name} (${f.typ || ''}): ${f.beschreibung || ''}`).join('\n')

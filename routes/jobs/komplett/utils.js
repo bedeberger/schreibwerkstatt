@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('crypto');
+
 /** Reduziert KI-Ref (String oder {name,id,…}-Objekt) auf einen blanken Namen.
  *  KI liefert in figuren_namen/orte_namen/issue.figuren etc. gelegentlich Objekte
  *  statt Strings — ohne Normalisierung würde `[object Object]` durch die Pipeline
@@ -125,7 +127,7 @@ async function runNonCritical(label, fn, log, { warnings = null, warnKey = null 
  * (z.B. nur Nachname, Titel+Name), wird per Token-Matching die eindeutig
  * passende Phase-2-Figur gesucht. Nur bei eindeutigem Match.
  */
-function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapterSzenen, log, jobId) {
+function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapterSzenen, log, jobId, aliasMap = null) {
   const nameToId = {};
   for (const f of figuren) {
     nameToId[f.name] = f.id;
@@ -134,6 +136,14 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapter
   const nameToIdLower = Object.fromEntries(
     Object.entries(nameToId).map(([k, v]) => [k.toLowerCase(), v])
   );
+  // Alias-Cluster (F3): Namen, die auf einen kanonischen Namen vereinheitlicht wurden, weiter
+  // auflösbar halten — sonst droppt eine Szene/Event, die noch den Alias-Namen trägt, im Remap.
+  if (aliasMap) {
+    for (const [aliasLower, canon] of Object.entries(aliasMap)) {
+      const id = nameToId[canon] || nameToIdLower[String(canon).toLowerCase()];
+      if (id && !nameToIdLower[aliasLower]) nameToIdLower[aliasLower] = id;
+    }
+  }
 
   function tryTokenFallback(name) {
     // KI liefert figur_name gelegentlich als Objekt statt String. Call-Sites
@@ -172,10 +182,72 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapter
   return { figNameToId: nameToId, figNameToIdLower: nameToIdLower };
 }
 
+/** Coverage-Self-Audit (F2): wählt bis zu `n` gleichmässig über das Buch verteilte,
+ *  nicht-leere Kapitel als Stichprobe und baut je Kapitel den Prüftext (auf
+ *  `maxCharsPerChapter` gedeckelt — die Stichprobe misst Recall, nicht Vollextraktion).
+ *  Deterministisch (kein Zufall) → reproduzierbar. Pure, testbar. */
+function sampleChapters(groups, groupOrder, n, maxCharsPerChapter = 40000) {
+  if (!groups || !groupOrder || n <= 0) return [];
+  const nonEmpty = groupOrder.filter(k => {
+    const g = groups.get(k);
+    return g && (g.pages || []).some(p => (p.text || '').trim());
+  });
+  if (!nonEmpty.length) return [];
+  const count = Math.min(n, nonEmpty.length);
+  const idxs = new Set();
+  for (let i = 0; i < count; i++) {
+    idxs.add(Math.min(nonEmpty.length - 1, Math.floor((i + 0.5) * nonEmpty.length / count)));
+  }
+  return [...idxs].map(i => {
+    const g = groups.get(nonEmpty[i]);
+    let chText = (g.pages || []).map(p => `### ${p.title}\n${p.text}`).join('\n\n---\n\n');
+    if (chText.length > maxCharsPerChapter) chText = chText.slice(0, maxCharsPerChapter);
+    return { name: g.name, chText };
+  });
+}
+
+/** Coverage-Self-Audit (F2): aggregiert die Per-Stichprobe-Ergebnisse zu einem Recall-Score
+ *  = erkannte / (erkannte + fehlende). null, wenn die Stichprobe keine Entitäten enthielt.
+ *  Pure, testbar. */
+function computeCoverageScore(samples) {
+  let erkannt = 0, fehlend = 0;
+  const missFig = [], missOrt = [];
+  for (const s of (samples || [])) {
+    erkannt += (Number(s?.erkannte_figuren) || 0) + (Number(s?.erkannte_orte) || 0);
+    const mf = (s?.fehlende_figuren || []).filter(Boolean);
+    const mo = (s?.fehlende_orte || []).filter(Boolean);
+    fehlend += mf.length + mo.length;
+    missFig.push(...mf); missOrt.push(...mo);
+  }
+  const denom = erkannt + fehlend;
+  return {
+    score: denom > 0 ? Math.round((erkannt / denom) * 100) / 100 : null,
+    erkannt, fehlend,
+    missingFiguren: [...new Set(missFig)].slice(0, 20),
+    missingOrte: [...new Set(missOrt)].slice(0, 20),
+  };
+}
+
+/** Konsolidierungs-Checkpoint (F5): deterministische Signatur des assemblierten Phase-1-
+ *  Katalogs + der konsolidierungs-relevanten Parameter. Ist sie unverändert, kann P2–P8
+ *  (die teuren Konsolidierungs-/Urteil-Calls) übersprungen werden — der DB-Katalog ist dann
+ *  bereits korrekt. `flags` enthält alles, was das Konsolidierungs-/Kontinuitäts-ERGEBNIS
+ *  beeinflusst, aber NICHT in der Extraktion (cacheVersion) steckt (Konsolidierungs-Modell,
+ *  Alias-/Attribut-Check-Toggles). JSON.stringify(chapters) ist bei Cache-HITs byte-stabil
+ *  (genau der Fall, in dem das Short-Circuit greifen soll). Pure, testbar. */
+function buildConsolidationSig(chapters, cacheVersion, flags = {}) {
+  return crypto.createHash('sha256')
+    .update(String(cacheVersion || ''))
+    .update('|flags:' + JSON.stringify(flags))
+    .update('|catalog:' + JSON.stringify(chapters || {}))
+    .digest('hex');
+}
+
 module.exports = {
   _refToString, _remapFigNames, extractField,
   buildBookSystemBlockText, buildBookPagesSig, bookSettingsSigPart,
   _stelleQuote,
   makePhaseTimer,
   runNonCritical, buildFigNameLookup,
+  sampleChapters, computeCoverageScore, buildConsolidationSig,
 };

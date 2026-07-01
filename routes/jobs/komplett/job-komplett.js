@@ -9,6 +9,11 @@ const {
   saveFaktenToDb,
   getBookSettings,
 } = require('../../../db/schema');
+
+// F5: eigenständiger Checkpoint-Typ für den Konsolidierungs-Short-Circuit — getrennt vom
+// Phase-1-Resume-Checkpoint ('komplett-analyse'), damit das Job-Ende-deleteCheckpoint ihn
+// nicht mitlöscht. Persistiert über Läufe; self-invalidierend über die Sig.
+const CONSOLIDATION_CP_TYPE = 'komplett-consolidation';
 const appUsers = require('../../../db/app-users');
 const bookAccess = require('../../../db/book-access');
 const { narrativeLabels } = require('../narrative-labels');
@@ -24,14 +29,40 @@ const {
 const contentStore = require('../../../lib/content-store');
 const appSettings = require('../../../lib/app-settings');
 const { setContext } = require('../../../lib/log-context');
-const { runNonCritical, buildBookSystemBlockText, buildBookPagesSig, _stelleQuote, makePhaseTimer } = require('./utils');
+const { runNonCritical, buildBookSystemBlockText, buildBookPagesSig, _stelleQuote, makePhaseTimer,
+  sampleChapters, computeCoverageScore, buildConsolidationSig } = require('./utils');
 const { loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./checkpoint');
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
 const {
   runPhase1, runPhase2, runPhase3, runPhase3Songs, runPhase3b, runZeitstrahl,
   buildPrelimFigurenKompakt, runPhase3OrteCall, komplettMaxTokens,
 } = require('./phases');
-const { buildAnachronismusData, verifyKontinuitaetProbleme, _komplettClaudeOverrides } = require('./job-shared');
+const { buildAnachronismusData, verifyKontinuitaetProbleme, _komplettClaudeOverrides, runAttributeContradictionCheck } = require('./job-shared');
+
+// ── Coverage-Self-Audit (F2, nur Claude) ─────────────────────────────────────
+// Misst den Extraktions-Recall an einer Kapitel-Stichprobe: pro Sample bekommt das Modell
+// den Kapiteltext + die bekannten Figuren-/Ort-Namen und meldet Wiedererkannte + Fehlende.
+// Rein diagnostisch (kein DB-Schreibzugriff), non-critical. Läuft auf dem Extraktions-Tier.
+// Gibt `{ score, erkannt, fehlend, missingFiguren, missingOrte, sampledChapters }` oder null.
+async function runCoverageAudit(ctx, figurenNames, orteNames) {
+  const { jobId, bookName, call, tok, log, prompts, sys, groups, groupOrder, extractModel } = ctx;
+  const n = Math.max(0, Math.min(20, parseInt(appSettings.get('ai.komplett.coverage_audit_chapters'), 10) || 0));
+  if (n <= 0) return null;
+  const samples = sampleChapters(groups, groupOrder, n);
+  if (!samples.length) return null;
+  updateJob(jobId, { statusText: 'job.phase.coverageAudit' });
+  const cap = komplettMaxTokens(ctx.effectiveProvider);
+  const results = await settledAll(samples.map(s => () => retryOnTransientAi(() => call(jobId, tok,
+    prompts.buildCoverageAuditPrompt(bookName, s.name, s.chText, figurenNames, orteNames),
+    toSystemBlocks(sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS), null, null, cap, 0.2, null,
+    prompts.SCHEMA_COVERAGE_AUDIT, extractModel,
+  ), { log, label: `Coverage «${s.name}»` })), { concurrency: 3 });
+  const ok = results.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value);
+  if (!ok.length) { log.warn('Coverage-Audit: keine auswertbare Stichprobe.'); return null; }
+  const cov = computeCoverageScore(ok);
+  log.info(`Coverage-Audit: Score ${cov.score == null ? 'n/a' : cov.score} (${cov.erkannt} erkannt, ${cov.fehlend} fehlend) über ${ok.length}/${samples.length} Kapitel.`);
+  return { ...cov, sampledChapters: ok.length };
+}
 
 // ── Job: Komplettanalyse ─────────────────────────────────────────────────────
 // Pipeline (token-optimiert):
@@ -62,8 +93,15 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     log.info(`Komplettanalyse-Claude-Override: ${JSON.stringify(overrides)} (global model=${appSettings.get('ai.claude.model')}, ctx=${appSettings.get('ai.claude.context_window')}, out=${appSettings.get('ai.claude.max_tokens_out')}, timeout=${appSettings.get('ai.claude.timeout_ms')}).`);
   }
   const komplettModel = overrides?.claudeModel || '';
-  const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema) =>
-    aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, effectiveProvider, schema);
+  // Tiered Model Routing (nur Claude): mechanische Extraktions-Calls dürfen ein günstigeres
+  // Modell nutzen als die Konsolidierung/das Urteil (letztere folgen dem job-weiten ALS-Modell
+  // = ai.claude.model.komplett). Leer → kein Tiering (extractModel folgt dem Komplett-Modell,
+  // modelOverride bleibt undefined → identisches Verhalten wie bisher).
+  const extractModel = effectiveProvider === 'claude'
+    ? (appSettings.get('ai.claude.model.komplett.extract') || '')
+    : '';
+  const call = (jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, schema, modelOverride) =>
+    aiCall(jobId_, tok_, prompt_, system_, fromPct, toPct, expectedChars, outputRatio, maxTokens, effectiveProvider, schema, modelOverride);
   // Per-Provider-Skalierung aus dessen `ai.<p>.context_window` (lib/ai.js#getContextConfigFor).
   // Bei Claude 200K-Kontext ≈ 420K Zeichen Single-Pass – reicht für fast alle Bücher.
   const { singlePass: singlePassLimit, perChunk: perChunkLimit } = chunkLimitsFor(effectiveProvider);
@@ -139,7 +177,11 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // Cache-Version: Modellname + Prompts-Schema-Version + completeness_passes. Ändert sich
     // eins davon, werden alle persistierten Phase-1-Caches automatisch verworfen (Hit-Test
     // matcht den vollen Sig-String inkl. dieser Version).
-    const cacheVersion = `${komplettModel || _modelName(effectiveProvider)}:${prompts.PROMPTS_VERSION || ''}:cp${completenessPasses}`;
+    // Das EXTRAKTIONS-Modell erzeugt den gecachten Phase-1-Inhalt → es (nicht das
+    // Konsolidierungs-Modell) gehört in die cacheVersion. Ohne Tiering ist extractModel
+    // leer und wir fallen wie bisher auf das Komplett-/Provider-Modell zurück.
+    const cacheModel = extractModel || komplettModel || _modelName(effectiveProvider);
+    const cacheVersion = `${cacheModel}:${prompts.PROMPTS_VERSION || ''}:cp${completenessPasses}`;
     // Buch-weite Signatur (Seitenstand + Settings + Modell/Prompt-Version) – dieselbe
     // Gate wie der chapter_extract_cache. Validiert den Checkpoint-Resume.
     const bookPagesSig = buildBookPagesSig(pageContents, getBookSettings(bookIdInt, email), cacheVersion);
@@ -152,6 +194,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       jobId, bookIdInt, bookName, email, call, tok, log,
       effectiveProvider, singlePassLimit, perChunkLimit, cacheVersion, bookPagesSig, prompts, sys,
       idMaps, pageContents, groups, groupOrder, totalChars, fullBookText, warnings, completenessPasses,
+      extractModel,
     };
     pt.mark('Laden');
 
@@ -170,6 +213,38 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       : await runPhase1(ctx);
     const { chapterFiguren, chapterOrte, chapterSongs, chapterFakten, chapterSzenen, chapterAssignments } = p1;
     pt.mark('P1 Extraktion');
+
+    // ── F5: Konsolidierungs-Checkpoint (Short-Circuit von P2–P8) ─────────────
+    // Der Delta-Cache macht Phase 1 bei unverändertem Seitenstand billig (Cache-HITs), aber
+    // P2/P3/P6/P8 (die teuren Konsolidierungs-/Urteil-Calls) liefen bisher IMMER neu. Ist der
+    // assemblierte Phase-1-Katalog + die konsolidierungs-relevanten Parameter unverändert, ist
+    // der DB-Katalog bereits korrekt → P2–P8 überspringen. Reines Short-Circuit, kein
+    // Merge-Eingriff (id-Stabilität unberührt). Die Sig ändert sich bei jeder Seiten-/Modell-/
+    // Prompt-/Gap-/Alias-/Attr-Änderung automatisch (via cacheVersion bzw. Extraktions-Inhalt).
+    const consolFlags = {
+      model: komplettModel || _modelName(effectiveProvider),
+      attr: appSettings.get('ai.komplett.attribute_check') === true,
+    };
+    const consolidationSig = buildConsolidationSig(p1, cacheVersion, consolFlags);
+    const consolMarker = loadCheckpoint(CONSOLIDATION_CP_TYPE, bookIdInt, email);
+    const figuresPresent = db.prepare(
+      'SELECT COUNT(*) AS c FROM figures WHERE book_id = ? AND user_email IS ?'
+    ).get(bookIdInt, email).c;
+    if (consolMarker && consolMarker.sig === consolidationSig && figuresPresent > 0) {
+      log.info('Konsolidierungs-Checkpoint HIT – Katalog unverändert, P2–P8 übersprungen.');
+      deleteCheckpoint('komplett-analyse', bookIdInt, email);
+      updateJob(jobId, { progress: 100, statusText: 'job.phase.consolidationCached' });
+      completeJob(jobId, {
+        figCount:    consolMarker.figCount ?? figuresPresent,
+        orteCount:   consolMarker.orteCount ?? 0,
+        songsCount:  consolMarker.songsCount ?? 0,
+        szenenCount: consolMarker.szenenCount ?? 0,
+        warnings,
+        consolidationSkipped: true,
+        tokensIn: tok.in, tokensOut: tok.out,
+      }, tps(tok), `SKIP(P2–P8) fig=${consolMarker.figCount ?? figuresPresent}`);
+      return;
+    }
 
     // Welt-Fakten persistieren (Full-Replace) — abfragbar im Buch-Chat via list_world_facts.
     saveFaktenToDb(bookIdInt, chapterFakten, email, idMaps.chNameToId);
@@ -311,16 +386,62 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       if (kontMultiPass && effectiveProvider === 'claude') {
         kontResult = await verifyKontinuitaetProbleme(ctx, kontResult, 96, 97);
       }
+    }
+
+    // ── F4: Attribut-Widerspruchs-Detektor (non-critical, nur Claude) ──────────
+    // Deterministisch gefundene Cross-Chapter-Widersprüche (Lebensereignis-Jahre, Welt-Fakten),
+    // die der fakten-basierte P8 pro Kapitel übersieht; das Modell (Konsolidierungs-Tier) urteilt.
+    // Bereits geurteilt → NICHT durch die verify-Stufe schleusen, sondern nach ihr einmischen.
+    let attrFindings = [];
+    if (effectiveProvider === 'claude' && appSettings.get('ai.komplett.attribute_check') === true) {
+      try {
+        attrFindings = await runAttributeContradictionCheck(ctx, 97, 98);
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        log.warn(`Attribut-Widerspruchs-Detektor fehlgeschlagen (ignoriert): ${e.message}`);
+        warnings.push({ key: 'job.warn.attributeCheckFailed' });
+      }
+    }
+
+    if (kontResult) {
+      if (attrFindings.length) {
+        kontResult = { ...kontResult, probleme: [...(kontResult.probleme || []), ...attrFindings] };
+      }
       // Single-Pass (Claude, voller Buchtext im Prompt): Beleg-Zitate gegen den Text
       // prüfen. Multi-Pass-Claude hat die separate verify-Stufe; der Fakten-Pfad zitiert
-      // paraphrasiert → requireQuoteEvidence dort aus (false negatives sonst).
+      // paraphrasiert → requireQuoteEvidence dort aus (false negatives sonst). Die
+      // F4-Befunde tragen keine «»-Zitate → von der Beleg-Prüfung unberührt.
       saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, idMaps.chNameToId, effectiveProvider, log,
         { fullBookText, requireQuoteEvidence: !kontMultiPass });
+    } else if (attrFindings.length) {
+      // P8 selbst fehlgeschlagen/leer, aber der Attribut-Detektor fand Cross-Chapter-Widersprüche:
+      // eigenständig als Kontinuitäts-Check persistieren (nicht verlieren).
+      saveKontinuitaetResult(bookIdInt, email, { zusammenfassung: '', probleme: attrFindings },
+        figNameToId, idMaps.chNameToId, effectiveProvider, log, { requireQuoteEvidence: false });
     }
 
     pt.mark('Block 2 (Zeitstrahl+Kontinuität)');
 
+    // ── Coverage-Self-Audit (F2, non-critical, nur Claude): Extraktions-Recall messbar machen ──
+    let coverage = null;
+    if (effectiveProvider === 'claude') {
+      coverage = await runNonCritical('Coverage-Self-Audit',
+        () => runCoverageAudit(ctx, figuren.map(f => f.name), orteKompakt.map(o => o.name)), log);
+      if (coverage && coverage.score != null) {
+        const minScore = Number(appSettings.get('ai.komplett.coverage_min_score')) || 0.8;
+        if (coverage.score < minScore) warnings.push({ key: 'job.warn.coverageLow', params: { score: coverage.score } });
+      }
+      pt.mark('Coverage-Audit');
+    }
+
     deleteCheckpoint('komplett-analyse', bookIdInt, email);
+    // F5: Konsolidierungs-Checkpoint schreiben — ein unveränderter Folgelauf überspringt P2–P8.
+    // Byte-identische Extraktion → identische Sig → HIT; jede Änderung verschiebt die Sig.
+    saveCheckpoint(CONSOLIDATION_CP_TYPE, bookIdInt, email, {
+      sig: consolidationSig,
+      figCount: figuren.length, orteCount: orte.length,
+      songsCount: songs.length, szenenCount: szenenResult.szenenCount,
+    });
     log.info(`Phasen-Timing: ${pt.summary()}`);
     completeJob(jobId, {
       figCount:    figuren.length,
@@ -328,8 +449,9 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       songsCount:  songs.length,
       szenenCount: szenenResult.szenenCount,
       warnings,
+      ...(coverage ? { coverage } : {}),
       tokensIn: tok.in, tokensOut: tok.out,
-    }, tps(tok), `fig=${figuren.length} orte=${orte.length} songs=${songs.length} szenen=${szenenResult.szenenCount}${warnings.length ? ` warn=${warnings.length}` : ''}`);
+    }, tps(tok), `fig=${figuren.length} orte=${orte.length} songs=${songs.length} szenen=${szenenResult.szenenCount}${coverage?.score != null ? ` cov=${coverage.score}` : ''}${warnings.length ? ` warn=${warnings.length}` : ''}`);
   } catch (e) {
     if (e.name !== 'AbortError') {
       const cause = e.cause?.message || e.cause?.code || '';

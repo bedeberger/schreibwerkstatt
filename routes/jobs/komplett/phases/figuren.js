@@ -6,7 +6,7 @@ const { i18nError, updateJob } = require('../../shared');
 const { buildFigNameLookup } = require('../utils');
 const {
   preMergeChapterFiguren, applySozialschichtModeVote, mergeDuplicateFiguren,
-  validateBeziehungenDescriptions, backfillFiguren, ensureUniqueFigIds,
+  validateBeziehungenDescriptions, backfillFiguren, ensureUniqueFigIds, applyAliasClusters,
 } = require('../figuren-merge');
 const { komplettMaxTokens } = require('./tokens');
 
@@ -20,6 +20,9 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
 
   const isSinglePass = chapterFiguren.length === 1 && chapterFiguren[0].kapitel === 'Gesamtbuch';
   let figuren;
+  // Alias-Cluster (F3, nur Multi-Pass): alias→kanonisch-Map hält Szenen/Events, die einen
+  // Alias-Namen tragen, im Remap auflösbar. null = kein Aliasing gelaufen.
+  let aliasMap = null;
 
   if (isSinglePass) {
     updateJob(jobId, { progress: 30, statusText: 'job.phase.consolidatingFiguren' });
@@ -33,6 +36,35 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
     // Spart Eingabetokens und verhindert, dass Phase 2 aus Bequemlichkeit doppelte Figuren durchlässt.
     const { chapterFiguren: preMerged, dupesRemoved } = preMergeChapterFiguren(chapterFiguren);
     if (dupesRemoved > 0) log.info(`Rollierender Pre-Merge – ${dupesRemoved} Figuren-Duplikate regelbasiert zusammengeführt.`);
+
+    // ── Alias-Cluster (F3, nur Claude): Namensvarianten derselben Figur (Epitheta/Spitznamen/
+    // Umbenennungen) VOR der Konsolidierung auf einen kanonischen Namen vereinheitlichen, damit
+    // die Konsolidierung sie zusammenführt statt als Dubletten zu behalten. Smart-Tier (das
+    // job-weite Komplett-Modell, kein extractModel-Override). Non-critical: bei Fehler bleibt
+    // die Konsolidierung wie bisher. Nur sinnvoll ab genügend Kandidaten. */
+    if (effectiveProvider === 'claude') {
+      const candidates = preMerged.flatMap(cf => (cf.figuren || []).map(f => ({
+        name: f.name,
+        beschreibung: (f.beschreibung || '').slice(0, 160),
+        kapitel: cf.kapitel,
+      }))).filter(c => c.name);
+      if (candidates.length >= 3) {
+        try {
+          updateJob(jobId, { statusText: 'job.phase.aliasCluster' });
+          const aliasRes = await call(jobId, tok,
+            prompts.buildAliasClusterPrompt(bookName, candidates),
+            sys.SYSTEM_FIGUREN_BLOCKS, 30, 30, komplettMaxTokens(effectiveProvider), 0.2, null, prompts.SCHEMA_FIGUREN_ALIAS_CLUSTER,
+          );
+          const { renamed, aliasMap: am } = applyAliasClusters(preMerged, aliasRes?.cluster || [], log);
+          if (renamed > 0) aliasMap = am;
+        } catch (e) {
+          if (e.name === 'AbortError') throw e;
+          log.warn(`Alias-Cluster übersprungen (${e.message}) – Konsolidierung unverändert.`);
+          ctx.warnings?.push({ key: 'job.warn.aliasClusterDegraded' });
+        }
+      }
+    }
+
     const figProgressEnd = effectiveProvider === 'claude' ? 40 : 43;
     let figResult;
     try {
@@ -140,7 +172,7 @@ async function runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen)
   }
 
   const figurenKompakt = figuren.map(f => ({ id: f.id, name: f.name, typ: f.typ || 'andere' }));
-  const { figNameToId, figNameToIdLower } = buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapterSzenen, log, jobId);
+  const { figNameToId, figNameToIdLower } = buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapterSzenen, log, jobId, aliasMap);
 
   return { figuren, figNameToId, figNameToIdLower, figurenKompakt, idRemap, isSinglePass };
 }

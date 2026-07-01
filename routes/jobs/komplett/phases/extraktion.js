@@ -33,7 +33,7 @@ async function runCompletenessGap(ctx, {
   // via displayOf in die Prompt-Liste fliesst (beide werden mit _normalizeName normalisiert).
   keyOf = (it) => it.name, isValid = (it) => it && it.name, displayOf = (it) => it.name,
 }) {
-  const { call, jobId, tok, log } = ctx;
+  const { call, jobId, tok, log, extractModel } = ctx;
   const seen = new Set((knownNames || []).map(n => _normalizeName(n)).filter(Boolean));
   const display = (knownNames || []).filter(Boolean);
   const fresh = [];
@@ -42,7 +42,7 @@ async function runCompletenessGap(ctx, {
     let res;
     try {
       res = await retryOnTransientAi(() => call(jobId, tok,
-        buildPrompt(display), systemBlocks, null, null, claudeExtractCap, 0.2, null, schema,
+        buildPrompt(display), systemBlocks, null, null, claudeExtractCap, 0.2, null, schema, extractModel,
       ), { log, label: `${label} (Gap ${round}/${maxPasses})` });
     } catch (e) {
       if (e.name === 'AbortError') throw e;
@@ -171,7 +171,7 @@ async function runSinglePassCompletenessGaps(ctx, { bookSystemBlock, claudeExtra
  * Caller bildet daraus partialFailure (Cache-/Checkpoint-Skip-Gate).
  */
 async function extractSinglePassClaude(ctx, { claudeExtractCap }) {
-  const { jobId, bookName, call, tok, log, prompts, sys, pageContents, fullBookText } = ctx;
+  const { jobId, bookName, call, tok, log, prompts, sys, pageContents, fullBookText, extractModel } = ctx;
   const failed = { relations: false, fakten: false, events: false };
 
   // Fakten als eigener Call (C): volle Modell-Aufmerksamkeit auf dichte Faktenerfassung
@@ -181,17 +181,17 @@ async function extractSinglePassClaude(ctx, { claudeExtractCap }) {
     () => retryOnTransientAi(() => call(jobId, tok,
       prompts.buildExtraktionFigurenStammPrompt('Gesamtbuch', bookName, pageContents.length, null),
       [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FIGUREN_STAMM_BLOCKS, '1h')],
-      12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM,
+      12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_FIGUREN_STAMM, extractModel,
     ), { log, label: 'Single-Pass Figuren-Stamm (A1)' }),
     () => retryOnTransientAi(() => call(jobId, tok,
       prompts.buildExtraktionOrtePassPrompt('Gesamtbuch', bookName, pageContents.length, null),
       [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_ORTE_PASS_BLOCKS, '1h')],
-      12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS,
+      12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_ORTE_PASS, extractModel,
     ), { log, label: 'Single-Pass Orte/Szenen (B)' }),
     () => retryOnTransientAi(() => call(jobId, tok,
       prompts.buildExtraktionFaktenPassPrompt('Gesamtbuch', bookName, pageContents.length, null),
       [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_FAKTEN_PASS_BLOCKS, '1h')],
-      12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_FAKTEN_PASS,
+      12, 20, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_FAKTEN_PASS, extractModel,
     ), { log, label: 'Single-Pass Fakten (C)' }),
   // warmup: A1 seriell zuerst → schreibt den 1h-bookSystemBlock-Cache; B/C (und das
   // nachgelagerte A2/P8) lesen ihn statt ihn teuer neu zu erstellen (~1× cache_creation gespart).
@@ -254,7 +254,7 @@ async function extractSinglePassClaude(ctx, { claudeExtractCap }) {
       runEvents ? () => retryOnTransientAi(() => call(jobId, tok,
         prompts.buildExtraktionEventsPassPrompt(bookName, stammFiguren, null),
         [bookSystemBlock, ...toSystemBlocks(sys.SYSTEM_KOMPLETT_EVENTS_PASS_BLOCKS, '1h')],
-        null, null, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_EVENTS,
+        null, null, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_EVENTS, extractModel,
       ), { log, label: 'Single-Pass Lebensereignisse (E)' }) : () => null,
       runRelations ? () => retryOnTransientAi(() => call(jobId, tok,
         prompts.buildFigurenBeziehungenExtraktionPrompt(bookName, stammFiguren, null),
@@ -364,6 +364,96 @@ async function extractSinglePass(ctx, { claudeExtractCap, callExtract }) {
     saveChapterExtractCache(bookIdInt, email, '__singlepass__', bookPagesSig, chapters, effectiveProvider);
   }
   return { chapters, partialFailure };
+}
+
+/**
+ * Multi-Pass Completeness-/Gap-Pass (nur Claude, grosse Bücher). Anders als der Single-Pass
+ * bekommt hier jeder Chunk EINEN Basis-Extraktions-Durchlauf → der Long-Tail (Nebenfiguren,
+ * einmal erwähnte Schauplätze/Fakten/Szenen) fällt pro Chunk systematisch durch. Dieser Pass
+ * prompt't pro Chunk erneut (kombiniertes Gap-Schema), gesät mit dem GLOBAL bereits gefundenen
+ * Katalog aller Chunks (Cross-Chunk-Dedup) → nur der genuine Long-Tail wird nachgezogen.
+ * Loop-until-dry pro Chunk bis completenessPasses. Rein ADDITIV (mutiert `chapters` in place,
+ * hängt fresh items an den jeweiligen Chunk-Eintrag). Eigener `:gap`-Cache pro Chunk → die
+ * Basis-Chunk-Caches bleiben gültig. Läuft auf dem Extraktions-Tier (extractModel). NON-FATAL.
+ */
+async function runMultiPassCompletenessGaps(ctx, { chunkTexts, chapters, concurrency }) {
+  const { jobId, bookIdInt, email, bookName, call, tok, log, effectiveProvider, prompts, sys, extractModel } = ctx;
+  const completenessPasses = ctx.completenessPasses || 0;
+  if (effectiveProvider !== 'claude' || completenessPasses <= 0 || !chunkTexts.length) return;
+
+  const claudeExtractCap = getContextConfigFor(effectiveProvider).maxTokensOut;
+  const faktKey = (f) => `${f.subjekt || ''}: ${f.fakt || ''}`;
+  const szeneKey = (s) => `${s.titel || ''} (${s.kapitel || ''})`;
+  const STREAMS = [
+    { name: 'figuren', arr: chapters.chapterFiguren, field: 'figuren', keyOf: (f) => f.name,   isValid: (f) => f && f.name },
+    { name: 'orte',    arr: chapters.chapterOrte,    field: 'orte',    keyOf: (o) => o.name,   isValid: (o) => o && o.name },
+    { name: 'fakten',  arr: chapters.chapterFakten,  field: 'fakten',  keyOf: faktKey,          isValid: (f) => f && f.fakt },
+    { name: 'szenen',  arr: chapters.chapterSzenen,  field: 'szenen',  keyOf: szeneKey,         isValid: (s) => s && s.titel },
+  ];
+  // Global-Known (über alle Chunks) als Anzeige-Liste + Normalisierungs-Set pro Strom.
+  const knownSet = {}, knownDisp = {};
+  for (const s of STREAMS) {
+    knownSet[s.name] = new Set();
+    knownDisp[s.name] = [];
+    for (const c of (s.arr || [])) for (const it of (c[s.field] || [])) {
+      const k = _normalizeName(s.keyOf(it));
+      if (!k || knownSet[s.name].has(k)) continue;
+      knownSet[s.name].add(k); knownDisp[s.name].push(s.keyOf(it));
+    }
+  }
+
+  updateJob(jobId, { statusText: 'job.phase.completenessChunks', statusParams: { n: chunkTexts.length } });
+  const perChunk = await settledAll(chunkTexts.map(({ chunk, key, pagesSig, chText }, chunkIdx) => async () => {
+    const chunkLabel = `Gap-Chunk ${chunkIdx + 1}/${chunkTexts.length} «${chunk.name}»`;
+    const gapCacheKey = `${key}:gap`;
+    const cached = loadChapterExtractCache(bookIdInt, email, gapCacheKey, pagesSig, effectiveProvider);
+    if (cached) { log.info(`${chunkLabel} – Cache-HIT.`); return cached; }
+
+    // Chunk-lokale Akkumulatoren, gesät mit dem globalen Known-Katalog.
+    const seen = {}, disp = {}, fresh = {};
+    for (const s of STREAMS) { seen[s.name] = new Set(knownSet[s.name]); disp[s.name] = knownDisp[s.name].slice(); fresh[s.name] = []; }
+    for (let round = 1; round <= completenessPasses; round++) {
+      let res;
+      try {
+        res = await retryOnTransientAi(() => call(jobId, tok,
+          prompts.buildChunkGapPrompt(chunk.name, bookName, chunk.pages.length, chText, {
+            figuren: disp.figuren, orte: disp.orte, fakten: disp.fakten, szenen: disp.szenen,
+          }),
+          sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS, null, null, claudeExtractCap, 0.2, null, prompts.SCHEMA_KOMPLETT_EXTRAKTION, extractModel,
+        ), { log, label: `${chunkLabel} (Gap ${round}/${completenessPasses})` });
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        log.warn(`${chunkLabel} Gap-Pass ${round} fehlgeschlagen (${e.message}) – übersprungen.`);
+        break;
+      }
+      let anyNew = 0;
+      for (const s of STREAMS) {
+        for (const it of (res?.[s.field] || [])) {
+          if (!s.isValid(it)) continue;
+          const k = _normalizeName(s.keyOf(it));
+          if (!k || seen[s.name].has(k)) continue;
+          seen[s.name].add(k); disp[s.name].push(s.keyOf(it)); fresh[s.name].push(it); anyNew++;
+        }
+      }
+      log.info(`${chunkLabel} Gap ${round}: +${anyNew} neu.`);
+      if (anyNew === 0) break; // loop-until-dry
+    }
+    saveChapterExtractCache(bookIdInt, email, gapCacheKey, pagesSig, fresh, effectiveProvider);
+    return fresh;
+  }), (chunkTexts.length > concurrency ? { concurrency } : {}));
+
+  // Additiv in die per-Chunk-Kapiteleinträge mergen (extractField hält Index-Alignment zu chunkTexts).
+  const totals = { figuren: 0, orte: 0, fakten: 0, szenen: 0 };
+  for (let i = 0; i < perChunk.length; i++) {
+    if (perChunk[i].status !== 'fulfilled' || !perChunk[i].value) continue;
+    const f = perChunk[i].value;
+    for (const s of STREAMS) {
+      const items = f[s.name];
+      if (items?.length && s.arr[i]) { s.arr[i][s.field].push(...items); totals[s.name] += items.length; }
+    }
+  }
+  if (totals.figuren || totals.orte || totals.fakten || totals.szenen)
+    log.info(`Multi-Pass Completeness: +${totals.figuren} Figuren, +${totals.orte} Orte, +${totals.fakten} Fakten, +${totals.szenen} Szenen.`);
 }
 
 /**
@@ -535,6 +625,11 @@ async function extractMultiPass(ctx, { chunks, chunkOrder, claudeExtractCap, cal
       throw i18nError('job.error.phase1Incomplete', { count: failedChunks.length, details });
     }
   }
+
+  // Completeness-/Gap-Pass (nur Claude): pro Chunk den Long-Tail nachziehen, den der
+  // eine Basis-Durchlauf ausgelassen hat. Additiv, non-fatal, eigener :gap-Cache.
+  await runMultiPassCompletenessGaps(ctx, { chunkTexts, chapters, concurrency: claudeConcurrency });
+
   return { chapters, partialFailure };
 }
 
@@ -566,7 +661,7 @@ function writePhase1Checkpoint(ctx, chapters, partialFailure) {
  */
 async function runPhase1(ctx) {
   const { jobId, call, tok, log, effectiveProvider, singlePassLimit, perChunkLimit: ctxPerChunkLimit,
-    prompts, groups, groupOrder, totalChars } = ctx;
+    prompts, groups, groupOrder, totalChars, extractModel } = ctx;
 
   // Claude packt alles in einen Chunk (singlePassLimit als obere Schranke), lokale
   // Provider chunken nach `ai.<provider>.context_window` (siehe ctx.perChunkLimit aus chunkLimitsFor).
@@ -584,7 +679,7 @@ async function runPhase1(ctx) {
   // darum die Claude-Extraktions-Calls direkt grosszügig aufs Provider-Ceiling deckeln.
   const claudeExtractCap = getContextConfigFor(effectiveProvider).maxTokensOut;
   const callExtract = (label, prompt, system, fromPct, toPct, expectedChars, schema) =>
-    retryOnTransientAi(() => call(jobId, tok, prompt, system, fromPct, toPct, expectedChars, 0.2, komplettMaxTokens(effectiveProvider), schema),
+    retryOnTransientAi(() => call(jobId, tok, prompt, system, fromPct, toPct, expectedChars, 0.2, komplettMaxTokens(effectiveProvider), schema, extractModel),
       { log, label });
 
   log.info(`Phase 1 – ${totalChars} Zeichen, ${effectiveProvider} → ${totalChars <= singlePassLimit ? 'Single-Pass' : `Multi-Pass (${groupOrder.length} Kapitel → ${chunkOrder.length} Chunks)`}`);

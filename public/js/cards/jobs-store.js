@@ -44,6 +44,7 @@ export function registerJobsStore() {
     alleAktualisierenTps: null,
     alleAktualisierenPassMode: null,
     alleAktualisierenWarnings: [],
+    alleAktualisierenCoverage: null,
     jobToast: null,
     _jobToastTimer: null,
     _toastedJobIds: new Set(),

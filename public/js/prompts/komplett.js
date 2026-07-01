@@ -15,6 +15,7 @@ export {
   buildKapiteluebergreifendeBeziehungenPrompt,
   buildFigurenBeziehungenExtraktionPrompt,
   buildSoziogrammConsolidationPrompt,
+  buildAliasClusterPrompt,
 } from './komplett/figuren.js';
 
 export {
@@ -34,6 +35,8 @@ export {
   buildOrteGapPrompt,
   buildFaktenGapPrompt,
   buildSzenenGapPrompt,
+  buildChunkGapPrompt,
+  buildCoverageAuditPrompt,
 } from './komplett/extraktion.js';
 
 export {
@@ -47,6 +50,7 @@ export {
   buildKontinuitaetCheckPrompt,
   buildKontinuitaetVerifyPrompt,
   buildKontinuitaetSinglePassPrompt,
+  buildAttributeContradictionJudgePrompt,
 } from './komplett/kontinuitaet.js';
 
 export {
@@ -66,4 +70,7 @@ export {
   SCHEMA_KONTINUITAET_FAKTEN,
   SCHEMA_KONTINUITAET_PROBLEME,
   SCHEMA_KONTINUITAET_VERIFY,
+  SCHEMA_COVERAGE_AUDIT,
+  SCHEMA_FIGUREN_ALIAS_CLUSTER,
+  SCHEMA_ATTR_CONTRADICTION,
 } from './komplett/schemas.js';

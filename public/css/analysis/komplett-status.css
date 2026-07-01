@@ -112,6 +112,23 @@
   margin-top: var(--space-2xs);
 }
 
+/* Coverage-Self-Audit (F2): Recall-Score der Stichprobe. Grün = ok, gedämpft warnfarbig bei niedrigem Score. */
+.komplett-coverage {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--font-size-mini);
+  color: var(--color-ok-text);
+  margin-top: var(--space-2xs);
+}
+.komplett-coverage .icon {
+  width: 0.9em;
+  height: 0.9em;
+}
+.komplett-coverage--low {
+  color: var(--color-warn-text);
+}
+
 /* Aktionen am Panel-Fuss (z.B. Delta-Cache leeren) — bewusst de-prominent,
    nur über das ⋯-Menü erreichbar statt als nackter Header-Button. */
 .komplett-status-actions {
