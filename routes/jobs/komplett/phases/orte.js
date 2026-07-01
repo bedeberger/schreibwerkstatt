@@ -3,7 +3,7 @@
 // Prelim-figurenKompakt + paralleler Orte-Call (Multi-Pass).
 const { saveOrteToDb, saveSongsToDb } = require('../../../../db/schema');
 const { updateJob } = require('../../shared');
-const { _remapFigRefs } = require('../utils');
+const { _remapFigRefs, _remapFigNames } = require('../utils');
 const { komplettMaxTokens } = require('./tokens');
 
 /** Regelbasierter Orte-Merge als Fallback, wenn die KI-Konsolidierung scheitert (z.B.
@@ -38,18 +38,17 @@ function buildFallbackOrte(chapterOrte, validFigIds, idRemap) {
 
 /** Regelbasierter Songs-Merge als Fallback, wenn die KI-Konsolidierung scheitert (analog
  *  buildFallbackOrte). Flattet chapterSongs über alle Kapitel, dedupliziert nach Titel+Interpret
- *  (case-insensitive, erstes Vorkommen gewinnt, figuren-Refs vereinigt), biegt figuren-IDs gegen
- *  idRemap um und vergibt song_uid kollisionsfrei sequenziell neu (UNIQUE(book_id, song_uid, user_email)). */
-function buildFallbackSongs(chapterSongs, validFigIds, idRemap) {
+ *  (case-insensitive, erstes Vorkommen gewinnt, figuren-Refs vereinigt), löst figuren_namen gegen
+ *  die kanonische Figurenliste zu fig_ids auf und vergibt song_uid kollisionsfrei sequenziell neu
+ *  (UNIQUE(book_id, song_uid, user_email)). */
+function buildFallbackSongs(chapterSongs, figNameToId, figNameToIdLower) {
   const byKey = new Map();
   for (const ch of (chapterSongs || [])) {
     for (const s of (ch.songs || [])) {
       const titel = (s.titel || s.title || '').trim();
       const key = (titel + '|' + (s.interpret || '').trim()).toLowerCase();
       if (!titel) continue;
-      const figIds = (s.figuren || [])
-        .map(fid => idRemap?.[fid] || fid)
-        .filter(fid => validFigIds.has(fid));
+      const figIds = _remapFigNames(s.figuren_namen, figNameToId, figNameToIdLower);
       if (!byKey.has(key)) {
         byKey.set(key, { ...s, figuren: [...new Set(figIds)] });
       } else {
@@ -153,9 +152,8 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
 /** Phase 3 Songs: Musikbibliothek konsolidieren analog zu Orten.
  *  Single-Pass: Songs aus Pass B übernehmen (figuren-Refs gegen idRemap+validFigIds filtern).
  *  Multi-Pass: KI-Call konsolidiert dedupliziert (Titel+Interpret) über alle Kapitel. */
-async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, idRemap) {
+async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, figNameToId, figNameToIdLower) {
   const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps, effectiveProvider } = ctx;
-  const validFigIds = new Set(figurenKompakt.map(f => f.id));
 
   let songs;
   if (isSinglePass) {
@@ -166,7 +164,7 @@ async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, i
       // song_uid run-intern IMMER neu vergeben (analog Orte, Rang 15) — kollisionsfrei
       // gegen UNIQUE(book_id, song_uid, user_email) in saveSongsToDb.
       id: 'song_' + (i + 1),
-      figuren: _remapFigRefs(s.figuren, idRemap, validFigIds),
+      figuren: _remapFigNames(s.figuren_namen, figNameToId, figNameToIdLower),
     }));
     log.info(`Phase 3 Songs übersprungen (Single-Pass, ${songs.length} Songs aus P1 übernommen).`);
   } else {
@@ -196,14 +194,14 @@ async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, i
         songs = songsResultRaw.songs.map((s, i) => ({
           ...s,
           id: s.id || ('song_' + (i + 1)),
-          figuren: _remapFigRefs(s.figuren, idRemap, validFigIds),
+          figuren: _remapFigNames(s.figuren_namen, figNameToId, figNameToIdLower),
         }));
       } else {
         if (songsResultRaw !== null) {
           log.warn('Songs-Konsolidierung lieferte kein songs-Array – Fallback auf kapitel-extrahierte Songs.');
           ctx.warnings?.push({ key: 'job.warn.songsKonsolidierungDegraded' });
         }
-        songs = buildFallbackSongs(chapterSongs, validFigIds, idRemap);
+        songs = buildFallbackSongs(chapterSongs, figNameToId, figNameToIdLower);
       }
       updateJob(jobId, { progress: 56 });
     }

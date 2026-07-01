@@ -59,7 +59,8 @@ test('SCHEMA_SONGS_KONSOL hat erwartete Felder', async () => {
   assert.ok(s.properties.songs.items.properties.interpret);
   assert.ok(s.properties.songs.items.properties.genre);
   assert.ok(s.properties.songs.items.properties.kontext_typ);
-  assert.ok(s.properties.songs.items.properties.figuren);
+  assert.ok(s.properties.songs.items.properties.figuren_namen,
+    'Songs referenzieren Figuren über figuren_namen (Klarnamen), nicht fig_id');
 });
 
 test('buildSongsConsolidationPrompt: Inputs werden eingebettet', async () => {
@@ -70,7 +71,7 @@ test('buildSongsConsolidationPrompt: Inputs werden eingebettet', async () => {
       songs: [
         { titel: 'Heroes', interpret: 'Bowie', genre: 'Rock',
           kontext_typ: 'hört', beschreibung: 'Im Auto', stimmung: 'melancholisch',
-          figuren: ['fig_1'], kapitel: [{ name: 'Kapitel 1', haeufigkeit: 2 }] },
+          figuren_namen: ['Anna'], kapitel: [{ name: 'Kapitel 1', haeufigkeit: 2 }] },
       ],
     },
   ];
@@ -81,7 +82,9 @@ test('buildSongsConsolidationPrompt: Inputs werden eingebettet', async () => {
   assert.match(prompt, /Heroes/);
   assert.match(prompt, /Bowie/);
   assert.match(prompt, /Kapitel 1/);
-  assert.match(prompt, /fig_1: Anna/);
+  // Figuren-Referenz per Klarname (nicht fig_id): Input-Zeile + Hinweisliste kanonischer Namen.
+  assert.match(prompt, /Figuren: Anna/);
+  assert.match(prompt, /verwende in «figuren_namen» exakt diese Schreibweise/);
   assert.match(prompt, /"songs":/, 'SONGS_SCHEMA im Prompt eingebettet');
 });
 

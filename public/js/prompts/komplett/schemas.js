@@ -85,7 +85,7 @@ const _songSchema = _obj({
   stimmung: _str,
   erste_erwaehnung: _str,
   kapitel: { type: 'array', items: _obj({ name: _str, haeufigkeit: _num }) },
-  figuren: { type: 'array', items: _str },
+  figuren_namen: { type: 'array', items: _str },
 });
 
 const _faktSchema = _obj({ kategorie: _str, subjekt: _str, fakt: _str, seite: _str });

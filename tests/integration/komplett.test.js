@@ -940,7 +940,7 @@ test('Komplettanalyse Phase 3 Songs-Konsolidierung trunkiert → Job ok, Fallbac
     return {
       figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
       orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', beschreibung: 'x', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] }],
-      songs: (perChapterSongs[num] || []).map(s => ({ ...s, interpret: 'X', beschreibung: 'b', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] })),
+      songs: (perChapterSongs[num] || []).map(s => ({ ...s, interpret: 'X', beschreibung: 'b', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: [] })),
       fakten: [], szenen: [], assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
     };
   });
@@ -966,6 +966,52 @@ test('Komplettanalyse Phase 3 Songs-Konsolidierung trunkiert → Job ok, Fallbac
   ).all(BOOK_ID, 'tester@test.dev');
   assert.deepEqual(songs.map(s => s.titel), ['Lied A', 'Lied B', 'Lied C', 'Lied D', 'Lied E']);
   assert.equal(new Set(songs.map(s => s.song_uid)).size, songs.length, 'song_uids nicht eindeutig');
+});
+
+test('Komplettanalyse Songs: figuren_namen wird gegen kanonische Figur aufgelöst, unbekannter Name verworfen', async () => {
+  const BOOK_ID = 714;
+  seedMultiChapterBook(BOOK_ID, 3);
+
+  ctx.mockAi.on(isP1Extract, ({ prompt }) => {
+    const m = prompt.match(/Kapitel (\d+)/);
+    const chap = m ? m[0] : 'Kapitel';
+    return {
+      figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
+      orte: [],
+      // Song referenziert Figuren über Klarnamen (nicht fig_id). Der Extraktions-Pass
+      // kennt A1s ID-Namespace nicht → Namen sind die einzige robuste Referenz.
+      songs: [{ id: 'song_1', titel: 'Bambule', interpret: 'Absolute Beginner', genre: 'Hip-Hop', kontext_typ: 'hört', beschreibung: 'b', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: ['Anna', 'Unbekannt Xyz'] }],
+      fakten: [], szenen: [], assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
+    };
+  });
+  ctx.mockAi.on(isFigKonsol, figKonsolResponse([
+    { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
+  ]));
+  ctx.mockAi.on(isOrteKonsol, { orte: [] });
+  // Konsolidierung gibt den Song mit Klarnamen zurück (inkl. eines nicht auflösbaren Namens).
+  ctx.mockAi.on(isSongsKonsol, { songs: [{ id: 'song_1', titel: 'Bambule', interpret: 'Absolute Beginner', genre: 'Hip-Hop', kontext_typ: 'hört', beschreibung: 'b', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren_namen: ['anna', 'Unbekannt Xyz'] }] });
+  ctx.mockAi.on(isBeziehung, { beziehungen: [] });
+  ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+
+  // Der Song ist über die song_figures-Bridge mit der KANONISCHEN Figur Anna verknüpft
+  // (Auflösung über den Namen, lowercase-Fallback greift bei 'anna'); der unbekannte
+  // Name 'Unbekannt Xyz' wird verworfen statt als Phantom-Link gespeichert.
+  const linkedFiguren = ctx.dbSchema.db.prepare(`
+    SELECT f.name FROM song_figures sf
+    JOIN songs s ON s.id = sf.song_id
+    JOIN figures f ON f.id = sf.figure_id
+    WHERE s.book_id = ? AND s.user_email = ?
+    ORDER BY f.name
+  `).all(BOOK_ID, 'tester@test.dev');
+  assert.deepEqual(linkedFiguren.map(r => r.name), ['Anna'],
+    `Song sollte genau mit Anna verknüpft sein, got ${JSON.stringify(linkedFiguren)}`);
 });
 
 // Baut N Lebensereignisse für eine Figur (distinct datum+ereignis → N Gruppen in P6).

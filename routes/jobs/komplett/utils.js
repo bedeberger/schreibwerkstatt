@@ -34,6 +34,22 @@ function _remapFigRefs(refs, idRemap, validFigIds) {
     .filter(fid => validFigIds.has(fid));
 }
 
+/** Löst Klarnamen einer Entität (Song) gegen die kanonische Figurenliste zu fig_ids auf –
+ *  identisches Muster wie remapSzenen (exakt, dann lowercase-Fallback). Nicht auflösbare
+ *  Namen werden verworfen. Ergebnis dedupliziert. Songs referenzieren Figuren über Namen
+ *  (nicht fig_id), weil der Song-Extraktions-Pass A1s ID-Namespace nicht teilt. */
+function _remapFigNames(names, figNameToId, figNameToIdLower) {
+  const out = [];
+  const seen = new Set();
+  for (const n of (names || [])) {
+    const name = _refToString(typeof n === 'object' && n ? (n.name ?? n) : n);
+    if (!name) continue;
+    const id = figNameToId?.[name] || figNameToIdLower?.[name.toLowerCase()] || null;
+    if (id && !seen.has(id)) { seen.add(id); out.push(id); }
+  }
+  return out;
+}
+
 /**
  * Baut den System-Block mit dem Buchtext, der über mehrere Claude-Calls gecached wird.
  * Byte-identische Formatierung in Phase 1 Pass A/B und Phase 8 Kontinuität,
@@ -168,7 +184,7 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapter
 }
 
 module.exports = {
-  _refToString, _remapFigRefs, extractField,
+  _refToString, _remapFigRefs, _remapFigNames, extractField,
   buildBookSystemBlockText, buildBookPagesSig, bookSettingsSigPart,
   _stelleQuote,
   makePhaseTimer,

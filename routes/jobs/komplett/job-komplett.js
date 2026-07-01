@@ -203,7 +203,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     pt.mark('P2+P3 Konsolidierung');
 
     // ── Phase 3 Songs: Musikbibliothek konsolidieren ─────────────────────────
-    const { songs } = await runPhase3Songs(ctx, chapterSongs || [], figurenKompakt, isSinglePass, idRemap);
+    const { songs } = await runPhase3Songs(ctx, chapterSongs || [], figurenKompakt, isSinglePass, figNameToId, figNameToIdLower);
 
     // ── Phase 3b: Kapitelübergreifende Beziehungen (non-critical, nur Multi-Pass) ──
     if (chapterFiguren.length > 1 && figuren.length >= 2) {

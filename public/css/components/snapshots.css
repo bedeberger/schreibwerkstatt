@@ -15,6 +15,13 @@
 .snapshots-capture__desc { flex: 2 1 18rem; min-width: 0; }
 .snapshots-capture__btn { white-space: nowrap; }
 
+/* Beim Fokus wickelt der LanguageTool-Dispatcher das Feld in <span class="lt-field-wrap">
+ * (flex:1) — dabei wird der Wrap zum Flex-Child und die feldspezifische flex-basis/
+ * -grow des Inputs greift nicht mehr. Ohne diese Regel spraenge das 2:1-Verhaeltnis
+ * auf 1:1 und die Feldbreiten wackeln beim Fokussieren. Wrap erbt die Feldwerte. */
+.snapshots-capture > .lt-field-wrap:has(> .snapshots-capture__label) { flex: 1 1 12rem; }
+.snapshots-capture > .lt-field-wrap:has(> .snapshots-capture__desc) { flex: 2 1 18rem; }
+
 /* Numerik-Spalten rechtsbuendig — Selektor schlaegt bewusst die linksbuendige
    .entity-grid-table th/td-Default-Regel (hoehere Specificity). */
 .snapshots-table .snapshots-num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -116,6 +123,9 @@
   .snapshots-capture { flex-direction: column; align-items: stretch; }
   .snapshots-capture__label,
   .snapshots-capture__desc { flex-basis: auto; }
+  /* Column-Layout: der Wrap darf keine feste (dann vertikale) flex-basis behalten. */
+  .snapshots-capture > .lt-field-wrap:has(> .snapshots-capture__label),
+  .snapshots-capture > .lt-field-wrap:has(> .snapshots-capture__desc) { flex: 0 0 auto; }
   .snapshots-compare__pickers { flex-direction: column; gap: var(--space-md); }
   .snapshots-summary__chars { margin-inline-start: 0; }
 }

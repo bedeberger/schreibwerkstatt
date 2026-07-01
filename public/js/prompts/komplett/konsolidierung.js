@@ -52,12 +52,12 @@ export function buildSongsConsolidationPrompt(bookName, chapterSongs, figurenKom
     `## Kapitel: ${cs.kapitel}\n` + (cs.songs || []).map(s =>
       `- «${s.titel || ''}»${s.interpret ? ` — ${s.interpret}` : ''} (${s.genre || 'andere'} / ${s.kontext_typ || '?'}): ${s.beschreibung || ''}` +
       (s.stimmung ? ` | Stimmung: ${s.stimmung}` : '') +
-      (s.figuren?.length ? ` | Figuren: ${s.figuren.join(', ')}` : '') +
+      (s.figuren_namen?.length ? ` | Figuren: ${s.figuren_namen.join(', ')}` : '') +
       (s.kapitel?.length ? ` | Kapitel: ` + s.kapitel.map(k => k.name + (k.haeufigkeit > 1 ? ' ×' + k.haeufigkeit : '')).join(', ') : '')
     ).join('\n')
   ).join('\n\n');
   const figurenStr = figurenKompakt && figurenKompakt.length
-    ? '\n\nBekannte Figuren (nur diese IDs in «figuren» verwenden):\n' + figurenKompakt.map(f => `${f.id}: ${f.name}`).join('\n')
+    ? '\n\nBekannte Figuren (verwende in «figuren_namen» exakt diese Schreibweise):\n' + figurenKompakt.map(f => `- ${f.name}`).join('\n')
     : '';
   return `Konsolidiere die folgenden Musik-Analysen aller Kapitel des Buchs «${bookName}» zu einer einheitlichen Gesamtliste. Dedupliziere Songs anhand von Titel+Interpret (gleicher Song = ein Eintrag, Kapitel-Liste mergen), führe Informationen zusammen und vergib stabile IDs (song_1, song_2, …).${figurenStr}
 
