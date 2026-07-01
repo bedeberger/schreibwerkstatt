@@ -197,6 +197,17 @@ export const ttsProofMethods = {
     return String(this.$store.shell.uiLocale || 'de').split('-')[0].trim().toLowerCase() || 'de';
   },
 
+  // Hat die aktuelle Seite vorlesbaren Text? Steuert die Sichtbarkeit des
+  // Vorlese-Docks: `renderedPageHtml` ist auch bei leerem Markup (`<p></p>`,
+  // `<p><br></p>`) truthy — der Dock soll aber nur erscheinen, wenn nach dem
+  // Strippen der Tags echter Text uebrig bleibt. Liest reaktiv aus
+  // `renderedPageHtml` (Alpine trackt den Zugriff im x-show-Aufruf).
+  _ttsHasReadableText() {
+    const html = this.renderedPageHtml;
+    if (!html) return false;
+    return html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').trim().length > 0;
+  },
+
   // Container der Leseansicht (Read-Modus). Bewusst nicht der Edit-Container
   // (`_getEditEl`): TTS liest den gerenderten Seitentext, nicht das
   // contenteditable. `:not(--editing)` grenzt gegen das Edit-Feld ab.

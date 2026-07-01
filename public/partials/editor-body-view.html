@@ -30,7 +30,7 @@
        Nur sichtbar, wenn Admin TTS aktiviert hat ($store.tts.enabled aus
        /config) und die Seite Inhalt hat. -->
   <template x-if="$store.tts.enabled">
-    <div class="tts-dock" x-show="renderedPageHtml" x-cloak>
+    <div class="tts-dock" x-show="renderedPageHtml && _ttsHasReadableText()" x-cloak>
       <!-- Status links: „liest" mit Satz-Fortschritt bzw. „pausiert". -->
       <span class="tts-status" aria-live="polite"
             x-show="$store.tts.playing"
