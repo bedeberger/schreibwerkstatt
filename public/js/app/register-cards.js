@@ -32,6 +32,7 @@ import { registerIdeenCard } from '../cards/ideen-card.js';
 import { registerRechercheCard } from '../cards/recherche-card.js';
 import { registerBookChatCard } from '../cards/book-chat-card.js';
 import { registerKontinuitaetCard } from '../cards/kontinuitaet-card.js';
+import { registerErzaehlprofilCard } from '../cards/erzaehlprofil-card.js';
 import { registerTagebuchRueckblickCard } from '../cards/tagebuch-rueckblick-card.js';
 import { registerBookSettingsCard } from '../cards/book-settings-card.js';
 import { registerUserSettingsCard } from '../cards/user-settings-card.js';
@@ -159,6 +160,7 @@ export function registerAllCards() {
   registerFolderImportCard();
   registerShareLinksCard();
   registerKontinuitaetCard();
+  registerErzaehlprofilCard();
   registerTagebuchRueckblickCard();
   registerEreignisseCard();
   registerOrteCard();

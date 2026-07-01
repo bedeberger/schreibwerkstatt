@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 226, 110 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 227, 112 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -26,6 +26,7 @@ erDiagram
   books ||--o{ zeitstrahl_events     : has
   books ||--o{ continuity_checks     : has
   books ||--o{ continuity_issues     : has
+  books ||--o{ chapter_narrative_profile : has
   books ||--o{ book_reviews          : has
   books ||--o{ chapter_reviews       : has
   books ||--o{ book_stats_history    : has
@@ -721,6 +722,32 @@ erDiagram
     INTEGER chapter_id FK "SET NULL"
     INTEGER sort_order
   }
+  chapter_narrative_profile {
+    INTEGER id                      PK
+    INTEGER book_id                 FK
+    TEXT    user_email
+    INTEGER chapter_id              FK "CASCADE"
+    TEXT    perspektive             "POV-Key (ich/er_sie_personal/...)"
+    TEXT    erzaehlzeit             "Tempus-Key"
+    INTEGER erzaehler_figur_id      FK "SET NULL"
+    TEXT    erzaehler_figur         "Klarname-Fallback wenn keine FK"
+    REAL    pov_konfidenz
+    TEXT    pov_beleg
+    INTEGER pov_abweichung          "weicht von deklarierter Soll-Perspektive ab"
+    INTEGER intensitaet             "Spannungskurve 1-5"
+    TEXT    intensitaet_begruendung
+    TEXT    zusammenfassung
+    INTEGER sort_order
+    TEXT    updated_at
+  }
+  chapter_narrative_themes {
+    INTEGER id         PK
+    INTEGER profile_id FK "CASCADE"
+    TEXT    thema
+    TEXT    typ        "thema|motiv|symbol"
+    TEXT    beleg
+    INTEGER sort_order
+  }
 
   storylines {
     INTEGER id          PK
@@ -846,6 +873,9 @@ erDiagram
   continuity_checks ||--o{ continuity_issues          : has
   continuity_issues ||--o{ continuity_issue_figures   : refs
   continuity_issues ||--o{ continuity_issue_chapters  : refs
+  books                      ||--o{ chapter_narrative_profile : has
+  chapters                   ||--o{ chapter_narrative_profile : profiles
+  chapter_narrative_profile  ||--o{ chapter_narrative_themes  : themes
   zeitstrahl_events ||--o{ zeitstrahl_event_chapters  : refs
   zeitstrahl_events ||--o{ zeitstrahl_event_pages     : refs
   zeitstrahl_events ||--o{ zeitstrahl_event_figures   : refs

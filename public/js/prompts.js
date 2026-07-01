@@ -51,6 +51,9 @@ function _promptsContentHash() {
     komplettNs.SCHEMA_KOMPLETT_EVENTS,
     komplettNs.SCHEMA_BEZIEHUNGEN,
     komplettNs.SCHEMA_FIGUREN_KONSOL, komplettNs.SCHEMA_KONTINUITAET_PROBLEME,
+    // Erzählprofil: über den Konsolidierungs-Checkpoint (F5) effektiv gecacht — Schema-
+    // Änderung muss die Cache-Version bumpen, sonst überspringt ein Folgelauf die Phase.
+    komplettNs.SCHEMA_ERZAEHLPROFIL,
     synonymNs.SCHEMA_SYNONYM,
     tagebuchNs.SCHEMA_RUECKBLICK,
   ]);
@@ -166,6 +169,10 @@ export {
   SCHEMA_ATTR_CONTRADICTION,
   buildCoverageAuditPrompt,
   buildAttributeContradictionJudgePrompt,
+  buildErzaehlprofilSinglePassPrompt,
+  buildErzaehlprofilChapterPrompt,
+  SCHEMA_ERZAEHLPROFIL,
+  SCHEMA_ERZAEHLPROFIL_CHAPTER,
 } from './prompts/komplett.js';
 
 export {

@@ -6,6 +6,7 @@ const {
   getLatestContinuityCheck,
   getContinuityIssueBookId,
   setContinuityIssueResolved,
+  getChapterNarrativeProfile,
   } = require('../../../db/schema');
 const { toIntId } = require('../../../lib/validate');
 const { setContext } = require('../../../lib/log-context');
@@ -75,6 +76,14 @@ komplettRouter.post('/kontinuitaet/issue/:issue_id/resolved', jsonBody, (req, re
   const resolved = !!req.body?.resolved;
   setContinuityIssueResolved(issueId, resolved);
   res.json({ ok: true, resolved });
+});
+
+// Kapitel-Erzählprofil (aus der Komplettanalyse-Phase «Erzählprofil») – viewer+.
+komplettRouter.get('/erzaehlprofil/:book_id', (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  const userEmail = req.session?.user?.email || null;
+  res.json(getChapterNarrativeProfile(bookId, userEmail));
 });
 
 komplettRouter.delete('/chapter-cache/:book_id', (req, res) => {

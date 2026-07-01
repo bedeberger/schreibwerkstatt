@@ -34,6 +34,8 @@ export const FEATURES = [
     aliases: ['errors','heatmap','findings','lektorat','typo','tippfehler'] },
   { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
     aliases: ['continuity','widerspruch','plot-hole','contradiction','consistency'] },
+  { key: 'erzaehlprofil',  kind: 'toggle', group: 'review', labelKey: 'tile.erzaehlprofil',  descKey: 'tile.erzaehlprofil.desc',  flag: 'showErzaehlprofilCard',  toggle: 'toggleErzaehlprofilCard',  requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
+    aliases: ['pov','perspektive','erzählperspektive','erzaehlperspektive','narration','pacing','spannungskurve','themen','motive','narrative','point of view','erzählprofil'] },
   // Tagebuch-Rückblick: nur bei Buchtyp 'tagebuch'. Rückwärtsgewandte KI-Verdichtung.
   { key: 'tagebuchRueckblick', kind: 'toggle', group: 'review', labelKey: 'tile.tagebuchRueckblick', descKey: 'tile.tagebuchRueckblick.desc', flag: 'showTagebuchRueckblickCard', toggle: 'toggleTagebuchRueckblickCard', requiresBook: true, minRole: 'editor', requiresBuchtyp: 'tagebuch',
     aliases: ['rückblick','rueckblick','retrospective','diary','tagebuch','jahresrückblick','monatsrückblick','review'] },
@@ -197,6 +199,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'songs',          flag: 'showSongsCard',          toggle: 'toggleSongsCard',          onReclick: 'refresh', partial: 'songs',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
   { key: 'kontinuitaet',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'kontinuitaet' },
+  { key: 'erzaehlprofil',  flag: 'showErzaehlprofilCard',  toggle: 'toggleErzaehlprofilCard',  onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'erzaehlprofil' },
   { key: 'tagebuchRueckblick', flag: 'showTagebuchRueckblickCard', toggle: 'toggleTagebuchRueckblickCard', onReclick: 'refresh', requiresBook: true, requiresBuchtyp: 'tagebuch', partial: 'tagebuch-rueckblick' },
   { key: 'bookSettings',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   onReclick: 'close', partial: 'book-settings' },
   { key: 'userSettings',   flag: 'showUserSettingsCard',   toggle: 'toggleUserSettingsCard',   onReclick: 'close', partial: 'user-settings' },

@@ -41,6 +41,8 @@ P5  Szenen + Assignments remappen (Klarnamen → IDs), Szenen/Events speichern
 P6  Zeitstrahl konsolidieren        ┐ Claude: P6 (silent) ∥ P8 (ownt Progress 82..97)
 P8  Kontinuitätsprüfung             ┘ lokal: sequentiell (Mutex)
    ↓
+Erzählprofil  POV/Erzählzeit + Pacing-Intensität + Themen/Motive pro Kapitel (non-critical, 98..99)
+   ↓
 Checkpoint löschen → completeJob({ figCount, orteCount, songsCount, szenenCount, warnings, … })
 ```
 
@@ -89,6 +91,18 @@ Aus den gespeicherten `figure_events` gruppiert (Datum + Ereignis-Text), struktu
 - **P8 ist die letzte, read-only Phase:** ein Fehler hier verwirft den bereits gespeicherten Katalog **nicht** — Kontinuität wird übersprungen, `job.warn.continuityFailed` gesammelt, Job bleibt `done`.
 - **Attribut-Widerspruchs-Detektor (F4, `ai.komplett.attribute_check` Default true, nur Claude, non-critical):** der fakten-basierte Multi-Pass-Check sieht Fakten nur pro Kapitel → Cross-Chapter-Widersprüche (Kapitel 2 vs. 40) fallen durch. `buildAttributeContradictions` ([job-shared.js](../routes/jobs/komplett/job-shared.js)) baut aus **bereits persistierten** per-Kapitel-Daten deterministisch Kandidatenpaare: (A) singuläre Lebensereignisse (geburt/tod/hochzeit) einer Figur mit ≥2 sicheren Jahren, (B) Welt-Fakten mit gleichem `subjekt` und divergentem `fakt` in verschiedenen Kapiteln (Cap `_ATTR_CANDIDATE_CAP=15`, Datums-Konflikte priorisiert). `runAttributeContradictionCheck` lässt nur diese Kandidaten vom Modell (Smart-Tier, `buildAttributeContradictionJudgePrompt`/`SCHEMA_ATTR_CONTRADICTION`) beurteilen; bestätigte werden **nach** der Verify-Stufe in `kontResult.probleme` eingemischt und mitgespeichert (`stelle_a`/`stelle_b` bewusst OHNE «»-Zitate → von `requireQuoteEvidence` unberührt). **Ergänzt** P8, ersetzt nichts; bei P8-Ausfall werden die Befunde eigenständig persistiert. Fehler → `job.warn.attributeCheckFailed`. **Grenze:** per-Kapitel-physische Attribute (Augenfarbe etc.) sind nicht per Kapitel gespeichert → der Detektor arbeitet auf `figure_events`/`world_facts`.
 
+### Zeitlücken (Feature der Kontinuitätsprüfung)
+
+Zusätzlich zu `zeitlinie` (widersprüchliche Zeitangaben) und `anachronismus` meldet die Kontinuitätsprüfung **unmarkierte Zeitsprünge** als `typ: 'zeitluecke'`: erhebliche Sprünge der Erzählzeit zwischen aufeinanderfolgenden Kapiteln/Szenen, die der Text weder durch Überleitung noch Zeitangabe kenntlich macht (Orientierungsverlust). Rein prompt-seitig (`_ZEITLUECKE_RULE` in [kontinuitaet.js](../public/js/prompts/komplett/kontinuitaet.js), an Single- **und** Multi-Pass-Check angehängt, ohne Zeitlinie-Gating — relative Sprünge zählen auch ohne Kalender). Bewusst signalisierte Ellipsen sind kein Befund; Schwere meist niedrig/mittel. Keine DB-/Schema-Änderung (`continuity_issues.typ` ist Freitext); Frontend-Label via `kontinuitaet.typ.*`.
+
+## Phase Erzählprofil (POV · Pacing · Themen)
+
+Read-only Endphase nach P8 (`runErzaehlprofil`, [phases/erzaehlprofil.js](../routes/jobs/komplett/phases/erzaehlprofil.js), non-critical, alle Provider). Erzeugt pro Kapitel ein Erzählprofil: erkannte **Erzählperspektive**/**-zeit** (Enum-Keys deckungsgleich mit [narrative-labels.js](../routes/jobs/narrative-labels.js)) + **Erzähler-/Fokusfigur** (Klarname → `figure_id`-Lookup via `figNameToId`, SET-NULL-Fallback als Name), **POV-Konfidenz** + Beleg, **Abweichung** von der in `book_settings` deklarierten Soll-Perspektive (server-berechnet, `gemischt`-tolerant), **Spannungs-Intensität 1–5** (Pacing-Kurve) und dominante **Themen/Motive/Symbole**.
+- **Single-Pass (Claude):** ein Call übers ganze Buch → Array pro Kapitel, gegen denselben 1h-`bookSystemBlock` wie P1/P8 (Cache-Read). **Multi-Pass (lokal/gross):** ein Call pro Kapitel (`concurrency 3` wie Coverage-Audit), Kapitelname im Prompt.
+- Speicherung: `saveChapterNarrativeProfiles` (Full-Replace pro Buch+User) in `chapter_narrative_profile` (+ Themen-Kind `chapter_narrative_themes`, CASCADE). Anzeige: eigene Karte **Erzählprofil** ([erzaehlprofil-card.js](../public/js/cards/erzaehlprofil-card.js), GET `/jobs/erzaehlprofil/:book_id`).
+- **Kein eigener Cache** — läuft nur, wenn der Konsolidierungs-Checkpoint (F5) NICHT griff (unveränderte Bücher überspringen die ganze Phase, das bestehende Profil bleibt). Damit ein Prompt-/Schema-Wechsel die Phase re-triggert, ist `SCHEMA_ERZAEHLPROFIL` in `_promptsContentHash` → bumpt `PROMPTS_VERSION` → `cacheVersion` → Konsolidierungs-Sig.
+- Fehler → `job.warn.narrativeProfileFailed`, Katalog bleibt (wie P8).
+
 ## Coverage-Self-Audit (F2)
 
 Nicht-kritische Diagnose-Phase nach der Konsolidierung (`ai.komplett.coverage_audit_chapters` Default 3, 0 = aus, nur Claude, Extraktions-Tier). `sampleChapters` ([utils.js](../routes/jobs/komplett/utils.js)) wählt N gleichmässig verteilte, nicht-leere Kapitel; pro Sample meldet das Modell (`buildCoverageAuditPrompt`/`SCHEMA_COVERAGE_AUDIT`), wie viele bekannte Figuren/Orte es wiedererkannt hat (`erkannte_*`) und welche NAMENTLICH genannten FEHLEN (`fehlende_*`). `computeCoverageScore` aggregiert zu `score = erkannt/(erkannt+fehlend)` (null bei entitätsloser Stichprobe). Ergebnis unter `job.result.coverage` (Score + `missingFiguren/-Orte` + `sampledChapters`); bei `score < ai.komplett.coverage_min_score` (Default 0.8) zusätzlich `job.warn.coverageLow`. Anzeige im Status-Panel ([komplett-status.html](../public/partials/komplett-status.html), Store-Feld `alleAktualisierenCoverage`). Nicht gecacht.
@@ -106,7 +120,7 @@ Drei unabhängige Mechanismen:
 
 ## Berührte DB-Tabellen
 
-`figures` · `figure_relations` · `figure_scenes` + `scene_figures` + `scene_locations` · `figure_events` · `locations` + `location_chapters` · `songs` · `world_facts` + `world_fact_chapters` · `continuity_issues` + Bridges · `page_figure_mentions` · `chapter_extract_cache` / `book_extract_cache` · `job_checkpoints` · FTS-Index. Schema/FKs: [docs/erd.md](erd.md). Schreibzugriff auf Buchinhalte ausschliesslich über die Content-Store-Facade; Katalog-Tabellen direkt via [db/schema.js](../db/schema.js)/[db/figures.js](../db/figures.js).
+`figures` · `figure_relations` · `figure_scenes` + `scene_figures` + `scene_locations` · `figure_events` · `locations` + `location_chapters` · `songs` · `world_facts` + `world_fact_chapters` · `continuity_issues` + Bridges · `chapter_narrative_profile` + `chapter_narrative_themes` · `page_figure_mentions` · `chapter_extract_cache` / `book_extract_cache` · `job_checkpoints` · FTS-Index. Schema/FKs: [docs/erd.md](erd.md). Schreibzugriff auf Buchinhalte ausschliesslich über die Content-Store-Facade; Katalog-Tabellen direkt via [db/schema.js](../db/schema.js)/[db/figures.js](../db/figures.js).
 
 ## Pflicht-Invarianten
 

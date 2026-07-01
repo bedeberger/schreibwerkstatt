@@ -28,6 +28,9 @@ test.beforeEach(() => {
   // Tests schalten sie gezielt ein.
   require('../../lib/app-settings').set('ai.komplett.coverage_audit_chapters', 0);
   require('../../lib/app-settings').set('ai.komplett.attribute_check', false);
+  // Erzählprofil-Phase defaultmässig AUS (fügt pro Lauf/Kapitel KI-Calls hinzu und würde
+  // die Kernpfad-Call-Counts verfälschen). Der dedizierte Erzählprofil-Test schaltet sie ein.
+  require('../../lib/app-settings').set('ai.komplett.narrative_profile', false);
 });
 
 function seedTinyBook(bookId) {
@@ -190,6 +193,53 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
   const cont = ctx.dbSchema.getLatestContinuityCheck(BOOK_ID, 'tester@test.dev');
   assert.ok(cont);
   assert.equal(cont.summary, 'Stimmig.');
+});
+
+test('Komplettanalyse Single-Pass: Erzählprofil-Phase persistiert POV/Intensität/Themen pro Kapitel', async () => {
+  const BOOK_ID = 51;
+  seedTinyBook(BOOK_ID);
+  require('../../lib/app-settings').set('ai.komplett.narrative_profile', true);
+
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'),
+    figurenStammResponse());
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'),
+    ortePassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'), eventsPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'), kontinuitaetResponse());
+  // Erzählprofil Single-Pass: schemaKeys === ['kapitel'].
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('kapitel'),
+    {
+      kapitel: [{
+        kapitel: 'Kapitel Eins', perspektive: 'ich', erzaehlzeit: 'praeteritum',
+        erzaehler_figur: 'Anna', pov_konfidenz: 0.9, pov_beleg: 'Ich ging in den Wald',
+        intensitaet: 4, intensitaet_begruendung: 'Zuspitzung', zusammenfassung: 'Anna entdeckt etwas.',
+        themen: [{ thema: 'Kälte', typ: 'motiv', beleg: 'Es war kalt' }],
+      }],
+    });
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'));
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+
+  const profile = ctx.dbSchema.getChapterNarrativeProfile(BOOK_ID, 'tester@test.dev');
+  assert.equal(profile.chapters.length, 1, 'ein Kapitel-Profil gespeichert');
+  const ch = profile.chapters[0];
+  assert.equal(ch.perspektive, 'ich');
+  assert.equal(ch.erzaehlzeit, 'praeteritum');
+  assert.equal(ch.intensitaet, 4);
+  assert.equal(ch.chapter_id, 1100, 'Kapitelname → chapter_id aufgelöst');
+  assert.ok(ch.erzaehler_figur_id != null, 'Erzähler «Anna» → figure_id aufgelöst (kein Snapshot)');
+  assert.equal(ch.erzaehler_figur, 'Anna', 'Erzähler-Name via JOIN auf figures');
+  assert.equal(ch.themen.length, 1);
+  assert.equal(ch.themen[0].thema, 'Kälte');
+  assert.equal(ch.themen[0].typ, 'motiv');
 });
 
 test('Komplettanalyse Single-Pass: Completeness-Pass ergänzt übersehene Figuren/Orte additiv', async () => {

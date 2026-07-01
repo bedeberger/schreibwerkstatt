@@ -18,6 +18,7 @@
   .card--kapitel          { --card-accent: var(--card-accent-kapitel); }
   .card--chat             { --card-accent: var(--card-accent-chat); }
   .card--ideen            { --card-accent: var(--card-accent-ideen); }
+  .card--erzaehlprofil    { --card-accent: var(--card-accent-erzaehlprofil); }
   .card--recherche        { --card-accent: var(--card-accent-recherche); }
   .card--finetune         { --card-accent: var(--card-accent-finetune); }
   .card--snapshots        { --card-accent: var(--card-accent-snapshots); }

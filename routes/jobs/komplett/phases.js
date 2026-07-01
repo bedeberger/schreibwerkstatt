@@ -14,9 +14,11 @@ const {
   runPhase3, runPhase3Songs, buildPrelimFigurenKompakt, runPhase3OrteCall,
 } = require('./phases/orte');
 const { runPhase3b, runZeitstrahl } = require('./phases/beziehungen-zeitstrahl');
+const { runErzaehlprofil } = require('./phases/erzaehlprofil');
 
 module.exports = {
   runPhase1, runPhase2, runPhase3, runPhase3Songs,
   buildPrelimFigurenKompakt, runPhase3OrteCall, runPhase3b, runZeitstrahl,
+  runErzaehlprofil,
   komplettMaxTokens,
 };

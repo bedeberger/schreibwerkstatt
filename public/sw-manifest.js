@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "b732ceec8fe7f1df";
+self.__SHELL_BUILD = "01acf909c2bca3a0";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -14,6 +14,7 @@ self.__SHELL_MANIFEST = [
   "/css/admin/logs.css",
   "/css/admin/parse-fails.css",
   "/css/analysis/analysis.css",
+  "/css/analysis/erzaehlprofil.css",
   "/css/analysis/heatmap.css",
   "/css/analysis/kapitel-review.css",
   "/css/analysis/komplett-status.css",
@@ -183,6 +184,7 @@ self.__SHELL_MANIFEST = [
   "/js/book/bookstats.js",
   "/js/book/diary-calendar.js",
   "/js/book/ereignisse.js",
+  "/js/book/erzaehlprofil.js",
   "/js/book/export.js",
   "/js/book/fehler-heatmap.js",
   "/js/book/figuren.js",
@@ -267,6 +269,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/entity-picker.js",
   "/js/cards/epub-export-card.js",
   "/js/cards/ereignisse-card.js",
+  "/js/cards/erzaehlprofil-card.js",
   "/js/cards/export-card-base.js",
   "/js/cards/export-card.js",
   "/js/cards/feature-registry.js",
@@ -416,6 +419,7 @@ self.__SHELL_MANIFEST = [
   "/js/prompts/geocode.js",
   "/js/prompts/import.js",
   "/js/prompts/komplett.js",
+  "/js/prompts/komplett/erzaehlprofil.js",
   "/js/prompts/komplett/extraktion.js",
   "/js/prompts/komplett/figuren.js",
   "/js/prompts/komplett/konsolidierung.js",
@@ -532,6 +536,7 @@ self.__SHELL_MANIFEST = [
   "/partials/editor-toolbar.html",
   "/partials/epub-export.html",
   "/partials/ereignisse.html",
+  "/partials/erzaehlprofil.html",
   "/partials/export.html",
   "/partials/fehler-heatmap.html",
   "/partials/figur-werkstatt.html",

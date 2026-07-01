@@ -82,6 +82,16 @@ const _ANACHRONISMUS_RULE = `
 
 Anachronismus-Prüfung (typ «anachronismus»): Vergleiche die oben unter «Zeitliche Verortung» gelisteten Songs, Technologien und historischen Ereignisse mit ihrer realen Entstehungs- bzw. Veröffentlichungszeit (aus deinem Allgemeinwissen). Maßgeblich ist je Eintrag das markierte «(Szene ~JAHR)» – fehlt es, gilt die Gesamtspanne. Wird etwas erwähnt, das es zu dieser Erzählzeit real noch nicht gab (ein Song nach seinem Erscheinungsjahr, eine Technologie vor ihrer Erfindung, ein Ereignis vor seinem tatsächlichen Datum), ist das ein Anachronismus. Für typ «anachronismus» gilt abweichend: stelle_a = wörtliches Zitat bzw. exakte Bezeichnung der Erwähnung im Buch; stelle_b = die für diesen Eintrag maßgebliche Erzählzeit (das «(Szene ~JAHR)» bzw. die Gesamtspanne) – als Klartext-Jahresangabe OHNE «» (kein Buchzitat nötig). Beschreibung nennt das reale Datum (z.B. «Der Song … erschien erst 1991, die Handlung spielt 1985»). Nur melden, wenn du dir beim realen Datum sicher bist; im Zweifel weglassen.`;
 
+// Zeitlücken-Prüfung (typ «zeitluecke») – IMMER angehängt (anders als Anachronismus, der
+// eine reale Kalender-Chronologie braucht): unmarkierte Zeitsprünge sind auch bei relativer
+// Erzählzeit ein Orientierungsproblem. Bewusst als eigener typ neben «zeitlinie»
+// (= widersprüchliche Zeitangaben): hier geht es NICHT um einen Widerspruch, sondern um
+// eine erzählerische Lücke ohne Signal. Darum trägt er zwei Belegstellen (vor/nach der
+// Lücke) statt zweier sich widersprechender Aussagen.
+const _ZEITLUECKE_RULE = `
+
+Zeitlücken-Prüfung (typ «zeitluecke»): Achte zusätzlich auf unmarkierte, erhebliche Zeitsprünge zwischen aufeinanderfolgenden Kapiteln oder Szenen. Ein Befund liegt vor, wenn zwischen dem Ende einer Passage und dem Beginn der nächsten offensichtlich viel Erzählzeit vergeht (Wochen, Monate, Jahre), der Text den Sprung aber weder durch eine Überleitung noch durch eine Zeitangabe kenntlich macht, sodass der Leser die zeitliche Orientierung verliert. stelle_a = wörtliches Zitat der letzten Zeit-/Handlungsverankerung VOR der Lücke; stelle_b = wörtliches Zitat der ersten Verankerung DANACH. beschreibung nennt die ungefähr übersprungene Spanne und dass kein Übergang markiert ist; empfehlung schlägt eine Überleitung oder Zeitmarkierung vor. WICHTIG: Klar signalisierte, bewusste Ellipsen (z.B. Kapitelbeginn «Drei Jahre später», ein erkennbarer Zeitsprung als Stilmittel) sind KEIN Fehler – melde eine Zeitlücke nur, wenn der Sprung wirklich unsignalisiert bleibt und desorientiert. Schwere meist «niedrig», bei starker Desorientierung «mittel». Im Zweifel weglassen.`;
+
 export function buildKontinuitaetChapterFactsPrompt(chapterName, chText) {
   return `Extrahiere alle konkreten Fakten und Behauptungen aus dem Kapitel «${chapterName}» die für die Kontinuitätsprüfung relevant sind: Figuren-Zustände (lebendig/tot, Verletzungen, Wissen, Beziehungen), Ortsbeschreibungen, Zeitangaben, Objekte und deren Besitz/Zustand, sowie wichtige Handlungsereignisse.
 
@@ -124,7 +134,7 @@ Prüfe zusätzlich die Soziolekt-Kohärenz: Spricht jede Figur konsistent mit de
 Antworte mit diesem JSON-Schema:
 ${PROBLEME_SCHEMA}
 
-${PROBLEME_RULES}${anachronismusStr ? _ANACHRONISMUS_RULE : ''}`;
+${PROBLEME_RULES}${anachronismusStr ? _ANACHRONISMUS_RULE : ''}${_ZEITLUECKE_RULE}`;
 }
 
 // Verify-Stufe für den Multi-Pass-Check: Der Fakten-basierte Check (buildKontinuitaetCheckPrompt)
@@ -210,5 +220,5 @@ ${textBlock}
 Antworte mit diesem JSON-Schema:
 ${PROBLEME_SCHEMA}
 
-${PROBLEME_RULES}${anachronismusStr ? _ANACHRONISMUS_RULE : ''}`;
+${PROBLEME_RULES}${anachronismusStr ? _ANACHRONISMUS_RULE : ''}${_ZEITLUECKE_RULE}`;
 }

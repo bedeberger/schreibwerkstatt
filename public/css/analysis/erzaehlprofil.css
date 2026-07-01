@@ -1,0 +1,185 @@
+/* Kapitel-Erzählprofil-Karte: POV/Erzählzeit pro Kapitel (+ Abweichung),
+   Spannungskurve (Intensität 1–5) und Themen-/Motiv-Verteilung.
+   Akzentfarbe über var(--card-accent) (Mapping in card-accents.css). */
+
+.erzaehlprofil-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 1.25rem);
+}
+
+.erzaehlprofil-baseline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.erzaehlprofil-deviation-note {
+  color: var(--card-accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.erzaehlprofil-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.erzaehlprofil-section-head {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+/* ── Spannungskurve ─────────────────────────────────────────────────────── */
+.erzaehlprofil-curve {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 120px;
+  padding: var(--space-sm);
+  background: var(--color-surface);
+  border-radius: var(--radius-md, 8px);
+  overflow-x: auto;
+}
+
+.erzaehlprofil-curve-col {
+  flex: 1 0 10px;
+  min-width: 10px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.erzaehlprofil-curve-bar {
+  width: 100%;
+  max-width: 22px;
+  height: var(--bar-h, 0%);
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--card-accent);
+  opacity: 0.55;
+  transition: opacity 0.12s ease;
+}
+
+.erzaehlprofil-curve-col:hover .erzaehlprofil-curve-bar,
+.erzaehlprofil-curve-col:focus-visible .erzaehlprofil-curve-bar { opacity: 1; }
+
+/* Höhere Intensität = kräftiger */
+.erzaehlprofil-curve-bar[data-level="4"] { opacity: 0.75; }
+.erzaehlprofil-curve-bar[data-level="5"] { opacity: 0.95; }
+
+.erzaehlprofil-curve-col--empty .erzaehlprofil-curve-bar {
+  background: var(--color-muted);
+  opacity: 0.2;
+}
+
+.erzaehlprofil-curve-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+/* ── Kapitel-Profil-Liste ───────────────────────────────────────────────── */
+.erzaehlprofil-chapter {
+  padding: var(--space-3, 0.75rem);
+  border-left: 3px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.erzaehlprofil-chapter--deviation {
+  border-left-color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 6%, transparent);
+}
+
+.erzaehlprofil-chapter-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.erzaehlprofil-pov-tag--deviation {
+  background: color-mix(in srgb, var(--card-accent) 18%, transparent);
+  color: var(--card-accent);
+  font-weight: 600;
+}
+
+.erzaehlprofil-narrator { font-style: italic; }
+
+.erzaehlprofil-deviation-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--card-accent);
+}
+
+.erzaehlprofil-chapter-summary {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+/* ── Themen-Chips ───────────────────────────────────────────────────────── */
+.erzaehlprofil-themen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.erzaehlprofil-thema-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 40%, transparent);
+  color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 8%, transparent);
+}
+
+.erzaehlprofil-thema-chip[data-typ="motiv"] {
+  border-style: dashed;
+}
+
+.erzaehlprofil-thema-chip[data-typ="symbol"] {
+  background: color-mix(in srgb, var(--card-accent) 16%, transparent);
+  font-weight: 600;
+}
+
+/* ── Themen-Verteilung ──────────────────────────────────────────────────── */
+.erzaehlprofil-themen-dist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.35rem);
+}
+
+.erzaehlprofil-themen-dist-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.erzaehlprofil-thema-typ {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.erzaehlprofil-thema-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}

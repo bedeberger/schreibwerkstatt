@@ -1,0 +1,116 @@
+<!-- Kapitel-Erzählprofil -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/erzaehlprofil-card.js.
+  `showErzaehlprofilCard` + `toggleErzaehlprofilCard` bleiben im Root.
+  Inhalt stammt aus der Komplettanalyse-Phase «Erzählprofil» (rein lesend).
+-->
+<div class="card card--erzaehlprofil" x-data="erzaehlprofilCard" x-show="$app.showErzaehlprofilCard" x-cloak>
+  <div class="card-header card-header--subline">
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('erzaehlprofil.title')"></span>
+      <div class="card-subline" x-show="erzaehlprofilResult?.updated_at">
+        <span class="card-timestamp" x-text="$app.t('common.asOf', { date: erzaehlprofilResult?.updated_at })"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leerzustand: Profil wird von der Komplettanalyse befüllt -->
+  <div x-show="!erzaehlprofilHasData()" class="card-empty">
+    <p class="card-empty-text" x-text="$app.t('erzaehlprofil.empty')"></p>
+    <button type="button" class="primary card-empty-cta"
+            @click="$app.alleAktualisieren()"
+            :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <span x-text="$app.t('header.updateAll')"></span>
+    </button>
+  </div>
+
+  <template x-if="erzaehlprofilHasData()">
+    <div class="erzaehlprofil-body">
+
+      <!-- Deklarierte Soll-Perspektive + Abweichungs-Hinweis -->
+      <div class="erzaehlprofil-baseline" x-show="erzaehlprofilDeclaredLabel()">
+        <span class="entity-meta-label" x-text="$app.t('erzaehlprofil.declared')"></span>
+        <span class="tag" x-text="erzaehlprofilDeclaredLabel()"></span>
+        <span class="erzaehlprofil-deviation-note" x-show="erzaehlprofilDeviations().length > 0"
+              x-text="$app.t('erzaehlprofil.deviationCount', { n: erzaehlprofilDeviations().length })"></span>
+      </div>
+
+      <!-- Spannungskurve (Intensität 1–5 pro Kapitel) -->
+      <div class="erzaehlprofil-section">
+        <div class="erzaehlprofil-section-head" x-text="$app.t('erzaehlprofil.curveTitle')"></div>
+        <div class="erzaehlprofil-curve" role="list">
+          <template x-for="(pt, i) in erzaehlprofilCurve()" :key="'c:' + (pt.chapter_id ?? i)">
+            <button type="button" class="erzaehlprofil-curve-col" role="listitem"
+                    :class="{ 'erzaehlprofil-curve-col--empty': !pt.intensitaet }"
+                    :data-tip="pt.kapitel + (pt.begruendung ? ' — ' + pt.begruendung : '')"
+                    @click="erzaehlprofilGotoKapitel(pt.chapter_id)">
+              <span class="erzaehlprofil-curve-bar" :style="{ '--bar-h': (pt.intensitaet / 5 * 100) + '%' }"
+                    :data-level="pt.intensitaet"></span>
+            </button>
+          </template>
+        </div>
+        <div class="erzaehlprofil-curve-legend">
+          <span x-text="$app.t('erzaehlprofil.curveLow')"></span>
+          <span x-text="$app.t('erzaehlprofil.curveHigh')"></span>
+        </div>
+      </div>
+
+      <!-- Kapitel-Profil-Liste -->
+      <div class="erzaehlprofil-section">
+        <div class="erzaehlprofil-section-head" x-text="$app.t('erzaehlprofil.chaptersTitle')"></div>
+        <div class="entity-list entity-list--accented">
+          <template x-for="(ch, i) in erzaehlprofilChapters()" :key="erzaehlprofilChapterKey(ch, i)">
+            <div class="erzaehlprofil-chapter"
+                 :class="{ 'erzaehlprofil-chapter--deviation': ch.pov_abweichung }">
+              <div class="erzaehlprofil-chapter-head">
+                <span class="kapitel-badge kapitel-badge--primary internal-link"
+                      x-show="ch.chapter_id != null"
+                      @click="erzaehlprofilGotoKapitel(ch.chapter_id)"
+                      x-text="ch.kapitel || '—'"></span>
+                <span class="kapitel-badge" x-show="ch.chapter_id == null" x-text="ch.kapitel || '—'"></span>
+                <span class="tag erzaehlprofil-pov-tag"
+                      :class="{ 'erzaehlprofil-pov-tag--deviation': ch.pov_abweichung }"
+                      x-text="erzaehlprofilPovLabel(ch.perspektive)"></span>
+                <span class="tag" x-show="ch.erzaehlzeit" x-text="erzaehlprofilTempusLabel(ch.erzaehlzeit)"></span>
+                <span class="tag erzaehlprofil-narrator" x-show="ch.erzaehler_figur"
+                      x-text="ch.erzaehler_figur"></span>
+                <span class="erzaehlprofil-deviation-badge" x-show="ch.pov_abweichung"
+                      x-text="$app.t('erzaehlprofil.deviationBadge')"></span>
+              </div>
+              <p class="erzaehlprofil-chapter-summary" x-show="ch.zusammenfassung" x-text="ch.zusammenfassung"></p>
+              <div class="erzaehlprofil-themen" x-show="(ch.themen || []).length">
+                <template x-for="(t, ti) in ch.themen" :key="'t:' + ti">
+                  <span class="erzaehlprofil-thema-chip" :data-typ="t.typ || 'thema'"
+                        :data-tip="t.beleg || ''"
+                        x-text="t.thema"></span>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Themen-/Motiv-Verteilung übers Buch (klappbar) -->
+      <div class="erzaehlprofil-section" x-show="erzaehlprofilThemenAggregiert().length"
+           x-data="collapsible()">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+          <span x-text="$app.t('erzaehlprofil.themenTitle')"></span>
+        </button>
+        <div x-bind="panel" class="collapsible-section erzaehlprofil-themen-dist" x-cloak>
+          <template x-for="(t, i) in erzaehlprofilThemenAggregiert()" :key="'d:' + i">
+            <div class="erzaehlprofil-themen-dist-row">
+              <span class="erzaehlprofil-thema-chip" :data-typ="t.typ || 'thema'" x-text="t.thema"></span>
+              <span class="erzaehlprofil-thema-typ" x-text="erzaehlprofilThemaTypLabel(t.typ)"></span>
+              <span class="erzaehlprofil-thema-count"
+                    x-text="$app.t('erzaehlprofil.themenCount', { n: t.count })"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </div>
+  </template>
+</div>

@@ -326,3 +326,35 @@ export const SCHEMA_ATTR_CONTRADICTION = _obj({
   beschreibung: _str,
   empfehlung: _str,
 });
+
+// ── Kapitel-Erzählprofil (Phase «Erzählprofil») ──────────────────────────────
+// Pro Kapitel: erkannte Erzählperspektive/-zeit (Enum-Keys deckungsgleich mit
+// routes/jobs/narrative-labels.js POV_LABELS/TEMPUS_LABELS — SSoT-Drift vermeiden),
+// Erzähler-/Fokusfigur (Klarname), POV-Konfidenz + Beleg, Spannungs-Intensität 1–5,
+// dominante Themen/Motive/Symbole. Static (nicht _isLocal-abhängig); die Enums helfen
+// lokalen Providern (Grammar-Constrained), Claude ignoriert das Schema.
+export const ERZAEHLPROFIL_POV_ENUM = ['ich', 'du', 'er_sie_personal', 'er_sie_auktorial', 'wir', 'gemischt'];
+export const ERZAEHLPROFIL_TEMPUS_ENUM = ['praeteritum', 'praesens', 'gemischt'];
+const _themaItem = _obj({
+  thema: _str,
+  typ: { type: 'string', enum: ['thema', 'motiv', 'symbol'] },
+  beleg: _str,
+});
+const _erzaehlprofilProps = (withKapitel) => ({
+  ...(withKapitel ? { kapitel: _str } : {}),
+  perspektive: { type: 'string', enum: ERZAEHLPROFIL_POV_ENUM },
+  erzaehlzeit: { type: 'string', enum: ERZAEHLPROFIL_TEMPUS_ENUM },
+  erzaehler_figur: _str,
+  pov_konfidenz: _num,
+  pov_beleg: _str,
+  intensitaet: _num,
+  intensitaet_begruendung: _str,
+  zusammenfassung: _str,
+  themen: { type: 'array', items: _themaItem },
+});
+// Single-Pass (ganzes Buch → Array pro Kapitel).
+export const SCHEMA_ERZAEHLPROFIL = _obj({
+  kapitel: { type: 'array', items: _obj(_erzaehlprofilProps(true)) },
+});
+// Multi-Pass (ein Kapitel pro Call; Kapitelname ist im Prompt bekannt).
+export const SCHEMA_ERZAEHLPROFIL_CHAPTER = _obj(_erzaehlprofilProps(false));

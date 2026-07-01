@@ -100,6 +100,13 @@ export const kontinuitaetMethods = {
     return (this.kontinuitaetResult?.issues || []).filter(i => !i.resolved).length;
   },
 
+  // Menschliches Label für den Issue-Typ. Freitext-Feld (Prompt-gesteuert) → i18n-Key
+  // mit Fallback auf den Rohwert, damit unbekannte/neue Typen nie leer rendern.
+  kontinuitaetTypLabel(typ) {
+    const t = window.__app.t('kontinuitaet.typ.' + (typ || ''));
+    return t === 'kontinuitaet.typ.' + (typ || '') ? (typ || '') : t;
+  },
+
   kontinuitaetIssuesBySchwere() {
     if (!this.kontinuitaetResult?.issues) return { kritisch: [], mittel: [], niedrig: [] };
     const groups = { kritisch: [], mittel: [], niedrig: [] };

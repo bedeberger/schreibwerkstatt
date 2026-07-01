@@ -252,6 +252,7 @@ const cardsState = () => ({
   showWorldFactsCard: false,
   showRechercheCard: false,
   showKontinuitaetCard: false,
+  showErzaehlprofilCard: false,
   showTagebuchRueckblickCard: false,
   showBookStatsCard: false,
   showStilCard: false,

@@ -54,6 +54,11 @@ export {
 } from './komplett/kontinuitaet.js';
 
 export {
+  buildErzaehlprofilSinglePassPrompt,
+  buildErzaehlprofilChapterPrompt,
+} from './komplett/erzaehlprofil.js';
+
+export {
   _rebuildKomplettSchemas,
   SCHEMA_KOMPLETT_EXTRAKTION,
   SCHEMA_KOMPLETT_FIGUREN_PASS,
@@ -73,4 +78,6 @@ export {
   SCHEMA_COVERAGE_AUDIT,
   SCHEMA_FIGUREN_ALIAS_CLUSTER,
   SCHEMA_ATTR_CONTRADICTION,
+  SCHEMA_ERZAEHLPROFIL,
+  SCHEMA_ERZAEHLPROFIL_CHAPTER,
 } from './komplett/schemas.js';

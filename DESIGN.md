@@ -2272,6 +2272,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [analysis/analysis.css](public/css/analysis/analysis.css) | `.section-heading*`, JS-generated Output-Stile. |
 | [analysis/heatmap.css](public/css/analysis/heatmap.css) | `.heatmap-*` Tabelle + Detail-Drawer. |
 | [analysis/kontinuitaet.css](public/css/analysis/kontinuitaet.css) | Kontinuitätsprüfung + Buch-Einstellungen-Spezifika. |
+| [analysis/erzaehlprofil.css](public/css/analysis/erzaehlprofil.css) | Kapitel-Erzählprofil: Spannungskurve (CSS-Balken), POV-/Themen-Chips, Abweichungs-Hervorhebung. |
 | [analysis/komplett-status.css](public/css/analysis/komplett-status.css) | Komplettanalyse-Status-Header. |
 | [analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) | Globaler Zeitstrahl: Ereignis-Liste + selbstgebautes `.gz-band`-Jahres-Band. |
 | [analysis/kapitel-review.css](public/css/analysis/kapitel-review.css) | Kapitel-Review. |

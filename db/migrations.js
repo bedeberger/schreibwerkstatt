@@ -8778,6 +8778,58 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 226 abgeschlossen (chapters.excluded — Kapitel aus Export/Bewertung/Komplettanalyse ausschliessen).');
   }
 
+  if (version < 227) {
+    // Kapitel-Erzählprofil (neue Komplettanalyse-Phase): pro Kapitel die aus dem Text
+    // erkannte Erzählperspektive/-zeit + Erzähler-/Fokusfigur (Abgleich gegen die in
+    // book_settings deklarierte Soll-Perspektive → pov_abweichung), die Spannungs-
+    // Intensitaet (1–5, Pacing-Kurve) und ein 1-Satz-Erzählfokus. Themen/Motive/Symbole
+    // pro Kapitel in der Kind-Tabelle (n:1). Aggregat-Cache der Komplettanalyse →
+    // CASCADE bei Buch- und Kapitel-Loeschung (kein user-kuratierter Inhalt).
+    // erzaehler_figur: figure_id-FK (SET NULL) mit Klarnamen-Fallback fuer nicht
+    // aufloesbare KI-Namen — analog continuity_issue_figures (Snapshot nur bei
+    // nullbarer FK, wenn kein ID-Mapping moeglich war).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS chapter_narrative_profile (
+        id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id                 INTEGER NOT NULL REFERENCES books(book_id)    ON DELETE CASCADE,
+        user_email              TEXT             REFERENCES app_users(email)  ON DELETE SET NULL,
+        chapter_id              INTEGER          REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        perspektive             TEXT,
+        erzaehlzeit             TEXT,
+        erzaehler_figur_id      INTEGER          REFERENCES figures(id)       ON DELETE SET NULL,
+        erzaehler_figur         TEXT,
+        pov_konfidenz           REAL,
+        pov_beleg               TEXT,
+        pov_abweichung          INTEGER NOT NULL DEFAULT 0,
+        intensitaet             INTEGER,
+        intensitaet_begruendung TEXT,
+        zusammenfassung         TEXT,
+        sort_order              INTEGER NOT NULL DEFAULT 0,
+        updated_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_cnp_book       ON chapter_narrative_profile(book_id, user_email);
+      CREATE INDEX IF NOT EXISTS idx_cnp_chapter    ON chapter_narrative_profile(chapter_id);
+      CREATE INDEX IF NOT EXISTS idx_cnp_figure     ON chapter_narrative_profile(erzaehler_figur_id);
+      CREATE INDEX IF NOT EXISTS idx_cnp_user_email ON chapter_narrative_profile(user_email);
+
+      CREATE TABLE IF NOT EXISTS chapter_narrative_themes (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL REFERENCES chapter_narrative_profile(id) ON DELETE CASCADE,
+        thema      TEXT NOT NULL,
+        typ        TEXT,
+        beleg      TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_cnt_profile ON chapter_narrative_themes(profile_id);
+    `);
+    const fkErrors227 = db.pragma('foreign_key_check');
+    if (fkErrors227.length) {
+      throw new Error(`Migration 227: foreign_key_check meldet ${fkErrors227.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 227').run();
+    logger.info('DB-Migration auf Version 227 abgeschlossen (chapter_narrative_profile + chapter_narrative_themes — Kapitel-Erzählprofil-Phase).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -35,7 +35,7 @@ const { loadAndValidateCheckpoint, restorePhase1FromCheckpoint } = require('./ch
 const { remapSzenen, remapAssignments, saveSzenenAndEvents, saveKontinuitaetResult } = require('./remap');
 const {
   runPhase1, runPhase2, runPhase3, runPhase3Songs, runPhase3b, runZeitstrahl,
-  buildPrelimFigurenKompakt, runPhase3OrteCall, komplettMaxTokens,
+  buildPrelimFigurenKompakt, runPhase3OrteCall, runErzaehlprofil, komplettMaxTokens,
 } = require('./phases');
 const { buildAnachronismusData, verifyKontinuitaetProbleme, _komplettClaudeOverrides, runAttributeContradictionCheck } = require('./job-shared');
 
@@ -432,6 +432,19 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
         if (coverage.score < minScore) warnings.push({ key: 'job.warn.coverageLow', params: { score: coverage.score } });
       }
       pt.mark('Coverage-Audit');
+    }
+
+    // ── Phase Erzählprofil (non-critical, alle Provider): POV/Erzählzeit, Pacing-
+    // Intensität und Themen/Motive pro Kapitel. Read-only Endphase wie Kontinuität –
+    // ein Fehler darf den bereits gespeicherten Katalog nicht kippen. Läuft nur, wenn
+    // der Konsolidierungs-Checkpoint NICHT griff (unveränderte Bücher überspringen sie
+    // oben komplett → das bestehende Profil bleibt gültig). Kill-Switch
+    // `ai.komplett.narrative_profile` (Default an; in Integration-Tests aus).
+    if (appSettings.get('ai.komplett.narrative_profile') !== false) {
+      await runNonCritical('Erzählprofil',
+        () => runErzaehlprofil(ctx, { figNameToId, fromPct: 98, toPct: 99 }), log,
+        { warnings, warnKey: 'job.warn.narrativeProfileFailed' });
+      pt.mark('Erzählprofil');
     }
 
     deleteCheckpoint('komplett-analyse', bookIdInt, email);

@@ -20,6 +20,7 @@ const ALLOWED_KEYS = new Set([
   'stil',
   'fehlerHeatmap',
   'kontinuitaet',
+  'erzaehlprofil',
   'tagebuchRueckblick',
   'figuren',
   'werkstatt',

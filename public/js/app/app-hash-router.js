@@ -63,6 +63,7 @@ export const appHashRouterMethods = {
     else if (this.showWorldFactsCard) parts.push('fakten');
     else if (this.showRechercheCard) parts.push('recherche');
     else if (this.showKontinuitaetCard) parts.push('kontinuitaet');
+    else if (this.showErzaehlprofilCard) parts.push('erzaehlprofil');
     else if (this.showTagebuchRueckblickCard) parts.push('rueckblick');
     else if (this.showBookReviewCard) parts.push('bewertung');
     else if (this.showKapitelReviewCard) parts.push('kapitel');
@@ -390,6 +391,9 @@ export const appHashRouterMethods = {
         case 'kontinuitaet':
           if (!this.showKontinuitaetCard) await this.toggleKontinuitaetCard();
           break;
+        case 'erzaehlprofil':
+          if (!this.showErzaehlprofilCard) await this.toggleErzaehlprofilCard();
+          break;
         case 'rueckblick':
           // Optionaler History-Eintrag-Permalink (#…/rueckblick/<entryId>). Root-
           // SSoT vor Toggle setzen; die Sub-Card öffnet den Eintrag im onOpen-Hook
@@ -470,7 +474,7 @@ export const appHashRouterMethods = {
       'currentPage', 'showEditorCard',
       'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showWorldFactsCard',
       'showRechercheCard',
-      'showKontinuitaetCard', 'showTagebuchRueckblickCard', 'showBookReviewCard', 'showBookChatCard',
+      'showKontinuitaetCard', 'showErzaehlprofilCard', 'showTagebuchRueckblickCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
       'showBookSettingsCard', 'showUserSettingsCard', 'showMyStatsCard', 'showHelpCard',
