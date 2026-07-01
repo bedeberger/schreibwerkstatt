@@ -5,7 +5,7 @@
 .erzaehlprofil-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5, 1.25rem);
+  gap: var(--space-lg);
 }
 
 .erzaehlprofil-baseline {
@@ -17,7 +17,7 @@
 
 .erzaehlprofil-deviation-note {
   color: var(--card-accent);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
@@ -28,7 +28,7 @@
 }
 
 .erzaehlprofil-section-head {
-  font-size: 0.8rem;
+  font-size: var(--font-size-mini);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -39,17 +39,17 @@
 .erzaehlprofil-curve {
   display: flex;
   align-items: flex-end;
-  gap: 3px;
+  gap: var(--space-3);
   height: 120px;
   padding: var(--space-sm);
   background: var(--color-surface);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-lg);
   overflow-x: auto;
 }
 
 .erzaehlprofil-curve-col {
-  flex: 1 0 10px;
-  min-width: 10px;
+  flex: 1 0 var(--space-10);
+  min-width: var(--space-10);
   height: 100%;
   display: flex;
   align-items: flex-end;
@@ -64,11 +64,11 @@
   width: 100%;
   max-width: 22px;
   height: var(--bar-h, 0%);
-  min-height: 2px;
-  border-radius: 3px 3px 0 0;
+  min-height: var(--space-2xs);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   background: var(--card-accent);
   opacity: 0.55;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--transition-base) ease;
 }
 
 .erzaehlprofil-curve-col:hover .erzaehlprofil-curve-bar,
@@ -86,13 +86,13 @@
 .erzaehlprofil-curve-legend {
   display: flex;
   justify-content: space-between;
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
 
 /* ── Kapitel-Profil-Liste ───────────────────────────────────────────────── */
 .erzaehlprofil-chapter {
-  padding: var(--space-3, 0.75rem);
+  padding: var(--space-md);
   border-left: 3px solid transparent;
   display: flex;
   flex-direction: column;
@@ -120,7 +120,7 @@
 .erzaehlprofil-narrator { font-style: italic; }
 
 .erzaehlprofil-deviation-badge {
-  font-size: 0.72rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -129,7 +129,7 @@
 
 .erzaehlprofil-chapter-summary {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
   color: var(--color-text);
 }
 
@@ -137,14 +137,14 @@
 .erzaehlprofil-themen {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .erzaehlprofil-thema-chip {
   display: inline-block;
-  padding: 2px 9px;
-  border-radius: 999px;
-  font-size: 0.78rem;
+  padding: var(--pad-badge);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-mini);
   border: 1px solid color-mix(in srgb, var(--card-accent) 40%, transparent);
   color: var(--card-accent);
   background: color-mix(in srgb, var(--card-accent) 8%, transparent);
@@ -163,7 +163,7 @@
 .erzaehlprofil-themen-dist {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1, 0.35rem);
+  gap: var(--space-6);
 }
 
 .erzaehlprofil-themen-dist-row {
@@ -173,13 +173,13 @@
 }
 
 .erzaehlprofil-thema-typ {
-  font-size: 0.75rem;
+  font-size: var(--font-size-mini);
   color: var(--color-muted);
 }
 
 .erzaehlprofil-thema-count {
   margin-left: auto;
-  font-size: 0.78rem;
+  font-size: var(--font-size-mini);
   font-variant-numeric: tabular-nums;
   color: var(--color-muted);
 }
