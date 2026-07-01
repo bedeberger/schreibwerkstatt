@@ -92,6 +92,13 @@ export const bookscopeMethods = {
     this.$store.jobs.alleAktualisierenTokIn = 0;
     this.$store.jobs.alleAktualisierenTokOut = 0;
     this.$store.jobs.alleAktualisierenTps = null;
+    // Run-transiente Felder (Warnungen/Coverage/PassMode/Last-Run) gehören zum
+    // alten Buch — sonst zeigt das Status-Panel des neuen Buchs dessen Werte.
+    // Last-Run lädt loadPages()→loadLastKomplettRun() gleich für das neue Buch.
+    this.$store.jobs.alleAktualisierenWarnings = [];
+    this.$store.jobs.alleAktualisierenCoverage = null;
+    this.$store.jobs.alleAktualisierenPassMode = null;
+    this.$store.jobs.alleAktualisierenLastRun = null;
     this.showKomplettStatus = false;
     this.resetDailyProgress();
     if (this.$store.nav.selectedBookId) this.loadDailyProgress(this.$store.nav.selectedBookId);
@@ -211,16 +218,22 @@ export const bookscopeMethods = {
       if (!target) continue;
       for (const k of Object.keys(defaults)) target[k] = defaults[k];
     }
-    if (this._komplettPollTimer) { clearInterval(this._komplettPollTimer); this._komplettPollTimer = null; }
-    // Last-Run-Stempel gehört zum Buch, nicht zur View — Buch bleibt bei
-    // Home-Klick gewählt, also für das aktuelle Buch neu laden statt nullen.
-    if (this.$store.nav.selectedBookId && typeof this.loadLastKomplettRun === 'function') this.loadLastKomplettRun(this.$store.nav.selectedBookId);
-    else this.$store.jobs.alleAktualisierenLastRun = null;
-    this.$store.jobs.alleAktualisierenProgress = 0;
-    this.$store.jobs.alleAktualisierenTokIn = 0;
-    this.$store.jobs.alleAktualisierenTokOut = 0;
-    this.$store.jobs.alleAktualisierenTps = null;
-    this.showKomplettStatus = false;
+    // Einen aktiv laufenden Komplett-Job NICHT abwürgen: Poller + Live-Progress
+    // stehen lassen, sonst friert der Fortschrittsring bei 0 % ein und das
+    // Job-Ende wird oben rechts nie sichtbar (nur der globale Queue-Poll bliebe
+    // aktuell). Nur den Ruhezustand zurücksetzen.
+    if (!this.$store.jobs.alleAktualisierenLoading) {
+      if (this._komplettPollTimer) { clearInterval(this._komplettPollTimer); this._komplettPollTimer = null; }
+      // Last-Run-Stempel gehört zum Buch, nicht zur View — Buch bleibt bei
+      // Home-Klick gewählt, also für das aktuelle Buch neu laden statt nullen.
+      if (this.$store.nav.selectedBookId && typeof this.loadLastKomplettRun === 'function') this.loadLastKomplettRun(this.$store.nav.selectedBookId);
+      else this.$store.jobs.alleAktualisierenLastRun = null;
+      this.$store.jobs.alleAktualisierenProgress = 0;
+      this.$store.jobs.alleAktualisierenTokIn = 0;
+      this.$store.jobs.alleAktualisierenTokOut = 0;
+      this.$store.jobs.alleAktualisierenTps = null;
+      this.showKomplettStatus = false;
+    }
     this.resetBookChat();
     // Default-Home: nach komplettem Reset Übersicht öffnen, falls Buch gewählt.
     // Kein lastPage-Restore — Home-Klick ist expliziter Wunsch nach Overview.

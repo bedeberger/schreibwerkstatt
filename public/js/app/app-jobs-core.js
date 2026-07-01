@@ -245,6 +245,20 @@ export const appJobsCoreMethods = {
     if (detail.type === 'batch-check' && detail.job?.status === 'done' && isCurrentBook) {
       this.refreshPageAges?.();
     }
+    // komplett-analyse: der per-Buch-Poller (_startKomplettPoll.onDone) wird bei
+    // Buchwechsel/Home/Reload abgerissen — dann ist er beim Job-Ende tot und die
+    // obere Status-Leiste (komplett-status.html) bleibt auf „läuft" hängen, obwohl
+    // die untere Queue über diese Disappearance-Detection korrekt aufräumt. Nur
+    // greifen, wenn der Poller wirklich weg ist (`!_komplettPollTimer`) — sonst
+    // erledigt onDone das reichere Reload und wir würden doppelt arbeiten.
+    if (detail.type === 'komplett-analyse' && isCurrentBook && !this._komplettPollTimer) {
+      this.$store.jobs.alleAktualisierenLoading = false;
+      if (detail.job?.status === 'done') {
+        this.$store.jobs.alleAktualisierenWarnings = Array.isArray(detail.job?.result?.warnings) ? detail.job.result.warnings : [];
+        this.$store.jobs.alleAktualisierenCoverage = detail.job?.result?.coverage || null;
+      }
+      this.loadLastKomplettRun?.(this.$store.nav.selectedBookId);
+    }
     this._maybeShowJobToast(detail);
   },
 
