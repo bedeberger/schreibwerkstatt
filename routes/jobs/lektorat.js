@@ -106,6 +106,49 @@ function dedupFehler(fehler) {
   });
 }
 
+// Subjektiv-stilistische Fehlertypen: exakt die Liste, für die der Prompt
+// (SCHWERE-SCHWELLE-Block in public/js/prompts/lektorat.js) eine Mengen-
+// Obergrenze verhängt. Mechanische/objektive Fehler (rechtschreibung,
+// grammatik inkl. Zeichensetzung, tempuswechsel, perspektivbruch, dialogformat)
+// und Konsistenz-Findings (namens-/figuren-/schauplatzmerkmal, anrede) fehlen
+// hier bewusst – sie werden NIE gekappt.
+const STYLISTIC_TYPEN = new Set([
+  'stil', 'satzbau', 'schwaches_verb', 'fuellwort', 'filterwort',
+  'klischee', 'ki_geruch', 'show_vs_tell', 'passiv', 'pleonasmus', 'wiederholung',
+]);
+
+const DEFAULT_STYLISTIC_CAP = 20;
+
+// Deterministischer Backstop zur Prompt-Regel „max ~20 stilistische Findings".
+// Modelle zählen und selbst-limitieren unzuverlässig – der Prompt bittet zwar um
+// harte Priorisierung, aber wenn das Modell 40 schwache Stil-Findings zurückgibt,
+// erzwingt dieser Handler-Filter die Grenze verlässlich. Objektive Fehler bleiben
+// vollständig erhalten; nur die im STYLISTIC_TYPEN-Set gelisteten Typen werden
+// nach Erreichen von `cap` verworfen. Reihenfolge bleibt erhalten (der Prompt hat
+// nach Textposition sortiert). Pure Funktion – testbar ohne AI/DB.
+function capStylisticFehler(fehler, cap = DEFAULT_STYLISTIC_CAP) {
+  if (!Array.isArray(fehler)) return fehler;
+  let kept = 0;
+  return fehler.filter(f => {
+    if (!STYLISTIC_TYPEN.has(f?.typ)) return true;   // objektiv/Konsistenz → nie kappen
+    if (kept < cap) { kept++; return true; }
+    return false;
+  });
+}
+
+// Cap aus app_settings (Admin-tunebar), Default 20 – analog ai.lektorat_batch_concurrency.
+function stylisticCap() {
+  const n = parseInt(appSettings.get('ai.lektorat_stylistic_cap'), 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_STYLISTIC_CAP;
+}
+
+// Vollständige Nachbearbeitung eines rohen fehler-Arrays: validieren → dedupen →
+// stilistischen Cap anwenden. Einziger Chokepoint für alle vier Aufruf-Stellen
+// (fresh/cached × Einzel/Batch), damit die Pipeline nicht auseinanderdriftet.
+function finalizeFehler(fehler, locale) {
+  return capStylisticFehler(dedupFehler(validateLektoratFehler(fehler, locale)), stylisticCap());
+}
+
 // Letzter History-Eintrag dieser Seite (für History-Insert-Dedup).
 const _lastPageCheckStmt = db.prepare(`
   SELECT id, errors_json FROM page_checks
@@ -219,7 +262,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       // das tote `kontext`-Feld oder 1:1-Vorschläge (== Original) enthalten.
       // validateLektoratFehler strippt `kontext` und filtert 1:1 mit.
       if (Array.isArray(result?.fehler)) {
-        result.fehler = dedupFehler(validateLektoratFehler(result.fehler, locale));
+        result.fehler = finalizeFehler(result.fehler, locale);
       }
     } else {
       result = await aiCall(jobId, tok,
@@ -238,7 +281,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
       );
 
       if (!Array.isArray(result?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
-      result.fehler = dedupFehler(validateLektoratFehler(result.fehler, locale));
+      result.fehler = finalizeFehler(result.fehler, locale);
 
       if (ctxSig) saveLektoratCache(bookId, userEmail, pageId, ctxSig, result, effectiveProvider);
     }
@@ -367,7 +410,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
           result = cached;
           // Re-Validate (strippt `kontext`, filtert 1:1) + Dedup auf Cached-Path.
           if (Array.isArray(result?.fehler)) {
-            result.fehler = dedupFehler(validateLektoratFehler(result.fehler, locale));
+            result.fehler = finalizeFehler(result.fehler, locale);
           }
         } else {
           // Bei Pool>1 sind feinere Pct-Ranges pro Item nicht sinnvoll
@@ -393,7 +436,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
           );
 
           if (!Array.isArray(result?.fehler)) throw new Error('fehler-Array fehlt');
-          result.fehler = dedupFehler(validateLektoratFehler(result.fehler, locale));
+          result.fehler = finalizeFehler(result.fehler, locale);
           saveLektoratCache(bookId, userEmail, p.id, ctxSig, result, effectiveProvider);
         }
         const fehler = result.fehler || [];
@@ -487,4 +530,4 @@ lektoratRouter.post('/batch-check', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { lektoratRouter, runCheckJob, runBatchCheckJob, dedupFehler, validateLektoratFehler };
+module.exports = { lektoratRouter, runCheckJob, runBatchCheckJob, dedupFehler, validateLektoratFehler, capStylisticFehler, STYLISTIC_TYPEN };

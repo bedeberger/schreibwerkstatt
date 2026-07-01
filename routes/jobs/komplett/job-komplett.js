@@ -39,7 +39,7 @@ const { buildAnachronismusData, verifyKontinuitaetProbleme, _komplettClaudeOverr
 //      → Schema im System-Prompt gecacht; Szenen/Events mit Klarnamen (kein ID-Lookup nötig)
 //   P2/P3 (Claude Multi-Pass parallel, sonst sequentiell):
 //      P2 (Figuren konsolidieren + Soziogramm) → figNameToId aufbauen
-//      P3 (Orte konsolidieren, prelim figurenKompakt im Prompt, idRemap post-hoc) → ortNameToId
+//      P3 (Orte konsolidieren, prelim figurenKompakt im Prompt, figuren_namen→fig_id post-hoc) → ortNameToId
 //   P3b (Kapitelübergreifende Beziehungen, nur Multi-Pass, non-critical)
 //   P5 Szenen remappen
 //   P6 Zeitstrahl + P8 Kontinuität: parallel bei Claude (P8 ownt Progress-Bar), sonst sequentiell
@@ -178,12 +178,12 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // ── Phase 2 + 3: Figuren + Orte konsolidieren ────────────────────────────
     // Multi-Pass Claude: P2 (Figuren-AI) und P3 (Orte-AI) sind unabhängig und
     // werden parallel gefahren. P3 nutzt prelim figurenKompakt (Pre-P2-Merge) im
-    // Prompt; nach P2-Merge werden die Orte-figuren-IDs via idRemap+validFigIds
-    // auf die finalen Post-Merge-IDs umgebogen.
+    // Prompt; nach P2-Merge werden die Orte-figuren_namen via figNameToId auf die
+    // finalen kanonischen fig_ids aufgelöst.
     // Single-Pass: kein AI-Call in P2/P3 → Parallelisierung bringt nichts.
     // Lokale Provider: sequentiell (Mutex serialisiert AI-Calls ohnehin).
     const isMultiPassClaude = effectiveProvider === 'claude' && chapterFiguren.length > 1;
-    let figuren, figNameToId, figNameToIdLower, figurenKompakt, idRemap, isSinglePass;
+    let figuren, figNameToId, figNameToIdLower, figurenKompakt, isSinglePass;
     let orte, ortNameToId, ortNameToIdLower;
     if (isMultiPassClaude) {
       const prelimFigKompakt = buildPrelimFigurenKompakt(chapterFiguren);
@@ -191,14 +191,14 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
         runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen),
         runPhase3OrteCall(ctx, chapterOrte, prelimFigKompakt),
       ]);
-      ({ figuren, figNameToId, figNameToIdLower, figurenKompakt, idRemap, isSinglePass } = p2Result);
+      ({ figuren, figNameToId, figNameToIdLower, figurenKompakt, isSinglePass } = p2Result);
       ({ orte, ortNameToId, ortNameToIdLower } =
-        await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap, { prefetchedOrteRaw: orteRaw }));
+        await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, figNameToId, figNameToIdLower, { prefetchedOrteRaw: orteRaw }));
     } else {
-      ({ figuren, figNameToId, figNameToIdLower, figurenKompakt, idRemap, isSinglePass } =
+      ({ figuren, figNameToId, figNameToIdLower, figurenKompakt, isSinglePass } =
         await runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen));
       ({ orte, ortNameToId, ortNameToIdLower } =
-        await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap));
+        await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, figNameToId, figNameToIdLower));
     }
     pt.mark('P2+P3 Konsolidierung');
 

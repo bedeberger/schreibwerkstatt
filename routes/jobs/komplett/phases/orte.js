@@ -3,22 +3,20 @@
 // Prelim-figurenKompakt + paralleler Orte-Call (Multi-Pass).
 const { saveOrteToDb, saveSongsToDb } = require('../../../../db/schema');
 const { updateJob } = require('../../shared');
-const { _remapFigRefs, _remapFigNames } = require('../utils');
+const { _remapFigNames } = require('../utils');
 const { komplettMaxTokens } = require('./tokens');
 
 /** Regelbasierter Orte-Merge als Fallback, wenn die KI-Konsolidierung scheitert (z.B.
  *  aiTruncated bei kleinem lokalem Modell). Flattet chapterOrte über alle Kapitel, dedupliziert
- *  nach Name (case-insensitive, erstes Vorkommen gewinnt, figuren-Refs vereinigt) und biegt
- *  figuren-IDs gegen idRemap um bzw. filtert nicht (mehr) existente heraus – analog Single-Pass. */
-function buildFallbackOrte(chapterOrte, validFigIds, idRemap) {
+ *  nach Name (case-insensitive, erstes Vorkommen gewinnt, figuren-Refs vereinigt) und löst
+ *  figuren_namen gegen die kanonische Figurenliste zu fig_ids auf – analog Single-Pass. */
+function buildFallbackOrte(chapterOrte, figNameToId, figNameToIdLower) {
   const byName = new Map();
   for (const ch of (chapterOrte || [])) {
     for (const o of (ch.orte || [])) {
       const key = (o.name || '').trim().toLowerCase();
       if (!key) continue;
-      const figIds = (o.figuren || [])
-        .map(fid => idRemap?.[fid] || fid)
-        .filter(fid => validFigIds.has(fid));
+      const figIds = _remapFigNames(o.figuren_namen, figNameToId, figNameToIdLower);
       if (!byName.has(key)) {
         byName.set(key, { ...o, figuren: [...new Set(figIds)] });
       } else {
@@ -64,10 +62,10 @@ function buildFallbackSongs(chapterSongs, figNameToId, figNameToIdLower) {
 /** Phase 3: Orte konsolidieren + Name→ID Lookup.
  *  Single-Pass-Optimierung analog zu Phase 2: Wenn Phase 1 im Single-Pass-Modus lief,
  *  sind die Orte bereits holistisch extrahiert – ein Konsolidierungs-Call fügt nichts
- *  hinzu und kostet ~15K Tokens. Die figuren-Referenzen in den Orten werden gegen das
- *  idRemap aus mergeDuplicateFiguren abgeglichen (gemergte Figuren werden umgebogen,
- *  nicht mehr existente entfernt). */
-async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap, opts = {}) {
+ *  hinzu und kostet ~15K Tokens. Die Figuren-Referenzen der Orte kommen als Klarnamen
+ *  (figuren_namen) und werden nach P2 via figNameToId/figNameToIdLower (exakt + lowercase-
+ *  Fallback) zu kanonischen fig_ids aufgelöst – nicht auflösbare Namen werden verworfen. */
+async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, figNameToId, figNameToIdLower, opts = {}) {
   const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps, effectiveProvider } = ctx;
   // prefetchAttempted: im Claude-Parallel-Pfad wurde der Orte-Call bereits gefahren (Promise.all).
   // null heisst dann „Prefetch fehlgeschlagen" (Warnung schon geloggt) → direkt Fallback, kein Re-Call.
@@ -77,7 +75,6 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
   let orte;
   if (isSinglePass) {
     updateJob(jobId, { progress: 43, statusText: 'job.phase.consolidatingOrte' });
-    const validFigIds = new Set(figurenKompakt.map(f => f.id));
     const raw = chapterOrte[0]?.orte || [];
     orte = raw.map((o, i) => ({
       ...o,
@@ -88,13 +85,12 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
       // (ortNameToId wird daraus gebaut; downstream zählt die DB-id). Orte haben — anders
       // als Figuren — kein ensureUniqueLocIds-Netz, darum hier deterministisch durchnummerieren.
       id: 'ort_' + (i + 1),
-      figuren: _remapFigRefs(o.figuren, idRemap, validFigIds),
+      figuren: _remapFigNames(o.figuren_namen, figNameToId, figNameToIdLower),
     }));
     log.info(`Phase 3 übersprungen (Single-Pass, ${orte.length} Orte aus P1 übernommen) – spart einen KI-Call.`);
     updateJob(jobId, { progress: 55 });
   } else {
     updateJob(jobId, { progress: 43, statusText: 'job.phase.consolidatingOrte' });
-    const validFigIds = new Set(figurenKompakt.map(f => f.id));
     let orteResultRaw = prefetched;
     if (!orteResultRaw && !prefetchAttempted) {
       try {
@@ -116,18 +112,18 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
     }
     if (!Array.isArray(orteResultRaw?.orte)) {
       // Call gescheitert ODER Antwort ohne orte-Array: kapitelweise extrahierte Orte
-      // regelbasiert mergen (flatten + Dedup nach Name, figuren-Refs gegen idRemap+validFigIds).
+      // regelbasiert mergen (flatten + Dedup nach Name, figuren_namen → fig_id aufgelöst).
       if (orteResultRaw !== null) {
         log.warn('Orte-Konsolidierung lieferte kein orte-Array – Fallback auf kapitel-extrahierte Orte.');
         ctx.warnings?.push({ key: 'job.warn.orteKonsolidierungDegraded' });
       }
-      orte = buildFallbackOrte(chapterOrte, validFigIds, idRemap);
+      orte = buildFallbackOrte(chapterOrte, figNameToId, figNameToIdLower);
       updateJob(jobId, { progress: 55 });
     } else if (prefetched) {
       orte = orteResultRaw.orte.map((o, i) => ({
         ...o,
         id: o.id || ('ort_' + (i + 1)),
-        figuren: _remapFigRefs(o.figuren, idRemap, validFigIds),
+        figuren: _remapFigNames(o.figuren_namen, figNameToId, figNameToIdLower),
       }));
       updateJob(jobId, { progress: 55 });
     } else {
@@ -150,7 +146,7 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, idRemap
 }
 
 /** Phase 3 Songs: Musikbibliothek konsolidieren analog zu Orten.
- *  Single-Pass: Songs aus Pass B übernehmen (figuren-Refs gegen idRemap+validFigIds filtern).
+ *  Single-Pass: Songs aus Pass B übernehmen (figuren_namen → fig_id via figNameToId aufgelöst).
  *  Multi-Pass: KI-Call konsolidiert dedupliziert (Titel+Interpret) über alle Kapitel. */
 async function runPhase3Songs(ctx, chapterSongs, figurenKompakt, isSinglePass, figNameToId, figNameToIdLower) {
   const { jobId, bookIdInt, bookName, email, call, tok, log, prompts, sys, idMaps, effectiveProvider } = ctx;
@@ -227,7 +223,7 @@ function buildPrelimFigurenKompakt(chapterFiguren) {
 }
 
 /** Nur der Orte-Konso-AI-Call (Multi-Pass) – ohne DB-Save, ohne Progress-Update.
- *  Aufrufer wendet idRemap+validFigIds-Filter via runPhase3(opts.prefetchedOrteRaw) an. */
+ *  Aufrufer löst figuren_namen → fig_id via runPhase3(opts.prefetchedOrteRaw) auf. */
 async function runPhase3OrteCall(ctx, chapterOrte, figurenKompaktForPrompt) {
   const { jobId, bookName, call, tok, log, prompts, sys, effectiveProvider } = ctx;
   try {

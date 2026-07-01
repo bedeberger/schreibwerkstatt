@@ -16,7 +16,7 @@ process.env.DB_PATH = path.join(os.tmpdir(), `schreibwerkstatt-lektorat-dedup-${
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 require('../../db/migrations');
 
-const { dedupFehler, validateLektoratFehler } = require('../../routes/jobs/lektorat');
+const { dedupFehler, validateLektoratFehler, capStylisticFehler, STYLISTIC_TYPEN } = require('../../routes/jobs/lektorat');
 
 test('dedupFehler entfernt byte-gleiche Duplikate (gleicher typ+original+korrektur)', () => {
   const input = [
@@ -95,4 +95,57 @@ test('dedupFehler behaelt Reihenfolge des ersten Vorkommens', () => {
   assert.equal(out.length, 2);
   assert.equal(out[0].original, 'B');
   assert.equal(out[1].original, 'A');
+});
+
+// ── capStylisticFehler: Handler-Backstop zur Prompt-Mengen-Obergrenze ──────────
+
+test('capStylisticFehler kappt stilistische Findings auf cap, unter cap unveraendert', () => {
+  const under = Array.from({ length: 5 }, (_, i) => ({ typ: 'stil', original: `s${i}` }));
+  assert.equal(capStylisticFehler(under, 20).length, 5, 'unter dem Cap: nichts entfernt');
+
+  const over = Array.from({ length: 30 }, (_, i) => ({ typ: 'fuellwort', original: `f${i}` }));
+  const out = capStylisticFehler(over, 20);
+  assert.equal(out.length, 20, 'ueber dem Cap: auf 20 gekappt');
+  assert.equal(out[0].original, 'f0', 'Reihenfolge erhalten (Textposition)');
+  assert.equal(out[19].original, 'f19');
+});
+
+test('capStylisticFehler kappt mechanische/objektive Fehler NIE', () => {
+  // 40 Rechtschreib- + 40 Grammatik-Fehler dürfen alle bleiben.
+  const mech = [
+    ...Array.from({ length: 40 }, (_, i) => ({ typ: 'rechtschreibung', original: `r${i}` })),
+    ...Array.from({ length: 40 }, (_, i) => ({ typ: 'grammatik', original: `g${i}` })),
+  ];
+  assert.equal(capStylisticFehler(mech, 20).length, 80, 'objektive Fehler bleiben vollständig');
+});
+
+test('capStylisticFehler: Konsistenz-Typen zaehlen nicht als stilistisch', () => {
+  // namenskonsistenz/figurenmerkmal/anrede/schauplatzmerkmal + tempuswechsel/perspektivbruch/
+  // dialogformat sind objektiv → nicht im Cap.
+  const objektiv = ['namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal',
+    'tempuswechsel', 'perspektivbruch', 'dialogformat']
+    .flatMap(typ => Array.from({ length: 10 }, (_, i) => ({ typ, original: `${typ}${i}` })));
+  assert.equal(capStylisticFehler(objektiv, 5).length, objektiv.length, 'kein Konsistenz-/Tempus-Finding gekappt');
+  // Gegenprobe: keiner dieser Typen ist im STYLISTIC_TYPEN-Set.
+  for (const typ of ['namenskonsistenz', 'figurenmerkmal', 'anrede', 'schauplatzmerkmal',
+    'tempuswechsel', 'perspektivbruch', 'dialogformat', 'rechtschreibung', 'grammatik']) {
+    assert.equal(STYLISTIC_TYPEN.has(typ), false, `${typ} darf nicht stilistisch sein`);
+  }
+});
+
+test('capStylisticFehler: gemischte Liste – nur stilistische Ueberzahl faellt weg', () => {
+  const input = [
+    { typ: 'rechtschreibung', original: 'r1' },   // bleibt
+    ...Array.from({ length: 25 }, (_, i) => ({ typ: 'stil', original: `s${i}` })),
+    { typ: 'grammatik', original: 'g1' },          // bleibt
+  ];
+  const out = capStylisticFehler(input, 20);
+  assert.equal(out.length, 22, '2 objektiv + 20 stilistisch');
+  assert.equal(out.filter(f => f.typ === 'stil').length, 20);
+  assert.ok(out.some(f => f.typ === 'rechtschreibung') && out.some(f => f.typ === 'grammatik'));
+});
+
+test('capStylisticFehler: nicht-Array bleibt unveraendert (defensiv)', () => {
+  assert.equal(capStylisticFehler(null), null);
+  assert.equal(capStylisticFehler(undefined), undefined);
 });

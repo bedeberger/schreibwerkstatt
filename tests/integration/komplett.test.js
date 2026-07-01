@@ -64,7 +64,7 @@ function ortePassResponse() {
   return {
     orte: [{
       id: 'ort_1', name: 'Wald', typ: 'natur', beschreibung: 'kalt',
-      kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren: ['fig_1'],
+      kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren_namen: ['Anna'],
     }],
     songs: [],
     szenen: [{
@@ -202,7 +202,7 @@ test('Komplettanalyse Single-Pass: Completeness-Pass ergänzt übersehene Figure
   ctx.mockAi.on(
     (e) => e.schemaKeys.includes('orte') && e.prompt.includes('bereits_erfasste_schauplaetze'),
     { orte: [{ id: 'ort_1', name: 'Hütte', typ: 'gebaeude', beschreibung: 'übersehen',
-      kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren: [] }], songs: [], szenen: [] },
+      kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren_namen: [] }], songs: [], szenen: [] },
   );
   // Erst-Extraktion (A1 + B + C + E + A2) + P8 wie im Basis-Test.
   ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
@@ -338,7 +338,7 @@ function extraktionResponseFor(chapterName) {
     }],
     orte: [{
       id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit',
-      kapitel: [{ name: chapterName, haeufigkeit: 1 }], figuren: ['fig_anna'],
+      kapitel: [{ name: chapterName, haeufigkeit: 1 }], figuren_namen: ['Anna'],
     }],
     fakten: [],
     szenen: [{
@@ -379,7 +379,7 @@ test('Komplettanalyse Multi-Pass: 3 Kapitel → 3 P1-Chunks + Konsol-Calls', asy
     {
       orte: [{
         id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit',
-        kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_anna'],
+        kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren_namen: ['Anna'],
       }],
     },
   );
@@ -427,7 +427,7 @@ test('Komplettanalyse Delta-Cache: Touch einer Seite → nur dieser Chunk re-ext
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('orte'),
-    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren: ['fig_anna'] }] },
+    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren_namen: ['Anna'] }] },
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'),
@@ -493,7 +493,7 @@ test('Komplettanalyse Delta-Cache: Kapitel umbenannt → nur dessen Chunk re-ext
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('orte'),
-    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren: ['fig_anna'] }] },
+    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren_namen: ['Anna'] }] },
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'),
@@ -563,7 +563,7 @@ test('Komplettanalyse Checkpoint-Recovery: p1_full_done → überspringt Phase 1
       { kapitel: 'Kapitel 3', figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', kapitel: [{ name: 'Kapitel 3', haeufigkeit: 1 }], beziehungen: [] }] },
     ],
     chapterOrte: [
-      { kapitel: 'Kapitel 1', orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren: ['fig_anna'] }] },
+      { kapitel: 'Kapitel 1', orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren_namen: ['Anna'] }] },
       { kapitel: 'Kapitel 2', orte: [] },
       { kapitel: 'Kapitel 3', orte: [] },
     ],
@@ -592,7 +592,7 @@ test('Komplettanalyse Checkpoint-Recovery: p1_full_done → überspringt Phase 1
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('orte'),
-    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren: ['fig_anna'] }] },
+    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren_namen: ['Anna'] }] },
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'),
@@ -636,7 +636,7 @@ test('Komplettanalyse Checkpoint-Invalid: altes Format → ignoriert, voller Lau
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('orte'),
-    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren: ['fig_anna'] }] },
+    { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: '', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren_namen: ['Anna'] }] },
   );
   ctx.mockAi.on(
     (e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'),
@@ -747,7 +747,7 @@ test('Komplettanalyse Phase 2 Soziogramm: >=4 Figuren → Refine-Call überschre
     { id: 'fig_3', name: 'Cara', kurzname: 'Cara', typ: 'nebenfigur', praesenz: 'punktuell', sozialschicht: 'unten', kapitel: [{ name: 'Kapitel 2', haeufigkeit: 1 }], beziehungen: [] },
     { id: 'fig_4', name: 'Dora', kurzname: 'Dora', typ: 'nebenfigur', praesenz: 'punktuell', sozialschicht: 'unten', kapitel: [{ name: 'Kapitel 3', haeufigkeit: 1 }], beziehungen: [] },
   ]));
-  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_1'] }] });
+  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren_namen: ['Anna'] }] });
   ctx.mockAi.on(isBeziehung, { beziehungen: [] }); // Phase 3b: keine kapitelübergreifenden
   ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
 
@@ -792,8 +792,8 @@ test('Komplettanalyse Phase 3 Orte-Konsolidierung: Konsol-Output dedupliziert di
     return {
       figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
       orte: [
-        { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: ['fig_anna'] },
-        { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] },
+        { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: ['Anna'] },
+        { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: [] },
       ],
       fakten: [], songs: [],
       szenen: [{ seite: 'Seite', kapitel: chap, titel: 'Anna unterwegs', wertung: 'mittel', kommentar: 'k', figuren_namen: ['Anna'], orte_namen: ['Land'] }],
@@ -806,8 +806,8 @@ test('Komplettanalyse Phase 3 Orte-Konsolidierung: Konsol-Output dedupliziert di
   // Konsolidierung führt die 6 Kapitel-Vorkommen (3×Land + 3×Berg) auf 2 Orte zusammen.
   ctx.mockAi.on(isOrteKonsol, {
     orte: [
-      { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_anna'] },
-      { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_anna'] },
+      { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren_namen: ['Anna'] },
+      { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren_namen: ['Anna'] },
     ],
   });
   ctx.mockAi.on(isBeziehung, { beziehungen: [] });
@@ -841,8 +841,8 @@ test('Komplettanalyse Phase 3 Orte-Konsolidierung trunkiert → Job ok, Warnung,
     return {
       figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
       orte: [
-        { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: ['fig_anna'] },
-        { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] },
+        { id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: ['Anna'] },
+        { id: 'ort_berg', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: [] },
       ],
       fakten: [], songs: [],
       szenen: [{ seite: 'Seite', kapitel: chap, titel: 'Anna unterwegs', wertung: 'mittel', kommentar: 'k', figuren_namen: ['Anna'], orte_namen: ['Land'] }],
@@ -895,7 +895,7 @@ test('Komplettanalyse Phase 3 Orte-Fallback: kapitelweise wiederverwendete loc_i
     const chap = m ? m[0] : 'Kapitel';
     return {
       figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
-      orte: (perChapterOrte[num] || []).map(o => ({ ...o, typ: 'natur', beschreibung: 'x', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] })),
+      orte: (perChapterOrte[num] || []).map(o => ({ ...o, typ: 'natur', beschreibung: 'x', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: [] })),
       fakten: [], songs: [],
       szenen: [], assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
     };
@@ -939,7 +939,7 @@ test('Komplettanalyse Phase 3 Songs-Konsolidierung trunkiert → Job ok, Fallbac
     const chap = m ? m[0] : 'Kapitel';
     return {
       figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
-      orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', beschreibung: 'x', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: [] }],
+      orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', beschreibung: 'x', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: [] }],
       songs: (perChapterSongs[num] || []).map(s => ({ ...s, interpret: 'X', beschreibung: 'b', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: [] })),
       fakten: [], szenen: [], assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
     };
@@ -947,7 +947,7 @@ test('Komplettanalyse Phase 3 Songs-Konsolidierung trunkiert → Job ok, Fallbac
   ctx.mockAi.on(isFigKonsol, figKonsolResponse([
     { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
   ]));
-  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', figuren: [] }] });
+  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', figuren_namen: [] }] });
   ctx.mockAi.on(isSongsKonsol, { truncated: true, text: '{"songs":[' }); // erzwingt Fallback
   ctx.mockAi.on(isBeziehung, { beziehungen: [] });
   ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
@@ -1014,6 +1014,48 @@ test('Komplettanalyse Songs: figuren_namen wird gegen kanonische Figur aufgelös
     `Song sollte genau mit Anna verknüpft sein, got ${JSON.stringify(linkedFiguren)}`);
 });
 
+test('Komplettanalyse Orte: figuren_namen wird gegen kanonische Figur aufgelöst, unbekannter Name verworfen', async () => {
+  const BOOK_ID = 715;
+  seedMultiChapterBook(BOOK_ID, 3);
+
+  ctx.mockAi.on(isP1Extract, ({ prompt }) => {
+    const m = prompt.match(/Kapitel (\d+)/);
+    const chap = m ? m[0] : 'Kapitel';
+    return {
+      figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
+      // Ort referenziert Figuren über Klarnamen (nicht fig_id) – wie Songs/Szenen.
+      orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: ['Anna', 'Unbekannt Xyz'] }],
+      songs: [], fakten: [], szenen: [], assignments: [{ figur_name: 'Anna', lebensereignisse: [] }],
+    };
+  });
+  ctx.mockAi.on(isFigKonsol, figKonsolResponse([
+    { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
+  ]));
+  // Orte-Konsolidierung gibt den Ort mit Klarnamen zurück (inkl. eines nicht auflösbaren Namens).
+  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_1', name: 'Berg', typ: 'natur', beschreibung: 'hoch', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], figuren_namen: ['anna', 'Unbekannt Xyz'] }] });
+  ctx.mockAi.on(isBeziehung, { beziehungen: [] });
+  ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+  );
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+
+  // Ort ist über location_figures mit der kanonischen Figur Anna verknüpft (Name-Auflösung
+  // inkl. lowercase-Fallback bei 'anna'); der unbekannte Name wird verworfen.
+  const linkedFiguren = ctx.dbSchema.db.prepare(`
+    SELECT f.name FROM location_figures lf
+    JOIN locations l ON l.id = lf.location_id
+    JOIN figures f ON f.id = lf.figure_id
+    WHERE l.book_id = ? AND l.user_email = ?
+    ORDER BY f.name
+  `).all(BOOK_ID, 'tester@test.dev');
+  assert.deepEqual(linkedFiguren.map(r => r.name), ['Anna'],
+    `Ort sollte genau mit Anna verknüpft sein, got ${JSON.stringify(linkedFiguren)}`);
+});
+
 // Baut N Lebensereignisse für eine Figur (distinct datum+ereignis → N Gruppen in P6).
 function lebensereignisse(n) {
   return Array.from({ length: n }, (_, i) => ({
@@ -1030,7 +1072,7 @@ function zeitstrahlSeedHandlers(eventCount) {
     const chap = m ? m[0] : 'Kapitel';
     return {
       figuren: [{ id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: chap, haeufigkeit: 1 }], beziehungen: [] }],
-      orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren: ['fig_anna'] }],
+      orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: chap, haeufigkeit: 1 }], figuren_namen: ['Anna'] }],
       fakten: [], songs: [],
       szenen: [{ seite: 'Seite', kapitel: chap, titel: 'Anna unterwegs', wertung: 'mittel', kommentar: 'k', figuren_namen: ['Anna'], orte_namen: ['Land'] }],
       assignments: [{ figur_name: 'Anna', lebensereignisse: chap === 'Kapitel 1' ? lebensereignisse(eventCount) : [] }],
@@ -1039,7 +1081,7 @@ function zeitstrahlSeedHandlers(eventCount) {
   ctx.mockAi.on(isFigKonsol, figKonsolResponse([
     { id: 'fig_anna', name: 'Anna', kurzname: 'Anna', typ: 'protagonist', praesenz: 'zentral', sozialschicht: 'mitte', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 1 }], beziehungen: [] },
   ]));
-  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren: ['fig_anna'] }] });
+  ctx.mockAi.on(isOrteKonsol, { orte: [{ id: 'ort_land', name: 'Land', typ: 'natur', beschreibung: 'weit', kapitel: [{ name: 'Kapitel 1', haeufigkeit: 3 }], figuren_namen: ['Anna'] }] });
   ctx.mockAi.on(isBeziehung, { beziehungen: [] });
   ctx.mockAi.on(isKontinuitaet, kontinuitaetResponse());
 }

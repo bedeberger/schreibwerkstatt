@@ -23,21 +23,10 @@ function extractField(settled, chunkTexts, field) {
   }));
 }
 
-/** Mappt Figuren-Refs einer Entität (Ort/Song) gegen `idRemap` (gemergte Figuren-IDs
- *  aus mergeDuplicateFiguren) und filtert auf weiterhin existierende IDs. SSoT für das
- *  in den Single-/Multi-Pass-Übernahmen mehrfach wiederholte Remap-Idiom.
- *  KEIN Set-Dedup: die direkten Aufrufer brauchen keins; die regelbasierten Fallback-
- *  Merges (buildFallbackOrte/buildFallbackSongs) deduplizieren separat und bleiben unberührt. */
-function _remapFigRefs(refs, idRemap, validFigIds) {
-  return (refs || [])
-    .map(fid => idRemap?.[fid] || fid)
-    .filter(fid => validFigIds.has(fid));
-}
-
-/** Löst Klarnamen einer Entität (Song) gegen die kanonische Figurenliste zu fig_ids auf –
+/** Löst Klarnamen einer Entität (Song/Ort) gegen die kanonische Figurenliste zu fig_ids auf –
  *  identisches Muster wie remapSzenen (exakt, dann lowercase-Fallback). Nicht auflösbare
- *  Namen werden verworfen. Ergebnis dedupliziert. Songs referenzieren Figuren über Namen
- *  (nicht fig_id), weil der Song-Extraktions-Pass A1s ID-Namespace nicht teilt. */
+ *  Namen werden verworfen. Ergebnis dedupliziert. Songs UND Orte referenzieren Figuren über
+ *  Namen (nicht fig_id), weil der Extraktions-Pass A1s ID-Namespace nicht teilt. */
 function _remapFigNames(names, figNameToId, figNameToIdLower) {
   const out = [];
   const seen = new Set();
@@ -184,7 +173,7 @@ function buildFigNameLookup(figuren, chapterFiguren, chapterAssignments, chapter
 }
 
 module.exports = {
-  _refToString, _remapFigRefs, _remapFigNames, extractField,
+  _refToString, _remapFigNames, extractField,
   buildBookSystemBlockText, buildBookPagesSig, bookSettingsSigPart,
   _stelleQuote,
   makePhaseTimer,

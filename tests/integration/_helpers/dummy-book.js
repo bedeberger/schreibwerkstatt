@@ -117,7 +117,7 @@ function _extraktionResponse(chapterName) {
     orte: DUMMY_ORTE.map(o => ({
       ...o,
       kapitel: [{ name: chapterName, haeufigkeit: 1 }],
-      figuren: ['fig_lea'],
+      figuren_namen: ['Lea Brunner'],
     })),
     fakten: [
       { kategorie: 'opfer', subjekt: 'Sibylle Amrein', fakt: 'tot am Seeufer', seite: 'Seite 1.1' },
@@ -149,7 +149,7 @@ function _ortePassResponse(chapterName) {
     orte: DUMMY_ORTE.map(o => ({
       ...o,
       kapitel: [{ name: chapterName, haeufigkeit: 1 }],
-      figuren: ['fig_lea'],
+      figuren_namen: ['Lea Brunner'],
     })),
     songs: [],
     szenen: [{
@@ -212,7 +212,7 @@ function registerKomplettAiMocks(mockAi) {
       orte: DUMMY_ORTE.map(o => ({
         ...o,
         kapitel: [{ name: 'Kapitel 1 — Der Fund', haeufigkeit: 1 }],
-        figuren: ['fig_lea'],
+        figuren_namen: ['Lea Brunner'],
       })),
     },
   );

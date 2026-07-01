@@ -72,7 +72,7 @@ const _ortSchema = _obj({
   erste_erwaehnung: _str,
   stimmung: _str,
   kapitel: { type: 'array', items: _obj({ name: _str, haeufigkeit: _num }) },
-  figuren: { type: 'array', items: _str },
+  figuren_namen: { type: 'array', items: _str },
 });
 
 const _songSchema = _obj({

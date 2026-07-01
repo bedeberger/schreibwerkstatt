@@ -77,12 +77,12 @@ export function buildLocationsConsolidationPrompt(bookName, chapterOrte, figuren
       `- ${o.name} (${o.typ || 'andere'}): ${o.beschreibung || ''}` +
       (o.land ? ` | Land: ${o.land}` : '') +
       (o.stimmung ? ` | Stimmung: ${o.stimmung}` : '') +
-      (o.figuren?.length ? ` | Figuren: ${o.figuren.join(', ')}` : '') +
+      (o.figuren_namen?.length ? ` | Figuren: ${o.figuren_namen.join(', ')}` : '') +
       (o.kapitel?.length ? ` | Kapitel: ` + o.kapitel.map(k => (typeof k === 'string' ? k : k.name)).join(', ') : '')
     ).join('\n')
   ).join('\n\n');
   const figurenStr = figurenKompakt && figurenKompakt.length
-    ? '\n\nBekannte Figuren (nur diese IDs in «figuren» verwenden):\n' + figurenKompakt.map(f => `${f.id}: ${f.name}`).join('\n')
+    ? '\n\nBekannte Figuren (verwende in «figuren_namen» exakt diese Schreibweise):\n' + figurenKompakt.map(f => `- ${f.name}`).join('\n')
     : '';
   return `Konsolidiere die folgenden Schauplatz-Analysen aller Kapitel des Buchs «${bookName}» zu einer einheitlichen Gesamtliste. Erkenne Schauplätze, die unter verschiedenen Namen denselben realen Ort meinen (Synonyme, bestimmter Artikel, Schreibvarianten, Abkürzungen – z.B. «die Burg» / «Festung Hohenstein» / «das Schloss»), und fasse sie zu einem einzigen Eintrag zusammen. Führe dabei Kapitel- und Figuren-Listen zusammen und vergib stabile IDs (ort_1, ort_2, …).${figurenStr}
 
@@ -97,7 +97,7 @@ ${ORTE_RULES}
 
 Konsolidierungs-Regeln:
 - kapitel: Alle Kapitel der zusammengeführten Orte beibehalten (Union der Arrays, Duplikate entfernen) – ein in mehreren Kapiteln vorkommender Ort behält ALLE seine Kapitel.
-- figuren: Figuren-Listen der zusammengeführten Orte vereinen (gleiche ID nur einmal); nur IDs aus der bekannten Figurenliste.
+- figuren_namen: Figuren-Namenslisten der zusammengeführten Orte vereinen (gleicher Name nur einmal); Klarnamen exakt wie in der bekannten Figurenliste.
 - beschreibung/stimmung: bei Merge die Informationen zusammenführen und die präziseste/reichste Formulierung wählen.
 - Gleicher Name, aber klar verschiedene Orte (z.B. zwei verschiedene Gasthäuser «zum Löwen», zwei Städte gleichen Namens) bleiben getrennte Einträge.
 - Hierarchisch verschachtelte Orte (Raum in Gebäude in Stadt) nur zusammenführen, wenn der Text sie tatsächlich gleichsetzt – sonst als eigenständige Schauplätze behalten.`;
