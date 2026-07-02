@@ -347,7 +347,8 @@ export const ERZAEHLPROFIL_TEMPUS_ENUM = ['praeteritum', 'praesens', 'gemischt']
 const _themaItem = _obj({
   thema: _str,
   typ: { type: 'string', enum: ['thema', 'motiv', 'symbol'] },
-  beleg: _str,
+  // 2–4 kurze wörtliche Zitate, die das Thema/Motiv im Kapitel belegen.
+  belege: { type: 'array', items: _str },
 });
 const _erzaehlprofilProps = (withKapitel) => ({
   ...(withKapitel ? { kapitel: _str } : {}),

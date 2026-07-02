@@ -48,4 +48,8 @@ test('Schemas: Single-Pass hat kapitel-Array, Chapter-Schema die Item-Felder', (
     SCHEMA_ERZAEHLPROFIL_CHAPTER.properties.erzaehlzeit.enum,
     ['praeteritum', 'praesens', 'gemischt'],
   );
+  // Themen tragen mehrere Belege (Array wörtlicher Zitate), nicht mehr einen Einzelstring.
+  const thema = SCHEMA_ERZAEHLPROFIL_CHAPTER.properties.themen.items;
+  assert.equal(thema.properties.belege.type, 'array');
+  assert.ok(!thema.properties.beleg, 'kein Einzel-beleg-Feld mehr');
 });

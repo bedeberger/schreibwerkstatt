@@ -53,6 +53,10 @@
           <input type="text" x-data="numInput({ integer: true, min: 0, max: 3600000 })" x-modelable="value" x-model="adminSettingsForm['ai.claude.timeout_ms.komplett']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettTimeoutMs')"></small>
         </label>
+        <label>ai.claude.effort.komplett
+          <input type="text" x-model="adminSettingsForm['ai.claude.effort.komplett']" placeholder="high">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.komplettEffort')"></small>
+        </label>
         <label>ai.komplett.completeness_passes
           <input type="text" x-data="numInput({ integer: true, min: 0, max: 3 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.completeness_passes']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.completenessPasses')"></small>
@@ -65,10 +69,37 @@
           <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 1 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.coverage_min_score']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.coverageMinScore')"></small>
         </label>
+        <label>ai.komplett.extract_single_pass_cap
+          <input type="text" x-data="numInput({ integer: true, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.extract_single_pass_cap']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.extractSinglePassCap')"></small>
+        </label>
+        <label>ai.komplett.figure_batch_size
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 200 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.figure_batch_size']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.figureBatchSize')"></small>
+        </label>
+        <label>ai.komplett.scene_backfill_min_chars
+          <input type="text" x-data="numInput({ integer: true, min: 500, max: 100000 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.scene_backfill_min_chars']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.sceneBackfillMinChars')"></small>
+        </label>
         <label class="checkbox-row">
           <input type="checkbox" :checked="adminSettingsForm['ai.komplett.attribute_check'] === true || adminSettingsForm['ai.komplett.attribute_check'] === 'true'"
                  @change="adminSettingsForm['ai.komplett.attribute_check'] = $event.target.checked">
           <span x-text="$app.t('admin.settings.help.attributeCheck')"></span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['ai.komplett.coverage_feedback'] === true || adminSettingsForm['ai.komplett.coverage_feedback'] === 'true'"
+                 @change="adminSettingsForm['ai.komplett.coverage_feedback'] = $event.target.checked">
+          <span x-text="$app.t('admin.settings.help.coverageFeedback')"></span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['ai.komplett.scene_backfill'] === true || adminSettingsForm['ai.komplett.scene_backfill'] === 'true'"
+                 @change="adminSettingsForm['ai.komplett.scene_backfill'] = $event.target.checked">
+          <span x-text="$app.t('admin.settings.help.sceneBackfill')"></span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" :checked="adminSettingsForm['ai.komplett.remap_rescue'] === true || adminSettingsForm['ai.komplett.remap_rescue'] === 'true'"
+                 @change="adminSettingsForm['ai.komplett.remap_rescue'] = $event.target.checked">
+          <span x-text="$app.t('admin.settings.help.remapRescue')"></span>
         </label>
 
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.bookchatTitle')"></span></h4>

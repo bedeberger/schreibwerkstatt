@@ -341,7 +341,7 @@ Tempuswechsel-Regeln (typ: «tempuswechsel»):
 - «original»: vollständiger Satz zeichengenau aus dem Text
 - «korrektur»: derselbe Satz im korrekten Tempus der umgebenden Passage
 - «erklaerung»: benennen, welches Tempus in der Passage etabliert ist (mit Verweis auf den Erzählform-Block, falls vorhanden) und welches im Satz verwendet wird
-- Nicht melden bei: Plusquamperfekt für Rückblenden, historischem Präsens als bewusstem Stilmittel, Tempuswechsel in direkter Rede / Dialog (Figuren sprechen in ihrer eigenen Zeit), zitierten Briefen / Tagebucheinträgen / Nachrichten, Wechsel an Szenen-/Kapitelgrenzen, sowie allgemeingültigen Aussagen / zeitlosen Wahrheiten im Präsens innerhalb einer Präteritum-Erzählung («Die Sonne geht im Osten auf»).`;
+- Nicht melden bei: Plusquamperfekt für Rückblenden, historischem Präsens als bewusstem Stilmittel, Tempuswechsel in direkter Rede / Dialog (Figuren sprechen in ihrer eigenen Zeit), zitierten Briefen / Tagebucheinträgen / Nachrichten, Wechsel an Szenen-/Kapitelgrenzen, allgemeingültigen Aussagen / zeitlosen Wahrheiten im Präsens innerhalb einer Präteritum-Erzählung («Die Sonne geht im Osten auf»), sowie auktorialem Erzähler-/Chronisten-Kommentar aus der Erzählgegenwart (gnomisches Präsens der Erzählinstanz, die aus ihrer Gegenwart auf die im Präteritum erzählte Handlung blickt, z.B. «Doch das ist eine andere Geschichte», «Wir wollen nicht vorgreifen», «Man ahnt bereits, wohin das führt»).`;
 }
 
 /**
@@ -369,6 +369,6 @@ export function _buildErzaehlformBlock(perspektive, zeit, buchtyp, mode = 'lekto
     perspektive ? `- Erzählperspektive: ${perspektive}` : null,
     zeit        ? `- Erzählzeit: ${zeit}`              : null,
   ].filter(Boolean);
-  const scopeNote = `- Gilt NUR für den narrativen Erzähltext. KEIN Bruch ist in folgenden Fällen: direkte Rede / Dialog (Figuren sprechen in ihrer eigenen Zeit), innere Monologe in direkter Form, zitierte Briefe / Tagebuch­einträge / Nachrichten / Dokumente im Roman, erlebte Rede, historisches Präsens als bewusstes Stilmittel, Rückblenden (Plusquamperfekt) und Antizipationen (Futur), sowie Wechsel an Szenen-/Kapitelgrenzen.`;
+  const scopeNote = `- Gilt NUR für den narrativen Erzähltext. KEIN Bruch ist in folgenden Fällen: direkte Rede / Dialog (Figuren sprechen in ihrer eigenen Zeit), innere Monologe in direkter Form, zitierte Briefe / Tagebuch­einträge / Nachrichten / Dokumente im Roman, erlebte Rede, historisches Präsens als bewusstes Stilmittel, Rückblenden (Plusquamperfekt) und Antizipationen (Futur), Wechsel an Szenen-/Kapitelgrenzen, sowie auktorialer Erzähler-/Chronisten-Kommentar aus der Erzählgegenwart (gnomisches Präsens der Erzählinstanz innerhalb einer Präteritum-Erzählung).`;
   return `\n${header}\n${lines.join('\n')}\n${scopeNote}\n`;
 }

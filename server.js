@@ -358,7 +358,7 @@ app.use('/metrics', require('./routes/metrics'));
 
 // ── Auth-Guard ────────────────────────────────────────────────────────────────
 // API-Pfade → 401 JSON; HTML-Pfade → Redirect zu /auth/login
-const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/publication/', '/content/', '/stt/', '/tts/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/', '/name-guard/'];
+const API_PREFIXES = ['/history/', '/figures/', '/locations/', '/world-facts/', '/songs/', '/jobs/', '/sync/', '/chat/', '/booksettings/', '/publication/', '/content/', '/stt/', '/tts/', '/books/', '/me/', '/admin/', '/local/', '/config', '/share/api/', '/name-guard/', '/research', '/research/'];
 
 app.use((req, res, next) => {
   // Device-Token (native Clients, z.B. Mac-Focus-Writer): Bearer swd_… loest auf

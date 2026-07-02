@@ -8830,6 +8830,21 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 227 abgeschlossen (chapter_narrative_profile + chapter_narrative_themes — Kapitel-Erzählprofil-Phase).');
   }
 
+  if (version < 228) {
+    // Themen/Motive tragen jetzt mehrere Belege (JSON-Array wörtlicher Zitate,
+    // wie figure_relations.belege) statt eines einzelnen beleg-Strings.
+    db.exec('ALTER TABLE chapter_narrative_themes RENAME COLUMN beleg TO belege');
+    // Bestehende Einzel-Belege ins Array heben; leere/NULL bleiben leer.
+    db.exec("UPDATE chapter_narrative_themes SET belege = json_array(belege) WHERE belege IS NOT NULL AND belege <> ''");
+    db.exec("UPDATE chapter_narrative_themes SET belege = NULL WHERE belege = ''");
+    const fkErrors228 = db.pragma('foreign_key_check');
+    if (fkErrors228.length) {
+      throw new Error(`Migration 228: foreign_key_check meldet ${fkErrors228.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 228').run();
+    logger.info('DB-Migration auf Version 228 abgeschlossen (chapter_narrative_themes.beleg → belege, JSON-Array mehrerer Zitate).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

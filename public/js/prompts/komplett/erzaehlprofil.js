@@ -31,7 +31,7 @@ ${_TEMPUS_LEGENDE}
 - intensitaet: dramaturgische Spannungs-/Intensitätsstufe des Kapitels, ganzzahlig 1–5 (1 = ruhig/reflexiv/expositorisch, 2 = ansteigend, 3 = mittlere Spannung, 4 = hohe Spannung/Konflikt, 5 = Höhepunkt/Eskalation/Wendepunkt). Beurteile die erzählerische Wirkung, nicht die Wortzahl.
 - intensitaet_begruendung: 1 Satz, warum diese Stufe (was das Kapitel dramaturgisch trägt).
 - zusammenfassung: 1 Satz zum erzählerischen Fokus des Kapitels (worum es erzähltechnisch geht).
-- themen: die dominanten Themen, Motive und Symbole des Kapitels (je 2–5, absteigend nach Relevanz). Pro Eintrag: thema (kurze Bezeichnung, z.B. «Schuld», «das Meer», «zerbrochene Uhr»), typ («thema» = abstrakter Bedeutungskomplex, «motiv» = wiederkehrendes konkretes Element, «symbol» = bedeutungstragender Gegenstand/Bild), beleg (kurzes Stichwort/Zitat der Textstelle; leer wenn nicht nötig). Nur textbelegte Themen – keine Spekulation.`;
+- themen: die dominanten Themen, Motive und Symbole des Kapitels (je 2–5, absteigend nach Relevanz). Pro Eintrag: thema (kurze Bezeichnung, z.B. «Schuld», «das Meer», «zerbrochene Uhr»), typ («thema» = abstrakter Bedeutungskomplex, «motiv» = wiederkehrendes konkretes Element, «symbol» = bedeutungstragender Gegenstand/Bild), belege (2–4 kurze WÖRTLICHE Zitate aus dem Kapitel, je 3–12 Wörter, die das Thema/Motiv im Text belegen; verschiedene Textstellen, nicht dasselbe Zitat variiert; leeres Array nur, wenn sich wirklich keine Stelle wörtlich zitieren lässt). Nur textbelegte Themen – KEINE Spekulation, KEINE erfundenen oder paraphrasierten Zitate.`;
 
 const _PROFIL_ITEM = `{
       "perspektive": "ich|du|er_sie_personal|er_sie_auktorial|wir|gemischt",
@@ -42,7 +42,7 @@ const _PROFIL_ITEM = `{
       "intensitaet": 3,
       "intensitaet_begruendung": "1 Satz",
       "zusammenfassung": "1 Satz erzählerischer Fokus",
-      "themen": [{ "thema": "Bezeichnung", "typ": "thema|motiv|symbol", "beleg": "kurz oder leer" }]
+      "themen": [{ "thema": "Bezeichnung", "typ": "thema|motiv|symbol", "belege": ["kurzes wörtliches Zitat", "weiteres Zitat aus anderer Textstelle"] }]
     }`;
 
 /** Single-Pass: das ganze Buch → ein Profil-Eintrag pro Kapitel. `bookText === null`

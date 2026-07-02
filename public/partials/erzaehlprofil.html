@@ -106,9 +106,15 @@
               <p class="erzaehlprofil-chapter-summary" x-show="ch.zusammenfassung" x-text="ch.zusammenfassung"></p>
               <div class="erzaehlprofil-themen" x-show="(ch.themen || []).length">
                 <template x-for="(t, ti) in ch.themen" :key="'t:' + ti">
-                  <span class="erzaehlprofil-thema-chip" :data-typ="t.typ || 'thema'"
-                        :data-tip="t.beleg || ''"
-                        x-text="t.thema"></span>
+                  <div class="erzaehlprofil-thema">
+                    <span class="erzaehlprofil-thema-chip" :data-typ="t.typ || 'thema'"
+                          x-text="t.thema"></span>
+                    <ul class="erzaehlprofil-thema-belege" x-show="(t.belege || []).length">
+                      <template x-for="(b, bi) in (t.belege || [])" :key="'b:' + bi">
+                        <li class="erzaehlprofil-beleg" x-text="'«' + b + '»'"></li>
+                      </template>
+                    </ul>
+                  </div>
                 </template>
               </div>
             </div>

@@ -1381,7 +1381,7 @@ function saveChapterNarrativeProfiles(bookId, userEmail, profiles, chNameToId, f
        pov_konfidenz, pov_beleg, pov_abweichung, intensitaet, intensitaet_begruendung, zusammenfassung, sort_order, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`);
     const insT = db.prepare(
-      'INSERT INTO chapter_narrative_themes (profile_id, thema, typ, beleg, sort_order) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO chapter_narrative_themes (profile_id, thema, typ, belege, sort_order) VALUES (?, ?, ?, ?, ?)'
     );
     list.forEach((p, i) => {
       const chId = (p.kapitel != null && chNameToId?.[p.kapitel] != null) ? chNameToId[p.kapitel] : null;
@@ -1409,7 +1409,14 @@ function saveChapterNarrativeProfiles(bookId, userEmail, profiles, chNameToId, f
         const thema = (t && typeof t === 'object') ? (t.thema || '') : String(t || '');
         const trimmed = String(thema).trim();
         if (!trimmed) return;
-        insT.run(pid, trimmed, (t && typeof t === 'object' && t.typ) || null, (t && typeof t === 'object' && t.beleg) || null, j);
+        // belege: Array wörtlicher Zitate → JSON. Legacy-Einzelstring (t.beleg)
+        // wird tolerant ins Array gehoben. Leeres/kein Beleg → NULL.
+        const rawBelege = (t && typeof t === 'object')
+          ? (Array.isArray(t.belege) ? t.belege : (t.beleg != null ? [t.beleg] : []))
+          : [];
+        const belegeArr = rawBelege.map(b => String(b || '').trim()).filter(Boolean);
+        const belege = belegeArr.length ? JSON.stringify(belegeArr) : null;
+        insT.run(pid, trimmed, (t && typeof t === 'object' && t.typ) || null, belege, j);
       });
       saved++;
     });
@@ -1437,14 +1444,21 @@ function getChapterNarrativeProfile(bookId, userEmail) {
   const declared = { erzaehlperspektive: bs?.erzaehlperspektive || null, erzaehlzeit: bs?.erzaehlzeit || null };
   if (!rows.length) return { chapters: [], declared, updated_at: null };
   const themeRows = db.prepare(`
-    SELECT profile_id, thema, typ, beleg FROM chapter_narrative_themes
+    SELECT profile_id, thema, typ, belege FROM chapter_narrative_themes
      WHERE profile_id IN (SELECT id FROM chapter_narrative_profile WHERE book_id = ? AND user_email IS ?)
      ORDER BY profile_id, sort_order, id
   `).all(bookIdInt, email);
+  const parseBelege = (raw) => {
+    if (!raw) return [];
+    try {
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.map(b => String(b || '').trim()).filter(Boolean) : [];
+    } catch { return String(raw).trim() ? [String(raw).trim()] : []; }
+  };
   const byPid = new Map();
   for (const t of themeRows) {
     if (!byPid.has(t.profile_id)) byPid.set(t.profile_id, []);
-    byPid.get(t.profile_id).push({ thema: t.thema, typ: t.typ, beleg: t.beleg });
+    byPid.get(t.profile_id).push({ thema: t.thema, typ: t.typ, belege: parseBelege(t.belege) });
   }
   // Abweichung zur Lese-Zeit aus der aktuellen Soll-Erzählform berechnen (statt aus
   // dem beim Lauf gespeicherten Flag) — so bleibt die Anzeige korrekt, auch wenn der
