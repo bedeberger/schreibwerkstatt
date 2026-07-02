@@ -36,7 +36,7 @@ Antworte mit diesem JSON-Schema:
       "kapitel": "NUR der reine Kapitelname aus dem ## Header – OHNE die ##-Markierung. Beispiel: aus «## Der Vater» wird «Der Vater». Nicht der ### Seiten-Header. Leer wenn unklar.",
       "titel": "Kurze Szenenbezeichnung (1 Satz)",
       "wertung": "stark|mittel|schwach",
-      "kommentar": "1-2 Sätze: was funktioniert, was fehlt (Spannung, Tempo, Figurenentwicklung)",
+      "kommentar": "Begründung der wertung + Verbesserungshinweis (2-3 Sätze): WARUM ist die Szene stark/mittel/schwach – konkret festgemacht an Spannung, Tempo, Figurenentwicklung, Konflikt/Ziel, Dialog oder Struktur. Bei «mittel»/«schwach» mindestens einen konkreten, umsetzbaren Verbesserungshinweis nennen; bei «stark» benennen, was sie trägt.",
       "figuren_namen": ["Figurenname exakt wie im Text"],
       "orte_namen": ["Schauplatzname exakt wie im Text"]
     }
@@ -102,6 +102,7 @@ Szenen-Regeln:
 - figuren_namen: aktiv beteiligte Figuren – Namen exakt wie im Text (vollständiger Name oder Spitzname); leeres Array wenn keine Figur beteiligt
 - orte_namen: Schauplatz der Szene – exakter Name wie im Text; leeres Array wenn kein konkreter Ort erwähnt
 - wertung: «stark» = überzeugend/spannend, «mittel» = verbesserungswürdig, «schwach» = klare Schwächen
+- kommentar MUSS die wertung begründen (woran festgemacht) und bei «mittel»/«schwach» einen konkreten Verbesserungshinweis geben – keine reine Zusammenfassung des Inhalts
 - Kein Cap auf Anzahl Szenen – vollständige Erfassung aller Handlungsabschnitte wichtiger als Kürze. Pro Kapitel mit Handlung mindestens eine Szene.
 - Nur wenn ein Kapitel ausschliesslich aus Exposition/Beschreibung ohne Handlungsabschnitt besteht: «szenen» als leeres Array
 
@@ -209,7 +210,7 @@ function buildKomplettSchemaOrteSzenen(_kontext = '') {
       "kapitel": "NUR der reine Kapitelname aus dem ## Header – OHNE ##-Markierung. Nicht der ### Seiten-Header. Leer wenn unklar.",
       "titel": "Kurze Szenenbezeichnung (1 Satz)",
       "wertung": "stark|mittel|schwach",
-      "kommentar": "1-2 Sätze: was funktioniert, was fehlt",
+      "kommentar": "Begründung der wertung + Verbesserungshinweis (2-3 Sätze): WARUM ist die Szene stark/mittel/schwach – konkret festgemacht an Spannung, Tempo, Figurenentwicklung, Konflikt/Ziel, Dialog oder Struktur. Bei «mittel»/«schwach» mindestens einen konkreten, umsetzbaren Verbesserungshinweis nennen; bei «stark» benennen, was sie trägt.",
       "figuren_namen": ["Figurenname exakt wie im Text"],
       "orte_namen": ["Schauplatzname exakt wie im Text"]
     }
@@ -238,7 +239,9 @@ ${SONGS_RULES}
 Szenen-Regeln:
 - seite: NUR der reine Titel eines ### Headers im aktuellen ## Kapitel, OHNE «### »-Markierung. NIEMALS den Kapitelnamen. Bei Unklarheit: leer.
 - figuren_namen: Klarnamen exakt wie im Text; leeres Array wenn keine Figur beteiligt.
-- orte_namen: exakter Name wie im Text; leeres Array wenn kein konkreter Ort.`;
+- orte_namen: exakter Name wie im Text; leeres Array wenn kein konkreter Ort.
+- wertung: «stark» = überzeugend/spannend, «mittel» = verbesserungswürdig, «schwach» = klare Schwächen.
+- kommentar MUSS die wertung begründen (woran festgemacht) und bei «mittel»/«schwach» einen konkreten Verbesserungshinweis geben – keine reine Zusammenfassung des Inhalts.`;
 }
 
 /** Schema-Block nur für Fakten (Claude-Single-Pass C, parallel zu A1/B).

@@ -15,10 +15,13 @@ const { parseJSON, _claudeAcceptsTemperature, _claudeUsesAdaptiveThinking, _clau
 // Opus 4.7+ haben temperature/top_p/top_k entfernt → 400 bei Verwendung.
 // _callClaude muss temperature für diese Modelle weglassen, für ältere senden.
 test('_claudeAcceptsTemperature: Opus 4.7+ lehnt ab, Sonnet/Opus 4.6 akzeptieren', () => {
-  for (const m of ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-opus-4-5', 'claude-opus-4-1', 'claude-haiku-4-5', '']) {
+  for (const m of ['claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-opus-4-6', 'claude-opus-4-5', 'claude-opus-4-1', 'claude-haiku-4-5', '']) {
     assert.equal(_claudeAcceptsTemperature(m), true, `${m} sollte temperature akzeptieren`);
   }
-  for (const m of ['claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-4-8[1m]', 'claude-opus-4-9', 'claude-opus-4-10']) {
+  // Moderne Generation lehnt Sampling-Parameter ab — inkl. Sonnet 5 und Fable/Mythos 5
+  // (frühere reine Opus-4.7+-Regex hätte diese mit temperature bestückt → 400).
+  for (const m of ['claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-4-8[1m]', 'claude-opus-4-9', 'claude-opus-4-10',
+    'claude-sonnet-5', 'claude-sonnet-5-20260101', 'claude-fable-5', 'claude-mythos-5']) {
     assert.equal(_claudeAcceptsTemperature(m), false, `${m} sollte temperature ablehnen`);
   }
 });
@@ -26,12 +29,40 @@ test('_claudeAcceptsTemperature: Opus 4.7+ lehnt ab, Sonnet/Opus 4.6 akzeptieren
 // Opus 4.7+ schreiben bei deaktiviertem Thinking Reasoning-Prosa in den sichtbaren
 // Output → bläht JSON-Only-Antworten bis zum Truncation-Wurf. _callClaude muss daher
 // für diese Modelle adaptive Thinking senden, für Sonnet 4.6 / Opus 4.6 / ältere nicht.
-test('_claudeUsesAdaptiveThinking: nur Opus 4.7+ (gleiche Generationen wie temperature-Verbot)', () => {
-  for (const m of ['claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-4-8[1m]', 'claude-opus-4-9', 'claude-opus-4-10']) {
+test('_claudeUsesAdaptiveThinking: moderne Generation (Opus 4.7+/Sonnet 5+/Fable 5+), sonst nicht', () => {
+  for (const m of ['claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-4-8[1m]', 'claude-opus-4-9', 'claude-opus-4-10',
+    'claude-sonnet-5', 'claude-fable-5', 'claude-mythos-5']) {
     assert.equal(_claudeUsesAdaptiveThinking(m), true, `${m} sollte adaptive Thinking nutzen`);
   }
-  for (const m of ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-opus-4-5', 'claude-opus-4-1', 'claude-haiku-4-5', '']) {
+  for (const m of ['claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-opus-4-6', 'claude-opus-4-5', 'claude-opus-4-1', 'claude-haiku-4-5', '']) {
     assert.equal(_claudeUsesAdaptiveThinking(m), false, `${m} sollte kein thinking-Feld senden`);
+  }
+});
+
+// Structured Outputs (output_config.format) — Allowlist unterstützter Modelle. Prod-Modell
+// Sonnet 4.6 ist NICHT gelistet → dort kein format senden (sonst 400). Komplett-Ziel Opus 4.8
+// (+ Sonnet 5, Fable, Haiku 4.5, Legacy Opus 4.5/4.1) ist gelistet.
+test('_claudeSupportsStructuredOutputs: Allowlist deckt Opus 4.7+/Sonnet 5/Fable/Haiku 4.5/Legacy-Opus', () => {
+  const { _claudeSupportsStructuredOutputs } = require('../../lib/ai');
+  for (const m of ['claude-opus-4-8', 'claude-opus-4-8[1m]', 'claude-opus-4-7', 'claude-sonnet-5',
+    'claude-fable-5', 'claude-mythos-5', 'claude-haiku-4-5', 'claude-opus-4-5', 'claude-opus-4-1']) {
+    assert.equal(_claudeSupportsStructuredOutputs(m), true, `${m} sollte Structured Outputs unterstützen`);
+  }
+  for (const m of ['claude-sonnet-4-6', 'claude-sonnet-4-5', '']) {
+    assert.equal(_claudeSupportsStructuredOutputs(m), false, `${m} sollte KEINE Structured Outputs bekommen`);
+  }
+});
+
+// Model-aware Tokenizer-Rate: moderne Generation rechnet konservativer (≤2.5), damit das
+// Char-Budget nicht überschätzt wird; ältere Modelle behalten den globalen CHARS_PER_TOKEN.
+test('_claudeCharsPerToken: moderne Generation ≤ 2.5, ältere = globaler Wert', () => {
+  const { _claudeCharsPerToken, CHARS_PER_TOKEN } = require('../../lib/ai');
+  for (const m of ['claude-opus-4-8', 'claude-sonnet-5', 'claude-fable-5']) {
+    assert.ok(_claudeCharsPerToken(m) <= 2.5, `${m} sollte ≤2.5 chars/token rechnen`);
+  }
+  for (const m of ['claude-sonnet-4-6', 'claude-opus-4-6', '']) {
+    assert.equal(_claudeCharsPerToken(m), CHARS_PER_TOKEN,
+      `${m} sollte den globalen CHARS_PER_TOKEN behalten`);
   }
 });
 

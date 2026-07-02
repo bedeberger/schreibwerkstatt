@@ -1281,3 +1281,152 @@ test('Komplettanalyse F4: buildAttributeContradictions findet Jahres-Konflikt ei
   assert.equal(geburt.typ, 'zeitlinie');
   assert.deepEqual([geburt.wertA.wert, geburt.wertB.wert].sort(), ['1970', '1975']);
 });
+
+// ── #4: E/A2-Batching ─────────────────────────────────────────────────────────
+// figure_batch_size=1 zwingt Anna + Bert in getrennte E- und A2-Batches. Erwartet:
+// A1 + B + C + 2×E + 2×A2 + P8 = 8 Calls; Katalog unverändert (Beziehung dedupliziert).
+test('Komplettanalyse #4: figure_batch_size=1 → E + A2 batchen, Katalog korrekt', async () => {
+  const BOOK_ID = 120;
+  seedTinyBook(BOOK_ID);
+  const appSettings = require('../../lib/app-settings');
+  appSettings.set('ai.komplett.figure_batch_size', 1);
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'), ortePassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'), eventsPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'), kontinuitaetResponse());
+
+  try {
+    const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
+    ctx.shared.enqueueJob(jobId, () =>
+      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'));
+    const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+    assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+    assert.equal(job.result.figCount, 2);
+    // A1 + B + C + E(Anna) + E(Bert) + A2(Anna-Scope) + A2(Bert-Scope) + P8 = 8.
+    assert.equal(ctx.mockAi.log.length, 8, `expected 8 AI calls (batched E+A2), got ${ctx.mockAi.log.length}`);
+    // Beziehung trotz doppelter Emission (beide A2-Batches) via Paar-Dedup nur EINMAL.
+    const relRows = ctx.dbSchema.db.prepare('SELECT COUNT(*) AS n FROM figure_relations WHERE book_id = ?').get(BOOK_ID);
+    assert.equal(relRows.n, 1, `expected 1 deduped relation, got ${relRows.n}`);
+  } finally {
+    appSettings.set('ai.komplett.figure_batch_size', 20);
+  }
+});
+
+// ── #8: Remap-Rescue ──────────────────────────────────────────────────────────
+// Eine Szene referenziert «Annie» (Spitzname, nicht im Katalog). Ohne Rescue würde die
+// Figuren-Verknüpfung gedroppt; der Namensauflösungs-Call mappt «Annie» → «Anna».
+test('Komplettanalyse #8: Remap-Rescue ordnet unauflösbaren Szenen-Namen dem Katalog zu', async () => {
+  const BOOK_ID = 121;
+  const email = 'tester@test.dev';
+  seedTinyBook(BOOK_ID);
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
+  // B liefert eine Szene, deren figuren_namen den unauflösbaren Spitznamen «Annie» trägt.
+  ctx.mockAi.on((e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'), {
+    orte: [{ id: 'ort_1', name: 'Wald', typ: 'natur', beschreibung: 'kalt', kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren_namen: [] }],
+    songs: [],
+    szenen: [{ seite: 'Seite Eins', kapitel: 'Kapitel Eins', titel: 'Annie im Wald', wertung: 'mittel', kommentar: 'k', figuren_namen: ['Annie'], orte_namen: ['Wald'] }],
+  });
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'), eventsPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+  // Namensauflösung: «Annie» → «Anna».
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zuordnungen'), { zuordnungen: [{ name: 'Annie', treffer: 'Anna' }] });
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'), kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'));
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+
+  // Die Szene ist mit Anna verknüpft (via gerettetem «Annie» → «Anna»), nicht leer.
+  const link = ctx.dbSchema.db.prepare(`
+    SELECT f.name AS fig FROM scene_figures sf
+      JOIN figure_scenes s ON s.id = sf.scene_id
+      JOIN figures f ON f.id = sf.figure_id
+     WHERE s.book_id = ?
+  `).all(BOOK_ID);
+  assert.ok(link.some(r => r.fig === 'Anna'), `Szene sollte mit Anna verknüpft sein (Rescue), got ${JSON.stringify(link)}`);
+});
+
+// ── #3: Szenen-Backfill ───────────────────────────────────────────────────────
+// Ein Kapitel mit substanziellem Text, für das die Extraktion 0 Szenen lieferte, bekommt
+// einen gezielten Szenen-Nachzieh-Call.
+test('Komplettanalyse #3: Szenen-Backfill ergänzt Szenen für ein szenenloses Kapitel', async () => {
+  const BOOK_ID = 122;
+  const email = 'tester@test.dev';
+  // ~6000 Zeichen (> scene_backfill_min_chars=3000), Single-Pass (< 20000).
+  ctx.dbSeed.setBook({
+    chapters: [{ id: 1300, book_id: BOOK_ID, name: 'Kapitel Eins' }],
+    pages: [{ id: 1400, book_id: BOOK_ID, chapter_id: 1300, name: 'Seite Eins', updated_at: '2026-01-01' }],
+    pageBodies: { 1400: '<p>' + 'Anna ging durch den weiten dunklen Wald. '.repeat(150) + '</p>' },
+  });
+
+  // Ziel-Szenen-Call ZUERST (first-match): erkennbar am Prompt-Marker + szenen-Schema.
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('szenen') && e.prompt.includes('kapitel_ohne_szenen'),
+    { orte: [], songs: [], szenen: [{ seite: 'Seite Eins', kapitel: 'Kapitel Eins', titel: 'Nachgezogene Szene', wertung: 'mittel', kommentar: 'k', figuren_namen: ['Anna'], orte_namen: [] }] },
+  );
+  ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
+  // B liefert KEINE Szene (szenen leer) → Backfill greift.
+  ctx.mockAi.on((e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'), {
+    orte: [{ id: 'ort_1', name: 'Wald', typ: 'natur', beschreibung: 'kalt', kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], figuren_namen: ['Anna'] }],
+    songs: [], szenen: [],
+  });
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'), eventsPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'), kontinuitaetResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'));
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.equal(job.result.szenenCount, 1, 'Backfill ergänzt die fehlende Szene');
+});
+
+// ── #2: Coverage-Feedback ─────────────────────────────────────────────────────
+// Der Vollständigkeits-Audit meldet eine fehlende Figur → gezielter Nachzieh-Pass ergänzt sie
+// additiv (vor E/A2), sodass figCount steigt.
+test('Komplettanalyse #2: Coverage-Feedback zieht eine vom Audit gemeldete fehlende Figur nach', async () => {
+  const BOOK_ID = 123;
+  const email = 'tester@test.dev';
+  seedTinyBook(BOOK_ID);
+  const appSettings = require('../../lib/app-settings');
+  appSettings.set('ai.komplett.coverage_audit_chapters', 1);
+
+  // Gezielter Figuren-Nachzieh-Call ZUERST (Prompt-Marker «fehlende_figuren» + figuren-Schema).
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('figuren') && e.prompt.includes('fehlende_figuren'),
+    { figuren: [{ id: 'fig_1', name: 'Clara', kurzname: 'Clara', typ: 'nebenfigur', beschreibung: 'vom Audit gefunden', sozialschicht: 'mitte', praesenz: 'punktuell', kapitel: [{ name: 'Kapitel Eins', haeufigkeit: 1 }], eigenschaften: [], schluesselzitate: [] }] },
+  );
+  // Audit-Call (forward + end) meldet Clara als fehlend.
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('erkannte_figuren') && e.schemaKeys.includes('fehlende_figuren'),
+    { erkannte_figuren: 2, fehlende_figuren: ['Clara'], erkannte_orte: 1, fehlende_orte: [] },
+  );
+  ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'), ortePassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'), eventsPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung') && e.schemaKeys.includes('probleme'), kontinuitaetResponse());
+
+  try {
+    const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
+    ctx.shared.enqueueJob(jobId, () =>
+      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'));
+    const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+    assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+    assert.equal(job.result.figCount, 3, 'Coverage-Feedback ergänzt die fehlende Figur Clara');
+    const names = ctx.dbSchema.db.prepare('SELECT name FROM figures WHERE book_id = ? ORDER BY name').all(BOOK_ID).map(r => r.name);
+    assert.deepEqual(names, ['Anna', 'Bert', 'Clara']);
+  } finally {
+    appSettings.set('ai.komplett.coverage_audit_chapters', 0);
+  }
+});
