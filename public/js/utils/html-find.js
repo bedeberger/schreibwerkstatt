@@ -101,6 +101,29 @@ export function findInHtml(html, needle) {
   return { htmlStart: starts[idx], htmlEnd: ends[idx + normalized.length - 1] };
 }
 
+/**
+ * Zählt die nicht-überlappenden Vorkommen von `needle` in `html` über dieselbe
+ * Text-View wie `findInHtml` (Tags ignorieren, Entities dekodieren, Whitespace
+ * kollabieren). Dient der Ambiguitäts-Erkennung vor einer Ersetzung: `findInHtml`
+ * greift immer das erste Vorkommen, was bei mehrdeutigen Phrasen die falsche
+ * Stelle treffen würde. Kommt der Text mehrfach vor, kann statt still-falscher
+ * Ersetzung abgebrochen werden.
+ */
+export function countInHtml(html, needle) {
+  if (!html || !needle) return 0;
+  const normalized = needle.replace(/\s+/g, ' ').trim();
+  if (!normalized) return 0;
+  const { text } = _buildHtmlTextMap(html);
+  let count = 0;
+  let from = 0;
+  let idx;
+  while ((idx = text.indexOf(normalized, from)) !== -1) {
+    count++;
+    from = idx + normalized.length;
+  }
+  return count;
+}
+
 const _VOID_TAGS = new Set([
   'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr',
 ]);

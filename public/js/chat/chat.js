@@ -1,4 +1,4 @@
-import { escHtml, findInHtml, clearStatusAfter } from '../utils.js';
+import { escHtml, findInHtml, countInHtml, replaceInHtml, clearStatusAfter } from '../utils.js';
 import { makeChatMethods } from './chat-base.js';
 import { contentRepo } from '../repo/content.js';
 
@@ -109,8 +109,24 @@ export const chatMethods = {
       // überschreiben, die zwischen letztem GET und jetzt geschrieben wurden.
       const page = await contentRepo.loadPage(pageIdAtStart, { fresh: true });
       if (!samePage()) return;
-      if (!findInHtml(page.html, vorschlag.original)) {
+      const occurrences = countInHtml(page.html, vorschlag.original);
+      if (occurrences === 0) {
         setErr(root.t('chat.originalNotFound'));
+        return;
+      }
+      // Mehrdeutig: findInHtml/replaceInHtml greifen immer das erste Vorkommen —
+      // bei mehrfachem Text würde also evtl. die falsche Stelle ersetzt. Lieber
+      // abbrechen als still-falsch ersetzen.
+      if (occurrences > 1) {
+        setErr(root.t('chat.originalAmbiguous'));
+        return;
+      }
+      // Block-Grenzen-Vorschlag: countInHtml findet ihn zwar (Tag-agnostische
+      // Text-View), aber replaceInHtml lässt ihn zum Schutz der Absatzstruktur
+      // unangetastet. Ohne Abfang wäre das ein stiller No-Op, der sich unten
+      // fälschlich wie „gespeichert" anfühlt (_applied + Erfolgsmeldung).
+      if (replaceInHtml(page.html, vorschlag.original, vorschlag.ersatz) === page.html) {
+        setErr(root.t('chat.crossesBlockBoundary'));
         return;
       }
     } catch (e) {

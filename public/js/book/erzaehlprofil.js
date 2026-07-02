@@ -149,6 +149,15 @@ export const erzaehlprofilMethods = {
   erzaehlprofilArcsFlagged() {
     return (this.erzaehlprofilBefund()?.arcs || []).filter(a => (a.flags || []).length);
   },
+  // Präsenz-Band: { chapters:[{chapter_id,kap}], figures:[{id,name,present:[0/1],flags}] }.
+  erzaehlprofilPresenceBand() {
+    const b = this.erzaehlprofilBefund()?.presenceBand;
+    return (b && b.figures?.length) ? b : null;
+  },
+  // Ganze Report-Sektion sichtbar? (Band ODER Befunde ODER KI-Dach-Befund vorhanden.)
+  erzaehlprofilHasReport() {
+    return !!this.erzaehlprofilAutorenBefund() || this.erzaehlprofilHasBefund() || !!this.erzaehlprofilPresenceBand();
+  },
   // Gibt es überhaupt etwas Auffälliges zu zeigen? Steuert die Sichtbarkeit der Sektion.
   erzaehlprofilHasBefund() {
     const b = this.erzaehlprofilBefund();

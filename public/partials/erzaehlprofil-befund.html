@@ -4,8 +4,35 @@
   Zeigt den KI-Dach-Befund (Autoren-Befund) + die deterministischen Struktur-Befunde
   aus der GET-Antwort. Rein diagnostisch/rückwärtsgewandt, nie generativ im Text.
 -->
-<template x-if="erzaehlprofilAutorenBefund() || erzaehlprofilHasBefund()">
+<template x-if="erzaehlprofilHasReport()">
   <div class="erzaehlprofil-befund">
+
+    <!-- Präsenz-Band: pro Hauptfigur eine Zeile mit Präsenz-Zellen über die Kapitel -->
+    <template x-if="erzaehlprofilPresenceBand()">
+      <div class="erzaehlprofil-section">
+        <div class="erzaehlprofil-section-head" x-text="$app.t('erzaehlprofil.presenceBandTitle')"></div>
+        <div class="erzaehlprofil-band" role="table">
+          <template x-for="(f, fi) in erzaehlprofilPresenceBand().figures" :key="'band:' + f.id">
+            <div class="erzaehlprofil-band-row" role="row">
+              <span class="erzaehlprofil-band-name tag erzaehlprofil-narrator internal-link"
+                    @click="erzaehlprofilGotoFigur(f.id)" x-text="f.name"></span>
+              <div class="erzaehlprofil-band-cells">
+                <template x-for="(cell, ci) in f.present" :key="'bc:' + ci">
+                  <span class="erzaehlprofil-band-cell" :class="{ 'erzaehlprofil-band-cell--on': cell }"
+                        :data-tip="erzaehlprofilPresenceBand().chapters[ci]?.kap || ''"
+                        @click="erzaehlprofilGotoKapitel(erzaehlprofilPresenceBand().chapters[ci]?.chapter_id)"></span>
+                </template>
+              </div>
+              <span class="erzaehlprofil-band-flags">
+                <template x-for="fl in f.flags" :key="'bf:' + fl">
+                  <span class="erzaehlprofil-flag" x-text="erzaehlprofilFlagLabel(fl)"></span>
+                </template>
+              </span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
 
     <!-- KI-Dach-Befund: priorisierte, an den Kennzahlen verankerte Synthese -->
     <template x-if="erzaehlprofilAutorenBefund()">

@@ -345,3 +345,57 @@
   color: var(--card-accent);
   background: color-mix(in srgb, var(--card-accent) 12%, transparent);
 }
+
+/* ── Präsenz-Band: wer ist wann auf der Bühne ──────────────────────────────── */
+.erzaehlprofil-band {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  overflow-x: auto;
+}
+
+.erzaehlprofil-band-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.erzaehlprofil-band-name {
+  flex: 0 0 auto;
+  min-width: var(--space-20);
+  max-width: var(--space-20);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erzaehlprofil-band-cells {
+  display: flex;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Eine Kapitel-Zelle: leer = abwesend, --on = präsent (Akzent). */
+.erzaehlprofil-band-cell {
+  flex: 1 1 0;
+  min-width: 4px;
+  height: var(--space-5);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-muted) 18%, transparent);
+  cursor: pointer;
+  transition: background var(--transition-base) ease;
+}
+
+.erzaehlprofil-band-cell--on { background: var(--card-accent); }
+.erzaehlprofil-band-cell:hover { outline: 1px solid var(--card-accent); }
+
+.erzaehlprofil-band-flags {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--space-6);
+}
+
+@media (max-width: 640px) {
+  .erzaehlprofil-band-name { min-width: var(--space-14); max-width: var(--space-14); }
+}

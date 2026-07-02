@@ -18,6 +18,33 @@ test('leere Eingabe → leerer Befund', () => {
   assert.equal(r.chapterCount, 0);
   assert.deepEqual(r.arcs, []);
   assert.deepEqual(r.encounters, []);
+  assert.deepEqual(r.presenceBand, { chapters: [], figures: [] });
+});
+
+test('Präsenz-Band: Vektor + Flags pro Hauptfigur, nach Präsenz sortiert', () => {
+  const n = 24;
+  const appearances = [];
+  // Figur 1 (Held): fast durchgehend präsent, keine Ereignisse → static.
+  for (let ch = 1; ch <= 20; ch++) appearances.push({ figure_id: 1, chapter_id: ch });
+  // Figur 2: Kap 1–3, dann erst wieder 22–24 → disappears.
+  for (const ch of [1, 2, 3, 22, 23, 24]) appearances.push({ figure_id: 2, chapter_id: ch });
+  const r = computeNarrativeReport({
+    chapters: chapters(n),
+    figures: [{ id: 1, name: 'Held' }, { id: 2, name: 'Nebel' }],
+    appearances,
+    events: [],
+  });
+  assert.equal(r.presenceBand.chapters.length, n);
+  assert.equal(r.presenceBand.figures.length, 2);
+  const held = r.presenceBand.figures[0]; // präsenter → zuerst
+  assert.equal(held.name, 'Held');
+  assert.equal(held.present.length, n);
+  assert.equal(held.present[0], 1);
+  assert.equal(held.present[23], 0);
+  assert.ok(held.flags.includes('static'));
+  const nebel = r.presenceBand.figures[1];
+  assert.ok(nebel.flags.includes('disappears'));
+  assert.equal(nebel.present[10], 0);
 });
 
 test('Präsenzbogen: Absenz-Lücke wird als disappears geflaggt', () => {
