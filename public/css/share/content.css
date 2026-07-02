@@ -53,6 +53,22 @@
    share-content--prose (für alle erzählenden Buchtypen; Sach-/Web-Text nutzt das
    identische margin-Modell oben — siehe NON_PROSE_BUCHTYPEN in routes/share.js). */
 .share-content--prose p { margin: 0 0 1em; }
+/* Drop Cap (Initiale) am Prosa-Einstieg: erster Absatz des Artikels (Seiten-
+   Share) bzw. erster Absatz nach einem Kapitel-Heading (Buch-/Kapitel-Share).
+   Progressive Enhancement — Browser ohne initial-letter (Firefox) rendern
+   schlicht normalen Text. Akzentfarbe bindet die Initiale an den Share-Look. */
+@supports (initial-letter: 2) or (-webkit-initial-letter: 2) {
+  .share-content--prose > p:first-child::first-letter,
+  .share-content--prose > .ms-page:first-child .ms-page__body > p:first-child::first-letter,
+  .share-content--prose .ms-chapter + .ms-page .ms-page__body > p:first-child::first-letter {
+    -webkit-initial-letter: 2;
+    initial-letter: 2;
+    padding-right: 0.08em;
+    font-weight: 600;
+    color: var(--share-accent);
+  }
+}
+
 /* Szenentrenner: <hr> als zentrierter Asterismus (* * *) statt technischer Rule —
    in Prosa markiert ein <hr> fast immer einen Szenenwechsel. */
 .share-content--prose hr {

@@ -1,6 +1,12 @@
 /* Transition-, Shadow-, Opacity-Tokens + globaler reduced-motion-Block. */
 
 :root {
+  /* === Easing ===
+     `ease` für Hover-Tints/Zustandswechsel (symmetrisch, unauffällig).
+     `--ease-out` (Quint) für Eingänge — schnell rein, sanft ausrollen:
+     Karten-Eingang, Modal/Drawer-Slide, Popover-Fade. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
   /* === Transition — drei Geschwindigkeits-Stufen ===
      NIE als `--x: var(--x)` definieren — zirkuläre Custom-Property ist
      invalid → ganze `transition`/`animation`-Property kippt auf Default
@@ -8,7 +14,7 @@
   --transition-fast:        0.1s ease;   /* Hover-Tints, schnelle Filter-Pills */
   --transition-base:        0.12s ease;  /* Standard-Buttons, Cards, Border-Color */
   --transition-slow:        0.15s ease;  /* grössere Flächen, Cross-Fade */
-  --transition-emphasized:  0.3s ease;   /* Modal/Drawer-Slide, Card-Eingang, längere Fades */
+  --transition-emphasized:  0.3s var(--ease-out); /* Modal/Drawer-Slide, Card-Eingang, längere Fades */
 
   /* === Shadow — drei Erhebungs-Stufen ===
      Dark-Theme erbt automatisch dunklere --color-shadow-*-Werte aus tokens/colors.css. */
@@ -40,5 +46,12 @@
     animation-duration: 0.001s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0s !important;
+  }
+  /* View Transitions (Kartenwechsel-Cross-Fade) instant statt animiert —
+     die Browser-Defaults hängen nicht an den Transition-Tokens oben. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

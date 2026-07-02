@@ -2,7 +2,7 @@
 /* === Buttons === */
 button {
   padding: var(--size-default-padding-y) 16px;
-  border: 0.5px solid var(--color-border-input);
+  border: var(--border-thin) solid var(--color-border-input);
   border-radius: var(--radius-md);
   background: transparent;
   font: inherit;

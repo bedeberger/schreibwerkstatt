@@ -49,16 +49,29 @@
 }
 
 /* === Base === */
+/* Text-Selektion im Feder-Gold — Marken-Akzent statt Browser-Blau.
+   Alpha-Mix statt Volltonfläche: Textfarbe bleibt unangetastet lesbar,
+   Dark-Theme erbt den aufgehellten Accent-Token automatisch. */
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
 html {
   background-color: var(--color-bg);
   /* Vignette: dezent abgedunkelte Ecken/Rand, Editorial-Tischfläche-Anmutung.
      Fixed-attachment: Gradient scrollt nicht mit, bleibt am Viewport. Dark-Theme
-     hat eigene --color-vignette-Intensität. */
-  background-image: radial-gradient(
-    ellipse 90% 70% at 50% 40%,
-    transparent 55%,
-    var(--color-vignette)
-  );
+     hat eigene --color-vignette-Intensität.
+     Darunter Papierkorn: dasselbe Turbulence-Rezept wie die Blatt-Textur der
+     Seitenansicht (page-view.css), auf der grossen Tischfläche schwächer
+     (0.035-Alpha). Fixed wie die Vignette — der Tisch scrollt nicht mit. */
+  background-image:
+    radial-gradient(
+      ellipse 90% 70% at 50% 40%,
+      transparent 55%,
+      var(--color-vignette)
+    ),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.27  0 0 0 0 0.18  0 0 0 0.035 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-repeat: no-repeat, repeat;
   background-attachment: fixed;
   scrollbar-gutter: stable;
 }

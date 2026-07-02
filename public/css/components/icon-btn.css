@@ -11,7 +11,7 @@
    `.<feature>-icon-btn` bzw. `.<wrapper> .icon-btn` — siehe DESIGN.md. */
 .icon-btn {
   background: var(--color-bg);
-  border: 0.5px solid var(--color-border);
+  border: var(--border-thin) solid var(--color-border);
   border-radius: var(--radius-sm);
   color: var(--color-muted);
   cursor: pointer;

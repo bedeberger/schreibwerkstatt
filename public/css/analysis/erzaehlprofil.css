@@ -118,6 +118,32 @@
 }
 
 .erzaehlprofil-narrator { font-style: italic; }
+.erzaehlprofil-narrator.internal-link { cursor: pointer; }
+.erzaehlprofil-narrator.internal-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* POV-Konfidenz: dezent muted; niedrige Konfidenz = Akzent (Prüf-Signal). */
+.erzaehlprofil-konfidenz {
+  font-size: var(--font-size-mini);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+  cursor: help;
+}
+
+.erzaehlprofil-konfidenz--low {
+  color: var(--card-accent);
+  font-weight: 600;
+}
+
+/* POV-Beleg: wörtliches Zitat, das die Perspektiv-Einordnung stützt. */
+.erzaehlprofil-beleg {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  color: var(--color-muted);
+}
 
 .erzaehlprofil-deviation-badge {
   font-size: var(--font-size-xs);

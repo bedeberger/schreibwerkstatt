@@ -272,6 +272,7 @@ export const appJobsCoreMethods = {
     const labels = {
       'komplett-analyse':      'toast.job.komplettAnalyse',
       'kontinuitaet':          'toast.job.kontinuitaet',
+      'erzaehlprofil':         'toast.job.erzaehlprofil',
       'review':                'toast.job.review',
       'chapter-review':        'toast.job.kapitelReview',
       'check':                 'toast.job.check',

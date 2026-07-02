@@ -21,6 +21,21 @@ export const FILTER_SCOPES = [
   ['kontinuitaetFilters', { figurId: '', kapitel: '', schwere: '' }],
 ];
 
+// Kartenwechsel als sanfter Cross-Fade (View Transitions API). Progressive
+// Enhancement: ohne Browser-Support (oder ohne DOM, Unit-Tests) läuft der
+// Callback direkt. Der Callback muss den DOM-Endzustand herstellen — Alpine
+// flusht reaktive Änderungen erst im nextTick, darum gehört das Warten (und
+// der Scroll, damit der neue Snapshot die Endposition zeigt) mit hinein.
+// Reduced-Motion wird CSS-seitig gekappt (tokens/motion.css).
+export async function _withCardTransition(ctx, apply) {
+  if (typeof document === 'undefined' || typeof document.startViewTransition !== 'function') {
+    await apply();
+    return;
+  }
+  const run = async () => { await apply(); await ctx.$nextTick?.(); };
+  await document.startViewTransition(run).updateCallbackDone.catch(() => {});
+}
+
 // Generischer Karten-Toggle. Liest Behavior-Felder aus EXCLUSIVE_CARDS-Entry
 // (onReclick, requiresBook, loadDeps, auditEvent, extraRefreshOnOpen) und
 // kapselt die Open/Close/Refresh-Pfade. Bespoke-Toggles (kapitelReview, ideen,
@@ -31,7 +46,7 @@ export async function _toggleCardGeneric(entry) {
       window.dispatchEvent(new CustomEvent(EVT.CARD_REFRESH, { detail: { name: entry.refreshName || entry.key } }));
       this._scrollToCardByKey(entry.key);
     } else {
-      this[entry.flag] = false;
+      await _withCardTransition(this, () => { this[entry.flag] = false; });
     }
     return;
   }
@@ -39,9 +54,13 @@ export async function _toggleCardGeneric(entry) {
   // Claude-only-Karten (Kontinuität/Erzählprofil) für Nicht-Claude gar nicht öffnen —
   // deckt Deep-Links (#kontinuitaet) + Palette-Klicks ab, falls sie durchrutschen.
   if (entry.requiresClaude && (this.$store.config?.effectiveProvider || 'claude') !== 'claude') return;
-  this._closeOtherMainCards(entry.key);
+  // Partial VOR der Transition laden — Netzwerk gehört nicht in den
+  // View-Transition-Callback (der friert das Rendering ein).
   if (entry.partial) await this._ensurePartial(entry.partial);
-  this[entry.flag] = true;
+  await _withCardTransition(this, () => {
+    this._closeOtherMainCards(entry.key);
+    this[entry.flag] = true;
+  });
   this._scrollToCardByKey(entry.key);
   if (entry.auditEvent) this.logAuditEvent?.(entry.auditEvent, { book: this.$store.nav.selectedBookId });
   if (entry.extraRefreshOnOpen) {

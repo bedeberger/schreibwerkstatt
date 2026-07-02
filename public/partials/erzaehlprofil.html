@@ -9,14 +9,28 @@
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
       <span class="card-title" x-text="$app.t('erzaehlprofil.title')"></span>
-      <div class="card-subline" x-show="erzaehlprofilResult?.updated_at">
+      <div class="card-subline" x-show="erzaehlprofilResult?.updated_at && !erzaehlprofilLoading">
         <span class="card-timestamp" x-text="$app.t('common.asOf', { date: erzaehlprofilResult?.updated_at })"></span>
       </div>
     </div>
+    <div class="card-actions">
+      <button type="button" class="icon-btn icon-btn--ghost" @click="runErzaehlprofil()"
+              :disabled="erzaehlprofilLoading || !$store.nav.selectedBookId"
+              :data-tip="erzaehlprofilHasData() ? $app.t('erzaehlprofil.rerun') : $app.t('erzaehlprofil.start')"
+              :aria-label="erzaehlprofilHasData() ? $app.t('erzaehlprofil.rerun') : $app.t('erzaehlprofil.start')">
+        <span x-show="erzaehlprofilLoading" class="spinner"></span>
+        <svg x-show="!erzaehlprofilLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+      </button>
+    </div>
   </div>
 
+  <div class="progress-bar-wrap" x-show="erzaehlprofilProgress > 0">
+    <div class="progress-bar" :style="{ '--progress': erzaehlprofilProgress + '%' }"></div>
+  </div>
+  <div class="card-status" x-show="erzaehlprofilStatus" x-html="erzaehlprofilStatus"></div>
+
   <!-- Leerzustand: Profil wird von der Komplettanalyse befüllt -->
-  <div x-show="!erzaehlprofilHasData()" class="card-empty">
+  <div x-show="!erzaehlprofilHasData() && !erzaehlprofilLoading" class="card-empty">
     <p class="card-empty-text" x-text="$app.t('erzaehlprofil.empty')"></p>
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
@@ -63,7 +77,7 @@
         <div class="entity-list entity-list--accented">
           <template x-for="(ch, i) in erzaehlprofilChapters()" :key="erzaehlprofilChapterKey(ch, i)">
             <div class="erzaehlprofil-chapter"
-                 :class="{ 'erzaehlprofil-chapter--deviation': ch.pov_abweichung }">
+                 :class="{ 'erzaehlprofil-chapter--deviation': ch.pov_abweichung || ch.tempus_abweichung }">
               <div class="erzaehlprofil-chapter-head">
                 <span class="kapitel-badge kapitel-badge--primary internal-link"
                       x-show="ch.chapter_id != null"
@@ -73,12 +87,22 @@
                 <span class="tag erzaehlprofil-pov-tag"
                       :class="{ 'erzaehlprofil-pov-tag--deviation': ch.pov_abweichung }"
                       x-text="erzaehlprofilPovLabel(ch.perspektive)"></span>
-                <span class="tag" x-show="ch.erzaehlzeit" x-text="erzaehlprofilTempusLabel(ch.erzaehlzeit)"></span>
-                <span class="tag erzaehlprofil-narrator" x-show="ch.erzaehler_figur"
+                <span class="tag" x-show="ch.erzaehlzeit"
+                      :class="{ 'erzaehlprofil-pov-tag--deviation': ch.tempus_abweichung }"
+                      x-text="erzaehlprofilTempusLabel(ch.erzaehlzeit)"></span>
+                <span class="tag erzaehlprofil-narrator internal-link" x-show="ch.erzaehler_figur && ch.erzaehler_figur_id != null"
+                      @click="erzaehlprofilGotoFigur(ch.erzaehler_figur_id)"
                       x-text="ch.erzaehler_figur"></span>
-                <span class="erzaehlprofil-deviation-badge" x-show="ch.pov_abweichung"
+                <span class="tag erzaehlprofil-narrator" x-show="ch.erzaehler_figur && ch.erzaehler_figur_id == null"
+                      x-text="ch.erzaehler_figur"></span>
+                <span class="erzaehlprofil-konfidenz" x-show="erzaehlprofilKonfidenzPct(ch) !== null"
+                      :class="{ 'erzaehlprofil-konfidenz--low': erzaehlprofilKonfidenzLow(ch) }"
+                      :data-tip="erzaehlprofilKonfidenzLow(ch) ? $app.t('erzaehlprofil.confidenceLow') : $app.t('erzaehlprofil.confidence')"
+                      x-text="$app.t('erzaehlprofil.confidenceValue', { pct: erzaehlprofilKonfidenzPct(ch) })"></span>
+                <span class="erzaehlprofil-deviation-badge" x-show="ch.pov_abweichung || ch.tempus_abweichung"
                       x-text="$app.t('erzaehlprofil.deviationBadge')"></span>
               </div>
+              <p class="erzaehlprofil-beleg" x-show="ch.pov_beleg" x-text="'«' + (ch.pov_beleg || '') + '»'"></p>
               <p class="erzaehlprofil-chapter-summary" x-show="ch.zusammenfassung" x-text="ch.zusammenfassung"></p>
               <div class="erzaehlprofil-themen" x-show="(ch.themen || []).length">
                 <template x-for="(t, ti) in ch.themen" :key="'t:' + ti">
@@ -87,6 +111,26 @@
                         x-text="t.thema"></span>
                 </template>
               </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Erzähler-/Fokusfiguren übers Buch (klappbar) -->
+      <div class="erzaehlprofil-section" x-show="erzaehlprofilFigurenVerteilung().length"
+           x-data="collapsible()">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+          <span x-text="$app.t('erzaehlprofil.narratorsTitle')"></span>
+        </button>
+        <div x-bind="panel" class="collapsible-section erzaehlprofil-themen-dist" x-cloak>
+          <template x-for="(f, i) in erzaehlprofilFigurenVerteilung()" :key="'f:' + i">
+            <div class="erzaehlprofil-themen-dist-row">
+              <span class="tag erzaehlprofil-narrator" x-show="f.figur_id == null" x-text="f.name"></span>
+              <span class="tag erzaehlprofil-narrator internal-link" x-show="f.figur_id != null"
+                    @click="erzaehlprofilGotoFigur(f.figur_id)" x-text="f.name"></span>
+              <span class="erzaehlprofil-thema-count"
+                    x-text="$app.t('erzaehlprofil.narratorChapters', { n: f.count })"></span>
             </div>
           </template>
         </div>

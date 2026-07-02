@@ -1,31 +1,42 @@
 @layer components {
 /* === Card ===
    Top-Border ist Akzentband: 2px in `--card-accent` (SSoT card-accents.css).
-   Fallback `--color-border` macht Karten ohne `card--<key>` neutral statt
-   farblos-inkonsistent. Baseline-Shadow extrem dezent, Hover lifted via
-   --shadow-sm; transition aus motion-Tokens → reduced-motion respektiert. */
+   Fallback `--color-surface` im Wash bzw. `--color-border` am Band macht
+   Karten ohne `card--<key>` neutral statt farblos-inkonsistent.
+   Flaches Modell: kein Baseline-/Hover-Schatten — die Karte lebt von Border +
+   Akzentband + Akzent-Wash; Hover verstärkt die Border Richtung Akzent.
+   Wash: hauchdünner Farbverlauf aus dem Karten-Akzent, der im Header-Bereich
+   beginnt und in die Surface ausläuft — macht die 32 Akzente als Orientierung
+   wahrnehmbar, ohne die Fläche einzufärben. */
 .card {
-  background: var(--color-surface);
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--card-accent, var(--color-surface)) 4%, var(--color-surface)),
+      var(--color-surface) 110px
+    );
   border-radius: var(--radius-lg);
-  border: 0.5px solid var(--color-border);
-  border-top: 2px solid var(--card-accent, var(--color-border));
-  padding: 1.25rem;
-  margin-bottom: 1rem;
+  border: var(--border-thin) solid var(--color-border);
+  border-top: var(--border-thick) solid var(--card-accent, var(--color-border));
+  padding: var(--space-20);
+  margin-bottom: var(--space-lg);
   /* `backwards` (nicht `both`): wendet den `from`-Zustand vor dem Start an
      (kein Eintritts-Flash), revertiert aber nach Ende auf den Basiszustand.
      Mit `both` bliebe `transform: translateY(0)` (Identitäts-Matrix) dauerhaft
      gesetzt — das etabliert einen Containing-Block für `position: fixed` und
      verschiebt das viewport-verankerte Combobox-Dropdown (Bottom-Sheet/Popup)
      in die Karte hinein statt an den Bildschirm. */
-  animation: cardFadeIn var(--transition-slow) backwards;
-  box-shadow: 0 1px 0 var(--color-shadow-soft);
-  transition: box-shadow var(--transition-base);
+  animation: cardFadeIn var(--transition-emphasized) backwards;
+  transition: border-color var(--transition-base);
 }
+/* Explizite Seiten statt border-color-Shorthand: der würde auch das
+   2px-Akzentband oben auf den Mix-Ton umfärben. */
 .card:hover {
-  box-shadow: var(--shadow-sm);
+  border-inline-color: color-mix(in oklab, var(--card-accent, var(--color-border)) 22%, var(--color-border));
+  border-bottom-color: color-mix(in oklab, var(--card-accent, var(--color-border)) 22%, var(--color-border));
 }
 @keyframes cardFadeIn {
-  from { opacity: 0; transform: translateY(5px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -56,6 +67,12 @@
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
   min-width: 0;
+  font-optical-sizing: auto;
+  text-wrap: balance;
+  /* Titel zieht dezent Richtung Karten-Akzent — Tinte bleibt dominant
+     (Kontrast), der Farbklang ordnet die Karte ein. Fallback currentColor
+     mixt Text mit Text → neutral bei Karten ohne Akzent. */
+  color: color-mix(in oklab, var(--card-accent, currentColor) 30%, var(--color-text));
 }
 
 /* Eyebrow: kleine, gesperrte Caps-Zeile ueber dem .card-title. Editorial-
@@ -139,7 +156,7 @@
 .card-subline-link {
   color: var(--color-muted);
   text-decoration: none;
-  border-bottom: 0.5px solid transparent;
+  border-bottom: var(--border-thin) solid transparent;
   transition: color var(--transition-base), border-color var(--transition-base);
 }
 .card-subline-link:hover {
@@ -291,15 +308,21 @@ textarea:disabled,
   position: fixed;
   z-index: var(--z-header);
   background: var(--color-surface);
-  border: 0.5px solid var(--color-border-focus);
+  border: var(--border-thin) solid var(--color-border-focus);
   box-shadow: var(--shadow-md);
+  transition: opacity var(--transition-base);
+}
+/* CSS-only-Eintritt (display:none → block) via @starting-style — nur Opacity,
+   damit die x-anchor-Positionierung/Messung unbeeinflusst bleibt. */
+@starting-style {
+  .combobox-dropdown { opacity: 0; }
 }
 .combobox-search {
   display: block;
   width: 100%;
   padding: var(--pad-btn-compact);
   border: none;
-  border-bottom: 0.5px solid var(--color-border);
+  border-bottom: var(--border-thin) solid var(--color-border);
   background: var(--color-bg);
   font-size: var(--font-size-base);
   color: var(--color-text);
@@ -392,7 +415,7 @@ textarea:disabled,
 .combobox-wrap--compact .combobox-trigger {
   font-size: var(--size-compact-font-size);
   padding: var(--size-compact-padding);
-  border-width: 0.5px;
+  border-width: var(--border-thin);
   border-color: var(--color-border);
   background: var(--color-bg);
 }
@@ -474,7 +497,7 @@ textarea:disabled,
 .card-form-row--dict,
 .card-form-row--devices {
   display: block;
-  border-top: 0.5px solid var(--color-border);
+  border-top: var(--border-thin) solid var(--color-border);
   padding-top: var(--space-10);
 }
 .card-form-label {
@@ -501,7 +524,7 @@ textarea:disabled,
   line-height: 1.4;
   margin: 22px 0 14px;
   padding-top: var(--space-14);
-  border-top: 0.5px solid var(--color-border);
+  border-top: var(--border-thin) solid var(--color-border);
 }
 /* Inline-Zahlenfeld mit Einheit (z.B. Tagesziel Minuten/Tag im Profil). */
 .card-form-goal-edit {
@@ -751,7 +774,7 @@ select[aria-invalid="true"],
 .form-section {
   margin-top: var(--space-14);
   padding-top: var(--space-14);
-  border-top: 0.5px solid var(--color-border);
+  border-top: var(--border-thin) solid var(--color-border);
 }
 .form-stats {
   display: flex;
