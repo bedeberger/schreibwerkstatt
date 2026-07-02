@@ -11,6 +11,9 @@ import {
   ROLE_RANK,
   hasMinRole,
   featuresVisibleFor,
+  featureByKey,
+  isFeatureAvailable,
+  unavailabilityReasonKey,
 } from '../../public/js/cards/feature-registry.js';
 
 test('jeder FEATURES-Eintrag hat ein gültiges minRole', () => {
@@ -59,6 +62,35 @@ test('featuresVisibleFor(owner, buchtyp=tagebuch): alle FEATURES', () => {
   const all = FEATURES.map(f => f.key).sort();
   const visible = featuresVisibleFor(FEATURES, 'owner', 'tagebuch').map(f => f.key).sort();
   assert.deepEqual(visible, all);
+});
+
+// requiresClaude: Kontinuität + Erzählprofil sind Claude-only (die Qualitätsstufen
+// gibt es nur bei Claude). Für Nicht-Claude ausgeblendet.
+test('requiresClaude-Karten sind kontinuitaet + erzaehlprofil', () => {
+  const gated = FEATURES.filter(f => f.requiresClaude).map(f => f.key).sort();
+  assert.deepEqual(gated, ['erzaehlprofil', 'kontinuitaet']);
+});
+
+test('featuresVisibleFor blendet requiresClaude-Karten aus, wenn effektiver Provider nicht Claude', () => {
+  const withClaude = new Set(featuresVisibleFor(FEATURES, 'editor', null, true).map(f => f.key));
+  const noClaude = new Set(featuresVisibleFor(FEATURES, 'editor', null, false).map(f => f.key));
+  for (const k of ['kontinuitaet', 'erzaehlprofil']) {
+    assert.ok(withClaude.has(k), `${k} bei Claude sichtbar`);
+    assert.ok(!noClaude.has(k), `${k} bei Nicht-Claude ausgeblendet`);
+  }
+});
+
+test('featuresVisibleFor: claudeEffective default true (Rückwärtskompatibilität)', () => {
+  const visible = new Set(featuresVisibleFor(FEATURES, 'editor').map(f => f.key));
+  assert.ok(visible.has('kontinuitaet') && visible.has('erzaehlprofil'));
+});
+
+test('isFeatureAvailable + unavailabilityReasonKey gaten requiresClaude', () => {
+  const feat = featureByKey('kontinuitaet');
+  const base = { selectedBookId: 1, pages: [{}], bookRole: 'editor' };
+  assert.equal(isFeatureAvailable(feat, { ...base, claudeEffective: true }), true);
+  assert.equal(isFeatureAvailable(feat, { ...base, claudeEffective: false }), false);
+  assert.equal(unavailabilityReasonKey(feat, { ...base, claudeEffective: false }), 'palette.disabled.needClaude');
 });
 
 test('featuresVisibleFor(editor) ohne passenden Buchtyp blendet requiresBuchtyp-Karten aus', () => {

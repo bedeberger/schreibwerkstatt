@@ -58,10 +58,17 @@ router.get('/config', (req, res) => {
       };
     }
   }
+  // Effektiver (per-User aufgelöster) Provider — Basis fürs Feature-Gating von
+  // Claude-only-Features im Frontend (anders als `apiProvider`, das den globalen
+  // ai.provider spiegelt und den Per-User-Override ignoriert).
+  const effectiveProvider = sessionUser
+    ? resolveProvider({ userEmail: sessionUser.email })
+    : (appSettings.get('ai.provider') || 'claude');
   res.json({
     claudeMaxTokens: MAX_TOKENS_OUT,
     claudeModel: appSettings.get('ai.claude.model') || 'claude-sonnet-4-6',
     apiProvider: appSettings.get('ai.provider') || 'claude',
+    effectiveProvider,
     charsPerToken: CHARS_PER_TOKEN,
     ollamaModel: appSettings.get('ai.ollama.model') || 'llama3.2',
     openaiCompatModel: appSettings.get('ai.openai-compat.model') || 'llama3.2',
@@ -120,8 +127,16 @@ router.get('/config', (req, res) => {
     // der Admin-Kill-Switch nicht auf false steht (Default an).
     researchChat: {
       enabled: appSettings.get('research_chat.enabled') !== false
-        && (sessionUser ? resolveProvider({ userEmail: sessionUser.email }) : (appSettings.get('ai.provider') || 'claude')) === 'claude'
+        && effectiveProvider === 'claude'
         && !!String(appSettings.get('ai.claude.api_key') || '').trim(),
+    },
+    // Komplettanalyse-Zusatzphasen «Kontinuität» + «Erzählprofil»: die
+    // qualitätskritischen Stufen (Single-Pass, Verify-Filter, Attribut-Check)
+    // gibt es nur bei Claude → für Nicht-Claude-User Karten ausgeblendet und die
+    // Phasen im Job übersprungen. Gating am effektiven (per-User) Provider.
+    komplett: {
+      continuity:      effectiveProvider === 'claude',
+      narrativeProfile: effectiveProvider === 'claude',
     },
   });
 });

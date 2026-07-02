@@ -15,6 +15,11 @@
 //   `dependsOnKomplett` – true: Karte konsumiert Komplettanalyse-Output
 //                     (Figuren/Orte/Szenen/Ereignisse/Fakten/Soziogramm/Kontinuität).
 //                     Palette zeigt dafür ein Hinweis-Badge.
+//   `requiresClaude` – true: Karte erscheint nur, wenn der effektive Provider Claude
+//                     ist (Kontinuität/Erzählprofil — die Qualitätsstufen gibt es nur
+//                     bei Claude). Gate greift in Palette (featuresVisibleFor +
+//                     isFeatureAvailable) und im generischen Toggle (_toggleCardGeneric).
+//                     ctx.claudeEffective liefert den Wert (aus $store.config.effectiveProvider).
 //
 // Aktionen (`kind: 'action'`): einmalige Befehle (Theme wechseln, Logout …).
 //   `run(root)` – wird mit Root als Argument aufgerufen.
@@ -32,9 +37,9 @@ export const FEATURES = [
     aliases: ['style','heatmap','passiv','fuellwoerter','filler','readability','lesbarkeit','metrik'] },
   { key: 'fehlerHeatmap',  kind: 'toggle', group: 'review', labelKey: 'tile.fehlerHeatmap',  descKey: 'tile.fehlerHeatmap.desc',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  requiresBook: true, minRole: 'editor',
     aliases: ['errors','heatmap','findings','lektorat','typo','tippfehler'] },
-  { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
+  { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true, minRole: 'editor', dependsOnKomplett: true, requiresClaude: true,
     aliases: ['continuity','widerspruch','plot-hole','contradiction','consistency'] },
-  { key: 'erzaehlprofil',  kind: 'toggle', group: 'review', labelKey: 'tile.erzaehlprofil',  descKey: 'tile.erzaehlprofil.desc',  flag: 'showErzaehlprofilCard',  toggle: 'toggleErzaehlprofilCard',  requiresBook: true, minRole: 'editor', dependsOnKomplett: true,
+  { key: 'erzaehlprofil',  kind: 'toggle', group: 'review', labelKey: 'tile.erzaehlprofil',  descKey: 'tile.erzaehlprofil.desc',  flag: 'showErzaehlprofilCard',  toggle: 'toggleErzaehlprofilCard',  requiresBook: true, minRole: 'editor', dependsOnKomplett: true, requiresClaude: true,
     aliases: ['pov','perspektive','erzählperspektive','erzaehlperspektive','narration','pacing','spannungskurve','themen','motive','narrative','point of view','erzählprofil'] },
   // Tagebuch-Rückblick: nur bei Buchtyp 'tagebuch'. Rückwärtsgewandte KI-Verdichtung.
   { key: 'tagebuchRueckblick', kind: 'toggle', group: 'review', labelKey: 'tile.tagebuchRueckblick', descKey: 'tile.tagebuchRueckblick.desc', flag: 'showTagebuchRueckblickCard', toggle: 'toggleTagebuchRueckblickCard', requiresBook: true, minRole: 'editor', requiresBuchtyp: 'tagebuch',
@@ -198,8 +203,8 @@ export const EXCLUSIVE_CARDS = [
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
   { key: 'songs',          flag: 'showSongsCard',          toggle: 'toggleSongsCard',          onReclick: 'refresh', partial: 'songs',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
-  { key: 'kontinuitaet',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'kontinuitaet' },
-  { key: 'erzaehlprofil',  flag: 'showErzaehlprofilCard',  toggle: 'toggleErzaehlprofilCard',  onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'erzaehlprofil' },
+  { key: 'kontinuitaet',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'kontinuitaet', requiresClaude: true },
+  { key: 'erzaehlprofil',  flag: 'showErzaehlprofilCard',  toggle: 'toggleErzaehlprofilCard',  onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'erzaehlprofil', requiresClaude: true },
   { key: 'tagebuchRueckblick', flag: 'showTagebuchRueckblickCard', toggle: 'toggleTagebuchRueckblickCard', onReclick: 'refresh', requiresBook: true, requiresBuchtyp: 'tagebuch', partial: 'tagebuch-rueckblick' },
   { key: 'bookSettings',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   onReclick: 'close', partial: 'book-settings' },
   { key: 'userSettings',   flag: 'showUserSettingsCard',   toggle: 'toggleUserSettingsCard',   onReclick: 'close', partial: 'user-settings' },
@@ -255,6 +260,7 @@ export function isFeatureAvailable(feature, ctx) {
   if (feature.requiresBook && !ctx.selectedBookId) return false;
   if (feature.requiresPages && !(ctx.pages && ctx.pages.length > 0)) return false;
   if (feature.requiresBuchtyp && ctx.buchtyp !== feature.requiresBuchtyp) return false;
+  if (feature.requiresClaude && !ctx.claudeEffective) return false;
   return true;
 }
 
@@ -264,6 +270,7 @@ export function unavailabilityReasonKey(feature, ctx) {
   if (feature.requiresBook && !ctx.selectedBookId) return 'palette.disabled.needBook';
   if (feature.requiresPages && !(ctx.pages && ctx.pages.length > 0)) return 'palette.disabled.needPages';
   if (feature.requiresBuchtyp && ctx.buchtyp !== feature.requiresBuchtyp) return 'palette.disabled.needBook';
+  if (feature.requiresClaude && !ctx.claudeEffective) return 'palette.disabled.needClaude';
   if (feature.minRole && ctx.bookRole && !hasMinRole(ctx.bookRole, feature.minRole)) return 'palette.disabled.insufficientRole';
   return null;
 }
@@ -284,11 +291,14 @@ export function hasMinRole(actual, required) {
 // Filter `features` aufs sichtbare Subset für eine Buchrolle. Cards ohne
 // `minRole` sind nur für editor+ sichtbar (defensive: kein impliziter Viewer).
 // `buchtyp` (optional): blendet `requiresBuchtyp`-Cards aus, deren Typ nicht passt.
-export function featuresVisibleFor(features, role, buchtyp = null) {
+// `claudeEffective` (optional, Default true): blendet `requiresClaude`-Cards aus,
+// wenn der effektive Provider nicht Claude ist (Kontinuität/Erzählprofil).
+export function featuresVisibleFor(features, role, buchtyp = null, claudeEffective = true) {
   const byBuchtyp = (f) => !f.requiresBuchtyp || f.requiresBuchtyp === buchtyp;
-  if (!role) return features.filter(f => !f.requiresBook && !f.requiresPages && byBuchtyp(f));
+  const byClaude = (f) => !f.requiresClaude || claudeEffective;
+  if (!role) return features.filter(f => !f.requiresBook && !f.requiresPages && byBuchtyp(f) && byClaude(f));
   return features.filter(f => {
     const min = f.minRole || 'editor';
-    return hasMinRole(role, min) && byBuchtyp(f);
+    return hasMinRole(role, min) && byBuchtyp(f) && byClaude(f);
   });
 }

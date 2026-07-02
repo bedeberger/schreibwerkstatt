@@ -6,6 +6,7 @@ const {
 const { _modelName } = require('../shared');
 const { _refToString, _stelleQuote } = require('./utils');
 const { NOW_ISO_SQL } = require('../../../db/now');
+const { matchScenes } = require('../../../lib/entity-match');
 const searchIndex = require('../../../lib/search');
 
 /** Mappt Szenen-Klarnamen (aus Phase 1) auf konsolidierte Figuren-/Ort-IDs.
@@ -110,10 +111,11 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
   db.transaction(() => {
     // Reconcile statt DELETE+INSERT, damit figure_scenes.id (und FK-Refs darauf:
     // research_item_links.scene_id, scene_locations) ueber Re-Analysen stabil bleibt.
-    // figure_scenes hat keinen lauf-stabilen Identifier → Match per (chapter_id +
-    // normalisierter Titel); re-detektiert behaelt id + stale=0, verschwundene → stale=1
-    // statt Loeschen. Spiegelt das figures-/locations-Reconcile-Netz.
-    const _normTitel = (t) => (t || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    // figure_scenes hat keinen lauf-stabilen Identifier → Match ueber matchScenes (pro
+    // Kapitel: exakter Titel → Token-Teilmenge des Titels), damit leichte Titel-Varianten
+    // zwischen Laeufen nicht als stale-Dublette akkumulieren; re-detektiert behaelt id +
+    // stale=0, verschwundene → stale=1 statt Loeschen. Spiegelt das figures-/locations-
+    // Reconcile-Netz.
     // Eingehende Szenen vorab auf chapter_id/page_id aufloesen (fuer Match-Key + Save).
     const resolved = szenen.map(s => {
       const chapterId = idMaps.chNameToId[s.kapitel] ?? null;
@@ -126,19 +128,8 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
     const existing = db.prepare(
       'SELECT id, chapter_id, titel FROM figure_scenes WHERE book_id = ? AND user_email IS ?'
     ).all(bookIdInt, email);
-    const exByKey = new Map();   // 'chapterId::titel' → [existingId, …]
-    for (const ex of existing) {
-      const k = (ex.chapter_id ?? 0) + '::' + _normTitel(ex.titel);
-      if (!exByKey.has(k)) exByKey.set(k, []);
-      exByKey.get(k).push(ex.id);
-    }
-    const matchOf = new Map();   // resolvedIndex → existingId
-    const usedExisting = new Set();
-    for (let i = 0; i < resolved.length; i++) {
-      const bucket = exByKey.get((resolved[i].chapterId ?? 0) + '::' + _normTitel(resolved[i].titel));
-      const exId = bucket && bucket.find(id => !usedExisting.has(id));
-      if (exId != null) { matchOf.set(i, exId); usedExisting.add(exId); }
-    }
+    const matchOf = matchScenes(existing, resolved);   // resolvedIndex → existingId
+    const usedExisting = new Set(matchOf.values());
     // Verschwundene → stale=1 (Refs bleiben), statt Loeschen.
     const markStale = db.prepare('UPDATE figure_scenes SET stale = 1 WHERE id = ?');
     for (const ex of existing) if (!usedExisting.has(ex.id)) markStale.run(ex.id);

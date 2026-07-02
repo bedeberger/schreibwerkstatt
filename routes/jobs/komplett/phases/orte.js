@@ -5,6 +5,7 @@ const { saveOrteToDb, saveSongsToDb } = require('../../../../db/schema');
 const { updateJob } = require('../../shared');
 const { _remapFigNames } = require('../utils');
 const { komplettMaxTokens } = require('./tokens');
+const { dedupeLocationsWithinRun } = require('../../../../lib/entity-match');
 
 /** Regelbasierter Orte-Merge als Fallback, wenn die KI-Konsolidierung scheitert (z.B.
  *  aiTruncated bei kleinem lokalem Modell). Flattet chapterOrte über alle Kapitel, dedupliziert
@@ -76,7 +77,12 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, figName
   if (isSinglePass) {
     updateJob(jobId, { progress: 43, statusText: 'job.phase.consolidatingOrte' });
     const raw = chapterOrte[0]?.orte || [];
-    orte = raw.map((o, i) => ({
+    // Within-Run-Dedup: der Single-Pass fährt KEINE KI-Konsolidierung (spart einen Call),
+    // aber die Completeness-Gap-Pässe ziehen Schreibvarianten desselben Orts nach
+    // («Frohheim-Schule Olten» / «Frohheim-Schulhaus Olten»). Konservativ per Token-
+    // Teilmenge verschmelzen, bevor IDs vergeben werden — sonst landen sie als Dubletten.
+    const deduped = dedupeLocationsWithinRun(raw);
+    orte = deduped.map((o, i) => ({
       ...o,
       // loc_id run-intern IMMER sequenziell neu vergeben (nicht o.id||-Fallback): der
       // Single-Pass-Completeness-Gap (runPhase1) kann ort_1… doppelt erzeugen, wenn der
@@ -87,7 +93,9 @@ async function runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, figName
       id: 'ort_' + (i + 1),
       figuren: _remapFigNames(o.figuren_namen, figNameToId, figNameToIdLower),
     }));
-    log.info(`Phase 3 übersprungen (Single-Pass, ${orte.length} Orte aus P1 übernommen) – spart einen KI-Call.`);
+    const mergedN = raw.length - deduped.length;
+    log.info(`Phase 3 übersprungen (Single-Pass, ${orte.length} Orte aus P1 übernommen`
+      + `${mergedN > 0 ? `, ${mergedN} Varianten verschmolzen` : ''}) – spart einen KI-Call.`);
     updateJob(jobId, { progress: 55 });
   } else {
     updateJob(jobId, { progress: 43, statusText: 'job.phase.consolidatingOrte' });

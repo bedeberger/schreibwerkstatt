@@ -16,6 +16,7 @@ const { recordJobLedger } = require('./cost-ledger');
 const draftFigures = require('./draft-figures');
 const { parseDatum } = require('../lib/datum-parse');
 const { normEventSubtyp } = require('./event-subtyp');
+const { matchLocations } = require('../lib/entity-match');
 const logger = require('../logger');
 
 // Whitelist für Welt-Fakten-Kategorien (harte Gruppierung analog EVENT_SUBTYP_WL).
@@ -248,7 +249,6 @@ function saveZeitstrahlEvents(bookId, userEmail, ereignisse, chNameToId = {}, pa
 // aufgebaut — kapitel-scoped gegen Namenskollisionen zwischen Kapiteln.
 // opts.matchBy 'name' (Komplettanalyse) | 'locId' (Default, Manual-Edit);
 // opts.onMissing 'stale' (markieren) | 'delete' (Default).
-const _normLocName = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
 function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdByChapter = null, opts = {}) {
   if (chNameToId == null) {
     const rows = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(bookId);
@@ -294,7 +294,7 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
 
   db.transaction(() => {
     const existing = db.prepare(
-      `SELECT id, loc_id, name, lat, lng FROM locations WHERE book_id = ? AND ${emailCond}`
+      `SELECT id, loc_id, name, typ, lat, lng FROM locations WHERE book_id = ? AND ${emailCond}`
     ).all(bookId, ...emailVal);
     const prevById = Object.fromEntries(existing.map(r => [r.id, r]));
 
@@ -335,15 +335,11 @@ function saveOrteToDb(bookId, orte, userEmail, chNameToId = null, pageNameToIdBy
     const usedExisting = new Set();
     if (matchByName) {
       // Auch stale-Orte sind Match-Kandidaten — ein wiederaufgetauchter Ort wird revived.
-      const exByNorm = new Map();
-      for (const ex of existing) {
-        const k = _normLocName(ex.name);
-        if (k && !exByNorm.has(k)) exByNorm.set(k, ex);
-      }
-      for (let i = 0; i < orte.length; i++) {
-        const ex = exByNorm.get(_normLocName(orte[i].name));
-        if (ex && !usedExisting.has(ex.id)) { matchOf.set(i, ex.id); usedExisting.add(ex.id); }
-      }
+      // Zweistufig (matchLocations): exakter Name → Token-Teilmenge/-Overlap. Fängt
+      // Schreibvarianten zwischen Läufen ab («Mathys AG (Bettlach)» ~ «Mathys AG
+      // Produktionsstätte Bettlach»), die sonst als stale-Dublette akkumulieren.
+      const locMatch = matchLocations(existing, orte);
+      for (const [i, exId] of locMatch) { matchOf.set(i, exId); usedExisting.add(exId); }
     } else {
       const byLocId = new Map(existing.map(ex => [ex.loc_id, ex.id]));
       for (let i = 0; i < orte.length; i++) {
@@ -1450,6 +1446,11 @@ function getChapterNarrativeProfile(bookId, userEmail) {
     if (!byPid.has(t.profile_id)) byPid.set(t.profile_id, []);
     byPid.get(t.profile_id).push({ thema: t.thema, typ: t.typ, beleg: t.beleg });
   }
+  // Abweichung zur Lese-Zeit aus der aktuellen Soll-Erzählform berechnen (statt aus
+  // dem beim Lauf gespeicherten Flag) — so bleibt die Anzeige korrekt, auch wenn der
+  // Autor die Soll-Perspektive/-zeit nach dem Analyselauf ändert, und Perspektiv- vs.
+  // Tempus-Abweichung sind getrennt. 'gemischt' als Soll ist tolerant (nie Abweichung).
+  const deviates = (soll, ist) => !!(soll && soll !== 'gemischt' && ist && ist !== soll);
   const chapters = rows.map(r => ({
     chapter_id: r.chapter_id,
     kapitel: r.chapter_name || null,
@@ -1459,7 +1460,8 @@ function getChapterNarrativeProfile(bookId, userEmail) {
     erzaehler_figur: r.erzaehler_figur_name || r.erzaehler_figur || null,
     pov_konfidenz: r.pov_konfidenz,
     pov_beleg: r.pov_beleg,
-    pov_abweichung: !!r.pov_abweichung,
+    pov_abweichung: deviates(declared.erzaehlperspektive, r.perspektive),
+    tempus_abweichung: deviates(declared.erzaehlzeit, r.erzaehlzeit),
     intensitaet: r.intensitaet,
     intensitaet_begruendung: r.intensitaet_begruendung,
     zusammenfassung: r.zusammenfassung,

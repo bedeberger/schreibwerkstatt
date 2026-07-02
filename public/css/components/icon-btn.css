@@ -112,6 +112,34 @@
   pointer-events: none;
 }
 
+/* Icon-Glyph-Normalisierung: alle Icon-only Action-/Close-Buttons rendern ihr
+   <svg.icon> auf dieselbe feste Grösse (--icon-size-action) statt auf ihre je
+   eigene font-size (.icon = 1em). Ohne das driften die Glyphen (Card-Close 18px,
+   Toast 16px, Find 15px, Synonym/Figur ~17.6px, Heatmap 13px …) — sichtbar
+   uneinheitlich, besonders mobil, wo der Tap-Target unten auf 40px wächst, das
+   Glyph aber gleich bleiben soll. Direkter Child-Selektor (0,2,0) schlägt `.icon`
+   (0,1,0). Diese Liste umfasst den @media-(pointer:coarse)-Block unten (jeder
+   40px-Tap-Target-Button MUSS hier stehen) plus Buttons, die zwar normalisiert
+   werden, aber keinen 40px-Target vertragen (`.search-clear--icon`, absolut im
+   Suchfeld). Gegatet durch tests/unit/icon-size-consistency.test.mjs. */
+.icon-btn > .icon,
+.btn-card-close > .icon,
+.job-toast-close > .icon,
+.organizer-delete-btn > .icon,
+.chat-session-delete > .icon,
+.history-item-delete > .icon,
+.edit-find-close > .icon,
+.figur-lookup-close > .icon,
+.synonym-picker-close > .icon,
+.entity-popover-close > .icon,
+.heatmap-detail-close > .icon,
+.search-clear > .icon,
+.search-clear--icon > .icon,
+.job-queue-cancel-btn > .icon {
+  width: var(--icon-size-action);
+  height: var(--icon-size-action);
+}
+
 /* Touch: auf coarse Pointern (Finger) vergrößerte Tap-Targets (≥40px). Nötig,
    weil `data-tip`-Tooltips hover-basiert sind (auf Touch unsichtbar) und 28px
    unter der empfohlenen Mindest-Tap-Größe liegen. Greift für alle Icon-only-

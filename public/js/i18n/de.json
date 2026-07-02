@@ -758,6 +758,7 @@
   "palette.chapter.pageCountOne": "{n} Seite",
   "palette.chapter.pageCountOther": "{n} Seiten",
   "palette.disabled.needBook": "Buch wählen",
+  "palette.disabled.needClaude": "Nur mit Claude verfügbar",
   "palette.disabled.needPages": "Buch enthält keine Seiten",
   "palette.action.theme": "Theme wechseln",
   "palette.action.theme.desc": "Hell · Dunkel · Auto",

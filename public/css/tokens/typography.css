@@ -41,6 +41,14 @@
   --font-em-140: 1.4em;
   --font-em-150: 1.5em;   /* h1 */
 
+  /* === Icon-Glyph-Grösse ===
+     Feste Rendergrösse des Sprite-Icons (<svg.icon>, sonst 1em) in Icon-only
+     Action-/Close-Buttons. Entkoppelt die Icon-Grösse von der font-size des
+     Buttons, damit alle Icon-only-Buttons dasselbe Glyph zeigen — desktop wie
+     mobile (wo der Tap-Target auf 40px wächst, das Glyph aber gleich bleiben
+     soll). SSoT-Konsument: components/icon-btn.css. */
+  --icon-size-action: 16px;
+
   /* === Font-Weight === */
   --fw-regular:    400;
   --fw-medium:     500;

@@ -54,9 +54,44 @@ export const erzaehlprofilMethods = {
     return parts.join(' · ');
   },
 
-  // Kapitel mit erkannter Abweichung von der deklarierten Soll-Perspektive.
+  // Kapitel mit erkannter Abweichung (Perspektive ODER Erzählzeit) von der
+  // deklarierten Soll-Erzählform.
   erzaehlprofilDeviations() {
-    return this.erzaehlprofilChapters().filter(c => c.pov_abweichung);
+    return this.erzaehlprofilChapters().filter(c => c.pov_abweichung || c.tempus_abweichung);
+  },
+
+  // POV-Konfidenz als Prozent (0–100) bzw. null, wenn nicht bestimmt.
+  erzaehlprofilKonfidenzPct(ch) {
+    const k = ch?.pov_konfidenz;
+    return (typeof k === 'number' && isFinite(k)) ? Math.round(k * 100) : null;
+  },
+  // Wackelnde/uneindeutige Erzählhaltung: die interessanten Stellen fürs Lektorat.
+  erzaehlprofilKonfidenzLow(ch) {
+    const k = ch?.pov_konfidenz;
+    return typeof k === 'number' && isFinite(k) && k < 0.6;
+  },
+
+  // Erzähler-/Fokusfiguren übers Buch aggregiert: je Figur Anzahl Kapitel + Liste,
+  // sortiert nach Häufigkeit. Bei Multi-POV-Romanen die zentrale Kennzahl («aus wessen
+  // Sicht wird wie oft erzählt»). Figuren mit aufgelöster figure_id sind klickbar.
+  erzaehlprofilFigurenVerteilung() {
+    const byKey = new Map();
+    for (const ch of this.erzaehlprofilChapters()) {
+      const name = (ch.erzaehler_figur || '').trim();
+      if (!name) continue;
+      const key = ch.erzaehler_figur_id != null ? 'id:' + ch.erzaehler_figur_id : 'n:' + name.toLowerCase();
+      if (!byKey.has(key)) byKey.set(key, { name, figur_id: ch.erzaehler_figur_id ?? null, count: 0, kapitel: [] });
+      const e = byKey.get(key);
+      e.count++;
+      if (ch.kapitel && !e.kapitel.includes(ch.kapitel)) e.kapitel.push(ch.kapitel);
+    }
+    return [...byKey.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  },
+
+  // Navigation zur Figur (öffnet die Figuren-Karte + selektiert). Nur mit id.
+  erzaehlprofilGotoFigur(figurId) {
+    if (figurId == null) return;
+    window.__app.openFigurById(figurId);
   },
 
   // Spannungskurven-Punkte: pro Kapitel { kapitel, chapter_id, intensitaet(1–5),

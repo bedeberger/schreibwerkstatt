@@ -36,6 +36,9 @@ export async function _toggleCardGeneric(entry) {
     return;
   }
   if (entry.requiresBook && !this.$store.nav.selectedBookId) return;
+  // Claude-only-Karten (Kontinuität/Erzählprofil) für Nicht-Claude gar nicht öffnen —
+  // deckt Deep-Links (#kontinuitaet) + Palette-Klicks ab, falls sie durchrutschen.
+  if (entry.requiresClaude && (this.$store.config?.effectiveProvider || 'claude') !== 'claude') return;
   this._closeOtherMainCards(entry.key);
   if (entry.partial) await this._ensurePartial(entry.partial);
   this[entry.flag] = true;

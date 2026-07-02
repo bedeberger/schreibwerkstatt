@@ -135,6 +135,7 @@ export const appInitMethods = {
       if (cfg.claudeModel) this.$store.config.claudeModel = cfg.claudeModel;
       if (cfg.claudeMaxTokens) this.$store.config.claudeMaxTokens = cfg.claudeMaxTokens;
       if (cfg.apiProvider) this.$store.config.apiProvider = cfg.apiProvider;
+      if (cfg.effectiveProvider) this.$store.config.effectiveProvider = cfg.effectiveProvider;
       if (cfg.ollamaModel) this.$store.config.ollamaModel = cfg.ollamaModel;
       if (cfg.openaiCompatModel) this.$store.config.openaiCompatModel = cfg.openaiCompatModel;
       this.$store.session.currentUser = cfg.user || null;

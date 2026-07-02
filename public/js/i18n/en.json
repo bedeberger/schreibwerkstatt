@@ -758,6 +758,7 @@
   "palette.chapter.pageCountOne": "{n} page",
   "palette.chapter.pageCountOther": "{n} pages",
   "palette.disabled.needBook": "Select a book first",
+  "palette.disabled.needClaude": "Available with Claude only",
   "palette.disabled.needPages": "Book has no pages",
   "palette.action.theme": "Switch theme",
   "palette.action.theme.desc": "Light · Dark · Auto",

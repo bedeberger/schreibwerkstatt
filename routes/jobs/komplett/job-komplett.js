@@ -369,9 +369,11 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       ]);
       kontResult = p8Out;
     } else {
+      // Kontinuitätsprüfung (P8) ist Claude-only — für lokale Provider übersprungen:
+      // ohne Single-Pass/Verify-Filter/Attribut-Check produziert der Fakten-Multi-Pass
+      // zu viele False Positives. Der Zeitstrahl (P6) ist Kern-Katalog und läuft weiter.
       await runZeitstrahlSafe();
-      updateJob(jobId, { progress: 82, statusText: 'job.phase.checkContinuity' });
-      kontResult = await runP8();
+      kontResult = null;
     }
     // Pflichtfeld-Check als Degradierung (P8 read-only → kein throw): ein schema-valides
     // Ergebnis ohne «zusammenfassung» würde saveKontinuitaetResult wortlos null liefern
@@ -434,13 +436,14 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       pt.mark('Coverage-Audit');
     }
 
-    // ── Phase Erzählprofil (non-critical, alle Provider): POV/Erzählzeit, Pacing-
+    // ── Phase Erzählprofil (non-critical, nur Claude): POV/Erzählzeit, Pacing-
     // Intensität und Themen/Motive pro Kapitel. Read-only Endphase wie Kontinuität –
     // ein Fehler darf den bereits gespeicherten Katalog nicht kippen. Läuft nur, wenn
     // der Konsolidierungs-Checkpoint NICHT griff (unveränderte Bücher überspringen sie
-    // oben komplett → das bestehende Profil bleibt gültig). Kill-Switch
+    // oben komplett → das bestehende Profil bleibt gültig). Claude-only (wie
+    // Kontinuität ausgeblendet für Nicht-Claude); Kill-Switch
     // `ai.komplett.narrative_profile` (Default an; in Integration-Tests aus).
-    if (appSettings.get('ai.komplett.narrative_profile') !== false) {
+    if (effectiveProvider === 'claude' && appSettings.get('ai.komplett.narrative_profile') !== false) {
       await runNonCritical('Erzählprofil',
         () => runErzaehlprofil(ctx, { figNameToId, fromPct: 98, toPct: 99 }), log,
         { warnings, warnKey: 'job.warn.narrativeProfileFailed' });
