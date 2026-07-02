@@ -63,6 +63,58 @@ export const adminMethods = {
   },
 
 
+  // Bulk-Cleanup der vom Komplettanalyse-Reconcile aufgelaufenen stale-Altlasten
+  // (Figuren/Szenen/Schauplätze, die nicht mehr im Text vorkommen). Räumt nur stale=1,
+  // aktive Einträge bleiben unberührt. Je ein Endpunkt pro Entitätstyp (parallel).
+  async deleteStaleEntities() {
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId) return;
+    if (!await window.__app.appConfirm({
+      message: window.__app.t('book.settings.staleCleanupConfirm'),
+      confirmLabel: window.__app.t('common.delete'),
+      danger: true,
+    })) return;
+
+    this.staleCleanupLoading = true;
+    this.staleCleanupMessage = '';
+    this.staleCleanupError   = '';
+    try {
+      const [figRes, sceneRes, locRes] = await Promise.all([
+        fetch(`/figures/${bookId}/stale`, { method: 'DELETE' }),
+        fetch(`/figures/scenes/${bookId}/stale`, { method: 'DELETE' }),
+        fetch(`/locations/${bookId}/stale`, { method: 'DELETE' }),
+      ]);
+      for (const r of [figRes, sceneRes, locRes]) {
+        if (!r.ok) {
+          let errData = null;
+          try { errData = await r.json(); } catch (_) {}
+          throw new Error(errData ? window.__app.tError(errData) : `HTTP ${r.status}`);
+        }
+      }
+      const fig   = (await figRes.json()).deleted   || {};
+      const scene = (await sceneRes.json()).deleted || {};
+      const loc   = (await locRes.json()).deleted   || {};
+      this.staleCleanupMessage = window.__app.t('book.settings.staleCleanupSummary', {
+        figuren:      fig.figures    || 0,
+        szenen:       scene.scenes   || 0,
+        schauplaetze: loc.locations  || 0,
+      });
+      // Buchweite Kataloge neu laden, damit die entfernten Zeilen aus offenen Karten verschwinden.
+      if (String(Alpine.store('nav').selectedBookId) === String(bookId)) {
+        window.__app.loadFiguren?.(bookId);
+        window.__app.loadOrte?.(bookId);
+        window.__app.loadSzenen?.(bookId);
+      }
+      if (this._staleMsgTimer) clearTimeout(this._staleMsgTimer);
+      this._staleMsgTimer = setTimeout(() => { this.staleCleanupMessage = ''; this._staleMsgTimer = null; }, 6000);
+    } catch (e) {
+      this.staleCleanupError = e.message;
+    } finally {
+      this.staleCleanupLoading = false;
+    }
+  },
+
+
   async deleteBook() {
     const app = window.__app;
     const bookId = Alpine.store('nav').selectedBookId;

@@ -1,8 +1,5 @@
     <!-- Cron-Tab -->
     <section x-show="adminSettingsTab === 'cron'" class="admin-settings-section">
-      <label>app.timezone
-        <input type="text" x-model="adminSettingsForm['app.timezone']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.appTimezone')"></small>
-      </label>
-      <label>cron.stale_days <input type="text" x-data="numInput({ step: 1, min: 1, max: 365 })" x-modelable="value" x-model="adminSettingsForm['cron.stale_days']"></label>
+      <div x-data="settingField({ k: 'app.timezone', help: 'admin.settings.help.appTimezone' })"></div>
+      <div x-data="settingField({ k: 'cron.stale_days', type: 'num', num: { step: 1, min: 1, max: 365 } })"></div>
     </section>

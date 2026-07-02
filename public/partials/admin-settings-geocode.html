@@ -3,38 +3,17 @@
     <section x-show="adminSettingsTab === 'geocode'" class="admin-settings-section">
       <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.geocode.geocodingTitle')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.hint')"></p>
-      <label>
-        <span x-text="$app.t('admin.settings.geocode.provider.label')"></span>
-        <div x-data="combobox({ placeholder: $app.t('admin.settings.geocode.provider.label'), compact: false })"
-             x-modelable="value" x-model="adminSettingsForm['geocode.provider']"
-             x-effect="options = [{ value: 'nominatim', label: 'Nominatim (OSM)' }, { value: 'photon', label: 'Photon (Komoot)' }]"></div>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.geocode.nominatim.label')"></span>
-        <input type="url" x-model="adminSettingsForm['geocode.nominatim.url']" :placeholder="$app.t('admin.settings.geocode.nominatim.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.nominatim.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.geocode.photon.label')"></span>
-        <input type="url" x-model="adminSettingsForm['geocode.photon.url']" :placeholder="$app.t('admin.settings.geocode.photon.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.photon.help')"></small>
-      </label>
+      <div x-data="settingField({ k: 'geocode.provider', type: 'select', base: 'geocode.provider', opts: [{ value: 'nominatim', label: 'Nominatim (OSM)' }, { value: 'photon', label: 'Photon (Komoot)' }] })"></div>
+      <div x-data="settingField({ k: 'geocode.nominatim.url', type: 'url', base: 'geocode.nominatim', help: true })"></div>
+      <div x-data="settingField({ k: 'geocode.photon.url', type: 'url', base: 'geocode.photon', help: true })"></div>
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('geocode')" x-text="$app.t('admin.settings.test.geocode')"></button>
       </div>
 
       <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.geocode.tilesTitle')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.tilesHint')"></p>
-      <label>
-        <span x-text="$app.t('admin.settings.geocode.tiles.label')"></span>
-        <input type="url" x-model="adminSettingsForm['geocode.tiles.url']" :placeholder="$app.t('admin.settings.geocode.tiles.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.tiles.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.geocode.tilesAttribution.label')"></span>
-        <input type="text" x-model="adminSettingsForm['geocode.tiles.attribution']" :placeholder="$app.t('admin.settings.geocode.tilesAttribution.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.geocode.tilesAttribution.help')"></small>
-      </label>
+      <div x-data="settingField({ k: 'geocode.tiles.url', type: 'url', base: 'geocode.tiles', help: true })"></div>
+      <div x-data="settingField({ k: 'geocode.tiles.attribution', base: 'geocode.tilesAttribution', help: true })"></div>
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('tiles')" x-text="$app.t('admin.settings.test.tiles')"></button>
       </div>

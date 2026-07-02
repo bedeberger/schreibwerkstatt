@@ -1,64 +1,17 @@
     <!-- TTS-Tab: Text-to-Speech / Proof-Listening (Notebook-Editor) -->
     <section x-show="adminSettingsTab === 'tts'" class="admin-settings-section">
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.hint')"></p>
-      <label class="checkbox-row">
-        <input type="checkbox" :checked="adminSettingsForm['tts.enabled'] === true || adminSettingsForm['tts.enabled'] === 'true'"
-               @change="adminSettingsForm['tts.enabled'] = $event.target.checked">
-        <span x-text="$app.t('admin.settings.tts.enabled.label')"></span>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.host.label')"></span>
-        <input type="url" x-model="adminSettingsForm['tts.host']" :placeholder="$app.t('admin.settings.tts.host.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.host.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.model.label')"></span>
-        <input type="text" x-model="adminSettingsForm['tts.model']" :placeholder="$app.t('admin.settings.tts.model.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.model.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.voice.label')"></span>
-        <input type="text" x-model="adminSettingsForm['tts.voice']" :placeholder="$app.t('admin.settings.tts.voice.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.voice.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.voiceDe.label')"></span>
-        <input type="text" x-model="adminSettingsForm['tts.voice.de']" :placeholder="$app.t('admin.settings.tts.voice.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.voiceLocale.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.voiceEn.label')"></span>
-        <input type="text" x-model="adminSettingsForm['tts.voice.en']" :placeholder="$app.t('admin.settings.tts.voice.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.voiceLocale.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.format.label')"></span>
-        <div x-data="combobox({ placeholder: $app.t('admin.settings.tts.format.label'), compact: false })"
-             x-modelable="value" x-model="adminSettingsForm['tts.format']"
-             x-effect="options = [{ value: 'mp3', label: 'MP3' }, { value: 'opus', label: 'Opus' }, { value: 'aac', label: 'AAC' }, { value: 'flac', label: 'FLAC' }, { value: 'wav', label: 'WAV' }, { value: 'pcm', label: 'PCM' }]"></div>
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.format.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.speed.label')"></span>
-        <input type="text" x-data="numInput({ step: 0.05, min: 0.25, max: 4, decimals: 2 })" x-modelable="value" x-model="adminSettingsForm['tts.speed']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.speed.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.pauseFragmentMs.label')"></span>
-        <input type="text" x-data="numInput({ integer: true, min: 0, max: 5000 })" x-modelable="value" x-model="adminSettingsForm['tts.pause.fragment_ms']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.pauseFragmentMs.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.pauseParagraphMs.label')"></span>
-        <input type="text" x-data="numInput({ integer: true, min: 0, max: 5000 })" x-modelable="value" x-model="adminSettingsForm['tts.pause.paragraph_ms']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.pauseParagraphMs.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.tts.apiKey.label')"></span>
-        <input type="password" x-model="adminSettingsForm['tts.api_key']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
-        <small x-show="adminSettingsMap['tts.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['tts.api_key']?.masked"></small>
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.tts.apiKey.help')"></small>
-      </label>
+      <div x-data="settingField({ k: 'tts.enabled', type: 'toggle', base: 'tts.enabled' })"></div>
+      <div x-data="settingField({ k: 'tts.host', type: 'url', base: 'tts.host', help: true })"></div>
+      <div x-data="settingField({ k: 'tts.model', base: 'tts.model', help: true })"></div>
+      <div x-data="settingField({ k: 'tts.voice', base: 'tts.voice', help: true })"></div>
+      <div x-data="settingField({ k: 'tts.voice.de', label: 'admin.settings.tts.voiceDe.label', phKey: 'admin.settings.tts.voice.placeholder', help: 'admin.settings.tts.voiceLocale.help' })"></div>
+      <div x-data="settingField({ k: 'tts.voice.en', label: 'admin.settings.tts.voiceEn.label', phKey: 'admin.settings.tts.voice.placeholder', help: 'admin.settings.tts.voiceLocale.help' })"></div>
+      <div x-data="settingField({ k: 'tts.format', type: 'select', base: 'tts.format', help: true, opts: [{ value: 'mp3', label: 'MP3' }, { value: 'opus', label: 'Opus' }, { value: 'aac', label: 'AAC' }, { value: 'flac', label: 'FLAC' }, { value: 'wav', label: 'WAV' }, { value: 'pcm', label: 'PCM' }] })"></div>
+      <div x-data="settingField({ k: 'tts.speed', type: 'num', base: 'tts.speed', num: { step: 0.05, min: 0.25, max: 4, decimals: 2 }, help: true })"></div>
+      <div x-data="settingField({ k: 'tts.pause.fragment_ms', type: 'num', base: 'tts.pauseFragmentMs', num: { integer: true, min: 0, max: 5000 }, help: true })"></div>
+      <div x-data="settingField({ k: 'tts.pause.paragraph_ms', type: 'num', base: 'tts.pauseParagraphMs', num: { integer: true, min: 0, max: 5000 }, help: true })"></div>
+      <div x-data="settingField({ k: 'tts.api_key', type: 'password', base: 'tts.apiKey', help: true })"></div>
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('tts')" x-text="$app.t('admin.settings.test.tts')"></button>
       </div>

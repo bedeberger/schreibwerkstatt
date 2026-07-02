@@ -380,4 +380,122 @@
   color: var(--color-muted);
 }
 
+/* === Figuren-Präsenz (Heatmap-Tab + Pro-Figur-Streifen) === */
+.figur-presence { margin-top: var(--space-10); }
+.figur-presence-intro {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  margin-bottom: var(--space-sm);
+}
+.figur-presence-findings {
+  list-style: none;
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.figur-presence-finding {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+.figur-presence-finding-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-muted);
+  transform: translateY(1px);
+}
+.figur-presence-finding-dot--gap           { background: var(--color-err-text); }
+.figur-presence-finding-dot--coPresenceGap { background: var(--color-err-text); }
+.figur-presence-finding-dot--lateEntrance  { background: var(--color-warn-text); }
+.figur-presence-finding-dot--earlyExit     { background: var(--color-warn-text); }
+.figur-presence-finding-dot--flatArc       { background: var(--color-muted); }
+
+/* Heatmap-Zellen quadratisch + kompakt, damit viele Kapitel-Spalten passen.
+   Doppelklasse (0,2,1) schlägt die Basis-.heatmap-table-Regeln (0,1,1/0,1,2). */
+.figur-presence-table td.figur-presence-cell {
+  padding: 0;
+  width: 22px;
+  min-width: 22px;
+  height: 26px;
+}
+.figur-presence-table th.figur-presence-colhead {
+  padding: var(--space-6) 0;
+  text-align: center;
+  min-width: 22px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.figur-presence-table th.figur-presence-colhead:hover { color: var(--color-primary); }
+.figur-presence-share {
+  display: block;
+  font-size: var(--font-size-xs, 11px);
+  color: var(--color-muted);
+}
+
+/* Wendepunkt-Marker: kleiner Punkt mittig in der Zelle. */
+.figur-presence-cell--wp { position: relative; }
+.figur-presence-cell--wp::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 1.5px var(--color-surface);
+}
+
+.figur-presence-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+.figur-presence-legend-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.figur-presence-legend-swatch {
+  width: 16px;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--color-border);
+  position: relative;
+}
+.figur-presence-legend-swatch--present {
+  background: color-mix(in srgb, var(--color-primary) 55%, transparent);
+}
+
+/* Pro-Figur-Streifen in den Figuren-Details */
+.figur-presence-strip { margin-top: var(--space-sm); }
+.figur-presence-strip-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: var(--space-2xs);
+}
+.figur-presence-strip-cell {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--color-border);
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .figur-presence-table td.figur-presence-cell { width: 16px; min-width: 16px; height: 20px; }
+  .figur-presence-table th.figur-presence-colhead { min-width: 16px; font-size: var(--font-size-xs, 11px); }
+  .figur-presence-strip-cell { width: 13px; height: 13px; }
+}
+
 }

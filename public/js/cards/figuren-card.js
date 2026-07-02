@@ -14,6 +14,7 @@
 //   - `loadFiguren`, `saveFiguren` (von vielen Modulen gerufen)
 
 import { graphMethods } from '../graph.js';
+import { presenceMethods } from '../book/figuren-presence.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
 
@@ -210,5 +211,6 @@ export function registerFigurenCard() {
     },
 
     ...graphMethods,
+    ...presenceMethods,
   }));
 }

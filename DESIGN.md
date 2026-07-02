@@ -25,6 +25,7 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Icon-Button-Count-Badge](#icon-button-count-badge-icon-btn-badge) — Counter oben rechts auf Icon-Button
 - [Badges & Tags](#badges--tags) — eckig, Severity, Hue-Palette
 - [Combobox](#combobox-auswahlfeld) — ersetzt `<select>`
+- [Setting-Field](#setting-field-settingfield) — ein Admin-Settings-Feld deklarativ
 - [Tabs / Modus-Toggle](#tabs--modus-toggle) — `.tabs` + `.tabs-btn`
 - [Form-Patterns](#form-patterns-settings--und-export-karten) — `.card-form-grid` + Wertspalten
 - [Progress-Bar](#progress-bar) — `--progress` Custom-Prop
@@ -791,7 +792,30 @@ Pflicht-Pattern (Wrapper-Div leer lassen, nur Attribute setzen):
 - `label` (Funktion/String) erzeugt das sichtbare Label; weglassen für einen reinen Switch — dann `ariaLabel` setzen (a11y-Name; wird ignoriert, sobald ein sichtbares Label da ist, um Doppel-Labeling zu vermeiden).
 - `disabled: true` graut aus + sperrt. Optional `@toggle-change="…"` für Side-Effects (Detail = neuer Boolean).
 
-**Beispiele:** [admin-settings-stt.html](public/partials/admin-settings-stt.html).
+**Beispiele:** direkt genutzt als Boolean-Primitive innerhalb von `settingField` ([public/js/setting-field.js](public/js/setting-field.js), `type: 'toggle'`); in den Admin-Settings-Partials erscheint der Switch daher über `settingField`, nicht als eigenes `x-data="toggleSwitch"`. Für einen freistehenden Switch ausserhalb der Settings-Karte gilt weiter das Pflicht-Pattern oben.
+
+### Setting-Field (`settingField`)
+
+**Regel:** Ein einzelnes Feld in einer **Admin-Settings-Karte** (Label + Control + optionaler Help-Text, gebunden an `adminSettingsForm[key]`/`adminSettingsMap[key]`) nutzt `Alpine.data('settingField')` aus [public/js/setting-field.js](public/js/setting-field.js). **Kein handgeschriebenes `<label><span x-text=…><input …><small …help></label>`** mehr pro Feld — die fünf Archetypen (Text/URL/E-Mail, Passwort/Secret mit Masked-Hint, Zahl via `numInput`, Auswahl via `combobox`, Boolean via `toggleSwitch`) waren über die Settings-Tabs vielfach dupliziert. Selbst-rendernde Komponente analog `combobox`/`toggleSwitch`: `init()` rendert die komplette `<label>`-Struktur und ruft `Alpine.initTree`; der interne `x-model` löst über die Alpine-Scope-Kette auf die `adminSettingsCard`-Form auf.
+
+**Use:** ausschliesslich die reinen Feld-Tabs der Admin-Settings. Sonderfälle mit eigener Logik (`provider` mit Subtabs + Budget-Widget, `api` mit Token-Verwaltung) bleiben von Hand. Wrapper-Div leer lassen, nur Attribute setzen:
+
+```html
+<!-- i18n-Konvention: Label/Placeholder/Help via base + `.label`/`.placeholder`/`.help` -->
+<div x-data="settingField({ k: 'image.host', type: 'url', base: 'image.host', help: true })"></div>
+<!-- Roh-Key als Label (keine i18n) + expliziter Help-Key -->
+<div x-data="settingField({ k: 'app.timezone', help: 'admin.settings.help.appTimezone' })"></div>
+<!-- Zahl / Auswahl / Boolean -->
+<div x-data="settingField({ k: 'cron.stale_days', type: 'num', num: { step: 1, min: 1, max: 365 } })"></div>
+<div x-data="settingField({ k: 'pdfa.flavour', type: 'select', opts: [{ value: '2b', label: '2b' }, { value: '3b', label: '3b' }] })"></div>
+<div x-data="settingField({ k: 'tts.enabled', type: 'toggle', base: 'tts.enabled' })"></div>
+```
+
+**Config:** `k` (Pflicht, Setting-Key); `type` (`text` Default | `url` | `email` | `password` | `num` | `select` | `toggle`); `base` (i18n-Basis unter `admin.settings.` → Label `.label`, Placeholder `.placeholder`, Help `.help` nur bei `help: true`); `label`/`phKey`/`help` (volle i18n-Key-Overrides, wenn die Keys nicht der `.label`/`.placeholder`/`.help`-Konvention folgen); `ph` (Literal-Placeholder-String); `secret` (Masked-Placeholder + Masked-Hint; bei `type: 'password'` implizit); `num` (numInput-Config); `opts` (combobox-Options).
+
+**Klassen:** `.setting-field` ([public/css/admin/admin-settings.css](public/css/admin/admin-settings.css)) — Grid-Item der Sektion (`min-width: 0` hält die Shrink-Kette; internes Grid stapelt Toggle + Help). Label/Input/Small erben die bestehenden `.admin-settings-section`-Descendant-Styles.
+
+**Beispiele:** [admin-settings-image.html](public/partials/admin-settings-image.html), [admin-settings-auth.html](public/partials/admin-settings-auth.html), [admin-settings-tts.html](public/partials/admin-settings-tts.html).
 
 ### Copy-Button (`copyButton`)
 

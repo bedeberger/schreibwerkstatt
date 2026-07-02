@@ -1,56 +1,16 @@
     <!-- STT-Tab: Speech-to-Text-Diktat (Notebook-Editor) -->
     <section x-show="adminSettingsTab === 'stt'" class="admin-settings-section">
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.hint')"></p>
-      <div x-data="toggleSwitch({ label: () => $app.t('admin.settings.stt.enabled.label') })"
-           x-modelable="value" x-model="adminSettingsForm['stt.enabled']"></div>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.host.label')"></span>
-        <input type="url" x-model="adminSettingsForm['stt.host']" :placeholder="$app.t('admin.settings.stt.host.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.host.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.model.label')"></span>
-        <input type="text" x-model="adminSettingsForm['stt.model']" :placeholder="$app.t('admin.settings.stt.model.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.model.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.apiKey.label')"></span>
-        <input type="password" x-model="adminSettingsForm['stt.api_key']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
-        <small x-show="adminSettingsMap['stt.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['stt.api_key']?.masked"></small>
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.apiKey.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.language.label')"></span>
-        <div x-data="combobox({ placeholder: $app.t('admin.settings.stt.language.label'), compact: false })"
-             x-modelable="value" x-model="adminSettingsForm['stt.language']"
-             x-effect="options = [{ value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }]"></div>
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.language.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.temperature.label')"></span>
-        <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 1, decimals: 2 })" x-modelable="value" x-model="adminSettingsForm['stt.temperature']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.temperature.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.upstreamTimeoutMs.label')"></span>
-        <input type="text" x-data="numInput({ integer: true, min: 5000, max: 120000 })" x-modelable="value" x-model="adminSettingsForm['stt.upstream_timeout_ms']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.upstreamTimeoutMs.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.vadSilenceMs.label')"></span>
-        <input type="text" x-data="numInput({ integer: true, min: 200, max: 5000 })" x-modelable="value" x-model="adminSettingsForm['stt.vad.silence_ms']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.vadSilenceMs.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.vadThreshold.label')"></span>
-        <input type="text" x-data="numInput({ step: 0.001, min: 0, max: 1, decimals: 3 })" x-modelable="value" x-model="adminSettingsForm['stt.vad.threshold']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.vadThreshold.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.stt.vadMaxSegmentS.label')"></span>
-        <input type="text" x-data="numInput({ integer: true, min: 5, max: 120 })" x-modelable="value" x-model="adminSettingsForm['stt.vad.max_segment_s']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.stt.vadMaxSegmentS.help')"></small>
-      </label>
+      <div x-data="settingField({ k: 'stt.enabled', type: 'toggle', base: 'stt.enabled' })"></div>
+      <div x-data="settingField({ k: 'stt.host', type: 'url', base: 'stt.host', help: true })"></div>
+      <div x-data="settingField({ k: 'stt.model', base: 'stt.model', help: true })"></div>
+      <div x-data="settingField({ k: 'stt.api_key', type: 'password', base: 'stt.apiKey', help: true })"></div>
+      <div x-data="settingField({ k: 'stt.language', type: 'select', base: 'stt.language', help: true, opts: [{ value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }] })"></div>
+      <div x-data="settingField({ k: 'stt.temperature', type: 'num', base: 'stt.temperature', num: { step: 0.05, min: 0, max: 1, decimals: 2 }, help: true })"></div>
+      <div x-data="settingField({ k: 'stt.upstream_timeout_ms', type: 'num', base: 'stt.upstreamTimeoutMs', num: { integer: true, min: 5000, max: 120000 }, help: true })"></div>
+      <div x-data="settingField({ k: 'stt.vad.silence_ms', type: 'num', base: 'stt.vadSilenceMs', num: { integer: true, min: 200, max: 5000 }, help: true })"></div>
+      <div x-data="settingField({ k: 'stt.vad.threshold', type: 'num', base: 'stt.vadThreshold', num: { step: 0.001, min: 0, max: 1, decimals: 3 }, help: true })"></div>
+      <div x-data="settingField({ k: 'stt.vad.max_segment_s', type: 'num', base: 'stt.vadMaxSegmentS', num: { integer: true, min: 5, max: 120 }, help: true })"></div>
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('stt')" x-text="$app.t('admin.settings.test.stt')"></button>
       </div>

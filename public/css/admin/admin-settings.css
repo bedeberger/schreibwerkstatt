@@ -49,6 +49,16 @@
   max-width: 100%;
 }
 
+/* settingField-Wrapper (public/js/setting-field.js): Grid-Item der Sektion.
+   `min-width: 0` hält die Shrink-Kette bis zum Input aufrecht; das interne
+   Grid stapelt bei Toggle-Feldern den Switch über dem Help-Text. Text-Felder
+   enthalten ein einzelnes `<label>`, das seine Struktur selbst layoutet. */
+.setting-field {
+  display: grid;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
 .admin-settings-section label.checkbox-row {
   grid-auto-flow: column;
   grid-auto-columns: max-content;

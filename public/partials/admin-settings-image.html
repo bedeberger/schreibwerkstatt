@@ -1,37 +1,12 @@
     <!-- Image-Tab: Bild-Generierung im Buch-Chat (self-hosted OpenAI-kompatibel) -->
     <section x-show="adminSettingsTab === 'image'" class="admin-settings-section">
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.image.hint')"></p>
-      <label class="checkbox-row">
-        <input type="checkbox" :checked="adminSettingsForm['image.enabled'] === true || adminSettingsForm['image.enabled'] === 'true'"
-               @change="adminSettingsForm['image.enabled'] = $event.target.checked">
-        <span x-text="$app.t('admin.settings.image.enabled.label')"></span>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.image.host.label')"></span>
-        <input type="url" x-model="adminSettingsForm['image.host']" :placeholder="$app.t('admin.settings.image.host.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.image.host.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.image.model.label')"></span>
-        <input type="text" x-model="adminSettingsForm['image.model']" :placeholder="$app.t('admin.settings.image.model.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.image.model.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.image.size.label')"></span>
-        <input type="text" x-model="adminSettingsForm['image.size']" :placeholder="$app.t('admin.settings.image.size.placeholder')">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.image.size.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.image.timeoutMs.label')"></span>
-        <input type="text" x-data="numInput({ integer: true, min: 5000, max: 600000 })" x-modelable="value" x-model="adminSettingsForm['image.timeout_ms']">
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.image.timeoutMs.help')"></small>
-      </label>
-      <label>
-        <span x-text="$app.t('admin.settings.image.apiKey.label')"></span>
-        <input type="password" x-model="adminSettingsForm['image.api_key']" :placeholder="$app.t('admin.settings.secret.masked')" autocomplete="off">
-        <small x-show="adminSettingsMap['image.api_key']?.masked" class="muted-msg muted-msg--sm" x-text="adminSettingsMap['image.api_key']?.masked"></small>
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.image.apiKey.help')"></small>
-      </label>
+      <div x-data="settingField({ k: 'image.enabled', type: 'toggle', base: 'image.enabled' })"></div>
+      <div x-data="settingField({ k: 'image.host', type: 'url', base: 'image.host', help: true })"></div>
+      <div x-data="settingField({ k: 'image.model', base: 'image.model', help: true })"></div>
+      <div x-data="settingField({ k: 'image.size', base: 'image.size', help: true })"></div>
+      <div x-data="settingField({ k: 'image.timeout_ms', type: 'num', base: 'image.timeoutMs', num: { integer: true, min: 5000, max: 600000 }, help: true })"></div>
+      <div x-data="settingField({ k: 'image.api_key', type: 'password', base: 'image.apiKey', help: true })"></div>
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('image')" x-text="$app.t('admin.settings.test.image')"></button>
       </div>

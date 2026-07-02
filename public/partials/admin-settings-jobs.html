@@ -1,11 +1,7 @@
     <!-- Jobs-Tab -->
     <section x-show="adminSettingsTab === 'jobs'" class="admin-settings-section">
-      <label>jobs.max_concurrent <input type="text" x-data="numInput({ step: 1, min: 1, max: 8 })" x-modelable="value" x-model="adminSettingsForm['jobs.max_concurrent']"></label>
-      <label>jobs.book_chat.mode
-        <div x-data="combobox({ placeholder: 'jobs.book_chat.mode', compact: false })"
-             x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.mode']"
-             x-effect="options = [{ value: 'auto', label: 'auto' }, { value: 'agent', label: 'agent' }, { value: 'classic', label: 'classic' }]"></div>
-      </label>
-      <label>jobs.book_chat.max_tool_iter <input type="text" x-data="numInput({ step: 1, min: 1, max: 50 })" x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.max_tool_iter']"></label>
-      <label>jobs.book_chat.token_budget <input type="text" x-data="numInput({ step: 1, min: 0, max: 2000000 })" x-modelable="value" x-model="adminSettingsForm['jobs.book_chat.token_budget']"></label>
+      <div x-data="settingField({ k: 'jobs.max_concurrent', type: 'num', num: { step: 1, min: 1, max: 8 } })"></div>
+      <div x-data="settingField({ k: 'jobs.book_chat.mode', type: 'select', opts: [{ value: 'auto', label: 'auto' }, { value: 'agent', label: 'agent' }, { value: 'classic', label: 'classic' }] })"></div>
+      <div x-data="settingField({ k: 'jobs.book_chat.max_tool_iter', type: 'num', num: { step: 1, min: 1, max: 50 } })"></div>
+      <div x-data="settingField({ k: 'jobs.book_chat.token_budget', type: 'num', num: { step: 1, min: 0, max: 2000000 } })"></div>
     </section>

@@ -8845,6 +8845,29 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 228 abgeschlossen (chapter_narrative_themes.beleg → belege, JSON-Array mehrerer Zitate).');
   }
 
+  if (version < 229) {
+    // KI-Dach-Befund (Autoren-Befund) der Erzählprofil-Karte: eine priorisierte,
+    // an den deterministischen Struktur-Befunden verankerte Synthese pro (Buch, User).
+    // Als JSON persistiert (Job erzeugt es, Karte liest es); 1 Zeile je Buch+User.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS narrative_report (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT             REFERENCES app_users(email) ON DELETE SET NULL,
+        report_json TEXT    NOT NULL,
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE(book_id, user_email)
+      );
+      CREATE INDEX IF NOT EXISTS idx_narrative_report_book ON narrative_report(book_id);
+    `);
+    const fkErrors229 = db.pragma('foreign_key_check');
+    if (fkErrors229.length) {
+      throw new Error(`Migration 229: foreign_key_check meldet ${fkErrors229.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 229').run();
+    logger.info('DB-Migration auf Version 229 abgeschlossen (narrative_report — KI-Dach-Befund/Autoren-Befund der Erzählprofil-Karte).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

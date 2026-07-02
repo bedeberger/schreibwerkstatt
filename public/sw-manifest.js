@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "9035706864e8060b";
+self.__SHELL_BUILD = "0238a1ae3557a319";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -188,6 +188,7 @@ self.__SHELL_MANIFEST = [
   "/js/book/erzaehlprofil.js",
   "/js/book/export.js",
   "/js/book/fehler-heatmap.js",
+  "/js/book/figuren-presence.js",
   "/js/book/figuren.js",
   "/js/book/finetune-export.js",
   "/js/book/history.js",
@@ -442,6 +443,7 @@ self.__SHELL_MANIFEST = [
   "/js/register.js",
   "/js/repo/content.js",
   "/js/scroll-fade.js",
+  "/js/setting-field.js",
   "/js/share-anchor.js",
   "/js/share-reader.js",
   "/js/share-reader/composer.js",

@@ -115,6 +115,27 @@ router.patch('/:book_id/coords', jsonBody, (req, res) => {
   res.json({ ok: true, updated });
 });
 
+// Bulk-Cleanup: alle STALE Schauplätze eines Buchs auf einmal löschen (Danger-Zone).
+// Pendant zum Figuren/Szenen-Bulk-Delete; räumt die vom Reconcile aufgelaufenen stale=1-
+// Altlasten. Nur stale wird angefasst. CASCADE räumt die Bridges mit.
+// Muss VOR '/:book_id/:id' stehen, sonst matcht 'stale' als :id.
+router.delete('/:book_id/stale', (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const userEmail = req.session?.user?.email || null;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal = userEmail ? [userEmail] : [];
+  const ids = db.prepare(
+    `SELECT id FROM locations WHERE book_id = ? AND ${emailCond} AND stale = 1`
+  ).all(bookId, ...emailVal).map(r => r.id);
+  db.transaction(() => {
+    const del = db.prepare('DELETE FROM locations WHERE id = ?');
+    for (const id of ids) del.run(id);
+  })();
+  for (const id of ids) searchIndex.remove('location', id);
+  res.json({ ok: true, deleted: { locations: ids.length } });
+});
+
 // Einzelnen STALE-Schauplatz endgültig löschen (GUI-Button auf "nicht mehr im Text"-
 // Zeilen). Nur stale erlaubt — aktive Orte überleben die Re-Analyse via Reconcile und
 // sollen nicht per Einzel-Delete aus dem Katalog fallen. CASCADE (foreign_keys=ON) räumt

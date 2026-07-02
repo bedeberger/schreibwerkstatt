@@ -79,6 +79,9 @@ export function registerBookSettingsCard() {
     bookHistoryResetError: '',
     bookDeleteLoading: false,
     bookDeleteError: '',
+    staleCleanupLoading: false,
+    staleCleanupMessage: '',
+    staleCleanupError: '',
     // Blog-Sync (WordPress).
     blogSectionOpen: false,
     blogConnection: null,
@@ -116,6 +119,7 @@ export function registerBookSettingsCard() {
     _pubSavedTimer: null,
     _savedAtTimer: null,
     _resetMsgTimer: null,
+    _staleMsgTimer: null,
     _shareInviteMsgTimer: null,
     _lifecycle: null,
     _onBlogJobFinished: null,
@@ -137,6 +141,8 @@ export function registerBookSettingsCard() {
           bookHistoryResetMessage: '',
           bookHistoryResetError: '',
           bookDeleteError: '',
+          staleCleanupMessage: '',
+          staleCleanupError: '',
           bookAccessList: [],
           bookAccessError: '',
           shareEmail: '',
@@ -175,6 +181,8 @@ export function registerBookSettingsCard() {
           bookHistoryResetMessage: '',
           bookHistoryResetError: '',
           bookDeleteError: '',
+          staleCleanupMessage: '',
+          staleCleanupError: '',
           bookAccessError: '',
           shareInviteMessage: '',
           blogMessage: '',
@@ -235,6 +243,7 @@ export function registerBookSettingsCard() {
     destroy() {
       if (this._savedAtTimer) { clearTimeout(this._savedAtTimer); this._savedAtTimer = null; }
       if (this._resetMsgTimer) { clearTimeout(this._resetMsgTimer); this._resetMsgTimer = null; }
+      if (this._staleMsgTimer) { clearTimeout(this._staleMsgTimer); this._staleMsgTimer = null; }
       if (this._shareInviteMsgTimer) { clearTimeout(this._shareInviteMsgTimer); this._shareInviteMsgTimer = null; }
       if (this._pubSavedTimer) { clearTimeout(this._pubSavedTimer); this._pubSavedTimer = null; }
       if (this._onBlogJobFinished) {

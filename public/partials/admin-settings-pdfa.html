@@ -1,13 +1,5 @@
     <!-- PDF/A-Tab -->
     <section x-show="adminSettingsTab === 'pdfa'" class="admin-settings-section">
-      <label>pdfa.flavour
-        <div x-data="combobox({ placeholder: 'pdfa.flavour', compact: false })"
-             x-modelable="value" x-model="adminSettingsForm['pdfa.flavour']"
-             x-effect="options = [{ value: '2b', label: '2b' }, { value: '3b', label: '3b' }]"></div>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" :checked="adminSettingsForm['pdfa.disabled'] === true || adminSettingsForm['pdfa.disabled'] === 'true'"
-               @change="adminSettingsForm['pdfa.disabled'] = $event.target.checked">
-        <span>pdfa.disabled</span>
-      </label>
+      <div x-data="settingField({ k: 'pdfa.flavour', type: 'select', opts: [{ value: '2b', label: '2b' }, { value: '3b', label: '3b' }] })"></div>
+      <div x-data="settingField({ k: 'pdfa.disabled', type: 'toggle' })"></div>
     </section>

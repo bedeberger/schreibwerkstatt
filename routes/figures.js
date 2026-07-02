@@ -400,7 +400,7 @@ router.get('/:book_id', (req, res) => {
     LEFT JOIN chapters c ON c.chapter_id = fa.chapter_id
     WHERE f.book_id = ? AND f.user_email = ?`).all(bookId, userEmail);
   const evts = db.prepare(`
-    SELECT fe.figure_id, fe.datum, fe.ereignis, fe.bedeutung, fe.typ,
+    SELECT fe.figure_id, fe.datum, fe.ereignis, fe.bedeutung, fe.typ, fe.subtyp,
            fe.chapter_id, fe.page_id,
            c.chapter_name AS kapitel, p.page_name AS seite
     FROM figure_events fe
@@ -441,7 +441,7 @@ router.get('/:book_id', (req, res) => {
   const evtMap = {};
   for (const e of evts) (evtMap[e.figure_id] ??= []).push({
     datum: e.datum, ereignis: e.ereignis, bedeutung: e.bedeutung,
-    typ: e.typ || 'persoenlich',
+    typ: e.typ || 'persoenlich', subtyp: e.subtyp || 'sonstiges',
     chapter_id: e.chapter_id ?? null, page_id: e.page_id ?? null,
     kapitel: e.kapitel || null, seite: e.seite || null,
   });
@@ -555,6 +555,49 @@ router.put('/:book_id', jsonBody, (req, res) => {
       logger.warn(`Figuren-Mentions-Neuberechnung für Buch ${bookId} fehlgeschlagen: ${e.message}`);
     }
   });
+});
+
+// Bulk-Cleanup: alle STALE Szenen eines Buchs auf einmal löschen (Danger-Zone). Pendant
+// zum Einzel-Delete '/scenes/:book_id/:id'. Der Reconcile markiert nicht mehr im Text
+// vorkommende Szenen als stale=1 statt sie zu löschen (FK-Refs überleben); dieser Endpunkt
+// räumt die aufgelaufenen Altlasten. Nur stale wird angefasst. CASCADE räumt die Bridges mit.
+// Muss VOR '/scenes/:book_id/:id' stehen, sonst matcht 'stale' als :id.
+router.delete('/scenes/:book_id/stale', (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const userEmail = req.session?.user?.email || null;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal = userEmail ? [userEmail] : [];
+  const ids = db.prepare(
+    `SELECT id FROM figure_scenes WHERE book_id = ? AND ${emailCond} AND stale = 1`
+  ).all(bookId, ...emailVal).map(r => r.id);
+  db.transaction(() => {
+    const del = db.prepare('DELETE FROM figure_scenes WHERE id = ?');
+    for (const id of ids) del.run(id);
+  })();
+  for (const id of ids) searchIndex.remove('scene', id);
+  res.json({ ok: true, deleted: { scenes: ids.length } });
+});
+
+// Bulk-Cleanup: alle STALE Figuren eines Buchs auf einmal löschen (Danger-Zone). Pendant
+// zum Einzel-Delete '/:book_id/:id'. Nur stale wird angefasst — aktive Figuren bleiben
+// unberührt. CASCADE räumt die Bridges mit.
+// Muss VOR '/:book_id/:id' stehen, sonst matcht 'stale' als :id.
+router.delete('/:book_id/stale', (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const userEmail = req.session?.user?.email || null;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const emailVal = userEmail ? [userEmail] : [];
+  const ids = db.prepare(
+    `SELECT id FROM figures WHERE book_id = ? AND ${emailCond} AND stale = 1`
+  ).all(bookId, ...emailVal).map(r => r.id);
+  db.transaction(() => {
+    const del = db.prepare('DELETE FROM figures WHERE id = ?');
+    for (const id of ids) del.run(id);
+  })();
+  for (const id of ids) searchIndex.remove('figure', id);
+  res.json({ ok: true, deleted: { figures: ids.length } });
 });
 
 // Einzelne STALE-Szene endgültig löschen (GUI-Button auf "nicht mehr im Text"-Zeilen).

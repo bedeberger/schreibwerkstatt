@@ -85,6 +85,7 @@ import { registerEntityPicker } from '../cards/entity-picker.js';
 import { registerCollapsible } from '../collapsible.js';
 import { registerTabs } from '../tabs.js';
 import { registerToggleSwitch } from '../toggle-switch.js';
+import { registerSettingField } from '../setting-field.js';
 import { registerMenu } from '../menu.js';
 import { registerModal } from '../modal.js';
 
@@ -203,6 +204,7 @@ export function registerAllCards() {
   registerCollapsible();
   registerTabs();
   registerToggleSwitch();
+  registerSettingField();
   registerMenu();
   registerModal();
 }

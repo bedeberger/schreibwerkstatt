@@ -8,6 +8,7 @@ const {
   setContinuityIssueResolved,
   getChapterNarrativeProfile,
   } = require('../../../db/schema');
+const { getNarrativeReport, getAutorenBefund } = require('../../../db/narrative-report');
 const { toIntId } = require('../../../lib/validate');
 const { resolveProvider } = require('../../../lib/ai');
 const { setContext } = require('../../../lib/log-context');
@@ -111,7 +112,13 @@ komplettRouter.get('/erzaehlprofil/:book_id', (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   const userEmail = req.session?.user?.email || null;
-  res.json(getChapterNarrativeProfile(bookId, userEmail));
+  const profile = getChapterNarrativeProfile(bookId, userEmail);
+  // Deterministischer Buch-Befund (read-time, pure Engine über die Katalog-Zeilen) +
+  // gespeicherter KI-Dach-Befund (Autoren-Befund). Beides an dieselbe Antwort gehängt,
+  // damit die Karte alles in einem Fetch bekommt.
+  const befund = profile.chapters.length ? getNarrativeReport(bookId, userEmail) : null;
+  const autorenBefund = getAutorenBefund(bookId, userEmail);
+  res.json({ ...profile, befund, autorenBefund });
 });
 
 komplettRouter.delete('/chapter-cache/:book_id', (req, res) => {

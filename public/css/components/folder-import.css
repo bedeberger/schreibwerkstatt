@@ -2,10 +2,6 @@
    Akzent: var(--card-accent) aus card-accents.css (.card--folderimport). */
 
 @layer components {
-  .card--folderimport {
-    max-width: 720px;
-  }
-
   .folder-import-body {
     display: flex;
     flex-direction: column;

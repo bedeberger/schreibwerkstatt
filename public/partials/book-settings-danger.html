@@ -25,6 +25,23 @@
 
       <div class="book-settings-danger-section">
         <div class="book-settings-danger-row">
+          <div class="book-settings-danger-text" x-text="$app.t('book.settings.staleCleanupText')"></div>
+          <div class="book-settings-danger-actions">
+            <button type="button"
+              class="book-settings-btn-danger"
+              @click="deleteStaleEntities()"
+              :disabled="staleCleanupLoading || !$store.nav.selectedBookId">
+              <span x-show="staleCleanupLoading" class="spinner"></span>
+              <span x-text="staleCleanupLoading ? $app.t('common.deleting') : $app.t('book.settings.staleCleanupButton')"></span>
+            </button>
+          </div>
+        </div>
+        <p class="card-form-saved" x-show="staleCleanupMessage" x-cloak x-transition.opacity.duration.250ms x-text="staleCleanupMessage"></p>
+        <p class="card-form-error" x-show="staleCleanupError" x-text="staleCleanupError"></p>
+      </div>
+
+      <div class="book-settings-danger-section">
+        <div class="book-settings-danger-row">
           <div class="book-settings-danger-text" x-text="$app.t('book.settings.deleteBookText')"></div>
           <div class="book-settings-danger-actions">
             <button type="button"
