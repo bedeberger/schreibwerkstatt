@@ -332,10 +332,15 @@ function _komplettClaudeOverrides(effectiveProvider) {
   const contextWindow = parseInt(appSettings.get('ai.claude.context_window.komplett'), 10) || 0;
   const maxTokensOut = parseInt(appSettings.get('ai.claude.max_tokens_out.komplett'), 10) || 0;
   const timeoutMs = parseInt(appSettings.get('ai.claude.timeout_ms.komplett'), 10) || 0;
+  const effort = String(appSettings.get('ai.claude.effort.komplett') || '').trim().toLowerCase();
   const patch = {};
   if (model) patch.claudeModel = model;
   if (contextWindow > 0) patch.claudeContextWindow = contextWindow;
   if (maxTokensOut > 0) patch.claudeMaxTokensOut = maxTokensOut;
+  // Effort greift für ALLE Claude-Calls des Jobs (P1–P8 + Kontinuität); ungültige Werte
+  // mappt _resolveClaudeEffort still auf null. Auf Nicht-Effort-Modellen (Sonnet 4.5/Haiku)
+  // klemmt _claudeOutputConfigParams selbst (kein 400).
+  if (effort) patch.claudeEffort = effort;
   // Eigenes Komplett-Profil aktiv? Dann den Timeout-Default greifen lassen (nie unter den
   // expliziten globalen Wert senken). Ohne Profil bleibt es beim globalen Timeout.
   const hasKomplettProfile = !!(model || contextWindow > 0 || maxTokensOut > 0);

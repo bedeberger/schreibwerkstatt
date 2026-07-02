@@ -87,6 +87,11 @@
           <span class="tag entity-typ-tag" x-text="o.typ || $app.t('orte.typAndere')"></span>
           <span class="entity-row-title" x-text="o.name"></span>
           <span x-show="o.stale" class="tag tag--stale" :data-tip="$app.t('orte.staleHint')" x-text="$app.t('orte.staleBadge')"></span>
+          <button type="button" x-show="o.stale" class="icon-btn danger entity-row-delete"
+                  @click.stop="$app.deleteStaleOrt(o)"
+                  :aria-label="$app.t('common.delete')" :data-tip="$app.t('entity.deleteStale')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+          </button>
           <span x-show="o.land" class="tag ort-land-tag" x-text="landLabel(o.land)"></span>
           <span x-show="o.stimmung" class="ort-stimmung" x-text="o.stimmung"></span>
           <template x-if="o.kapitel?.length">
@@ -162,7 +167,14 @@
         <template x-for="o in sorted" :key="o.id">
           <tr>
             <td><span class="tag entity-typ-tag" x-text="o.typ || $app.t('orte.typAndere')"></span></td>
-            <td class="entity-grid-cell-title" x-text="o.name"></td>
+            <td class="entity-grid-cell-title">
+              <span x-text="o.name"></span>
+              <button type="button" x-show="o.stale" class="icon-btn danger entity-row-delete"
+                      @click.stop="$app.deleteStaleOrt(o)"
+                      :aria-label="$app.t('common.delete')" :data-tip="$app.t('entity.deleteStale')">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+              </button>
+            </td>
             <td><span x-show="o.land" class="tag ort-land-tag" x-text="landLabel(o.land)"></span></td>
             <td x-text="o.stimmung"></td>
             <td>

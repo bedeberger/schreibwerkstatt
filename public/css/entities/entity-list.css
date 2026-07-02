@@ -73,6 +73,14 @@
 .entity-row--stale { opacity: 0.6; }
 .entity-row--stale .entity-row-title { font-style: italic; }
 
+/* Löschbutton auf stale-Zeilen (Orte/Szenen/Figuren, geteilte Klasse). Kompakt,
+   schrumpft nicht; erscheint nur bei stale (x-show im Markup). button.danger färbt rot. */
+.entity-row-delete {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 2px 5px;
+}
+
 /* Anchor-Bar: 3px farbiger Linksrand am Row + Detail.
    Sichtbar nur, wenn .entity-list--accented gesetzt + --card-accent vorhanden.
    Macht jede Karte (Orte/Szenen/Kontinuität) optisch unterscheidbar. */

@@ -28,6 +28,24 @@ export const orteMethods = {
     }
   },
 
+  // Stale-Ort ("nicht mehr im Text") endgültig löschen. Nur für stale-Einträge —
+  // aktive Orte werden bei der nächsten Komplettanalyse ohnehin neu abgeglichen. CASCADE
+  // räumt location_figures/-chapters/scene_locations + evtl. research_item_links mit.
+  async deleteStaleOrt(o) {
+    if (!o?.stale) return;
+    if (!await this.appConfirm({
+      message: this.t('orte.confirmDeleteStale', { name: o.name }),
+      confirmLabel: this.t('common.delete'), danger: true,
+    })) return;
+    try {
+      const r = await fetch(`/locations/${this.$store.nav.selectedBookId}/${o.id}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      this.$store.catalog.orte = this.$store.catalog.orte.filter(x => x.id !== o.id);
+    } catch (e) {
+      console.error('[deleteStaleOrt]', e);
+    }
+  },
+
   // Nur Koordinaten patchen (Marker-Drag, Undo/Redo, Georef löschen) — leichter
   // und race-frei gegenüber dem Full-Replace von saveOrte. patches: [{id,lat,lng}].
   // Liefert true/false; Caller spiegeln optimistisch und rollen bei false zurück.

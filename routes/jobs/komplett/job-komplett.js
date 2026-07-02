@@ -21,7 +21,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, toSystemBlocks, getPrompts, getBookPrompts,
   loadOrderedBookContents, loadPageContents, groupByChapter, buildSinglePassBookText, cleanPageTextForClaude,
-  chunkLimitsFor, BATCH_SIZE, jobAbortControllers,
+  chunkLimitsFor, resolveExtractSinglePassLimit, BATCH_SIZE, jobAbortControllers,
   _modelName, fmtTok, tps,
   createJob, enqueueJob, findActiveJobId,
   retryOnTransientAi, settledAll,
@@ -105,6 +105,15 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   // Per-Provider-Skalierung aus dessen `ai.<p>.context_window` (lib/ai.js#getContextConfigFor).
   // Bei Claude 200K-Kontext ≈ 420K Zeichen Single-Pass – reicht für fast alle Bücher.
   const { singlePass: singlePassLimit, perChunk: perChunkLimit } = chunkLimitsFor(effectiveProvider);
+  // EXTRAKTIONS-Schwelle, entkoppelt von der Kontinuitäts-Schwelle (singlePassLimit): bei
+  // Opus 4.8 + 1M würde sonst fast jedes Buch Single-Pass extrahiert (schlechterer Long-Tail-
+  // Recall + Truncation-Risiko im 128K-Output). ai.komplett.extract_single_pass_cap > 0 zwingt
+  // die Extraktion in kapitelweise Chunks (Gap-Pässe + Alias-Cluster greifen), während
+  // Kontinuität/Erzählprofil weiter das ganze Buch sehen. Nur Claude.
+  const extractCapChars = effectiveProvider === 'claude'
+    ? Math.max(0, parseInt(appSettings.get('ai.komplett.extract_single_pass_cap'), 10) || 0)
+    : 0;
+  const extractSinglePassLimit = resolveExtractSinglePassLimit(singlePassLimit, extractCapChars);
   const prompts = await getPrompts();
   const sys = await getBookPrompts(bookId, email);
   const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
@@ -163,8 +172,10 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // Einmal bauen, wiederverwenden (Phase 1 Single-Pass, Phase 3b, P8 Kontinuität)
     const fullBookText = buildSinglePassBookText(groups, groupOrder);
     // Single/Multi-Pass-Signal für die Frontend-Phasenanzeige: Im Single-Pass wird
-    // Phase 3b übersprungen, die UI blendet den entsprechenden Eintrag aus.
-    const passMode = totalChars <= singlePassLimit ? 'single' : 'multi';
+    // Phase 3b übersprungen, die UI blendet den entsprechenden Eintrag aus. Kennzahl ist die
+    // EXTRAKTIONS-Schwelle (sie bestimmt chapterFiguren.length > 1 → ob P2/P3/P3b laufen),
+    // nicht die Kontinuitäts-Schwelle.
+    const passMode = totalChars <= extractSinglePassLimit ? 'single' : 'multi';
     updateJob(jobId, { passMode });
 
     // completeness_passes (geclampt) verändert den Single-Pass-Extraktionsinhalt (zusätzliche
@@ -174,14 +185,34 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // die Multi-Pass-Chunk-Keys und den Checkpoint-bookPagesSig (alle drei invalidieren).
     const completenessPasses = Math.max(0, Math.min(3,
       parseInt(appSettings.get('ai.komplett.completeness_passes'), 10) || 0));
-    // Cache-Version: Modellname + Prompts-Schema-Version + completeness_passes. Ändert sich
-    // eins davon, werden alle persistierten Phase-1-Caches automatisch verworfen (Hit-Test
-    // matcht den vollen Sig-String inkl. dieser Version).
+
+    // Content-verändernde Single-Pass-Erweiterungen (nur Claude): Coverage-Feedback +
+    // Szenen-Backfill mutieren den gecachten __singlepass__-Katalog. Wie completeness_passes
+    // müssen ihre Enablement-/Parameter-Werte in die cacheVersion, sonst friert ein Toggle den
+    // alten HIT ein. Einmal berechnen und via ctx durchreichen → cacheVersion und tatsächliches
+    // Verhalten (extraktion.js) lesen dieselben Werte, kein Drift.
+    const coverageAuditChapters = Math.max(0, Math.min(20,
+      parseInt(appSettings.get('ai.komplett.coverage_audit_chapters'), 10) || 0));
+    const coverageFeedbackEnabled = effectiveProvider === 'claude'
+      && coverageAuditChapters > 0
+      && appSettings.get('ai.komplett.coverage_feedback') !== false;
+    const sceneBackfillEnabled = effectiveProvider === 'claude'
+      && appSettings.get('ai.komplett.scene_backfill') !== false;
+    const sceneBackfillMinChars = Math.max(500, parseInt(appSettings.get('ai.komplett.scene_backfill_min_chars'), 10) || 3000);
+    const figureBatchSize = Math.max(1, parseInt(appSettings.get('ai.komplett.figure_batch_size'), 10) || 20);
+
+    // Cache-Version: Modellname + Prompts-Schema-Version + completeness_passes + (nur Claude)
+    // die Single-Pass-Extraktions-Erweiterungen (Extraktions-Cap, Coverage-Feedback,
+    // Szenen-Backfill). Ändert sich eins davon, werden alle persistierten Phase-1-Caches
+    // automatisch verworfen (Hit-Test matcht den vollen Sig-String inkl. dieser Version).
     // Das EXTRAKTIONS-Modell erzeugt den gecachten Phase-1-Inhalt → es (nicht das
     // Konsolidierungs-Modell) gehört in die cacheVersion. Ohne Tiering ist extractModel
     // leer und wir fallen wie bisher auf das Komplett-/Provider-Modell zurück.
     const cacheModel = extractModel || komplettModel || _modelName(effectiveProvider);
-    const cacheVersion = `${cacheModel}:${prompts.PROMPTS_VERSION || ''}:cp${completenessPasses}`;
+    const singlePassAug = effectiveProvider === 'claude'
+      ? `:esp${extractCapChars}:cf${coverageFeedbackEnabled ? 1 : 0}:cac${coverageAuditChapters}:sb${sceneBackfillEnabled ? 1 : 0}:sbm${sceneBackfillMinChars}`
+      : '';
+    const cacheVersion = `${cacheModel}:${prompts.PROMPTS_VERSION || ''}:cp${completenessPasses}${singlePassAug}`;
     // Buch-weite Signatur (Seitenstand + Settings + Modell/Prompt-Version) – dieselbe
     // Gate wie der chapter_extract_cache. Validiert den Checkpoint-Resume.
     const bookPagesSig = buildBookPagesSig(pageContents, getBookSettings(bookIdInt, email), cacheVersion);
@@ -192,9 +223,11 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     const warnings = [];
     const ctx = {
       jobId, bookIdInt, bookName, email, call, tok, log,
-      effectiveProvider, singlePassLimit, perChunkLimit, cacheVersion, bookPagesSig, prompts, sys,
+      effectiveProvider, singlePassLimit, extractSinglePassLimit, perChunkLimit,
+      cacheVersion, bookPagesSig, prompts, sys,
       idMaps, pageContents, groups, groupOrder, totalChars, fullBookText, warnings, completenessPasses,
       extractModel,
+      coverageFeedbackEnabled, coverageAuditChapters, sceneBackfillEnabled, sceneBackfillMinChars, figureBatchSize,
     };
     pt.mark('Laden');
 

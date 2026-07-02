@@ -133,4 +133,24 @@ export const figurenMethods = {
       console.error('[saveFiguren]', e);
     }
   },
+
+  // Stale-Figur ("nicht mehr im Text") endgültig löschen. Nur für stale-Einträge —
+  // aktive Figuren werden bei der nächsten Komplettanalyse neu abgeglichen. CASCADE räumt
+  // figure_relations/-events/-scenes/-appearances + evtl. plot_beat_figures/research_item_links mit.
+  async deleteStaleFigur(f) {
+    if (!f?.stale) return;
+    if (!await this.appConfirm({
+      message: this.t('figuren.confirmDeleteStale', { name: f.name }),
+      confirmLabel: this.t('common.delete'), danger: true,
+    })) return;
+    try {
+      const r = await fetch(`/figures/${this.$store.nav.selectedBookId}/${f.id}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      this.$store.catalog.figuren = this.$store.catalog.figuren.filter(x => x.id !== f.id);
+      this._figurLookupIndex = null;
+      this._buildGlobalZeitstrahl();
+    } catch (e) {
+      console.error('[deleteStaleFigur]', e);
+    }
+  },
 };

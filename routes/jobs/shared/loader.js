@@ -34,6 +34,20 @@ function chunkLimitsFor(provider) {
   };
 }
 
+// EXTRAKTIONS-Single-Pass-Schwelle, ENTKOPPELT von der Kontinuitäts-Schwelle
+// (singlePassLimit). Ein grosses Kontextfenster (Opus 4.8 + 1M) lässt fast jedes Buch
+// Single-Pass laufen — für die KONTINUITÄTSPRÜFUNG erwünscht (Cross-Chapter-Kontext im
+// 1M-Fenster), für die EXTRAKTION aber recall-schädlich (ein Call soll ALLE Entitäten aus
+// 700K+ Tokens aufzählen; kapitelweise Chunks + Gap-Pässe + Alias-Cluster erwischen den
+// Long-Tail zuverlässiger). `extractCapChars` (ai.komplett.extract_single_pass_cap) kappt die
+// Extraktion tiefer: 0 = keine Entkopplung (folgt singlePassLimit). Nie unter den
+// 20000-Zeichen-Floor. Pure, testbar. */
+function resolveExtractSinglePassLimit(singlePassLimit, extractCapChars) {
+  const cap = Math.max(0, Number(extractCapChars) || 0);
+  if (cap <= 0) return singlePassLimit;
+  return Math.max(20000, Math.min(cap, singlePassLimit));
+}
+
 // Lädt Buch-Tree (book_order-Overlay angewandt) und liefert chMap mit
 // hierarchischem Pfad ("Teil 1 › Kapitel 1"), chNameToId-Lookup (sowohl raw
 // chapter_name als auch Pfad → id) und pages[] in echter Buchorganizer-
@@ -183,7 +197,7 @@ function buildSinglePassBookText(groups, groupOrder) {
 }
 
 module.exports = {
-  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, chunkLimitsFor,
+  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, BATCH_SIZE, chunkLimitsFor, resolveExtractSinglePassLimit,
   loadOrderedBookContents,
   loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
 };

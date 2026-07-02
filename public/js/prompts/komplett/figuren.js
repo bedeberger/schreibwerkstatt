@@ -120,7 +120,7 @@ Regeln:
 // Eigenständiger Pass: nimmt die in A1 extrahierten Figuren-Stammdaten (stabile IDs)
 // plus den – im System-Prompt gecachten – Buchtext und liefert ALLE Beziehungen flach
 // (von/zu). Wird via mergeBeziehungenIntoFiguren in figuren[].beziehungen zurückgefaltet.
-export function buildFigurenBeziehungenExtraktionPrompt(bookName, figurenList, bookText) {
+export function buildFigurenBeziehungenExtraktionPrompt(bookName, figurenList, bookText, vonScopeNames = null) {
   const figInfo = figurenList.map(f => {
     const kap = (f.kapitel || []).map(k => k.name).join(', ') || '(kein Kapitel)';
     return `- **${f.id}** ${f.name}${f.kurzname && f.kurzname !== f.name ? ` («${f.kurzname}»)` : ''} | ${f.typ || 'andere'} | Kapitel: ${kap}` +
@@ -133,12 +133,21 @@ export function buildFigurenBeziehungenExtraktionPrompt(bookName, figurenList, b
     ? ''
     : `\n- machtverhaltnis: ganzzahlig im Bereich -2 bis 2 (KEIN führendes Plus-Zeichen). 2=«zu» dominiert klar, 1=«zu» leichter Vorteil, 0=symmetrisch, -1=«von» leichter Vorteil, -2=«von» dominiert klar; 0 wenn unklar`;
   const machtField = _isLocal ? '' : ' "machtverhaltnis": 0,';
+  // Batch-Scope (grosse Casts): die volle Figurenliste bleibt sichtbar (damit «zu» auflösbar
+  // ist), aber es werden NUR Beziehungen ausgegeben, deren «von» eine der Scope-Figuren ist →
+  // partitionierter, kleinerer Output pro Call. Paar-Dedup übernimmt der Server.
+  const scope = Array.isArray(vonScopeNames) && vonScopeNames.length
+    ? `\n\nGib in DIESEM Durchgang AUSSCHLIESSLICH Beziehungen aus, deren «von»-Figur eine der folgenden ist:\n${vonScopeNames.map(n => `- ${n}`).join('\n')}\n(Die übrigen Figuren dienen nur als mögliche «zu»-Gegenüber; für sie in diesem Durchgang KEINE «von»-Beziehungen ausgeben.)`
+    : '';
+  const scopeRule = scope
+    ? '\n- NUR Beziehungen mit «von» aus der oben genannten Scope-Liste; alle anderen weglassen (sie werden in einem anderen Durchgang erfasst).'
+    : '';
   return `Buchname: «${bookName}»
 
 Analysiere die folgende Figurenliste und den Buchtext. Identifiziere ALLE Beziehungen zwischen den Figuren, die im Text eindeutig belegt sind.
 
 Figurenliste:
-${figInfo}
+${figInfo}${scope}
 
 ${textBlock}
 
@@ -154,7 +163,7 @@ Regeln:
 - typ beschreibt die ROLLE von «zu» (NICHT von «von»). Beispiel: Robert hat Mutter Sandra → { von: «<Roberts id>», zu: «<Sandras id>», typ: elternteil } (Sandra IST der Elternteil von Robert). patronage=Schutzherrschaft (zu = Patron), geschaeft=wirtschaftliche Beziehung, geschwister/ehepartner/ex_partner/verbuendete/komplize=ungerichtet, vorgesetzter=«zu» ist Vorgesetzte(r) von «von», untergebener=«zu» ist «von» unterstellt, liebesbeziehung nur für nicht-eheliche romantische Bindung, übrige selbsterklärend.
 - Pro Figurenpaar höchstens EINE Beziehung – nicht von→zu UND zu→von für dasselbe Paar. Keine widersprüchlichen Angaben.${machtRule}
 - belege: HÖCHSTENS 1 Stelle (Kapitelname + Seitentitel) an der die Beziehung klar wird. seite leer lassen wenn identisch mit dem Kapitelnamen oder unklar. Seitennamen aus ### Überschriften, Kapitel aus ## Überschriften.
-- KONSERVATIV: Nur Beziehungen die im Text eindeutig belegt sind – lieber weglassen als spekulieren.
+- KONSERVATIV: Nur Beziehungen die im Text eindeutig belegt sind – lieber weglassen als spekulieren.${scopeRule}
 - Leeres Array wenn keine Beziehungen eindeutig belegt sind.`;
 }
 

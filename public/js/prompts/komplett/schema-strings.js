@@ -69,6 +69,7 @@ export const figurenBasisRules = (kontext = '') => `Regeln:
 - KEINE historischen oder realen Personen die nur erwähnt, zitiert oder als Referenz genannt werden (z.B. Napoleon, Einstein, ein Politiker, eine Künstlerin)
 - Sortiert nach Wichtigkeit (zentral zuerst)
 - KONSERVATIV heisst belegt, NICHT knapp: Nur Figuren, Beziehungen und Eigenschaften aufnehmen die im Text belegt sind – aber vorhandene Belege voll ausschöpfen. Unterscheide Spekulation (verboten) von textgestützter Schlussfolgerung (erwünscht – was der Text klar nahelegt, darf benannt werden). Ein leeres Feld ist nur dann richtig, wenn der Text wirklich nichts hergibt; wo Belege da sind, schreibe ausführlich und konkret statt in Stichworten.
+- COVERAGE-FIRST bei der AUFNAHME (nicht bei der Feldtiefe): Nimm JEDE namentlich fassbare Figur auf – auch Grenzfälle, Nebenfiguren und nur einmal mit Eigennamen erwähnte Personen. Dubletten und Fehlaufnahmen werden in einer NACHGELAGERTEN Konsolidierung zusammengeführt bzw. entfernt; eine ausgelassene Figur ist dagegen dauerhaft verloren. Im Zweifel also aufnehmen. (Dies senkt NUR die Aufnahme-Schwelle – die einzelnen Felder bleiben streng textbelegt, keine erfundenen Details.)
 - DEDUPLIZIERUNG MIT KONTEXTABGLEICH: Figuren zusammenführen wenn der Name übereinstimmt (gleicher Vor- und Nachname) ODER ein Teilname (nur Vorname oder nur Nachname) mit mindestens einem inhaltlichen Indiz zusammenpasst – z.B. gleicher Beruf, überschneidende Fachkenntnisse, konsistente Charakterzüge oder übereinstimmendes Verhalten kapitelübergreifend. Beispiel: «Maria» die in Kapitel 1 als Kräuterkundige gilt und «Maria Huber» die in Kapitel 3 Naturheilkunde beherrscht – zusammenführen. Widersprechen sich Eigenschaften eindeutig, getrennt behalten. Gibt es nur Namensähnlichkeit ohne inhaltliche Überschneidung: getrennt behalten.`;
 
 // ── Schauplatz-Schemata (auch verwendet in Komplett-Analyse) ─────────────────
@@ -95,6 +96,7 @@ export const ORTE_RULES = `Regeln:
 - figuren_namen: Klarnamen der Figuren, die am Ort auftreten – exakt wie im Text (vollständiger Name oder Spitzname, KEINE ID); leeres Array wenn keine Figur klar zuordenbar
 - kapitel: flaches Array der Kapitelnamen (Strings), in denen der Ort aktiv vorkommt – jeder Kapitelname höchstens einmal
 - land: ISO-3166-1-alpha-2 in Kleinbuchstaben. Belege das Land aus dem Text (genannte Stadt/Region/Land). Ist im Text kein anderes Land erkennbar, ordne den Ort dem HAUPT-SCHAUPLATZLAND des Buchs zu (falls im Kontext angegeben). Reine Innenräume/Gebäude ohne geografischen Hinweis erben das Land der umgebenden Stadt/Region. Nur leer lassen, wenn weder Text noch Hauptland eine Zuordnung erlauben.
+- COVERAGE-FIRST bei der AUFNAHME: Im Zweifel jeden benannten Schauplatz aufnehmen – Dubletten werden nachgelagert konsolidiert, ein ausgelassener Ort ist verloren.
 - Kein Cap auf Anzahl Orte – vollständige Erfassung wichtiger als Kürze`;
 
 // ── Musik-Schema (Songs/Musikstücke) ────────────────────────────────────────

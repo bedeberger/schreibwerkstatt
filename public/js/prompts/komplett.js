@@ -37,6 +37,10 @@ export {
   buildSzenenGapPrompt,
   buildChunkGapPrompt,
   buildCoverageAuditPrompt,
+  buildTargetedFigurenPrompt,
+  buildTargetedOrtePrompt,
+  buildTargetedSzenenPrompt,
+  buildNameResolutionPrompt,
 } from './komplett/extraktion.js';
 
 export {
@@ -78,6 +82,7 @@ export {
   SCHEMA_COVERAGE_AUDIT,
   SCHEMA_FIGUREN_ALIAS_CLUSTER,
   SCHEMA_ATTR_CONTRADICTION,
+  SCHEMA_NAME_RESOLUTION,
   SCHEMA_ERZAEHLPROFIL,
   SCHEMA_ERZAEHLPROFIL_CHAPTER,
 } from './komplett/schemas.js';

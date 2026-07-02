@@ -306,6 +306,15 @@ export const SCHEMA_COVERAGE_AUDIT = _obj({
   fehlende_orte: { type: 'array', items: _str },
 });
 
+// Remap-Rescue: Zuordnung unauflösbarer Figuren-Bezeichnungen zum Katalog (oder «» = keine).
+// Runtime-only (kein persistenter Cache) → NICHT in _promptsContentHash.
+export const SCHEMA_NAME_RESOLUTION = _obj({
+  zuordnungen: {
+    type: 'array',
+    items: _obj({ name: _str, treffer: _str }),
+  },
+});
+
 // Alias-Cluster (F3): Cluster von Namensvarianten, die dieselbe Figur bezeichnen
 // (Epitheta, Spitznamen, Umbenennungen). `kanonisch` = bevorzugter Name; `aliase` =
 // die übrigen Namen aus der Kandidatenliste, die zu derselben Figur gehören.

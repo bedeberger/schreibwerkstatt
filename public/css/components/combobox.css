@@ -1,0 +1,212 @@
+@layer components {
+/* === Combobox (Searchable Select) === */
+.combobox-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.combobox-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  flex: 1 1 auto;
+  padding: var(--size-default-padding-y) 10px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  gap: var(--space-6);
+}
+.combobox-trigger:hover { background: var(--color-hover); }
+.combobox-trigger:active { transform: none; }
+.combobox-trigger:focus-visible { outline: none; border-color: var(--color-border-focus); }
+.combobox-trigger[aria-expanded="true"],
+.combobox-trigger:focus-within { border-color: var(--color-border-focus); }
+.combobox-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.combobox-chevron {
+  flex-shrink: 0;
+  opacity: var(--opacity-muted);
+}
+.combobox-chevron--open { transform: rotate(180deg); }
+/* Position kommt von x-anchor (Floating UI, `.fixed`-Strategie) — entkommt
+   overflow-clippenden Vorfahren (horizontal scrollende Container wie das
+   Plot-Swimlane-Grid) und flippt automatisch nach oben, wenn unten kein Platz
+   ist. left/top werden von x-anchor inline gesetzt, die Breite via ddWidth. */
+.combobox-dropdown {
+  position: fixed;
+  z-index: var(--z-header);
+  background: var(--color-surface);
+  border: var(--border-thin) solid var(--color-border-focus);
+  box-shadow: var(--shadow-md);
+  transition: opacity var(--transition-base);
+}
+/* CSS-only-Eintritt (display:none → block) via @starting-style — nur Opacity,
+   damit die x-anchor-Positionierung/Messung unbeeinflusst bleibt. */
+@starting-style {
+  .combobox-dropdown { opacity: 0; }
+}
+.combobox-search {
+  display: block;
+  width: 100%;
+  padding: var(--pad-btn-compact);
+  border: none;
+  border-bottom: var(--border-thin) solid var(--color-border);
+  background: var(--color-bg);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+.combobox-search:focus-visible { outline: none; }
+.combobox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  /* Scroll-Chaining ans Fenster kappen: sonst scrollt am oberen/unteren Listen-
+     Ende (oder bei kurzer, nicht scrollbarer Liste) das ganze Fenster weiter,
+     was den window-Scroll-Listener triggert und das Dropdown ungewollt schliesst. */
+  overscroll-behavior: contain;
+}
+.combobox-option {
+  padding: var(--pad-btn-compact);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Optionale Zweitzeile (opt.sublabel) — gedämpfter Kontext unter dem Label.
+   Beide Spans clippen einzeln, da das ellipsis der Option bei Block-Kindern
+   nicht greift. */
+.combobox-option__label,
+.combobox-option__sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.combobox-option__sub {
+  margin-top: 1px;
+  font-size: var(--size-compact-font-size);
+  color: var(--color-muted);
+}
+.combobox-option:hover,
+.combobox-option--hl { background: var(--color-hover); }
+.combobox-option--selected { font-weight: 400; color: var(--color-accent); }
+.combobox-option--selected.combobox-option--hl,
+.combobox-option--selected:hover { background: var(--color-accent-hover); }
+.combobox-empty {
+  list-style: none;
+  padding: var(--pad-btn-compact);
+  font-size: var(--font-size-base);
+  color: var(--color-muted);
+  font-style: italic;
+}
+/* Nicht auswählbarer Gruppen-Header (opt.group) zwischen den Optionen.
+   Liest als eigenständige Section-Bande: subtiler --color-bg gegen die weisse
+   Dropdown-Fläche (--color-surface) + Hairline-Trenner + Uppercase/Letterspacing.
+   sticky, damit der Header beim Scrollen innerhalb seiner Gruppe oben stehen
+   bleibt. Horizontal-Padding = Options-Kante (10px), damit das Kategorie-Label
+   bündig über den Buchtiteln startet statt 2px weiter links. */
+.combobox-group {
+  list-style: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-6) var(--space-10) var(--space-5);
+  background: var(--color-bg);
+  border-bottom: var(--border-thin) solid var(--color-border);
+  font-size: var(--size-compact-font-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--color-muted);
+  cursor: default;
+}
+/* Compact-Comboboxen: Options-Kante ist 8px (siehe .combobox-wrap--compact
+   .combobox-option), Header dort bündig nachziehen. */
+.combobox-wrap--compact .combobox-group {
+  padding-left: var(--space-sm);
+  padding-right: var(--space-sm);
+}
+.combobox-wrap--disabled .combobox-trigger {
+  opacity: var(--opacity-hint);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+/* Compact variant – Grösse über --size-compact-* synchron mit .btn-compact.
+   Hairline-Border (0.5px) statt der 1px-Feldborder: compact lebt in dichten
+   Kontexten (Filter-Bars), wo die Höhe mit Suchfeld/Tabs auf 0.5px matchen
+   muss (Filter-Bar-Höhen-Invariante). Full-size-Form-Comboboxen erben 1px aus
+   .combobox-trigger; der card-form-row-Override unten zieht compact dort wieder
+   auf 1px hoch. */
+.combobox-wrap--compact .combobox-trigger {
+  font-size: var(--size-compact-font-size);
+  padding: var(--size-compact-padding);
+  border-width: var(--border-thin);
+  border-color: var(--color-border);
+  background: var(--color-bg);
+}
+.combobox-wrap--compact .combobox-search { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
+.combobox-wrap--compact .combobox-option { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
+.combobox-wrap--compact .combobox-empty { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
+
+/* Optionaler Footer-Button (cfg.footer.{label,action}). Sitzt unterhalb der
+   Liste, durch border-top abgesetzt. Keine Tastatur-Nav (bewusst aussen vor —
+   ArrowDown/Enter bleibt auf den regulären Optionen). */
+.combobox-footer-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: transparent;
+  padding: var(--pad-btn-compact);
+  font-size: var(--font-size-base);
+  color: var(--color-accent);
+  cursor: pointer;
+  font-family: inherit;
+}
+.combobox-footer-btn:hover,
+.combobox-footer-btn:focus-visible { background: var(--color-hover); outline: none; }
+.combobox-wrap--compact .combobox-footer-btn { font-size: var(--size-compact-font-size); padding: var(--space-5) 8px; }
+
+/* In Standard-Formularzeilen matchen Comboboxen die Feldgrösse von Input/Select
+   (volle Höhe, Surface-Hintergrund) — kompakte Defaults wirken sonst kleiner
+   als die übrigen Felder derselben Form. Breite ist via width:100% ohnehin
+   identisch. */
+.card-form-row .combobox-wrap--compact .combobox-trigger {
+  padding: var(--size-default-padding-y) 10px;
+  font-size: var(--font-size-base);
+  background: var(--color-surface);
+  border-width: 1px;
+  border-color: var(--color-border-input);
+}
+
+/* Mobile: lange Labels (Kapitel-/Figur-/Ort-Namen) wrappen statt zu ellipsen,
+   damit sie in der schmalen Dropdown-Breite lesbar bleiben. */
+@media (max-width: 600px) {
+  .combobox-option,
+  .combobox-option__label,
+  .combobox-option__sub {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  /* iOS: font-size >= 16px verhindert Zoom-in beim Fokus der Suche. */
+  .combobox-search,
+  .combobox-wrap--compact .combobox-search { font-size: 16px; }
+}
+
+}

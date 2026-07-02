@@ -34,6 +34,19 @@
   gap: var(--space-sm);
   font-size: var(--font-size-sm);
   color: var(--color-muted);
+  /* Grid-Item darf unter min-content schrumpfen — sonst sprengt das Label die
+     Sektion-Spalte auf schmalen Breiten. */
+  min-width: 0;
+}
+
+/* Formular-Controls sind Grid-Items ihres Labels: `min-width: auto`
+   (= size-basierte min-content-Breite eines Inputs) verhindert sonst das
+   Schrumpfen trotz width:100% → Felder laufen über den Kartenrand. */
+.admin-settings-section input,
+.admin-settings-section select,
+.admin-settings-section textarea {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-settings-section label.checkbox-row {
@@ -87,6 +100,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-accent-soft);
+  min-width: 0;
 }
 
 .admin-settings-subheading {

@@ -82,6 +82,7 @@ module.exports = {
   PER_CHUNK_LIMIT: loader.PER_CHUNK_LIMIT,
   BATCH_SIZE: loader.BATCH_SIZE,
   chunkLimitsFor: loader.chunkLimitsFor,
+  resolveExtractSinglePassLimit: loader.resolveExtractSinglePassLimit,
 
   jsonBody, jsonBodyLarge,
   sharedRouter: router.sharedRouter,

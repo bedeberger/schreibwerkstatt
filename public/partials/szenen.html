@@ -160,6 +160,11 @@
                   x-text="$app.t('szenen.rating.' + (s.wertung || 'mittel'))"></span>
             <span class="entity-row-title" x-text="s.titel"></span>
             <span x-show="s.stale" class="tag tag--stale" :data-tip="$app.t('szenen.staleHint')" x-text="$app.t('szenen.staleBadge')"></span>
+            <button type="button" x-show="s.stale" class="icon-btn danger entity-row-delete"
+                    @click.stop="$app.deleteStaleSzene(s)"
+                    :aria-label="$app.t('common.delete')" :data-tip="$app.t('entity.deleteStale')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+            </button>
             <span class="kapitel-badges">
               <span class="kapitel-badge kapitel-badge--primary internal-link"
                     @click.stop="$app.openKapitelByName(s.kapitel)"

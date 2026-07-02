@@ -4,6 +4,7 @@ const { ensureTree } = require('../db/book-order');
 const { recomputeBookFigureMentions } = require('../lib/page-index');
 const { toIntId, inClause } = require('../lib/validate');
 const { aclParamGuard } = require('../lib/acl');
+const { bookParamHandler } = require('../lib/log-context');
 const { parseDatum } = require('../lib/datum-parse');
 const searchIndex = require('../lib/search');
 const logger = require('../logger');
@@ -12,6 +13,7 @@ const router = express.Router();
 // Figuren/Orte/Szenen sind nur fuer editor+ relevant (Buchwelt-CRUD); Lektor
 // und Viewer sehen die Karten nicht — Server folgt der Frontend-Sicht.
 router.param('book_id', aclParamGuard('editor'));
+router.param('book_id', bookParamHandler);
 const jsonBody = express.json();
 
 // Lese-Reihenfolge: globaler Ordinalwert je Kapitel/Seite aus dem book_order-Tree
@@ -553,6 +555,45 @@ router.put('/:book_id', jsonBody, (req, res) => {
       logger.warn(`Figuren-Mentions-Neuberechnung für Buch ${bookId} fehlgeschlagen: ${e.message}`);
     }
   });
+});
+
+// Einzelne STALE-Szene endgültig löschen (GUI-Button auf "nicht mehr im Text"-Zeilen).
+// Nur stale erlaubt. CASCADE räumt scene_figures/scene_locations/song_scenes +
+// research_item_links mit.
+router.delete('/scenes/:book_id/:id', (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  const id = toIntId(req.params.id);
+  if (!bookId || !id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const userEmail = req.session?.user?.email || null;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const row = db.prepare(
+    `SELECT stale FROM figure_scenes WHERE id = ? AND book_id = ? AND ${emailCond}`
+  ).get(id, bookId, ...(userEmail ? [userEmail] : []));
+  if (!row) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (!row.stale) return res.status(409).json({ error_code: 'NOT_STALE' });
+  db.prepare('DELETE FROM figure_scenes WHERE id = ?').run(id);
+  searchIndex.remove('scene', id);
+  res.json({ ok: true });
+});
+
+// Einzelne STALE-Figur endgültig löschen (GUI-Button auf "nicht mehr im Text"-Zeilen).
+// Nur stale erlaubt — aktive Figuren überleben die Re-Analyse via Reconcile. CASCADE räumt
+// figure_relations/-events/-scenes/-appearances/-tags/page_figure_mentions +
+// plot_beat_figures/research_item_links mit.
+router.delete('/:book_id/:id', (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  const id = toIntId(req.params.id);
+  if (!bookId || !id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const userEmail = req.session?.user?.email || null;
+  const emailCond = userEmail ? 'user_email = ?' : 'user_email IS NULL';
+  const row = db.prepare(
+    `SELECT stale FROM figures WHERE id = ? AND book_id = ? AND ${emailCond}`
+  ).get(id, bookId, ...(userEmail ? [userEmail] : []));
+  if (!row) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (!row.stale) return res.status(409).json({ error_code: 'NOT_STALE' });
+  db.prepare('DELETE FROM figures WHERE id = ?').run(id);
+  searchIndex.remove('figure', id);
+  res.json({ ok: true });
 });
 
 module.exports = router;

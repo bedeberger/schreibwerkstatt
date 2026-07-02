@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "1a97dd451e434f05";
+self.__SHELL_BUILD = "794bc4863b41ecf7";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -45,6 +45,7 @@ self.__SHELL_MANIFEST = [
   "/css/chat.css",
   "/css/components/buttons-badges.css",
   "/css/components/card-form.css",
+  "/css/components/combobox.css",
   "/css/components/comment-rail.css",
   "/css/components/confirm-dialog.css",
   "/css/components/context-menu.css",
@@ -421,6 +422,8 @@ self.__SHELL_MANIFEST = [
   "/js/prompts/komplett.js",
   "/js/prompts/komplett/erzaehlprofil.js",
   "/js/prompts/komplett/extraktion.js",
+  "/js/prompts/komplett/extraktion/messages.js",
+  "/js/prompts/komplett/extraktion/system.js",
   "/js/prompts/komplett/figuren.js",
   "/js/prompts/komplett/konsolidierung.js",
   "/js/prompts/komplett/kontinuitaet.js",
