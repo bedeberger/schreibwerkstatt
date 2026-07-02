@@ -6,7 +6,7 @@
 const { db, getBookSettings } = require('../../../db/schema');
 const appSettings = require('../../../lib/app-settings');
 const { updateJob, settledAll } = require('../shared');
-const { _stelleQuote } = require('./utils');
+const { _stelleQuote, _refToString } = require('./utils');
 
 // ── Verify-Stufe für den Multi-Pass-Kontinuitätscheck ────────────────────────
 // Der Fakten-basierte Check sieht nur extrahierte Fakten, nicht den Volltext –
@@ -313,6 +313,64 @@ async function runAttributeContradictionCheck(ctx, fromPct, toPct) {
   return findings;
 }
 
+// ── Remap-Rescue: unauflösbare Figuren-Klarnamen dem Katalog zuordnen ─────────
+// remapSzenen/remapAssignments verwerfen Figuren-Klarnamen aus Szenen/Events, die sich weder
+// exakt noch per lowercase/Token-Fallback einem konsolidierten Figur-Eintrag zuordnen lassen
+// (Spitznamen, Teilnamen, Epitheta, Schreibvarianten). Bevor sie gedroppt werden, mappt ein
+// billiger Auflösungs-Call (Kandidaten + Katalognamen → Zuordnung oder «») sie – gefundene
+// Treffer werden als lowercase-Aliase in figNameToIdLower eingespeist, sodass der anschliessende
+// Remap sie auflöst statt Szenen-Figuren-Links / Event-Assignments zu verlieren. Nur Claude,
+// nur wenn es überhaupt unauflösbare Namen gibt. Non-fatal (AbortError propagiert). Mutiert
+// figNameToIdLower in place; gibt die Anzahl neu aufgelöster Namen zurück.
+async function resolveRemapNames(ctx, { chapterSzenen, chapterAssignments, figuren, figNameToId, figNameToIdLower }) {
+  const { call, prompts, sys, jobId, tok, bookName, log, effectiveProvider } = ctx;
+  if (effectiveProvider !== 'claude') return 0;
+  if (appSettings.get('ai.komplett.remap_rescue') === false) return 0;
+
+  const isResolved = (name) => !name || !!(figNameToId[name] || figNameToIdLower[name.toLowerCase()]);
+  const unknown = new Map(); // lowerKey → Anzeige-Name
+  const add = (raw) => {
+    const name = _refToString(raw);
+    if (!name || isResolved(name)) return;
+    const k = name.toLowerCase();
+    if (!unknown.has(k)) unknown.set(k, name);
+  };
+  for (const { szenen } of (chapterSzenen || []))
+    for (const s of (szenen || []))
+      for (const n of (s?.figuren_namen || [])) add(n);
+  for (const { assignments } of (chapterAssignments || []))
+    for (const a of (assignments || [])) add(a?.figur_name);
+
+  const unknownList = [...unknown.values()];
+  const catalogNames = (figuren || []).map(f => f.name).filter(Boolean);
+  if (!unknownList.length || !catalogNames.length) return 0;
+
+  updateJob(jobId, { statusText: 'job.phase.resolveNames' });
+  let res;
+  try {
+    res = await call(jobId, tok,
+      prompts.buildNameResolutionPrompt(bookName, unknownList, catalogNames),
+      sys.SYSTEM_FIGUREN_BLOCKS, null, null, 800, 0.2, null, prompts.SCHEMA_NAME_RESOLUTION);
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    log.warn(`Remap-Rescue Namensauflösung fehlgeschlagen (ignoriert): ${e.message}`);
+    return 0;
+  }
+  const catalogByLower = new Map((figuren || []).map(f => [String(f.name || '').toLowerCase(), f.id]));
+  let added = 0;
+  for (const z of (res?.zuordnungen || [])) {
+    const name = _refToString(z?.name);
+    const treffer = _refToString(z?.treffer);
+    if (!name || !treffer) continue;
+    const id = figNameToId[treffer] || figNameToIdLower[treffer.toLowerCase()] || catalogByLower.get(treffer.toLowerCase());
+    if (!id) continue;
+    const lk = name.toLowerCase();
+    if (!figNameToIdLower[lk]) { figNameToIdLower[lk] = id; added++; }
+  }
+  if (added) log.info(`Remap-Rescue: ${added}/${unknownList.length} unauflösbare Namen dem Katalog zugeordnet.`);
+  return added;
+}
+
 // ── Per-Job-Claude-Overrides für die Komplettanalyse-Familie ──────────────────
 // Nur ai.provider = claude: Modell, Kontextfenster, Output-Cap und Hard-Timeout dürfen
 // eigenständig vom globalen ai.claude.* abweichen (z.B. Opus 4.8 mit 128K Output + längerem
@@ -357,4 +415,5 @@ module.exports = {
   _VERIFY_RADIUS, _verifyExcerpt, verifyKontinuitaetProbleme,
   buildAnachronismusData, KOMPLETT_DEFAULT_TIMEOUT_MS, _komplettClaudeOverrides,
   buildAttributeContradictions, runAttributeContradictionCheck,
+  resolveRemapNames,
 };

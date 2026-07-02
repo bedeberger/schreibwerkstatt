@@ -37,7 +37,7 @@ const {
   runPhase1, runPhase2, runPhase3, runPhase3Songs, runPhase3b, runZeitstrahl,
   buildPrelimFigurenKompakt, runPhase3OrteCall, runErzaehlprofil, komplettMaxTokens,
 } = require('./phases');
-const { buildAnachronismusData, verifyKontinuitaetProbleme, _komplettClaudeOverrides, runAttributeContradictionCheck } = require('./job-shared');
+const { buildAnachronismusData, verifyKontinuitaetProbleme, _komplettClaudeOverrides, runAttributeContradictionCheck, resolveRemapNames } = require('./job-shared');
 
 // ── Coverage-Self-Audit (F2, nur Claude) ─────────────────────────────────────
 // Misst den Extraktions-Recall an einer Kapitel-Stichprobe: pro Sample bekommt das Modell
@@ -331,6 +331,10 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       'SELECT id, loc_id FROM locations WHERE book_id = ? AND user_email = ? ORDER BY sort_order'
     ).all(bookIdInt, email);
     const locIdToDbId = Object.fromEntries(locRows.map(r => [r.loc_id, r.id]));
+    // Remap-Rescue (#8, nur Claude): unauflösbare Figuren-Klarnamen aus Szenen/Events dem Katalog
+    // zuordnen (mutiert figNameToIdLower in place), BEVOR remapSzenen/remapAssignments sie droppen.
+    // Non-fatal (AbortError propagiert); no-op wenn alle Namen bereits auflösbar sind.
+    await resolveRemapNames(ctx, { chapterSzenen, chapterAssignments, figuren, figNameToId, figNameToIdLower });
     const szenen = remapSzenen(chapterSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNameToIdLower, idMaps.chNameToId, log);
     const assignments = remapAssignments(chapterAssignments, figNameToId, figNameToIdLower, idMaps.chNameToId, log, jobId);
     updateJob(jobId, { progress: 76, statusText: 'job.phase.savingScenes' });

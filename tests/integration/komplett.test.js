@@ -605,11 +605,20 @@ test('Komplettanalyse Checkpoint-Recovery: p1_full_done → überspringt Phase 1
   // bookPagesSig MUSS dem entsprechen, was der Job aus dem aktuellen Seitenstand
   // berechnet — sonst verwirft die Staleness-Gate den Checkpoint und P1 läuft neu.
   const prompts = await ctx.shared.getPrompts();
-  // cacheVersion-Format spiegelt job.js: model:PROMPTS_VERSION:cp<completeness_passes>.
-  // completeness_passes ist in beforeEach auf 0 gesetzt → Suffix :cp0.
-  const completenessPasses = Math.max(0, Math.min(3,
-    parseInt(require('../../lib/app-settings').get('ai.komplett.completeness_passes'), 10) || 0));
-  const cacheVersion = `${ctx.shared._modelName('claude')}:${prompts.PROMPTS_VERSION || ''}:cp${completenessPasses}`;
+  // cacheVersion-Format spiegelt job.js exakt:
+  //   model:PROMPTS_VERSION:cp<completeness_passes>:esp<cap>:cf<coverageFeedback>:cac<auditChapters>:sb<sceneBackfill>:sbm<minChars>
+  // (Der :esp…-Suffix nur für Claude.) beforeEach setzt completeness_passes=0 und
+  // coverage_audit_chapters=0 → cf0/cac0; extract_single_pass_cap unset → esp0; scene_backfill
+  // Default true → sb1, scene_backfill_min_chars Default 3000 → sbm3000.
+  const _s = require('../../lib/app-settings');
+  const completenessPasses = Math.max(0, Math.min(3, parseInt(_s.get('ai.komplett.completeness_passes'), 10) || 0));
+  const extractCapChars = Math.max(0, parseInt(_s.get('ai.komplett.extract_single_pass_cap'), 10) || 0);
+  const coverageAuditChapters = Math.max(0, Math.min(20, parseInt(_s.get('ai.komplett.coverage_audit_chapters'), 10) || 0));
+  const coverageFeedbackEnabled = coverageAuditChapters > 0 && _s.get('ai.komplett.coverage_feedback') !== false;
+  const sceneBackfillEnabled = _s.get('ai.komplett.scene_backfill') !== false;
+  const sceneBackfillMinChars = Math.max(500, parseInt(_s.get('ai.komplett.scene_backfill_min_chars'), 10) || 3000);
+  const singlePassAug = `:esp${extractCapChars}:cf${coverageFeedbackEnabled ? 1 : 0}:cac${coverageAuditChapters}:sb${sceneBackfillEnabled ? 1 : 0}:sbm${sceneBackfillMinChars}`;
+  const cacheVersion = `${ctx.shared._modelName('claude')}:${prompts.PROMPTS_VERSION || ''}:cp${completenessPasses}${singlePassAug}`;
   const pageMeta = [
     { id: 3000, updated_at: '2026-01-01', chapter_id: 2000, chapter: 'Kapitel 1' },
     { id: 3001, updated_at: '2026-01-01', chapter_id: 2001, chapter: 'Kapitel 2' },
