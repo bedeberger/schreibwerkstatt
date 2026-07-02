@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 228, 112 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 230, 113 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -748,6 +748,13 @@ erDiagram
     TEXT    belege     "JSON-Array wörtlicher Zitate"
     INTEGER sort_order
   }
+  narrative_report {
+    INTEGER id          PK
+    INTEGER book_id     FK "CASCADE"
+    TEXT    user_email  FK "SET NULL, UNIQUE(book_id, user_email)"
+    TEXT    report_json "KI-Dach-Befund/Autoren-Befund (JSON)"
+    TEXT    updated_at
+  }
 
   storylines {
     INTEGER id          PK
@@ -876,6 +883,8 @@ erDiagram
   books                      ||--o{ chapter_narrative_profile : has
   chapters                   ||--o{ chapter_narrative_profile : profiles
   chapter_narrative_profile  ||--o{ chapter_narrative_themes  : themes
+  books                      ||--o{ narrative_report           : has
+  app_users                  ||--o{ narrative_report           : authors
   zeitstrahl_events ||--o{ zeitstrahl_event_chapters  : refs
   zeitstrahl_events ||--o{ zeitstrahl_event_pages     : refs
   zeitstrahl_events ||--o{ zeitstrahl_event_figures   : refs

@@ -6,43 +6,46 @@
   </div>
 
   <div class="folder-import-body" x-show="!jobId">
-    <div x-data="radioGroup({ variant: 'card' })" x-modelable="value" x-model="importKind"
-         x-effect="options = [
-           { value: 'diary',  label: $app.t('folderImport.kind.diary') },
-           { value: 'swbook', label: $app.t('folderImport.kind.swbook') }
-         ]"></div>
-
-    <div class="folder-import-field" x-show="importKind === 'swbook'">
-      <div class="folder-import-merge-info" x-text="$app.t('folderImport.swbookHint')"></div>
-    </div>
-
-    <div x-show="importKind === 'diary'"
-         x-data="radioGroup({ variant: 'card' })" x-modelable="value" x-model="mode"
-         x-effect="options = [
-           { value: 'new-book', label: $app.t('folderImport.mode.newBook') },
-           { value: 'merge', label: $app.t('folderImport.mode.merge'), disabled: !$store.nav.selectedBookId }
-         ]"></div>
-
-    <div class="folder-import-field" x-show="importKind === 'diary'">
-      <label class="folder-import-label" x-text="$app.t('folderImport.grouping.label')"></label>
-      <div x-data="radioGroup({ variant: 'card' })" x-modelable="value" x-model="grouping"
+    <div class="folder-import-row">
+      <label class="folder-import-label" x-text="$app.t('folderImport.kindLabel')"></label>
+      <div x-data="radioGroup()" x-modelable="value" x-model="importKind"
            x-effect="options = [
-             { value: 'year-month', label: $app.t('folderImport.grouping.yearMonth') },
-             { value: 'year',       label: $app.t('folderImport.grouping.year') },
-             { value: 'flat',       label: $app.t('folderImport.grouping.flat') }
+             { value: 'diary',  label: $app.t('folderImport.kind.diary') },
+             { value: 'swbook', label: $app.t('folderImport.kind.swbook') }
            ]"></div>
-      <div class="folder-import-label" x-text="$app.t('folderImport.grouping.hint.' + grouping)"></div>
     </div>
 
-    <div class="folder-import-field" x-show="importKind === 'diary' && mode === 'new-book'">
+    <div class="folder-import-merge-info" x-show="importKind === 'swbook'" x-text="$app.t('folderImport.swbookHint')"></div>
+
+    <div class="folder-import-row" x-show="importKind === 'diary'">
+      <label class="folder-import-label" x-text="$app.t('folderImport.modeLabel')"></label>
+      <div x-data="radioGroup()" x-modelable="value" x-model="mode"
+           x-effect="options = [
+             { value: 'new-book', label: $app.t('folderImport.mode.newBook') },
+             { value: 'merge', label: $app.t('folderImport.mode.merge'), disabled: !$store.nav.selectedBookId }
+           ]"></div>
+    </div>
+
+    <div class="folder-import-row" x-show="importKind === 'diary'">
+      <label class="folder-import-label" x-text="$app.t('folderImport.grouping.label')"></label>
+      <div class="folder-import-field">
+        <div x-data="radioGroup()" x-modelable="value" x-model="grouping"
+             x-effect="options = [
+               { value: 'year-month', label: $app.t('folderImport.grouping.yearMonth') },
+               { value: 'year',       label: $app.t('folderImport.grouping.year') },
+               { value: 'flat',       label: $app.t('folderImport.grouping.flat') }
+             ]"></div>
+        <div class="folder-import-hint" x-text="$app.t('folderImport.grouping.hint.' + grouping)"></div>
+      </div>
+    </div>
+
+    <div class="folder-import-row" x-show="importKind === 'diary' && mode === 'new-book'">
       <label class="folder-import-label" x-text="$app.t('folderImport.bookName')"></label>
       <input type="text" class="folder-import-input" x-model="bookName"
              :placeholder="$app.t('folderImport.bookNamePlaceholder')">
     </div>
 
-    <div class="folder-import-field" x-show="importKind === 'diary' && mode === 'merge'">
-      <div class="folder-import-merge-info" x-text="$app.t('folderImport.mergeInto', { name: $app.selectedBookName || '' })"></div>
-    </div>
+    <div class="folder-import-merge-info" x-show="importKind === 'diary' && mode === 'merge'" x-text="$app.t('folderImport.mergeInto', { name: $app.selectedBookName || '' })"></div>
 
     <div class="folder-import-drop"
          :class="{ 'has-file': !!file }"

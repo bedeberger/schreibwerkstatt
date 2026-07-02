@@ -134,6 +134,58 @@ export const erzaehlprofilMethods = {
   erzaehlprofilChapterKey(ch, i) {
     return ch?.chapter_id != null ? 'ch:' + ch.chapter_id : 'i:' + i;
   },
+
+  // ── Buch-Befund ────────────────────────────────────────────────────────────
+  // Deterministischer Struktur-Befund (read-time server-berechnet) + KI-Dach-Befund
+  // (Autoren-Befund). Beide hängen an der GET-Antwort. Rein diagnostisch.
+  erzaehlprofilBefund() {
+    return this.erzaehlprofilResult?.befund || null;
+  },
+  erzaehlprofilAutorenBefund() {
+    const a = this.erzaehlprofilResult?.autorenBefund || null;
+    return (a && Array.isArray(a.befunde) && a.befunde.length) ? a : null;
+  },
+  // Nur Präsenzbögen mit auffälligem Flag (verschwindet / statisch).
+  erzaehlprofilArcsFlagged() {
+    return (this.erzaehlprofilBefund()?.arcs || []).filter(a => (a.flags || []).length);
+  },
+  // Gibt es überhaupt etwas Auffälliges zu zeigen? Steuert die Sichtbarkeit der Sektion.
+  erzaehlprofilHasBefund() {
+    const b = this.erzaehlprofilBefund();
+    if (!b) return false;
+    return this.erzaehlprofilArcsFlagged().length > 0
+      || (b.encounters || []).length > 0
+      || (b.pacing?.sags || []).length > 0
+      || (b.pacing?.flags || []).length > 0
+      || (b.droppedMotifs || []).length > 0
+      || (b.eventDeserts || []).length > 0
+      || (b.locations?.oneOff || []).length > 0
+      || (b.locations?.abandoned || []).length > 0
+      || (b.pov?.lowConfidenceRuns || []).length > 0;
+  },
+
+  // Label-Helfer für die Flags (i18n mit Fallback auf den Rohschlüssel).
+  erzaehlprofilFlagLabel(flag) {
+    const t = window.__app.t('erzaehlprofil.flag.' + flag);
+    return t === 'erzaehlprofil.flag.' + flag ? flag : t;
+  },
+  erzaehlprofilPacingFlagLabel(flag) {
+    const t = window.__app.t('erzaehlprofil.pacingFlag.' + flag);
+    return t === 'erzaehlprofil.pacingFlag.' + flag ? flag : t;
+  },
+  // Schweregrad einer Autoren-Befund-Zeile → CSS-Klasse (hoch/mittel/niedrig).
+  erzaehlprofilBefundPrioClass(prio) {
+    return 'erzaehlprofil-befund-item--' + (['hoch', 'mittel', 'niedrig'].includes(prio) ? prio : 'mittel');
+  },
+  erzaehlprofilBefundKatLabel(kat) {
+    if (!kat) return '';
+    const t = window.__app.t('erzaehlprofil.befundKat.' + kat);
+    return t === 'erzaehlprofil.befundKat.' + kat ? kat : t;
+  },
+  erzaehlprofilBefundPrioLabel(prio) {
+    const t = window.__app.t('erzaehlprofil.befundPrio.' + prio);
+    return t === 'erzaehlprofil.befundPrio.' + prio ? prio : t;
+  },
 };
 
 export { _POV_KEYS, _TEMPUS_KEYS };

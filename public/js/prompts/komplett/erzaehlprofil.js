@@ -70,6 +70,39 @@ Antworte mit diesem JSON-Schema:
 ${textBlock}`;
 }
 
+/** KI-Dach-Befund («Autoren-Befund»): verdichtet die bereits DETERMINISTISCH berechneten
+ *  Struktur-Befunde (befund) zu einer priorisierten Autoren-Einschätzung. Das Modell darf
+ *  NUR die gelieferten Kennzahlen benennen/priorisieren/formulieren — es erfindet keine
+ *  neuen Befunde und schreibt keinen Buchtext (rein diagnostisch, rückwärtsgewandt). */
+export function buildAutorenBefundPrompt(bookName, befund, declared) {
+  const decl = [
+    declared?.erzaehlperspektive ? `Soll-Perspektive: ${declared.erzaehlperspektive}` : null,
+    declared?.erzaehlzeit ? `Soll-Erzählzeit: ${declared.erzaehlzeit}` : null,
+  ].filter(Boolean).join(', ');
+  return `Du bist Lektor:in und erstellst den «Autoren-Befund» für das Buch «${bookName}» — eine kurze, priorisierte Struktureinschätzung.
+
+Dir liegen DETERMINISTISCH aus dem Manuskript-Katalog berechnete Struktur-Befunde als JSON vor (Figuren-Präsenz/Absenz, Begegnungslücken, Pacing-Kurve, fallengelassene Motive, Ereignis-Dichte, Perspektiv-Konfidenz, Schauplatz-Nutzung). Kapitelangaben sind echte Kapitelnamen.
+
+STRIKTE REGELN:
+- Stütze JEDEN Befund AUSSCHLIESSLICH auf die gelieferten Zahlen/Fakten. Erfinde NICHTS, spekuliere nicht über den Inhalt, den du nicht siehst.
+- Jeder Befund nennt im Feld «beleg» die konkrete Kennzahl/Stelle, auf der er beruht (z.B. «Anna fehlt Kap. 4–21 (18 Kapitel)», «Spannungstief Kap. 12–16»).
+- Sei diagnostisch und rückwärtsgewandt: beschreibe, was strukturell auffällt, ggf. mit einem knappen handwerklichen Hinweis worauf zu achten ist. Schreibe KEINEN Buchtext, keine Szenen, keine Formulierungsvorschläge für das Manuskript.
+- Priorisiere: «hoch» nur für strukturell gravierende Muster (z.B. Hauptfigur verschwindet über weite Strecken, behauptete Beziehung ohne gemeinsame Szene, durchgehend flaches Pacing). Redundanzen weglassen.
+- Wenn die Befunde insgesamt unauffällig sind, gib wenige oder keine Einträge zurück und sage das in der Zusammenfassung.
+- 3–8 Befunde. Sprache: Deutsch.
+${decl ? `\nDeklarierte Erzählform: ${decl}\n` : ''}
+Antworte mit diesem JSON-Schema:
+{
+  "zusammenfassung": "1–3 Sätze Gesamteinschätzung der Struktur",
+  "befunde": [
+    { "kategorie": "figuren|pacing|struktur|perspektive|kohaerenz|thema|orte|dramaturgie", "prio": "hoch|mittel|niedrig", "titel": "kurze Überschrift", "text": "die Beobachtung", "beleg": "die konkrete Kennzahl/Stelle" }
+  ]
+}
+
+Struktur-Befunde (JSON):
+${JSON.stringify(befund)}`;
+}
+
 /** Multi-Pass: ein einzelnes Kapitel → ein Profil-Objekt (Kapitelname ist bekannt). */
 export function buildErzaehlprofilChapterPrompt(bookName, chapterName, chText) {
   return `Analysiere die Erzählweise des Kapitels «${chapterName}» aus dem Buch «${bookName}».

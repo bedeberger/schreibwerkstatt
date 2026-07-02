@@ -60,6 +60,7 @@ export {
 export {
   buildErzaehlprofilSinglePassPrompt,
   buildErzaehlprofilChapterPrompt,
+  buildAutorenBefundPrompt,
 } from './komplett/erzaehlprofil.js';
 
 export {
@@ -85,4 +86,5 @@ export {
   SCHEMA_NAME_RESOLUTION,
   SCHEMA_ERZAEHLPROFIL,
   SCHEMA_ERZAEHLPROFIL_CHAPTER,
+  SCHEMA_AUTOREN_BEFUND,
 } from './komplett/schemas.js';

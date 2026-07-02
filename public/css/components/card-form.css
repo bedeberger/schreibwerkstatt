@@ -499,8 +499,8 @@ select[aria-invalid="true"],
   cursor: pointer;
 }
 
-/* Variante „card": umrandete Radio-Karten mit Akzent-Tint bei Auswahl
-   (z.B. Folder-Import). --card-accent kommt aus dem umgebenden Karten-Scope. */
+/* Variante „card" (Standard aller Radio-Gruppen): umrandete Radio-Karten mit
+   Akzent-Tint bei Auswahl. --card-accent kommt aus dem umgebenden Karten-Scope. */
 .form-radio-group--card {
   gap: var(--space-lg);
 }

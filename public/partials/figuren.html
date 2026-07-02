@@ -45,50 +45,8 @@
       <button type="button" class="tabs-btn" :class="{ 'tabs-btn--active': figurenGraphModus === 'praesenz' }" @click="setFigurenGraphModus('praesenz')" x-text="$app.t('figuren.modePraesenz')"></button>
     </div>
 
-    <!-- Legende (klappbar, Chevron-Stil wie Kontinuität) -->
-    <div class="figur-legend-wrap" x-data="collapsible()" x-show="figurenGraphModus !== 'praesenz'">
-      <button type="button" class="collapsible-toggle" x-bind="trigger">
-        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
-        <span x-text="$app.t('figuren.legend.toggle')"></span>
-      </button>
-
-      <template x-if="open && figurenGraphModus !== 'soziogramm'">
-        <div class="figur-legend-body">
-          <div class="figur-legend">
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--hauptfigur"></span><span x-text="$app.t('figuren.type.hauptfigur')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--antagonist"></span><span x-text="$app.t('figuren.type.antagonist')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--mentor"></span><span x-text="$app.t('figuren.type.mentor')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--nebenfigur"></span><span x-text="$app.t('figuren.type.nebenfigur')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--randfigur"></span><span x-text="$app.t('figuren.type.randfigur')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--andere"></span><span x-text="$app.t('figuren.type.andere')"></span></span>
-            <span class="figur-legend-sep" aria-hidden="true"></span>
-            <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--eltern"></span><span x-text="$app.t('figuren.edge.eltern')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--geschwister"></span><span x-text="$app.t('figuren.edge.geschwister')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--freund"></span><span x-text="$app.t('figuren.edge.freund')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--feind"></span><span x-text="$app.t('figuren.edge.feind')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--liebesbeziehung"></span><span x-text="$app.t('figuren.edge.liebesbeziehung')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--patronage"></span><span x-text="$app.t('figuren.edge.patronage')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--geschaeft"></span><span x-text="$app.t('figuren.edge.geschaeft')"></span></span>
-          </div>
-          <div x-show="figurenGraphModus === 'figur'" class="figur-soziogramm-hint" x-text="$app.t('figuren.graph.hint')"></div>
-        </div>
-      </template>
-
-      <template x-if="open && figurenGraphModus === 'soziogramm'">
-        <div class="figur-legend-body">
-          <div class="figur-legend figur-legend--soziogramm">
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--wirtschaftselite"></span><span x-text="$app.t('figuren.schicht.wirtschaftselite')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--gehobenes_buergertum"></span><span x-text="$app.t('figuren.schicht.gehobenes_buergertum')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--mittelschicht"></span><span x-text="$app.t('figuren.schicht.mittelschicht')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--arbeiterschicht"></span><span x-text="$app.t('figuren.schicht.arbeiterschicht')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--migrantenmilieu"></span><span x-text="$app.t('figuren.schicht.migrantenmilieu')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--prekariat"></span><span x-text="$app.t('figuren.schicht.prekariat')"></span></span>
-            <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--unterwelt"></span><span x-text="$app.t('figuren.schicht.unterwelt')"></span></span>
-          </div>
-          <div class="figur-soziogramm-hint" x-text="$app.t('figuren.soziogramm.hint')"></div>
-        </div>
-      </template>
-    </div>
+    <!-- Graph-Legende (klappbar) — nested Partial im figurenCard-Scope -->
+    <div id="partial-figuren-graph-legend"></div>
 
     <div class="figuren-graph-wrap" x-show="figurenGraphModus !== 'praesenz'" :class="{ 'is-fullscreen': figurenGraphFullscreen }" @keydown.escape.window="figurenGraphFullscreen && toggleFigurenGraphFullscreen()">
       <div class="figuren-graph-toolbar">
@@ -111,63 +69,8 @@
       <div id="figur-tooltip" class="figur-tooltip"></div>
     </div>
 
-    <!-- Präsenz: Figuren × Kapitel-Heatmap + deterministische Befunde -->
-    <div x-show="figurenGraphModus === 'praesenz'" class="figur-presence" x-cloak>
-      <p class="figur-presence-intro" x-text="$app.t('figuren.presence.intro')"></p>
-
-      <template x-if="figurenPresenceData().findings.length">
-        <ul class="figur-presence-findings">
-          <template x-for="(fd, fi) in figurenPresenceData().findings" :key="fi">
-            <li class="figur-presence-finding">
-              <span class="figur-presence-finding-dot" :class="'figur-presence-finding-dot--' + fd.kind" aria-hidden="true"></span>
-              <span class="internal-link" @click="$app.openFigurById(fd.figId)" x-text="figurenPresenceFindingText(fd)"></span>
-            </li>
-          </template>
-        </ul>
-      </template>
-
-      <template x-if="figurenPresenceData().rows.length">
-        <div class="heatmap-scroll">
-          <table class="heatmap-table figur-presence-table">
-            <thead>
-              <tr>
-                <th class="heatmap-rowhead" x-text="$app.t('figuren.presence.figur')"></th>
-                <template x-for="(c, ci) in figurenPresenceData().chapters" :key="ci">
-                  <th class="figur-presence-colhead internal-link" @click="figurenPresenceJumpToChapter(c)" :data-tip="c"><span x-text="ci + 1"></span></th>
-                </template>
-                <th class="heatmap-numcol figur-presence-totalhead" x-text="$app.t('figuren.presence.total')"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="row in figurenPresenceData().rows" :key="row.id">
-                <tr>
-                  <th class="heatmap-rowhead internal-link" @click="$app.openFigurById(row.id)">
-                    <span class="heatmap-rowhead-main" x-text="row.name"></span>
-                    <span class="heatmap-rowhead-sub" x-text="$app.t('figuren.type.' + row.typ)"></span>
-                  </th>
-                  <template x-for="(c, ci) in figurenPresenceData().chapters" :key="ci">
-                    <td class="heatmap-cell figur-presence-cell"
-                        :class="{ 'heatmap-cell--primary': row.haeByCol[ci] > 0, 'heatmap-cell--empty': row.haeByCol[ci] === 0 && ci >= row.firstIdx && ci <= row.lastIdx, 'figur-presence-cell--wp': row.wpCols.has(ci) }"
-                        :style="figurenPresenceCellVars(row.haeByCol[ci], figurenPresenceData().maxCell)"
-                        :data-tip="c + (row.haeByCol[ci] ? ' · ×' + row.haeByCol[ci] : '')"></td>
-                  </template>
-                  <td class="heatmap-numcol figur-presence-total">
-                    <span x-text="row.total"></span>
-                    <span class="figur-presence-share" x-text="figurenPresenceSharePct(row.share) + '%'"></span>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-      </template>
-
-      <div class="figur-presence-legend">
-        <span class="figur-presence-legend-entry"><span class="figur-presence-legend-swatch figur-presence-legend-swatch--present"></span><span x-text="$app.t('figuren.presence.legend.present')"></span></span>
-        <span class="figur-presence-legend-entry"><span class="figur-presence-legend-swatch heatmap-cell--empty"></span><span x-text="$app.t('figuren.presence.legend.gap')"></span></span>
-        <span class="figur-presence-legend-entry"><span class="figur-presence-legend-swatch figur-presence-cell--wp"></span><span x-text="$app.t('figuren.presence.legend.wendepunkt')"></span></span>
-      </div>
-    </div>
+    <!-- Präsenz-Tab (Figuren × Kapitel-Heatmap) — nested Partial im figurenCard-Scope -->
+    <div id="partial-figuren-presence"></div>
   </div>
 
 
@@ -358,21 +261,8 @@
                 </template>
               </div>
             </div>
-            <!-- Präsenz-Streifen: Auftritte je Kapitel + Wendepunkt-Marker (belegter Bogen) -->
-            <template x-if="$store.catalogUi.selectedFigurId === f.id && figurenPresenceRow(f.id)">
-              <div class="figur-presence-strip">
-                <div class="bewertung-section-title" x-text="$app.t('figuren.presence.stripTitle')"></div>
-                <div class="figur-presence-strip-cells">
-                  <template x-for="(c, ci) in figurenPresenceData().chapters" :key="ci">
-                    <span class="figur-presence-strip-cell heatmap-cell"
-                          :class="{ 'heatmap-cell--primary': figurenPresenceRow(f.id).haeByCol[ci] > 0, 'heatmap-cell--empty': figurenPresenceRow(f.id).haeByCol[ci] === 0 && ci >= figurenPresenceRow(f.id).firstIdx && ci <= figurenPresenceRow(f.id).lastIdx, 'figur-presence-cell--wp': figurenPresenceRow(f.id).wpCols.has(ci) }"
-                          :style="figurenPresenceCellVars(figurenPresenceRow(f.id).haeByCol[ci], figurenPresenceData().maxCell)"
-                          :data-tip="c"
-                          @click="figurenPresenceJumpToChapter(c)"></span>
-                  </template>
-                </div>
-              </div>
-            </template>
+            <!-- Präsenz-Streifen dieser Figur (Auftritte je Kapitel + Wendepunkt-Marker) -->
+            <!-- @include figuren-presence-strip -->
             <!-- Musikgeschmack — abgeleitet aus song_figures-Rollup -->
             <div x-show="$app.songsByFigurId.get(f.id)?.length" class="figur-musikgeschmack">
               <div class="bewertung-section-title" x-text="$app.t('figuren.field.musikgeschmack')"></div>

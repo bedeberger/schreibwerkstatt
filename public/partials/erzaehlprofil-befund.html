@@ -1,0 +1,160 @@
+<!--
+  Buch-Befund (Teil der Erzählprofil-Karte) — nested Partial, injiziert in
+  #partial-erzaehlprofil-befund innerhalb x-data="erzaehlprofilCard".
+  Zeigt den KI-Dach-Befund (Autoren-Befund) + die deterministischen Struktur-Befunde
+  aus der GET-Antwort. Rein diagnostisch/rückwärtsgewandt, nie generativ im Text.
+-->
+<template x-if="erzaehlprofilAutorenBefund() || erzaehlprofilHasBefund()">
+  <div class="erzaehlprofil-befund">
+
+    <!-- KI-Dach-Befund: priorisierte, an den Kennzahlen verankerte Synthese -->
+    <template x-if="erzaehlprofilAutorenBefund()">
+      <div class="erzaehlprofil-section erzaehlprofil-autoren-befund">
+        <div class="erzaehlprofil-section-head" x-text="$app.t('erzaehlprofil.autorenBefundTitle')"></div>
+        <p class="erzaehlprofil-autoren-summary" x-show="erzaehlprofilAutorenBefund().zusammenfassung"
+           x-text="erzaehlprofilAutorenBefund().zusammenfassung"></p>
+        <div class="entity-list">
+          <template x-for="(b, i) in erzaehlprofilAutorenBefund().befunde" :key="'ab:' + i">
+            <div class="erzaehlprofil-befund-item" :class="erzaehlprofilBefundPrioClass(b.prio)">
+              <div class="erzaehlprofil-befund-item-head">
+                <span class="tag" x-show="b.kategorie" x-text="erzaehlprofilBefundKatLabel(b.kategorie)"></span>
+                <span class="erzaehlprofil-befund-prio" x-text="erzaehlprofilBefundPrioLabel(b.prio)"></span>
+                <span class="erzaehlprofil-befund-titel" x-show="b.titel" x-text="b.titel"></span>
+              </div>
+              <p class="erzaehlprofil-befund-text" x-text="b.text"></p>
+              <p class="erzaehlprofil-befund-beleg" x-show="b.beleg"
+                 x-text="$app.t('erzaehlprofil.befundEvidence') + ': ' + b.beleg"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Deterministische Struktur-Befunde (klappbar) -->
+    <template x-if="erzaehlprofilHasBefund()">
+      <div class="erzaehlprofil-section" x-data="collapsible(!erzaehlprofilAutorenBefund())">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+          <span x-text="$app.t('erzaehlprofil.strukturBefundTitle')"></span>
+        </button>
+        <div x-bind="panel" class="collapsible-section" x-cloak>
+
+          <!-- Begegnungslücken -->
+          <div class="erzaehlprofil-befund-group" x-show="(erzaehlprofilBefund().encounters || []).length">
+            <div class="erzaehlprofil-befund-group-head" x-text="$app.t('erzaehlprofil.encountersTitle')"></div>
+            <div class="entity-list">
+              <template x-for="(e, i) in erzaehlprofilBefund().encounters" :key="'enc:' + i">
+                <div class="erzaehlprofil-befund-row" :class="{ 'erzaehlprofil-befund-row--strong': e.hasRelation }">
+                  <span class="erzaehlprofil-pair"><span x-text="e.aName"></span> ✕ <span x-text="e.bName"></span></span>
+                  <span class="tag" x-show="e.hasRelation"
+                        x-text="$app.t('erzaehlprofil.encounterRelation', { typ: e.relTyp || '' })"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Präsenzbögen mit Auffälligkeit -->
+          <div class="erzaehlprofil-befund-group" x-show="erzaehlprofilArcsFlagged().length">
+            <div class="erzaehlprofil-befund-group-head" x-text="$app.t('erzaehlprofil.arcsTitle')"></div>
+            <div class="entity-list">
+              <template x-for="(a, i) in erzaehlprofilArcsFlagged()" :key="'arc:' + i">
+                <div class="erzaehlprofil-befund-row">
+                  <span class="tag erzaehlprofil-narrator internal-link" x-show="a.id != null"
+                        @click="erzaehlprofilGotoFigur(a.id)" x-text="a.name"></span>
+                  <template x-for="f in a.flags" :key="'af:' + f">
+                    <span class="erzaehlprofil-flag" x-text="erzaehlprofilFlagLabel(f)"></span>
+                  </template>
+                  <span class="erzaehlprofil-befund-detail internal-link" x-show="a.longestGap"
+                        @click="erzaehlprofilGotoKapitel(a.longestGap.fromChapterId)"
+                        x-text="$app.t('erzaehlprofil.arcGap', { from: a.longestGap?.fromKap, to: a.longestGap?.toKap, n: a.longestGap?.len })"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Pacing -->
+          <div class="erzaehlprofil-befund-group"
+               x-show="(erzaehlprofilBefund().pacing.sags || []).length || (erzaehlprofilBefund().pacing.flags || []).length">
+            <div class="erzaehlprofil-befund-group-head" x-text="$app.t('erzaehlprofil.pacingBefundTitle')"></div>
+            <div class="erzaehlprofil-flag-row" x-show="(erzaehlprofilBefund().pacing.flags || []).length">
+              <template x-for="f in erzaehlprofilBefund().pacing.flags" :key="'pf:' + f">
+                <span class="erzaehlprofil-flag" x-text="erzaehlprofilPacingFlagLabel(f)"></span>
+              </template>
+            </div>
+            <div class="entity-list">
+              <template x-for="(s, i) in erzaehlprofilBefund().pacing.sags" :key="'sag:' + i">
+                <div class="erzaehlprofil-befund-row internal-link" @click="erzaehlprofilGotoKapitel(s.fromChapterId)">
+                  <span class="erzaehlprofil-befund-detail"
+                        x-text="$app.t('erzaehlprofil.pacingSag', { from: s.fromKap, to: s.toKap, n: s.len })"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Fallengelassene Motive -->
+          <div class="erzaehlprofil-befund-group" x-show="(erzaehlprofilBefund().droppedMotifs || []).length">
+            <div class="erzaehlprofil-befund-group-head" x-text="$app.t('erzaehlprofil.droppedMotifsTitle')"></div>
+            <div class="entity-list">
+              <template x-for="(m, i) in erzaehlprofilBefund().droppedMotifs" :key="'dm:' + i">
+                <div class="erzaehlprofil-befund-row">
+                  <span class="erzaehlprofil-thema-chip" :data-typ="m.typ || 'thema'" x-text="m.thema"></span>
+                  <span class="erzaehlprofil-befund-detail"
+                        x-text="$app.t('erzaehlprofil.motifSpan', { from: m.firstKap, to: m.lastKap })"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Ereignis-Wüsten -->
+          <div class="erzaehlprofil-befund-group" x-show="(erzaehlprofilBefund().eventDeserts || []).length">
+            <div class="erzaehlprofil-befund-group-head" x-text="$app.t('erzaehlprofil.eventDesertsTitle')"></div>
+            <div class="entity-list">
+              <template x-for="(d, i) in erzaehlprofilBefund().eventDeserts" :key="'ed:' + i">
+                <div class="erzaehlprofil-befund-row internal-link" @click="erzaehlprofilGotoKapitel(d.fromChapterId)">
+                  <span class="erzaehlprofil-befund-detail"
+                        x-text="$app.t('erzaehlprofil.eventDesert', { from: d.fromKap, to: d.toKap, n: d.len })"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Wacklige Erzählhaltung (POV-Konfidenz-Läufe) -->
+          <div class="erzaehlprofil-befund-group" x-show="(erzaehlprofilBefund().pov.lowConfidenceRuns || []).length">
+            <div class="erzaehlprofil-befund-group-head" x-text="$app.t('erzaehlprofil.povRunsTitle')"></div>
+            <div class="entity-list">
+              <template x-for="(p, i) in erzaehlprofilBefund().pov.lowConfidenceRuns" :key="'pr:' + i">
+                <div class="erzaehlprofil-befund-row internal-link" @click="erzaehlprofilGotoKapitel(p.fromChapterId)">
+                  <span class="erzaehlprofil-befund-detail"
+                        x-text="$app.t('erzaehlprofil.povRun', { from: p.fromKap, to: p.toKap, n: p.len })"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Schauplatz-Nutzung -->
+          <div class="erzaehlprofil-befund-group"
+               x-show="(erzaehlprofilBefund().locations.oneOff || []).length || (erzaehlprofilBefund().locations.abandoned || []).length">
+            <div class="erzaehlprofil-befund-group-head" x-text="$app.t('erzaehlprofil.locationsBefundTitle')"></div>
+            <div class="erzaehlprofil-flag-row" x-show="(erzaehlprofilBefund().locations.oneOff || []).length">
+              <span class="entity-meta-label" x-text="$app.t('erzaehlprofil.locationsOneOff')"></span>
+              <template x-for="(name, i) in erzaehlprofilBefund().locations.oneOff" :key="'oo:' + i">
+                <span class="tag" x-text="name"></span>
+              </template>
+            </div>
+            <div class="entity-list" x-show="(erzaehlprofilBefund().locations.abandoned || []).length">
+              <template x-for="(l, i) in erzaehlprofilBefund().locations.abandoned" :key="'ab:' + i">
+                <div class="erzaehlprofil-befund-row">
+                  <span class="tag" x-text="l.name"></span>
+                  <span class="erzaehlprofil-befund-detail"
+                        x-text="$app.t('erzaehlprofil.motifSpan', { from: l.firstKap, to: l.lastKap })"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </template>
+
+  </div>
+</template>

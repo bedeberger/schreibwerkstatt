@@ -33,7 +33,14 @@ export async function _withCardTransition(ctx, apply) {
     return;
   }
   const run = async () => { await apply(); await ctx.$nextTick?.(); };
-  await document.startViewTransition(run).updateCallbackDone.catch(() => {});
+  const vt = document.startViewTransition(run);
+  // `ready`/`finished` rejecten (unbehandelt), wenn der Browser die Transition
+  // überspringt — etwa bei verstecktem Tab ("skipped because document
+  // visibility state is hidden"). Schlucken, sonst löst das ein
+  // unhandledrejection aus. Der DOM-Endzustand steht via updateCallbackDone.
+  vt.ready?.catch(() => {});
+  vt.finished?.catch(() => {});
+  await vt.updateCallbackDone.catch(() => {});
 }
 
 // Generischer Karten-Toggle. Liest Behavior-Felder aus EXCLUSIVE_CARDS-Entry

@@ -54,6 +54,9 @@ function _promptsContentHash() {
     // Erzählprofil: über den Konsolidierungs-Checkpoint (F5) effektiv gecacht — Schema-
     // Änderung muss die Cache-Version bumpen, sonst überspringt ein Folgelauf die Phase.
     komplettNs.SCHEMA_ERZAEHLPROFIL,
+    // Autoren-Befund läuft in derselben Phase; Prompt-/Schema-Wechsel soll die
+    // Erzählprofil-Phase über den Konsolidierungs-Checkpoint (F5) re-triggern.
+    komplettNs.SCHEMA_AUTOREN_BEFUND,
     synonymNs.SCHEMA_SYNONYM,
     tagebuchNs.SCHEMA_RUECKBLICK,
   ]);
@@ -176,8 +179,10 @@ export {
   buildAttributeContradictionJudgePrompt,
   buildErzaehlprofilSinglePassPrompt,
   buildErzaehlprofilChapterPrompt,
+  buildAutorenBefundPrompt,
   SCHEMA_ERZAEHLPROFIL,
   SCHEMA_ERZAEHLPROFIL_CHAPTER,
+  SCHEMA_AUTOREN_BEFUND,
 } from './prompts/komplett.js';
 
 export {

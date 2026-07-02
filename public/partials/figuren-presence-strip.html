@@ -1,0 +1,14 @@
+<template x-if="$store.catalogUi.selectedFigurId === f.id && figurenPresenceRow(f.id)">
+  <div class="figur-presence-strip">
+    <div class="bewertung-section-title" x-text="$app.t('figuren.presence.stripTitle')"></div>
+    <div class="figur-presence-strip-cells">
+      <template x-for="(c, ci) in figurenPresenceData().chapters" :key="ci">
+        <span class="figur-presence-strip-cell heatmap-cell"
+              :class="{ 'heatmap-cell--primary': figurenPresenceRow(f.id).haeByCol[ci] > 0, 'heatmap-cell--empty': figurenPresenceRow(f.id).haeByCol[ci] === 0 && ci >= figurenPresenceRow(f.id).firstIdx && ci <= figurenPresenceRow(f.id).lastIdx, 'figur-presence-cell--wp': figurenPresenceRow(f.id).wpCols.has(ci) }"
+              :style="figurenPresenceCellVars(figurenPresenceRow(f.id).haeByCol[ci], figurenPresenceData().maxCell)"
+              :data-tip="c"
+              @click="figurenPresenceJumpToChapter(c)"></span>
+      </template>
+    </div>
+  </div>
+</template>

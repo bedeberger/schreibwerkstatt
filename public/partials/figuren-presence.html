@@ -1,0 +1,59 @@
+<!-- Figuren-Präsenz-Tab: Figuren × Kapitel-Heatmap + deterministische Befunde.
+     Nested-Partial der Figuren-Karte (Placeholder `partial-figuren-presence` in
+     figuren.html), läuft im figurenCard-Scope. Logik: js/book/figuren-presence.js -->
+<div x-show="figurenGraphModus === 'praesenz'" class="figur-presence" x-cloak>
+  <p class="figur-presence-intro" x-text="$app.t('figuren.presence.intro')"></p>
+
+  <template x-if="figurenPresenceData().findings.length">
+    <ul class="figur-presence-findings">
+      <template x-for="(fd, fi) in figurenPresenceData().findings" :key="fi">
+        <li class="figur-presence-finding">
+          <span class="figur-presence-finding-dot" :class="'figur-presence-finding-dot--' + fd.kind" aria-hidden="true"></span>
+          <span class="internal-link" @click="$app.openFigurById(fd.figId)" x-text="figurenPresenceFindingText(fd)"></span>
+        </li>
+      </template>
+    </ul>
+  </template>
+
+  <template x-if="figurenPresenceData().rows.length">
+    <div class="heatmap-scroll">
+      <table class="heatmap-table figur-presence-table">
+        <thead>
+          <tr>
+            <th class="heatmap-rowhead" x-text="$app.t('figuren.presence.figur')"></th>
+            <template x-for="(c, ci) in figurenPresenceData().chapters" :key="ci">
+              <th class="figur-presence-colhead internal-link" @click="figurenPresenceJumpToChapter(c)" :data-tip="c"><span x-text="ci + 1"></span></th>
+            </template>
+            <th class="heatmap-numcol figur-presence-totalhead" x-text="$app.t('figuren.presence.total')"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="row in figurenPresenceData().rows" :key="row.id">
+            <tr>
+              <th class="heatmap-rowhead internal-link" @click="$app.openFigurById(row.id)">
+                <span class="heatmap-rowhead-main" x-text="row.name"></span>
+                <span class="heatmap-rowhead-sub" x-text="$app.t('figuren.type.' + row.typ)"></span>
+              </th>
+              <template x-for="(c, ci) in figurenPresenceData().chapters" :key="ci">
+                <td class="heatmap-cell figur-presence-cell"
+                    :class="{ 'heatmap-cell--primary': row.haeByCol[ci] > 0, 'heatmap-cell--empty': row.haeByCol[ci] === 0 && ci >= row.firstIdx && ci <= row.lastIdx, 'figur-presence-cell--wp': row.wpCols.has(ci) }"
+                    :style="figurenPresenceCellVars(row.haeByCol[ci], figurenPresenceData().maxCell)"
+                    :data-tip="c + (row.haeByCol[ci] ? ' · ×' + row.haeByCol[ci] : '')"></td>
+              </template>
+              <td class="heatmap-numcol figur-presence-total">
+                <span x-text="row.total"></span>
+                <span class="figur-presence-share" x-text="figurenPresenceSharePct(row.share) + '%'"></span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </template>
+
+  <div class="figur-presence-legend">
+    <span class="figur-presence-legend-entry"><span class="figur-presence-legend-swatch figur-presence-legend-swatch--present"></span><span x-text="$app.t('figuren.presence.legend.present')"></span></span>
+    <span class="figur-presence-legend-entry"><span class="figur-presence-legend-swatch heatmap-cell--empty"></span><span x-text="$app.t('figuren.presence.legend.gap')"></span></span>
+    <span class="figur-presence-legend-entry"><span class="figur-presence-legend-swatch figur-presence-cell--wp"></span><span x-text="$app.t('figuren.presence.legend.wendepunkt')"></span></span>
+  </div>
+</div>

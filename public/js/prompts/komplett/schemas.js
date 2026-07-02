@@ -368,3 +368,21 @@ export const SCHEMA_ERZAEHLPROFIL = _obj({
 });
 // Multi-Pass (ein Kapitel pro Call; Kapitelname ist im Prompt bekannt).
 export const SCHEMA_ERZAEHLPROFIL_CHAPTER = _obj(_erzaehlprofilProps(false));
+
+// KI-Dach-Befund (Autoren-Befund): priorisierte Synthese der deterministischen
+// Struktur-Befunde. Das Modell benennt/priorisiert nur die gelieferten Kennzahlen,
+// es erfindet keine neuen Befunde (Verankerung erzwungen im Prompt).
+export const AUTOREN_BEFUND_KAT_ENUM = ['figuren', 'pacing', 'struktur', 'perspektive', 'kohaerenz', 'thema', 'orte', 'dramaturgie'];
+export const SCHEMA_AUTOREN_BEFUND = _obj({
+  zusammenfassung: _str,
+  befunde: {
+    type: 'array',
+    items: _obj({
+      kategorie: { type: 'string', enum: AUTOREN_BEFUND_KAT_ENUM },
+      prio: { type: 'string', enum: ['hoch', 'mittel', 'niedrig'] },
+      titel: _str,
+      text: _str,
+      beleg: _str,
+    }),
+  },
+});

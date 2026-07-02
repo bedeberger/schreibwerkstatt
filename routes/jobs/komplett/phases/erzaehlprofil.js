@@ -6,6 +6,7 @@
 // Non-critical, read-only Endphase: ein Fehler darf den bereits gespeicherten Katalog nicht
 // kippen (Kapselung im Aufrufer via runNonCritical).
 const { saveChapterNarrativeProfiles, getBookSettings } = require('../../../../db/schema');
+const { getNarrativeReport, saveAutorenBefund } = require('../../../../db/narrative-report');
 const { updateJob, toSystemBlocks, retryOnTransientAi, settledAll } = require('../../shared');
 const { buildBookSystemBlockText } = require('../utils');
 const { komplettMaxTokens } = require('./tokens');
@@ -59,7 +60,36 @@ async function runErzaehlprofil(ctx, opts = {}) {
   const declared = { erzaehlperspektive: bs?.erzaehlperspektive || null, erzaehlzeit: bs?.erzaehlzeit || null };
   const saved = saveChapterNarrativeProfiles(bookIdInt, email, profiles, idMaps.chNameToId, figNameToId, declared);
   log.info(`Erzählprofil gespeichert: ${saved} Kapitel${singlePass ? ' (Single-Pass)' : ' (Multi-Pass)'}.`);
+
+  // KI-Dach-Befund (Autoren-Befund) über die jetzt frisch berechenbaren, DETERMINISTISCHEN
+  // Struktur-Befunde. Nur Claude, non-critical (Fehler kippt das Kapitel-Profil nicht).
+  if (saved > 0 && effectiveProvider === 'claude') {
+    try {
+      await runAutorenBefund(ctx, { declared, fromPct: toPct, toPct });
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      log.warn(`Autoren-Befund übersprungen: ${e.message}`);
+    }
+  }
   return saved;
+}
+
+/** Verdichtet die deterministischen Struktur-Befunde zu einer priorisierten
+ *  Autoren-Einschätzung (ein Claude-Call, non-critical). Persistiert in narrative_report. */
+async function runAutorenBefund(ctx, { declared, fromPct, toPct }) {
+  const { jobId, bookIdInt, bookName, email, call, tok, log, effectiveProvider, prompts, sys } = ctx;
+  const befund = getNarrativeReport(bookIdInt, email);
+  if (!befund || !befund.chapterCount) return;
+  updateJob(jobId, { progress: fromPct, statusText: 'job.phase.narrativeProfile' });
+  const cap = komplettMaxTokens(effectiveProvider);
+  const res = await retryOnTransientAi(() => call(jobId, tok,
+    prompts.buildAutorenBefundPrompt(bookName, befund, declared),
+    toSystemBlocks(sys.SYSTEM_KOMPLETT_EXTRAKTION_BLOCKS),
+    fromPct, toPct, 4000, 0.5, null, prompts.SCHEMA_AUTOREN_BEFUND,
+  ), { log, label: 'Autoren-Befund' });
+  const befunde = Array.isArray(res?.befunde) ? res.befunde : [];
+  saveAutorenBefund(bookIdInt, email, { zusammenfassung: res?.zusammenfassung || '', befunde });
+  log.info(`Autoren-Befund gespeichert: ${befunde.length} Einträge.`);
 }
 
 module.exports = { runErzaehlprofil };

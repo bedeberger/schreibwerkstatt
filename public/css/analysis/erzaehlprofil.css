@@ -227,3 +227,121 @@
   font-variant-numeric: tabular-nums;
   color: var(--color-muted);
 }
+
+/* ── Buch-Befund (KI-Dach-Befund + deterministische Struktur-Befunde) ──────── */
+.erzaehlprofil-befund {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* KI-Dach-Befund: leicht akzentuierte Box, hebt die Synthese vom Detail ab. */
+.erzaehlprofil-autoren-befund {
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--card-accent) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-accent) 20%, transparent);
+}
+
+.erzaehlprofil-autoren-summary {
+  margin: 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+}
+
+/* Eine Befund-Zeile der KI-Synthese; Prio steuert den linken Balken. */
+.erzaehlprofil-befund-item {
+  padding: var(--space-sm) var(--space-md);
+  border-left: 3px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.erzaehlprofil-befund-item--hoch    { border-left-color: var(--card-accent); }
+.erzaehlprofil-befund-item--mittel  { border-left-color: color-mix(in srgb, var(--card-accent) 55%, transparent); }
+.erzaehlprofil-befund-item--niedrig { border-left-color: var(--color-border); }
+
+.erzaehlprofil-befund-item-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.erzaehlprofil-befund-prio {
+  font-size: var(--font-size-mini);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-muted);
+}
+
+.erzaehlprofil-befund-titel { font-weight: 600; }
+
+.erzaehlprofil-befund-text {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.erzaehlprofil-befund-beleg {
+  margin: 0;
+  font-size: var(--font-size-mini);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+/* Struktur-Befund-Gruppen (Begegnungslücken, Bögen, Pacing, …). */
+.erzaehlprofil-befund-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-sm);
+}
+
+.erzaehlprofil-befund-group-head {
+  font-size: var(--font-size-mini);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.erzaehlprofil-befund-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: var(--space-6) 0;
+}
+
+.erzaehlprofil-befund-row--strong { font-weight: 600; }
+
+.erzaehlprofil-befund-detail {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.internal-link.erzaehlprofil-befund-detail,
+.erzaehlprofil-befund-row.internal-link { cursor: pointer; }
+.erzaehlprofil-befund-row.internal-link:hover .erzaehlprofil-befund-detail {
+  color: var(--card-accent);
+}
+
+.erzaehlprofil-pair { font-size: var(--font-size-sm); color: var(--color-text); }
+
+.erzaehlprofil-flag-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* Auffälligkeits-Flag (verschwindet, statisch, kein Höhepunkt …). */
+.erzaehlprofil-flag {
+  padding: var(--pad-badge);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-mini);
+  font-weight: 600;
+  color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 12%, transparent);
+}

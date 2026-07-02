@@ -26,9 +26,9 @@ export function radioGroupData(cfg = {}) {
     value: cfg.value ?? null,
     options: [],
     _name: null,
-    // Optische Variante: null = plain (Standard), 'card' = umrandete Radio-
-    // Karten mit Akzent-Tint (z. B. Folder-Import) → Klasse .form-radio-group--card.
-    _variant: cfg.variant ?? null,
+    // Optische Variante: 'card' (Standard) = umrandete Radio-Karten mit Akzent-
+    // Tint → Klasse .form-radio-group--card; 'plain' = schlichte Reihe ohne Rahmen.
+    _variant: cfg.variant ?? 'card',
 
     _isSelected(val) {
       return String(this.value ?? '') === String(val);

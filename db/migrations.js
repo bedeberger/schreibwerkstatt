@@ -8868,6 +8868,18 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 229 abgeschlossen (narrative_report — KI-Dach-Befund/Autoren-Befund der Erzählprofil-Karte).');
   }
 
+  if (version < 230) {
+    // FK-Spalte narrative_report.user_email braucht einen eigenen Index (Performance-Falle).
+    // Der UNIQUE(book_id, user_email) deckt user_email allein nicht ab (Prefix book_id).
+    db.exec('CREATE INDEX IF NOT EXISTS idx_narrative_report_user ON narrative_report(user_email);');
+    const fkErrors230 = db.pragma('foreign_key_check');
+    if (fkErrors230.length) {
+      throw new Error(`Migration 230: foreign_key_check meldet ${fkErrors230.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 230').run();
+    logger.info('DB-Migration auf Version 230 abgeschlossen (Index auf narrative_report.user_email).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

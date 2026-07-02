@@ -1,0 +1,45 @@
+<!-- Graph-Legende (klappbar, Chevron-Stil wie Kontinuität). Nested-Partial der
+     Figuren-Karte (Placeholder `partial-figuren-graph-legend`), figurenCard-Scope. -->
+<div class="figur-legend-wrap" x-data="collapsible()" x-show="figurenGraphModus !== 'praesenz'">
+  <button type="button" class="collapsible-toggle" x-bind="trigger">
+    <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+    <span x-text="$app.t('figuren.legend.toggle')"></span>
+  </button>
+
+  <template x-if="open && figurenGraphModus !== 'soziogramm'">
+    <div class="figur-legend-body">
+      <div class="figur-legend">
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--hauptfigur"></span><span x-text="$app.t('figuren.type.hauptfigur')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--antagonist"></span><span x-text="$app.t('figuren.type.antagonist')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--mentor"></span><span x-text="$app.t('figuren.type.mentor')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--nebenfigur"></span><span x-text="$app.t('figuren.type.nebenfigur')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--randfigur"></span><span x-text="$app.t('figuren.type.randfigur')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--andere"></span><span x-text="$app.t('figuren.type.andere')"></span></span>
+        <span class="figur-legend-sep" aria-hidden="true"></span>
+        <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--eltern"></span><span x-text="$app.t('figuren.edge.eltern')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--geschwister"></span><span x-text="$app.t('figuren.edge.geschwister')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--freund"></span><span x-text="$app.t('figuren.edge.freund')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--feind"></span><span x-text="$app.t('figuren.edge.feind')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--liebesbeziehung"></span><span x-text="$app.t('figuren.edge.liebesbeziehung')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--patronage"></span><span x-text="$app.t('figuren.edge.patronage')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-edge-line figur-edge-line--geschaeft"></span><span x-text="$app.t('figuren.edge.geschaeft')"></span></span>
+      </div>
+      <div x-show="figurenGraphModus === 'figur'" class="figur-soziogramm-hint" x-text="$app.t('figuren.graph.hint')"></div>
+    </div>
+  </template>
+
+  <template x-if="open && figurenGraphModus === 'soziogramm'">
+    <div class="figur-legend-body">
+      <div class="figur-legend figur-legend--soziogramm">
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--wirtschaftselite"></span><span x-text="$app.t('figuren.schicht.wirtschaftselite')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--gehobenes_buergertum"></span><span x-text="$app.t('figuren.schicht.gehobenes_buergertum')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--mittelschicht"></span><span x-text="$app.t('figuren.schicht.mittelschicht')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--arbeiterschicht"></span><span x-text="$app.t('figuren.schicht.arbeiterschicht')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--migrantenmilieu"></span><span x-text="$app.t('figuren.schicht.migrantenmilieu')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--prekariat"></span><span x-text="$app.t('figuren.schicht.prekariat')"></span></span>
+        <span class="figur-legend-entry"><span class="figur-legend-dot figur-legend-dot--unterwelt"></span><span x-text="$app.t('figuren.schicht.unterwelt')"></span></span>
+      </div>
+      <div class="figur-soziogramm-hint" x-text="$app.t('figuren.soziogramm.hint')"></div>
+    </div>
+  </template>
+</div>

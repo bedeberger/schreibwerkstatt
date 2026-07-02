@@ -11,15 +11,32 @@
   /* Import-/Modus-/Gruppierungs-Auswahl nutzt die Card-Variante des
      selbst-rendernden .form-radio-group (card-form.css). */
 
+  /* Label-links/Feld-rechts-Raster (analog .card-form-row). Label in schmaler
+     Spalte, Steuerelement füllt den Rest — verhindert lone-Feld über volle
+     Kartenbreite. */
+  .folder-import-row {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    align-items: start;
+    gap: var(--space-lg);
+  }
+
   .folder-import-field {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+    min-width: 0;
   }
 
   .folder-import-label {
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: 700;
+    color: var(--color-text);
+    padding-top: var(--space-xs);
+  }
+
+  .folder-import-hint {
+    font-size: var(--font-size-sm);
     color: var(--color-muted);
   }
 
@@ -30,6 +47,7 @@
     background: var(--color-bg);
     color: var(--color-text);
     font-size: var(--font-size-md);
+    max-width: 28rem;
   }
 
   .folder-import-input:focus {
@@ -47,9 +65,13 @@
 
   .folder-import-drop {
     position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
     border: 2px dashed var(--color-border);
     border-radius: var(--radius-md);
-    padding: var(--space-xl) var(--space-lg);
+    padding: var(--space-2xl) var(--space-lg);
     text-align: center;
     transition: border-color 150ms, background 150ms;
     background: var(--color-bg);
@@ -194,6 +216,12 @@
   }
 
   @media (max-width: 640px) {
+    .folder-import-row {
+      grid-template-columns: 1fr;
+      gap: var(--space-sm);
+    }
+    .folder-import-label { padding-top: 0; }
+    .folder-import-input { max-width: none; }
     .folder-import-actions { justify-content: stretch; }
     .folder-import-actions .btn-compact { flex: 1; }
   }

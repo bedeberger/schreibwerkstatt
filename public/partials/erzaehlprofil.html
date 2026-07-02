@@ -51,6 +51,11 @@
               x-text="$app.t('erzaehlprofil.deviationCount', { n: erzaehlprofilDeviations().length })"></span>
       </div>
 
+      <!-- Buch-Befund: KI-Dach-Befund + deterministische Struktur-Befunde.
+           String-seitiger Fragment-Include (nicht DOM-Placeholder): dieser Block liegt
+           in einem <template x-if>, in das der DOM-Cascade nicht absteigt. -->
+      <!-- @include erzaehlprofil-befund -->
+
       <!-- Spannungskurve (Intensität 1–5 pro Kapitel) -->
       <div class="erzaehlprofil-section">
         <div class="erzaehlprofil-section-head" x-text="$app.t('erzaehlprofil.curveTitle')"></div>
