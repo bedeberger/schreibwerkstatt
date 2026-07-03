@@ -159,6 +159,13 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  transition: opacity 0.12s ease;
+}
+/* Refetch bei Filter/Sort/Suche: Liste bleibt sichtbar, wird nur gedimmt und
+   klick-inert — kein Skeleton-Swap, der bei jedem Tastendruck flackert. */
+.recherche-list.is-refreshing {
+  opacity: var(--opacity-disabled);
+  pointer-events: none;
 }
 
 .research-item {
@@ -533,7 +540,14 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 /* ── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .recherche-toolbar { flex-direction: column; align-items: stretch; }
-  .recherche-filters { flex-direction: column; align-items: stretch; }
+  /* Filter bleiben ein umbrechendes Raster (2 Comboboxen pro Zeile), analog zum
+     entity-list-Muster — kein hoher Full-Width-Stack. Suchfeld + Archiv-Schalter
+     spannen die volle Breite. */
+  .recherche-filters { align-items: stretch; gap: var(--space-xs); }
+  .recherche-filters > .combobox-wrap--compact { flex: 1 1 45%; min-width: 0; }
+  .recherche-filters .filter-search-wrap { flex: 1 1 100%; }
+  .recherche-filters .filter-search-input { width: 100%; }
+  .recherche-archived-toggle { flex: 1 1 100%; }
   .recherche-search { min-width: 0; }
   .research-item-actions { margin-left: 0; }
   .research-item-head { gap: var(--space-2xs); }

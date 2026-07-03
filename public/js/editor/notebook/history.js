@@ -18,6 +18,7 @@
 // landet hier.
 
 import { normalizeEditorBlocks } from '../shared/html-clean.js';
+import { editorHost } from '../shared/editor-host.js';
 
 const HISTORY_DEBOUNCE_MS = 500;
 const HISTORY_MAX = 100;
@@ -129,7 +130,7 @@ export const notebookHistoryMethods = {
   },
 
   notebookUndo() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app?.editMode || app.focusActive) return;
     if (this._undoApplying) return;
     if (this._undoTimer) {
@@ -143,7 +144,7 @@ export const notebookHistoryMethods = {
   },
 
   notebookRedo() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app?.editMode || app.focusActive) return;
     if (this._undoApplying) return;
     if (this._undoIdx >= this._undoStack.length - 1) return;
@@ -172,7 +173,7 @@ export const notebookHistoryMethods = {
       }
       restoreCaretAtOffset(el, snap.caretOffset);
       el.focus?.();
-      const app = window.__app;
+      const app = editorHost();
       if (app) {
         app.editDirty = true;
         this._scheduleDraftSave?.();

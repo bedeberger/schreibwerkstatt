@@ -19,6 +19,9 @@ export function registerRechercheCard() {
     _linkTargetsBookId: null,
 
     loading: false,
+    // Refetch bei Filter/Sort/Suche (Daten schon vorhanden): Liste bleibt stehen
+    // und wird nur gedimmt, statt aufs Skeleton umzuschalten — kein Flackern.
+    refreshing: false,
     busy: false,
     errorMessage: '',
 

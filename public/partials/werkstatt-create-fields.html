@@ -1,0 +1,13 @@
+<!-- Geteilte Neu-Anlage-Felder (Name-Input + Speichern/Abbrechen). Via
+     @include im Empty-State und in der Sidebar eingebunden — eine Quelle. -->
+<input type="text"
+       class="werkstatt-new-name"
+       :placeholder="$app.t('werkstatt.field.name')"
+       x-model="newName"
+       @keydown.enter.prevent="createDraft()"
+       @keydown.escape.prevent="cancelCreate()"
+       :aria-label="$app.t('werkstatt.field.name')">
+<div class="werkstatt-create-row">
+  <button type="button" class="primary" :disabled="busy || !newName.trim()" @click="createDraft()" x-text="$app.t('werkstatt.action.save')"></button>
+  <button type="button" :disabled="busy" @click="cancelCreate()" x-text="$app.t('common.cancel')"></button>
+</div>

@@ -41,7 +41,7 @@
         <span class="card-title" x-text="t('editor.title', { name: currentPage?.name || '–' })"></span>
       </template>
       <div class="card-subline">
-        <span class="save-indicator"
+        <span class="save-indicator" aria-live="polite"
               x-show="editMode || lastSavedKind() !== 'none'"
               :class="'save-indicator--' + lastSavedKind()"
               :data-tip="saveIndicatorTip()">
@@ -241,94 +241,9 @@
   </div>
   <div class="card-status" x-show="checkStatus" x-html="checkStatus"></div>
   <div id="status" x-html="statusHtml"></div>
-  <!-- Page-Editor-Toolbar (Zoom/FitWidth/Fullscreen/HR). Lebt im Topbar, damit
-       sie über die bestehende Sticky-Region permanent sichtbar bleibt — auch
-       beim Scrollen tief in die Seite (Vollbild). -->
-  <div class="page-editor-toolbar" x-show="editMode && !focusActive" x-cloak>
-    <button type="button" class="icon-btn"
-            :disabled="!notebookCanUndo()"
-            :data-tip="t('editor.toolbar.undoTitle')" :aria-label="t('editor.toolbar.undoTitle')"
-            @click="notebookUndo()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#undo"/></svg>
-    </button>
-    <button type="button" class="icon-btn"
-            :disabled="!notebookCanRedo()"
-            :data-tip="t('editor.toolbar.redoTitle')" :aria-label="t('editor.toolbar.redoTitle')"
-            @click="notebookRedo()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#redo"/></svg>
-    </button>
-    <span class="action-sep" aria-hidden="true"></span>
-    <button type="button" class="icon-btn"
-            :data-tip="t('editor.toolbar.hrTitle')" :aria-label="t('editor.toolbar.hrTitle')"
-            @click="insertHorizontalRule()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#separator-horizontal"/></svg>
-    </button>
-    <button type="button" class="icon-btn"
-            :class="{ 'is-success': quotesNormalizedFlash }"
-            :data-tip="quotesNormalizedFlash
-              ? (quotesNormalizedFlash.count > 0
-                  ? t('editor.toolbar.quotesDone', { count: quotesNormalizedFlash.count })
-                  : t('editor.toolbar.quotesNone'))
-              : t('editor.toolbar.quotesTitle')"
-            :aria-label="t('editor.toolbar.quotesTitle')"
-            @click="normalizeQuotes()">
-      <svg class="icon" aria-hidden="true" x-show="!quotesNormalizedFlash"><use href="/icons.svg?v=690#quote"/></svg>
-      <svg class="icon" aria-hidden="true" x-show="quotesNormalizedFlash" x-cloak><use href="/icons.svg?v=690#check"/></svg>
-    </button>
-    <span class="action-sep" aria-hidden="true"></span>
-    <button type="button" class="icon-btn"
-            :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
-            @click="pageEditorZoomOut()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#minus"/></svg>
-    </button>
-    <button type="button" class="icon-btn"
-            :data-tip="t('graph.zoomIn')" :aria-label="t('graph.zoomIn')"
-            @click="pageEditorZoomIn()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
-    </button>
-    <button type="button" class="icon-btn"
-            :data-tip="t('graph.reset')" :aria-label="t('graph.reset')"
-            @click="pageEditorZoomReset()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#scan"/></svg>
-    </button>
-    <button type="button" class="icon-btn"
-            :aria-pressed="pageEditorFitWidth"
-            :data-tip="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
-            :aria-label="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
-            @click="togglePageEditorFitWidth()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#move-horizontal"/></svg>
-    </button>
-    <button type="button" class="icon-btn"
-            :aria-pressed="pageEditorFullscreen"
-            :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
-            :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
-            @click="togglePageEditorFullscreen()">
-      <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg>
-    </button>
-    <!-- Steuerzeichen-Anzeige (Absatzmarken ¶ + Soft-Break ↵). Reine
-         CSS-Pseudo-Element-Dekoration auf dem contenteditable — kein Markup im
-         gespeicherten HTML. State pageEditorShowMarks (in editorPrefs). -->
-    <button type="button" class="icon-btn"
-            :aria-pressed="pageEditorShowMarks"
-            :data-tip="pageEditorShowMarks ? t('editor.toolbar.marksOff') : t('editor.toolbar.marksOn')"
-            :aria-label="pageEditorShowMarks ? t('editor.toolbar.marksOff') : t('editor.toolbar.marksOn')"
-            @click="togglePageEditorShowMarks()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=692#pilcrow"/></svg>
-    </button>
-    <span class="action-sep" aria-hidden="true"></span>
-    <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel). Aendert nur die
-         Buch-Setting (book_settings.entities_enabled, PUT /booksettings/:id/entities-enabled, Event
-         book:settings:updated); der Auf/Zu-Zustand der Klappschiene (entityPanelOpen) bleibt User-Wahl. -->
-    <button type="button" class="icon-btn"
-            :aria-pressed="entitiesEnabledForCurrentBook"
-            :data-tip="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
-            :aria-label="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
-            @click="toggleEntitiesEnabledForCurrentBook()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#radio"/></svg>
-    </button>
-    <!-- STT-Diktat-Mic schwebt im Editorfeld unten rechts (siehe
-         editor-body-edit.html), nicht hier in der Toolbar. -->
-  </div>
+  <!-- Edit-Toolbar (Undo/Redo/Fullscreen/Meatball) → Partial editor-page-toolbar.html.
+       Lebt im sticky Topbar, damit sie beim Scrollen permanent sichtbar bleibt. -->
+  <div id="partial-editor-page-toolbar" class="display-contents"></div>
   </div><!-- /editor-card__topbar -->
 
   <!-- Live-Presence anderer User wird über den globalen Collab-Toast gemeldet

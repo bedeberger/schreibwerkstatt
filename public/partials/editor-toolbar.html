@@ -9,6 +9,8 @@
   <template x-teleport="body">
     <div x-show="bubbleShow && $app.editMode && !$app.focusActive" x-cloak
          class="edit-bubble-toolbar"
+         role="toolbar"
+         :aria-label="$app.t('editor.toolbar.ariaLabel')"
          :style="{ left: bubbleX + 'px', top: bubbleY + 'px' }"
          @mousedown.prevent>
       <button type="button" class="edit-bubble-btn edit-bubble-btn--bold"   @click="toolbarBold()"   :data-tip="$app.t('editor.toolbar.boldTitle')"   :aria-label="$app.t('editor.toolbar.boldTitle')">B</button>
@@ -55,6 +57,9 @@
   <template x-teleport="body">
     <div x-show="slashShow && $app.editMode && !$app.focusActive" x-cloak
          class="edit-slash-menu"
+         role="listbox"
+         :aria-label="$app.t('editor.slash.ariaLabel')"
+         :aria-activedescendant="slashShow ? ('edit-slash-opt-' + slashIdx) : null"
          :style="{ left: slashX + 'px', bottom: slashY + 'px' }"
          @click.outside="_closeSlash()">
       <div class="edit-slash-hint" :class="{ 'edit-slash-hint--query': slashQuery }">
@@ -62,11 +67,14 @@
         <span x-show="slashQuery" class="edit-slash-query"><span class="edit-slash-query-slash">/</span><span x-text="slashQuery"></span></span>
       </div>
       <template x-for="(it, i) in slashItems()" :key="it.key">
-        <div class="edit-slash-row">
+        <div class="edit-slash-row" role="presentation">
           <div x-show="it.showGroup"
                class="edit-slash-group" x-text="it.groupLabel"></div>
           <button type="button"
                   class="edit-slash-item"
+                  role="option"
+                  :id="'edit-slash-opt-' + i"
+                  :aria-selected="slashIdx === i"
                   :class="it.modClass + (slashIdx === i ? ' edit-slash-item--active' : '')"
                   @mousedown.prevent
                   @click="_applySlashByKey(it.key)"

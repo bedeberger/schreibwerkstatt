@@ -1,5 +1,5 @@
 // Teil von notebookEditMethods (siehe Facade edit.js).
-import { handleEditorCopy, handleEditorCut, handleEditorPaste } from './_shared.js';
+import { editorHost, handleEditorCopy, handleEditorCut, handleEditorPaste } from './_shared.js';
 
 export const inputMethods = {
 
@@ -17,7 +17,7 @@ export const inputMethods = {
 
 
   _markEditDirty() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app?.editMode) return;
     app.editDirty = true;
     this._scheduleDraftSave();

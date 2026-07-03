@@ -1,5 +1,5 @@
 // Teil von notebookEditMethods (siehe Facade edit.js).
-import { FEATURE_BLOCK_MERGE, clearDraft, clearNormalSnapshot, ensureTrailingParagraph, getActiveEditorContainer, htmlToText, installEditCounter, isNoChange, isPageConflict, normalizeEditorBlocks, readConflictBody, readDraft, readEditorPrefs, savePage, sortByPosition, stripLektoratMarks, trackMerge, tzOpts, writeDraft, writeNormalSnapshot } from './_shared.js';
+import { FEATURE_BLOCK_MERGE, clearDraft, clearNormalSnapshot, editorHost, ensureTrailingParagraph, findInHtml, getActiveEditorContainer, htmlToText, installEditCounter, isNoChange, isPageConflict, normalizeEditorBlocks, readConflictBody, readDraft, readEditorPrefs, savePage, sortByPosition, stripLektoratMarks, trackMerge, tzOpts, writeDraft, writeNormalSnapshot } from './_shared.js';
 
 export const lifecycleMethods = {
   // Container-Lookup: einziger Eintrittspunkt für beide Modi.
@@ -8,25 +8,91 @@ export const lifecycleMethods = {
   },
 
 
+  // Gemeinsame Nachbereitung nach jedem erfolgreichen Page-Save. Aufrufer:
+  // saveEdit + quickSave + submitConflictResolution, jeweils im Haupt- und im
+  // 409-Re-Merge-Pfad. Übernimmt den frischen Server-Stand, spiegelt Findings/
+  // Stats, räumt Draft + Dirty-/Offline-/Conflict-Flags. Kein Teardown (Editor
+  // bleibt offen) und kein setStatus — Wortlaut/Übergang entscheidet der
+  // Aufrufer je nach Pfad. `applyToEditor` spiegelt das gespeicherte HTML in
+  // den Live-Editor (Konflikt-Auflösungs-Pfade, damit Folge-Edits auf dem
+  // gemergten Stand aufbauen).
+  _applySaveSuccess(saved, html, { pageId = null, applyToEditor = false } = {}) {
+    const app = editorHost();
+    if (!app) return;
+    if (applyToEditor) this._applyMergedToEditor(html);
+    if (saved?.updated_at && app.currentPage) app.currentPage.updated_at = saved.updated_at;
+    app.originalHtml = html;
+    app.currentPageEmpty = !htmlToText(html).trim();
+    this._filterFindingsAfterSave(html);
+    app._syncPageStatsAfterSave?.(app.currentPage, html);
+    // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
+    app.refreshPageAges?.();
+    clearDraft(pageId ?? app.currentPage?.id);
+    app.lastAutosaveAt = Date.now();
+    app.lastDraftSavedAt = null;
+    app.editDirty = false;
+    app.saveOffline = false;
+    app.editConflict = null;
+    app.updatePageView?.();
+  },
+
+
+  // Vollständiges Teardown einer Edit-Session: stoppt Autosave/Draft/Retry/
+  // Marks/Counter/Presence/Lock, verwirft Snapshot + Draft und setzt die
+  // Session-Flags zurück. Reihenfolge = Pflicht-Invariante #11 (Draft →
+  // Snapshot → Autosave → OnlineRetry → Marks → Counter → Presence → Lock →
+  // History → editMode=false); frühes editMode=false liesse Teardowns auf
+  // bereits genullten Refs laufen. Aufrufer: cancelEdit + saveEdit
+  // (Non-Focus-Pfad). SSoT für den Session-Abbau — kein Copy-Paste je Pfad.
+  _teardownEditSession() {
+    const app = editorHost();
+    if (!app) return;
+    if (app.currentPage) clearDraft(app.currentPage.id);
+    clearNormalSnapshot();
+    this._stopAutosave();
+    this._uninstallOnlineRetry();
+    this._uninstallFormatMarks();
+    app._editCounterCtx?.teardown?.();
+    app._stopPresenceHeartbeat?.();
+    app._releaseEditLock?.(app.currentPage?.id);
+    this._historyClear?.();
+    app.editMode = false;
+    app.editDirty = false;
+    app.editSaving = false;
+    app.saveOffline = false;
+    app.pendingDraft = null;
+    app.lastDraftSavedAt = null;
+    app.pageEditorFullscreen = false;
+    app.pageEditorFitWidth = false;
+    app.closeSynonymMenu?.();
+    app.closeSynonymPicker?.();
+    app.closeFigurLookup?.();
+  },
+
+
   // Nach jedem erfolgreichen Save: Findings, deren `original`-Text nicht mehr
   // im neuen HTML vorkommt, gelten als behoben und fliegen raus. Gilt sowohl
   // für saveEdit (expliziter Save) als auch quickSave (Ctrl+S/Autosave) –
   // damit das Prüf-Panel auch nach Fokus-Editor-Edits aktuell bleibt.
+  // Überlebens-Check via `findInHtml` (tolerant gegen Tag-/Entity-/Whitespace-
+  // Differenzen), identisch zu `sortByPosition` — reines indexOf auf rohem HTML
+  // würde ein noch gültiges Finding verwerfen, sobald sich Markup (z.B.
+  // data-bid) um den Textausschnitt herum ändert.
   _filterFindingsAfterSave(newHtml) {
-    const app = window.__app;
+    const app = editorHost();
     if (!app?.lektoratFindings || app.lektoratFindings.length === 0) return;
     const survivors = [];
     const prevSelected = new Map();
     for (let i = 0; i < app.lektoratFindings.length; i++) {
       const f = app.lektoratFindings[i];
-      if (f.original && newHtml.indexOf(f.original) !== -1) {
+      if (f.original && findInHtml(newHtml, f.original)) {
         survivors.push(f);
         prevSelected.set(f, !!app.selectedFindings[i]);
       }
     }
     app.lektoratFindings = sortByPosition(newHtml, survivors);
     app.selectedFindings = app.lektoratFindings.map(f => prevSelected.get(f) ?? false);
-    app.appliedOriginals = app.appliedOriginals.filter(o => newHtml.indexOf(o) !== -1);
+    app.appliedOriginals = app.appliedOriginals.filter(o => findInHtml(newHtml, o));
     if (app.lektoratFindings.length === 0) {
       app.checkDone = false;
       app.correctedHtml = null;
@@ -38,7 +104,7 @@ export const lifecycleMethods = {
 
 
   startEdit() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app || !app.currentPage || app.originalHtml === null) return;
     if (app.checkLoading || app.saveApplying != null) return;
     // Prüfmodus blockt Edit (Invariante: editMode + checkDone forbidden).
@@ -155,7 +221,7 @@ export const lifecycleMethods = {
 
 
   async cancelEdit() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app) return;
     if (app.editDirty) {
       const ok = await app.appConfirm({
@@ -165,33 +231,14 @@ export const lifecycleMethods = {
       });
       if (!ok) return;
     }
-    if (app.currentPage) clearDraft(app.currentPage.id);
-    clearNormalSnapshot();
-    this._stopAutosave();
-    this._uninstallOnlineRetry();
-    this._uninstallFormatMarks();
-    app._editCounterCtx?.teardown?.();
-    app._stopPresenceHeartbeat?.();
-    app._releaseEditLock?.(app.currentPage?.id);
-    this._historyClear?.();
-    app.lastDraftSavedAt = null;
-    app.editMode = false;
-    app.editDirty = false;
-    app.editSaving = false;
-    app.saveOffline = false;
-    app.pageEditorFullscreen = false;
-    app.pageEditorFitWidth = false;
-    app.pendingDraft = null;
-    app.closeSynonymMenu?.();
-    app.closeSynonymPicker?.();
-    app.closeFigurLookup?.();
+    this._teardownEditSession();
     app.updatePageView?.();
     if (app.focusActive) app.exitFocusMode?.();
   },
 
 
   async saveEdit() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app || !app.currentPage) return;
     if (!app.canEdit?.()) return;
     const el = this._getEditEl();
@@ -277,41 +324,13 @@ export const lifecycleMethods = {
         source,
         expectedUpdatedAt: expectedAt,
       });
-      if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
-
-      app.originalHtml = saveHtml;
-      app.currentPageEmpty = !htmlToText(saveHtml).trim();
-
-      this._filterFindingsAfterSave(saveHtml);
-      app._syncPageStatsAfterSave?.(app.currentPage, saveHtml);
-      // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
-      app.refreshPageAges?.();
-
-      clearDraft(app.currentPage.id);
-      app.lastAutosaveAt = Date.now();
-      app.lastDraftSavedAt = null;
-      app.editDirty = false;
-      app.saveOffline = false;
-      app.editConflict = null;
-      app.updatePageView?.();
-      // Kein extra setStatus — Save-Indicator in der Subline zeigt schon
-      // "gespeichert HH:MM"; doppelte Notification wäre redundant.
+      this._applySaveSuccess(saved, saveHtml);
+      // Kein extra setStatus vor dem Teardown — Save-Indicator in der Subline
+      // zeigt schon "gespeichert HH:MM"; doppelte Notification wäre redundant.
       if (app.focusActive) {
         // Fokus bleibt aktiv — User schreibt weiter; editMode/Listener bleiben.
       } else {
-        clearNormalSnapshot();
-        this._stopAutosave();
-        this._uninstallOnlineRetry();
-        this._uninstallFormatMarks();
-        app._editCounterCtx?.teardown?.();
-        app._stopPresenceHeartbeat?.();
-        app._releaseEditLock?.(app.currentPage?.id);
-        this._historyClear?.();
-        app.editMode = false;
-        app.pageEditorFullscreen = false;
-        app.pageEditorFitWidth = false;
-        app.closeSynonymMenu?.();
-        app.closeSynonymPicker?.();
+        this._teardownEditSession();
       }
       app.setStatus('');
     } catch (e) {
@@ -328,17 +347,7 @@ export const lifecycleMethods = {
               html: merge.saveHtml, pageName: app.currentPage.name, source,
               expectedUpdatedAt: merge.expectedAt,
             });
-            if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
-            app.originalHtml = merge.saveHtml;
-            app.currentPageEmpty = !htmlToText(merge.saveHtml).trim();
-            this._filterFindingsAfterSave(merge.saveHtml);
-            app._syncPageStatsAfterSave?.(app.currentPage, merge.saveHtml);
-            app.refreshPageAges?.();
-            clearDraft(app.currentPage.id);
-            app.editDirty = false;
-            app.saveOffline = false;
-            app.editConflict = null;
-            app.updatePageView?.();
+            this._applySaveSuccess(saved, merge.saveHtml);
             app.setStatus(app.t('edit.conflict.merged.silent'), false, 3000);
             return;
           } catch (e2) { console.warn('[saveEdit] merged re-save failed', e2); }
@@ -369,7 +378,7 @@ export const lifecycleMethods = {
 
   // Stilles Speichern (Ctrl+S / Auto-Save): bleibt im Editor.
   async quickSave() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app || !app.editMode || !app.currentPage || app.editSaving) return;
     // Ohne Edit-Recht kein Auto-Save (Defense; startEdit blockt
     // ohnehin den Eintritt — aber Race mit Role-Refresh waehrend Edit-Session).
@@ -436,20 +445,7 @@ export const lifecycleMethods = {
         source,
         expectedUpdatedAt: expectedAt,
       });
-      if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
-      app.originalHtml = saveHtml;
-      app.editDirty = false;
-      app.saveOffline = false;
-      app.editConflict = null;
-      app.lastAutosaveAt = Date.now();
-      app.lastDraftSavedAt = null;
-      clearDraft(app.currentPage.id);
-      app.currentPageEmpty = !htmlToText(saveHtml).trim();
-      this._filterFindingsAfterSave(saveHtml);
-      app._syncPageStatsAfterSave?.(app.currentPage, saveHtml);
-      // Sidebar-Lektorat-Status flippt auf 'warn' (updated_at > checkedAt) — Server-Map nachladen.
-      app.refreshPageAges?.();
-      app.updatePageView?.();
+      this._applySaveSuccess(saved, saveHtml);
       // Kein setStatus — Save-Indicator in der Subline zeigt schon
       // "gespeichert HH:MM"; doppelte Notification wäre redundant.
       app.setStatus('');
@@ -467,19 +463,7 @@ export const lifecycleMethods = {
               html: merge.saveHtml, pageName: app.currentPage.name, source,
               expectedUpdatedAt: merge.expectedAt,
             });
-            if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
-            app.originalHtml = merge.saveHtml;
-            app.editDirty = false;
-            app.saveOffline = false;
-            app.editConflict = null;
-            app.lastAutosaveAt = Date.now();
-            app.lastDraftSavedAt = null;
-            clearDraft(app.currentPage.id);
-            app.currentPageEmpty = !htmlToText(merge.saveHtml).trim();
-            this._filterFindingsAfterSave(merge.saveHtml);
-            app._syncPageStatsAfterSave?.(app.currentPage, merge.saveHtml);
-            app.refreshPageAges?.();
-            app.updatePageView?.();
+            this._applySaveSuccess(saved, merge.saveHtml);
             return;
           } catch (e2) { console.warn('[quickSave] merged re-save failed', e2); }
         }

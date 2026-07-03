@@ -1437,7 +1437,7 @@ Nur in Sidebar-Tree verwendet. Bei neuer hierarchischer Liste: erst prüfen, ob 
 
 ### Dropdown-/Aktions-Menü (Meatball, `⋯`) — verbindliche Harmonisierung
 
-**Use:** Klick-gebundenes Menü an einem Trigger-Button, das sekundäre Aktionen eines Elements bündelt. **Alle** Meatball-/Overflow-Menüs der App nutzen ausschliesslich das `.context-menu`-Vokabular — kein per-Feature nachgebautes Popover-CSS (`*-menu-popover`, `*-context-menu` o.ä.). Konsumenten: Seiten-Action-Leiste ([editor-notebook.html](public/partials/editor-notebook.html), `pageActionsMenuOpen`), Kapitel-Review-Header, Figur-Werkstatt-Header, Recherche-Item-Aktionen, Ideen-Karte, Plot-Strang-Lane, Figur-Werkstatt-Mindmap-Rechtsklick.
+**Use:** Klick-gebundenes Menü an einem Trigger-Button, das sekundäre Aktionen eines Elements bündelt. **Alle** Meatball-/Overflow-Menüs der App nutzen ausschliesslich das `.context-menu`-Vokabular — kein per-Feature nachgebautes Popover-CSS (`*-menu-popover`, `*-context-menu` o.ä.). Konsumenten: Seiten-Action-Leiste ([editor-notebook.html](public/partials/editor-notebook.html), `pageActionsMenuOpen`), Notebook-Edit-Toolbar (sekundäre Controls, `.page-editor-toolbar` via `menu()`), Kapitel-Review-Header, Figur-Werkstatt-Header, Recherche-Item-Aktionen, Ideen-Karte, Plot-Strang-Lane, Figur-Werkstatt-Mindmap-Rechtsklick.
 
 **Pflicht (für jedes Aktions-Menü):**
 - **Trigger** ist ein Icon-Button `more-horizontal` (`.icon-btn icon-btn--ghost`), nie ein `⋯`/`≡`/`▾`-Glyph. `aria-haspopup="menu"` + `:aria-expanded` + `data-tip`/`aria-label` Pflicht.

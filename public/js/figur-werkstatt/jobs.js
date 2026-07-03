@@ -3,7 +3,7 @@
 // arbeitet KI auf altem Server-Snapshot und überschreibt user-edits beim Apply.
 
 import { fetchJson } from '../utils.js';
-import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
+import { startWerkstattJobPoll, stopWerkstattJob } from './job-poll.js';
 import { _newNodeId } from './mindmap.js';
 
 export const jobsMethods = {
@@ -26,50 +26,7 @@ export const jobsMethods = {
         body: JSON.stringify({ draftId: sel.id, knotenId: this.selectedKnotenId }),
       });
       this._brainstormJobId = resp.jobId;
-      startPoll(this, {
-        timerProp: '_brainstormPollTimer',
-        jobId: resp.jobId,
-        progressProp: 'brainstormProgress',
-        onProgress: (job) => {
-          this.brainstormStatus = runningJobStatus(app.t.bind(app),
-            job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
-            job.progress, job.tokensPerSec, job.statusParams);
-        },
-        onDone: (job) => {
-          // Result nur aufs aktuelle Draft anwenden; sonst landet Vorschlags-
-          // Liste auf der falschen Figur. History via loadRuns kriegt der
-          // Quell-Draft beim nächsten Öffnen via _reattachActiveJobs / loadRuns.
-          const targetId = this._brainstormJobDraftId;
-          this.brainstormLoading = false;
-          this.brainstormStatus = '';
-          this._brainstormJobId = null;
-          this._brainstormJobDraftId = null;
-          if (this.selectedDraftId === targetId) {
-            this.brainstormResult = {
-              knotenId: job.result.knotenId,
-              knotenPfad: job.result.knotenPfad,
-              vorschlaege: job.result.vorschlaege || [],
-            };
-            this.selectedRunId = job.result.runId || null;
-            this.loadRuns?.();
-          }
-        },
-        onError: (job) => {
-          this.brainstormLoading = false;
-          this.brainstormStatus = '';
-          this._brainstormJobId = null;
-          if (this.selectedDraftId === this._brainstormJobDraftId) {
-            this.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
-          }
-          this._brainstormJobDraftId = null;
-        },
-        onNotFound: () => {
-          this.brainstormLoading = false;
-          this.brainstormStatus = '';
-          this._brainstormJobId = null;
-          this._brainstormJobDraftId = null;
-        },
-      });
+      startWerkstattJobPoll(this, 'brainstorm', resp.jobId);
     } catch (e) {
       this.brainstormLoading = false;
       this._brainstormJobDraftId = null;
@@ -116,47 +73,7 @@ export const jobsMethods = {
         body: JSON.stringify({ draftId: sel.id }),
       });
       this._consistencyJobId = resp.jobId;
-      startPoll(this, {
-        timerProp: '_consistencyPollTimer',
-        jobId: resp.jobId,
-        progressProp: 'consistencyProgress',
-        onProgress: (job) => {
-          this.consistencyStatus = runningJobStatus(app.t.bind(app),
-            job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
-            job.progress, job.tokensPerSec, job.statusParams);
-        },
-        onDone: (job) => {
-          const targetId = this._consistencyJobDraftId;
-          this.consistencyLoading = false;
-          this.consistencyStatus = '';
-          this._consistencyJobId = null;
-          this._consistencyJobDraftId = null;
-          if (this.selectedDraftId === targetId) {
-            this.consistencyResult = {
-              konflikte: job.result.konflikte || [],
-              fazit: job.result.fazit || '',
-            };
-            this.selectedKonfliktIdx = null;
-            this.selectedRunId = job.result.runId || null;
-            this.loadRuns?.();
-          }
-        },
-        onError: (job) => {
-          this.consistencyLoading = false;
-          this.consistencyStatus = '';
-          this._consistencyJobId = null;
-          if (this.selectedDraftId === this._consistencyJobDraftId) {
-            this.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
-          }
-          this._consistencyJobDraftId = null;
-        },
-        onNotFound: () => {
-          this.consistencyLoading = false;
-          this.consistencyStatus = '';
-          this._consistencyJobId = null;
-          this._consistencyJobDraftId = null;
-        },
-      });
+      startWerkstattJobPoll(this, 'consistency', resp.jobId);
     } catch (e) {
       this.consistencyLoading = false;
       this._consistencyJobDraftId = null;
@@ -170,36 +87,18 @@ export const jobsMethods = {
     const id = this._brainstormJobId;
     if (!id) return;
     await window.__app.cancelJob(id);
-    if (this._brainstormPollTimer) { clearInterval(this._brainstormPollTimer); this._brainstormPollTimer = null; }
-    this.brainstormLoading = false;
-    this.brainstormStatus = '';
-    this.brainstormProgress = 0;
-    this._brainstormJobId = null;
-    this._brainstormJobDraftId = null;
+    stopWerkstattJob(this, 'brainstorm');
   },
 
   async cancelConsistency() {
     const id = this._consistencyJobId;
     if (!id) return;
     await window.__app.cancelJob(id);
-    if (this._consistencyPollTimer) { clearInterval(this._consistencyPollTimer); this._consistencyPollTimer = null; }
-    this.consistencyLoading = false;
-    this.consistencyStatus = '';
-    this.consistencyProgress = 0;
-    this._consistencyJobId = null;
-    this._consistencyJobDraftId = null;
+    stopWerkstattJob(this, 'consistency');
   },
 
   _clearJobs() {
-    if (this._brainstormPollTimer) { clearInterval(this._brainstormPollTimer); this._brainstormPollTimer = null; }
-    if (this._consistencyPollTimer) { clearInterval(this._consistencyPollTimer); this._consistencyPollTimer = null; }
-    this.brainstormLoading = false;
-    this.consistencyLoading = false;
-    this.brainstormStatus = '';
-    this.consistencyStatus = '';
-    this._brainstormJobId = null;
-    this._brainstormJobDraftId = null;
-    this._consistencyJobId = null;
-    this._consistencyJobDraftId = null;
+    stopWerkstattJob(this, 'brainstorm');
+    stopWerkstattJob(this, 'consistency');
   },
 };

@@ -1,0 +1,97 @@
+<!-- Page-Editor-Toolbar (Zoom/FitWidth/Fullscreen/HR). Lebt im sticky
+     `.editor-card__topbar` (via Placeholder in editor-notebook.html), damit sie
+     über die Sticky-Region permanent sichtbar bleibt — auch beim Scrollen tief
+     in die Seite (Vollbild). Undo/Redo/Fullscreen bleiben inline; die sekundären
+     Controls liegen im Meatball-`⋯`-Menü (gleiches .context-menu-Vokabular +
+     menu()-Primitiv wie die Seiten-Action-Leiste, siehe DESIGN.md „Dropdown-/
+     Aktions-Menü"). Zoom/Toggles nutzen @click.stop, damit das Menü offen bleibt
+     (mehrfach klickbar / Zustand sichtbar); Einmal-Aktionen schliessen. -->
+<div class="page-editor-toolbar" x-show="editMode && !focusActive" x-cloak>
+  <button type="button" class="icon-btn"
+          :disabled="!notebookCanUndo()"
+          :data-tip="t('editor.toolbar.undoTitle')" :aria-label="t('editor.toolbar.undoTitle')"
+          @click="notebookUndo()">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#undo"/></svg>
+  </button>
+  <button type="button" class="icon-btn"
+          :disabled="!notebookCanRedo()"
+          :data-tip="t('editor.toolbar.redoTitle')" :aria-label="t('editor.toolbar.redoTitle')"
+          @click="notebookRedo()">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#redo"/></svg>
+  </button>
+  <span class="action-sep" aria-hidden="true"></span>
+  <button type="button" class="icon-btn"
+          :aria-pressed="pageEditorFullscreen"
+          :data-tip="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
+          :aria-label="pageEditorFullscreen ? t('graph.fullscreenClose') : t('graph.fullscreen')"
+          @click="togglePageEditorFullscreen()">
+    <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg>
+  </button>
+  <span x-data="menu()">
+    <button type="button" class="icon-btn" x-bind="trigger" :class="{ 'is-active': open }"
+            aria-haspopup="menu"
+            :data-tip="t('editor.btn.moreActions')" :aria-label="t('editor.btn.moreActions')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg>
+    </button>
+    <div class="context-menu context-menu--dropdown" x-bind="panel" x-cloak>
+      <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+              @click="insertHorizontalRule()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#separator-horizontal"/></svg>
+        <span x-text="t('editor.toolbar.hrTitle')"></span>
+      </button>
+      <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+              :class="{ 'context-menu-item--on': quotesNormalizedFlash }"
+              @click.stop="normalizeQuotes()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#quote"/></svg>
+        <span x-text="quotesNormalizedFlash
+          ? (quotesNormalizedFlash.count > 0
+              ? t('editor.toolbar.quotesDone', { count: quotesNormalizedFlash.count })
+              : t('editor.toolbar.quotesNone'))
+          : t('editor.toolbar.quotesTitle')"></span>
+      </button>
+      <div class="context-menu-sep" role="separator"></div>
+      <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+              @click.stop="pageEditorZoomOut()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#minus"/></svg>
+        <span x-text="t('graph.zoomOut')"></span>
+      </button>
+      <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+              @click.stop="pageEditorZoomIn()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
+        <span x-text="t('graph.zoomIn')"></span>
+      </button>
+      <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+              @click.stop="pageEditorZoomReset()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#scan"/></svg>
+        <span x-text="t('graph.reset')"></span>
+      </button>
+      <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+              :class="{ 'context-menu-item--on': pageEditorFitWidth }"
+              @click.stop="togglePageEditorFitWidth()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#move-horizontal"/></svg>
+        <span x-text="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"></span>
+      </button>
+      <!-- Steuerzeichen-Anzeige (Absatzmarken ¶ + Soft-Break ↵). Reine
+           CSS-Pseudo-Element-Dekoration auf dem contenteditable — kein Markup im
+           gespeicherten HTML. State pageEditorShowMarks (in editorPrefs). -->
+      <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+              :class="{ 'context-menu-item--on': pageEditorShowMarks }"
+              @click.stop="togglePageEditorShowMarks()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=692#pilcrow"/></svg>
+        <span x-text="pageEditorShowMarks ? t('editor.toolbar.marksOff') : t('editor.toolbar.marksOn')"></span>
+      </button>
+      <div class="context-menu-sep" role="separator"></div>
+      <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel). Aendert nur die
+           Buch-Setting (book_settings.entities_enabled, PUT /booksettings/:id/entities-enabled, Event
+           book:settings:updated); der Auf/Zu-Zustand der Klappschiene (entityPanelOpen) bleibt User-Wahl. -->
+      <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+              :class="{ 'context-menu-item--on': entitiesEnabledForCurrentBook }"
+              @click.stop="toggleEntitiesEnabledForCurrentBook()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#radio"/></svg>
+        <span x-text="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"></span>
+      </button>
+    </div>
+  </span>
+  <!-- STT-Diktat-Mic schwebt im Editorfeld unten rechts (siehe
+       editor-body-edit.html), nicht hier in der Toolbar. -->
+</div>

@@ -51,7 +51,6 @@ const CATEGORIES = [
     allow: {
       'public/js/cards/editor-spellcheck/controller.js': 773,
       'public/js/editor/notebook/stt-dictation.js': 769,
-      'public/js/editor/notebook/toolbar.js': 743,
       'public/js/share-reader.js': 658,
       'public/js/editor/focus/card.js': 601,
     },
@@ -65,7 +64,7 @@ const CATEGORIES = [
       'public/partials/buchorganizer.html': 516,
       'public/partials/admin-usage.html': 452,
       'public/partials/recherche.html': 438,
-      'public/partials/editor-notebook.html': 435,
+      'public/partials/editor-notebook.html': 350,
       'public/partials/figur-werkstatt.html': 406,
       'public/partials/figuren.html': 377,
       'public/partials/book-editor.html': 358,

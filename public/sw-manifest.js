@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "0c8762ca12d8f358";
+self.__SHELL_BUILD = "3558b85f79042e0a";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -362,6 +362,10 @@ self.__SHELL_MANIFEST = [
   "/js/editor/notebook/storage.js",
   "/js/editor/notebook/stt-dictation.js",
   "/js/editor/notebook/toolbar.js",
+  "/js/editor/notebook/toolbar/_shared.js",
+  "/js/editor/notebook/toolbar/bubble.js",
+  "/js/editor/notebook/toolbar/keydown.js",
+  "/js/editor/notebook/toolbar/slash.js",
   "/js/editor/notebook/trampoline.js",
   "/js/editor/notebook/tts-proof.js",
   "/js/editor/shared/active-editor.js",
@@ -387,6 +391,7 @@ self.__SHELL_MANIFEST = [
   "/js/figur-werkstatt/context-menu.js",
   "/js/figur-werkstatt/crud.js",
   "/js/figur-werkstatt/import.js",
+  "/js/figur-werkstatt/job-poll.js",
   "/js/figur-werkstatt/jobs.js",
   "/js/figur-werkstatt/mindmap.js",
   "/js/figur-werkstatt/runs.js",
@@ -537,6 +542,7 @@ self.__SHELL_MANIFEST = [
   "/partials/editor-findings.html",
   "/partials/editor-focus.html",
   "/partials/editor-notebook.html",
+  "/partials/editor-page-toolbar.html",
   "/partials/editor-synonyme.html",
   "/partials/editor-toolbar.html",
   "/partials/epub-export.html",
@@ -593,5 +599,8 @@ self.__SHELL_MANIFEST = [
   "/partials/szenen.html",
   "/partials/tagebuch-rueckblick.html",
   "/partials/user-settings.html",
+  "/partials/werkstatt-create-fields.html",
+  "/partials/werkstatt-import-fields.html",
+  "/partials/werkstatt-run-row.html",
   "/partials/world-facts.html",
 ];

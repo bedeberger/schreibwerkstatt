@@ -1,5 +1,5 @@
 // Teil von notebookEditMethods (siehe Facade edit.js).
-import { FEATURE_BLOCK_MERGE, buildResolvedHtml, clearDraft, contentRepo, htmlToText, isPageConflict, mergeBlocks, mergedToHtml, readConflictBody, savePage, trackMerge, writeDraft } from './_shared.js';
+import { FEATURE_BLOCK_MERGE, buildResolvedHtml, contentRepo, editorHost, isPageConflict, mergeBlocks, mergedToHtml, readConflictBody, savePage, trackMerge, writeDraft } from './_shared.js';
 
 export const conflictMethods = {
 
@@ -39,7 +39,7 @@ export const conflictMethods = {
   // { merged, conflicts } oder null → Aufrufer fällt auf klassischen Banner zurück
   // (Flag off, leere Base = frische Page → 2-Way-Fallback, oder Merge wirft).
   _computeBlockMerge(localHtml, remoteHtml) {
-    const app = window.__app;
+    const app = editorHost();
     if (!FEATURE_BLOCK_MERGE) return null;
     const base = app.originalHtml || '';
     if (!base) return null;
@@ -65,7 +65,7 @@ export const conflictMethods = {
 
   // Konflikt-Banner öffnen: kollidierende Blöcke + Auflösungs-State festhalten.
   _openConflictResolution({ merged, conflicts, source, remoteUpdatedAt }) {
-    const app = window.__app;
+    const app = editorHost();
     const decisions = {};
     for (const c of conflicts) decisions[c.bid] = 'local';
     app.conflictResolution = {
@@ -88,7 +88,7 @@ export const conflictMethods = {
   //   { conflict:true } — Auflösungs-Banner geöffnet, Aufrufer bricht ab.
   //   null — kein Merge (Flag off / leere Base / Read-Fehler) → klassischer Pfad.
   async _attemptBlockMerge({ localHtml, source, remoteHtml = null, remoteUpdatedAt = null }) {
-    const app = window.__app;
+    const app = editorHost();
     if (!FEATURE_BLOCK_MERGE || !app.currentPage) return null;
     if (remoteHtml === null || remoteUpdatedAt === null) {
       try {
@@ -116,7 +116,7 @@ export const conflictMethods = {
 
   // Auflösungs-Entscheidung pro Block (UI). choice: 'local'|'remote'|'both'.
   resolveBlock(bid, choice) {
-    const app = window.__app;
+    const app = editorHost();
     if (!app.conflictResolution) return;
     app.conflictResolution.decisions[bid] = choice;
   },
@@ -124,7 +124,7 @@ export const conflictMethods = {
 
   // Bulk: alle Konflikte auf eine Seite setzen.
   resolveAllConflicts(choice) {
-    const app = window.__app;
+    const app = editorHost();
     if (!app.conflictResolution) return;
     for (const c of app.conflictResolution.conflicts) {
       app.conflictResolution.decisions[c.bid] = choice;
@@ -135,7 +135,7 @@ export const conflictMethods = {
   // Auflösung übernehmen: finales HTML aus merged + decisions bauen und mit
   // expected_updated_at = remoteUpdatedAt speichern.
   async submitConflictResolution() {
-    const app = window.__app;
+    const app = editorHost();
     const cr = app.conflictResolution;
     if (!cr || app.editSaving) return;
     const finalHtml = buildResolvedHtml(cr.merged, cr.decisions);
@@ -149,22 +149,9 @@ export const conflictMethods = {
         source,
         expectedUpdatedAt: cr.remoteUpdatedAt,
       });
-      if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
-      this._applyMergedToEditor(finalHtml);
-      app.originalHtml = finalHtml;
-      app.currentPageEmpty = !htmlToText(finalHtml).trim();
-      this._filterFindingsAfterSave(finalHtml);
-      app._syncPageStatsAfterSave?.(app.currentPage, finalHtml);
-      app.refreshPageAges?.();
-      clearDraft(cr.pageId);
-      app.lastAutosaveAt = Date.now();
-      app.lastDraftSavedAt = null;
-      app.editDirty = false;
-      app.saveOffline = false;
-      app.editConflict = null;
+      this._applySaveSuccess(saved, finalHtml, { pageId: cr.pageId, applyToEditor: true });
       trackMerge('conflict_resolved', { mix: this._resolutionMix(cr) });
       app.conflictResolution = null;
-      app.updatePageView?.();
       app.setStatus('');
     } catch (e) {
       if (isPageConflict(e)) {
@@ -186,22 +173,9 @@ export const conflictMethods = {
               html: merge.saveHtml, pageName: app.currentPage?.name, source,
               expectedUpdatedAt: merge.expectedAt,
             });
-            if (saved?.updated_at) app.currentPage.updated_at = saved.updated_at;
-            this._applyMergedToEditor(merge.saveHtml);
-            app.originalHtml = merge.saveHtml;
-            app.currentPageEmpty = !htmlToText(merge.saveHtml).trim();
-            this._filterFindingsAfterSave(merge.saveHtml);
-            app._syncPageStatsAfterSave?.(app.currentPage, merge.saveHtml);
-            app.refreshPageAges?.();
-            clearDraft(cr.pageId);
-            app.lastAutosaveAt = Date.now();
-            app.lastDraftSavedAt = null;
-            app.editDirty = false;
-            app.saveOffline = false;
-            app.editConflict = null;
+            this._applySaveSuccess(saved, merge.saveHtml, { pageId: cr.pageId, applyToEditor: true });
             trackMerge('conflict_resolved', { mix: this._resolutionMix(cr) });
             app.conflictResolution = null;
-            app.updatePageView?.();
             app.setStatus(app.t('edit.conflict.merged.silent'), false, 3000);
             return;
           } catch (e2) { console.warn('[submitConflictResolution] merged re-save failed', e2); }
@@ -239,7 +213,7 @@ export const conflictMethods = {
   // Auflösung abbrechen: Konflikt-State verwerfen, frischen Server-Stand laden.
   // Lokale Edits bleiben als Page-Revision/Draft erhalten (Last-Resort).
   async cancelConflictResolution() {
-    const app = window.__app;
+    const app = editorHost();
     const cr = app.conflictResolution;
     app.conflictResolution = null;
     app.editConflict = null;

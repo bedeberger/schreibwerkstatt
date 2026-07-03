@@ -1,6 +1,7 @@
 // Draft-CRUD: Liste laden, Auswahl, Neu/Speichern/Löschen, Reset, Dirty-Tracking.
 
 import { fetchJson } from '../utils.js';
+import { stopWerkstattJob } from './job-poll.js';
 
 export const crudMethods = {
   // Vergleich Form-Felder gegen selectedDraft + _mindmapDirty (gesetzt durch
@@ -94,22 +95,8 @@ export const crudMethods = {
     // Lokale Poll/Loading-State auf foreign Draft kappen, sonst zeigt der
     // Progress-Bar auf der falschen Figur. Server-Job läuft weiter; wenn der
     // User zurückwechselt, hängt _reattachActiveJobs den Poll wieder an.
-    if (this._brainstormJobId && this._brainstormJobDraftId !== id) {
-      if (this._brainstormPollTimer) { clearInterval(this._brainstormPollTimer); this._brainstormPollTimer = null; }
-      this.brainstormLoading = false;
-      this.brainstormStatus = '';
-      this.brainstormProgress = 0;
-      this._brainstormJobId = null;
-      this._brainstormJobDraftId = null;
-    }
-    if (this._consistencyJobId && this._consistencyJobDraftId !== id) {
-      if (this._consistencyPollTimer) { clearInterval(this._consistencyPollTimer); this._consistencyPollTimer = null; }
-      this.consistencyLoading = false;
-      this.consistencyStatus = '';
-      this.consistencyProgress = 0;
-      this._consistencyJobId = null;
-      this._consistencyJobDraftId = null;
-    }
+    if (this._brainstormJobId && this._brainstormJobDraftId !== id) stopWerkstattJob(this, 'brainstorm');
+    if (this._consistencyJobId && this._consistencyJobDraftId !== id) stopWerkstattJob(this, 'consistency');
     // selectedDraftId-Wechsel ist :key der x-for-Mindmap-Hülle. Alpine entfernt
     // das alte Mindmap-Element und mountet ein frisches via x-init mit $el.
     if (this.selectedDraftId !== id) this._destroyMindmap();

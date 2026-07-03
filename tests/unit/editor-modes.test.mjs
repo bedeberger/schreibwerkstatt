@@ -55,7 +55,7 @@ test('I1: enterFocusMode bricht ab, wenn editMode false', () => {
 });
 
 // ── I2: cancelEdit ruft exitFocusMode ────────────────────────────────────────
-test('I2: cancelEdit ruft exitFocusMode wenn focusActive', () => {
+test('I2: cancelEdit ruft exitFocusMode wenn focusActive + delegiert Teardown', () => {
   const src = read('public/js/editor/notebook/edit.js');
   const m = src.match(/async cancelEdit\s*\(\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(m, 'cancelEdit gefunden');
@@ -64,8 +64,13 @@ test('I2: cancelEdit ruft exitFocusMode wenn focusActive', () => {
   // exitFocusMode geht durch dieselbe Trampoline-Schicht zurück in die Focus-Sub.
   assert.match(body, /if\s*\(\s*app\.focusActive\s*\)\s*app\.exitFocusMode(\?\.|)\(\s*\)/,
     'cancelEdit muss exitFocusMode rufen, wenn focusActive');
-  assert.match(body, /app\.editMode\s*=\s*false/, 'cancelEdit räumt editMode');
-  assert.match(body, /app\.editDirty\s*=\s*false/, 'cancelEdit räumt editDirty');
+  assert.match(body, /this\._teardownEditSession\(\)/,
+    'cancelEdit baut die Session über _teardownEditSession() ab (SSoT)');
+  // editMode/editDirty-Reset lebt jetzt zentral im Teardown-Helper — dort gated.
+  const td = src.match(/_teardownEditSession\s*\(\)\s*\{[\s\S]*?\n  \}/);
+  assert.ok(td, '_teardownEditSession gefunden');
+  assert.match(td[0], /app\.editMode\s*=\s*false/, '_teardownEditSession räumt editMode');
+  assert.match(td[0], /app\.editDirty\s*=\s*false/, '_teardownEditSession räumt editDirty');
 });
 
 // ── I3: saveEdit — Fokus bleibt im Fokus ─────────────────────────────────────
@@ -83,8 +88,14 @@ test('I3: saveEdit hat Fokus-Branch, der editMode NICHT räumt', () => {
   const exitBranch = ifElseMatch[2];
   assert.doesNotMatch(focusBranch, /app\.editMode\s*=\s*false/,
     'Fokus-Branch darf editMode NICHT räumen (User soll weiterschreiben)');
-  assert.match(exitBranch, /app\.editMode\s*=\s*false/,
-    'Nicht-Fokus-Branch räumt editMode');
+  assert.doesNotMatch(focusBranch, /_teardownEditSession/,
+    'Fokus-Branch darf die Session NICHT abbauen (User soll weiterschreiben)');
+  assert.match(exitBranch, /this\._teardownEditSession\(\)/,
+    'Nicht-Fokus-Branch baut die Session via _teardownEditSession ab');
+  // editMode=false lebt zentral im Teardown-Helper.
+  const td = src.match(/_teardownEditSession\s*\(\)\s*\{[\s\S]*?\n  \}/);
+  assert.ok(td, '_teardownEditSession gefunden');
+  assert.match(td[0], /app\.editMode\s*=\s*false/, '_teardownEditSession räumt editMode');
 });
 
 // ── I4: resetPage Reset-Reihenfolge ──────────────────────────────────────────

@@ -259,7 +259,7 @@
   </div>
 
   <!-- Schnipsel-Liste -->
-  <div class="recherche-list" x-show="!loading && items.length > 0">
+  <div class="recherche-list" :class="{ 'is-refreshing': refreshing }" x-show="!loading && items.length > 0">
     <template x-for="item in items" :key="item.id">
       <div class="research-item" :class="{ 'research-item--pinned': item.pinned, 'research-item--archived': item.archived }">
 

@@ -55,8 +55,13 @@ function findDeep(root, selector) {
 function menuTokens(file) {
   const html = readFileSync(file, 'utf8');
   const { document } = parseHTML(`<!DOCTYPE html><html><body>${html}</body></html>`);
-  const dropdown = findDeep(document, '.context-menu--dropdown');
-  assert.ok(dropdown, `${file}: kein .context-menu--dropdown gefunden`);
+  // Auf `.action-overflow` skopiert: das ist der Feature-Aktions-Meatball
+  // (Ideen/Recherche/Plot/Teilen/Export) in beiden Partials. So bleibt der
+  // Vergleich stabil, auch wenn ein Partial weitere Dropdowns hat (z.B. das
+  // Edit-Toolbar-`⋯`-Menü in editor-page-toolbar.html) — die liegen NICHT
+  // in `.action-overflow` und dürfen den Parity-Vergleich nicht kapern.
+  const dropdown = findDeep(document, '.action-overflow .context-menu--dropdown');
+  assert.ok(dropdown, `${file}: kein .action-overflow .context-menu--dropdown gefunden`);
   // .context-menu-item selektiert nur Einträge; .context-menu-sep trägt die
   // Klasse nicht und fällt damit raus. Dokument-Reihenfolge = Anzeige-Reihenfolge.
   return [...dropdown.querySelectorAll('.context-menu-item')].map(iconToken);

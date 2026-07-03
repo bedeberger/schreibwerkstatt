@@ -15,6 +15,8 @@
 // Font-Size-Zoom (--editor-zoom) ändert die Editor-Box nicht → die
 // pageEditorZoom*-Methoden rufen _scheduleFormatMarks explizit.
 
+import { editorHost } from '../shared/editor-host.js';
+
 const NOTEBOOK_EDIT_SEL = '#editor-card .page-content-view--editing';
 
 // Auto-Slot-<br> als einziges Kind eines leeren Text-Blocks ist strukturell
@@ -42,7 +44,7 @@ function isTrailingBr(br) {
 
 export const formatMarksMethods = {
   _renderFormatMarks() {
-    const app = window.__app;
+    const app = editorHost();
     const editEl = document.querySelector(NOTEBOOK_EDIT_SEL);
     if (!editEl) return;
     const layer = editEl.parentElement?.querySelector('.page-editor-marks-layer');

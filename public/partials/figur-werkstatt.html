@@ -37,31 +37,12 @@
   <!-- Create-Inline (auch bei leerem Empty-State sichtbar nach Klick auf CTA) -->
   <div x-show="creating && drafts.length === 0" class="card-empty" x-cloak>
     <p class="card-empty-text" x-text="$app.t('werkstatt.action.new')"></p>
-    <input type="text"
-           class="werkstatt-new-name"
-           :placeholder="$app.t('werkstatt.field.name')"
-           x-model="newName"
-           @keydown.enter.prevent="createDraft()"
-           @keydown.escape.prevent="cancelCreate()"
-           :aria-label="$app.t('werkstatt.field.name')">
-    <div class="row">
-      <button type="button" class="primary" :disabled="busy || !newName.trim()" @click="createDraft()" x-text="$app.t('werkstatt.action.save')"></button>
-      <button type="button" :disabled="busy" @click="cancelCreate()" x-text="$app.t('common.cancel')"></button>
-    </div>
+    <!-- @include werkstatt-create-fields -->
   </div>
 
   <!-- Import-Inline bei leerem Empty-State: Combobox mit Buch-Figuren ohne aktiven Draft -->
   <div x-show="importing && drafts.length === 0" class="card-empty" x-cloak>
-    <div x-show="importablesLoading" class="card-status" x-text="$app.t('werkstatt.import.loading')"></div>
-    <div x-show="!importablesLoading && importables.length === 0" class="card-status" x-text="$app.t('werkstatt.import.empty')"></div>
-    <div x-show="!importablesLoading && importables.length > 0" class="form-stack">
-      <div x-data="entityPicker({ entity: 'custom', placeholder: $app.t('werkstatt.import.placeholder'), items: () => importables.map(f => ({ value: String(f.id), label: f.name + (f.typ ? ' [' + f.typ + ']' : ''), sublabel: importFigureContext(f) })) })"
-           x-modelable="value" x-model="selectedImportFigureId"></div>
-    </div>
-    <div class="row">
-      <button type="button" class="primary" :disabled="busy || !selectedImportFigureId" @click="runImport()" x-text="$app.t('werkstatt.import.confirm')"></button>
-      <button type="button" :disabled="busy" @click="cancelImport()" x-text="$app.t('common.cancel')"></button>
-    </div>
+    <!-- @include werkstatt-import-fields -->
   </div>
 
   <!-- 2-Spalten-Layout: Drafts-Liste links, Detail rechts -->
@@ -86,33 +67,11 @@
       </div>
 
       <div x-show="creating" class="werkstatt-create-inline" x-cloak>
-        <input type="text"
-               class="werkstatt-new-name"
-               :placeholder="$app.t('werkstatt.field.name')"
-               x-model="newName"
-               @keydown.enter.prevent="createDraft()"
-               @keydown.escape.prevent="cancelCreate()"
-               :aria-label="$app.t('werkstatt.field.name')">
-        <div class="werkstatt-create-row">
-          <button type="button" class="primary" :disabled="busy || !newName.trim()" @click="createDraft()" x-text="$app.t('werkstatt.action.save')"></button>
-          <button type="button" :disabled="busy" @click="cancelCreate()" x-text="$app.t('common.cancel')"></button>
-        </div>
+        <!-- @include werkstatt-create-fields -->
       </div>
 
-      <!-- Import-Inline: Combobox listet Buch-Figuren ohne aktiven Draft des Users.
-           Auswahl + Übernehmen erzeugt Draft mit Mindmap aus figures-Feldern und
-           source_figure_id-Referenz. -->
       <div x-show="importing" class="werkstatt-create-inline" x-cloak>
-        <div x-show="importablesLoading" class="card-status" x-text="$app.t('werkstatt.import.loading')"></div>
-        <div x-show="!importablesLoading && importables.length === 0" class="card-status" x-text="$app.t('werkstatt.import.empty')"></div>
-        <div x-show="!importablesLoading && importables.length > 0" class="form-stack">
-          <div x-data="entityPicker({ entity: 'custom', placeholder: $app.t('werkstatt.import.placeholder'), items: () => importables.map(f => ({ value: String(f.id), label: f.name + (f.typ ? ' [' + f.typ + ']' : ''), sublabel: importFigureContext(f) })) })"
-               x-modelable="value" x-model="selectedImportFigureId"></div>
-        </div>
-        <div class="werkstatt-create-row">
-          <button type="button" class="primary" :disabled="busy || !selectedImportFigureId" @click="runImport()" x-text="$app.t('werkstatt.import.confirm')"></button>
-          <button type="button" :disabled="busy" @click="cancelImport()" x-text="$app.t('common.cancel')"></button>
-        </div>
+        <!-- @include werkstatt-import-fields -->
       </div>
     </div>
 
@@ -314,17 +273,7 @@
         <div class="history-heading" x-text="$app.t('werkstatt.runs.brainstorm', { count: runs.brainstorm.length })"></div>
         <template x-for="r in runs.brainstorm" :key="r.id">
           <div>
-            <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
-                 @click="openRun(r.id, 'brainstorm')">
-              <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-              <span x-show="r.knoten_pfad" class="tag" x-text="r.knoten_pfad"></span>
-              <span x-show="r.model" class="tag" x-text="r.model"></span>
-              <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
-              <button type="button" class="history-item-delete"
-                      @click.stop="deleteRun(r.id, 'brainstorm')"
-                      :data-tip="$app.t('common.deleteEntry')"
-                      :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
-            </div>
+            <!-- @include werkstatt-run-row -->
             <div x-show="selectedRunId === r.id && brainstormResult" class="history-detail" x-cloak>
               <div class="chat-vorschlaege">
                 <template x-for="(v, idx) in brainstormResult ? brainstormResult.vorschlaege : []" :key="idx">
@@ -352,16 +301,7 @@
         <div class="history-heading" x-text="$app.t('werkstatt.runs.consistency', { count: runs.consistency.length })"></div>
         <template x-for="r in runs.consistency" :key="r.id">
           <div>
-            <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
-                 @click="openRun(r.id, 'consistency')">
-              <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-              <span x-show="r.model" class="tag" x-text="r.model"></span>
-              <span class="history-chevron" :class="{ open: selectedRunId === r.id }">›</span>
-              <button type="button" class="history-item-delete"
-                      @click.stop="deleteRun(r.id, 'consistency')"
-                      :data-tip="$app.t('common.deleteEntry')"
-                      :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
-            </div>
+            <!-- @include werkstatt-run-row -->
             <div x-show="selectedRunId === r.id && consistencyResult" class="history-detail" x-cloak>
               <p class="werkstatt-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult ? consistencyResult.fazit : ''"></p>
               <div x-show="consistencyResult && consistencyResult.konflikte.length === 0" class="card-status" x-text="$app.t('werkstatt.consistency.noIssues')"></div>

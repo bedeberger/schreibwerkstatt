@@ -1,5 +1,5 @@
 // Geteilte Imports + Modul-Konstanten der notebookEditMethods-Submodule.
-import { htmlToText, tzOpts } from '../../../utils.js';
+import { htmlToText, tzOpts, findInHtml } from '../../../utils.js';
 import { handleEditorPaste, handleEditorCopy, handleEditorCut } from '../../shared/paste.js';
 import { sortByPosition } from '../../../book/page-view.js';
 import { contentRepo } from '../../../repo/content.js';
@@ -14,6 +14,7 @@ import { mergeBlocks, mergedToHtml, buildResolvedHtml } from '../../shared/block
 import { trackMerge } from '../../shared/merge-telemetry.js';
 import { FEATURE_BLOCK_MERGE } from '../../../app/app-state.js';
 import { getActiveEditorContainer } from '../../shared/active-editor.js';
+import { editorHost } from '../../shared/editor-host.js';
 import { installEditCounter } from '../../shared/edit-counter.js';
 import { writeNormalSnapshot, clearNormalSnapshot, readEditorPrefs, writeEditorPrefs } from '../storage.js';
 import { runQuoteNormalize } from '../../shared/quote-normalize.js';
@@ -35,4 +36,4 @@ export const DRAFT_DEBOUNCE_MS = 500;
 // `window.__app` (Root). Aufruf von extern: über die Trampoline-Forwarder
 // in [trampoline.js] am Root-Spread (`app.startEdit()` → `__notebookCard.startEdit()`).
 
-export { EVT, FEATURE_BLOCK_MERGE, buildResolvedHtml, clearDraft, clearNormalSnapshot, contentRepo, ensureTrailingParagraph, getActiveEditorContainer, handleEditorCopy, handleEditorCut, handleEditorPaste, htmlToText, installEditCounter, isNoChange, isPageConflict, mergeBlocks, mergedToHtml, normalizeEditorBlocks, readConflictBody, readDraft, readEditorPrefs, runQuoteNormalize, savePage, sortByPosition, stripLektoratMarks, trackMerge, tzOpts, writeDraft, writeEditorPrefs, writeNormalSnapshot };
+export { EVT, FEATURE_BLOCK_MERGE, buildResolvedHtml, clearDraft, clearNormalSnapshot, contentRepo, editorHost, ensureTrailingParagraph, findInHtml, getActiveEditorContainer, handleEditorCopy, handleEditorCut, handleEditorPaste, htmlToText, installEditCounter, isNoChange, isPageConflict, mergeBlocks, mergedToHtml, normalizeEditorBlocks, readConflictBody, readDraft, readEditorPrefs, runQuoteNormalize, savePage, sortByPosition, stripLektoratMarks, trackMerge, tzOpts, writeDraft, writeEditorPrefs, writeNormalSnapshot };

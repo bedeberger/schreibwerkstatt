@@ -1,10 +1,16 @@
 // Teil von notebookEditMethods (siehe Facade edit.js).
-import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS, DRAFT_DEBOUNCE_MS, clearDraft, isNoChange, stripLektoratMarks, writeDraft } from './_shared.js';
+import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS, DRAFT_DEBOUNCE_MS, clearDraft, editorHost, isNoChange, stripLektoratMarks, writeDraft } from './_shared.js';
 
+// Timer-Handles (`_draftTimer`, `_autosaveIdleTimer`, `_autosaveMaxTimer`,
+// `_onlineHandler`, `_onlineVisHandler`) leben BEWUSST am Host (Root, deklariert
+// im notebookState-Slice von app-state.js), nicht an der Card: `_stopAutosave`
+// wird auch aus Root-Kontext gerufen (app-view/page.js#resetPage via Trampoline)
+// und muss dieselben Handles treffen. Der card-lokale `_undoTimer` (history.js)
+// ist die Ausnahme, weil Undo card-only ist — daher kein Widerspruch.
 export const autosaveMethods = {
 
   _scheduleDraftSave() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app) return;
     if (app._draftTimer) clearTimeout(app._draftTimer);
     app._draftTimer = setTimeout(() => {
@@ -20,7 +26,7 @@ export const autosaveMethods = {
   // verlieren. Beim Aufruf nach Debounce-Fire ist _draftTimer bereits null
   // (ungefährlicher No-op).
   _flushDraftSaveNow() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app) return;
     if (app._draftTimer) { clearTimeout(app._draftTimer); app._draftTimer = null; }
     if (!app.editMode || !app.currentPage) return;
@@ -38,7 +44,7 @@ export const autosaveMethods = {
 
 
   _startAutosave() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app) return;
     this._clearAutosaveTimers();
     if (app.editDirty) this._scheduleAutosave();
@@ -46,7 +52,7 @@ export const autosaveMethods = {
 
 
   _stopAutosave() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app) return;
     this._clearAutosaveTimers();
     if (app._draftTimer) { clearTimeout(app._draftTimer); app._draftTimer = null; }
@@ -54,7 +60,7 @@ export const autosaveMethods = {
 
 
   _clearAutosaveTimers() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app) return;
     if (app._autosaveIdleTimer) { clearTimeout(app._autosaveIdleTimer); app._autosaveIdleTimer = null; }
     if (app._autosaveMaxTimer) { clearTimeout(app._autosaveMaxTimer); app._autosaveMaxTimer = null; }
@@ -66,7 +72,7 @@ export const autosaveMethods = {
   // weiter und greift bei Dauer-Tippen, sodass spätestens AUTOSAVE_MAX_MS
   // nach der ersten Änderung ein Save ausgelöst wird.
   _scheduleAutosave() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app) return;
     if (app._autosaveIdleTimer) clearTimeout(app._autosaveIdleTimer);
     app._autosaveIdleTimer = setTimeout(() => this._fireAutosave(), AUTOSAVE_IDLE_MS);
@@ -77,7 +83,7 @@ export const autosaveMethods = {
 
 
   _fireAutosave() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app) return;
     this._clearAutosaveTimers();
     if (app.editMode && app.editDirty && !app.editSaving) this.quickSave();
@@ -85,7 +91,7 @@ export const autosaveMethods = {
 
 
   _installOnlineRetry() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app || app._onlineHandler) return;
     // Retry-Trigger fuer einen haengengebliebenen Offline-Save. Das `online`-Event
     // allein genuegt nicht: es feuert nur bei einem echten Offline→Online-Wechsel,
@@ -106,7 +112,7 @@ export const autosaveMethods = {
 
 
   _uninstallOnlineRetry() {
-    const app = window.__app;
+    const app = editorHost();
     if (!app || !app._onlineHandler) return;
     window.removeEventListener('online', app._onlineHandler);
     window.removeEventListener('focus', app._onlineHandler);

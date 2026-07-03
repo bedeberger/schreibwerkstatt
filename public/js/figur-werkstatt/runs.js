@@ -4,7 +4,7 @@
 // der Mindmap existiert — Live-Run gegen mutierten Tree nach `werkstatt.error.knotenGone`.
 
 import { fetchJson, tzOpts } from '../utils.js';
-import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
+import { reattachWerkstattJob } from './job-poll.js';
 
 export const runsMethods = {
   async loadRuns() {
@@ -122,119 +122,13 @@ export const runsMethods = {
       const bs = queue.find(j => j.type === 'werkstatt-brainstorm'
         && typeof j.dedupId === 'string'
         && j.dedupId.startsWith(draftStr + '|'));
-      if (bs && this.selectedDraftId === draftId) this._reattachBrainstormJob(bs, draftId);
+      if (bs && this.selectedDraftId === draftId) reattachWerkstattJob(this, 'brainstorm', bs, draftId);
     }
     if (!this._consistencyJobId && !this.consistencyLoading) {
       const cs = queue.find(j => j.type === 'werkstatt-consistency'
         && String(j.dedupId) === draftStr);
-      if (cs && this.selectedDraftId === draftId) this._reattachConsistencyJob(cs, draftId);
+      if (cs && this.selectedDraftId === draftId) reattachWerkstattJob(this, 'consistency', cs, draftId);
     }
-  },
-
-  _reattachBrainstormJob(qItem, draftId) {
-    const app = window.__app;
-    this.brainstormLoading = true;
-    this.brainstormProgress = qItem.progress || 0;
-    this.brainstormStatus = runningJobStatus(app.t.bind(app),
-      qItem.statusText, qItem.tokensIn, qItem.tokensOut, qItem.maxTokensOut,
-      qItem.progress, qItem.tokensPerSec, qItem.statusParams);
-    this.brainstormResult = null;
-    this._brainstormJobId = qItem.id;
-    this._brainstormJobDraftId = draftId;
-    startPoll(this, {
-      timerProp: '_brainstormPollTimer',
-      jobId: qItem.id,
-      progressProp: 'brainstormProgress',
-      onProgress: (job) => {
-        this.brainstormStatus = runningJobStatus(app.t.bind(app),
-          job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
-          job.progress, job.tokensPerSec, job.statusParams);
-      },
-      onDone: (job) => {
-        const targetId = this._brainstormJobDraftId;
-        this.brainstormLoading = false;
-        this.brainstormStatus = '';
-        this._brainstormJobId = null;
-        this._brainstormJobDraftId = null;
-        if (this.selectedDraftId === targetId) {
-          this.brainstormResult = {
-            knotenId: job.result.knotenId,
-            knotenPfad: job.result.knotenPfad,
-            vorschlaege: job.result.vorschlaege || [],
-          };
-          this.selectedRunId = job.result.runId || null;
-          this.loadRuns?.();
-        }
-      },
-      onError: (job) => {
-        this.brainstormLoading = false;
-        this.brainstormStatus = '';
-        this._brainstormJobId = null;
-        if (this.selectedDraftId === this._brainstormJobDraftId) {
-          this.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
-        }
-        this._brainstormJobDraftId = null;
-      },
-      onNotFound: () => {
-        this.brainstormLoading = false;
-        this.brainstormStatus = '';
-        this._brainstormJobId = null;
-        this._brainstormJobDraftId = null;
-      },
-    });
-  },
-
-  _reattachConsistencyJob(qItem, draftId) {
-    const app = window.__app;
-    this.consistencyLoading = true;
-    this.consistencyProgress = qItem.progress || 0;
-    this.consistencyStatus = runningJobStatus(app.t.bind(app),
-      qItem.statusText, qItem.tokensIn, qItem.tokensOut, qItem.maxTokensOut,
-      qItem.progress, qItem.tokensPerSec, qItem.statusParams);
-    this.consistencyResult = null;
-    this._consistencyJobId = qItem.id;
-    this._consistencyJobDraftId = draftId;
-    startPoll(this, {
-      timerProp: '_consistencyPollTimer',
-      jobId: qItem.id,
-      progressProp: 'consistencyProgress',
-      onProgress: (job) => {
-        this.consistencyStatus = runningJobStatus(app.t.bind(app),
-          job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
-          job.progress, job.tokensPerSec, job.statusParams);
-      },
-      onDone: (job) => {
-        const targetId = this._consistencyJobDraftId;
-        this.consistencyLoading = false;
-        this.consistencyStatus = '';
-        this._consistencyJobId = null;
-        this._consistencyJobDraftId = null;
-        if (this.selectedDraftId === targetId) {
-          this.consistencyResult = {
-            konflikte: job.result.konflikte || [],
-            fazit: job.result.fazit || '',
-          };
-          this.selectedKonfliktIdx = null;
-          this.selectedRunId = job.result.runId || null;
-          this.loadRuns?.();
-        }
-      },
-      onError: (job) => {
-        this.consistencyLoading = false;
-        this.consistencyStatus = '';
-        this._consistencyJobId = null;
-        if (this.selectedDraftId === this._consistencyJobDraftId) {
-          this.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
-        }
-        this._consistencyJobDraftId = null;
-      },
-      onNotFound: () => {
-        this.consistencyLoading = false;
-        this.consistencyStatus = '';
-        this._consistencyJobId = null;
-        this._consistencyJobDraftId = null;
-      },
-    });
   },
 
   formatRunDate(iso) {

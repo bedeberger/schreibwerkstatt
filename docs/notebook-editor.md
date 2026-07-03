@@ -4,7 +4,7 @@ Klassischer Bearbeitungsmodus **für eine einzelne Seite**: `contenteditable` mi
 
 Implementations-Detail: Notebook- und Focus-Editor teilen die Save-/HTML-Pipeline aus [public/js/editor/shared/](../public/js/editor/shared/) (`save-pipeline.js`, `html-clean.js`, `active-editor.js`); das macht sie nicht zu einem Editor — es ist eine geteilte Lib. Bucheditor nutzt `shared/` bewusst nicht (eigener Save-Pfad mit Per-Block-Queue). Alle drei Editoren schreiben über die [Content-Store-Facade](../lib/content-store/).
 
-Code: [public/js/editor/notebook/edit.js](../public/js/editor/notebook/edit.js) (Methods-Spread in Root, `notebookEditMethods`), [public/js/editor/notebook/toolbar.js](../public/js/editor/notebook/toolbar.js) (Methods für `editorToolbarCard`), [public/js/editor/notebook/storage.js](../public/js/editor/notebook/storage.js) (Snapshot), [public/js/editor/notebook/history.js](../public/js/editor/notebook/history.js) (Undo/Redo-Stack pro Edit-Session). Card-Wrapper: [public/js/cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js). Partials: [public/partials/editor-notebook.html](../public/partials/editor-notebook.html), [public/partials/editor-body-edit.html](../public/partials/editor-body-edit.html), [public/partials/editor-toolbar.html](../public/partials/editor-toolbar.html). CSS: [public/css/editor/notebook/](../public/css/editor/notebook/).
+Code: [public/js/editor/notebook/edit.js](../public/js/editor/notebook/edit.js) (Facade, spreadet die Submodule aus `edit/` zu `notebookEditMethods`), [public/js/editor/notebook/toolbar.js](../public/js/editor/notebook/toolbar.js) (Facade für `editorToolbarCard`, spreadet aus `toolbar/`), [public/js/editor/notebook/storage.js](../public/js/editor/notebook/storage.js) (Snapshot), [public/js/editor/notebook/history.js](../public/js/editor/notebook/history.js) (Undo/Redo-Stack pro Edit-Session). Der Editor-Kern greift auf den Root nicht direkt via `window.__app` zu, sondern über `editorHost()` ([shared/editor-host.js](../public/js/editor/shared/editor-host.js)) — in der SPA ist das `window.__app`, in einer fremden Schale ein injizierter Host. Ausnahme: `card.js` (Reload-Restore-Glue) und `toolbar/` (notebook-only Chrome) bleiben auf `window.__app`. Card-Wrapper: [public/js/cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js). Partials: [public/partials/editor-notebook.html](../public/partials/editor-notebook.html), [public/partials/editor-body-edit.html](../public/partials/editor-body-edit.html), [public/partials/editor-toolbar.html](../public/partials/editor-toolbar.html). CSS: [public/css/editor/notebook/](../public/css/editor/notebook/).
 
 Trigger: Edit-Button im Karten-Header (`startEdit`). Snapshot-Restore mountet den Editor automatisch beim Reload, wenn `normal.snapshot` für die aktuell geladene Seite passt.
 
@@ -78,10 +78,9 @@ view  ──startEdit──▶ edit  ──saveEdit──▶ view
 3. Kürzungs-Safety: neuer Text < 20 % vom alten und Original > 50 Z → `appConfirm` „kürzer speichern?".
 4. `_checkPageConflict` — Pre-Check via `contentRepo.loadPage(id, { fresh: true })`; `remote.updated_at !== currentPage.updated_at` → Konflikt-Modal mit Überschreib-/Behalt-Option.
 5. `contentRepo.savePage(id, buildSavePayload({ source: focusActive ? 'focus' : 'main', expectedUpdatedAt }))` (siehe [shared/save-pipeline.js](../public/js/editor/shared/save-pipeline.js)).
-6. Server-Response: `currentPage.updated_at` übernehmen.
-7. `_filterFindingsAfterSave(newHtml)` — Findings, deren `original` nicht mehr matcht, fliegen raus + selectedFindings + appliedOriginals + correctedHtml resetten.
-8. `_syncPageStatsAfterSave` + `refreshPageAges` (Lektorat-Status flippt auf `warn`).
-9. `clearDraft`, Snapshot weg, Autosave/OnlineRetry/Counter/Presence/Lock-Teardown — **nur wenn nicht im Focus**. Im Focus bleibt `editMode=true`.
+6. `_applySaveSuccess(saved, savedHtml)` — **SSoT für die Save-Erfolgs-Nachbereitung** (Lifecycle): übernimmt `currentPage.updated_at`, setzt `originalHtml`/`currentPageEmpty`, ruft `_filterFindingsAfterSave` + `_syncPageStatsAfterSave` + `refreshPageAges`, räumt Draft + `editDirty`/`saveOffline`/`editConflict`, `updatePageView`. Alle sechs Save-Pfade (saveEdit/quickSave/submitConflictResolution × Haupt- + 409-Re-Merge) rufen denselben Helper — keine Copy-Paste-Drift. `applyToEditor:true` spiegelt zusätzlich den gemergten Stand in den Editor (Konflikt-Auflösung).
+7. `_filterFindingsAfterSave(newHtml)` — Findings, deren `original` nicht mehr matcht (Überlebens-Check via `findInHtml`, tolerant gegen Tag-/Whitespace-Differenzen, identisch zu `sortByPosition`), fliegen raus + selectedFindings + appliedOriginals + correctedHtml resetten.
+8. Teardown **nur wenn nicht im Focus** via `_teardownEditSession()` (s.u.). Im Focus bleibt `editMode=true`.
 10. Fehlerpfade: 409 `PAGE_CONFLICT` (Race nach Pre-Check) → Block-Merge-Versuch (s.u.); kollisionsfrei = stille Re-Save, sonst Auflösungs-Banner; bei Flag-off/Fehlschlag Draft sichern + klassischer Banner. Netzwerkfehler → Draft + `saveOffline=true`, Online-Retry feuert `quickSave`.
 
 ### Block-Level-Merge bei Stale-Write ([shared/block-merge.js](../public/js/editor/shared/block-merge.js))
@@ -101,8 +100,10 @@ Flag `FEATURE_BLOCK_MERGE` ([app-state.js](../public/js/app/app-state.js)). Grei
 
 ### cancelEdit
 - Bei `editDirty` → `appConfirm` „verwerfen?". Klick „nein" → kein Cleanup, Editor bleibt.
-- Volles Teardown: Draft + Snapshot + Autosave + OnlineRetry + Counter + Presence + Lock.
-- Wenn `focusActive` → zusätzlich `exitFocusMode` (Focus folgt Edit aus dem Notebook-Pfad; gilt nur, solange Invariante `focusMode ⇒ editMode` aktiv ist).
+- Volles Teardown via `_teardownEditSession()`. Wenn `focusActive` → zusätzlich `exitFocusMode` (Focus folgt Edit aus dem Notebook-Pfad; gilt nur, solange Invariante `focusMode ⇒ editMode` aktiv ist).
+
+### `_teardownEditSession` (SSoT für den Session-Abbau)
+`cancelEdit` und der Non-Focus-Pfad von `saveEdit` bauen die Edit-Session über **denselben** Helper ab — kein Copy-Paste je Pfad, sonst leckt ein vergessener Teardown-Schritt Listener/Lock/Observer. Reihenfolge = Pflicht-Invariante #11: Draft → Snapshot → Autosave → OnlineRetry → FormatMarks → Counter → Presence → Lock → History → `editMode=false` (+ Flags-Reset + Synonym-/Figur-Menüs schliessen). Der Focus-Branch von `saveEdit` ruft ihn **nicht** (User schreibt weiter).
 
 ## Undo/Redo (Session-scoped, pro Seite)
 
@@ -144,7 +145,7 @@ Cleanup bei `cancelEdit` / `saveEdit` (Non-Focus-Pfad).
 
 ## Toolbar (Bubble + Slash)
 
-Sub-Karte `editorToolbarCard` ([cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js)), Methods aus [notebook/toolbar.js](../public/js/editor/notebook/toolbar.js). Beide Layer als teleportierte Templates in [partials/editor-toolbar.html](../public/partials/editor-toolbar.html) → `position:fixed` ist ausserhalb des `.card`-Transform-Kontextes.
+Sub-Karte `editorToolbarCard` ([cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js)), Methods aus der Facade [notebook/toolbar.js](../public/js/editor/notebook/toolbar.js), die aus dem Subfolder `toolbar/` spreadet: `bubble.js` (Bubble-Toolbar + Link-Bar), `slash.js` (Slash-Menü), `keydown.js` (Keydown-Dispatcher), `_shared.js` (Modul-Helfer + `SLASH_ITEMS` + Block-Lookups). Beide Layer als teleportierte Templates in [partials/editor-toolbar.html](../public/partials/editor-toolbar.html) → `position:fixed` ist ausserhalb des `.card`-Transform-Kontextes.
 
 | Layer | Trigger | Sichtbar wenn | Funktion |
 |---|---|---|---|
@@ -155,6 +156,9 @@ Sub-Karte `editorToolbarCard` ([cards/editor-toolbar-card.js](../public/js/cards
 
 ### Slash-Items ([toolbar.js#L14-22](../public/js/editor/notebook/toolbar.js#L14-L22))
 `paragraph`, `h2`, `h3`, `blockquote` (mit innerem `<p>`), `poem` (`div.poem` + innerem `<p>`), `list` (`ul > li`), `hr` (+ Folge-`<p>`). Tag-Swap am ganzen Block; Caret landet im Replacement (oder im wrapP-`<p>`).
+
+### Keydown-Dispatcher (`_onEditKeydown` in [toolbar/keydown.js](../public/js/editor/notebook/toolbar/keydown.js))
+Statt eines Megaswitch eine geordnete Kette benannter Handler (`_kbSoftBreak`, `_kbTodoEnter`, `_kbPoemEnter`, `_kbDateStamp`, `_kbInlineFormat`, `_kbHorizontalRule`, `_kbLink`, `_kbUndoRedo`, dann Focus-Hard-Stop, dann `_kbSlashNav`, `_kbDeleteBlock`, `_kbSlashTrigger`). Jeder Handler gibt `true` zurück, wenn er das Event konsumiert hat → der Dispatcher bricht ab. **Reihenfolge ist verhaltensrelevant** (z.B. Shift+Enter vor Enter-in-Todo); die Handler bis zum Focus-Hard-Stop laufen in beiden Modi, danach sind Slash + Block-Transforms tabu. Neuer Shortcut → eigenen `_kb*`-Handler ergänzen und an der richtigen Stelle in die Dispatcher-Kette hängen.
 
 ### Shortcuts (notebook + focus, im delegierten Listener)
 - `Shift+Enter` → `insertLineBreak` (cross-browser Soft-Break statt Default-Absatzsplit).
@@ -198,7 +202,7 @@ Manche Block-Elemente nehmen keinen Caret an (`<hr>` ist void; künftig denkbar:
 10. **Counter `installEditCounter` läuft ab `startEdit`.** Tagesdelta muss alle Edits zählen, sonst sieht der Focus-Counter beim Wiedereintritt falsche Werte. Anzeige nur im Focus-Header (`x-show=focusActive`).
 11. **Cleanup-Reihenfolge bei `cancelEdit`/`saveEdit` (clean):** Draft → Snapshot → Autosave → OnlineRetry → Counter → Presence → Lock → `editMode=false`. Frühes `editMode=false` lässt Teardowns auf bereits genullten Refs laufen.
 12. **Edit + Prüfmodus forbidden.** `startEdit` bricht bei `checkDone === true` ab; Edit/Fokus-Buttons sind im Prüfmodus per `x-show="!checkDone"` ausgeblendet. Findings landen damit nie im contenteditable — Korrekturen werden ausschliesslich via `saveCorrections` aus dem Prüfmodus-Header angewandt.
-13. **Findings-Filter nach jedem Save** (`_filterFindingsAfterSave`): Defensive Restbereinigung, falls Findings doch existieren — `original`-Text nicht mehr im neuen HTML → raus. Mit Invariante #12 üblicherweise No-Op.
+13. **Findings-Filter nach jedem Save** (`_filterFindingsAfterSave`): Defensive Restbereinigung, falls Findings doch existieren — `original` per `findInHtml` (tolerant, gleiche Match-Funktion wie `sortByPosition`) nicht mehr im neuen HTML → raus. **Kein rohes `indexOf`** — sonst verwirft eine reine Markup-Änderung (z.B. `data-bid`) rund um den Textausschnitt ein noch gültiges Finding. Mit Invariante #12 üblicherweise No-Op.
 
 ## Entity-Linking (Figuren/Orte-Highlights + Kontext-Panel)
 
@@ -248,9 +252,9 @@ Kein Cross-Import `notebook/` ↔ `focus/`. Gemeinsames läuft strikt über `sha
 ## Erweitern (Checkliste)
 
 Neuer Toolbar-Button / Slash-Item / Shortcut:
-1. Slash-Item: `SLASH_ITEMS` in [toolbar.js#L14](../public/js/editor/notebook/toolbar.js#L14) ergänzen + i18n-Key `editor.slash.<key>` in beiden Locale-Dateien.
-2. Toolbar-Button: in [partials/editor-toolbar.html](../public/partials/editor-toolbar.html) — Bubble-Layer; Handler in [notebook/toolbar.js](../public/js/editor/notebook/toolbar.js) + im Focus `x-show="!focusActive"`-Guard (Bubble selbst schon gated).
-3. Shortcut: `_onEditKeydown` in [toolbar.js](../public/js/editor/notebook/toolbar.js) — wenn Focus auch reagieren soll, **vor** dem `if (app.focusActive) return;`-Branch. Sonst danach.
+1. Slash-Item: `SLASH_ITEMS` in [toolbar/_shared.js](../public/js/editor/notebook/toolbar/_shared.js) ergänzen + i18n-Key `editor.slash.<key>` in beiden Locale-Dateien.
+2. Toolbar-Button: in [partials/editor-toolbar.html](../public/partials/editor-toolbar.html) — Bubble-Layer; Handler in [toolbar/bubble.js](../public/js/editor/notebook/toolbar/bubble.js) + im Focus `x-show="!focusActive"`-Guard (Bubble selbst schon gated).
+3. Shortcut: neuen `_kb*`-Handler in [toolbar/keydown.js](../public/js/editor/notebook/toolbar/keydown.js) anlegen (gibt `true` bei Konsum zurück) und an der richtigen Stelle in die `_onEditKeydown`-Dispatcher-Kette hängen — wenn Focus auch reagieren soll, **vor** dem `if (app.focusActive) return;`-Branch. Sonst danach.
 4. Save-Pfad anfassen: jede Mutation läuft durch `stripLektoratMarks` + `buildSavePayload`. Niemals direkt PUT — Content-Store-Facade ist Pflicht.
 5. Tests: bei Save-/Dirty-Pfaden → [tests/unit/stale-write.test.mjs](../tests/unit/stale-write.test.mjs) / [tests/unit/html-clean.test.js](../tests/unit/html-clean.test.js) erweitern.
 
@@ -259,6 +263,9 @@ Neuer Toolbar-Button / Slash-Item / Shortcut:
 | Datei | Deckt ab |
 |---|---|
 | [tests/unit/html-clean.test.js](../tests/unit/html-clean.test.js) | `stripLektoratMarks`, `normalizeEditorBlocks`, `normalizeForCompare` |
+| [tests/unit/notebook-autosave.test.mjs](../tests/unit/notebook-autosave.test.mjs) | Autosave-Timing (Idle/Max/Reset via mock.timers), `_fireAutosave`-Gating, Online-Retry-Gating, `_flushDraftSaveNow` |
+| [tests/unit/notebook-toolbar.test.mjs](../tests/unit/notebook-toolbar.test.mjs) | Slash-Transforms (`_applySlashItem` pro Blocktyp), `slashItems`-Filter, `_normalizeLinkUrl`, `_brLeftOfCaret`-Dedup |
+| [tests/unit/notebook-restore.test.mjs](../tests/unit/notebook-restore.test.mjs) | Reload-Wiederaufnahme (`_tryRestoreNotebook`): Draft-Gating, richtige Seite, Snapshot-Einmal-Konsum |
 | [tests/unit/stale-write.test.mjs](../tests/unit/stale-write.test.mjs) | Pre-Save-Conflict-Check (`fresh: true`), 409 PAGE_CONFLICT-Handling |
 | [tests/unit/page-stats-normalization.test.mjs](../tests/unit/page-stats-normalization.test.mjs) | `_syncPageStatsAfterSave` Frontend/Server-Parität |
 | [tests/e2e/lektorat.spec.js](../tests/e2e/lektorat.spec.js) | Edit-Mode-Flow inkl. Findings-Apply, Save-Source `main` |

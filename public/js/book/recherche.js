@@ -21,7 +21,10 @@ export const rechercheMethods = {
     const app = window.__app;
     const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.items = []; return; }
-    this.loading = true;
+    // Skeleton nur beim Erstladen (noch keine Daten). Bei Filter-/Sort-/Such-
+    // Refetches bleibt die Liste stehen und wird nur gedimmt (refreshing) — sonst
+    // flackert bei jedem Tastendruck das Skeleton auf und wieder weg.
+    if (this.items.length > 0) this.refreshing = true; else this.loading = true;
     try {
       const qs = new URLSearchParams({ book_id: String(bookId) });
       if (this.filterKind) qs.set('kind', this.filterKind);
@@ -40,6 +43,7 @@ export const rechercheMethods = {
       this.items = [];
     } finally {
       this.loading = false;
+      this.refreshing = false;
     }
   },
 
@@ -83,6 +87,7 @@ export const rechercheMethods = {
     this.suggestions = {};
     this.errorMessage = '';
     this.busy = false;
+    this.refreshing = false;
     if (this._suggestTimer) { clearInterval(this._suggestTimer); this._suggestTimer = null; }
   },
 
