@@ -143,6 +143,60 @@ test('Map-Reduce: Jahr über mehrere große Monate → Monats-Calls + Reduce', a
   assert.equal(job.result.rueckblick.zusammenfassung, 'Jahr.');
 });
 
+test('Map-Reduce: ein einzelner überlanger Monat wird größenbasiert gechunkt', async () => {
+  const BOOK_ID = 708;
+  // Alle Einträge im selben Monat (byMonth.size == 1), Summe > SINGLE_PASS_LIMIT →
+  // kein Monats-Split möglich, also Größen-Chunking statt eines übergroßen Single-Pass.
+  seedDiary(BOOK_ID, ['2024-03-01', '2024-03-08', '2024-03-15', '2024-03-22'], { charsPerEntry: 600 });
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse('März.'));
+
+  const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-03' }, `${BOOK_ID}:2024-03`);
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-03'));
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  assert.equal(job.result.entryCount, 4);
+  // Mehr als ein Call beweist: kein Single-Pass, obwohl nur ein Monat vorliegt.
+  assert.ok(ctx.mockAi.log.length > 1, `erwartet Map-Reduce (>1 Call), war ${ctx.mockAi.log.length}`);
+  assert.equal(job.result.rueckblick.zusammenfassung, 'März.');
+});
+
+test('entry_count: Snapshot beim Insert, Touch nach reinem Lösch-Vorgang', async () => {
+  const BOOK_ID = 709;
+  const latest = () => ctx.dbSchema.db.prepare(
+    `SELECT entry_count FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?
+     ORDER BY created_at DESC, id DESC LIMIT 1`
+  ).get(BOOK_ID, 'tester@test.dev');
+  const histCount = () => ctx.dbSchema.db.prepare(
+    'SELECT COUNT(*) AS n FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?'
+  ).get(BOOK_ID, 'tester@test.dev').n;
+
+  seedDiary(BOOK_ID, ['2024-10-01', '2024-10-08', '2024-10-20']);
+  ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse());
+
+  const jobId1 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-10' }, `${BOOK_ID}:2024-10_a`);
+  ctx.shared.enqueueJob(jobId1, () =>
+    ctx.rueckblick.runRueckblickJob(jobId1, BOOK_ID, 'tester@test.dev', null, '2024-10'));
+  await waitForJob(ctx.shared, jobId1);
+  assert.equal(latest().entry_count, 3, 'Insert speichert Eintrags-Snapshot');
+  assert.equal(histCount(), 1);
+
+  // Einen Eintrag löschen (Cache-MISS durch geänderten pages_sig), AI liefert
+  // identisches Ergebnis → keine neue Zeile, aber entry_count-Snapshot wird aktualisiert.
+  // Direktes SQL-Delete (der Seed ist additiv — Reseed würde die Seite nicht entfernen).
+  ctx.dbSchema.db.prepare('DELETE FROM pages WHERE page_id = ?').run(BOOK_ID * 100 + 2);
+  const jobId2 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-10' }, `${BOOK_ID}:2024-10_b`);
+  ctx.shared.enqueueJob(jobId2, () =>
+    ctx.rueckblick.runRueckblickJob(jobId2, BOOK_ID, 'tester@test.dev', null, '2024-10'));
+  const job2 = await waitForJob(ctx.shared, jobId2);
+  assert.equal(job2.status, 'done');
+  assert.equal(job2.result.fromCache, false, 'gelöschter Eintrag → Cache-MISS');
+  assert.equal(histCount(), 1, 'identisches Ergebnis → keine Duplikat-Zeile');
+  assert.equal(latest().entry_count, 2, 'Touch aktualisiert den Snapshot auf die neue Anzahl');
+});
+
 test('Cache-HIT: identischer 2. Lauf → 0 AI-Calls', async () => {
   const BOOK_ID = 703;
   seedDiary(BOOK_ID, ['2024-05-01', '2024-05-09']);

@@ -72,11 +72,16 @@ export const tagebuchRueckblickMethods = {
 
   // ── Neugenerierungs-Sperre ───────────────────────────────────────────────────
   // Ein Rückblick wird NICHT neu generiert, solange sich die datierten Einträge des
-  // Zeitraums seit der letzten Generierung nicht geändert haben. Signal: jüngste
-  // updated_at aller datierten Seiten des Zeitraums vs. created_at des gespeicherten
-  // Rückblicks. Ist keine Seite jünger als der Rückblick → aktuell → Button gesperrt.
-  // Deckt sich mit der serverseitigen Cache-Invalidierung (pages_sig keyt ebenfalls
-  // auf updated_at): unveränderte Seiten ⇒ Cache-HIT ⇒ ohnehin kein KI-Call.
+  // Zeitraums seit der letzten Generierung nicht geändert haben. Zwei Signale:
+  //  1. jüngste updated_at aller datierten Seiten > created_at des Rückblicks
+  //     → Seite bearbeitet/hinzugefügt.
+  //  2. aktuelle Anzahl datierter Seiten ≠ entry_count-Snapshot des Rückblicks
+  //     → Seite gelöscht (deckt den Fall ab, den (1) nicht sieht: keine verbleibende
+  //     Seite ist jünger, aber eine ist verschwunden).
+  // Ist beides unauffällig → aktuell → Button gesperrt. Deckt sich mit der server-
+  // seitigen Cache-Invalidierung (pages_sig keyt auf id:updated_at aller Seiten des
+  // Zeitraums): unveränderte Menge ⇒ Cache-HIT ⇒ ohnehin kein KI-Call. Legacy-
+  // Einträge ohne entry_count (null) prüfen nur (1) — altes Verhalten.
   rueckblickUpToDate() {
     const z = this.rueckblickZeitraum;
     if (!z) return false;
@@ -84,22 +89,26 @@ export const tagebuchRueckblickMethods = {
     if (!entry?.created_at) return false;
     const genMs = new Date(entry.created_at).getTime();
     if (!genMs) return false;
-    return this._newestPageMtimeForZeitraum(z) <= genMs;
+    const { newest, count } = this._pageStatsForZeitraum(z);
+    if (newest > genMs) return false;
+    if (entry.entry_count != null && count !== entry.entry_count) return false;
+    return true;
   },
 
-  // Jüngste updated_at (ms) aller datierten Seiten des Zeitraums; 0 wenn keine.
-  _newestPageMtimeForZeitraum(z) {
+  // Jüngste updated_at (ms) + Anzahl aller datierten Seiten des Zeitraums.
+  _pageStatsForZeitraum(z) {
     const pages = Alpine.store('nav').pages || [];
-    return this._memo('newestMtime:' + z, [pages, z], () => {
+    return this._memo('pageStats:' + z, [pages, z], () => {
       const prefix = /^\d{4}$/.test(z) ? z + '-' : z; // Jahr → 'YYYY-', Monat → 'YYYY-MM'
-      let newest = 0;
+      let newest = 0, count = 0;
       for (const p of pages) {
         const name = p?.name || '';
         if (!ISO_DATE_RE.test(name) || !name.startsWith(prefix)) continue;
+        count++;
         const ms = p.updated_at ? new Date(p.updated_at).getTime() : 0;
         if (ms > newest) newest = ms;
       }
-      return newest;
+      return { newest, count };
     });
   },
 

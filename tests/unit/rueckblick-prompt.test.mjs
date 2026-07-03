@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildRueckblickPrompt, buildRueckblickReducePrompt, SCHEMA_RUECKBLICK } from '../../public/js/prompts/tagebuch.js';
+import { buildRueckblickPrompt, buildRueckblickReducePrompt, mergeRueckblickFacets, SCHEMA_RUECKBLICK, SCHEMA_RUECKBLICK_SYNTH } from '../../public/js/prompts/tagebuch.js';
 import { configurePrompts } from '../../public/js/prompts.js';
 import { readFileSync } from 'node:fs';
 
@@ -80,15 +80,22 @@ test('buildRueckblickReducePrompt: vorheriger Rückblick fliesst in den Reduce',
   assert.match(p, /Das Vorjahr\./);
 });
 
-test('buildRueckblickReducePrompt: Monats-Teilergebnisse + Konsolidierung', () => {
+test('buildRueckblickReducePrompt: verdichtete Facetten + Synthese-Auftrag', () => {
   const monthResults = [
-    { monat: '2024-01', themen: [{ label: 'Arbeit', haeufigkeit: 2, belege: ['2024-01-03'] }], personen: [], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Januar.' },
-    { monat: '2024-02', themen: [], personen: [{ name: 'Anna', haeufigkeit: 1 }], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Februar.' },
+    { monat: '2024-01', themen: [{ label: 'Arbeit', haeufigkeit: 2, belege: ['2024-01-03', '2024-01-10'] }], personen: [], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Januar.' },
+    { monat: '2024-02', themen: [], personen: [{ name: 'Anna', haeufigkeit: 1, belege: ['2024-02-01'] }], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Februar.' },
   ];
   const p = buildRueckblickReducePrompt(monthResults, { zeitraum: '2024' });
-  assert.match(p, /Monat 2024-01/);
-  assert.match(p, /Monat 2024-02/);
-  assert.match(p, /Konsolidiere/);
+  // Monats-Labels als Teil-Header (ohne "Monat "-Präfix im neuen Format).
+  assert.match(p, /## 2024-01/);
+  assert.match(p, /## 2024-02/);
+  // Facetten sind bereits gemergt und werden dem Modell final vorgelegt.
+  assert.match(p, /<verdichtete_facetten/);
+  assert.match(p, /Arbeit \(2×\)/);
+  assert.match(p, /Anna \(1×\)/);
+  // Synthese-Auftrag: nur Tage + Zusammenfassung, Facetten nicht erneut ausgeben.
+  assert.match(p, /bemerkenswertesten Tage/);
+  assert.match(p, /Gib die Facetten NICHT erneut aus/);
   assert.match(p, /ausschliesslich mit einem JSON-Objekt/);
 });
 
@@ -123,10 +130,25 @@ test('buildRueckblickPrompt: Personen/Orte-Belege im Output-Schema + Constraint'
   assert.match(p, /jede Person, jeder Ort/);
 });
 
-test('buildRueckblickReducePrompt: Personen-Belege fliessen in den Reduce-Text', () => {
-  const monthResults = [
-    { monat: '2024-01', themen: [], personen: [{ name: 'Anna', haeufigkeit: 2, belege: ['2024-01-03', '2024-01-09'] }], orte: [], bemerkenswerteTage: [], zusammenfassung: 'Januar.' },
+test('SCHEMA_RUECKBLICK_SYNTH: nur Tage + Zusammenfassung', () => {
+  assert.equal(SCHEMA_RUECKBLICK_SYNTH.type, 'object');
+  assert.deepEqual(Object.keys(SCHEMA_RUECKBLICK_SYNTH.properties).sort(), ['bemerkenswerteTage', 'zusammenfassung']);
+  assert.ok(!SCHEMA_RUECKBLICK_SYNTH.properties.themen, 'Facetten dürfen nicht Teil des Synth-Schemas sein');
+});
+
+test('mergeRueckblickFacets: Belege-Union + haeufigkeit = eindeutige Belegtage', () => {
+  const parts = [
+    { monat: '2024-01', themen: [{ label: 'Arbeit', haeufigkeit: 1, belege: ['2024-01-03'] }], personen: [{ name: 'Anna', haeufigkeit: 1, belege: ['2024-01-05'] }], orte: [] },
+    { monat: '2024-02', themen: [{ label: 'arbeit', haeufigkeit: 1, belege: ['2024-01-03', '2024-02-08'] }], personen: [{ name: 'Anna', haeufigkeit: 1, belege: ['2024-02-09'] }], orte: [] },
   ];
-  const p = buildRueckblickReducePrompt(monthResults, { zeitraum: '2024' });
-  assert.match(p, /Anna \(2×; 2024-01-03, 2024-01-09\)/);
+  const m = mergeRueckblickFacets(parts);
+  // 'Arbeit' + 'arbeit' verschmelzen (case-insensitiv); Belege dedupliziert + vereinigt.
+  assert.equal(m.themen.length, 1);
+  assert.equal(m.themen[0].label, 'Arbeit');
+  assert.deepEqual(m.themen[0].belege, ['2024-01-03', '2024-02-08']);
+  assert.equal(m.themen[0].haeufigkeit, 2);
+  // Anna über zwei Monate → zwei eindeutige Belegtage.
+  assert.equal(m.personen.length, 1);
+  assert.equal(m.personen[0].haeufigkeit, 2);
+  assert.deepEqual(m.orte, []);
 });

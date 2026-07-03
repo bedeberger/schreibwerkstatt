@@ -59,6 +59,7 @@ function _promptsContentHash() {
     komplettNs.SCHEMA_AUTOREN_BEFUND,
     synonymNs.SCHEMA_SYNONYM,
     tagebuchNs.SCHEMA_RUECKBLICK,
+    tagebuchNs.SCHEMA_RUECKBLICK_SYNTH,
   ]);
   return _hashContent(_allLocalePromptsSnapshot() + schemaPart);
 }
@@ -210,7 +211,9 @@ export {
 export {
   buildRueckblickPrompt,
   buildRueckblickReducePrompt,
+  mergeRueckblickFacets,
   SCHEMA_RUECKBLICK,
+  SCHEMA_RUECKBLICK_SYNTH,
 } from './prompts/tagebuch.js';
 
 export {

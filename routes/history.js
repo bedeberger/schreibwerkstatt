@@ -185,11 +185,19 @@ router.get('/rueckblick/:book_id', (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   const rows = db.prepare(`
-    SELECT id, zeitraum, result_json, model, created_at
+    SELECT id, zeitraum, result_json, model, entry_count, created_at
     FROM tagebuch_rueckblicke
     WHERE book_id = ? AND user_email = ?
     ORDER BY created_at DESC LIMIT 20`).all(bookId, user_email);
-  res.json(rows.map(r => ({ ...r, result_json: JSON.parse(r.result_json || 'null') })));
+  // Pro-Zeile parsen: eine einzelne kaputte result_json-Zeile darf nicht die
+  // ganze Liste 500en (sonst lädt die History gar nicht → Rückblick-Karte bleibt
+  // leer). Fehlerhafte Zeile → result_json: null (Frontend blendet sie aus).
+  res.json(rows.map(r => {
+    let result_json = null;
+    try { result_json = JSON.parse(r.result_json || 'null'); }
+    catch (e) { logger.warn(`[history/rueckblick] kaputte result_json in Zeile id=${r.id}: ${e.message}`); }
+    return { ...r, result_json };
+  }));
 });
 
 // Rückblick-Heatmap-Coverage: aggregiert datierte Seiten (Monats-/Jahres-Buckets)

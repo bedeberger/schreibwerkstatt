@@ -8880,6 +8880,24 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 230 abgeschlossen (Index auf narrative_report.user_email).');
   }
 
+  if (version < 231) {
+    // entry_count: Snapshot der Anzahl datierter Einträge des Zeitraums zum
+    // Generierungszeitpunkt. Die Client-Neugenerierungs-Sperre vergleicht ihn mit
+    // der aktuellen Anzahl, damit ein reiner Lösch-Vorgang (Eintrag entfernt, aber
+    // keine Seite jünger als der Rückblick) die Sperre wieder löst. Legacy-Zeilen:
+    // NULL → Sperre fällt auf die reine mtime-Prüfung zurück (altes Verhalten).
+    const rbCols = db.pragma('table_info(tagebuch_rueckblicke)').map(c => c.name);
+    if (!rbCols.includes('entry_count')) {
+      db.exec('ALTER TABLE tagebuch_rueckblicke ADD COLUMN entry_count INTEGER');
+    }
+    const fkErrors231 = db.pragma('foreign_key_check');
+    if (fkErrors231.length) {
+      throw new Error(`Migration 231: foreign_key_check meldet ${fkErrors231.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 231').run();
+    logger.info('DB-Migration auf Version 231 abgeschlossen (tagebuch_rueckblicke.entry_count).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

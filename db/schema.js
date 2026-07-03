@@ -791,7 +791,7 @@ const _loadRueckblickCache = db.prepare(
 const _saveRueckblickCache = db.prepare(
   `INSERT OR REPLACE INTO tagebuch_rueckblick_cache
    (book_id, user_email, zeitraum, provider, pages_sig, result_json, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?)`
+   VALUES (?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`
 );
 const _deleteRueckblickCache = db.prepare(
   `DELETE FROM tagebuch_rueckblick_cache WHERE book_id = ? AND user_email = ?`
@@ -806,7 +806,7 @@ function loadRueckblickCache(bookId, userEmail, zeitraum, pagesSig, provider = '
 function saveRueckblickCache(bookId, userEmail, zeitraum, pagesSig, result, provider = '') {
   _saveRueckblickCache.run(
     parseInt(bookId), userEmail || '', zeitraum, provider || '',
-    pagesSig, JSON.stringify(result), new Date().toISOString(),
+    pagesSig, JSON.stringify(result),
   );
 }
 
@@ -817,11 +817,11 @@ function deleteRueckblickCache(bookId, userEmail) {
 // ── History: Tagebuch-Rückblicke (dauerhaft, analog book_reviews) ─────────────
 // Eine Zeile pro „Erstellen"-Lauf — re-öffenbar im Karten-History-Block.
 const _insertRueckblick = db.prepare(
-  `INSERT INTO tagebuch_rueckblicke (book_id, user_email, zeitraum, result_json, model, created_at)
-   VALUES (?, ?, ?, ?, ?, ${NOW_ISO_SQL})`
+  `INSERT INTO tagebuch_rueckblicke (book_id, user_email, zeitraum, result_json, model, entry_count, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`
 );
 const _listRueckblicke = db.prepare(
-  `SELECT id, zeitraum, result_json, model, created_at
+  `SELECT id, zeitraum, result_json, model, entry_count, created_at
    FROM tagebuch_rueckblicke WHERE book_id = ? AND user_email = ?
    ORDER BY created_at DESC LIMIT ?`
 );
@@ -830,15 +830,31 @@ const _latestRueckblickJson = db.prepare(
    WHERE book_id = ? AND user_email = ? AND zeitraum = ?
    ORDER BY created_at DESC, id DESC LIMIT 1`
 );
+// Aktualisiert den entry_count-Snapshot der jüngsten Zeile eines Zeitraums, ohne
+// eine neue History-Zeile zu erzeugen (identisches Ergebnis nach Lösch-Vorgang).
+const _touchRueckblickEntryCount = db.prepare(
+  `UPDATE tagebuch_rueckblicke SET entry_count = ?
+   WHERE id = (SELECT id FROM tagebuch_rueckblicke
+               WHERE book_id = ? AND user_email = ? AND zeitraum = ?
+               ORDER BY created_at DESC, id DESC LIMIT 1)`
+);
 const _deleteRueckblick = db.prepare(
   `DELETE FROM tagebuch_rueckblicke WHERE id = ? AND user_email = ?`
 );
 
-function insertRueckblick(bookId, userEmail, zeitraum, result, model = null) {
+function insertRueckblick(bookId, userEmail, zeitraum, result, model = null, entryCount = null) {
   return _insertRueckblick.run(
     parseInt(bookId), userEmail || '', zeitraum,
     JSON.stringify(result), model || null,
+    entryCount == null ? null : parseInt(entryCount),
   ).lastInsertRowid;
+}
+
+function touchRueckblickEntryCount(bookId, userEmail, zeitraum, entryCount) {
+  return _touchRueckblickEntryCount.run(
+    entryCount == null ? null : parseInt(entryCount),
+    parseInt(bookId), userEmail || '', zeitraum,
+  ).changes;
 }
 
 // Roher result_json-String des jüngsten History-Eintrags eines Zeitraums (oder
@@ -1529,7 +1545,7 @@ module.exports = {
   loadBookReviewCache, saveBookReviewCache, deleteReviewCache,
   loadChapterMacroReviewCache, saveChapterMacroReviewCache, deleteChapterMacroReviewCache,
   loadRueckblickCache, saveRueckblickCache, deleteRueckblickCache,
-  insertRueckblick, latestRueckblickJson, listRueckblicke, deleteRueckblick,
+  insertRueckblick, touchRueckblickEntryCount, latestRueckblickJson, listRueckblicke, deleteRueckblick,
   loadSynonymCache, saveSynonymCache, deleteSynonymCache,
   loadLektoratCache, saveLektoratCache, deleteLektoratCache,
   loadFinetuneAiCache, saveFinetuneAiCache, deleteFinetuneAiCache,

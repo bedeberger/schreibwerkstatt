@@ -37,6 +37,19 @@ Antworte mit diesem JSON-Schema:
 }
 </output_format>`;
 
+// Reduzierte Ausgabe des Reduce-Passes: Themen/Personen/Orte werden deterministisch
+// im Code zusammengeführt (mergeRueckblickFacets), das Modell liefert nur noch die
+// synthetisierenden Teile — die über den ganzen Zeitraum bemerkenswertesten Tage
+// und die Fliesstext-Betrachtung.
+const RUECKBLICK_SYNTH_OUTPUT = `
+<output_format>
+Antworte mit diesem JSON-Schema:
+{
+  "bemerkenswerteTage": [ { "datum": "2024-03-15", "begruendung": "ein Satz, warum dieser Tag heraussticht" } ],
+  "zusammenfassung": "2–4 Absätze Fliesstext: zentrale Stimmungen, Entwicklungen und roter Faden des Zeitraums – nur belegt"
+}
+</output_format>`;
+
 // Formatiert die gefilterten Einträge für den Single-Pass-Call: ein Block pro
 // Tag mit Datum-Header, damit das Modell Belege zeichengenau zuordnen kann.
 function _formatEntries(entries) {
@@ -116,35 +129,78 @@ ${_formatEntries(entries)}
 </eintraege>${_jsonOnly()}`;
 }
 
-// Formatiert die Monats-Teilergebnisse für den Reduce-Call.
-function _formatMonthResults(monthResults) {
-  return monthResults.map(m => {
-    const themen = (m.themen || []).map(t => `${t.label} (${t.haeufigkeit}×; ${(t.belege || []).join(', ')})`).join('; ') || '–';
-    const personen = (m.personen || []).map(p => `${p.name} (${p.haeufigkeit}×; ${(p.belege || []).join(', ')})`).join('; ') || '–';
-    const orte = (m.orte || []).map(o => `${o.name} (${o.haeufigkeit}×; ${(o.belege || []).join(', ')})`).join('; ') || '–';
+// Führt die Facetten (Themen/Personen/Orte) der Teilrückblicke deterministisch
+// zusammen: gleiche Labels/Namen (case-insensitiv) verschmelzen, Belege werden
+// vereinigt, "haeufigkeit" = Anzahl eindeutiger Belegtage. Rein numerische
+// Aggregation gehört in den Code, nicht in einen zweiten KI-Call (spart Tokens,
+// eliminiert Zähl-Halluzination). Absteigend nach Häufigkeit.
+function _mergeFacet(partResults, arrKey, labelKey) {
+  const map = new Map();
+  for (const part of (partResults || [])) {
+    for (const item of (part[arrKey] || [])) {
+      const display = String(item[labelKey] || '').trim();
+      if (!display) continue;
+      const nk = display.toLowerCase();
+      let rec = map.get(nk);
+      if (!rec) { rec = { display, belege: new Set() }; map.set(nk, rec); }
+      for (const b of (item.belege || [])) {
+        const d = String(b).slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) rec.belege.add(d);
+      }
+    }
+  }
+  return [...map.values()]
+    .map(v => ({ [labelKey]: v.display, haeufigkeit: v.belege.size, belege: [...v.belege].sort() }))
+    .sort((a, b) => b.haeufigkeit - a.haeufigkeit);
+}
+
+export function mergeRueckblickFacets(partResults) {
+  return {
+    themen:   _mergeFacet(partResults, 'themen', 'label'),
+    personen: _mergeFacet(partResults, 'personen', 'name'),
+    orte:     _mergeFacet(partResults, 'orte', 'name'),
+  };
+}
+
+// Kompakte Darstellung der bereits verdichteten Facetten für den Reduce-Prompt.
+function _formatMergedFacets(merged) {
+  const line = (arr, key) => (arr || []).slice(0, 40).map(x => `${x[key]} (${x.haeufigkeit}×)`).join(', ') || '–';
+  return `Themen: ${line(merged.themen, 'label')}\nPersonen: ${line(merged.personen, 'name')}\nOrte: ${line(merged.orte, 'name')}`;
+}
+
+// Bemerkenswerte-Tage-Kandidaten + Zusammenfassungen je Teil (fürs Synthese-Urteil).
+function _formatMonthSummaries(partResults) {
+  return (partResults || []).map(m => {
     const tage = (m.bemerkenswerteTage || []).map(t => `${t.datum}: ${t.begruendung}`).join(' | ') || '–';
-    return `## Monat ${m.monat}\nThemen: ${themen}\nPersonen: ${personen}\nOrte: ${orte}\nBemerkenswerte Tage: ${tage}\nZusammenfassung: ${m.zusammenfassung || '–'}`;
+    return `## ${m.monat}\nBemerkenswerte Tage: ${tage}\nZusammenfassung: ${m.zusammenfassung || '–'}`;
   }).join('\n\n');
 }
 
 /**
- * Reduce-Pass: konsolidiert pro Monat erzeugte Teilergebnisse zu einem
- * Gesamt-Rückblick über den Zeitraum (Jahr). Nur Aggregation der Belege —
- * keine neuen Aussagen über die Teilergebnisse hinaus.
- * @param {Array<object>} monthResults  je Monat ein SCHEMA_RUECKBLICK-Objekt + `monat`
- * @param {{ zeitraum:string }} opts
+ * Reduce-/Synthese-Pass: die Facetten (Themen/Personen/Orte) sind bereits
+ * deterministisch gemergt (mergeRueckblickFacets); dieser Call liefert nur noch
+ * die synthetisierenden Teile — die über den ganzen Zeitraum bemerkenswertesten
+ * Tage und die Fliesstext-Betrachtung. Nutzt NUR die Teilrückblicke; nichts Neues.
+ * @param {Array<object>} partResults  je Teil ein SCHEMA_RUECKBLICK-Objekt + `monat` (Label)
+ * @param {{ zeitraum:string, vorblick?:object, merged?:object }} opts  merged = mergeRueckblickFacets(partResults)
  */
-export function buildRueckblickReducePrompt(monthResults, { zeitraum, vorblick = null } = {}) {
+export function buildRueckblickReducePrompt(partResults, { zeitraum, vorblick = null, merged = null } = {}) {
+  const facets = merged || mergeRueckblickFacets(partResults);
   return `<aufgabe>
-Konsolidiere die folgenden Monats-Teilrückblicke zu EINEM Gesamt-Rückblick über den Zeitraum «${zeitraum}».
-Führe gleiche Themen/Personen/Orte zusammen und summiere ihre Häufigkeiten. Wähle die über den
-ganzen Zeitraum bemerkenswertesten Tage aus. Erzeuge eine zusammenfassende Betrachtung des gesamten
-Zeitraums. Nutze NUR Informationen aus den Teilrückblicken; füge nichts hinzu.
+Aus den folgenden Teil-Rückblicken eines Zeitraums «${zeitraum}» sind die wiederkehrenden Themen,
+Personen und Orte bereits final zusammengeführt (siehe <verdichtete_facetten>). Deine Aufgabe:
+1. Wähle die über den GANZEN Zeitraum bemerkenswertesten Tage aus (nur Tage aus den Teilrückblicken).
+2. Schreibe eine zusammenfassende Betrachtung (2–4 Absätze) des gesamten Zeitraums.
+Nutze NUR Informationen aus den Teilrückblicken und den verdichteten Facetten; füge nichts hinzu.
+Gib die Facetten NICHT erneut aus — sie sind bereits final.
 </aufgabe>
 ${RUECKBLICK_CONSTRAINT}${_vorblickBlock(vorblick)}
-${RUECKBLICK_OUTPUT}
-<monats_teilrueckblicke zeitraum="${zeitraum}" monate="${monthResults.length}">
-${_formatMonthResults(monthResults)}
+${RUECKBLICK_SYNTH_OUTPUT}
+<verdichtete_facetten zeitraum="${zeitraum}">
+${_formatMergedFacets(facets)}
+</verdichtete_facetten>
+<monats_teilrueckblicke zeitraum="${zeitraum}" teile="${(partResults || []).length}">
+${_formatMonthSummaries(partResults)}
 </monats_teilrueckblicke>${_jsonOnly()}`;
 }
 
@@ -171,6 +227,13 @@ export const SCHEMA_RUECKBLICK = _obj({
   themen:              { type: 'array', items: _themaItem },
   personen:            { type: 'array', items: _nennungItem },
   orte:                { type: 'array', items: _nennungItem },
+  bemerkenswerteTage:  { type: 'array', items: _tagItem },
+  zusammenfassung:     _str,
+});
+
+// Reduzierte Ausgabe des Reduce-/Synthese-Passes (Facetten kommen deterministisch
+// aus mergeRueckblickFacets, nicht vom Modell).
+export const SCHEMA_RUECKBLICK_SYNTH = _obj({
   bemerkenswerteTage:  { type: 'array', items: _tagItem },
   zusammenfassung:     _str,
 });

@@ -8,6 +8,7 @@ const express = require('express');
 const {
   db,
   loadRueckblickCache, saveRueckblickCache, insertRueckblick, latestRueckblickJson,
+  touchRueckblickEntryCount,
 } = require('../../db/schema');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
@@ -25,6 +26,36 @@ const { setContext } = require('../../lib/log-context');
 
 const rueckblickRouter = express.Router();
 
+// Teilt die (nach Datum sortierten) Einträge in Map-Gruppen für den Reduce-Pass.
+// Deckt ein Jahres-Zeitraum mehrere Monate ab, ist jede Gruppe ein Monat. Fällt
+// alles in einen Monat (Monats-Zeitraum oder Jahr mit nur einem belegten Monat),
+// werden die Einträge größenbasiert gechunkt — so bleibt auch ein einzelner
+// überlanger Monat unter dem Per-Chunk-Budget (byMonth.size == 1 → kein Split).
+// Ein für sich zu großer Einzeleintrag bildet notfalls eine eigene Gruppe.
+function _chunkGroups(entries, z, perChunkLimit) {
+  const byMonth = new Map();
+  for (const e of entries) {
+    const key = e.monthKey || String(z.year);
+    if (!byMonth.has(key)) byMonth.set(key, []);
+    byMonth.get(key).push(e);
+  }
+  if (byMonth.size > 1) {
+    return [...byMonth.keys()].sort().map(key => ({ label: key, entries: byMonth.get(key) }));
+  }
+  const groups = [];
+  let cur = [], curChars = 0;
+  for (const e of entries) {
+    const len = e.text.length;
+    if (cur.length && curChars + len > perChunkLimit) { groups.push(cur); cur = []; curChars = 0; }
+    cur.push(e); curChars += len;
+  }
+  if (cur.length) groups.push(cur);
+  return groups.map(es => ({
+    label: es.length === 1 ? es[0].datum : `${es[0].datum}…${es[es.length - 1].datum}`,
+    entries: es,
+  }));
+}
+
 // ── Job: Tagebuch-Rückblick ─────────────────────────────────────────────────────
 async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
   const logger = makeJobLogger(jobId);
@@ -34,32 +65,34 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
   try {
     if (!z) throw i18nError('job.error.rueckblickEmpty');
     const prompts = await getPrompts();
-    const { buildRueckblickPrompt, buildRueckblickReducePrompt, SCHEMA_RUECKBLICK, PROMPTS_VERSION } = prompts;
+    const {
+      buildRueckblickPrompt, buildRueckblickReducePrompt, mergeRueckblickFacets,
+      SCHEMA_RUECKBLICK, SCHEMA_RUECKBLICK_SYNTH, PROMPTS_VERSION,
+    } = prompts;
     const { SYSTEM_RUECKBLICK_BLOCKS: SYSTEM_RUECKBLICK } = await getBookPrompts(bookId, userEmail);
 
     const { resolveProvider } = require('../../lib/ai');
     const effectiveProvider = resolveProvider({ userEmail });
-    const { singlePass: SINGLE_PASS_LIMIT } = chunkLimitsFor(effectiveProvider);
+    const { singlePass: SINGLE_PASS_LIMIT, perChunk: PER_CHUNK_LIMIT } = chunkLimitsFor(effectiveProvider);
     const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
 
     // Optionaler Entitäts-Kontext (verbessert Personen-/Orts-Verknüpfung, kein Muss).
     // Pro Entität Name + kompakte Info (Rolle/Beruf/Alias bzw. Typ/Land) — hilft
     // dem Modell, Erwähnungen korrekt der kanonischen Schreibweise zuzuordnen.
+    const ENTITY_CAP = 80;
     let figuren = [], orte = [];
     try {
-      figuren = (getFiguren(bookIdInt, email) || [])
-        .filter(f => f.name)
-        .slice(0, 80)
-        .map(f => {
-          const info = [f.typ, f.beruf, (f.kurzname && f.kurzname !== f.name) ? `auch: ${f.kurzname}` : null]
-            .filter(Boolean).join(', ');
-          return { name: f.name, info };
-        });
-      orte = db.prepare('SELECT name, typ, land FROM locations WHERE book_id = ? AND user_email = ?')
-        .all(bookIdInt, email)
-        .filter(r => r.name)
-        .slice(0, 80)
-        .map(r => ({ name: r.name, info: [r.typ, r.land].filter(Boolean).join(', ') }));
+      const allFig = (getFiguren(bookIdInt, email) || []).filter(f => f.name);
+      const allOrt = db.prepare('SELECT name, typ, land FROM locations WHERE book_id = ? AND user_email = ?')
+        .all(bookIdInt, email).filter(r => r.name);
+      if (allFig.length > ENTITY_CAP) logger.info(`Entitäts-Kontext: ${allFig.length - ENTITY_CAP} von ${allFig.length} Figuren abgeschnitten (Cap ${ENTITY_CAP}).`);
+      if (allOrt.length > ENTITY_CAP) logger.info(`Entitäts-Kontext: ${allOrt.length - ENTITY_CAP} von ${allOrt.length} Orten abgeschnitten (Cap ${ENTITY_CAP}).`);
+      figuren = allFig.slice(0, ENTITY_CAP).map(f => {
+        const info = [f.typ, f.beruf, (f.kurzname && f.kurzname !== f.name) ? `auch: ${f.kurzname}` : null]
+          .filter(Boolean).join(', ');
+        return { name: f.name, info };
+      });
+      orte = allOrt.slice(0, ENTITY_CAP).map(r => ({ name: r.name, info: [r.typ, r.land].filter(Boolean).join(', ') }));
     } catch (e) { logger.warn(`Entitäts-Kontext übersprungen: ${e.message}`); }
 
     // Vorangegangener Rückblick (Vor-Monat bzw. Vorjahr), falls vorhanden — gibt
@@ -115,46 +148,50 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
       updateJob(jobId, { progress: 97, statusText: 'job.phase.checkpointLoaded' });
     } else {
       const totalChars = entries.reduce((s, e) => s + e.text.length, 0);
-      // Monats-Gruppen (für Map-Reduce-Entscheidung).
-      const byMonth = new Map();
-      for (const e of entries) {
-        const key = e.monthKey || String(z.year);
-        if (!byMonth.has(key)) byMonth.set(key, []);
-        byMonth.get(key).push(e);
-      }
 
-      if (totalChars <= SINGLE_PASS_LIMIT || byMonth.size <= 1) {
+      if (totalChars <= SINGLE_PASS_LIMIT) {
         updateJob(jobId, { progress: 55, statusText: 'job.phase.rueckblickConsolidating' });
         r = await aiCall(jobId, tok,
           buildRueckblickPrompt(entries, { zeitraum, figuren, orte, vorblick }),
           SYSTEM_RUECKBLICK, 55, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
         );
       } else {
-        // Map: pro Monat ein Teil-Rückblick. Reduce: konsolidiert zum Zeitraum.
-        const monthKeys = [...byMonth.keys()].sort();
-        const monthResults = [];
-        for (let mi = 0; mi < monthKeys.length; mi++) {
+        // Über Budget → Map-Reduce. Bevorzugt an Monatsgrenzen (Jahres-Zeitraum);
+        // bei einem einzelnen überlangen Monat greift Größen-Chunking, damit der
+        // Call nie das Input-Budget sprengt (byMonth.size == 1 → kein Monats-Split).
+        const groups = _chunkGroups(entries, z, PER_CHUNK_LIMIT);
+        logger.info(`Rückblick «${zeitraum}»: ${totalChars} Zeichen > Budget → Map-Reduce über ${groups.length} Gruppe(n).`);
+        const partResults = [];
+        for (let gi = 0; gi < groups.length; gi++) {
           if (jobAbortControllers.get(jobId)?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-          const key = monthKeys[mi];
-          const fromPct = 55 + Math.round((mi / monthKeys.length) * 30);
-          const toPct = 55 + Math.round(((mi + 1) / monthKeys.length) * 30);
+          const g = groups[gi];
+          const fromPct = 55 + Math.round((gi / groups.length) * 30);
+          const toPct = 55 + Math.round(((gi + 1) / groups.length) * 30);
           updateJob(jobId, {
             progress: fromPct, statusText: 'job.phase.rueckblickAnalyzingMonth',
-            statusParams: { monat: key, current: mi + 1, total: monthKeys.length },
+            statusParams: { monat: g.label, current: gi + 1, total: groups.length },
           });
-          // Vorblick bewusst NICHT an die Monats-Maps — der Entwicklungs-Kontext
-          // gehört in den Reduce, sonst bläht er jeden Monats-Call auf.
+          // Vorblick bewusst NICHT an die Teil-Calls — der Entwicklungs-Kontext
+          // gehört in den Reduce, sonst bläht er jeden Teil-Call auf.
           const mr = await aiCall(jobId, tok,
-            buildRueckblickPrompt(byMonth.get(key), { zeitraum: key, figuren, orte }),
+            buildRueckblickPrompt(g.entries, { zeitraum: g.label, figuren, orte }),
             SYSTEM_RUECKBLICK, fromPct, toPct, 2000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
           );
-          monthResults.push({ ...mr, monat: key });
+          partResults.push({ ...mr, monat: g.label });
         }
         updateJob(jobId, { progress: 88, statusText: 'job.phase.rueckblickConsolidating' });
-        r = await aiCall(jobId, tok,
-          buildRueckblickReducePrompt(monthResults, { zeitraum, vorblick }),
-          SYSTEM_RUECKBLICK, 88, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK,
+        // Facetten deterministisch mergen (kein KI-Zählen), Synthese-Call liefert
+        // nur bemerkenswerteTage + zusammenfassung.
+        const merged = mergeRueckblickFacets(partResults);
+        const synth = await aiCall(jobId, tok,
+          buildRueckblickReducePrompt(partResults, { zeitraum, vorblick, merged }),
+          SYSTEM_RUECKBLICK, 88, 97, 3000, 0.25, null, effectiveProvider, SCHEMA_RUECKBLICK_SYNTH,
         );
+        r = {
+          ...merged,
+          bemerkenswerteTage: Array.isArray(synth?.bemerkenswerteTage) ? synth.bemerkenswerteTage : [],
+          zusammenfassung: typeof synth?.zusammenfassung === 'string' ? synth.zusammenfassung : '',
+        };
       }
 
       if (!r || typeof r.zusammenfassung !== 'string' || !r.zusammenfassung.trim()) {
@@ -165,10 +202,15 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
 
     // History-Zeile nur bei inhaltlich neuem Ergebnis → re-öffenbar. Identische
     // Re-Runs / Cache-HITs (gleicher Zeitraum, gleiches result_json) erzeugen
-    // keine Duplikat-Zeile.
+    // keine Duplikat-Zeile — aktualisieren aber den entry_count-Snapshot der
+    // jüngsten Zeile, damit die Client-Neugenerierungs-Sperre nach einem reinen
+    // Lösch-Vorgang (Zusammenfassung unverändert, Eintrag aber weg) wieder greift
+    // statt dauerhaft „nicht aktuell" anzuzeigen.
     const model = _modelName(effectiveProvider);
     if (JSON.stringify(r) !== latestRueckblickJson(bookIdInt, email, zeitraum)) {
-      insertRueckblick(bookIdInt, email, zeitraum, r, model);
+      insertRueckblick(bookIdInt, email, zeitraum, r, model, entries.length);
+    } else {
+      touchRueckblickEntryCount(bookIdInt, email, zeitraum, entries.length);
     }
 
     completeJob(jobId, { rueckblick: r, zeitraum, entryCount: entries.length, fromCache, tokensIn: tok.in, tokensOut: tok.out },
