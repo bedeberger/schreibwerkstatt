@@ -169,7 +169,7 @@
 .figur-arc-body { margin-top: var(--space-2xs); }
 .figur-arc-stations {
   margin: var(--space-2xs) 0;
-  padding-left: var(--space-lg);
+  padding-left: var(--space-xl);
   font-size: var(--font-size-sm);
   line-height: 1.5;
 }

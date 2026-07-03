@@ -84,6 +84,23 @@ test('Befund lateEntrance / earlyExit für Core-Typen', () => {
   assert.ok(early.some(f => f.kind === 'earlyExit' && f.chapter === 'K2'));
 });
 
+test('Einzelkapitel-Figur: kein lateEntrance/earlyExit (kein Bogen)', () => {
+  // Figur tritt nur in einem mittleren Kapitel auf → weder "spät ein" noch "früh ab".
+  const f = computePresence([fig('Solo', 'hauptfigur', [k('K4')])], CH).findings;
+  assert.ok(!f.some(x => x.kind === 'lateEntrance'), 'kein lateEntrance');
+  assert.ok(!f.some(x => x.kind === 'earlyExit'), 'kein earlyExit');
+});
+
+test('Episodische Anthologie: Ko-Präsenz-Lücke flutet nicht bei Einzelkapitel-Antagonist', () => {
+  // Antagonist nur in einem Kapitel → "teilt kein Kapitel mit X" wäre trivial für jede Hauptfigur.
+  const co = computePresence([
+    fig('Held1', 'hauptfigur', [k('K1')]),
+    fig('Held2', 'hauptfigur', [k('K2')]),
+    fig('Böse', 'antagonist', [k('K5')]),
+  ], CH).findings.filter(f => f.kind === 'coPresenceGap');
+  assert.equal(co.length, 0);
+});
+
 test('Befund flatArc: Hauptfigur ohne deklarierte UND belegte Wendepunkte', () => {
   const flat = computePresence([fig('A', 'hauptfigur', [k('K1'), k('K2'), k('K3')])], CH).findings;
   assert.ok(flat.some(f => f.kind === 'flatArc'));

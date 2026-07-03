@@ -18,6 +18,20 @@ const EDGE_FRACTION = 0.25; // erstes/letztes Viertel des Buchs = "spät/früh"
 // Mindestlänge einer internen Abwesenheits-Kette, damit sie als Befund gilt.
 function gapThreshold(n) { return Math.max(3, Math.round(n * 0.15)); }
 
+// Episodik-Erkennung: Bei "eine Hauptfigur pro Kapitel" (Porträt-Anthologie) sind
+// fast alle Kernfiguren Einzelkapitel-Figuren. Dann greifen die bogen-basierten
+// Befunde nicht (Abwesenheit ist die Norm, kein Fehler) — stattdessen ist Wiederkehr
+// über mehrere Kapitel das aussagekräftige Signal. Kohorte = Hauptfiguren (Fallback:
+// Kern-Typen), damit Einzelauftritte von Rand-/Nebenfiguren in normalen Romanen die
+// Erkennung nicht verfälschen.
+function detectEpisodic(rows, n) {
+  const mains = rows.filter(r => r.typ === 'hauptfigur');
+  const cohort = mains.length >= 3 ? mains : rows.filter(r => CORE_TYPES.has(r.typ));
+  if (n < 3 || cohort.length < 3) return false;
+  const singleChapter = cohort.filter(r => r.firstIdx === r.lastIdx).length;
+  return singleChapter / cohort.length >= 0.6;
+}
+
 // Kern-Aggregation. `figuren` = Katalog-Array, `chapterOrder` = Kapitelnamen in
 // Lese-Reihenfolge (Spaltenachse). Liefert Matrix + Zeilen-Kennzahlen + Befunde.
 export function computePresence(figuren, chapterOrder) {
@@ -85,7 +99,11 @@ export function computePresence(figuren, chapterOrder) {
   });
   for (const r of rows) r.share = grandTotal > 0 ? r.total / grandTotal : 0;
 
-  return { chapters, chapterNameToId: nameToId, rows, maxCell, grandTotal, findings: computeFindings(rows, chapters) };
+  return {
+    chapters, chapterNameToId: nameToId, rows, maxCell, grandTotal,
+    episodic: detectEpisodic(rows, n),
+    findings: computeFindings(rows, chapters),
+  };
 }
 
 // Deterministische Befunde aus den Zeilen-Kennzahlen. Reihenfolge = Anzeige-
@@ -97,16 +115,33 @@ export function computeFindings(rows, chapters) {
   const edge = Math.max(1, Math.round(n * EDGE_FRACTION));
   const out = [];
 
+  // Episodisches Buch: Bogen-/Abwesenheits-Befunde entfallen (sie würden nur die
+  // Anthologie-Struktur als Fehler melden). Stattdessen die Linse umdrehen und die
+  // verbindenden Figuren zeigen — jene, die mehrere Kapitel überspannen.
+  if (detectEpisodic(rows, n)) {
+    for (const r of rows) {
+      if (r.cols.length < 2) continue;
+      out.push({ kind: 'recurring', typ: r.typ, figId: r.id, figName: r.name,
+        count: r.cols.length, fromChapter: chapters[r.firstIdx], toChapter: chapters[r.lastIdx] });
+    }
+    out.sort((a, b) => b.count - a.count);
+    return out;
+  }
+
   for (const r of rows) {
     const core = CORE_TYPES.has(r.typ);
+    // Auftritt über mehrere Kapitel? Eine Figur in genau einem Kapitel hat keinen
+    // Bogen — sie tritt weder "spät ein" noch geht sie "früh ab" (das wäre in
+    // episodischen Büchern/Anthologien die Norm, kein Befund).
+    const spans = r.lastIdx > r.firstIdx;
     if (core && r.maxGap && r.maxGap.len >= gap) {
       out.push({ kind: 'gap', typ: r.typ, figId: r.id, figName: r.name, len: r.maxGap.len,
         fromChapter: chapters[r.maxGap.fromIdx], toChapter: chapters[r.maxGap.toIdx] });
     }
-    if (core && n >= 4 && r.firstIdx >= edge) {
+    if (core && spans && n >= 4 && r.firstIdx >= edge) {
       out.push({ kind: 'lateEntrance', typ: r.typ, figId: r.id, figName: r.name, chapter: chapters[r.firstIdx] });
     }
-    if (core && n >= 4 && (n - 1 - r.lastIdx) >= edge) {
+    if (core && spans && n >= 4 && (n - 1 - r.lastIdx) >= edge) {
       out.push({ kind: 'earlyExit', typ: r.typ, figId: r.id, figName: r.name, chapter: chapters[r.lastIdx] });
     }
     if ((r.typ === 'hauptfigur' || r.typ === 'antagonist') && r.declaredWendepunkte === 0 && r.wendepunktCount === 0) {
@@ -115,8 +150,10 @@ export function computeFindings(rows, chapters) {
   }
 
   // Ko-Präsenz-Lücke: Hauptfigur teilt kein einziges Kapitel mit einem Antagonisten.
-  const antagCols = rows.filter(r => r.typ === 'antagonist').map(r => ({ r, set: new Set(r.cols) }));
-  for (const h of rows.filter(r => r.typ === 'hauptfigur')) {
+  // Nur sinnvoll, wenn beide über mehrere Kapitel präsent sind — bei Einzelkapitel-
+  // Figuren ist "teilt kein Kapitel" trivial wahr und flutet die Liste.
+  const antagCols = rows.filter(r => r.typ === 'antagonist' && r.lastIdx > r.firstIdx).map(r => ({ r, set: new Set(r.cols) }));
+  for (const h of rows.filter(r => r.typ === 'hauptfigur' && r.lastIdx > r.firstIdx)) {
     for (const { r: a, set } of antagCols) {
       if (h.cols.some(c => set.has(c))) continue;
       out.push({ kind: 'coPresenceGap', figId: h.id, figName: h.name, otherId: a.id, otherName: a.name });

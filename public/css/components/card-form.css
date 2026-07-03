@@ -450,6 +450,19 @@ select[aria-invalid="true"],
   grid-column: 2;
   text-align: left;
 }
+/* Mobile: das 170px/1fr-Raster quetscht Label + Feld auf Handybreite zusammen
+   und die Gaps wirken zu eng. Auf eine Spalte umbrechen und Zeilen-/Feld-Abstand
+   auf die naechsthoehere Token-Stufe anheben. */
+@media (max-width: 600px) {
+  .card-form-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
+  .card-form-label { padding-top: 0; }
+  .card-form-field { gap: var(--space-sm); }
+  .card-form-row > .card-form-hint { grid-column: 1; }
+}
 
 .form-lead {
   margin: var(--space-xs) 0 14px;
