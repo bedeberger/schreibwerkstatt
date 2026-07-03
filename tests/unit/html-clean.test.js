@@ -277,6 +277,14 @@ test('linkifyBareUrls: URL mit Query-String + Anker', () => {
   assert.match(out, /<a href="https:\/\/example\.com\/path\?x=1(&amp;|&)y=2#anchor">/);
 });
 
+test('linkifyBareUrls: &amp;-Entity in URL spannt den ganzen Link (kein Abbruch am &)', () => {
+  // contenteditable persistiert getippte URLs mit escaptem `&`; der Parser
+  // zerlegt das in mehrere Text-Nodes → ohne normalize() bricht der Link am &.
+  const out = linkifyBareUrls('<p>Job https://jobs.admin.ch/?lang=de&amp;f=verwaltungseinheit:1083431 offen.</p>');
+  assert.match(out, /href="https:\/\/jobs\.admin\.ch\/\?lang=de&f=verwaltungseinheit:1083431"/);
+  assert.match(out, /1083431<\/a> offen\./); // Rest der URL ist im Link, nicht Klartext
+});
+
 test('linkifyBareUrls: kein http im Text → no-op', () => {
   assert.equal(linkifyBareUrls('<p>Kein Link hier.</p>'), '<p>Kein Link hier.</p>');
 });
