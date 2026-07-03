@@ -44,10 +44,12 @@
   padding: var(--space-sm);
   background: var(--color-surface);
   border-radius: var(--radius-lg);
+  box-shadow: inset 0 -1px 0 var(--color-border);
   overflow-x: auto;
 }
 
 .erzaehlprofil-curve-col {
+  position: relative;
   flex: 1 0 var(--space-10);
   min-width: var(--space-10);
   height: 100%;
@@ -60,7 +62,24 @@
   cursor: pointer;
 }
 
+/* Leerer Track hinter jedem Balken: niedrige/leere Kapitel lesen als bewusst
+   niedrig statt als Render-Lücke. */
+.erzaehlprofil-curve-col::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 22px;
+  height: 100%;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: color-mix(in srgb, var(--color-muted) 9%, transparent);
+  pointer-events: none;
+}
+
 .erzaehlprofil-curve-bar {
+  position: relative;
   width: 100%;
   max-width: 22px;
   height: var(--bar-h, 0%);
@@ -78,9 +97,10 @@
 .erzaehlprofil-curve-bar[data-level="4"] { opacity: 0.75; }
 .erzaehlprofil-curve-bar[data-level="5"] { opacity: 0.95; }
 
+/* Leeres Kapitel: nur der Track bleibt sichtbar, kein Stummel. */
 .erzaehlprofil-curve-col--empty .erzaehlprofil-curve-bar {
-  background: var(--color-muted);
-  opacity: 0.2;
+  background: transparent;
+  opacity: 0;
 }
 
 .erzaehlprofil-curve-legend {
@@ -145,7 +165,9 @@
   color: var(--color-muted);
 }
 
+/* Das eine Signal im Kapitelkopf: von den neutralen Meta-Tags nach rechts abgesetzt. */
 .erzaehlprofil-deviation-badge {
+  margin-left: auto;
   font-size: var(--font-size-xs);
   font-weight: 700;
   text-transform: uppercase;
@@ -226,6 +248,25 @@
   font-size: var(--font-size-mini);
   font-variant-numeric: tabular-nums;
   color: var(--color-muted);
+}
+
+/* Themen-Verteilung als wrappende Wolke: nutzt die volle Breite statt einer
+   langen Einzelspalte. Jede Zeile ist ein gruppierter Cluster (Chip · Typ · Count). */
+.erzaehlprofil-themen-dist--cloud {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.erzaehlprofil-themen-dist--cloud .erzaehlprofil-themen-dist-row {
+  gap: var(--space-6);
+  padding: var(--space-2xs) var(--space-sm);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.erzaehlprofil-themen-dist--cloud .erzaehlprofil-thema-count {
+  margin-left: 0;
 }
 
 /* ── Buch-Befund (KI-Dach-Befund + deterministische Struktur-Befunde) ──────── */
@@ -334,6 +375,13 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-sm);
+}
+
+/* Einmal-Schauplätze können in die Hunderte gehen: auf ein paar Zeilen gekappt,
+   Rest scrollt — die Liste dominiert die Karte nicht mehr. */
+.erzaehlprofil-oneoff-scroll {
+  max-height: min(200px, 40vh);
+  overflow-y: auto;
 }
 
 /* Auffälligkeits-Flag (verschwindet, statisch, kein Höhepunkt …). */

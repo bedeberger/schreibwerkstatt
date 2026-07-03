@@ -4,6 +4,10 @@
 <div x-show="figurenGraphModus === 'praesenz'" class="figur-presence" x-cloak>
   <p class="figur-presence-intro" x-text="$app.t('figuren.presence.intro')"></p>
 
+  <template x-if="figurenPresenceData().episodic">
+    <p class="figur-presence-note" x-text="$app.t('figuren.presence.episodicNote')"></p>
+  </template>
+
   <template x-if="figurenPresenceData().findings.length">
     <ul class="figur-presence-findings">
       <template x-for="(fd, fi) in figurenPresenceData().findings" :key="fi">
@@ -16,7 +20,7 @@
   </template>
 
   <template x-if="figurenPresenceData().rows.length">
-    <div class="heatmap-scroll">
+    <div class="heatmap-scroll figur-presence-scroll">
       <table class="heatmap-table figur-presence-table">
         <thead>
           <tr>

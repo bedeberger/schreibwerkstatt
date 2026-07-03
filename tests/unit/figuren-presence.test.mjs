@@ -101,6 +101,36 @@ test('Episodische Anthologie: Ko-Präsenz-Lücke flutet nicht bei Einzelkapitel-
   assert.equal(co.length, 0);
 });
 
+test('Episodik: erkannt bei Hauptfigur-pro-Kapitel, Linse umgedreht auf Wiederkehr', () => {
+  // 5 Einzelkapitel-Hauptfiguren (episodisch) + 1 Figur, die 3 Kapitel verbindet.
+  const data = computePresence([
+    fig('A', 'hauptfigur', [k('K1')]),
+    fig('B', 'hauptfigur', [k('K2')]),
+    fig('C', 'hauptfigur', [k('K3')]),
+    fig('D', 'hauptfigur', [k('K4')]),
+    fig('E', 'hauptfigur', [k('K5')]),
+    fig('Faden', 'nebenfigur', [k('K1'), k('K3'), k('K6')]),
+  ], CH);
+  assert.equal(data.episodic, true);
+  // Keine Bogen-Anomalien mehr — nur der Wiederkehr-Befund für die Verbindungsfigur.
+  assert.deepEqual(data.findings.map(f => f.kind), ['recurring']);
+  const r = data.findings[0];
+  assert.equal(r.figName, 'Faden');
+  assert.equal(r.count, 3);
+  assert.equal(r.fromChapter, 'K1');
+  assert.equal(r.toChapter, 'K6');
+});
+
+test('Episodik: normaler Roman-Cast wird NICHT als episodisch erkannt', () => {
+  const data = computePresence([
+    fig('A', 'hauptfigur', [k('K1'), k('K2'), k('K5')]),
+    fig('B', 'hauptfigur', [k('K1'), k('K3'), k('K6')]),
+    fig('C', 'hauptfigur', [k('K2'), k('K4'), k('K6')]),
+  ], CH);
+  assert.equal(data.episodic, false);
+  assert.ok(!data.findings.some(f => f.kind === 'recurring'));
+});
+
 test('Befund flatArc: Hauptfigur ohne deklarierte UND belegte Wendepunkte', () => {
   const flat = computePresence([fig('A', 'hauptfigur', [k('K1'), k('K2'), k('K3')])], CH).findings;
   assert.ok(flat.some(f => f.kind === 'flatArc'));

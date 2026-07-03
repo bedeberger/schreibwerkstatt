@@ -198,6 +198,7 @@ export const presenceMethods = {
       case 'earlyExit':    return t('figuren.presence.finding.earlyExit', { name: fd.figName, chapter: fd.chapter });
       case 'flatArc':      return t('figuren.presence.finding.flatArc', { name: fd.figName });
       case 'coPresenceGap':return t('figuren.presence.finding.coPresenceGap', { name: fd.figName, other: fd.otherName });
+      case 'recurring':    return t('figuren.presence.finding.recurring', { name: fd.figName, count: fd.count, from: fd.fromChapter, to: fd.toChapter });
       default:             return '';
     }
   },

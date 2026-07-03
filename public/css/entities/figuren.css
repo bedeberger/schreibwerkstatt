@@ -124,7 +124,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin: 0 0 var(--space-md);
+  /* Akzent-Tick in den linken Rand hängen: der Titeltext startet bündig mit dem
+     Fliesstext (Detail-Rows, Werte) auf einer gemeinsamen Kante, der Tick liegt
+     als Marginalie im Padding. -(Tick-Breite + gap). */
+  margin: 0 0 var(--space-md) calc(-3px - var(--space-xs));
   font-size: var(--font-size-sm);
   font-weight: 700;
   text-transform: uppercase;
@@ -166,14 +169,14 @@
 
 /* === Figuren: Entwicklungsbogen === */
 .figur-arc { margin-bottom: var(--space-10); }
-.figur-arc-body { margin-top: var(--space-2xs); }
+.figur-arc-body { margin-top: var(--space-sm); }
 .figur-arc-stations {
-  margin: var(--space-2xs) 0;
-  padding-left: var(--space-xl);
+  margin: var(--space-sm) 0;
+  padding-left: var(--space-lg);
   font-size: var(--font-size-sm);
   line-height: 1.5;
 }
-.figur-arc-stations li { margin-bottom: var(--space-2xs); }
+.figur-arc-stations li { margin-bottom: var(--space-6); }
 .figur-arc-stations li:last-child { margin-bottom: 0; }
 
 /* === Figuren: Detail-Sektionstitel mit zartem Akzent-Tick (an Karten-Identität gekoppelt) === */
@@ -183,6 +186,9 @@
   gap: var(--space-xs);
   margin-top: var(--space-lg);
   margin-bottom: var(--space-sm);
+  /* Tick hängt in den linken Rand (analog .figur-group-title), damit der
+     Titeltext bündig mit dem Fliesstext startet. -(Tick-Breite + gap). */
+  margin-left: calc(-2px - var(--space-xs));
 }
 /* Erste Untersektion direkt unter einem Gruppentitel braucht keinen grossen Abstand */
 .figur-group > *:first-child .bewertung-section-title:not(.bewertung-section-title--inline),
@@ -337,8 +343,14 @@
 /* Anker-Ereignis hinter "Jahr / Alter" — gedämpft (das "weil …"). */
 .figur-jahr-anchor { font-size: var(--font-size-sm); color: var(--color-muted); }
 
-.figur-eigenschaften-list { margin-bottom: var(--space-sm); }
-.figur-detail .figur-eigenschaften-list li { padding-top: var(--space-6); padding-bottom: var(--space-6); }
+.figur-eigenschaften-list { margin-bottom: var(--space-sm); padding-left: 0; }
+/* Gleiche Schriftgrösse + Rhythmus wie der übrige Detail-Text (sonst wirkt die
+   Liste zu gross und zu luftig gegenüber den Nachbar-Sektionen). Marker fluchtet
+   mit der Titelkante, Text um --space-md eingerückt. */
+.figur-detail .figur-eigenschaften-list li {
+  font-size: var(--font-size-sm);
+  padding: var(--space-2xs) 0 var(--space-2xs) var(--space-md);
+}
 
 .figur-tags-row {
   font-size: var(--font-size-sm);
@@ -387,6 +399,15 @@
   color: var(--color-muted);
   margin-bottom: var(--space-sm);
 }
+.figur-presence-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  background: var(--color-ok-bg);
+  border-left: 3px solid var(--color-ok-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
 .figur-presence-findings {
   list-style: none;
   margin: 0 0 var(--space-md);
@@ -414,6 +435,15 @@
 .figur-presence-finding-dot--lateEntrance  { background: var(--color-warn-text); }
 .figur-presence-finding-dot--earlyExit     { background: var(--color-warn-text); }
 .figur-presence-finding-dot--flatArc       { background: var(--color-muted); }
+.figur-presence-finding-dot--recurring     { background: var(--color-ok-text); }
+
+/* Tabelle hugt ihren Inhalt statt `width: 100%` von .heatmap-table zu erben —
+   bei wenigen Kapiteln verteilt 100% die Slack in die flexible Namensspalte, die
+   Zellen treiben in die Mitte und vor "Total" klafft eine tote Lücke. Analog zur
+   Präsenz-Matrix im Buch-Overview (book-overview/presence.css). Der Scroll-Wrapper
+   hugt mit (fit-content) und cappt bei Overflow auf 100% → viele Kapitel scrollen. */
+.figur-presence-scroll { width: fit-content; max-width: 100%; }
+.figur-presence-table { width: auto; }
 
 /* Heatmap-Zellen quadratisch + kompakt, damit viele Kapitel-Spalten passen.
    Doppelklasse (0,2,1) schlägt die Basis-.heatmap-table-Regeln (0,1,1/0,1,2). */

@@ -1,3 +1,4 @@
+@layer components {
 /* Welt-Fakten/Weltregeln-Karte (read-only). Reuse entity-list + filter-bar;
    eigene Klassen nur für die Kategorie-Gruppierung + Fakt-Zeile.
    Akzent über var(--card-accent) (Mapping in card-accents.css). */
@@ -101,4 +102,5 @@
 @media (max-width: 640px) {
   .weltfakten-row { grid-template-columns: 1fr; gap: var(--space-2xs); }
   .weltfakten-row-body { padding-left: 0; border-left: none; }
+}
 }

@@ -162,11 +162,18 @@
           <div class="erzaehlprofil-befund-group"
                x-show="(erzaehlprofilBefund().locations.oneOff || []).length || (erzaehlprofilBefund().locations.abandoned || []).length">
             <div class="erzaehlprofil-befund-group-head" x-text="$app.t('erzaehlprofil.locationsBefundTitle')"></div>
-            <div class="erzaehlprofil-flag-row" x-show="(erzaehlprofilBefund().locations.oneOff || []).length">
-              <span class="entity-meta-label" x-text="$app.t('erzaehlprofil.locationsOneOff')"></span>
-              <template x-for="(name, i) in erzaehlprofilBefund().locations.oneOff" :key="'oo:' + i">
-                <span class="tag" x-text="name"></span>
-              </template>
+            <div x-show="(erzaehlprofilBefund().locations.oneOff || []).length" x-data="collapsible()">
+              <button type="button" class="collapsible-toggle" x-bind="trigger">
+                <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+                <span x-text="$app.t('erzaehlprofil.locationsOneOffToggle', { n: (erzaehlprofilBefund().locations.oneOff || []).length })"></span>
+              </button>
+              <div x-bind="panel" class="collapsible-section erzaehlprofil-oneoff-scroll" x-cloak>
+                <div class="erzaehlprofil-flag-row">
+                  <template x-for="(name, i) in erzaehlprofilBefund().locations.oneOff" :key="'oo:' + i">
+                    <span class="tag" x-text="name"></span>
+                  </template>
+                </div>
+              </div>
             </div>
             <div class="entity-list" x-show="(erzaehlprofilBefund().locations.abandoned || []).length">
               <template x-for="(l, i) in erzaehlprofilBefund().locations.abandoned" :key="'ab:' + i">

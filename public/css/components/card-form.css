@@ -408,9 +408,7 @@ textarea:disabled,
   gap: var(--space-6);
 }
 @media (max-width: 600px) {
-  .card-empty {
-    padding: var(--space-xl) var(--space-md);
-  }
+  .card-empty { padding: var(--space-xl) var(--space-md); }
 }
 .card-form-textarea {
   width: 100%;
@@ -449,19 +447,6 @@ select[aria-invalid="true"],
 .card-form-row > .card-form-hint {
   grid-column: 2;
   text-align: left;
-}
-/* Mobile: das 170px/1fr-Raster quetscht Label + Feld auf Handybreite zusammen
-   und die Gaps wirken zu eng. Auf eine Spalte umbrechen und Zeilen-/Feld-Abstand
-   auf die naechsthoehere Token-Stufe anheben. */
-@media (max-width: 600px) {
-  .card-form-row {
-    grid-template-columns: 1fr;
-    gap: var(--space-sm);
-    margin-bottom: var(--space-lg);
-  }
-  .card-form-label { padding-top: 0; }
-  .card-form-field { gap: var(--space-sm); }
-  .card-form-row > .card-form-hint { grid-column: 1; }
 }
 
 .form-lead {
@@ -591,17 +576,19 @@ select[aria-invalid="true"],
   opacity: var(--opacity-strong);
 }
 
+/* Mobile: das 170px/1fr-Raster quetscht Label + Feld auf Handybreite zusammen
+   und die Gaps wirken zu eng. Auf eine Spalte umbrechen und Zeilen-/Feld-Abstand
+   auf die naechsthoehere Token-Stufe anheben. */
 @media (max-width: 600px) {
   .card-form-row {
     grid-template-columns: 1fr;
-    gap: var(--space-6);
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
   }
-  .card-form-label {
-    padding-top: 0;
-  }
-  .form-inline {
-    gap: var(--space-10) 16px;
-  }
+  .card-form-label { padding-top: 0; }
+  .card-form-field { gap: var(--space-sm); }
+  .card-form-row > .card-form-hint { grid-column: 1; }
+  .form-inline { gap: var(--space-10) 16px; }
   .form-inline-field {
     flex: 1 1 calc(50% - 16px);
     min-width: 0;
@@ -611,15 +598,9 @@ select[aria-invalid="true"],
     width: auto;
     min-width: 0;
   }
-  .form-radio-group {
-    gap: var(--space-md);
-  }
-  .form-radio-group--card {
-    flex-direction: column;
-  }
-  .form-radio-group--card .form-radio-option {
-    width: 100%;
-  }
+  .form-radio-group { gap: var(--space-md); }
+  .form-radio-group--card { flex-direction: column; }
+  .form-radio-group--card .form-radio-option { width: 100%; }
 }
 
 /* === Card-Actions (Button-Gruppe im card-header) === */

@@ -154,7 +154,7 @@
           <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
           <span x-text="$app.t('erzaehlprofil.themenTitle')"></span>
         </button>
-        <div x-bind="panel" class="collapsible-section erzaehlprofil-themen-dist" x-cloak>
+        <div x-bind="panel" class="collapsible-section erzaehlprofil-themen-dist erzaehlprofil-themen-dist--cloud" x-cloak>
           <template x-for="(t, i) in erzaehlprofilThemenAggregiert()" :key="'d:' + i">
             <div class="erzaehlprofil-themen-dist-row">
               <span class="erzaehlprofil-thema-chip" :data-typ="t.typ || 'thema'" x-text="t.thema"></span>
