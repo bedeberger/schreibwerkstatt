@@ -1,9 +1,9 @@
 import { EVT } from '../events.js';
 // editorEntitiesCard — Entity-Linking-Sub-Komponente (Notebook-Editor):
 //   - Inline-Highlights (Figuren, Orte) im contenteditable.
-//   - „Auf dieser Seite"-Collapsible ueber dem Editor-Body mit drei Reihen
-//     (Figuren / Szenen / Ereignisse). Pattern wie .figure-context-panel.
 //   - Popover (teleport) bei Klick auf ein Highlight.
+// Die Kontext-Listen (Figuren/Szenen/Ereignisse) leben im Referenz-Slot
+// (cards/reference-card.js), nicht mehr hier.
 //
 // Lifecycle:
 //   - Aktivierung gesteuert ueber Root-Flag `entitiesEnabledForCurrentBook`
@@ -20,7 +20,6 @@ import { EVT } from '../events.js';
 
 import {
   applyHighlights, clearHighlights, findHighlightAtPoint,
-  selectScenesForView, selectEventsForView,
   toEntitiesList,
 } from '../editor/notebook/entities.js';
 
@@ -47,13 +46,6 @@ export function registerEditorEntitiesCard() {
     _recomputeTimer: null,
     _abort: null,
     _onSettingsUpdated: null,
-    // Memo-Cache fuer panelScenes/panelEvents. Alpine ruft die Getter mehrfach
-    // pro Render auf; ohne Cache laeuft filter+sort jedes Mal neu. Key =
-    // pageId|chapterId|sourceLen — Quellen-Wechsel invalidiert implizit.
-    _scenesKey: null,
-    _scenesVal: { onPage: [], inChapter: [] },
-    _eventsKey: null,
-    _eventsVal: { onPage: [], inChapter: [] },
 
     init() {
       const abort = new AbortController();
@@ -116,14 +108,9 @@ export function registerEditorEntitiesCard() {
       // nicht — Entity-Popover bleibt offen und ueberdeckt das LT-Popover.
       // Mousedown auf document/capture laeuft vor jedem Root-Listener, schliesst
       // sauber bevor LT sein Popover oeffnet.
-      // Ausnahme: Chip-zu-Chip-Wechsel. Mousedown auf einem anderen Chip wuerde
-      // den Popover schliessen und der nachfolgende Click ihn neu oeffnen —
-      // sichtbares Flackern. Wir lassen Chip-Targets durch, der Chip-Click
-      // ueberschreibt den State ohnehin.
       document.addEventListener('mousedown', (e) => {
         if (!this.entityPopover) return;
         if (e.target?.closest?.('.entity-popover')) return;
-        if (e.target?.closest?.('.figure-context-chip')) return;
         this.closePopover();
       }, { capture: true, signal });
 
@@ -197,57 +184,6 @@ export function registerEditorEntitiesCard() {
       if (!root) { clearHighlights(); this._highlights = []; return; }
       const entities = toEntitiesList(app.$store.catalog.figuren, app.$store.catalog.orte);
       this._highlights = applyHighlights(root, entities);
-    },
-
-    // ── Panel-Daten ─────────────────────────────────────────────────────────
-    //
-    // Alpine ruft Getter im Panel-Template mehrfach pro Render (x-show, x-if,
-    // x-for je 1×) — bei 20k-Zeichen-Seiten + viel Buchmaterial summiert sich
-    // das. Memoization auf (page, szenen/figuren-laenge) eliminiert die
-    // wiederholten filter+sort-Sweeps; gecacht wird das Resultat-Objekt, das
-    // x-for direkt iteriert. Reset implizit beim Wechsel der Quellen.
-
-    panelScenes() {
-      const app = window.__app;
-      const pid = app?.currentPage?.id;
-      const cid = app?.currentPage?.chapter_id;
-      const szenen = app?.$store?.catalog?.szenen || [];
-      const key = pid + '|' + cid + '|' + szenen.length;
-      if (this._scenesKey !== key) {
-        this._scenesKey = key;
-        this._scenesVal = selectScenesForView(szenen, pid, cid);
-      }
-      return this._scenesVal;
-    },
-
-    panelEvents() {
-      const app = window.__app;
-      const pid = app?.currentPage?.id;
-      const cid = app?.currentPage?.chapter_id;
-      const figuren = app?.$store?.catalog?.figuren || [];
-      const key = pid + '|' + cid + '|' + figuren.length;
-      if (this._eventsKey !== key) {
-        this._eventsKey = key;
-        this._eventsVal = selectEventsForView(figuren, pid, cid);
-      }
-      return this._eventsVal;
-    },
-
-    panelEmpty() {
-      const s = this.panelScenes();
-      const e = this.panelEvents();
-      return s.onPage.length === 0 && s.inChapter.length === 0
-        && e.onPage.length === 0 && e.inChapter.length === 0;
-    },
-
-    extractionEmpty() {
-      const cat = window.__app?.$store?.catalog;
-      const figuren = cat?.figuren || [];
-      const f = figuren.length;
-      const o = (cat?.orte || []).length;
-      const s = (cat?.szenen || []).length;
-      const e = figuren.reduce((n, x) => n + (Array.isArray(x?.lebensereignisse) ? x.lebensereignisse.length : 0), 0);
-      return f === 0 && o === 0 && s === 0 && e === 0;
     },
 
     // ── Navigation ──────────────────────────────────────────────────────────

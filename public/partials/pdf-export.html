@@ -69,7 +69,7 @@
          x-data="combobox({ placeholder: $app.t('pdfExport.profile'), compact: false })"
          x-modelable="value" x-model="activeProfileId"
          x-effect="options = profiles.map(p => ({ value: p.id, label: p.name + (p.is_default ? ' ★' : '') }))"
-         @combobox-change="selectProfile(activeProfileId)"></div>
+         @combobox-change="selectProfile($event.detail)"></div>
     <button type="button" class="export-profile-btn" :data-tip="$app.t('pdfExport.newProfile')"
             @click="_showCreate = !_showCreate">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>

@@ -14,6 +14,18 @@ test('defaultConfig liefert vollständigen Schema-Baum', () => {
   assert.equal(c.pdfa.standard, 'pdfa');
 });
 
+test('Seitennummerierung: Defaults + Clamping der neuen Felder', () => {
+  const d = defaultConfig();
+  assert.equal(d.layout.countFrontMatter, false);
+  assert.equal(d.layout.pageNumberFirstVisible, 1);
+  // countFrontMatter als Bool, pageNumberFirstVisible als geclampter Num
+  assert.equal(validateConfig({ layout: { countFrontMatter: true } }).layout.countFrontMatter, true);
+  assert.equal(validateConfig({ layout: { pageNumberFirstVisible: 4 } }).layout.pageNumberFirstVisible, 4);
+  assert.equal(validateConfig({ layout: { pageNumberFirstVisible: 0 } }).layout.pageNumberFirstVisible, 1);
+  assert.equal(validateConfig({ layout: { pageNumberFirstVisible: 99999 } }).layout.pageNumberFirstVisible, 9999);
+  assert.equal(validateConfig({ layout: { pageNumberFirstVisible: 'nope' } }).layout.pageNumberFirstVisible, 1);
+});
+
 test('pdfa.standard: enum-Whitelist + enabled leitet ab', () => {
   assert.equal(validateConfig({ pdfa: { standard: 'pdfx' } }).pdfa.standard, 'pdfx');
   assert.equal(validateConfig({ pdfa: { standard: 'pdfx' } }).pdfa.enabled, false);

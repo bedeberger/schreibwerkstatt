@@ -35,7 +35,6 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
    entkoppelt; das frühere Peek-Through-Pattern (Card-Header durch Top-Gap
    sichtbar) entfällt. */
 #editor-card.focus-host .editor-card__topbar,
-#editor-card.focus-host .figure-context-panel,
 #editor-card.focus-host .history-bar { display: none; }
 
 /* Safari resolved height:100% über eine block-Kette nicht zuverlässig in

@@ -301,6 +301,10 @@ export const pageMethods = {
     this.showIdeenCard = false;
     this.ideenChapterId = null;
     this.ideenScope = 'page';
+    // Referenz-Slot sitzt im selben Editor-Slot (Mutex mit Chat + Ideen) →
+    // beim Verlassen der Seite ebenfalls schliessen, sonst rendert er ohne
+    // Editor-Split-Container auf voller Breite.
+    this.showReferenceCard = false;
     this._checkDoneBeforeChat = false;
     this.currentPage = null;
     this.pageLastEditor = null;

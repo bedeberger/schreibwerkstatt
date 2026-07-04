@@ -67,6 +67,24 @@ test('Footer-Token erzeugt KEINE Ghost-Pages (Regression)', async () => {
   assert.equal(pageCount(withFooter), pageCount(noFooter), 'Footer-Pass darf keine Extra-Pages erzeugen');
 });
 
+test('countFrontMatter + pageNumberFirstVisible ändern Page-Count nicht', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  cfg.layout.footerCenter = '{page} / {pages}';
+  const baseline = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  const tuned = {
+    ...cfg,
+    layout: { ...cfg.layout, countFrontMatter: true, pageNumberFirstVisible: 3 },
+  };
+  const withOpts = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: tuned }, coverBuf: null, token: null,
+  });
+  // Reine Stempel-Optionen: keine zusätzlichen/fehlenden Seiten.
+  assert.equal(pageCount(withOpts), pageCount(baseline));
+});
+
 test('blankPageAfter erzeugt zusätzliche leere Page pro Kapitel', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;

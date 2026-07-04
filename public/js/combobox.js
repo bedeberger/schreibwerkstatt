@@ -144,6 +144,9 @@ export function comboboxData(cfg = {}) {
           // Bildschirm-Tastatur, deren resize das am Trigger verankerte Dropdown
           // verschieben wuerde. Die Liste ist auch ohne Fokus voll bedienbar.
           if (!this._isMobile()) this.$refs.cbInput?.focus();
+          // Aktuell gewaehlten Eintrag beim Oeffnen in den sichtbaren Bereich
+          // scrollen, damit lange Listen nicht am Anfang stehen bleiben.
+          this._scrollHl();
         });
       },
       close() {

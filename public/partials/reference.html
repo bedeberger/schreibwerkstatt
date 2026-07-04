@@ -14,7 +14,7 @@
               @click="toggleReferenceScope()"
               :data-tip="referenceScope === 'page' ? $app.t('reference.scope.toBook') : $app.t('reference.scope.toContext')"
               :aria-label="referenceScope === 'page' ? $app.t('reference.scope.toBook') : $app.t('reference.scope.toContext')">
-        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=693#' + (referenceScope === 'book' ? 'book' : 'file-text')"/></svg>
+        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=693#' + (referenceScope === 'book' ? 'book-open' : 'scroll')"/></svg>
       </button>
     </div>
     <button type="button" class="btn-card-close" @click="$app.toggleReferenceCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
@@ -63,6 +63,8 @@
           <div class="reference-row-head">
             <span class="reference-row-title" x-text="fig.name"></span>
             <span x-show="fig.typ" class="tag" x-text="$app.t('figuren.type.' + fig.typ)"></span>
+            <span x-show="$app.figurJahrLabel(fig)" class="tag" :data-tip="$app.t('figuren.jahrAlterTip')" x-text="$app.figurJahrLabel(fig)"></span>
+            <span x-show="fig.geburtstag" class="tag" :data-tip="$app.t('figuren.birthYearTip')" x-text="$app.t('figuren.birthYear', { jahr: fig.geburtstag })"></span>
           </div>
           <div class="reference-row-sub" x-show="fig.rolle" x-text="fig.rolle"></div>
           <div class="reference-row-desc" x-show="fig.beschreibung" x-text="fig.beschreibung"></div>

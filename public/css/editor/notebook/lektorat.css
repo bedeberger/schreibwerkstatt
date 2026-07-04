@@ -153,42 +153,4 @@
 .lektorat-tip-korrektur { font-weight: 700; color: var(--color-mark-ins-text); }
 .lektorat-tip-erkl { color: var(--color-subtle); }
 
-/* === Figure Context Panel === */
-.figure-context-panel {
-  margin: var(--space-md) 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-}
-.figure-context-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-sm) 12px;
-  cursor: pointer;
-  user-select: none;
-}
-.figure-context-header:hover { background: var(--color-hover-light); }
-/* `.internal-link` traegt der Header nur fuer die Tastatur-Delegation (role=button,
-   Tab-Fokus). Die globale Link-Optik (Underline + Opacity-Dip) passt nicht zu einem
-   Collapse-Toggle — Hintergrund-Hover + Chevron sind die Affordanz, Fokus-Ring bleibt. */
-.figure-context-header.internal-link:hover,
-.figure-context-header.internal-link:focus-visible { opacity: 1; text-decoration: none; }
-.figure-context-title { display: flex; align-items: center; gap: var(--space-6); font-size: var(--font-size-sm); font-weight: 400; }
-.figure-context-body { padding: var(--space-xs) 12px 10px; display: flex; flex-wrap: wrap; gap: var(--space-6); }
-.figure-context-chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-3) 8px;
-  font-size: var(--font-size-sm);
-  background: var(--color-tooltip-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 0;
-  cursor: default;
-}
-.figure-context-chip:hover { border-color: var(--color-accent); }
-.figure-context-chip .tag { font-size: var(--font-size-micro); padding: 0 4px; }
-
 }

@@ -161,14 +161,10 @@
           <span class="action-sep" aria-hidden="true"></span>
           <span class="action-group">
             <span class="icon-btn-badge-wrap" x-show="canReview()">
-              <button type="button" class="icon-btn icon-btn--ghost" @click="toggleChatCard()" :class="{ 'is-active': showChatCard }" :disabled="currentPageEmpty" :data-tip="t('editor.btn.chatTitle')" :aria-label="t('editor.btn.chat')">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#message-square"/></svg>
-              </button>
+              <button type="button" class="icon-btn icon-btn--ghost" @click="toggleChatCard()" :class="{ 'is-active': showChatCard }" :disabled="currentPageEmpty" :data-tip="t('editor.btn.chatTitle')" :aria-label="t('editor.btn.chat')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#message-square"/></svg></button>
               <span class="icon-btn-badge" x-show="currentPageChatSessionCount > 0" x-text="currentPageChatSessionCount" :data-tip="t('editor.btn.chatCountTitle', { n: currentPageChatSessionCount })"></span>
             </span>
-            <button type="button" class="icon-btn icon-btn--ghost" @click="toggleReferenceCard()" :class="{ 'is-active': showReferenceCard }" :data-tip="t('editor.btn.referenceTitle')" :aria-label="t('editor.btn.reference')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#book-open"/></svg>
-            </button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="toggleReferenceCard()" :class="{ 'is-active': showReferenceCard }" :data-tip="t('editor.btn.referenceTitle')" :aria-label="t('editor.btn.reference')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#book-open"/></svg></button>
             <span class="icon-btn-badge-wrap" x-show="pageCommentCount > 0">
               <button type="button" class="icon-btn icon-btn--ghost" @click="window.dispatchEvent(new CustomEvent('comments-rail:toggle'))" :class="{ 'is-active': pageCommentRailOpen }" :data-tip="t('share.rail.toggle')" :aria-label="t('share.rail.toggle')" :aria-pressed="pageCommentRailOpen">
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#users"/></svg>
@@ -304,9 +300,8 @@
             x-text="t('edit.conflict.resolveBtn')"></button>
   </div>
 
-  <!-- „Auf dieser Seite"-Panel (Entity-Linking + Kapitel-Figuren konsolidiert): eine Collapsible
-       mit drei Sektionen (Figuren Kapitel-Scope, Szenen, Ereignisse). Stil + Hover-Tooltips wie
-       .figure-context-panel. Lebt im Partial editor-entities-panel.html. -->
+  <!-- Entity-Popover-Host für die Inline-Highlights (Figuren/Orte) im Editor.
+       Die Kontext-Listen leben im Referenz-Slot. Partial: editor-entities-panel.html. -->
   <div id="partial-editor-entities-panel" class="display-contents"></div>
 
   <!-- Preview + optional Befunde: Layout wird zum Split, sobald geprüft wurde.
