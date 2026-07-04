@@ -90,6 +90,29 @@
               </div>
             </div>
 
+            <h4 class="pdfx-font-group-title" x-text="$app.t('pdfExport.cover.spineImage')"></h4>
+            <p class="card-form-field-note" x-text="$app.t('pdfExport.cover.spineImageHint')"></p>
+            <div class="pdfx-cover-preview">
+              <template x-if="activeProfile.has_spine">
+                <img :src="spineImageUrl()" alt="">
+              </template>
+              <template x-if="!activeProfile.has_spine">
+                <span x-text="$app.t('pdfExport.cover.spineNoFile')"></span>
+              </template>
+            </div>
+            <div class="pdfx-cover-actions">
+              <div class="pdfx-file-btn"
+                   x-data="fileDrop({ accept: 'image/jpeg,image/png,image/webp', drag: false })"
+                   @file-drop="uploadSpineImage($event.detail.file)">
+                <span x-text="spineImageUploading ? $app.t('pdfExport.cover.spineUploading') : (activeProfile.has_spine ? $app.t('pdfExport.cover.spineReplace') : $app.t('pdfExport.cover.spineUpload'))"></span>
+              </div>
+              <button type="button"
+                      x-show="activeProfile.has_spine"
+                      @click="removeSpineImage()"
+                      x-text="$app.t('pdfExport.cover.spineRemove')"></button>
+            </div>
+            <p class="card-form-error" x-show="spineImageError" x-text="spineImageError"></p>
+
             <h4 class="pdfx-font-group-title" x-text="$app.t('pdfExport.cover.backImage')"></h4>
             <div class="pdfx-cover-preview">
               <template x-if="activeProfile.has_back_cover">

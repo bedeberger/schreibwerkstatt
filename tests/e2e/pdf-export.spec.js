@@ -28,7 +28,7 @@ test.describe('pdf-export-card', () => {
   // das neue Profil → Editor (export-tabs) mountet.
   async function createProfile(page, name) {
     await page.locator('.export-profile-bar button:has(use[href$="#plus"])').click();
-    await page.locator('.export-create-row .card-form-input').fill(name);
+    await page.locator('.export-create-row:not(.export-rename-row) .card-form-input').fill(name);
     await page.locator('.export-create-row button.primary', { hasText: 'Anlegen' }).click();
     await expect(page.locator('.export-tabs')).toBeVisible();
   }
@@ -40,7 +40,7 @@ test.describe('pdf-export-card', () => {
 
   test('Profil anlegen → Editor mit Tabs sichtbar', async ({ page }) => {
     await createProfile(page, 'Mein Profil');
-    await expect(page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Layout' })).toBeVisible();
+    await expect(page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Format' })).toBeVisible();
     // Backend kennt das Profil.
     const { profiles } = await page.request.get(`${BASE}/pdf-export/profiles`).then(r => r.json());
     expect(profiles.some(p => p.name === 'Mein Profil')).toBe(true);
@@ -49,11 +49,11 @@ test.describe('pdf-export-card', () => {
   test('Tab-Wechsel zeigt verschiedene Tab-Panels', async ({ page }) => {
     await createProfile(page, 'X');
     const activeTab = page.locator('.export-tabs .tabs-btn--active');
-    await expect(activeTab).toHaveText(/Layout/);
+    await expect(activeTab).toHaveText(/Format/);
     await page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Cover' }).click();
     await expect(activeTab).toHaveText(/Cover/);
-    await page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Norm' }).click();
-    await expect(activeTab).toHaveText(/Norm/);
+    await page.locator('.export-tabs .tabs-btn').filter({ hasText: 'Druck' }).click();
+    await expect(activeTab).toHaveText(/Druck/);
   });
 
   test('Cover-Tab: Umschlag-Sektion berechnet Live-Rückenbreite', async ({ page }) => {

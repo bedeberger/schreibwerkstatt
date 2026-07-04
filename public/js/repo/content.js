@@ -163,6 +163,20 @@ export const contentRepo = {
     return out;
   },
 
+  // POST /content/pages/:id/images — Manuskript-Bild hochladen. `file` ist ein
+  // File/Blob; der Body sind die rohen Bytes (Server normalisiert via sharp).
+  // Liefert { id, url, width, height, mime }. Kein SW-Cache-Bust noetig — das
+  // Bild-BLOB liegt nicht im CONTENT_CACHE.
+  async uploadPageImage(id, file) {
+    const r = await _fetchWithTimeout('/content/pages/' + id + '/images', {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    }, WRITE_TIMEOUT_MS);
+    if (!r.ok) throw _httpError('POST', 'pages/' + id + '/images', r.status, await _errBody(r));
+    return r.json();
+  },
+
   // Alias fuer Strukturoperationen (rename/move/reorder ohne Body-Change).
   async updatePage(id, body) {
     // Invalidiert auch das Buch-Tree-Listing, weil Rename/Move dort sichtbar wird.

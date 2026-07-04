@@ -349,6 +349,38 @@ test('mirrorMargins: Render läuft ohne Crash, gleiche Page-Count wie ohne Mirro
   assert.equal(pageCount(mirrored), pageCount(baseline), 'Mirror darf Page-Count nicht ändern');
 });
 
+test('mirrorMargins: Text-Cursor folgt dem gespiegelten Rand (Regression: Verso-Textstart)', async () => {
+  // addPage() setzt doc.x auf den BASIS-Rand, BEVOR der pageAdded-Hook spiegelt.
+  // Ohne Cursor-Nachzug startet der Body auf Verso-Seiten am (grösseren) Recto-
+  // Innenrand → linker/rechter Rand vertauscht sich sichtbar. Invariante:
+  // doc.x == margins.left auf JEDER Seite (recto wie verso).
+  const PDFDocument = (await import('pdfkit')).default;
+  const { createPageGeometry } = await import('../../lib/pdf-render/page-geometry.js');
+  const { MM_TO_PT } = await import('../../lib/pdf-render/layout.js');
+
+  const margins = { top: 25 * MM_TO_PT, right: 15 * MM_TO_PT, bottom: 25 * MM_TO_PT, left: 30 * MM_TO_PT };
+  const doc = new PDFDocument({ size: [595, 842], margins, autoFirstPage: false, bufferPages: true });
+  doc.on('data', () => {});
+  const geo = createPageGeometry(doc, {
+    layout: { bodyInsetMm: { top: 0, right: 0, bottom: 0, left: 0 } },
+    margins, bleedPt: 0, mirror: true, frontMatterAllowed: true, blankPageIdxs: new Set(),
+  });
+  geo.attach();
+
+  for (let i = 0; i < 4; i++) {
+    doc.addPage();
+    const idx = doc.bufferedPageRange().start + doc.bufferedPageRange().count - 1;
+    const verso = idx % 2 === 1;
+    assert.ok(Math.abs(doc.x - doc.page.margins.left) < 0.01,
+      `Seite ${idx} (${verso ? 'verso' : 'recto'}): doc.x=${doc.x} muss margins.left=${doc.page.margins.left} folgen`);
+    // Verso spiegelt tatsächlich (linker Rand = Aussenrand 15mm, nicht 30mm).
+    const expectLeftMm = verso ? 15 : 30;
+    assert.ok(Math.abs(doc.page.margins.left / MM_TO_PT - expectLeftMm) < 0.01,
+      `Seite ${idx}: erwarteter linker Rand ${expectLeftMm}mm`);
+  }
+  doc.end();
+});
+
 test('widowOrphanControl: schiebt Absatz auf neue Seite statt Single-Line-Witwe/Waise', async () => {
   // Vier mittellange Absätze, plus ein letzter Absatz, der eine Single-Line-
   // Witwe/Waise produzieren würde. Mit Kontrolle wird er als Ganzes

@@ -3,8 +3,10 @@
   Alpine.data-Sub-Komponente — public/js/cards/pdf-export-card.js.
   Aufbau identisch zu Word/EPUB (export-shared.css): Header mit Scope-Picker +
   Export, Hint, einzeilige Profil-Leiste (Combobox + Icon-Aktionen), Anlege-
-  Zeile, Tabs, Speichern-Footer unten. Tabs: Layout / Schrift / Kapitel /
-  Cover / TOC / Extras / Druck / Norm.
+  Zeile, Tabs, Speichern-Footer unten. Tabs (Self-Publishing-Workflow):
+  Format / Schrift / Kapitel / Kopf & Seitenzahlen / Titelei & Verzeichnis /
+  Cover / Druck. Seitennummerierung + Kopf-/Fusszeile sind bewusst in einem
+  Tab zentralisiert; PDF-Norm ist Teil des Druck-Tabs.
   Pattern-Konformität (DESIGN.md): Combobox statt <select>, .tabs / .tabs-btn,
   Standard-Buttons, .card-form-row, .collapsible-toggle + .history-chevron,
   .card-form-saved / .card-form-error.
@@ -74,14 +76,42 @@
             @click="_showCreate = !_showCreate">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
     </button>
+    <button type="button" class="export-profile-btn" x-show="activeProfile"
+            :data-tip="$app.t('pdfExport.renameProfile')" @click="beginRename()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#pencil"/></svg>
+    </button>
+    <button type="button" class="export-profile-btn" x-show="activeProfile"
+            :data-tip="$app.t('pdfExport.duplicateProfile')" @click="duplicateProfile()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#copy"/></svg>
+    </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile && !activeProfile.is_default"
             :data-tip="$app.t('pdfExport.makeDefault')" @click="setDefault(activeProfileId)">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#check"/></svg>
     </button>
+    <button type="button" class="export-profile-btn" x-show="activeProfile"
+            :data-tip="$app.t('pdfExport.exportProfile')" @click="exportProfileConfig()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+    </button>
+    <button type="button" class="export-profile-btn"
+            :data-tip="$app.t('pdfExport.importProfile')" @click="$refs.importInput.click()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#file-plus"/></svg>
+    </button>
+    <input type="file" hidden x-ref="importInput" accept="application/json,.json"
+           @change="importProfileConfig($event.target.files[0]); $event.target.value = ''">
     <button type="button" class="export-profile-btn" x-show="profiles.length > 1"
             :data-tip="$app.t('pdfExport.deleteProfile')" @click="deleteProfile(activeProfileId)">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
     </button>
+  </div>
+
+  <!-- Profil umbenennen (eingeklappt) -->
+  <div class="export-create-row export-rename-row" x-show="_showRename" x-cloak>
+    <input type="text" class="card-form-input" x-model="renameValue"
+           :placeholder="$app.t('pdfExport.renamePlaceholder')" maxlength="80"
+           @keydown.enter="renameProfile()" data-spellcheck="spelling">
+    <button type="button" class="primary" data-label-ok
+            :disabled="!renameValue.trim()" @click="renameProfile()"
+            x-text="$app.t('common.save')"></button>
   </div>
 
   <!-- Neues Profil anlegen (eingeklappt) -->
@@ -103,7 +133,7 @@
   </div>
 
   <template x-if="_formMounted && activeProfile">
-    <div x-data="tabs(['layout','font','chapter','cover','toc','extras','print','pdfa'])"
+    <div x-data="tabs(['layout','font','chapter','pagination','frontmatter','cover','print'])"
          x-modelable="value" x-model="activeTab">
       <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')) -->
       <div class="tabs tabs--scrollable export-tabs" x-bind="tablist">
@@ -117,11 +147,10 @@
       <!-- @include pdf-export-layout -->
       <!-- @include pdf-export-font -->
       <!-- @include pdf-export-chapter -->
+      <!-- @include pdf-export-pagination -->
+      <!-- @include pdf-export-frontmatter -->
       <!-- @include pdf-export-cover -->
-      <!-- @include pdf-export-toc -->
-      <!-- @include pdf-export-extras -->
       <!-- @include pdf-export-print -->
-      <!-- @include pdf-export-pdfa -->
 
       <!-- Persistenter Footer: Speichern gilt für alle Tabs (Profil-Config) -->
       <div class="card-actions">

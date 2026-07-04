@@ -286,6 +286,152 @@ export function exportJobSlice(cfg) {
   };
 }
 
+// ── Profil umbenennen + Import/Export (PDF/DOCX) ──────────────────────────────
+// Beide Karten haben user-scoped Profile mit { id, name, config }. Umbenennen
+// schickt nur den neuen Namen an die PUT-Route (config bleibt serverseitig
+// erhalten). Export lädt das aktive Profil als selbsttragende JSON-Datei
+// herunter (nur name+config — keine BLOBs; Cover/Rückseite bleiben buch-/profil-
+// gebunden). Import legt daraus über die POST-Route ein neues Profil an; der
+// Server validiert die Config (validateConfig verwirft unbekannte Keys, clamped
+// Numerik). Fehler landen im karteneigenen `${prefix}.error.*`-Namespace.
+//
+// cfg:
+//   basePath   — '/pdf-export' | '/docx-export' (CRUD-Route)
+//   type       — Marker in der Exportdatei ('pdf-export-profile' | 'docx-export-profile')
+//   i18nPrefix — 'pdfExport' | 'docxExport'
+function _profileNameSlug(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+function _uniqueProfileName(base, profiles) {
+  const names = new Set((profiles || []).map(p => p.name));
+  if (!names.has(base)) return base.slice(0, 80);
+  for (let n = 2; n < 1000; n++) {
+    const cand = `${base} (${n})`.slice(0, 80);
+    if (!names.has(cand)) return cand;
+  }
+  return base.slice(0, 80);
+}
+
+export function profileTransferSlice(cfg) {
+  return {
+    _showRename: false,
+    renameValue: '',
+    importing: false,
+
+    beginRename() {
+      if (!this.activeProfile) return;
+      this.renameValue = this.activeProfile.name;
+      this._showRename = true;
+    },
+
+    async renameProfile() {
+      const name = String(this.renameValue || '').trim().slice(0, 80);
+      if (!this.activeProfile || !name) return;
+      if (name === this.activeProfile.name) { this._showRename = false; return; }
+      try {
+        const r = await fetch(`${cfg.basePath}/profiles/${this.activeProfile.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.exportError = window.__app.t(d.error_code === 'PROFILE_NAME_TAKEN'
+            ? `${cfg.i18nPrefix}.error.nameTaken`
+            : `${cfg.i18nPrefix}.error.saveFailed`);
+          return;
+        }
+        const updated = await r.json();
+        this.activeProfile.name = updated.name;
+        const idx = this.profiles.findIndex(p => p.id === updated.id);
+        if (idx >= 0) this.profiles[idx].name = updated.name;
+        this._showRename = false;
+      } catch {
+        this.exportError = window.__app.t(`${cfg.i18nPrefix}.error.saveFailed`);
+      }
+    },
+
+    // Aktives Profil duplizieren — ein Klick, kein Anlege-Formular. Server-seitig
+    // via `clone_from` (kopiert Config, NICHT profil-gebundene BLOBs wie das
+    // Rückseitenbild — gleiche Semantik wie die Klon-Combobox im Anlege-Formular).
+    // Name = «<Name> (Kopie)», bei Kollision durchnummeriert.
+    async duplicateProfile() {
+      if (!this.activeProfile) return;
+      const base = `${this.activeProfile.name} (${window.__app.t('common.copySuffix')})`;
+      const name = _uniqueProfileName(base, this.profiles);
+      try {
+        const r = await fetch(`${cfg.basePath}/profiles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, clone_from: this.activeProfile.id }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.exportError = window.__app.t(`${cfg.i18nPrefix}.error.createFailed`, d.params);
+          return;
+        }
+        const profile = await r.json();
+        this.profiles.push(profile);
+        await this.selectProfile(profile.id);
+      } catch {
+        this.exportError = window.__app.t(`${cfg.i18nPrefix}.error.createFailed`);
+      }
+    },
+
+    exportProfileConfig() {
+      if (!this.activeProfile) return;
+      const payload = {
+        app: 'schreibwerkstatt',
+        type: cfg.type,
+        version: 1,
+        name: this.activeProfile.name,
+        config: this.activeProfile.config,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${_profileNameSlug(this.activeProfile.name) || 'profil'}.${cfg.type}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+
+    async importProfileConfig(file) {
+      if (!file || this.importing) return;
+      this.importing = true;
+      this.exportError = '';
+      try {
+        let data;
+        try { data = JSON.parse(await file.text()); }
+        catch { this.exportError = window.__app.t(`${cfg.i18nPrefix}.error.importInvalid`); return; }
+        if (!data || data.type !== cfg.type || !data.config || typeof data.config !== 'object') {
+          this.exportError = window.__app.t(`${cfg.i18nPrefix}.error.importInvalid`);
+          return;
+        }
+        const base = String(data.name || '').trim() || window.__app.t(`${cfg.i18nPrefix}.importedName`);
+        const name = _uniqueProfileName(base, this.profiles);
+        const r = await fetch(`${cfg.basePath}/profiles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, config: data.config }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.exportError = window.__app.t(`${cfg.i18nPrefix}.error.importFailed`, d.params);
+          return;
+        }
+        const profile = await r.json();
+        this.profiles.push(profile);
+        await this.selectProfile(profile.id);
+      } finally {
+        this.importing = false;
+      }
+    },
+  };
+}
+
 // ── Kapitel-ohne-Nummer-Chips ─────────────────────────────────────────────────
 // Pick-Optionen sind identisch (Tree-basiert); nur die Id-Quelle unterscheidet
 // sich (PDF/DOCX: activeProfile.config.chapter.unnumberedChapterIds, EPUB:

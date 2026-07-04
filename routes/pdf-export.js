@@ -10,6 +10,7 @@ const {
   listPdfExportProfiles, getPdfExportProfile, createPdfExportProfile,
   updatePdfExportProfile, deletePdfExportProfile,
   setPdfExportProfileBackCover, clearPdfExportProfileBackCover, getPdfExportProfileBackCover,
+  setPdfExportProfileSpineImage, clearPdfExportProfileSpineImage, getPdfExportProfileSpineImage,
   setPdfExportProfileDefault,
 } = require('../db/schema');
 const { defaultConfig, validateConfig } = require('../lib/pdf-export-defaults');
@@ -193,6 +194,56 @@ router.get('/profiles/:id/back-cover', (req, res) => {
   if (err) return res.status(err.status).json({ error_code: err.error_code });
   const img = getPdfExportProfileBackCover(id);
   if (!img) return res.status(404).json({ error_code: 'NO_BACK_COVER' });
+  res.setHeader('Content-Type', img.mime);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.end(img.image);
+});
+
+// ── Umschlag-Buchrückenbild (separates Cover-PDF) ────────────────────────────
+// Identische sharp-Härtung wie Cover (prepareCover). Erlaubt ein durchgehendes
+// Motiv als Front/Rücken/Rückseite-Panels.
+router.post('/profiles/:id/spine-image', rawCoverBody, async (req, res) => {
+  const userEmail = _user(req);
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const profile = getPdfExportProfile(id);
+  const err = _ownedOr404(profile, userEmail);
+  if (err) return res.status(err.status).json({ error_code: err.error_code });
+
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error_code: 'SPINE_IMAGE_EMPTY' });
+  }
+
+  let prepared;
+  try {
+    prepared = await prepareCover(req.body);
+  } catch (e) {
+    return res.status(400).json({ error_code: 'SPINE_IMAGE_INVALID', params: { reason: e.message } });
+  }
+  setPdfExportProfileSpineImage(id, prepared.buffer, prepared.mime);
+  res.json({ ok: true, mime: prepared.mime, width: prepared.width, height: prepared.height, bytes: prepared.buffer.length });
+});
+
+router.delete('/profiles/:id/spine-image', (req, res) => {
+  const userEmail = _user(req);
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const profile = getPdfExportProfile(id);
+  const err = _ownedOr404(profile, userEmail);
+  if (err) return res.status(err.status).json({ error_code: err.error_code });
+  clearPdfExportProfileSpineImage(id);
+  res.json({ ok: true });
+});
+
+router.get('/profiles/:id/spine-image', (req, res) => {
+  const userEmail = _user(req);
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const profile = getPdfExportProfile(id);
+  const err = _ownedOr404(profile, userEmail);
+  if (err) return res.status(err.status).json({ error_code: err.error_code });
+  const img = getPdfExportProfileSpineImage(id);
+  if (!img) return res.status(404).json({ error_code: 'NO_SPINE_IMAGE' });
   res.setHeader('Content-Type', img.mime);
   res.setHeader('Cache-Control', 'private, no-store');
   res.end(img.image);

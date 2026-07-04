@@ -97,7 +97,11 @@ async function _buildSnapshotPayload(bookId, req) {
   const htmlById = new Map();
   for (const d of details) if (d && d.id) htmlById.set(d.id, d.html || '');
 
-  const nodes = treeToNodes(tree, htmlById);
+  // Manuskript-Bild-BLOBs mitziehen, damit sie einen Restore ueberleben
+  // (Restore wiped Seiten → CASCADE loescht page_images, neue page_ids).
+  const { collectReferencedImages } = require('../db/page-images');
+  const imagesByPage = collectReferencedImages(htmlById);
+  const nodes = treeToNodes(tree, htmlById, imagesByPage);
   const settings = (() => { try { return getBookSettings(bookId); } catch { return null; } })();
   const content = buildBookJson({ book, settings, nodes });
 
@@ -335,9 +339,19 @@ router.post('/:bookId/:id/restore', express.json({ limit: '1mb' }), async (req, 
         chapterIdByTemp.set(o.tempId, ch.id);
         chaptersCreated += 1;
       } else if (o.op === 'page') {
-        await contentStore.createPage(
+        const created = await contentStore.createPage(
           { book_id: bookId, chapter_id: parentChapterId, name: o.name || '', html: o.html || '' }, req);
         pagesCreated += 1;
+        // Mitgefuehrte Bild-BLOBs unter der neuen page_id neu einfuegen + die
+        // /content/page-image/<oldId>-Refs im HTML auf die neuen IDs umschreiben.
+        if (created?.id && o.images?.length) {
+          const { restorePageImages } = require('../db/page-images');
+          const rewritten = restorePageImages(created.id, o.html || '', o.images);
+          if (rewritten != null) {
+            try { await contentStore.savePage(created.id, { html: rewritten, source: 'import' }, req); }
+            catch (e) { logger.warn(`Restore Bild-Rewrite «${o.name}» fehlgeschlagen (book=${bookId}): ${e.message}`); }
+          }
+        }
       }
     } catch (e) {
       logger.warn(`Restore createXxx «${o.name}» fehlgeschlagen (book=${bookId}): ${e.message}`);

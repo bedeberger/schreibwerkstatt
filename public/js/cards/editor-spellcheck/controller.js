@@ -395,6 +395,11 @@ export function createSpellcheckController({
     popover.setAttribute('contenteditable', 'false');
     popover.setAttribute('data-editor', editorKind);
 
+    // Fokus/Selection im Editor halten: Popover ist contenteditable=false im
+    // Editor — mousedown auf Nicht-Button-Flächen würde sonst die Selection
+    // wegnehmen. preventDefault unterbindet nur Fokus/Selektion, nicht click.
+    popover.addEventListener('mousedown', (ev) => ev.preventDefault());
+
     const header = document.createElement('div');
     header.className = 'lt-popover__header';
     const catBadge = document.createElement('span');

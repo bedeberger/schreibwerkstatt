@@ -136,6 +136,16 @@ async function runBookImportJob(jobId, { userEmail }) {
           );
           if (o.srcId != null && pg?.id) pageIdMap.set(o.srcId, pg.id);
           pagesCreated += 1;
+          // Mitgefuehrte Manuskript-Bilder unter der neuen page_id neu einfuegen
+          // + /content/page-image/<oldId>-Refs im HTML auf die neuen IDs mappen.
+          if (pg?.id && o.images?.length) {
+            const { restorePageImages } = require('../../db/page-images');
+            const rewritten = restorePageImages(pg.id, o.html || '', o.images);
+            if (rewritten != null) {
+              try { await contentStore.savePage(pg.id, { html: rewritten, source: 'import' }, ctx); }
+              catch (e) { log.warn(`book-import: Bild-Rewrite «${o.name}» fail: ${e.message}`); }
+            }
+          }
         } catch (e) { log.warn(`book-import: createPage «${o.name}» fail: ${e.message}`); }
       }
     }

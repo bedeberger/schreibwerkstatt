@@ -73,7 +73,11 @@ router.get('/:bookId', async (req, res) => {
   const htmlById = new Map();
   for (const d of details) if (d && d.id) htmlById.set(d.id, d.html || '');
 
-  const nodes = treeToNodes(tree, htmlById);
+  // Manuskript-Bild-BLOBs (base64) in die Page-Nodes einbetten, damit sie in die
+  // Zielinstanz mitwandern (die page_images-Bytes liegen sonst nur lokal).
+  const { collectReferencedImages } = require('../db/page-images');
+  const imagesByPage = collectReferencedImages(htmlById);
+  const nodes = treeToNodes(tree, htmlById, imagesByPage);
   const settings = (() => { try { return getBookSettings(bookId); } catch { return null; } })();
 
   // Optionale Extra-Bloecke einsammeln (synchroner DB-Read, kein KI-Call).

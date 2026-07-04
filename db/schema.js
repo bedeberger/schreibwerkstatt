@@ -1558,6 +1558,9 @@ module.exports = {
   setPdfExportProfileBackCover:   pdfExport.setBackCover,
   clearPdfExportProfileBackCover: pdfExport.clearBackCover,
   getPdfExportProfileBackCover:   pdfExport.getBackCover,
+  setPdfExportProfileSpineImage:   pdfExport.setSpineImage,
+  clearPdfExportProfileSpineImage: pdfExport.clearSpineImage,
+  getPdfExportProfileSpineImage:   pdfExport.getSpineImage,
   setPdfExportProfileDefault: pdfExport.setDefault,
   // fonts
   getCachedFont: fonts.getCachedFont,

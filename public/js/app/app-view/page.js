@@ -228,11 +228,21 @@ export const pageMethods = {
     });
     if (!ok) return;
     if (this.currentPage?.id !== page.id) return;
+    // Kapitel der gelöschten Seite merken (resetPage nullt currentPage) —
+    // danach dorthin zurückfallen statt leere Ansicht zu zeigen.
+    const chapterId = page.chapter_id;
     try {
       await contentRepo.deletePage(page.id);
       try { clearDraft(page.id); } catch {}
       this.resetPage();
       await this.loadPages();
+      // Auf das Kapitel zurückfallen (wie ein Klick auf den Kapitel-Header):
+      // leeres Kapitel → Kapitel-Review-Karte (neue Seite anlegbar), sonst
+      // Review/Expand. Solo-Seiten (kein chapter_id) bleiben ohne Fallback.
+      if (chapterId != null) {
+        const item = this._findTreeChapter(chapterId);
+        if (item) await this._onChapterHeaderActivate(item);
+      }
     } catch (e) {
       console.error('[deleteCurrentPage]', e);
       this.setStatus(this.t('bookOrganizer.saveFailed', { detail: e.message }));

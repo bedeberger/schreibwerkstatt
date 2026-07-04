@@ -60,14 +60,42 @@
             @click="showCreate = !showCreate">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
     </button>
+    <button type="button" class="export-profile-btn" x-show="activeProfile"
+            :data-tip="$app.t('docxExport.renameProfile')" @click="beginRename()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#pencil"/></svg>
+    </button>
+    <button type="button" class="export-profile-btn" x-show="activeProfile"
+            :data-tip="$app.t('docxExport.duplicateProfile')" @click="duplicateProfile()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#copy"/></svg>
+    </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile && !activeProfile.is_default"
             :data-tip="$app.t('docxExport.makeDefault')" @click="setDefaultProfile(activeProfileId)">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#check"/></svg>
     </button>
+    <button type="button" class="export-profile-btn" x-show="activeProfile"
+            :data-tip="$app.t('docxExport.exportProfile')" @click="exportProfileConfig()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+    </button>
+    <button type="button" class="export-profile-btn"
+            :data-tip="$app.t('docxExport.importProfile')" @click="$refs.importInput.click()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#file-plus"/></svg>
+    </button>
+    <input type="file" hidden x-ref="importInput" accept="application/json,.json"
+           @change="importProfileConfig($event.target.files[0]); $event.target.value = ''">
     <button type="button" class="export-profile-btn" x-show="profiles.length > 1"
             :data-tip="$app.t('docxExport.deleteProfile')" @click="deleteProfile(activeProfileId)">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
     </button>
+  </div>
+
+  <!-- Profil umbenennen (eingeklappt) -->
+  <div class="export-create-row export-rename-row" x-show="_showRename" x-cloak>
+    <input type="text" class="card-form-input" x-model="renameValue"
+           :placeholder="$app.t('docxExport.renamePlaceholder')" maxlength="80"
+           @keydown.enter="renameProfile()" data-spellcheck="spelling">
+    <button type="button" class="primary" data-label-ok
+            :disabled="!renameValue.trim()" @click="renameProfile()"
+            x-text="$app.t('common.save')"></button>
   </div>
 
   <div class="export-create-row" x-show="showCreate" x-cloak>

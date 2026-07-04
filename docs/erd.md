@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 232, 114 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 234, 115 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -114,6 +114,7 @@ erDiagram
   pages ||--o{ songs                 : firstMention
   pages ||--o{ figures               : firstMention
   pages ||--|| page_locks            : locked
+  pages ||--o{ page_images           : "embedded images"
   pages ||--o{ page_revisions        : has
   books ||--o{ page_revisions        : has
   books ||--|| book_order            : has
@@ -281,6 +282,16 @@ erDiagram
     TEXT    client        "Browser·OS bzw. nativer Client"
     TEXT    created_at
     TEXT    summary
+  }
+  page_images {
+    INTEGER id          PK
+    INTEGER page_id     FK "ON DELETE CASCADE"
+    TEXT    mime
+    INTEGER width
+    INTEGER height
+    INTEGER size        "bytes"
+    BLOB    image
+    TEXT    created_at
   }
   book_order {
     INTEGER book_id    PK,FK "ON DELETE CASCADE"
@@ -1344,6 +1355,8 @@ erDiagram
     TEXT    author_image_mime
     BLOB    back_cover_image
     TEXT    back_cover_image_mime
+    BLOB    spine_image
+    TEXT    spine_image_mime
     INTEGER is_default
     INTEGER created_at
     INTEGER updated_at

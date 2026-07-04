@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "ca5a40dfb9b6a694";
+self.__SHELL_BUILD = "7b25bb15848e45f1";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -585,12 +585,11 @@ self.__SHELL_MANIFEST = [
   "/partials/palette.html",
   "/partials/pdf-export-chapter.html",
   "/partials/pdf-export-cover.html",
-  "/partials/pdf-export-extras.html",
   "/partials/pdf-export-font.html",
+  "/partials/pdf-export-frontmatter.html",
   "/partials/pdf-export-layout.html",
-  "/partials/pdf-export-pdfa.html",
+  "/partials/pdf-export-pagination.html",
   "/partials/pdf-export-print.html",
-  "/partials/pdf-export-toc.html",
   "/partials/pdf-export.html",
   "/partials/plot-beat-cell.html",
   "/partials/plot-board-flat.html",

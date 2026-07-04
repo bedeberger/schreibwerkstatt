@@ -260,8 +260,14 @@ router.get('/link-targets', (req, res) => {
     'SELECT page_id AS id, page_name AS label FROM pages WHERE book_id = ? ORDER BY position, page_name'
   ).all(bookId);
   // user-skopierte Welt-Entitäten: nur die des anfragenden Users anbieten.
+  // Wo eine „Wichtigkeit" existiert, danach primär sortieren: Figuren nach
+  // praesenz (Handlungsgewicht, zentral→randfigur), Beats nach intensitaet
+  // (5→1). Orte/Szenen haben kein Wichtigkeits-Signal → kuratierte sort_order.
   out.figure = db.prepare(
-    'SELECT id, name AS label FROM figures WHERE book_id = ? AND user_email = ? ORDER BY sort_order, name'
+    `SELECT id, name AS label FROM figures WHERE book_id = ? AND user_email = ?
+      ORDER BY CASE praesenz WHEN 'zentral' THEN 0 WHEN 'regelmaessig' THEN 1
+                             WHEN 'punktuell' THEN 2 WHEN 'randfigur' THEN 3
+                             ELSE 4 END, sort_order, name`
   ).all(bookId, userEmail);
   out.location = db.prepare(
     'SELECT id, name AS label FROM locations WHERE book_id = ? AND user_email = ? ORDER BY sort_order, name'
@@ -270,7 +276,8 @@ router.get('/link-targets', (req, res) => {
     'SELECT id, titel AS label FROM figure_scenes WHERE book_id = ? AND user_email = ? ORDER BY sort_order, titel'
   ).all(bookId, userEmail);
   out.beat = db.prepare(
-    'SELECT id, titel AS label FROM plot_beats WHERE book_id = ? AND user_email = ? ORDER BY sort_order, titel'
+    `SELECT id, titel AS label FROM plot_beats WHERE book_id = ? AND user_email = ?
+      ORDER BY CASE WHEN intensitaet IS NULL THEN 1 ELSE 0 END, intensitaet DESC, sort_order, titel`
   ).all(bookId, userEmail);
   out.thread = db.prepare(
     'SELECT id, name AS label FROM plot_threads WHERE book_id = ? AND user_email = ? ORDER BY position, name'

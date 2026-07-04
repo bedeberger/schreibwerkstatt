@@ -13,7 +13,7 @@
 // export-card-base.js (geteilt mit PDF + EPUB).
 
 import { EVT } from '../events.js';
-import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice } from './export-card-base.js';
+import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice, profileTransferSlice } from './export-card-base.js';
 
 export function registerDocxExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -30,6 +30,7 @@ export function registerDocxExportCard() {
       getIds: (s) => s.activeProfile?.config?.chapter?.unnumberedChapterIds || [],
       setIds: (s, arr) => { s.activeProfile.config.chapter.unnumberedChapterIds = arr; },
     }),
+    ...profileTransferSlice({ basePath: '/docx-export', type: 'docx-export-profile', i18nPrefix: 'docxExport' }),
 
     profiles: [],
     activeProfileId: null,

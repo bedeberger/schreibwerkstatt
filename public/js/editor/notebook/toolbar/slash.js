@@ -3,6 +3,7 @@
 // hinter dem Focus-Hard-Stop).
 
 import { getEditEl, placeCaretIn, SLASH_ITEMS, _formatStamp } from './_shared.js';
+import { contentRepo } from '../../../repo/content.js';
 
 export const slashMethods = {
   _updateSlashPosition() {
@@ -84,6 +85,57 @@ export const slashMethods = {
     this.slashShow = true;
   },
 
+  // Bild-Upload: Datei-Dialog → Upload → <figure>-Insert. Der Trigger-Block
+  // wird vor dem async Upload gesichert; ist er beim Zurueckkommen weg (User hat
+  // weitergetippt), haengen wir das Bild ans Editor-Ende.
+  async _slashInsertImage(block) {
+    const app = window.__app;
+    const pageId = app?.currentPage?.id;
+    if (!pageId) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) return;
+      let result;
+      try {
+        result = await contentRepo.uploadPageImage(pageId, file);
+      } catch {
+        app?._showJobToast?.({
+          message: app?.t?.('editor.image.uploadError') || 'Bild-Upload fehlgeschlagen',
+          severity: 'err', jobType: 'image', bookId: null,
+        });
+        return;
+      }
+      this._insertImageFigure(block, result);
+    }, { once: true });
+    input.click();
+  },
+
+  _insertImageFigure(block, result) {
+    const editEl = getEditEl();
+    if (!editEl || !result?.url) return;
+    const fig = document.createElement('figure');
+    const img = document.createElement('img');
+    img.src = result.url;
+    img.alt = '';
+    const cap = document.createElement('figcaption');
+    cap.appendChild(document.createElement('br'));
+    fig.appendChild(img);
+    fig.appendChild(cap);
+    if (block && block.isConnected && block.parentNode && editEl.contains(block)) {
+      block.parentNode.replaceChild(fig, block);
+    } else {
+      editEl.appendChild(fig);
+    }
+    placeCaretIn(cap);
+    window.__app?._markEditDirty?.();
+  },
+
   _closeSlash() {
     this.slashShow = false;
     this.slashQuery = '';
@@ -102,6 +154,14 @@ export const slashMethods = {
     const editEl = getEditEl();
     const block = this._slashBlock;
     if (!editEl || !block || !block.parentNode) { this._closeSlash(); return; }
+
+    // Bild: oeffnet den Datei-Dialog. Async → Block vor dem Schliessen sichern,
+    // Menue sofort schliessen (der Dialog uebernimmt).
+    if (item.upload === 'image') {
+      this._slashInsertImage(block);
+      this._closeSlash();
+      return;
+    }
 
     // Datums-/Zeit-Stempel: ersetzt den (per Trigger leeren) Block durch
     // einen <p> mit dem formatierten Stempel-String. Caret hinter den Text,

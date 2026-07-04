@@ -14,7 +14,7 @@
 // export-card-base.js (geteilt mit EPUB + DOCX).
 
 import { EVT } from '../events.js';
-import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice } from './export-card-base.js';
+import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice, profileTransferSlice } from './export-card-base.js';
 import * as presets from './pdf-export-presets.js';
 
 export function registerPdfExportCard() {
@@ -63,6 +63,7 @@ export function registerPdfExportCard() {
       getIds: (s) => s.activeProfile?.config?.chapter?.unnumberedChapterIds || [],
       setIds: (s, arr) => { s.activeProfile.config.chapter.unnumberedChapterIds = arr; },
     }),
+    ...profileTransferSlice({ basePath: '/pdf-export', type: 'pdf-export-profile', i18nPrefix: 'pdfExport' }),
 
     profiles: [],
     activeProfileId: null,
@@ -97,6 +98,9 @@ export function registerPdfExportCard() {
 
     backCoverUploading: false,
     backCoverError: '',
+
+    spineImageUploading: false,
+    spineImageError: '',
 
     _onBookChanged: null,
     _onViewReset: null,
@@ -330,6 +334,40 @@ export function registerPdfExportCard() {
     backCoverUrl() {
       if (!this.activeProfile?.has_back_cover) return '';
       return `/pdf-export/profiles/${this.activeProfile.id}/back-cover?v=${this.coverPreviewVersion}`;
+    },
+
+    // ── Umschlag-Buchrückenbild (separates Cover-PDF) ─────────────────────
+    async uploadSpineImage(file) {
+      if (!file || !this.activeProfile) return;
+      this.spineImageUploading = true;
+      this.spineImageError = '';
+      try {
+        const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/spine-image`, {
+          method: 'POST',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.spineImageError = window.__app.t('pdfExport.error.spineImageInvalid', d.params);
+          return;
+        }
+        await this.selectProfile(this.activeProfile.id);
+      } finally {
+        this.spineImageUploading = false;
+      }
+    },
+
+    async removeSpineImage() {
+      if (!this.activeProfile) return;
+      const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/spine-image`, { method: 'DELETE' });
+      if (!r.ok) return;
+      await this.selectProfile(this.activeProfile.id);
+    },
+
+    spineImageUrl() {
+      if (!this.activeProfile?.has_spine) return '';
+      return `/pdf-export/profiles/${this.activeProfile.id}/spine-image?v=${this.coverPreviewVersion}`;
     },
 
     // Live-Rückenbreite (mm) = Papiervolumen je 1000 Seiten × Seitenzahl / 1000.

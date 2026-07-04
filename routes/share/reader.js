@@ -22,6 +22,41 @@ const {
 } = H;
 
 function register(router) {
+  // ── Public: Manuskript-Bild eines geteilten Inhalts ────────────────────────
+  // Token-gebundener Bild-Stream (der Reader laeuft ohne Session; /content/* ist
+  // auth-geschuetzt). Scope-Check: das Bild muss zu einer Seite im Link-Scope
+  // gehoeren (page → gleiche Seite, chapter → gleiches Kapitel, book → gleiches Buch).
+  router.get('/:token/page-image/:id', (req, res) => {
+    const token = String(req.params.token || '');
+    if (!TOKEN_RE.test(token)) return res.status(404).type('html').send('Not found');
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) return res.status(404).type('html').send('Not found');
+    const link = shareLinks.getShareLinkByToken(token);
+    if (!link || isExpired(link)) return res.status(404).type('html').send('Not found');
+    setContext({ book: link.book_id });
+
+    const { getPageImage } = require('../../db/page-images');
+    const row = getPageImage(id);
+    if (!row || !row.image) return res.status(404).type('html').send('Not found');
+
+    // Scope: Bild nur ausliefern, wenn seine Seite im geteilten Bereich liegt.
+    const inScope =
+      link.kind === 'page'    ? row.page_id === link.page_id
+      : link.kind === 'chapter' ? (row.book_id === link.book_id && row.chapter_id === link.chapter_id)
+      : link.kind === 'book'    ? row.book_id === link.book_id
+      : false;
+    if (!inScope) return res.status(404).type('html').send('Not found');
+
+    const SAFE_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+    const safe = SAFE_IMAGE_MIME.has(row.mime);
+    res.setHeader('Content-Type', safe ? row.mime : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Content-Length', row.image.length);
+    res.end(row.image);
+  });
+
   // ── Public: Reader-View ───────────────────────────────────────────────────
   router.get('/:token', async (req, res) => {
     const token = String(req.params.token || '');

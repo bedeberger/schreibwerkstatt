@@ -16,7 +16,7 @@ const {
   i18nError,
   jsonBody,
 } = require('./shared');
-const { getPdfExportProfile, getPdfExportProfileBackCover, getBookSettings } = require('../../db/schema');
+const { getPdfExportProfile, getPdfExportProfileBackCover, getPdfExportProfileSpineImage, getBookSettings } = require('../../db/schema');
 // Cover/Autorfoto + Titelei sind buch-weit (book_publication), geteilt mit dem
 // EPUB-Export. Der PDF-Render liest sie von hier, nicht mehr vom Profil.
 const {
@@ -130,8 +130,13 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
         const back = getPdfExportProfileBackCover(profileId);
         if (back) backImageBuf = back.image;
       }
+      let spineImageBuf = null;
+      if (profile.has_spine) {
+        const spine = getPdfExportProfileSpineImage(profileId);
+        if (spine) spineImageBuf = spine.image;
+      }
       updateJob(jobId, { progress: 40, statusText: 'job.phase.renderCover' });
-      buffer = await renderCoverBuffer({ book, profile, frontImageBuf, backImageBuf, lang: bookLang });
+      buffer = await renderCoverBuffer({ book, profile, frontImageBuf, backImageBuf, spineImageBuf, lang: bookLang });
       log.info(`Umschlag-PDF gerendert (Ruecken=${computeSpineMm(cs).toFixed(1)} mm, ${cs.pageCount} Seiten, profile=${profile.name})`);
     } else {
       const coverBuf = (scope === 'book' && profile.config.cover.enabled) ? pubCoverBuf : null;

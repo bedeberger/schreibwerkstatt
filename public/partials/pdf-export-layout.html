@@ -1,6 +1,19 @@
-      <!-- Layout-Tab -->
+      <!-- Format-Tab: reine Seiten-Geometrie (Format, Ränder, Satzspiegel).
+           Kopf-/Fusszeile + Seitenzahlen leben im Tab „Kopf & Seitenzahlen". -->
       <div class="export-tab-panel" x-bind="panel('layout')">
         <div class="card-form-grid">
+          <div class="card-form-row card-form-row--top">
+            <label class="card-form-label" x-text="$app.t('pdfExport.layout.trimPreset')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox($app.t('pdfExport.layout.trimPresetPlaceholder'))"
+                   x-modelable="value" x-model="trimPresetSel"
+                   x-effect="options = trimPresetOptions()"
+                   @combobox-change="applyTrimPreset($event.detail)"
+></div>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.trimPresetHint')"></p>
+            </div>
+          </div>
+
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageSize')"></label>
             <div class="card-form-field">
@@ -73,152 +86,6 @@
                 <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.right" class="pdfx-num-input"></label>
                 <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.bottom" class="pdfx-num-input"></label>
                 <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.left" class="pdfx-num-input"></label>
-              </div>
-            </div>
-          </div>
-
-          <div class="collapsible-wrap" x-data="collapsible()">
-            <button type="button" class="collapsible-toggle" x-bind="trigger">
-              <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
-              <span x-text="$app.t('pdfExport.layout.headerFooter')"></span>
-            </button>
-            <div x-bind="panel" x-cloak class="collapsible-section">
-              <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.tokensHint')"></p>
-              <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.hfSidesHint')"></p>
-
-              <!-- Kopf-/Fusszeile als Seiten-Raster: 3 Positionen × 2 Buchseiten.
-                   Recto = rechte/ungerade Seite (gilt auch für alle Seiten, wenn
-                   die Verso-Felder leer bleiben), Verso = linke/gerade Seite. -->
-              <div class="pdfx-hf-zone">
-                <span class="pdfx-hf-zone-title" x-text="$app.t('pdfExport.layout.zoneHeader')"></span>
-                <div class="pdfx-hf-grid">
-                  <span class="pdfx-hf-corner" aria-hidden="true"></span>
-                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posLeft')"></span>
-                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posCenter')"></span>
-                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posRight')"></span>
-
-                  <span class="pdfx-hf-rowhead"><span x-text="$app.t('pdfExport.layout.sideRecto')"></span><small x-text="$app.t('pdfExport.layout.sideRectoHint')"></small></span>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.headerLeft" class="pdfx-text-input">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','left','bold') }" @click="toggleHfStyle('header','recto','left','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','left','italic') }" @click="toggleHfStyle('header','recto','left','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','left','upper') }" @click="toggleHfStyle('header','recto','left','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.headerCenter" class="pdfx-text-input">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','center','bold') }" @click="toggleHfStyle('header','recto','center','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','center','italic') }" @click="toggleHfStyle('header','recto','center','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','center','upper') }" @click="toggleHfStyle('header','recto','center','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.headerRight" class="pdfx-text-input">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','right','bold') }" @click="toggleHfStyle('header','recto','right','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','right','italic') }" @click="toggleHfStyle('header','recto','right','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','recto','right','upper') }" @click="toggleHfStyle('header','recto','right','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-
-                  <span class="pdfx-hf-rowhead"><span x-text="$app.t('pdfExport.layout.sideVerso')"></span><small x-text="$app.t('pdfExport.layout.sideVersoHint')"></small></span>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.headerVersoLeft" class="pdfx-text-input" :placeholder="activeProfile.config.layout.headerLeft || $app.t('pdfExport.layout.sameAsRecto')">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','left','bold') }" @click="toggleHfStyle('header','verso','left','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','left','italic') }" @click="toggleHfStyle('header','verso','left','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','left','upper') }" @click="toggleHfStyle('header','verso','left','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.headerVersoCenter" class="pdfx-text-input" :placeholder="activeProfile.config.layout.headerCenter || $app.t('pdfExport.layout.sameAsRecto')">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','center','bold') }" @click="toggleHfStyle('header','verso','center','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','center','italic') }" @click="toggleHfStyle('header','verso','center','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','center','upper') }" @click="toggleHfStyle('header','verso','center','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.headerVersoRight" class="pdfx-text-input" :placeholder="activeProfile.config.layout.headerRight || $app.t('pdfExport.layout.sameAsRecto')">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','right','bold') }" @click="toggleHfStyle('header','verso','right','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','right','italic') }" @click="toggleHfStyle('header','verso','right','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('header','verso','right','upper') }" @click="toggleHfStyle('header','verso','right','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="pdfx-hf-zone">
-                <span class="pdfx-hf-zone-title" x-text="$app.t('pdfExport.layout.zoneFooter')"></span>
-                <div class="pdfx-hf-grid">
-                  <span class="pdfx-hf-corner" aria-hidden="true"></span>
-                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posLeft')"></span>
-                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posCenter')"></span>
-                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posRight')"></span>
-
-                  <span class="pdfx-hf-rowhead"><span x-text="$app.t('pdfExport.layout.sideRecto')"></span><small x-text="$app.t('pdfExport.layout.sideRectoHint')"></small></span>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.footerLeft" class="pdfx-text-input">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','left','bold') }" @click="toggleHfStyle('footer','recto','left','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','left','italic') }" @click="toggleHfStyle('footer','recto','left','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','left','upper') }" @click="toggleHfStyle('footer','recto','left','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.footerCenter" class="pdfx-text-input">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','center','bold') }" @click="toggleHfStyle('footer','recto','center','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','center','italic') }" @click="toggleHfStyle('footer','recto','center','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','center','upper') }" @click="toggleHfStyle('footer','recto','center','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.footerRight" class="pdfx-text-input">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','right','bold') }" @click="toggleHfStyle('footer','recto','right','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','right','italic') }" @click="toggleHfStyle('footer','recto','right','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','recto','right','upper') }" @click="toggleHfStyle('footer','recto','right','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-
-                  <span class="pdfx-hf-rowhead"><span x-text="$app.t('pdfExport.layout.sideVerso')"></span><small x-text="$app.t('pdfExport.layout.sideVersoHint')"></small></span>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.footerVersoLeft" class="pdfx-text-input" :placeholder="activeProfile.config.layout.footerLeft || $app.t('pdfExport.layout.sameAsRecto')">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','left','bold') }" @click="toggleHfStyle('footer','verso','left','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','left','italic') }" @click="toggleHfStyle('footer','verso','left','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','left','upper') }" @click="toggleHfStyle('footer','verso','left','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.footerVersoCenter" class="pdfx-text-input" :placeholder="activeProfile.config.layout.footerCenter || $app.t('pdfExport.layout.sameAsRecto')">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','center','bold') }" @click="toggleHfStyle('footer','verso','center','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','center','italic') }" @click="toggleHfStyle('footer','verso','center','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','center','upper') }" @click="toggleHfStyle('footer','verso','center','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                  <div class="pdfx-hf-cell"><input x-model="activeProfile.config.layout.footerVersoRight" class="pdfx-text-input" :placeholder="activeProfile.config.layout.footerRight || $app.t('pdfExport.layout.sameAsRecto')">
-                    <div class="pdfx-hf-sbtns"><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','right','bold') }" @click="toggleHfStyle('footer','verso','right','bold')" :data-tip="$app.t('pdfExport.style.bold')"><b>B</b></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','right','italic') }" @click="toggleHfStyle('footer','verso','right','italic')" :data-tip="$app.t('pdfExport.style.italic')"><i>I</i></button><button type="button" class="pdfx-hf-sbtn" :class="{ 'is-on': hfStyleActive('footer','verso','right','upper') }" @click="toggleHfStyle('footer','verso','right','upper')" :data-tip="$app.t('pdfExport.style.upper')">AA</button></div>
-                  </div>
-                </div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageNumberStart')"></label>
-                <div class="card-form-field">
-                  <input type="text" x-data="numInput({ step: 1, min: 1, max: 9999 })" x-modelable="value" x-model="activeProfile.config.layout.pageNumberStart" class="pdfx-num-input">
-                </div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageCountMode')"></label>
-                <div class="card-form-field">
-                  <div x-data="combobox($app.t('pdfExport.layout.pageCountMode'))"
-                       x-modelable="value" x-model="activeProfile.config.layout.pageCountMode"
-                       x-effect="options = [{ value: 'body', label: $app.t('pdfExport.layout.pageCountMode.body') }, { value: 'physical', label: $app.t('pdfExport.layout.pageCountMode.physical') }]"
-></div>
-                  <p class="card-form-field-note" x-text="$app.t(activeProfile.config.layout.pageCountMode === 'physical' ? 'pdfExport.layout.pageCountModeHintPhysical' : 'pdfExport.layout.pageCountModeHintBody')"></p>
-                </div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageNumberFirstVisible')"></label>
-                <div class="card-form-field">
-                  <input type="text" x-data="numInput({ step: 1, min: 1, max: 9999 })" x-modelable="value" x-model="activeProfile.config.layout.pageNumberFirstVisible" class="pdfx-num-input">
-                  <p class="card-form-field-note" x-text="$app.t(activeProfile.config.layout.pageCountMode === 'physical' ? 'pdfExport.layout.pageNumberFirstVisibleHintCounted' : 'pdfExport.layout.pageNumberFirstVisibleHint')"></p>
-                </div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.frontMatterNumbering')"></label>
-                <div class="card-form-field">
-                  <div x-data="combobox($app.t('pdfExport.layout.frontMatterNumbering'))"
-                       x-modelable="value" x-model="activeProfile.config.layout.frontMatterNumbering"
-                       x-effect="options = [{ value: 'none', label: $app.t('pdfExport.layout.frontMatterNum.none') }, { value: 'roman', label: 'i, ii, iii' }, { value: 'arabic', label: '1, 2, 3' }]"
-></div>
-                  <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.frontMatterNumberingHint')"></p>
-                </div>
-              </div>
-              <div class="card-form-row" x-show="activeProfile.config.layout.frontMatterNumbering !== 'none'" x-cloak>
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.frontMatterNumberFirstVisible')"></label>
-                <div class="card-form-field">
-                  <input type="text" x-data="numInput({ step: 1, min: 1, max: 9999 })" x-modelable="value" x-model="activeProfile.config.layout.frontMatterNumberFirstVisible" class="pdfx-num-input">
-                </div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label">&nbsp;</label>
-                <div class="card-form-field">
-                  <label class="pdfx-check">
-                    <input type="checkbox" x-model="activeProfile.config.layout.headerRule">
-                    <span x-text="$app.t('pdfExport.layout.headerRule')"></span>
-                  </label>
-                  <label class="pdfx-check">
-                    <input type="checkbox" x-model="activeProfile.config.layout.footerRule">
-                    <span x-text="$app.t('pdfExport.layout.footerRule')"></span>
-                  </label>
-                  <label class="pdfx-check">
-                    <input type="checkbox" x-model="activeProfile.config.layout.showHeaderOnChapterStart">
-                    <span x-text="$app.t('pdfExport.layout.showHeaderOnChapterStart')"></span>
-                  </label>
-                  <label class="pdfx-check">
-                    <input type="checkbox" x-model="activeProfile.config.layout.showFooterOnChapterStart">
-                    <span x-text="$app.t('pdfExport.layout.showFooterOnChapterStart')"></span>
-                  </label>
-                  <label class="pdfx-check">
-                    <input type="checkbox" x-model="activeProfile.config.layout.showHeaderOnChapterEnd">
-                    <span x-text="$app.t('pdfExport.layout.showHeaderOnChapterEnd')"></span>
-                  </label>
-                  <label class="pdfx-check">
-                    <input type="checkbox" x-model="activeProfile.config.layout.showFooterOnChapterEnd">
-                    <span x-text="$app.t('pdfExport.layout.showFooterOnChapterEnd')"></span>
-                  </label>
-                </div>
               </div>
             </div>
           </div>

@@ -23,6 +23,7 @@ export const SLASH_ITEMS = [
   { key: 'hr',         tag: 'hr',                          group: 'break' },
   { key: 'pagebreak',  tag: 'hr', className: 'pagebreak',  group: 'break' },
   { key: 'blankpage',  tag: 'hr', className: 'blankpage',  group: 'break' },
+  { key: 'bild',       upload: 'image',        group: 'insert' },
   { key: 'heute',      insertText: 'date',     group: 'insert' },
   { key: 'jetzt',      insertText: 'datetime', group: 'insert' },
   { key: 'zeit',       insertText: 'time',     group: 'insert' },

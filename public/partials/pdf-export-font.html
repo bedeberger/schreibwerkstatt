@@ -4,6 +4,7 @@
             { key: 'body',       roles: ['body','heading'] },
             { key: 'runningHead', roles: ['header','footer'] },
             { key: 'titlePages', roles: ['title','subtitle','byline','dedication','frontMatter','year'] },
+            { key: 'toc',        roles: ['tocTitle','toc'] },
             { key: 'backmatter', roles: ['authorBio'] },
             { key: 'imprint',    roles: ['imprint'] }
           ]" :key="group.key">
@@ -88,6 +89,23 @@
                                x-modelable="value" x-model="activeProfile.config.font.body.numerals"
                                x-effect="options = [{ value: 'auto', label: $app.t('pdfExport.font.numerals.auto') }, { value: 'lining', label: $app.t('pdfExport.font.numerals.lining') }, { value: 'oldstyle', label: $app.t('pdfExport.font.numerals.oldstyle') }]"
 ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="role === 'toc'">
+                    <div>
+                      <div class="card-form-row">
+                        <label class="card-form-label" x-text="$app.t('pdfExport.font.lineHeight')"></label>
+                        <div class="card-form-field">
+                          <input type="text" x-data="numInput({ step: 0.05, min: 0.8, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.toc.lineHeight" class="pdfx-num-input">
+                        </div>
+                      </div>
+                      <div class="card-form-row">
+                        <label class="card-form-label" x-text="$app.t('pdfExport.font.paragraphGap')"></label>
+                        <div class="card-form-field">
+                          <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.toc.paragraphGap" class="pdfx-num-input">
                         </div>
                       </div>
                     </div>

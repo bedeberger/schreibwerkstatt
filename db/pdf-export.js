@@ -22,6 +22,7 @@ const _SELECT_COLS = `id, book_id, kind, user_email, name, config_json, is_defau
        (cover_image IS NOT NULL) AS has_cover, cover_mime,
        (author_image IS NOT NULL) AS has_author_image, author_image_mime,
        (back_cover_image IS NOT NULL) AS has_back_cover, back_cover_image_mime,
+       (spine_image IS NOT NULL) AS has_spine, spine_image_mime,
        created_at, updated_at`;
 
 const _stmtListBook = db.prepare(
@@ -38,6 +39,9 @@ const _stmtGet = db.prepare(`SELECT ${_SELECT_COLS} FROM pdf_export_profile WHER
 const _stmtGetBackCover = db.prepare(
   `SELECT back_cover_image AS image, back_cover_image_mime AS mime FROM pdf_export_profile WHERE id = ?`
 );
+const _stmtGetSpine = db.prepare(
+  `SELECT spine_image AS image, spine_image_mime AS mime FROM pdf_export_profile WHERE id = ?`
+);
 const _stmtInsert = db.prepare(
   `INSERT INTO pdf_export_profile (book_id, kind, user_email, name, config_json, is_default, created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
@@ -51,6 +55,12 @@ const _stmtSetBackCover = db.prepare(
 );
 const _stmtClearBackCover = db.prepare(
   `UPDATE pdf_export_profile SET back_cover_image = NULL, back_cover_image_mime = NULL, updated_at = ? WHERE id = ?`
+);
+const _stmtSetSpine = db.prepare(
+  `UPDATE pdf_export_profile SET spine_image = ?, spine_image_mime = ?, updated_at = ? WHERE id = ?`
+);
+const _stmtClearSpine = db.prepare(
+  `UPDATE pdf_export_profile SET spine_image = NULL, spine_image_mime = NULL, updated_at = ? WHERE id = ?`
 );
 const _stmtClearDefaultsBook = db.prepare(
   `UPDATE pdf_export_profile SET is_default = 0
@@ -80,6 +90,8 @@ function _row(r) {
     author_image_mime: r.author_image_mime || null,
     has_back_cover: !!r.has_back_cover,
     back_cover_mime: r.back_cover_image_mime || null,
+    has_spine: !!r.has_spine,
+    spine_mime: r.spine_image_mime || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -127,6 +139,20 @@ function getBackCover(id) {
   return { image: r.image, mime: r.mime };
 }
 
+function setSpineImage(id, buffer, mime) {
+  _stmtSetSpine.run(buffer, mime, Date.now(), parseInt(id));
+}
+
+function clearSpineImage(id) {
+  _stmtClearSpine.run(Date.now(), parseInt(id));
+}
+
+function getSpineImage(id) {
+  const r = _stmtGetSpine.get(parseInt(id));
+  if (!r || !r.image) return null;
+  return { image: r.image, mime: r.mime };
+}
+
 const _setDefaultTx = db.transaction((bookId, userEmail, id) => {
   const s = _scope(bookId);
   if (s.kind === 'book') _stmtClearDefaultsBook.run(s.bookId, userEmail);
@@ -142,5 +168,6 @@ function setDefault(bookId, userEmail, id) {
 module.exports = {
   listProfiles, getProfile, createProfile, updateProfile, deleteProfile,
   setBackCover, clearBackCover, getBackCover,
+  setSpineImage, clearSpineImage, getSpineImage,
   setDefault,
 };

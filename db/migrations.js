@@ -8927,6 +8927,54 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 232 abgeschlossen (writing_session — Schreib-Session-Tracking fuer Meine Statistik).');
   }
 
+  if (version < 233) {
+    // Vom User im Notebook-Editor eingefuegte Manuskript-Bilder. An die Seite
+    // gebunden; CASCADE mit der Seite, da das Bild ohne seinen Seiten-Kontext
+    // (das referenzierende <img> im Page-HTML) keinen Bezug mehr hat. BLOB inline
+    // wie chat_images — pro Seite wenige, sharp-normalisierte Bilder. Owner-/ACL-
+    // Check der Serve-Route laeuft ueber JOIN page_id → pages.book_id.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS page_images (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_id     INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
+        mime        TEXT    NOT NULL DEFAULT 'image/jpeg',
+        width       INTEGER,
+        height      INTEGER,
+        size        INTEGER NOT NULL DEFAULT 0,
+        image       BLOB    NOT NULL,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_page_images_page ON page_images(page_id)');
+    const fkErrors233 = db.pragma('foreign_key_check');
+    if (fkErrors233.length) {
+      throw new Error(`Migration 233: foreign_key_check meldet ${fkErrors233.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 233').run();
+    logger.info('DB-Migration auf Version 233 abgeschlossen (page_images — Manuskript-Bilder im Notebook-Editor).');
+  }
+
+  if (version < 234) {
+    // Buchruecken-Bild fuer das separate Umschlag-PDF (druckfertiger PDF-Export).
+    // BLOB direkt im Profil, analog cover_image/author_image/back_cover_image.
+    // Erlaubt ein durchgehendes Motiv als Front/Ruecken/Rueckseite-Panels.
+    // Additive Spalten, kein FK noetig.
+    const pepCols234 = db.pragma('table_info(pdf_export_profile)').map(c => c.name);
+    if (!pepCols234.includes('spine_image')) {
+      db.prepare('ALTER TABLE pdf_export_profile ADD COLUMN spine_image BLOB').run();
+    }
+    if (!pepCols234.includes('spine_image_mime')) {
+      db.prepare('ALTER TABLE pdf_export_profile ADD COLUMN spine_image_mime TEXT').run();
+    }
+
+    const fkErrors234 = db.pragma('foreign_key_check');
+    if (fkErrors234.length) {
+      throw new Error(`Migration 234: foreign_key_check meldet ${fkErrors234.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 234').run();
+    logger.info('DB-Migration auf Version 234 abgeschlossen (pdf_export_profile.spine_image).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -2,6 +2,7 @@
 // Content-Routes: Seiten-Ebene (Detail/Save/Create/Delete), Page-Presence-
 // Heartbeats + Page-Revisions (Liste/Detail/Restore).
 
+const express = require('express');
 const contentStore = require('../../lib/content-store');
 const pageRevisions = require('../../db/page-revisions');
 const pagePresence = require('../../db/page-presence');
@@ -240,6 +241,80 @@ function register(router) {
       await contentStore.deletePage(pageId, req);
       res.json({ ok: true });
     } catch (e) { _fail(res, e, 'DELETE /content/pages/:id'); }
+  });
+
+  // ── Manuskript-Bilder (Notebook-Editor) ────────────────────────────────────
+  // Vom User eingefuegte Bilder, als BLOB an die Seite gebunden (CASCADE),
+  // im Page-HTML referenziert als <img src="/content/page-image/:id">.
+
+  // Rohe Bild-Bytes (Browser sendet den File-Body mit Content-Type: image/*).
+  const rawImageBody = express.raw({ type: 'image/*', limit: '16mb' });
+
+  // POST /content/pages/:page_id/images — Bild hochladen. minRole editor.
+  // Body = rohe Bild-Bytes. sharp normalisiert (sRGB, EXIF-strip, max 2000px,
+  // JPEG/PNG). Liefert { id, url, width, height, mime }.
+  router.post('/pages/:page_id/images', rawImageBody, async (req, res) => {
+    const pageId = toIntId(req.params.page_id);
+    if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
+    if (_guardPage(req, res, pageId, 'editor') == null) return;
+    const raw = req.body;
+    if (!Buffer.isBuffer(raw) || raw.length === 0) {
+      return res.status(400).json({ error_code: 'EMPTY_IMAGE' });
+    }
+    try {
+      const { preparePageImage } = require('../../lib/page-image-prepare');
+      const { insertPageImage } = require('../../db/page-images');
+      const prepared = await preparePageImage(raw);
+      const id = insertPageImage({
+        pageId,
+        mime: prepared.mime,
+        width: prepared.width,
+        height: prepared.height,
+        size: prepared.buffer.length,
+        image: prepared.buffer,
+      });
+      res.json({
+        id,
+        url: `/content/page-image/${id}`,
+        width: prepared.width,
+        height: prepared.height,
+        mime: prepared.mime,
+      });
+    } catch (e) {
+      if (/^image-/.test(e.message || '')) {
+        return res.status(400).json({ error_code: 'INVALID_IMAGE', detail: e.message });
+      }
+      _fail(res, e, 'POST /content/pages/:id/images');
+    }
+  });
+
+  // GET /content/page-image/:id — Bild streamen. ACL-Owner-Scope via JOIN
+  // page_id → pages.book_id (viewer reicht — Bild ist Teil des lesbaren Inhalts).
+  // ?download=1 erzwingt Attachment-Disposition.
+  router.get('/page-image/:id', (req, res) => {
+    const id = toIntId(req.params.id);
+    if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+    const { getPageImage } = require('../../db/page-images');
+    const row = getPageImage(id);
+    if (!row) return res.status(404).json({ error_code: 'IMAGE_NOT_FOUND' });
+    setContext({ book: row.book_id });
+    try { requireBookAccess(req, row.book_id, 'viewer'); }
+    catch (e) { if (sendACLError(res, e)) return; throw e; }
+
+    // Defense-in-depth: nur Raster-MIMEs inline; nosniff + restriktive CSP
+    // verhindern HTML/Script-Interpretation des Bild-Bodys (Stored-XSS-Schutz).
+    const SAFE_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+    const safe = SAFE_IMAGE_MIME.has(row.mime);
+    const ext = (safe && row.mime.split('/')[1]) || 'jpg';
+    res.setHeader('Content-Type', safe ? row.mime : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    if (req.query.download || !safe) {
+      res.setHeader('Content-Disposition', `attachment; filename="bild-${id}.${ext}"`);
+    }
+    res.setHeader('Content-Length', row.image.length);
+    res.end(row.image);
   });
 }
 

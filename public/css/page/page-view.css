@@ -85,13 +85,7 @@
 .page-content-view s, .page-content-view del, .page-content-view strike { text-decoration: line-through; }
 .page-content-view sup { vertical-align: super; font-size: var(--font-em-75); line-height: 0; }
 .page-content-view sub { vertical-align: sub; font-size: var(--font-em-75); line-height: 0; }
-.page-content-view blockquote {
-  border-left: 3px solid var(--color-border);
-  padding: 0.3em 0 0.3em 12px;
-  margin: 0.4em 0;
-  color: var(--color-subtle);
-  font-style: italic;
-}
+.page-content-view blockquote { border-left: 3px solid var(--color-border); padding: 0.3em 0 0.3em 12px; margin: 0.4em 0; color: var(--color-subtle); font-style: italic; }
 .page-content-view blockquote > :first-child { margin-top: 0; }
 .page-content-view blockquote > :last-child { margin-bottom: 0; }
 /* WordPress-Import-Artefakt: BookStack-HTML hat oft ein orphan <br> direkt
@@ -105,6 +99,10 @@
 .page-content-view th { background: var(--color-bg); font-weight: 700; }
 .page-content-view ul, .page-content-view ol { padding-left: 1.5em; margin: 0.4em 0; }
 .page-content-view img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
+/* Eingefügte Manuskript-Bilder: zentrierte figure + optionale Bildunterschrift. */
+.page-content-view figure { margin: 1em 0; text-align: center; }
+.page-content-view figure img { display: block; margin: 0 auto; }
+.page-content-view figcaption { margin-top: var(--space-6); font-size: var(--font-size-sm); color: var(--color-subtle); font-style: italic; text-align: center; }
 .page-content-view hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
 /* Seitenumbruch-Marker: nur im Editor sichtbar, im PDF-Export erzeugt er addPage().
    Dashed + Akzentfarbe grenzt ihn klar von der soliden Trennlinie ab. */
