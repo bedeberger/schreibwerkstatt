@@ -17,6 +17,9 @@ export const TRIM_PRESETS = [
   { value: 'kdp-5.25x8',    w: 133.35, h: 203.2, label: 'KDP 5.25 × 8″ (13.34 × 20.32 cm)' },
   { value: 'kdp-5.5x8.5',   w: 139.7,  h: 215.9, label: 'KDP 5.5 × 8.5″ (13.97 × 21.59 cm)' },
   { value: 'kdp-6x9',       w: 152.4,  h: 228.6, label: 'KDP 6 × 9″ (15.24 × 22.86 cm)' },
+  { value: 'kdp-6.14x9.21', w: 156,    h: 234,   label: 'KDP 6.14 × 9.21″ (15.6 × 23.4 cm)' },
+  { value: 'kdp-7x10',      w: 177.8,  h: 254,   label: 'KDP 7 × 10″ (17.78 × 25.4 cm)' },
+  { value: 'kdp-8.5x11',    w: 215.9,  h: 279.4, label: 'KDP 8.5 × 11″ (21.59 × 27.94 cm)' },
 ];
 
 // Papiertyp-Vorlagen für die Rückenbreite. `bulk` = mm Rückenstärke je 1000
