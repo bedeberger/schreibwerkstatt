@@ -33,6 +33,12 @@
 }
 .share-content ul, .share-content ol { padding-left: 1.6em; }
 .share-content img { max-width: 100%; height: auto; border-radius: var(--share-radius-sm); }
+/* Eingefügte Manuskript-Bilder: zentrierte figure + Bildunterschrift — gespiegelt
+   aus der Notebook-Leseansicht (.page-content-view figure/figcaption), mit
+   Share-Tokens statt App-Tokens. */
+.share-content figure { margin: 1em 0; text-align: center; }
+.share-content figure img { display: block; margin: 0 auto; }
+.share-content figcaption { margin-top: 8px; font-size: 14px; color: var(--share-muted); font-style: italic; text-align: center; }
 .share-content a { color: var(--share-accent); }
 .share-content hr {
   border: 0;
@@ -56,13 +62,15 @@
 /* Drop Cap (Initiale) am Prosa-Einstieg: erster Absatz des Artikels (Seiten-
    Share) bzw. erster Absatz nach einem Kapitel-Heading (Buch-/Kapitel-Share).
    Progressive Enhancement — Browser ohne initial-letter (Firefox) rendern
-   schlicht normalen Text. Akzentfarbe bindet die Initiale an den Share-Look. */
+   schlicht normalen Text. Akzentfarbe bindet die Initiale an den Share-Look.
+   Sink 1 (Wert `2 1`): 2 Zeilen hoch, aber nur 1 Zeile versenkt — so hängt die
+   Initiale bei kurzen/einzeiligen ersten Absätzen nicht ins Leere darunter. */
 @supports (initial-letter: 2) or (-webkit-initial-letter: 2) {
   .share-content--prose > p:first-child::first-letter,
   .share-content--prose > .ms-page:first-child .ms-page__body > p:first-child::first-letter,
   .share-content--prose .ms-chapter + .ms-page .ms-page__body > p:first-child::first-letter {
-    -webkit-initial-letter: 2;
-    initial-letter: 2;
+    -webkit-initial-letter: 2 1;
+    initial-letter: 2 1;
     padding-right: 0.08em;
     font-weight: 600;
     color: var(--share-accent);
@@ -140,6 +148,13 @@
 .share-toc__link:hover {
   background: color-mix(in srgb, var(--share-accent) 6%, transparent);
   color: var(--share-text);
+}
+/* Scroll-Spy: aktuell gelesene Sektion (share-reader/toc.js). Akzent-Rand links
+   + zarter Tint, analog zur aktiven Bucheditor-Outline-Zeile. */
+.share-toc__link--active {
+  color: var(--share-text);
+  background: color-mix(in srgb, var(--share-accent) 9%, transparent);
+  box-shadow: inset 2px 0 0 0 var(--share-accent);
 }
 
 /* Findings-Marks und Spellcheck-Squiggles aus Editor-Runtime neutralisieren:

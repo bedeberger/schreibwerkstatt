@@ -8,6 +8,7 @@ import { el } from './dom.js';
 export function setupToc({ menuSection }) {
   setupTocToggle(menuSection);
   setupTocScroll();
+  setupTocSpy();
 }
 
 // Toggle-Eintrag im Optionen-Menü (⋯). Blendet das ganze TOC-Panel aus; im Grid
@@ -65,4 +66,68 @@ function setupTocScroll() {
       try { history.replaceState(null, '', '#' + id); } catch {}
     });
   });
+}
+
+// Scroll-Spy: markiert im TOC den Eintrag der aktuell gelesenen Sektion
+// („wo bin ich gerade"). Pendant zur Bucheditor-Outline, aber ohne Alpine —
+// scroll-getrieben statt IntersectionObserver, weil die Anker-Ziele dünne
+// Überschriften sind (IO nach intersectionRatio wackelt bei kurzen Elementen).
+// Aktiv = die letzte Überschrift, die über die Leselinie (Sticky-Header-Kante)
+// nach oben gescrollt ist. Im ≥1100px-Grid ist das TOC eine höhen-gedeckelte,
+// scrollbare sticky Leiste → aktiven Eintrag darin sichtbar halten.
+function setupTocSpy() {
+  const links = Array.from(document.querySelectorAll('.share-toc__link'));
+  const entries = links
+    .map((link) => {
+      const id = (link.getAttribute('href') || '').replace(/^#/, '');
+      return { link, target: id ? document.getElementById(id) : null };
+    })
+    .filter((e) => e.target); // Dokument-Reihenfolge (querySelectorAll)
+  if (entries.length < 2) return;
+
+  const toc = document.querySelector('.share-toc');
+  let activeLink = null;
+  let raf = 0;
+
+  function readingLine() {
+    const h = document.querySelector('.share-header');
+    return (h ? h.getBoundingClientRect().height : 0) + 24;
+  }
+
+  // Aktiven Eintrag im höhen-gedeckelten TOC-Viewport halten (nur den TOC-
+  // Container scrollen, nie das Fenster). Analog Bucheditor _scrollOutlineToActive.
+  function scrollTocToActive() {
+    if (!toc || !activeLink) return;
+    const c = toc.getBoundingClientRect();
+    const a = activeLink.getBoundingClientRect();
+    const pad = 24;
+    if (a.top < c.top + pad) toc.scrollTop -= (c.top + pad) - a.top;
+    else if (a.bottom > c.bottom - pad) toc.scrollTop += a.bottom - (c.bottom - pad);
+  }
+
+  function update() {
+    raf = 0;
+    const line = readingLine();
+    let current = entries[0];
+    for (const e of entries) {
+      if (e.target.getBoundingClientRect().top <= line) current = e;
+      else break;
+    }
+    if (current.link === activeLink) return;
+    if (activeLink) {
+      activeLink.classList.remove('share-toc__link--active');
+      activeLink.removeAttribute('aria-current');
+    }
+    activeLink = current.link;
+    activeLink.classList.add('share-toc__link--active');
+    activeLink.setAttribute('aria-current', 'true');
+    scrollTocToActive();
+  }
+
+  function schedule() {
+    if (!raf) raf = requestAnimationFrame(update);
+  }
+  window.addEventListener('scroll', schedule, { passive: true });
+  window.addEventListener('resize', schedule, { passive: true });
+  update();
 }

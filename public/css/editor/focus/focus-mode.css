@@ -393,11 +393,25 @@ body.palette-open { overflow: hidden; overscroll-behavior: contain; }
    in Chrome mit styleWithCSS=true schreibt inline-styles statt <b>; sonst
    wäre Bold im Fokus-Modus unsichtbar trotz funktionierendem Shortcut. */
 
-/* Tabellen und Bilder stören den Lese-/Schreibfluss – komplett ausblenden.
+/* Tabellen-Layout stört den Lese-/Schreibfluss – komplett ausblenden.
    Im Edit-Modus bleibt das Markup im DOM erhalten und wird beim Verlassen
    wieder sichtbar. */
-.focus-editor__content :is(table, img) {
+.focus-editor__content table {
   display: none;
+}
+
+/* Bilder werden NICHT versteckt, sondern als kleiner, gedimmter Thumbnail
+   gezeigt. Ein per display:none entferntes Bild lässt eine bebilderte Seite
+   im Fokus leer/ignoriert wirken; der Thumbnail bestätigt die Präsenz und
+   zeigt, welches Bild dort sitzt, ohne den Schreibfluss zu dominieren. */
+.focus-editor__content img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 3em;
+  margin: 0.4em auto;
+  opacity: 0.5;
+  border-radius: var(--radius-sm);
 }
 
 /* === Fokus-Modus: Auto-Hide-Cursor, Header-Live-Counter === */
