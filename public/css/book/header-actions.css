@@ -466,15 +466,34 @@
   color: var(--color-subtle);
 }
 .today-ring-week-day--today { font-weight: 700; color: var(--color-accent); }
+/* Kartenbündiger Footer-Link: Trenner über die volle Popover-Breite (negative
+   Ränder heben das Popover-Padding auf), Text links, Pfeil rechts (nudget bei
+   Hover), accent-getönter Hover — gleiches Muster wie der Entity-Popover-Link. */
 .today-ring-pop-link {
-  align-self: flex-start;
-  padding: 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-accent);
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin: var(--space-2xs) calc(-1 * var(--space-md)) calc(-1 * var(--space-md));
+  padding: var(--space-sm) var(--space-md);
   border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: none;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-accent);
   cursor: pointer;
+  transition: background var(--transition-base);
 }
+.today-ring-pop-link:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.today-ring-pop-link .icon {
+  width: 15px;
+  height: 15px;
+  transition: transform var(--transition-base);
+}
+.today-ring-pop-link:hover .icon { transform: translateX(2px); }
 
 /* Touch: mehr Luft zwischen den Header-Controls. Größe bleibt (28px-Chip-
    Alignment mit Ring/Avatar), nur Abstände wachsen — Vertikal-Padding ≤3px,

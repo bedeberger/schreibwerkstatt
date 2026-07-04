@@ -434,8 +434,10 @@
           </div>
 
           <button type="button" class="today-ring-pop-link internal-link"
-                  @click="$store.progress.popoverOpen = false; toggleMyStatsCard()"
-                  x-text="t('todayRing.fullStats')"></button>
+                  @click="$store.progress.popoverOpen = false; toggleMyStatsCard()">
+            <span x-text="t('todayRing.fullStats')"></span>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-right"/></svg>
+          </button>
         </div>
       </span>
     </template>
