@@ -20,7 +20,7 @@ export const myStatsTrendMethods = {
     return this._memo('periodCmp', [this.myStatsHistory, this.myStatsWriting, from, to], () =>
       computePeriodComparison(this.myStatsHistory, this.myStatsWriting, from, to));
   },
-  get myStatsHasPeriodCmp() { return this.myStatsPeriodComparison().available; },
+  myStatsHasPeriodCmp() { return this.myStatsPeriodComparison().available; },
   // Delta als Anzeige-Text: Prozent, wenn eine Vergleichsbasis existiert; sonst
   // der absolute Zuwachs mit Vorzeichen (Vorperiode war leer → % waere sinnlos).
   myStatsCmpText(d) {
@@ -39,14 +39,14 @@ export const myStatsTrendMethods = {
     const win = this._winSessions();
     return this._memo('sessionStats', [win], () => computeSessionStats(win));
   },
-  get myStatsHasSessions() { return this.myStatsSessionStats().hasData; },
+  myStatsHasSessions() { return this.myStatsSessionStats().hasData; },
 
   // ── Gesamt-Prognose ueber alle Buecher mit offenem Gesamtziel (Lifetime) ──────
   myStatsOverallForecast() {
     const goals = this.myStatsBookGoals();
     return this._memo('overallForecast', [goals], () => computeOverallForecast(goals));
   },
-  get myStatsHasOverallForecast() { return this.myStatsOverallForecast().hasData; },
+  myStatsHasOverallForecast() { return this.myStatsOverallForecast().hasData; },
   myStatsOverallForecastLabel() {
     const f = this.myStatsOverallForecast();
     const t = window.__app.t;
@@ -74,5 +74,5 @@ export const myStatsTrendMethods = {
   myStatsVocabTrend() {
     return this._memo('vocabTrend', [this.myStatsHistory], () => computeVocabTrend(this.myStatsHistory));
   },
-  get myStatsHasVocab() { return this.myStatsVocabTrend().hasData; },
+  myStatsHasVocab() { return this.myStatsVocabTrend().hasData; },
 };

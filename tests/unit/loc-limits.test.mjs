@@ -77,7 +77,6 @@ const CATEGORIES = [
       'public/partials/user-settings.html': 268,
       'public/partials/szenen.html': 273,
       'public/partials/orte.html': 277,
-      'public/partials/my-stats.html': 259,
       'public/partials/finetune-export.html': 254,
     },
   },

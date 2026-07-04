@@ -6,7 +6,7 @@
 <!-- Vorperioden-Vergleich: aktiver Zeitraum vs. gleich lange Periode davor
      (Zeichen-Zuwachs + Schreibzeit). Nur bei aktivem, nach vorne begrenztem
      Zeitraum sichtbar. -->
-<template x-if="myStatsHasPeriodCmp">
+<template x-if="myStatsHasPeriodCmp()">
   <div class="overview-tile overview-tile--medium">
     <div class="overview-tile-label" x-text="$app.t('mystats.periodCompare')"></div>
     <div class="overview-consistency-grid">
@@ -124,7 +124,7 @@
         </span>
         <span class="overview-consistency-label" x-text="$app.t('mystats.sentenceLen')"></span>
       </div>
-      <div class="overview-consistency-item" x-show="myStatsHasVocab">
+      <div class="overview-consistency-item" x-show="myStatsHasVocab()">
         <span class="overview-consistency-value">
           <span x-text="_myStatsFmt(myStatsVocabTrend().total)"></span>
           <svg class="icon mystats-trend" aria-hidden="true"><use :href="'/icons.svg#' + myStatsTrendIcon(myStatsVocabTrend().trend)"></use></svg>

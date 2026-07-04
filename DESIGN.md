@@ -784,8 +784,8 @@ Pflicht-Pattern (Wrapper-Div leer lassen, nur Attribute setzen):
 **Klassen** [public/css/components/toggle-switch.css](public/css/components/toggle-switch.css):
 - `.toggle-switch` — Wrapper (von `init()` gesetzt)
 - `.toggle-switch__btn` — Button (Track + Label), trägt den nativen Fokus-Ring
-- `.toggle-switch__track` / `.toggle-switch__track.is-on` — Schalter-Bahn (eckig, `--radius-sm` — kein pill-runder iOS-Switch, konsistent mit dem Badge-Aesthetic)
-- `.toggle-switch__thumb` — gleitender Knopf
+- `.toggle-switch__track` / `.toggle-switch__track.is-on` — Schalter-Bahn (runde Pille, `border-radius: 999px` — die vertraute An/Aus-Schalter-Affordance; die eckige-Badges-Regel gilt für Badges/Tags, nicht für dieses Control)
+- `.toggle-switch__thumb` — gleitender runder Knopf (`border-radius: 50%`)
 - `.toggle-switch__label` — sichtbares Label rechts vom Switch
 
 **Regeln:**

@@ -344,7 +344,7 @@
    Basis-Zellen (--lvl0..4) leben in book-overview/stats.css; hier nur die
    mystats-eigenen Ziel-Varianten. */
 .mystats-streak-modes {
-  margin: var(--space-2xs) 0 var(--space-1);
+  margin: var(--space-2xs) 0 var(--space-xs);
 }
 .card--mystats .overview-streak-cell--goal-hit { background: var(--color-success); }
 .card--mystats .overview-streak-cell--goal-miss {

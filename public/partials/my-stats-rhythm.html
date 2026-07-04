@@ -107,7 +107,7 @@
 
 <!-- Session-Kennzahlen: Anzahl, Ø-Länge, längste Session, Sessions/aktiver Tag.
      Aus writing_session (heartbeat-abgeleitet), zeitraum-bewusst. -->
-<template x-if="myStatsHasSessions">
+<template x-if="myStatsHasSessions()">
   <div class="overview-tile overview-tile--medium">
     <div class="overview-tile-label" x-text="$app.t('mystats.sessions')"></div>
     <div class="overview-consistency-grid">

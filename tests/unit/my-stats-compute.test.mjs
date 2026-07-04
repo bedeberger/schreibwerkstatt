@@ -605,3 +605,116 @@ test('computeBookGoals: reicht category durch', () => {
   ]);
   assert.deepEqual(rows[0].category, { id: 2, name: 'Krimi', color: '#abc' });
 });
+
+// ── Trend-/Session-/Prognose-Funktionen (my-stats-trends.js) ─────────────────
+const { computePeriodComparison, computeSessionStats, computeOverallForecast,
+        computeVocabTrend } =
+  await import('../../public/js/cards/my-stats-trends.js');
+
+test('computeSessionStats: Anzahl, Durchschnitt, laengste, pro aktivem Tag', () => {
+  const s = computeSessionStats([
+    { book_id: 1, date: '2026-06-01', seconds: 600 },
+    { book_id: 1, date: '2026-06-01', seconds: 1800 }, // laengste, selber Tag
+    { book_id: 2, date: '2026-06-02', seconds: 300 },
+    { book_id: 2, date: '2026-06-03', seconds: 0 },    // 0s faellt raus
+  ]);
+  assert.equal(s.hasData, true);
+  assert.equal(s.count, 3);
+  assert.equal(s.avgSeconds, Math.round((600 + 1800 + 300) / 3));
+  assert.equal(s.longestSeconds, 1800);
+  assert.equal(s.longestDate, '2026-06-01');
+  assert.equal(s.activeDays, 2);
+  assert.equal(s.perActiveDay, 1.5);
+});
+
+test('computeSessionStats: leer → hasData false', () => {
+  assert.equal(computeSessionStats([]).hasData, false);
+  assert.equal(computeSessionStats([{ book_id: 1, date: '2026-06-01', seconds: 0 }]).hasData, false);
+});
+
+test('computePeriodComparison: Vorperiode gleich lang, davor liegend', () => {
+  // 3-Tage-Fenster 2026-06-08..10; Vorperiode 06-05..07.
+  const history = [
+    { book_id: 1, recorded_at: '2026-06-04', chars: 1000, words: 100, page_count: 2 },
+    { book_id: 1, recorded_at: '2026-06-07', chars: 1600, words: 160, page_count: 3 },
+    { book_id: 1, recorded_at: '2026-06-10', chars: 2200, words: 220, page_count: 4 },
+  ];
+  const writing = [
+    { book_id: 1, date: '2026-06-06', seconds: 1200 },
+    { book_id: 1, date: '2026-06-09', seconds: 3600 },
+  ];
+  const c = computePeriodComparison(history, writing, '2026-06-08', '2026-06-10');
+  assert.equal(c.available, true);
+  assert.equal(c.days, 3);
+  assert.equal(c.prevFrom, '2026-06-05');
+  assert.equal(c.prevTo, '2026-06-07');
+  // cur chars: end(<=06-10)=2200 minus base(< 06-08 → 06-07)=1600 → 600.
+  assert.equal(c.chars.cur, 600);
+  // prev chars: end(<=06-07)=1600 minus base(< 06-05 → 06-04)=1000 → 600.
+  assert.equal(c.chars.prev, 600);
+  assert.equal(c.chars.pct, 0);
+  // Schreibzeit: cur = 3600 (06-09), prev = 1200 (06-06).
+  assert.equal(c.writingSeconds.cur, 3600);
+  assert.equal(c.writingSeconds.prev, 1200);
+  assert.equal(c.writingSeconds.pct, 200);
+  assert.equal(c.writingSeconds.dir, 1);
+});
+
+test('computePeriodComparison: pct null wenn Vorperiode leer', () => {
+  const c = computePeriodComparison([], [{ book_id: 1, date: '2026-06-09', seconds: 600 }],
+                                     '2026-06-08', '2026-06-10');
+  assert.equal(c.writingSeconds.prev, 0);
+  assert.equal(c.writingSeconds.pct, null);
+  assert.equal(c.writingSeconds.dir, 1);
+});
+
+test('computePeriodComparison: unvollstaendiges Fenster → not available', () => {
+  assert.equal(computePeriodComparison([], [], null, '2026-06-10').available, false);
+  assert.equal(computePeriodComparison([], [], '2026-06-10', null).available, false);
+});
+
+test('computeOverallForecast: summiert Rest + Tempo, prognostiziert Datum', () => {
+  const goals = [
+    { hasGoal: true, reached: false, remainingChars: 30000, recentDailyChars: 1000 },
+    { hasGoal: true, reached: false, remainingChars: 20000, recentDailyChars: 1000 },
+    { hasGoal: true, reached: true,  remainingChars: 0,     recentDailyChars: 500 }, // erreicht → ignoriert
+    { hasGoal: false },                                                              // kein Ziel → ignoriert
+  ];
+  const f = computeOverallForecast(goals, new Date('2026-06-10T12:00:00'));
+  assert.equal(f.hasData, true);
+  assert.equal(f.booksOpen, 2);
+  assert.equal(f.remainingChars, 50000);
+  assert.equal(f.dailyChars, 2000);
+  assert.equal(f.stalled, false);
+  assert.equal(f.forecastDays, 25); // 50000 / 2000
+});
+
+test('computeOverallForecast: kein Tempo → stalled', () => {
+  const f = computeOverallForecast([
+    { hasGoal: true, reached: false, remainingChars: 10000, recentDailyChars: 0 },
+  ]);
+  assert.equal(f.hasData, true);
+  assert.equal(f.stalled, true);
+  assert.equal(f.forecastDate, null);
+});
+
+test('computeOverallForecast: keine offenen Ziele → hasData false', () => {
+  assert.equal(computeOverallForecast([]).hasData, false);
+  assert.equal(computeOverallForecast([{ hasGoal: true, reached: true, remainingChars: 0 }]).hasData, false);
+});
+
+test('computeVocabTrend: Summe unique_words + Trend ggue. ~30 Tagen', () => {
+  const history = [
+    { book_id: 1, recorded_at: isoDaysAgo(40), chars: 1000, unique_words: 500 },
+    { book_id: 1, recorded_at: isoDaysAgo(1),  chars: 2000, unique_words: 900 },
+    { book_id: 2, recorded_at: isoDaysAgo(1),  chars: 1000, unique_words: 300 },
+  ];
+  const v = computeVocabTrend(history);
+  assert.equal(v.hasData, true);
+  assert.equal(v.total, 1200);   // 900 + 300 (juengstes je Buch)
+  assert.equal(v.trend, 1);      // gegen 500 vor ~30 Tagen gestiegen
+});
+
+test('computeVocabTrend: kein Wortschatz → hasData false', () => {
+  assert.equal(computeVocabTrend([]).hasData, false);
+});
