@@ -5,7 +5,8 @@
 //   /history/fehler-heatmap/:book_id → Top-Fehlertypen (mode=open)
 //   /history/review/:book_id        → letzte Bewertung
 //   /history/lektorat-time/:book_id → Lektoratszeit pro Kapitel
-//   /history/page-stats/:book_id    → Stale-Check (Auto-Sync)
+//   /history/stats-stale/:book_id   → Server-Urteil Stats-Staleness (Auto-Sync)
+//   /history/page-stats/:book_id    → tokEsts-Refresh nach Auto-Sync
 //   /usage/page/recent              → zuletzt geöffnete Seiten
 //   /figures/:book_id, /figures/scenes/:book_id → Figuren/Szenen-Counts + Top-Figuren
 //   /locations/:book_id             → Schauplätze

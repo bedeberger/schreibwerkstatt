@@ -2,15 +2,15 @@
 // loadBookOverview ruft 10 Endpoints parallel und schreibt das Resultat in den
 // State. _checkBookStatsStaleness läuft anschliessend silent im Hintergrund;
 // resetBookOverview leert State + Memos beim Buchwechsel.
-import { fetchJson, aggregateLiveBookStats } from '../utils.js';
+import { fetchJson } from '../utils.js';
 
 // Retry once mit kurzem Backoff: bei 9 parallelen Endpoints fängt das
 // 5xx-/Netzwerk-Blips ab, ohne dass das Tile stumm leer rendert.
-async function fetchJsonRetry(url) {
-  try { return await fetchJson(url); }
+async function fetchJsonRetry(url, opts) {
+  try { return await fetchJson(url, opts); }
   catch (e1) {
     await new Promise(r => setTimeout(r, 250));
-    try { return await fetchJson(url); }
+    try { return await fetchJson(url, opts); }
     catch (e2) {
       console.warn('[bookOverview] fetch failed twice', url, e2);
       throw e2;
@@ -28,19 +28,29 @@ export const loadMethods = {
     this._loadingBookId = bookId;
     this.overviewLoading = true;
     this.overviewBookId = bookId;
+    // Fehlgeschlagene Endpoints sammeln (nach dem einen Retry aus fetchJsonRetry),
+    // statt sie still zu schlucken — die Overview zeigt danach einen dezenten
+    // Hinweis + Retry, damit ein ausgefallenes Tile nicht als „keine Daten"
+    // missverstanden wird.
+    const failed = [];
+    const guard = (key, fallback) => (e) => {
+      failed.push(key);
+      console.warn(`[bookOverview] ${key} fehlgeschlagen`, e);
+      return fallback;
+    };
     try {
       const [stats, coverage, heat, reviews, recent, figuren, szenen, orte, songs, lektoratTime, settings] = await Promise.all([
-        fetchJsonRetry(`/history/book-stats/${bookId}`).catch(() => []),
-        fetchJsonRetry(`/history/coverage/${bookId}`).catch(() => null),
-        fetchJsonRetry(`/history/fehler-heatmap/${bookId}?mode=open`).catch(() => null),
-        fetchJsonRetry(`/history/review/${bookId}`).catch(() => []),
-        fetchJsonRetry(`/usage/page/recent?book_id=${bookId}&limit=5`).catch(() => []),
-        fetchJsonRetry(`/figures/${bookId}`).catch(() => null),
-        fetchJsonRetry(`/figures/scenes/${bookId}`).catch(() => null),
-        fetchJsonRetry(`/locations/${bookId}`).catch(() => null),
-        fetchJsonRetry(`/songs/${bookId}`).catch(() => null),
-        fetchJsonRetry(`/history/lektorat-time/${bookId}`).catch(() => null),
-        fetchJsonRetry(`/booksettings/${bookId}`).catch(() => null),
+        fetchJsonRetry(`/history/book-stats/${bookId}`).catch(guard('stats', [])),
+        fetchJsonRetry(`/history/coverage/${bookId}`).catch(guard('coverage', null)),
+        fetchJsonRetry(`/history/fehler-heatmap/${bookId}?mode=open`).catch(guard('heat', null)),
+        fetchJsonRetry(`/history/review/${bookId}`).catch(guard('review', [])),
+        fetchJsonRetry(`/usage/page/recent?book_id=${bookId}&limit=5`).catch(guard('recent', [])),
+        fetchJsonRetry(`/figures/${bookId}`).catch(guard('figuren', null)),
+        fetchJsonRetry(`/figures/scenes/${bookId}`).catch(guard('szenen', null)),
+        fetchJsonRetry(`/locations/${bookId}`).catch(guard('orte', null)),
+        fetchJsonRetry(`/songs/${bookId}`).catch(guard('songs', null)),
+        fetchJsonRetry(`/history/lektorat-time/${bookId}`).catch(guard('lektorat', null)),
+        fetchJsonRetry(`/booksettings/${bookId}`).catch(guard('settings', null)),
       ]);
       if (this.overviewBookId !== bookId) return;
       this.overviewStats = Array.isArray(stats) ? stats : [];
@@ -65,10 +75,11 @@ export const loadMethods = {
       // erst nach `settings` fest, daher sequenziell (non-Tagebuch fetcht nie).
       this.overviewRueckblickCoverage = null;
       if (this.overviewBuchtyp === 'tagebuch') {
-        const cov = await fetchJsonRetry(`/history/rueckblick-coverage/${bookId}`).catch(() => null);
+        const cov = await fetchJsonRetry(`/history/rueckblick-coverage/${bookId}`).catch(guard('rueckblick', null));
         if (this.overviewBookId !== bookId) return;
         this.overviewRueckblickCoverage = cov || null;
       }
+      this.overviewLoadErrors = failed;
     } catch (e) {
       console.error('[loadBookOverview]', e);
     } finally {
@@ -84,6 +95,11 @@ export const loadMethods = {
   // Silent background staleness check + auto-sync. Re-Entry-sicher via _staleCheckBookId
   // und _statsSyncBookId. Während des Post-Sync-Reloads bleibt _statsSyncBookId gesetzt,
   // damit der rekursive Check sofort returnt (kein Loop).
+  //
+  // Das Stale-Urteil fällt der Server (`POST /history/stats-stale`) — SSoT über
+  // page_stats + book_stats_history. Der Client liefert nur seine autoritative
+  // Content-Store-Seitenliste ({ id, updated_at }); die frühere dreistufige
+  // Client-Heuristik (a/b/c) ist damit entfallen.
   async _checkBookStatsStaleness(bookId) {
     if (!bookId) return;
     if (typeof window === 'undefined') return;
@@ -101,76 +117,22 @@ export const loadMethods = {
       }
       const pages = Alpine.store('nav').pages || [];
       if (!pages.length) return;
-      const cache = await fetchJsonRetry(`/history/page-stats/${bookId}`).catch(() => null);
-      if (!cache) return;
+      const payload = pages.map(p => ({ id: p.id, updated_at: p.updated_at }));
+      const verdict = await fetchJsonRetry(`/history/stats-stale/${bookId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pages: payload }),
+      }).catch(() => null);
+      if (!verdict?.stale) return;
       if (Alpine.store('nav').selectedBookId !== bookId) return;
-      let stale = false;
-      // (a) per-Seite-Diff: BookStack-pages.updated_at vs page_stats-Cache.
-      for (const p of pages) {
-        const c = cache[p.id];
-        if (!c || c.updated_at !== p.updated_at) { stale = true; break; }
-      }
-      // (b) Aggregat-Diff: book_stats_history.recorded_at (Tagesgranularität) vs
-      // letzte page-Aktivität. Lazy `/sync/page-stats/:id` (IntersectionObserver
-      // in tree.js) hält page_stats fresh, ohne aber book_stats_history zu
-      // schreiben → Sparkline-Snapshot bleibt sonst hängen, bis Cron nachts läuft
-      // oder User manuell synct. Stats-Tile soll nach Edit ohne Wartezeit korrekt
-      // sein, also hier explizit nachsynchronisieren.
-      if (!stale) {
-        const stats = this.overviewStats || [];
-        const lastSnapshotDate = stats.length ? stats[stats.length - 1].recorded_at : null;
-        let latestPageDate = null;
-        for (const p of pages) {
-          const d = p.updated_at ? p.updated_at.slice(0, 10) : null;
-          if (d && (!latestPageDate || d > latestPageDate)) latestPageDate = d;
-        }
-        if (latestPageDate && (!lastSnapshotDate || lastSnapshotDate < latestPageDate)) {
-          stale = true;
-        }
-      }
-      // (c) Live-Diff: Σ tokEsts.chars vs neuester Snapshot.chars. Greift den
-      // Tagesgranularitäts-Blindspot von (b) ab — User editiert mehrfach am
-      // selben Tag nach erstem Sync; Datums-String identisch, aber Live wächst
-      // weiter. Sparkline + Δ-Trend zeigen ohne manuellen Refresh die jüngste
-      // Spitze. Toleranz max(50, 0.5%), damit Normalisierungs-Rundungen nicht
-      // bei jedem Open einen Sync triggern.
-      if (!stale) {
-        const stats = this.overviewStats || [];
-        const lastSnapshot = stats.length ? stats[stats.length - 1] : null;
-        const tokEsts = app.tokEsts || {};
-        const liveChars = aggregateLiveBookStats(tokEsts).chars;
-        const snapshotChars = Number(lastSnapshot?.chars) || 0;
-        if (liveChars > 0 && snapshotChars > 0) {
-          const diff = Math.abs(liveChars - snapshotChars);
-          const tolerance = Math.max(50, snapshotChars * 0.005);
-          if (diff > tolerance) stale = true;
-        }
-      }
-      if (!stale) return;
       this._statsSyncBookId = bookId;
       try {
         const res = await fetch(`/sync/book/${bookId}`, { method: 'POST' });
         if (!res.ok) return;
-        if (Alpine.store('nav').selectedBookId !== bookId) return;
-        // tokEsts aktualisieren — gleicher Pfad wie syncBookStats in bookstats.js,
-        // damit Sidebar-Σ und Hero-Snapshot nach dem Auto-Sync sofort aktuell sind.
-        // REASSIGN, nicht index-assign: book-overview-Methoden cachen via _memo
-        // mit tokEsts-Ref als Source. Index-Assign hält dieselbe Referenz →
-        // Cache-Hit → stale Compute (Streak-Heatmap-Symptom: heutige Cell fehlt
-        // weil Cache von vor dem Sync überlebt). Reassign triggert Memo-Invalidate.
-        try {
-          const fresh = await fetchJsonRetry(`/history/page-stats/${bookId}`);
-          const updated = { ...app.tokEsts };
-          for (const p of pages) {
-            const c = fresh[p.id];
-            if (c && c.updated_at === p.updated_at) {
-              updated[p.id] = { tok: c.tok, words: c.words, chars: c.chars };
-            }
-          }
-          app.tokEsts = updated;
-        } catch { /* tokEsts-Update non-critical */ }
         if (!app.showBookOverviewCard || Alpine.store('nav').selectedBookId !== bookId) return;
-        await this.loadBookOverview(bookId);
+        // Gezielter Reload: nur die stats-abhängigen Tiles + tokEsts, NICHT alle
+        // 11 Endpoints — Figuren/Orte/Szenen/Reviews/… ändert ein Stats-Sync nicht.
+        await this._reloadStatsTiles(bookId, pages, app);
       } finally {
         if (this._statsSyncBookId === bookId) this._statsSyncBookId = null;
       }
@@ -181,6 +143,33 @@ export const loadMethods = {
     }
   },
 
+  // Refresh nach Auto-Sync: nur Snapshot-Verlauf + Coverage neu holen und tokEsts
+  // aktualisieren. tokEsts REASSIGN (nicht Index-Assign): book-overview-Methoden
+  // memoizen mit der tokEsts-Ref als Source — dieselbe Referenz behalten hiesse
+  // Cache-Hit → stale Compute (Streak-Heatmap: heutige Cell fehlt). Reassign
+  // triggert Memo-Invalidate. Gleicher tokEsts-Pfad wie syncBookStats in bookstats.js.
+  async _reloadStatsTiles(bookId, pages, app) {
+    const [stats, coverage, fresh] = await Promise.all([
+      fetchJsonRetry(`/history/book-stats/${bookId}`).catch(() => null),
+      fetchJsonRetry(`/history/coverage/${bookId}`).catch(() => null),
+      fetchJsonRetry(`/history/page-stats/${bookId}`).catch(() => null),
+    ]);
+    if (this.overviewBookId !== bookId || Alpine.store('nav').selectedBookId !== bookId) return;
+    if (Array.isArray(stats)) this.overviewStats = stats;
+    if (coverage) this.overviewCoverage = coverage;
+    if (fresh) {
+      const updated = { ...app.tokEsts };
+      for (const p of pages) {
+        const c = fresh[p.id];
+        if (c && c.updated_at === p.updated_at) {
+          updated[p.id] = { tok: c.tok, words: c.words, chars: c.chars };
+        }
+      }
+      app.tokEsts = updated;
+    }
+    this._memos = {};
+  },
+
   // Tagebücher (buchtyp 'tagebuch') sind Ich-Perspektive + datierte Einträge ohne
   // Ensemble/Dramaturgie — die narrativen Analyse-Tiles (Figuren-/Schauplatz-Matrix,
   // Szenen-Wertung, Kapitel-Verteilung/-Findings) sind dort bedeutungslos und werden
@@ -188,6 +177,18 @@ export const loadMethods = {
   // Figuren-/Orte-Top-Listen bleiben.
   overviewIsTagebuch() {
     return this.overviewBuchtyp === 'tagebuch';
+  },
+
+  // True, wenn das Buch Seiten hat, die Komplettanalyse (Figuren/Schauplätze/
+  // Szenen) aber noch nie gelaufen ist — dann zeigt die Overview ein einzelnes
+  // CTA-Tile statt drei leerer Zählkacheln kommentarlos auszublenden. Tagebücher
+  // haben bewusst keine narrative Analyse und sind ausgenommen.
+  overviewNeedsAnalysis() {
+    if (this.overviewIsTagebuch()) return false;
+    if (!(Alpine.store('nav').pages || []).length) return false;
+    return this.overviewFigurenCount() === 0
+      && this.overviewSzenenCount() === 0
+      && this.overviewOrteCount() === 0;
   },
 
   resetBookOverview() {
@@ -208,6 +209,7 @@ export const loadMethods = {
     this.overviewGoalDeadline = null;
     this.overviewBuchtyp = null;
     this.overviewRueckblickCoverage = null;
+    this.overviewLoadErrors = [];
     this.overviewBookId = null;
     this._memos = {};
   },

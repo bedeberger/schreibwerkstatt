@@ -30,6 +30,33 @@
             "type": "command",
             "command": "node scripts/hooks/i18n-check.js",
             "statusMessage": "i18n-Locales pruefen"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/hooks/loc-limits-check.js",
+            "statusMessage": "LOC-Limits pruefen"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/session-git-status.js",
+            "statusMessage": "git status"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/stop-run-unit-tests.js",
+            "statusMessage": "Unit-Tests laufen"
           }
         ]
       }

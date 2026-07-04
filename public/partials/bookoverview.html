@@ -21,6 +21,14 @@
   <div x-show="overviewLoading && !overviewLatest()" class="muted-msg muted-msg--spaced" x-text="$app.t('overview.loading')"></div>
   <div x-show="!overviewLoading && !overviewLatest() && (!overviewCoverage || overviewCoverage.total_pages === 0)" class="muted-msg muted-msg--spaced" x-text="$app.t('overview.empty')"></div>
 
+  <!-- Fehlerhinweis: mindestens ein Endpoint ist auch nach Retry ausgefallen.
+       Verhindert, dass ein leeres Tile als „keine Daten" fehlgedeutet wird. -->
+  <div class="overview-notice" x-show="overviewLoadErrors.length > 0" x-cloak role="status">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+    <span class="overview-notice-text" x-text="$app.t('overview.loadError')"></span>
+    <button type="button" class="btn-compact" @click="loadBookOverview($store.nav.selectedBookId)" :disabled="overviewLoading" x-text="$app.t('overview.refresh')"></button>
+  </div>
+
   <div class="overview-grid" x-show="overviewLatest() || overviewCoverage?.total_pages > 0 || $store.nav.pages.length > 0">
     <div id="partial-bookoverview-snapshot"></div>
     <div id="partial-bookoverview-charts"></div>

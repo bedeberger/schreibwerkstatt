@@ -59,6 +59,45 @@
 
 .overview-tile--wide { grid-column: 1 / -1; }
 
+/* Fehler-Hinweis über dem Grid: dezente Warn-Zeile + Retry. Warn-Tokens
+   (amber), linker Akzent-Border analog zur „abgeleiteten Konsequenz-Box". */
+.overview-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-10) var(--space-md);
+  margin-bottom: var(--space-md);
+  border: 0.5px solid var(--color-warn-text);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+  font-size: var(--font-size-sm);
+}
+.overview-notice .icon { flex: none; }
+.overview-notice-text { flex: 1 1 auto; min-width: 0; }
+
+/* CTA-Tile: gestrichelter Rahmen signalisiert „noch leer, hier handeln".
+   Erbt Hover/Focus vom .internal-link-Tile. */
+.overview-tile--cta {
+  border-style: dashed;
+  justify-content: center;
+}
+.overview-cta-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.overview-cta-text {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+}
+.overview-cta-action {
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
 /* Hero-Tiles (Snapshot + Trend) sind doppelt so breit wie normale Tiles
    auf grösseren Viewports — visuelle Hierarchie. Medium-Tiles (Presence,
    Findings) ebenfalls span 2 — keine volle Zeilenbreite, sonst zu viel

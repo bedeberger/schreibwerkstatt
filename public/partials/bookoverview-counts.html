@@ -1,3 +1,18 @@
+<!-- CTA: Komplettanalyse noch nicht gelaufen — statt drei leerer Zählkacheln
+     ein Placeholder mit Handlungsaufruf (Figuren/Schauplätze/Szenen kommen
+     alle aus demselben Job, daher ein kombiniertes Tile statt drei). -->
+<template x-if="overviewNeedsAnalysis() && !$store.jobs.alleAktualisierenLoading">
+  <div class="overview-tile overview-tile--cta internal-link"
+       @click="$app.alleAktualisieren()"
+       :aria-label="$app.t('overview.cta.action')">
+    <div class="overview-tile-label" x-text="$app.t('overview.cta.label')"></div>
+    <div class="overview-cta-body">
+      <span class="overview-cta-text" x-text="$app.t('overview.cta.text')"></span>
+      <span class="overview-cta-action" x-text="$app.t('overview.cta.action')"></span>
+    </div>
+  </div>
+</template>
+
 <!-- Figuren: Anzahl + Top-3 als Avatar-Chips -->
 <template x-if="overviewFigurenCount() > 0">
   <div class="overview-tile internal-link"

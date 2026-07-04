@@ -1923,6 +1923,8 @@ Bekannte Views: `figuren`, `orte`, `szenen`, `ereignisse`, `kontinuitaet`, `bewe
 - Bewertung: `.overview-stars` + `.overview-star` (`--full`/`--half`), `.overview-review-meta`/`-date`/`-trend`
 - Figuren-Chips: `.overview-fig-row` + `-count`/`-count-unit`/`-chips`/`-chip`/`-name`/`-avatar` (Avatar-Farbe via `[data-idx="0|1|2"]`)
 - Soundtrack-Liste: `.overview-song-list` + `-item`/`-dot` (Akzent-Punkt via `--card-accent`)/`-titel`/`-interpret`/`-count` (Top-Songs nach Häufigkeit, Math via `overviewTopSongs()`/`overviewSongsCount()` in [public/js/book-overview/songs.js](public/js/book-overview/songs.js))
+- Fehler-Hinweis: `.overview-notice` (über dem Grid, `role="status"`) + `.overview-notice-text` — amber Warn-Tokens + linker 3 px-Border + Retry-Button (`btn-compact`). Sichtbar via `overviewLoadErrors.length > 0`, wenn ein Endpoint auch nach Retry ausfiel. Verhindert, dass ein leeres Tile als „keine Daten" fehlgedeutet wird.
+- Leerzustand-CTA: `.overview-tile--cta` (gestrichelter Rahmen, erbt `.internal-link`-Hover) + `.overview-cta-body`/`-text` (muted)/`-action` (Primary-Akzent). Ein **kombiniertes** Tile, wenn das Buch Seiten hat, aber Figuren/Schauplätze/Szenen noch fehlen (`overviewNeedsAnalysis()`), Klick startet die Komplettanalyse. Statt drei leerer Zählkacheln kommentarlos auszublenden.
 
 **Klick-Verhalten:** `.overview-tile.internal-link` öffnet die zugehörige Karte (über globalen `.internal-link`-Handler aus app.js — nicht selbst verdrahten).
 
