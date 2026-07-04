@@ -231,6 +231,22 @@ export function registerPdfExportCard() {
       mutate();
     },
 
+    // Slot-Auszeichnung (bold/italic/upper) einer Kopf-/Fusszeilen-Zelle
+    // umschalten bzw. abfragen. Die Struktur wird beim ersten Toggle lazy
+    // angelegt (ältere Profile ohne layout.hfStyle crashen so nicht; Server-
+    // Validierung ergänzt den Rest beim Speichern), Alpine wrappt sie reaktiv.
+    hfStyleActive(zone, side, pos, attr) {
+      return !!this.activeProfile?.config?.layout?.hfStyle?.[zone]?.[side]?.[pos]?.[attr];
+    },
+    toggleHfStyle(zone, side, pos, attr) {
+      const lay = this.activeProfile?.config?.layout;
+      if (!lay) return;
+      const hf = lay.hfStyle || (lay.hfStyle = {});
+      const zo = hf[zone] || (hf[zone] = {}), si = zo[side] || (zo[side] = {});
+      const cell = si[pos] || (si[pos] = { bold: false, italic: false, upper: false });
+      cell[attr] = !cell[attr];
+    },
+
     async selectProfile(id) {
       // Form unmounten, dann State wechseln, dann neu mounten.
       await this._unmountFormThen(() => { this.activeProfileId = id; });
@@ -433,6 +449,11 @@ export function registerPdfExportCard() {
       if (minOuter + 1e-6 < KDP_OUTER_MIN_MM) {
         out.push({ ok: false, text: t('pdfExport.print.kdpWarnOuter', { have: minOuter, min: KDP_OUTER_MIN_MM }) });
       }
+      // KDP-Innenteil darf keine Druckermarken tragen — Schnittmarken sind ein
+      // Upload-Verhinderer, auch wenn die Ränder passen.
+      if (cfg.print?.cropMarks) {
+        out.push({ ok: false, text: t('pdfExport.print.kdpWarnCropMarks') });
+      }
       if (!out.length) out.push({ ok: true, text: t('pdfExport.print.kdpOk', { pages: pc }) });
       return out;
     },
@@ -466,6 +487,26 @@ export function registerPdfExportCard() {
       const meta = this.fontList.find(f => f.family === family);
       if (meta && !meta.weights.includes(this.activeProfile.config.font[role].weight)) {
         this.activeProfile.config.font[role].weight = meta.weights.includes(400) ? 400 : meta.weights[0];
+      }
+    },
+
+    // Schriftfamilie einer Rolle auf alle übrigen Font-Rollen übertragen. Nur die
+    // Familie wird gesetzt — Grösse/Zeilenhöhe/Farbe/Kursiv bleiben rollenspezifisch
+    // (typografische Einheitlichkeit ohne die Feinheiten zu plätten). Das Weight
+    // jeder Rolle wird gegen die Allowed-Liste der neuen Familie geclamped.
+    applyFamilyToAll(fromRole) {
+      if (!this.activeProfile) return;
+      const fonts = this.activeProfile.config.font;
+      const family = fonts[fromRole]?.family;
+      if (!family) return;
+      const meta = this.fontList.find(f => f.family === family);
+      for (const role of Object.keys(fonts)) {
+        const f = fonts[role];
+        if (!f || typeof f !== 'object' || !('family' in f)) continue;
+        f.family = family;
+        if (meta && !meta.weights.includes(f.weight)) {
+          f.weight = meta.weights.includes(400) ? 400 : meta.weights[0];
+        }
       }
     },
 

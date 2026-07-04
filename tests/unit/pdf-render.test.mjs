@@ -80,7 +80,7 @@ test('Footer-Token erzeugt KEINE Ghost-Pages (Regression)', async () => {
   assert.equal(pageCount(withFooter), pageCount(noFooter), 'Footer-Pass darf keine Extra-Pages erzeugen');
 });
 
-test('countFrontMatter + pageNumberFirstVisible ändern Page-Count nicht', async () => {
+test('pageCountMode=physical + pageNumberFirstVisible ändern Page-Count nicht', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
   cfg.layout.footerCenter = '{page} / {pages}';
@@ -89,13 +89,33 @@ test('countFrontMatter + pageNumberFirstVisible ändern Page-Count nicht', async
   });
   const tuned = {
     ...cfg,
-    layout: { ...cfg.layout, countFrontMatter: true, pageNumberFirstVisible: 3 },
+    layout: { ...cfg.layout, pageCountMode: 'physical', pageNumberFirstVisible: 3 },
   };
   const withOpts = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: tuned }, coverBuf: null, token: null,
   });
   // Reine Stempel-Optionen: keine zusätzlichen/fehlenden Seiten.
   assert.equal(pageCount(withOpts), pageCount(baseline));
+});
+
+test('pageCountMode=physical zählt Body-Leerseiten mit, ohne Ghost-Pages', async () => {
+  // firstChapterOnRecto erzwingt bei geradem Seitenstand eine Leer-Verso vor
+  // dem ersten Kapitel — der 'physical'-Zählpfad muss diese mitzählen (cnt++),
+  // ohne die Seitenanzahl gegenüber dem 'body'-Modus zu verändern.
+  const cfgBody = defaultConfig();
+  cfgBody.cover.enabled = false;
+  cfgBody.chapter.firstChapterOnRecto = true;
+  cfgBody.layout.footerCenter = '{page} / {pages}';
+  cfgBody.layout.pageCountMode = 'body';
+  const bodyBuf = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfgBody }, coverBuf: null, token: null,
+  });
+  const cfgPhys = { ...cfgBody, layout: { ...cfgBody.layout, pageCountMode: 'physical' } };
+  const physBuf = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfgPhys }, coverBuf: null, token: null,
+  });
+  assert.equal(physBuf.slice(0, 5).toString(), '%PDF-');
+  assert.equal(pageCount(physBuf), pageCount(bodyBuf), 'Zählmodus darf keine Seiten hinzufügen/entfernen');
 });
 
 test('frontMatterNumbering=roman ändert Page-Count nicht + rendert ohne Crash', async () => {

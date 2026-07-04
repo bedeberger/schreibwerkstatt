@@ -86,3 +86,69 @@ test('hr.pagebreak/blankpage werden erkannt (sonst hr)', () => {
   assert.equal(blocks[1].kind, 'blankpage');
   assert.equal(blocks[2].kind, 'hr');
 });
+
+// ── Realistisches Editor-Markup ─────────────────────────────────────────────
+// Die Fälle oben nutzen handgeschriebenes Sauber-HTML. Produktives Seiten-HTML
+// aus dem Content-Store trägt aber auf jedem Block-Tag eine stabile `data-bid`
+// (lib/html-clean.js#ensureBlockIds, Basis für Block-Level-Merge + Kommentar-
+// Anker) und verschachtelt Inline-Stile tiefer. Diese Fälle spiegeln das echte
+// Markup, damit der Walker nicht nur an idealisierten Fixtures grün ist.
+
+test('data-bid auf Block-Tags wird toleriert (ignoriert, kein Leak in Output)', () => {
+  const blocks = parseHtmlToBlocks(
+    '<h2 data-bid="a1b2c3d4">Kapiteltitel</h2>' +
+    '<p data-bid="e5f6a7b8">Erster Absatz mit <strong>Betonung</strong>.</p>'
+  );
+  assert.deepEqual(blocks[0], { kind: 'heading', level: 2, text: 'Kapiteltitel' });
+  assert.equal(blocks[1].kind, 'paragraph');
+  assert.equal(blocks[1].runs[1].bold, true);
+  assert.equal(blocks[1].runs[1].text, 'Betonung');
+});
+
+test('Überschriften-Level > 3 werden auf 3 geklemmt (h4/h5/h6)', () => {
+  const blocks = parseHtmlToBlocks(
+    '<h4 data-bid="1">Vier</h4><h5 data-bid="2">Fünf</h5><h6 data-bid="3">Sechs</h6>'
+  );
+  assert.deepEqual(blocks.map(b => b.level), [3, 3, 3]);
+  assert.deepEqual(blocks.map(b => b.text), ['Vier', 'Fünf', 'Sechs']);
+});
+
+test('verschachtelte Inline-Stile kumulieren (strong > em → bold+italic)', () => {
+  const blocks = parseHtmlToBlocks(
+    '<p data-bid="1">Ein <strong>fett <em>und kursiv</em></strong> Wort.</p>'
+  );
+  const runs = blocks[0].runs;
+  const both = runs.find(r => r.bold && r.italic);
+  assert.ok(both, 'kombinierter bold+italic Run erwartet');
+  assert.equal(both.text, 'und kursiv');
+});
+
+test('blockquote mit verschachtelten data-bid-Absätzen', () => {
+  const blocks = parseHtmlToBlocks(
+    '<blockquote data-bid="1"><p data-bid="2">Zitatzeile eins.</p>' +
+    '<p data-bid="3">Zitatzeile zwei.</p></blockquote>'
+  );
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].kind, 'blockquote');
+  assert.equal(blocks[0].blocks.length, 2);
+  assert.equal(blocks[0].blocks[0].runs[0].text, 'Zitatzeile eins.');
+});
+
+test('pre behält Zeilenumbrüche als eigene Zeilen', () => {
+  const blocks = parseHtmlToBlocks('<pre data-bid="1">Zeile eins\nZeile zwei</pre>');
+  assert.equal(blocks[0].kind, 'pre');
+  assert.deepEqual(blocks[0].lines.map(l => l[0].text), ['Zeile eins', 'Zeile zwei']);
+});
+
+test('reale Tabelle (thead/tbody, mehrere Zellen) → Fließtext-Fallback ohne Verlust', () => {
+  const blocks = parseHtmlToBlocks(
+    '<table data-bid="1"><thead><tr><th>Name</th><th>Rolle</th></tr></thead>' +
+    '<tbody><tr><td>Josef K.</td><td>Angeklagter</td></tr></tbody></table>'
+  );
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].kind, 'paragraph');
+  const text = blocks[0].runs.map(r => r.text).join('');
+  for (const cell of ['Name', 'Rolle', 'Josef K.', 'Angeklagter']) {
+    assert.ok(text.includes(cell), `Zellinhalt "${cell}" darf nicht verloren gehen`);
+  }
+});

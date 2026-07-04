@@ -28,6 +28,9 @@
                            x-effect="options = fontList.map(f => ({ value: f.family, label: f.family }))"
                            @combobox-change="onFontPick(role, $event.detail)"
 ></div>
+                      <button type="button" class="btn-compact btn-compact--ghost pdfx-font-apply-all"
+                              @click="applyFamilyToAll(role)"
+                              x-text="$app.t('pdfExport.font.applyToAll')"></button>
                     </div>
                   </div>
 

@@ -21,10 +21,16 @@ test('defaultConfig liefert vollständigen Schema-Baum', () => {
 
 test('Seitennummerierung: Defaults + Clamping der neuen Felder', () => {
   const d = defaultConfig();
-  assert.equal(d.layout.countFrontMatter, false);
+  assert.equal(d.layout.pageCountMode, 'body');
   assert.equal(d.layout.pageNumberFirstVisible, 1);
-  // countFrontMatter als Bool, pageNumberFirstVisible als geclampter Num
-  assert.equal(validateConfig({ layout: { countFrontMatter: true } }).layout.countFrontMatter, true);
+  // pageCountMode als Enum, pageNumberFirstVisible als geclampter Num
+  assert.equal(validateConfig({ layout: { pageCountMode: 'physical' } }).layout.pageCountMode, 'physical');
+  assert.equal(validateConfig({ layout: { pageCountMode: 'nonsense' } }).layout.pageCountMode, 'body');
+  // Migration: altes countFrontMatter-Bool → Modus
+  assert.equal(validateConfig({ layout: { countFrontMatter: true } }).layout.pageCountMode, 'physical');
+  assert.equal(validateConfig({ layout: { countFrontMatter: false } }).layout.pageCountMode, 'body');
+  // Neuer Modus gewinnt gegenüber Legacy-Bool, wenn beide vorhanden
+  assert.equal(validateConfig({ layout: { pageCountMode: 'body', countFrontMatter: true } }).layout.pageCountMode, 'body');
   assert.equal(validateConfig({ layout: { pageNumberFirstVisible: 4 } }).layout.pageNumberFirstVisible, 4);
   assert.equal(validateConfig({ layout: { pageNumberFirstVisible: 0 } }).layout.pageNumberFirstVisible, 1);
   assert.equal(validateConfig({ layout: { pageNumberFirstVisible: 99999 } }).layout.pageNumberFirstVisible, 9999);

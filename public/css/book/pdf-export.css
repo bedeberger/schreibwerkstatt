@@ -72,7 +72,36 @@
   display: grid;
   grid-template-columns: max-content repeat(3, minmax(0, 1fr));
   gap: 0.4rem 0.55rem;
-  align-items: center;
+  align-items: start;
+}
+/* Zelle = Textfeld + Auszeichnungs-Toggles (bold/italic/upper) darunter. */
+.pdfx-hf-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.pdfx-hf-sbtns { display: flex; gap: 0.2rem; }
+.pdfx-hf-sbtn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 2px 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.pdfx-hf-sbtn b, .pdfx-hf-sbtn i { font-style: normal; font-weight: inherit; }
+.pdfx-hf-sbtn b { font-weight: 700; }
+.pdfx-hf-sbtn i { font-style: italic; }
+.pdfx-hf-sbtn:hover { border-color: var(--card-accent, var(--color-accent)); }
+.pdfx-hf-sbtn.is-on {
+  background: var(--card-accent, var(--color-accent));
+  border-color: var(--card-accent, var(--color-accent));
+  color: #fff;
 }
 .pdfx-hf-colhead {
   font-size: var(--font-size-xs);
@@ -140,12 +169,22 @@
   font-weight: 500;
   font-size: var(--font-size-xs);
 }
+/* „Für alle übernehmen" — überträgt die Familie dieser Rolle auf alle anderen.
+   Sitzt links unter der Schriftart-Combobox. */
+.pdfx-font-apply-all {
+  align-self: flex-start;
+}
+/* Simuliert den gedruckten Innenteil: Papier ist immer weiss, unabhängig vom
+   App-Theme. Fixe Papier-/Ink-Farben, damit die (meist schwarze) Schriftfarbe
+   im Dark-Mode nicht auf dunklem Grund verschwindet und die Vorschau dem echten
+   PDF-Output entspricht. */
 .pdfx-font-preview {
   margin-top: 0.6rem;
   padding: 0.5rem 0.7rem;
   border: 0.5px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-bg);
+  background: #ffffff;
+  color: #1a1a1a;
   font-size: var(--font-size-lg);
 }
 
