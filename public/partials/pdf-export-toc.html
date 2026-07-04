@@ -63,6 +63,15 @@
                   </div>
                 </div>
               </template>
+              <div class="card-form-row">
+                <label class="card-form-label">&nbsp;</label>
+                <div class="card-form-field">
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.toc.startOnRecto">
+                    <span x-text="$app.t('pdfExport.toc.startOnRecto')"></span>
+                  </label>
+                </div>
+              </div>
             </div>
 
             <h4 class="pdfx-font-group-title" x-text="$app.t('pdfExport.toc.format.heading')"></h4>

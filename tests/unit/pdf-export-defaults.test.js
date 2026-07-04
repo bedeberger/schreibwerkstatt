@@ -10,6 +10,7 @@ test('defaultConfig liefert vollständigen Schema-Baum', () => {
   assert.equal(c.chapter.pageStructure, 'flatten');
   assert.equal(c.cover.enabled, false);
   assert.equal(c.toc.enabled, true);
+  assert.equal(c.toc.startOnRecto, true);
   assert.equal(c.pdfa.enabled, true);
   assert.equal(c.pdfa.standard, 'pdfa');
 });
@@ -136,6 +137,12 @@ test('validateConfig: toc.depth akzeptiert 3', () => {
   assert.equal(c.toc.depth, 3);
 });
 
+test('validateConfig: toc.startOnRecto ist boolean-validiert', () => {
+  assert.equal(validateConfig({ toc: { startOnRecto: false } }).toc.startOnRecto, false);
+  // Nicht-Boolean fällt auf Default (true) zurück.
+  assert.equal(validateConfig({ toc: { startOnRecto: 'nope' } }).toc.startOnRecto, true);
+});
+
 test('defaultConfig: Trennlinien-Toggles default off', () => {
   const c = defaultConfig();
   assert.equal(c.chapter.titleRule, false);
@@ -232,6 +239,13 @@ test('validateConfig: neue Extras + imprintPosition-Enum', () => {
   assert.equal(validateConfig({ extras: { imprintPosition: 'sideways' } }).extras.imprintPosition, 'front');
   // ISBN über 20 Zeichen wird getrimmt.
   assert.ok(validateConfig({ extras: { isbn: 'x'.repeat(50) } }).extras.isbn.length <= 20);
+});
+
+test('validateConfig: print.padToEvenPages — Default aus, Bool-validiert', () => {
+  assert.equal(defaultConfig().print.padToEvenPages, false);
+  assert.equal(validateConfig({ print: { padToEvenPages: true } }).print.padToEvenPages, true);
+  // Nicht-Boolean fällt auf Default zurück.
+  assert.equal(validateConfig({ print: { padToEvenPages: 'yes' } }).print.padToEvenPages, false);
 });
 
 test('defaultConfig: coverSpec-Block (Umschlag-PDF) vorhanden + leer', () => {

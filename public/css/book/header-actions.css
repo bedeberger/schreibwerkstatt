@@ -384,49 +384,88 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
-.today-ring-pop-head,
-.today-ring-pop-streak {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-}
 .today-ring-pop-label {
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-subtle);
 }
-.today-ring-pop-count { font-weight: 600; color: var(--color-text); }
-.today-ring-pop-streak-val { font-weight: 600; color: var(--color-accent); }
+
+/* Hero: grosser Fokus-Donut mit %-Zahl + heutige Kennzahlen. */
+.today-ring-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.today-ring-donut {
+  position: relative;
+  flex: 0 0 auto;
+  width: 60px;
+  height: 60px;
+}
+.today-ring-donut svg { width: 60px; height: 60px; display: block; }
+.today-ring-donut-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.today-ring-donut--reached circle:nth-of-type(2) { stroke: var(--color-success); }
+.today-ring-donut--empty circle:first-of-type {
+  stroke-dasharray: 1.6 2;
+  stroke-opacity: var(--opacity-strong);
+}
+.today-ring-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+.today-ring-hero-count { font-size: var(--font-size-sm); color: var(--color-muted); }
+.today-ring-hero-count strong { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-text); }
+.today-ring-hero-streak { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-accent); }
+
+/* 7-Tage-Chart: Balken + Wochentagskürzel unter jedem Balken. */
+.today-ring-week-wrap { display: flex; flex-direction: column; gap: var(--space-xs); }
 .today-ring-week {
   display: flex;
   align-items: flex-end;
   gap: var(--space-3);
-  height: 44px;
 }
 .today-ring-week-col {
   flex: 1 1 0;
   display: flex;
-  align-items: flex-end;
-  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2xs);
 }
 .today-ring-week-track {
-  flex: 1;
+  width: 100%;
+  height: 40px;
   display: flex;
   align-items: flex-end;
-  height: 100%;
 }
 .today-ring-week-bar {
   width: 100%;
   height: var(--bar);
-  min-height: 2px;
+  min-height: 3px;
   background: var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: background var(--transition-base);
 }
 .today-ring-week-bar--reached { background: var(--color-success); }
 .today-ring-week-bar--today { background: var(--color-accent); }
 .today-ring-week-bar--today.today-ring-week-bar--reached { background: var(--color-success); }
+.today-ring-week-day {
+  font-size: var(--font-size-micro);
+  text-transform: uppercase;
+  color: var(--color-subtle);
+}
+.today-ring-week-day--today { font-weight: 700; color: var(--color-accent); }
 .today-ring-pop-link {
   align-self: flex-start;
   padding: 0;

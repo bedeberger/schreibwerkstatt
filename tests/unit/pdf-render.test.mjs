@@ -104,6 +104,24 @@ test('frontMatterNumbering=roman ändert Page-Count nicht + rendert ohne Crash',
   assert.equal(pageCount(withRoman), pageCount(baseline), 'Titelei-Nummerierung darf keine Seiten hinzufügen');
 });
 
+test('padToEvenPages füllt ungerade Gesamtseitenzahl auf gerade auf', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;
+  const off = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  const cfgOn = { ...cfg, print: { ...cfg.print, padToEvenPages: true } };
+  const on = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfgOn }, coverBuf: null, token: null,
+  });
+  const nOff = pageCount(off);
+  const nOn = pageCount(on);
+  // Mit Padding ist die Gesamtzahl immer gerade …
+  assert.equal(nOn % 2, 0, 'gepolstertes PDF muss gerade Seitenzahl haben');
+  // … und es kommt höchstens genau eine Leerseite dazu (nur bei ungeradem Basis-Count).
+  assert.equal(nOn, nOff + (nOff % 2), 'Padding darf nur bei ungerader Basis +1 Seite ergeben');
+});
+
 function buf5(b) { return b.slice(0, 5).toString(); }
 
 test('blankPageAfter erzeugt zusätzliche leere Page pro Kapitel', async () => {
@@ -138,6 +156,7 @@ test('Widmung + Impressum erzeugen je eine zusätzliche Seite', async () => {
 test('Motto/Frontmatter-Seite erzeugt zusätzliche Seite', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
+  cfg.toc.startOnRecto = false; // Recto-Padding würde die Parität ausgleichen
   const baseline = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
   });
@@ -164,6 +183,7 @@ test('Autor-Seite (Bio-Text) erzeugt zusätzliche Seite', async () => {
 test('ISBN/Copyright ohne Impressum-Freitext erzeugt trotzdem Impressum-Seite', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
+  cfg.toc.startOnRecto = false; // Recto-Padding würde die Parität ausgleichen
   const baseline = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
   });
@@ -321,4 +341,55 @@ test('TOC mit Page-Numbers stempelt Zahlen rechts ein', async () => {
   // Schwer reliably zu prüfen ohne Decode — wir checken nur, dass der Render
   // ohne Crash durchläuft und Page-Count plausibel ist (Title + TOC + Body).
   assert.ok(pageCount(buf) >= 4);
+});
+
+test('TOC startOnRecto schiebt Leerseite ein, wenn TOC sonst auf Verso landet', async () => {
+  // Kein Cover, keine Widmung/Impressum → nur Titelseite als Titelei.
+  // Ohne Recto-Padding beginnt die TOC auf Seite 2 (Verso) → +1 Leerseite.
+  const on = defaultConfig();
+  on.cover.enabled = false;
+  on.toc.startOnRecto = true;
+  const off = defaultConfig();
+  off.cover.enabled = false;
+  off.toc.startOnRecto = false;
+  const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf: null, token: null });
+  const bufOff = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: off }, coverBuf: null, token: null });
+  assert.equal(pageCount(bufOn), pageCount(bufOff) + 1);
+});
+
+test('TOC startOnRecto fügt KEINE Leerseite ein, wenn TOC bereits auf Recto landet', async () => {
+  // Titelseite + Widmung (ohne eigenes Recto-Padding) → TOC beginnt auf Seite 3
+  // (Recto), Padding no-op.
+  const on = defaultConfig();
+  on.cover.enabled = false;
+  on.extras.dedication = 'Für alle, die lesen.';
+  on.extras.dedicationOnRecto = false;
+  on.toc.startOnRecto = true;
+  const off = defaultConfig();
+  off.cover.enabled = false;
+  off.extras.dedication = 'Für alle, die lesen.';
+  off.extras.dedicationOnRecto = false;
+  off.toc.startOnRecto = false;
+  const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf: null, token: null });
+  const bufOff = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: off }, coverBuf: null, token: null });
+  assert.equal(pageCount(bufOn), pageCount(bufOff));
+});
+
+test('dedicationOnRecto schiebt Leerseite ein, wenn die Widmung sonst auf Verso landet', async () => {
+  // Kein Cover, kein Impressum → nur Titelseite (Recto). Ohne Padding beginnt die
+  // Widmung auf Seite 2 (Verso); mit dedicationOnRecto wird eine Leerseite davor
+  // eingeschoben → +1 Seite gegenüber der Verso-Variante.
+  const on = defaultConfig();
+  on.cover.enabled = false;
+  on.toc.enabled = false;
+  on.extras.dedication = 'Für alle, die lesen.';
+  on.extras.dedicationOnRecto = true;
+  const off = defaultConfig();
+  off.cover.enabled = false;
+  off.toc.enabled = false;
+  off.extras.dedication = 'Für alle, die lesen.';
+  off.extras.dedicationOnRecto = false;
+  const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf: null, token: null });
+  const bufOff = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: off }, coverBuf: null, token: null });
+  assert.equal(pageCount(bufOn), pageCount(bufOff) + 1);
 });

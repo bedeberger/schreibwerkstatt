@@ -307,4 +307,26 @@ export const bookscopeMethods = {
       tokEsts: this.tokEsts,
     });
   },
+
+  // Grösserer Fokus-Donut fürs Ring-Popover (r=26, viewBox 60×60) — gleiche
+  // Math wie der Header-Ring, nur mehr Fläche für die %-Zahl in der Mitte.
+  headerRingDetail() {
+    const progress = this.$store.progress;
+    return computeTodayRing({
+      stats: progress.dailyProgressStats,
+      tokEsts: this.tokEsts,
+      goalChars: progress.dailyProgressDailyGoalChars || 1500,
+      r: 26,
+    });
+  },
+
+  // Narrow-Wochentag (M/D/M…) für die Balken-Beschriftung. UTC-Mittag-Anker +
+  // timeZone:'UTC' → der Wochentag folgt exakt dem Kalendertag der iso, ohne
+  // dass die Browser-Zeitzone ihn um einen Tag verschiebt.
+  headerWeekBarLabel(iso) {
+    const locale = this.$store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US';
+    try {
+      return new Date(iso + 'T12:00:00Z').toLocaleDateString(locale, { weekday: 'narrow', timeZone: 'UTC' });
+    } catch { return ''; }
+  },
 };
