@@ -9,7 +9,7 @@ const WEEKS = 52;
 
 // Reine Tages-Arithmetik auf ISO-Strings (YYYY-MM-DD), TZ-frei via UTC, damit
 // DST-Spruenge die Kalendertage nicht verschieben.
-function isoAddDays(iso, n) {
+export function isoAddDays(iso, n) {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + n);
@@ -435,7 +435,7 @@ export function computeGoalAttainment(writingRows, goalMinutes, todaySeconds = n
 }
 
 // Differenz b - a in Kalendertagen (ISO YYYY-MM-DD), TZ-frei via UTC.
-function isoDayDiff(aIso, bIso) {
+export function isoDayDiff(aIso, bIso) {
   const [ay, am, ad] = aIso.split('-').map(Number);
   const [by, bm, bd] = bIso.split('-').map(Number);
   return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);

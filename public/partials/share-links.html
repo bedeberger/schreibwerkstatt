@@ -40,10 +40,8 @@
 
     <template x-if="createKind !== 'page'">
       <div class="share-create__row">
-        <label class="checkbox-row">
-          <input type="checkbox" x-model="createShowToc">
-          <span x-text="$app.t('share.create.toc')"></span>
-        </label>
+        <div x-data="toggleSwitch({ label: () => $app.t('share.create.toc') })"
+             x-modelable="value" x-model="createShowToc"></div>
         <span class="share-create__hint" x-text="$app.t('share.create.tocHint')"></span>
       </div>
     </template>
@@ -130,10 +128,8 @@
             <label class="share-create__label" x-text="$app.t('share.expires.label')"></label>
             <input type="datetime-local" x-model="editExpiresAt" class="share-create__input">
             <template x-if="link.kind !== 'page'">
-              <label class="checkbox-row">
-                <input type="checkbox" x-model="editShowToc">
-                <span x-text="$app.t('share.create.toc')"></span>
-              </label>
+              <div x-data="toggleSwitch({ label: () => $app.t('share.create.toc') })"
+                   x-modelable="value" x-model="editShowToc"></div>
             </template>
             <div class="share-row__edit-actions">
               <button type="button" class="primary" @click="saveEdit(link.token)" :disabled="savingEdit">

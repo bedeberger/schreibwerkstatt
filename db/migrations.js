@@ -8898,6 +8898,35 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 231 abgeschlossen (tagebuch_rueckblicke.entry_count).');
   }
 
+  if (version < 232) {
+    // Schreib-Sessions: eine Zeile je zusammenhaengendem Schreibabschnitt pro
+    // (User, Buch). Aus dem writing-time-Heartbeat abgeleitet — ein Ping innerhalb
+    // von SESSION_GAP_SECONDS nach der letzten Aktivitaet verlaengert die laufende
+    // Session, sonst beginnt eine neue. Basis fuer Session-Kennzahlen (Anzahl,
+    // Durchschnittslaenge, laengste Session) in „Meine Statistik". `date` = lokales
+    // ISO-Datum des Session-Starts (Zeitraum-Filter im Frontend).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS writing_session (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT    NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        book_id    INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        date       TEXT    NOT NULL,
+        started_at TEXT    NOT NULL,
+        ended_at   TEXT    NOT NULL,
+        seconds    INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_ws_user_book ON writing_session(user_email, book_id);
+      CREATE INDEX IF NOT EXISTS idx_ws_book ON writing_session(book_id);
+      CREATE INDEX IF NOT EXISTS idx_ws_user_date ON writing_session(user_email, date);
+    `);
+    const fkErrors232 = db.pragma('foreign_key_check');
+    if (fkErrors232.length) {
+      throw new Error(`Migration 232: foreign_key_check meldet ${fkErrors232.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 232').run();
+    logger.info('DB-Migration auf Version 232 abgeschlossen (writing_session — Schreib-Session-Tracking fuer Meine Statistik).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -13,6 +13,11 @@ const router = express.Router();
 router.param('book_id', aclParamGuard('viewer'));
 const jsonBody = express.json();
 
+// Zwei aufeinanderfolgende writing-time-Pings gelten als dieselbe Schreib-Session,
+// solange zwischen ihnen hoechstens so viele Sekunden liegen. Der Heartbeat kommt
+// alle ~30 s; eine Pause laenger als 15 min zaehlt als Session-Ende.
+const SESSION_GAP_SECONDS = 900;
+
 function _guardBook(req, res, bookId, minRole) {
   setContext({ book: bookId });
   try { requireBookAccess(req, bookId, minRole); return true; }
@@ -677,6 +682,25 @@ router.post('/writing-time', jsonBody, (req, res) => {
     VALUES (?, ?, ?, ?)
     ON CONFLICT(user_email, book_id, hour) DO UPDATE SET seconds = seconds + excluded.seconds
   `).run(user_email, book_id, localHour(), seconds);
+  // Schreib-Session ableiten: die juengste Session dieses (User, Buch) verlaengern,
+  // wenn ihr Ende hoechstens SESSION_GAP_SECONDS zurueckliegt; sonst neue Session.
+  // started_at des neuen Abschnitts = jetzt minus die gerade gemeldeten Sekunden.
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.parse(nowIso);
+  const last = db.prepare(`
+    SELECT id, ended_at FROM writing_session
+    WHERE user_email = ? AND book_id = ? ORDER BY ended_at DESC LIMIT 1
+  `).get(user_email, book_id);
+  if (last && (nowMs - Date.parse(last.ended_at)) <= SESSION_GAP_SECONDS * 1000) {
+    db.prepare('UPDATE writing_session SET ended_at = ?, seconds = seconds + ? WHERE id = ?')
+      .run(nowIso, seconds, last.id);
+  } else {
+    const startIso = new Date(nowMs - seconds * 1000).toISOString();
+    db.prepare(`
+      INSERT INTO writing_session (user_email, book_id, date, started_at, ended_at, seconds)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(user_email, book_id, date, startIso, nowIso, seconds);
+  }
   res.json({ ok: true, added: seconds });
 });
 

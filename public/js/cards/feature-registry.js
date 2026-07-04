@@ -70,30 +70,30 @@ export const FEATURES = [
     aliases: ['statistik','progress','wordcount','entwicklung','timeline'] },
   { key: 'bookSettings',   kind: 'toggle', group: 'tools',  labelKey: 'tile.bookSettings',   descKey: 'tile.bookSettings.desc',   flag: 'showBookSettingsCard',   toggle: 'toggleBookSettingsCard',   requiresBook: true, minRole: 'editor',
     aliases: ['settings','config','buchtyp','booktype','einstellungen','genre'] },
-  { key: 'finetuneExport', kind: 'toggle', group: 'tools',  labelKey: 'tile.finetuneExport', descKey: 'tile.finetuneExport.desc', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', requiresBook: true, minRole: 'editor',
+  { key: 'finetuneExport', kind: 'toggle', group: 'export', labelKey: 'tile.finetuneExport', descKey: 'tile.finetuneExport.desc', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', requiresBook: true, minRole: 'editor',
     aliases: ['export','training','jsonl','llm','dataset','samples'] },
-  { key: 'snapshots',      kind: 'toggle', group: 'tools',  labelKey: 'tile.snapshots',      descKey: 'tile.snapshots.desc',      flag: 'showSnapshotsCard',      toggle: 'toggleSnapshotsCard',      requiresPages: true, minRole: 'editor',
+  { key: 'snapshots',      kind: 'toggle', group: 'manuscript', labelKey: 'tile.snapshots',      descKey: 'tile.snapshots.desc',      flag: 'showSnapshotsCard',      toggle: 'toggleSnapshotsCard',      requiresPages: true, minRole: 'editor',
     aliases: ['fassung','fassungen','version','versionen','meilenstein','milestone','snapshot','snapshots','manuskript','vergleich','diff','revision'] },
   // Export: viewer reicht (Lese-Zugang impliziert Export).
-  { key: 'export',         kind: 'toggle', group: 'tools',  labelKey: 'tile.export',         descKey: 'tile.export.desc',         flag: 'showExportCard',         toggle: 'toggleExportCard',         requiresBook: true, minRole: 'viewer',
+  { key: 'export',         kind: 'toggle', group: 'export', labelKey: 'tile.export',         descKey: 'tile.export.desc',         flag: 'showExportCard',         toggle: 'toggleExportCard',         requiresBook: true, minRole: 'viewer',
     aliases: ['download','pdf','epub','html','txt','markdown','md','herunterladen','speichern'] },
-  { key: 'pdfExport',      kind: 'toggle', group: 'tools',  labelKey: 'tile.pdfExport',      descKey: 'tile.pdfExport.desc',      flag: 'showPdfExportCard',      toggle: 'togglePdfExportCard',      requiresBook: true, minRole: 'viewer',
+  { key: 'pdfExport',      kind: 'toggle', group: 'export', labelKey: 'tile.pdfExport',      descKey: 'tile.pdfExport.desc',      flag: 'showPdfExportCard',      toggle: 'togglePdfExportCard',      requiresBook: true, minRole: 'viewer',
     aliases: ['pdf','pdfa','custom','layout','schrift','font','cover','titelbild','print','druck'] },
-  { key: 'epubExport',     kind: 'toggle', group: 'tools',  labelKey: 'tile.epubExport',     descKey: 'tile.epubExport.desc',     flag: 'showEpubExportCard',     toggle: 'toggleEpubExportCard',     requiresBook: true, minRole: 'viewer',
+  { key: 'epubExport',     kind: 'toggle', group: 'export', labelKey: 'tile.epubExport',     descKey: 'tile.epubExport.desc',     flag: 'showEpubExportCard',     toggle: 'toggleEpubExportCard',     requiresBook: true, minRole: 'viewer',
     aliases: ['epub','ebook','e-book','reader','reflow','kindle','blocksatz','toc','inhaltsverzeichnis'] },
-  { key: 'docxExport',     kind: 'toggle', group: 'tools',  labelKey: 'tile.docxExport',     descKey: 'tile.docxExport.desc',     flag: 'showDocxExportCard',     toggle: 'toggleDocxExportCard',     requiresBook: true, minRole: 'viewer',
+  { key: 'docxExport',     kind: 'toggle', group: 'export', labelKey: 'tile.docxExport',     descKey: 'tile.docxExport.desc',     flag: 'showDocxExportCard',     toggle: 'toggleDocxExportCard',     requiresBook: true, minRole: 'viewer',
     aliases: ['word','docx','manuskript','manuscript','lektorat','verlag','normseite','doc','review','einreichen'] },
-  { key: 'folderImport',   kind: 'toggle', group: 'tools',  labelKey: 'tile.folderImport',   descKey: 'tile.folderImport.desc',   flag: 'showFolderImportCard',   toggle: 'toggleFolderImportCard',   minRole: 'editor',
+  { key: 'folderImport',   kind: 'toggle', group: 'manuscript', labelKey: 'tile.folderImport',   descKey: 'tile.folderImport.desc',   flag: 'showFolderImportCard',   toggle: 'toggleFolderImportCard',   minRole: 'editor',
     aliases: ['import','folder','ordner','tagebuch','diary','docx','odt','zip','word','openoffice'] },
-  { key: 'bookOrganizer',  kind: 'toggle', group: 'tools',  labelKey: 'tile.bookOrganizer',  descKey: 'tile.bookOrganizer.desc',  flag: 'showBookOrganizerCard', toggle: 'toggleBookOrganizerCard',  requiresBook: true, minRole: 'editor',
+  { key: 'bookOrganizer',  kind: 'toggle', group: 'manuscript', labelKey: 'tile.bookOrganizer',  descKey: 'tile.bookOrganizer.desc',  flag: 'showBookOrganizerCard', toggle: 'toggleBookOrganizerCard',  requiresBook: true, minRole: 'editor',
     aliases: ['organize','organisieren','sortieren','reorder','umordnen','verschieben','rename','umbenennen','delete','loeschen','create','anlegen','struktur','kapitel','chapter','seiten','pages'] },
   // Editor: viewer (read-only) / lektor (apply-only) / editor+ (frei).
-  { key: 'bookEditor',     kind: 'toggle', group: 'tools',  labelKey: 'tile.bookEditor',     descKey: 'tile.bookEditor.desc',     flag: 'showBookEditorCard',    toggle: 'toggleBookEditorCard',     requiresPages: true, minRole: 'viewer',
+  { key: 'bookEditor',     kind: 'toggle', group: 'manuscript', labelKey: 'tile.bookEditor',     descKey: 'tile.bookEditor.desc',     flag: 'showBookEditorCard',    toggle: 'toggleBookEditorCard',     requiresPages: true, minRole: 'viewer',
     aliases: ['bucheditor','book-editor','stream','endlos','endless','single-page','one-page','edit-all','alle-bearbeiten','volltext','full-text','suchen-ersetzen','search-replace','find-replace','suchen','ersetzen'] },
   // Volltextsuche. minRole viewer — Search filtert
   // serverseitig zusaetzlich nach book_access; jeder Auth-User darf suchen,
   // sieht aber nur eigene Buecher.
-  { key: 'search',         kind: 'toggle', group: 'tools',  labelKey: 'tile.search',         descKey: 'tile.search.desc',         flag: 'showSearchCard',        toggle: 'toggleSearchCard',         minRole: 'viewer',
+  { key: 'search',         kind: 'toggle', group: 'manuscript', labelKey: 'tile.search',         descKey: 'tile.search.desc',         flag: 'showSearchCard',        toggle: 'toggleSearchCard',         minRole: 'viewer',
     aliases: ['suche','search','volltext','fulltext','find','finden','fts','grep'] },
   { key: 'shareLinks',     kind: 'toggle', group: 'tools',  labelKey: 'tile.shareLinks',     descKey: 'tile.shareLinks.desc',     flag: 'showShareLinksCard',    toggle: 'toggleShareLinksCard',     requiresBook: true, minRole: 'editor',
     aliases: ['share','teilen','link','readonly','beta','feedback','public','offentlich','geteilt'] },
@@ -232,13 +232,15 @@ export const EXCLUSIVE_CARDS = [
   { key: 'help',           flag: 'showHelpCard',           toggle: 'toggleHelpCard',           onReclick: 'close', partial: 'help' },
 ];
 
-export const FEATURE_GROUPS = ['review', 'world', 'tools', 'app'];
+export const FEATURE_GROUPS = ['review', 'world', 'manuscript', 'export', 'tools', 'app'];
 
 export const GROUP_LABEL_KEY = {
-  review: 'tile.group.review',
-  world:  'tile.group.world',
-  tools:  'tile.group.tools',
-  app:    'palette.group.app',
+  review:     'tile.group.review',
+  world:      'tile.group.world',
+  manuscript: 'tile.group.manuscript',
+  export:     'tile.group.export',
+  tools:      'tile.group.tools',
+  app:        'palette.group.app',
 };
 
 const ALL = [...FEATURES, ...ACTIONS];

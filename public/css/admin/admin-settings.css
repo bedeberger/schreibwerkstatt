@@ -59,13 +59,6 @@
   min-width: 0;
 }
 
-.admin-settings-section label.checkbox-row {
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
-  justify-content: start;
-  align-items: center;
-}
-
 .admin-settings-actions {
   margin-top: var(--space-md);
   display: flex;

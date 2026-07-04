@@ -1,0 +1,133 @@
+<!-- Schreibrhythmus-Kacheln der „Meine Statistik" (nested via
+     <div id="partial-my-stats-rhythm"> in public/partials/my-stats.html, im
+     x-data="myStatsCard"-Scope). Wrapper ist display:contents
+     (.card--mystats .overview-grid > [id^="partial-my-stats-"]) → die .overview-tile
+     bleiben direkte Grid-Children. Daten: my-stats-card.js / -compute.js /
+     -trends-methods.js. Umfasst: Streak-Heatmap (+ Ziel-Modus), Wochentags-Muster,
+     Session-Kennzahlen. -->
+
+<!-- Schreibrhythmus: Kennzahlen-Grid + Streak-Heatmap -->
+<template x-if="myStatsHasRhythm">
+  <div class="overview-tile overview-tile--wide">
+    <div class="overview-tile-label" x-text="$app.t('mystats.rhythm')"></div>
+    <div class="overview-consistency-grid">
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="$app.t('mystats.days', { n: myStatsStreak().currentStreak })"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.streakCurrent')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="$app.t('mystats.days', { n: myStatsStreak().longestStreak })"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.streakLongest')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="_myStatsFmt(myStatsStreak().totalActiveDays)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.activeDays')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="myStatsMinFmt(myStatsDerived().dailyAvgMin)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.dailyAvg')"></span>
+      </div>
+      <div class="overview-consistency-item" x-show="myStatsDerived().bestDayMin > 0">
+        <span class="overview-consistency-value" x-text="myStatsMinFmt(myStatsDerived().bestDayMin)"></span>
+        <span class="overview-consistency-label"
+              x-text="$app.t('mystats.bestDay') + ' · ' + myStatsDateLabel(myStatsDerived().bestDayDate)"></span>
+      </div>
+      <div class="overview-consistency-item" x-show="myStatsDerived().paceCharsPerHour > 0">
+        <span class="overview-consistency-value" x-text="$app.t('mystats.pace', { n: _myStatsFmt(myStatsDerived().paceCharsPerHour) })"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.paceLabel')"></span>
+      </div>
+    </div>
+
+    <!-- Modus-Umschalter der Heatmap: Aktivität (Minuten-Quartil) vs. Ziel
+         (erreicht/verfehlt). Nur sichtbar, wenn ein Tagesziel gesetzt ist. -->
+    <div class="mystats-streak-modes btn-group" x-show="myStatsHasGoal" x-cloak>
+      <template x-for="m in [{v:'activity',k:'activity'},{v:'goal',k:'goal'}]" :key="m.v">
+        <button type="button" class="btn-compact" :class="{ primary: myStatsStreakMode === m.v }"
+                @click="myStatsStreakMode = m.v"
+                x-text="$app.t('mystats.streakMode.' + m.k)"></button>
+      </template>
+    </div>
+
+    <!-- Streak-Heatmap: 52×7 GitHub-Stil, aktive Schreibtage bzw. Ziel-Tage -->
+    <div class="overview-streak-grid" role="img" :aria-label="$app.t('mystats.rhythm')">
+      <template x-for="(week, wi) in myStatsStreak().weeks" :key="wi">
+        <div class="overview-streak-week">
+          <template x-for="(cell, di) in week" :key="di">
+            <div class="overview-streak-cell"
+                 :class="myStatsStreakCellClass(cell)"
+                 :data-tip="cell && cell.iso
+                   ? (cell.active
+                       ? $app.t('mystats.cellTip', { date: myStatsDateLabel(cell.iso), min: cell.minutes })
+                       : $app.t('mystats.cellTipNone', { date: myStatsDateLabel(cell.iso) }))
+                   : null"></div>
+          </template>
+        </div>
+      </template>
+    </div>
+    <div class="overview-streak-legend">
+      <span class="overview-streak-legend-label" x-text="$app.t('mystats.legend')"></span>
+      <template x-if="myStatsStreakMode !== 'goal' || !myStatsHasGoal">
+        <span class="mystats-streak-legend-scale">
+          <span class="overview-streak-cell overview-streak-cell--lvl0"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl1"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl2"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl3"></span>
+          <span class="overview-streak-cell overview-streak-cell--lvl4"></span>
+        </span>
+      </template>
+      <template x-if="myStatsStreakMode === 'goal' && myStatsHasGoal">
+        <span class="mystats-streak-legend-scale">
+          <span class="overview-streak-cell overview-streak-cell--goal-miss"></span>
+          <span class="mystats-streak-legend-txt" x-text="$app.t('mystats.streakMode.miss')"></span>
+          <span class="overview-streak-cell overview-streak-cell--goal-hit"></span>
+          <span class="mystats-streak-legend-txt" x-text="$app.t('mystats.streakMode.hit')"></span>
+        </span>
+      </template>
+    </div>
+  </div>
+</template>
+
+<!-- Wochentags-Muster: 7 Balken Mo..So (Summe Schreibminuten) -->
+<template x-if="myStatsHasRhythm">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('mystats.weekdayPattern')"></div>
+    <div class="overview-weekday-bars">
+      <template x-for="(d, i) in myStatsWeekdays()" :key="i">
+        <div class="overview-weekday-col"
+             :data-tip="$app.t('mystats.weekdayTip', { day: myStatsWeekdayLabels()[i], time: myStatsMinFmt(d.minutes) })">
+          <div class="overview-weekday-track">
+            <div class="overview-weekday-fill" :style="{ '--progress': d.pct + '%' }"></div>
+          </div>
+          <span class="overview-weekday-label" x-text="myStatsWeekdayLabels()[i]"></span>
+        </div>
+      </template>
+    </div>
+  </div>
+</template>
+
+<!-- Session-Kennzahlen: Anzahl, Ø-Länge, längste Session, Sessions/aktiver Tag.
+     Aus writing_session (heartbeat-abgeleitet), zeitraum-bewusst. -->
+<template x-if="myStatsHasSessions">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('mystats.sessions')"></div>
+    <div class="overview-consistency-grid">
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="_myStatsFmt(myStatsSessionStats().count)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.sessionCount')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="myStatsMinFmt(myStatsSessionStats().avgSeconds / 60)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.sessionAvg')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="myStatsMinFmt(myStatsSessionStats().longestSeconds / 60)"></span>
+        <span class="overview-consistency-label"
+              x-text="$app.t('mystats.sessionLongest') + (myStatsSessionStats().longestDate ? ' · ' + myStatsDateLabel(myStatsSessionStats().longestDate) : '')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value" x-text="myStatsDec(myStatsSessionStats().perActiveDay)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.sessionPerDay')"></span>
+      </div>
+    </div>
+  </div>
+</template>

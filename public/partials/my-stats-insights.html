@@ -3,6 +3,31 @@
      display:contents (css/components/my-stats.css), damit die .overview-tile direkte
      Grid-Children der .overview-grid bleiben. Daten: my-stats-card.js / -compute.js. -->
 
+<!-- Vorperioden-Vergleich: aktiver Zeitraum vs. gleich lange Periode davor
+     (Zeichen-Zuwachs + Schreibzeit). Nur bei aktivem, nach vorne begrenztem
+     Zeitraum sichtbar. -->
+<template x-if="myStatsHasPeriodCmp">
+  <div class="overview-tile overview-tile--medium">
+    <div class="overview-tile-label" x-text="$app.t('mystats.periodCompare')"></div>
+    <div class="overview-consistency-grid">
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value overview-trend-pct"
+              :class="myStatsPeriodComparison().chars.dir > 0 ? 'overview-trend-pct--up' : myStatsPeriodComparison().chars.dir < 0 ? 'overview-trend-pct--down' : ''"
+              x-text="myStatsCmpText(myStatsPeriodComparison().chars)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.cmpChars')"></span>
+      </div>
+      <div class="overview-consistency-item">
+        <span class="overview-consistency-value overview-trend-pct"
+              :class="myStatsPeriodComparison().writingSeconds.dir > 0 ? 'overview-trend-pct--up' : myStatsPeriodComparison().writingSeconds.dir < 0 ? 'overview-trend-pct--down' : ''"
+              x-text="myStatsCmpText(myStatsPeriodComparison().writingSeconds)"></span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.cmpWriting')"></span>
+      </div>
+    </div>
+    <p class="mystats-cmp-note"
+       x-text="$app.t('mystats.cmpNote', { from: myStatsDateLabel(myStatsPeriodComparison().prevFrom), to: myStatsDateLabel(myStatsPeriodComparison().prevTo) })"></p>
+  </div>
+</template>
+
 <!-- Tagesziel (Minuten/Tag): Live-Fortschritt heute + Ziel-Streak.
      Gesetzt wird das Ziel im Profil (userSettingsCard); hier nur die Anzeige.
      Immer sichtbar (auch ohne gesetztes Ziel → Hinweis aufs Profil). -->
@@ -98,6 +123,13 @@
           <svg class="icon mystats-trend" aria-hidden="true"><use :href="'/icons.svg#' + myStatsTrendIcon(myStatsReadability().sentenceLenTrend)"></use></svg>
         </span>
         <span class="overview-consistency-label" x-text="$app.t('mystats.sentenceLen')"></span>
+      </div>
+      <div class="overview-consistency-item" x-show="myStatsHasVocab">
+        <span class="overview-consistency-value">
+          <span x-text="_myStatsFmt(myStatsVocabTrend().total)"></span>
+          <svg class="icon mystats-trend" aria-hidden="true"><use :href="'/icons.svg#' + myStatsTrendIcon(myStatsVocabTrend().trend)"></use></svg>
+        </span>
+        <span class="overview-consistency-label" x-text="$app.t('mystats.vocabTrend')"></span>
       </div>
     </div>
   </div>

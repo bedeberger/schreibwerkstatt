@@ -12,6 +12,7 @@ import { computeWritingStreak, computeWeekdayPattern, computeDerived, computeMil
          computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
          filterByWindow, bucketizeIso, aggregateByBucket } from './my-stats-compute.js';
 import { computeVolumeByCategory } from './my-stats-category.js';
+import { myStatsTrendMethods } from './my-stats-trends-methods.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -25,6 +26,7 @@ const METRIC_KEYS = {
   page_count:    'mystats.metric.pages',
   chapter_count: 'mystats.metric.chapters',
   writing:       'mystats.metric.writing',
+  lektorat:      'mystats.metric.lektorat',
 };
 
 // Meilenstein-Label-Keys pro Kategorie (Wert via {n} interpoliert).
@@ -50,11 +52,14 @@ let _themeObserver = null;
 export function registerMyStatsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('myStatsCard', () => ({
+    ...myStatsTrendMethods,
     myStatsData: null,
     myStatsHistory: [],
     myStatsWriting: [],
     myStatsLektorat: [],
+    myStatsSessions: [],
     myStatsMetric: 'chars',
+    myStatsStreakMode: 'activity', // 'activity' | 'goal' — Streak-Heatmap-Faerbung
     // Globaler Zeitraum-Filter (steuert die ganze Karte). Preset-Tage
     // (30/90/365, 0 = alles) ODER freie Von/Bis-ISO-Daten — Custom hat Vorrang.
     myStatsRangeDays: 0,
@@ -99,6 +104,7 @@ export function registerMyStatsCard() {
         this.myStatsHistory = Array.isArray(hist.history) ? hist.history : [];
         this.myStatsWriting = Array.isArray(hist.writing) ? hist.writing : [];
         this.myStatsLektorat = Array.isArray(hist.lektorat) ? hist.lektorat : [];
+        this.myStatsSessions = Array.isArray(hist.sessions) ? hist.sessions : [];
       } catch (e) {
         console.error('[myStats load]', e);
         this.myStatsError = window.__app.t('mystats.loadError');
@@ -106,6 +112,7 @@ export function registerMyStatsCard() {
         this.myStatsHistory = [];
         this.myStatsWriting = [];
         this.myStatsLektorat = [];
+        this.myStatsSessions = [];
       } finally {
         this.myStatsLoading = false;
       }
@@ -402,11 +409,14 @@ export function registerMyStatsCard() {
       if (_chart) { _chart.destroy(); _chart = null; }
 
       const metric = this.myStatsMetric;
-      const isWriting = metric === 'writing';
+      // Zeit-Metriken (Schreib- bzw. Lektoratszeit) sind Tages-Deltas in Sekunden;
+      // Inhalts-Metriken sind kumulative book_stats_history-Snapshots.
+      const isTime = metric === 'writing' || metric === 'lektorat';
+      const timeSrc = metric === 'lektorat' ? this.myStatsLektorat : this.myStatsWriting;
       const byBook = this.myStatsChartMode === 'byBook';
 
       // Quelle vereinheitlichen auf { book_id, date, raw }.
-      const src = isWriting ? this.myStatsWriting : this.myStatsHistory;
+      const src = isTime ? timeSrc : this.myStatsHistory;
       let rows = src.map(r => ({ book_id: r.book_id, date: r.recorded_at || r.date, raw: r }));
       if (!rows.length) return;
 
@@ -420,9 +430,9 @@ export function registerMyStatsCard() {
       // mitten am Tag (oder ein noch ausstehender Nachtlauf) erzeugt sonst einen
       // Teil-Tages-Punkt mit weniger Büchern als der Vortag — als künstlicher
       // Einbruch sichtbar. Darum jüngste Tage abschneiden, solange ihre Buch-Zahl
-      // unter der des Vortags liegt. Nur für Content-Historie — Schreibzeit ist
-      // naturgemäss dünn (nur aktive Tage) und kennt kein „vollständiges" Tagesbild.
-      if (!isWriting) {
+      // unter der des Vortags liegt. Nur für Content-Historie — Zeit-Metriken sind
+      // naturgemäss dünn (nur aktive Tage) und kennen kein „vollständiges" Tagesbild.
+      if (!isTime) {
         const allDates = [...new Set(rows.map(r => r.date))].sort();
         const booksOn = new Map();
         for (const r of rows) {
@@ -437,7 +447,7 @@ export function registerMyStatsCard() {
 
       const valOf = (raw) => {
         if (metric === 'normseiten') return Math.round(((Number(raw.chars) || 0) / 1500) * 10) / 10;
-        if (isWriting)              return Math.round((Number(raw.seconds) || 0) / 60);
+        if (isTime)                 return Math.round((Number(raw.seconds) || 0) / 60);
         return Number(raw[metric]) || 0;
       };
 
@@ -445,7 +455,7 @@ export function registerMyStatsCard() {
       // im Bucket summiert ('sum'); Inhalts-Snapshots (kumulative Groessen) nehmen
       // den juengsten Tageswert je Bucket ('last').
       const gran = this.myStatsChartGran;
-      const aggMode = isWriting ? 'sum' : 'last';
+      const aggMode = isTime ? 'sum' : 'last';
 
       // X-Achse = sortierte eindeutige Buckets über alle Bücher.
       const buckets = [...new Set(rows.map(r => bucketizeIso(r.date, gran)))].sort();
@@ -500,10 +510,10 @@ export function registerMyStatsCard() {
         const points = [...totalByDate.entries()].map(([date, value]) => ({ date, value }));
         const bmap = new Map(aggregateByBucket(points, gran, aggMode).map(x => [x.bucket, x.value]));
         let series = buckets.map(b => bmap.has(b) ? bmap.get(b) : 0);
-        // Kumuliert nur fuer Schreibzeit sinnvoll (Bucket-Deltas aufsummiert →
+        // Kumuliert nur fuer Zeit-Metriken sinnvoll (Bucket-Deltas aufsummiert →
         // total investierte Zeit). Inhaltsmetriken sind bereits kumulative
         // Snapshot-Groessen, daher dort kein Cumulative-Toggle im UI.
-        if (this.myStatsCumulative && isWriting) {
+        if (this.myStatsCumulative && isTime) {
           let acc = 0;
           series = series.map(v => (acc += v));
         }
@@ -543,7 +553,7 @@ export function registerMyStatsCard() {
             x: { grid: { color: gridLine }, ticks: { font: { size: 11 }, color: muted, maxTicksLimit: 12 } },
             y: {
               grid: { color: gridLine },
-              beginAtZero: isWriting || byBook,
+              beginAtZero: isTime || byBook,
               ticks: {
                 font: { size: 11 }, color: muted,
                 callback: v => fmt(v),

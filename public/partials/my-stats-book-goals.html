@@ -101,5 +101,9 @@
         </tbody>
       </table>
     </div>
+    <!-- Gesamt-Prognose ueber alle Buecher mit offenem Ziel (aktuelles Tempo). -->
+    <p class="mystats-overall-forecast" x-show="myStatsHasOverallForecast"
+       :class="myStatsOverallForecast().stalled ? 'mystats-overall-forecast--stalled' : ''"
+       x-text="myStatsOverallForecastLabel()"></p>
   </div>
 </template>

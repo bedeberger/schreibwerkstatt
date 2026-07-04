@@ -332,6 +332,42 @@
 .mystats-goals-forecast--ontrack { color: var(--color-success); }
 .mystats-goals-forecast--behind { color: var(--color-schwach); }
 
+/* Gesamt-Prognose ueber alle Buecher mit offenem Ziel (unter der Ziel-Tabelle). */
+.mystats-overall-forecast {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+.mystats-overall-forecast--stalled { color: var(--color-muted); }
+
+/* Streak-Heatmap: Modus-Umschalter (Aktivität/Ziel) + Ziel-Faerbung der Zellen.
+   Basis-Zellen (--lvl0..4) leben in book-overview/stats.css; hier nur die
+   mystats-eigenen Ziel-Varianten. */
+.mystats-streak-modes {
+  margin: var(--space-2xs) 0 var(--space-1);
+}
+.card--mystats .overview-streak-cell--goal-hit { background: var(--color-success); }
+.card--mystats .overview-streak-cell--goal-miss {
+  background: color-mix(in srgb, var(--color-muted) 30%, var(--color-bg));
+}
+.mystats-streak-legend-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.mystats-streak-legend-txt {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  margin-right: var(--space-2xs);
+}
+
+/* Vorperioden-Vergleich: Fussnote mit dem Vergleichszeitraum. */
+.mystats-cmp-note {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
 /* iOS: >= 16px verhindert Zoom-in beim Fokus der Datumsfelder. Gleicher 768px-
    Breakpoint + gleiche (0,2,0)-Spezifität wie die Desktop-Compact-Regel oben,
    damit sie diese auf Mobile überstimmt (sonst bliebe 12px → iOS-Zoom). */

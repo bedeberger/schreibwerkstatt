@@ -275,7 +275,7 @@ router.get('/profile-stats', (req, res) => {
 router.get('/profile-stats-history', (req, res) => {
   const email = req.session.user.email;
   const owned = ownedBooksForStats(email);
-  if (!owned.length) return res.json({ history: [], writing: [] });
+  if (!owned.length) return res.json({ history: [], writing: [], lektorat: [], sessions: [] });
   try {
     const ph = owned.map(() => '?').join(',');
     const history = db.prepare(`
@@ -298,7 +298,15 @@ router.get('/profile-stats-history', (req, res) => {
       GROUP BY book_id, date
       ORDER BY date ASC
     `).all(email, ...owned);
-    res.json({ history, writing, lektorat });
+    // Schreib-Sessions (aus writing_session, aus dem Heartbeat abgeleitet): eine
+    // Zeile je zusammenhaengendem Schreibabschnitt. `date` = lokales ISO-Datum des
+    // Session-Starts → Zeitraum-Filter im Frontend. Basis fuer Session-Kennzahlen.
+    const sessions = db.prepare(`
+      SELECT book_id, date, seconds
+      FROM writing_session WHERE user_email = ? AND book_id IN (${ph}) AND seconds > 0
+      ORDER BY date ASC
+    `).all(email, ...owned);
+    res.json({ history, writing, lektorat, sessions });
   } catch (e) {
     logger.error('[me/profile-stats-history] DB-Fehler: ' + e.message, { user: email });
     res.status(500).json({ error_code: 'DB_ERROR' });

@@ -101,82 +101,10 @@
     </div>
     </template>
 
-    <!-- Schreibrhythmus: Kennzahlen-Grid + Streak-Heatmap -->
-    <template x-if="myStatsHasRhythm">
-      <div class="overview-tile overview-tile--wide">
-        <div class="overview-tile-label" x-text="$app.t('mystats.rhythm')"></div>
-        <div class="overview-consistency-grid">
-          <div class="overview-consistency-item">
-            <span class="overview-consistency-value" x-text="$app.t('mystats.days', { n: myStatsStreak().currentStreak })"></span>
-            <span class="overview-consistency-label" x-text="$app.t('mystats.streakCurrent')"></span>
-          </div>
-          <div class="overview-consistency-item">
-            <span class="overview-consistency-value" x-text="$app.t('mystats.days', { n: myStatsStreak().longestStreak })"></span>
-            <span class="overview-consistency-label" x-text="$app.t('mystats.streakLongest')"></span>
-          </div>
-          <div class="overview-consistency-item">
-            <span class="overview-consistency-value" x-text="_myStatsFmt(myStatsStreak().totalActiveDays)"></span>
-            <span class="overview-consistency-label" x-text="$app.t('mystats.activeDays')"></span>
-          </div>
-          <div class="overview-consistency-item">
-            <span class="overview-consistency-value" x-text="myStatsMinFmt(myStatsDerived().dailyAvgMin)"></span>
-            <span class="overview-consistency-label" x-text="$app.t('mystats.dailyAvg')"></span>
-          </div>
-          <div class="overview-consistency-item" x-show="myStatsDerived().bestDayMin > 0">
-            <span class="overview-consistency-value" x-text="myStatsMinFmt(myStatsDerived().bestDayMin)"></span>
-            <span class="overview-consistency-label"
-                  x-text="$app.t('mystats.bestDay') + ' · ' + myStatsDateLabel(myStatsDerived().bestDayDate)"></span>
-          </div>
-          <div class="overview-consistency-item" x-show="myStatsDerived().paceCharsPerHour > 0">
-            <span class="overview-consistency-value" x-text="$app.t('mystats.pace', { n: _myStatsFmt(myStatsDerived().paceCharsPerHour) })"></span>
-            <span class="overview-consistency-label" x-text="$app.t('mystats.paceLabel')"></span>
-          </div>
-        </div>
-
-        <!-- Streak-Heatmap: 52×7 GitHub-Stil, aktive Schreibtage -->
-        <div class="overview-streak-grid" role="img" :aria-label="$app.t('mystats.rhythm')">
-          <template x-for="(week, wi) in myStatsStreak().weeks" :key="wi">
-            <div class="overview-streak-week">
-              <template x-for="(cell, di) in week" :key="di">
-                <div class="overview-streak-cell"
-                     :class="cell ? ('overview-streak-cell--lvl' + cell.level + (cell.future ? ' overview-streak-cell--future' : '')) : 'overview-streak-cell--empty'"
-                     :data-tip="cell && cell.iso
-                       ? (cell.active
-                           ? $app.t('mystats.cellTip', { date: myStatsDateLabel(cell.iso), min: cell.minutes })
-                           : $app.t('mystats.cellTipNone', { date: myStatsDateLabel(cell.iso) }))
-                       : null"></div>
-              </template>
-            </div>
-          </template>
-        </div>
-        <div class="overview-streak-legend">
-          <span class="overview-streak-legend-label" x-text="$app.t('mystats.legend')"></span>
-          <span class="overview-streak-cell overview-streak-cell--lvl0"></span>
-          <span class="overview-streak-cell overview-streak-cell--lvl1"></span>
-          <span class="overview-streak-cell overview-streak-cell--lvl2"></span>
-          <span class="overview-streak-cell overview-streak-cell--lvl3"></span>
-          <span class="overview-streak-cell overview-streak-cell--lvl4"></span>
-        </div>
-      </div>
-    </template>
-
-    <!-- Wochentags-Muster: 7 Balken Mo..So (Summe Schreibminuten) -->
-    <template x-if="myStatsHasRhythm">
-      <div class="overview-tile overview-tile--medium">
-        <div class="overview-tile-label" x-text="$app.t('mystats.weekdayPattern')"></div>
-        <div class="overview-weekday-bars">
-          <template x-for="(d, i) in myStatsWeekdays()" :key="i">
-            <div class="overview-weekday-col"
-                 :data-tip="$app.t('mystats.weekdayTip', { day: myStatsWeekdayLabels()[i], time: myStatsMinFmt(d.minutes) })">
-              <div class="overview-weekday-track">
-                <div class="overview-weekday-fill" :style="{ '--progress': d.pct + '%' }"></div>
-              </div>
-              <span class="overview-weekday-label" x-text="myStatsWeekdayLabels()[i]"></span>
-            </div>
-          </template>
-        </div>
-      </div>
-    </template>
+    <!-- Schreibrhythmus (Streak-Heatmap + Ziel-Modus), Wochentags-Muster und
+         Session-Kennzahlen ausgelagert wg. 250-LOC-Partial-Limit.
+         display:contents-Wrapper → Tiles bleiben Grid-Kinder. -->
+    <div id="partial-my-stats-rhythm"></div>
 
     <!-- Insight-Tiles (Lesbarkeit, Aufwand, Pro-Buch-Zeit) ausgelagert wg.
          250-LOC-Partial-Limit. display:contents-Wrapper → Tiles bleiben Grid-Kinder. -->
@@ -239,10 +167,11 @@
                  {value:'unique_words',  label: $app.t('mystats.metric.uniqueWords')},
                  {value:'page_count',    label: $app.t('mystats.metric.pages')},
                  {value:'chapter_count', label: $app.t('mystats.metric.chapters')},
-                 {value:'writing',       label: $app.t('mystats.metric.writing')}
+                 {value:'writing',       label: $app.t('mystats.metric.writing')},
+                 {value:'lektorat',      label: $app.t('mystats.metric.lektorat')}
                ]"
                @combobox-change="$nextTick(() => renderMyStatsChart())"></div>
-          <div class="btn-group" x-show="myStatsMetric === 'writing'" x-cloak>
+          <div class="btn-group" x-show="myStatsMetric === 'writing' || myStatsMetric === 'lektorat'" x-cloak>
             <template x-for="c in [{v:false,k:'daily'},{v:true,k:'cumulative'}]" :key="String(c.v)">
               <button type="button" class="btn-compact" :class="{ primary: myStatsCumulative === c.v }"
                       @click="myStatsCumulative = c.v; renderMyStatsChart()"

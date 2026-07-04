@@ -81,26 +81,10 @@
           <input type="text" x-data="numInput({ integer: true, min: 500, max: 100000 })" x-modelable="value" x-model="adminSettingsForm['ai.komplett.scene_backfill_min_chars']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.sceneBackfillMinChars')"></small>
         </label>
-        <label class="checkbox-row">
-          <input type="checkbox" :checked="adminSettingsForm['ai.komplett.attribute_check'] === true || adminSettingsForm['ai.komplett.attribute_check'] === 'true'"
-                 @change="adminSettingsForm['ai.komplett.attribute_check'] = $event.target.checked">
-          <span x-text="$app.t('admin.settings.help.attributeCheck')"></span>
-        </label>
-        <label class="checkbox-row">
-          <input type="checkbox" :checked="adminSettingsForm['ai.komplett.coverage_feedback'] === true || adminSettingsForm['ai.komplett.coverage_feedback'] === 'true'"
-                 @change="adminSettingsForm['ai.komplett.coverage_feedback'] = $event.target.checked">
-          <span x-text="$app.t('admin.settings.help.coverageFeedback')"></span>
-        </label>
-        <label class="checkbox-row">
-          <input type="checkbox" :checked="adminSettingsForm['ai.komplett.scene_backfill'] === true || adminSettingsForm['ai.komplett.scene_backfill'] === 'true'"
-                 @change="adminSettingsForm['ai.komplett.scene_backfill'] = $event.target.checked">
-          <span x-text="$app.t('admin.settings.help.sceneBackfill')"></span>
-        </label>
-        <label class="checkbox-row">
-          <input type="checkbox" :checked="adminSettingsForm['ai.komplett.remap_rescue'] === true || adminSettingsForm['ai.komplett.remap_rescue'] === 'true'"
-                 @change="adminSettingsForm['ai.komplett.remap_rescue'] = $event.target.checked">
-          <span x-text="$app.t('admin.settings.help.remapRescue')"></span>
-        </label>
+        <div x-data="settingField({ k: 'ai.komplett.attribute_check', type: 'toggle', label: 'admin.settings.help.attributeCheck' })"></div>
+        <div x-data="settingField({ k: 'ai.komplett.coverage_feedback', type: 'toggle', label: 'admin.settings.help.coverageFeedback' })"></div>
+        <div x-data="settingField({ k: 'ai.komplett.scene_backfill', type: 'toggle', label: 'admin.settings.help.sceneBackfill' })"></div>
+        <div x-data="settingField({ k: 'ai.komplett.remap_rescue', type: 'toggle', label: 'admin.settings.help.remapRescue' })"></div>
 
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.bookchatTitle')"></span></h4>
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.claude.bookchatIntro')"></small>
@@ -150,12 +134,7 @@
           <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.ollama.repeat_penalty']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
         </label>
-        <label class="checkbox-row">
-          <input type="checkbox" :checked="adminSettingsForm['ai.ollama.think'] === true || adminSettingsForm['ai.ollama.think'] === 'true'"
-                 @change="adminSettingsForm['ai.ollama.think'] = $event.target.checked">
-          <span>ai.ollama.think</span>
-        </label>
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.think')"></small>
+        <div x-data="settingField({ k: 'ai.ollama.think', type: 'toggle', help: 'admin.settings.help.think' })"></div>
       </div>
 
       <div x-show="adminSettingsProviderSubtab === 'openai-compat'" class="admin-settings-subsection">
@@ -179,12 +158,7 @@
           <input type="text" x-data="numInput({ step: 0.05, decimals: 2, min: 1, max: 2 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.repeat_penalty']">
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
         </label>
-        <label class="checkbox-row">
-          <input type="checkbox" :checked="adminSettingsForm['ai.openai-compat.think'] === true || adminSettingsForm['ai.openai-compat.think'] === 'true'"
-                 @change="adminSettingsForm['ai.openai-compat.think'] = $event.target.checked">
-          <span>ai.openai-compat.think</span>
-        </label>
-        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.thinkOpenaiCompat')"></small>
+        <div x-data="settingField({ k: 'ai.openai-compat.think', type: 'toggle', help: 'admin.settings.help.thinkOpenaiCompat' })"></div>
       </div>
 
       <template x-if="adminSettingsBudget(adminSettingsProviderSubtab)">

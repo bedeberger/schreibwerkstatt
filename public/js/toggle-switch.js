@@ -1,7 +1,6 @@
-// Toggle-Switch (selbst-rendernd) — Ersatz für `<label class="checkbox-row">
-// <input type="checkbox" :checked=… @change=…><span>…</label>`.
+// Toggle-Switch (selbst-rendernd) — die kanonische Boolean-Einstellung.
 //
-// Vereinheitlicht das überall verstreute Boolean-Einstellungs-Markup (Admin-
+// Vereinheitlicht das Boolean-Einstellungs-Markup (Admin-
 // Settings, Export-Optionen, Kill-Switches) zu einem `role="switch"`-Element —
 // analog combobox / num-input / radio-group. `init()` rendert Track + Thumb +
 // optionales Label komplett selbst und setzt die `.toggle-switch`-Klasse aufs
