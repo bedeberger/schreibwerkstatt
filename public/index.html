@@ -75,6 +75,7 @@
   <link rel="stylesheet" href="css/editor/notebook/lektorat.css">
   <link rel="stylesheet" href="css/editor/notebook/comments-rail.css">
   <link rel="stylesheet" href="css/editor/notebook/entities.css">
+  <link rel="stylesheet" href="css/editor/reference-slot.css">
   <link rel="stylesheet" href="css/editor/synonym-menu.css">
   <link rel="stylesheet" href="css/editor/figur-lookup.css">
   <link rel="stylesheet" href="css/editor/spellcheck.css">
@@ -228,6 +229,7 @@
   <link rel="modulepreload" href="js/cards/book-editor-card.js">
   <link rel="modulepreload" href="js/cards/book-organizer-card.js">
   <link rel="modulepreload" href="js/cards/chat-card.js">
+  <link rel="modulepreload" href="js/cards/reference-card.js">
   <link rel="modulepreload" href="js/cards/figuren-card.js">
   <link rel="modulepreload" href="js/cards/figur-werkstatt-card.js">
   <link rel="modulepreload" href="js/cards/orte-card.js">
@@ -493,10 +495,11 @@
 <div id="partial-bookstats"></div>
 <div id="partial-stil-heatmap"></div>
 <div id="partial-fehler-heatmap"></div>
-<div class="editor-chat-wrap" :class="{ 'editor-chat-split': $app.showEditorCard && ($app.showChatCard || $app.showIdeenCard) }">
+<div class="editor-chat-wrap" :class="{ 'editor-chat-split': $app.showEditorCard && ($app.showChatCard || $app.showIdeenCard || $app.showReferenceCard) }">
   <div id="partial-editor-notebook" class="display-contents"></div>
   <div id="partial-chat" class="display-contents"></div>
   <div id="partial-ideen" class="display-contents"></div>
+  <div id="partial-reference" class="display-contents"></div>
 </div>
 <div id="partial-book-settings"></div>
 <div id="partial-snapshots"></div>

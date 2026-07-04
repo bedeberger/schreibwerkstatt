@@ -1,0 +1,138 @@
+<!-- Referenz-Slot (read-only Begleitpanel neben dem Notebook-Editor).
+     Alpine.data-Sub-Komponente — public/js/cards/reference-card.js.
+     showReferenceCard bleibt am Root; fachlicher State in der Sub.
+     Mutex mit Seiten-Chat + Ideen im selben 420px-Slot. Nie schreibend. -->
+<div class="card card--reference" id="reference-card" x-data="referenceCard" x-show="$app.showReferenceCard" x-cloak>
+  <div class="card-header">
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="referenceScope === 'page' && referenceHasContext() ? ($app.currentPage?.name || '') : $app.t('reference.wholeBook')"></span>
+      <span class="card-title" x-text="$app.t('reference.title')"></span>
+    </div>
+    <div class="card-actions">
+      <button type="button" class="icon-btn icon-btn--ghost"
+              :class="{ 'is-active': referenceScope === 'book' }"
+              @click="toggleReferenceScope()"
+              :data-tip="referenceScope === 'page' ? $app.t('reference.scope.toBook') : $app.t('reference.scope.toContext')"
+              :aria-label="referenceScope === 'page' ? $app.t('reference.scope.toBook') : $app.t('reference.scope.toContext')">
+        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=693#' + (referenceScope === 'book' ? 'book' : 'file-text')"/></svg>
+      </button>
+    </div>
+    <button type="button" class="btn-card-close" @click="$app.toggleReferenceCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+  </div>
+
+  <div class="reference-scope-note" x-text="referenceScope === 'page'
+        ? (referenceHasContext() ? $app.t('reference.scope.contextNote', { page: $app.currentPage?.name || '' }) : $app.t('reference.scope.noContext'))
+        : $app.t('reference.scope.bookNote')"></div>
+
+  <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')). Nur der Tablist im tabs-
+       Scope; die Panels lesen referenceTab direkt aus der Karte. -->
+  <div x-data="tabs(['figuren','orte','szenen','ereignisse','recherche'])"
+       x-modelable="value" x-model="referenceTab">
+    <div class="tabs tabs--scrollable" x-bind="tablist">
+      <button class="tabs-btn" x-bind="tabBtn('figuren')">
+        <span x-text="$app.t('reference.tab.figuren')"></span>
+        <span class="reference-tab-count" x-show="referenceCount('figuren') > 0" x-text="referenceCount('figuren')"></span>
+      </button>
+      <button class="tabs-btn" x-bind="tabBtn('orte')">
+        <span x-text="$app.t('reference.tab.orte')"></span>
+        <span class="reference-tab-count" x-show="referenceCount('orte') > 0" x-text="referenceCount('orte')"></span>
+      </button>
+      <button class="tabs-btn" x-bind="tabBtn('szenen')">
+        <span x-text="$app.t('reference.tab.szenen')"></span>
+        <span class="reference-tab-count" x-show="referenceCount('szenen') > 0" x-text="referenceCount('szenen')"></span>
+      </button>
+      <button class="tabs-btn" x-bind="tabBtn('ereignisse')">
+        <span x-text="$app.t('reference.tab.ereignisse')"></span>
+        <span class="reference-tab-count" x-show="referenceCount('ereignisse') > 0" x-text="referenceCount('ereignisse')"></span>
+      </button>
+      <button class="tabs-btn" x-bind="tabBtn('recherche')">
+        <span x-text="$app.t('reference.tab.recherche')"></span>
+        <span class="reference-tab-count" x-show="referenceCount('recherche') > 0" x-text="referenceCount('recherche')"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="reference-body">
+    <!-- Figuren -->
+    <div x-show="referenceTab === 'figuren'" class="reference-panel">
+      <template x-if="referenceFiguren().length === 0">
+        <div class="reference-empty" x-text="$app.t('reference.empty.figuren')"></div>
+      </template>
+      <template x-for="fig in referenceFiguren()" :key="'rf-' + (fig.id ?? fig.name)">
+        <div class="reference-row">
+          <div class="reference-row-head">
+            <span class="reference-row-title" x-text="fig.name"></span>
+            <span x-show="fig.typ" class="tag" x-text="$app.t('figuren.type.' + fig.typ)"></span>
+          </div>
+          <div class="reference-row-sub" x-show="fig.rolle" x-text="fig.rolle"></div>
+          <div class="reference-row-desc" x-show="fig.beschreibung" x-text="fig.beschreibung"></div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Orte -->
+    <div x-show="referenceTab === 'orte'" class="reference-panel">
+      <template x-if="referenceOrte().length === 0">
+        <div class="reference-empty" x-text="$app.t('reference.empty.orte')"></div>
+      </template>
+      <template x-for="ort in referenceOrte()" :key="'ro-' + (ort.id ?? ort.name)">
+        <div class="reference-row">
+          <div class="reference-row-head">
+            <span class="reference-row-title" x-text="ort.name"></span>
+          </div>
+          <div class="reference-row-desc" x-show="ort.beschreibung" x-text="ort.beschreibung"></div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Szenen -->
+    <div x-show="referenceTab === 'szenen'" class="reference-panel">
+      <template x-if="referenceSzenen().length === 0">
+        <div class="reference-empty" x-text="$app.t('reference.empty.szenen')"></div>
+      </template>
+      <template x-for="s in referenceSzenen()" :key="'rs-' + s.id">
+        <div class="reference-row">
+          <div class="reference-row-head">
+            <span class="reference-row-title" x-text="s.titel || $app.t('entities.scene')"></span>
+            <span x-show="s.wertung" class="tag" :class="'badge--wertung-' + s.wertung" x-text="s.wertung"></span>
+          </div>
+          <div class="reference-row-desc" x-show="s.zusammenfassung || s.beschreibung" x-text="s.zusammenfassung || s.beschreibung"></div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Ereignisse (konsolidierte Chronologie) -->
+    <div x-show="referenceTab === 'ereignisse'" class="reference-panel">
+      <template x-if="referenceEreignisse().length === 0">
+        <div class="reference-empty" x-text="$app.t('reference.empty.ereignisse')"></div>
+      </template>
+      <template x-for="(ev, ei) in referenceEreignisse()" :key="'re-' + ei">
+        <div class="reference-row">
+          <div class="reference-row-head">
+            <span class="reference-row-title" x-text="ev.ereignis"></span>
+            <span x-show="referenceEventDate(ev)" class="tag" x-text="referenceEventDate(ev)"></span>
+          </div>
+          <div class="reference-row-sub" x-show="ev.kapitel" x-text="Array.isArray(ev.kapitel) ? ev.kapitel.join(', ') : ev.kapitel"></div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Recherche -->
+    <div x-show="referenceTab === 'recherche'" class="reference-panel">
+      <div x-show="referenceRechercheLoading" class="reference-empty" x-text="$app.t('reference.loading')"></div>
+      <template x-if="!referenceRechercheLoading && referenceRechercheItems().length === 0">
+        <div class="reference-empty" x-text="$app.t('reference.empty.recherche')"></div>
+      </template>
+      <template x-for="item in referenceRechercheItems()" :key="'rr-' + item.id">
+        <div class="reference-row">
+          <div class="reference-row-head">
+            <span class="reference-row-title" x-text="referenceRechercheText(item)"></span>
+            <span class="tag" x-text="referenceRechercheKind(item)"></span>
+          </div>
+          <div class="reference-row-desc" x-show="item.title && item.body" x-text="item.body"></div>
+          <div class="reference-row-sub" x-show="item.source" x-text="item.source"></div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>

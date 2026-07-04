@@ -23,6 +23,13 @@ const TRIM_PRESETS = [
   { value: '135x215', w: 135, h: 215 },
   { value: '155x230', w: 155, h: 230 },
   { value: '170x240', w: 170, h: 240 },
+  // Amazon-KDP-Trims (in Zoll definiert, mm gerundet). `label` überschreibt das
+  // berechnete cm-Label, weil KDP-Formate nach ihrer Zoll-Bezeichnung bekannt sind.
+  { value: 'kdp-5.06x7.81', w: 128.5,  h: 198.4, label: 'KDP 5.06 × 7.81″ (12.85 × 19.84 cm)' },
+  { value: 'kdp-5x8',       w: 127,    h: 203.2, label: 'KDP 5 × 8″ (12.7 × 20.32 cm)' },
+  { value: 'kdp-5.25x8',    w: 133.35, h: 203.2, label: 'KDP 5.25 × 8″ (13.34 × 20.32 cm)' },
+  { value: 'kdp-5.5x8.5',   w: 139.7,  h: 215.9, label: 'KDP 5.5 × 8.5″ (13.97 × 21.59 cm)' },
+  { value: 'kdp-6x9',       w: 152.4,  h: 228.6, label: 'KDP 6 × 9″ (15.24 × 22.86 cm)' },
 ];
 
 export function registerPdfExportCard() {
@@ -322,7 +329,7 @@ export function registerPdfExportCard() {
     trimPresetOptions() {
       return TRIM_PRESETS.map(p => ({
         value: p.value,
-        label: `${p.w / 10} × ${p.h / 10} cm`,
+        label: p.label || `${p.w / 10} × ${p.h / 10} cm`,
       }));
     },
     applyTrimPreset(value) {

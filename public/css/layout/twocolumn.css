@@ -131,12 +131,14 @@ body.sidebar-resizing iframe {
   }
   .editor-chat-split #chat-card,
   .editor-chat-split #ideen-card,
+  .editor-chat-split #reference-card,
   .kapitel-ideen-split #ideen-card {
     position: sticky;
     top: 1.5rem;
   }
   .editor-chat-split .chat-messages,
   .editor-chat-split .ideen-list,
+  .editor-chat-split .reference-body,
   .kapitel-ideen-split .ideen-list {
     max-height: 60vh;
     overflow-y: auto;

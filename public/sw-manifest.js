@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "eb9bccf004a64baa";
+self.__SHELL_BUILD = "80dbb38b76384586";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -76,6 +76,7 @@ self.__SHELL_MANIFEST = [
   "/css/editor/notebook/find-replace.css",
   "/css/editor/notebook/findings.css",
   "/css/editor/notebook/lektorat.css",
+  "/css/editor/reference-slot.css",
   "/css/editor/shared/conflict-resolution.css",
   "/css/editor/shared/editor-chrome.css",
   "/css/editor/spellcheck.css",
@@ -306,6 +307,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/plot-card.js",
   "/js/cards/progress-store.js",
   "/js/cards/recherche-card.js",
+  "/js/cards/reference-card.js",
   "/js/cards/search-card.js",
   "/js/cards/session-store.js",
   "/js/cards/share-links-card.js",
@@ -592,6 +594,7 @@ self.__SHELL_MANIFEST = [
   "/partials/plot-thread-bar.html",
   "/partials/plot.html",
   "/partials/recherche.html",
+  "/partials/reference.html",
   "/partials/search.html",
   "/partials/share-links.html",
   "/partials/shortcuts.html",

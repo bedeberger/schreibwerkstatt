@@ -88,6 +88,7 @@ export const cardsMethods = {
         this._checkDoneBeforeChat = false;
       }
     }
+    if (this.showReferenceCard) this.showReferenceCard = false;
     await this._ensurePartial('ideen');
     this.ideenScope = 'page';
     this.ideenChapterId = null;
@@ -104,6 +105,7 @@ export const cardsMethods = {
       return;
     }
     if (this.showChatCard) this.showChatCard = false;
+    if (this.showReferenceCard) this.showReferenceCard = false;
     await this._ensurePartial('ideen');
     this.ideenScope = 'chapter';
     this.ideenChapterId = cid;
@@ -184,9 +186,25 @@ export const cardsMethods = {
     }
     if (!this.currentPage) return;
     if (this.showIdeenCard) this.showIdeenCard = false;
+    if (this.showReferenceCard) this.showReferenceCard = false;
     await this._ensurePartial('chat');
     this.showChatCard = true;
     this.logAuditEvent?.('chatOpened', { book: this.$store.nav.selectedBookId, page: this.currentPage.id });
+  },
+
+  // Referenz-Slot: read-only Begleitpanel (Figuren/Orte/Szenen/Ereignisse/
+  // Recherche), Mutex mit Seiten-Chat + Ideen im selben Slot neben dem Editor.
+  // Kein currentPage-Zwang — der Buch-Scope funktioniert auch ohne offene Seite;
+  // erreichbar ist der Toggle ohnehin nur aus der Editor-Toolbar.
+  async toggleReferenceCard() {
+    if (this.showReferenceCard) {
+      this.showReferenceCard = false;
+      return;
+    }
+    if (this.showChatCard) this.showChatCard = false;
+    if (this.showIdeenCard) this.showIdeenCard = false;
+    await this._ensurePartial('reference');
+    this.showReferenceCard = true;
   },
 
   // Seitenwechsel: Seiten-Chat resetten (Chat ist pro Seite).

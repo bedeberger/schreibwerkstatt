@@ -1,125 +1,17 @@
-<!-- Entity-Linking-Panel "Auf dieser Seite" (Notebook-Editor).
-     Wiederverwendung des `.figure-context-panel`-Patterns: Header + Chevron +
-     Chip-Body. Drei Sektionen — Figuren (Kapitel-Scope), Szenen (Seite +
-     Kapitel-ohne-Seitenbezug), Ereignisse (analog). Sektion ohne Inhalte
-     wird ausgeblendet.
-
-     Chip-Klick oeffnet das gemeinsame `.entity-popover` (Teleport in body) —
-     identisches Markup/CSS/State wie das Editor-Highlight-Popover. Footer-
-     Button im Popover navigiert dann zur jeweiligen Karte.
+<!-- Entity-Popover-Host (Notebook-Editor). editorEntitiesCard rechnet die
+     Inline-Highlights (Figuren/Orte) im contenteditable; ein Klick auf ein
+     Highlight oeffnet das teleportierte `.entity-popover`. Die Kontext-Listen
+     (Figuren/Szenen/Ereignisse) leben im Referenz-Slot (reference-card.js).
      x-data: editorEntitiesCard (cards/editor-entities-card.js). -->
 <div x-data="editorEntitiesCard" class="display-contents">
 
-  <!-- Sichtbarkeit haengt am Buch-Level (extractionEmpty), nicht an den
-       Sektionen der aktuellen Seite: das Panel bleibt beim Seitenwechsel
-       stehen statt zu verschwinden/reinzuploppen (Layout-Sprung ueber dem
-       Editor-Body). Seiten ohne Eintraege zeigen den Empty-Hinweis im Body. -->
-  <div class="figure-context-panel" x-show="!extractionEmpty()" x-cloak>
-    <div class="figure-context-header internal-link"
-         @click="$app.entityPanelOpen = !$app.entityPanelOpen"
-         :aria-expanded="$app.entityPanelOpen ? 'true' : 'false'">
-      <span class="figure-context-title">
-        <span x-text="$app.t('entities.panel.title')"></span>
-        <!-- Zaehler-Badges: machen den zugeklappten Zustand informativ —
-             ohne Aufklappen sichtbar, ob/wie viel die Seite an Kontext hat. -->
-        <span class="figure-context-counts">
-          <span x-show="$app.chapterFigures.length > 0" class="tag"
-                x-text="$app.t('entities.panel.figures') + ': ' + $app.chapterFigures.length"></span>
-          <span x-show="panelScenes().onPage.length + panelScenes().inChapter.length > 0" class="tag"
-                x-text="$app.t('entities.panel.scenes') + ': ' + (panelScenes().onPage.length + panelScenes().inChapter.length)"></span>
-          <span x-show="panelEvents().onPage.length + panelEvents().inChapter.length > 0" class="tag"
-                x-text="$app.t('entities.panel.events') + ': ' + (panelEvents().onPage.length + panelEvents().inChapter.length)"></span>
-        </span>
-      </span>
-      <span class="history-chevron" :class="{ open: $app.entityPanelOpen }" aria-hidden="true">›</span>
-    </div>
+  <!-- Das frühere „Auf dieser Seite"-Collapsible (Figuren/Szenen/Ereignisse)
+       lebt jetzt als Tabs im Referenz-Slot neben dem Editor (reference-card.js /
+       reference.html). Hier bleibt nur der Popover, den die Inline-Highlights
+       im contenteditable per Klick öffnen. -->
 
-    <!-- Collapse via Grid-Row 0fr→1fr (CSS-Transition) statt x-show-Snap. -->
-    <div class="figure-context-collapse" :class="{ open: $app.entityPanelOpen }">
-    <div class="figure-context-body figure-context-body--rows">
-
-      <!-- Figuren (Kapitel-Scope, wie urspruengliches figure-context-panel) -->
-      <template x-if="$app.chapterFigures.length > 0">
-        <div class="figure-context-section">
-          <span class="figure-context-section-label" x-text="$app.t('entities.panel.figures')"></span>
-          <div class="figure-context-chips">
-            <template x-for="(fig, fi) in $app.chapterFigures" :key="'cf-' + (fig.id ?? fi)">
-              <span class="figure-context-chip internal-link"
-                    @click="openPopoverForChip('figure', fig, fig.name, $event)">
-                <span x-text="fig.kurzname || fig.name"></span>
-                <span x-show="fig.typ" class="tag" x-text="$app.t('figuren.type.' + fig.typ)"></span>
-                <span x-show="$app.figurJahrLabel(fig)" class="tag" :data-tip="$app.t('figuren.jahrAlterTip')" x-text="$app.figurJahrLabel(fig)"></span>
-                <span x-show="fig.geburtstag" class="tag" :data-tip="$app.t('figuren.birthYearTip')" x-text="$app.t('figuren.birthYear', { jahr: fig.geburtstag })"></span>
-              </span>
-            </template>
-          </div>
-        </div>
-      </template>
-
-      <!-- Szenen (Seite + Kapitel-ohne-Seitenbezug, gedimmt) -->
-      <template x-if="panelScenes().onPage.length + panelScenes().inChapter.length > 0">
-        <div class="figure-context-section">
-          <span class="figure-context-section-label" x-text="$app.t('entities.panel.scenes')"></span>
-          <div class="figure-context-chips">
-            <template x-for="s in panelScenes().onPage" :key="'sp-' + s.id">
-              <span class="figure-context-chip internal-link"
-                    @click="openPopoverForChip('scene', s, s.titel || $app.t('entities.scene'), $event)">
-                <span x-text="s.titel || $app.t('entities.scene')"></span>
-                <span x-show="s.wertung" class="tag"
-                      :class="'badge--wertung-' + s.wertung"
-                      x-text="s.wertung"></span>
-              </span>
-            </template>
-            <template x-for="s in panelScenes().inChapter" :key="'sc-' + s.id">
-              <span class="figure-context-chip figure-context-chip--chapter internal-link"
-                    @click="openPopoverForChip('scene', s, s.titel || $app.t('entities.scene'), $event)"
-                    :data-tip="$app.t('entities.panel.inChapter')">
-                <span x-text="s.titel || $app.t('entities.scene')"></span>
-                <span x-show="s.wertung" class="tag"
-                      :class="'badge--wertung-' + s.wertung"
-                      x-text="s.wertung"></span>
-              </span>
-            </template>
-          </div>
-        </div>
-      </template>
-
-      <!-- Ereignisse (Seite + Kapitel-ohne-Seitenbezug) -->
-      <template x-if="panelEvents().onPage.length + panelEvents().inChapter.length > 0">
-        <div class="figure-context-section">
-          <span class="figure-context-section-label" x-text="$app.t('entities.panel.events')"></span>
-          <div class="figure-context-chips">
-            <template x-for="(e, ei) in panelEvents().onPage" :key="'ep-' + ei + '-' + e.figure_id">
-              <span class="figure-context-chip internal-link"
-                    @click="openPopoverForChip('event', e, e.ereignis, $event)">
-                <span x-text="e.ereignis"></span>
-                <span x-show="e.datum" class="tag" x-text="e.datum_label || e.datum"></span>
-              </span>
-            </template>
-            <template x-for="(e, ei) in panelEvents().inChapter" :key="'ec-' + ei + '-' + e.figure_id">
-              <span class="figure-context-chip figure-context-chip--chapter internal-link"
-                    @click="openPopoverForChip('event', e, e.ereignis, $event)"
-                    :data-tip="$app.t('entities.panel.inChapter')">
-                <span x-text="e.ereignis"></span>
-                <span x-show="e.datum" class="tag" x-text="e.datum_label || e.datum"></span>
-              </span>
-            </template>
-          </div>
-        </div>
-      </template>
-
-      <!-- Seite ohne Kontext-Eintraege: Panel bleibt stehen (stabile Praesenz),
-           Body sagt explizit, dass es hier nichts gibt. -->
-      <template x-if="$app.chapterFigures.length === 0 && panelEmpty()">
-        <span class="figure-context-empty" x-text="$app.t('entities.panel.empty')"></span>
-      </template>
-
-    </div>
-    </div>
-  </div>
-
-  <!-- Popover (teleport): wird von Highlight-Klicks im Editor UND von Chip-
-       Klicks in der Kontext-Leiste befuellt. Vier `kind`-Varianten: figure,
+  <!-- Popover (teleport): wird von Highlight-Klicks im Editor befuellt. Vier
+       `kind`-Varianten: figure,
        location, scene, event — Accent-Bar und Avatar-Toenung pro kind in
        entities.css. -->
   <template x-teleport="body">

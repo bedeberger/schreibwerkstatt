@@ -77,6 +77,7 @@ const NON_EXCLUSIVE_WHITELIST = new Set([
   'showEditorCard',      // Editor — gegen-exklusiv via _closeOtherMainCards/selectPage, kein Eintrag
   'showChatCard',        // Seiten-Chat (Slot neben Editor)
   'showIdeenCard',       // Seiten-Ideen (Slot neben Editor)
+  'showReferenceCard',   // Referenz-Slot (Slot neben Editor, Mutex mit Chat/Ideen)
   // UI-Sentinels, keine eigene Karte:
   'showKomplettStatus',
   'showAvatarMenu',

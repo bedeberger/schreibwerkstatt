@@ -1,0 +1,78 @@
+@layer components {
+/* === Referenz-Slot (read-only Begleitpanel neben dem Notebook-Editor) ===
+   Companion im 420px-Slot (Mutex mit Seiten-Chat + Ideen). Kartenrahmen +
+   Header teilt sich das .card-/.card-header-Muster; hier nur die Slot-eigenen
+   Teile: Scope-Hinweis, Tab-Zähler, Panel-Listenzeilen. */
+
+.card--reference {
+  --card-accent: var(--card-accent-recherche, var(--color-accent));
+}
+
+.reference-scope-note {
+  margin: calc(-1 * var(--space-4)) 0 var(--space-8);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.reference-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-muted);
+  background: var(--color-surface-2, var(--color-border));
+  border-radius: var(--radius-sm);
+}
+
+.reference-body {
+  margin-top: var(--space-8);
+}
+
+.reference-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.reference-row {
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.reference-row:last-child { border-bottom: none; }
+
+.reference-row-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.reference-row-title {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.reference-row-sub {
+  margin-top: 0.15rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
+.reference-row-desc {
+  margin-top: 0.25rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-soft, var(--color-text));
+  line-height: 1.45;
+}
+
+.reference-empty {
+  padding: var(--space-16) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  text-align: center;
+}
+}

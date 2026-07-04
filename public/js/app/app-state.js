@@ -259,6 +259,7 @@ const cardsState = () => ({
   showFehlerHeatmapCard: false,
   showChatCard: false,
   showIdeenCard: false,
+  showReferenceCard: false,
   showBookChatCard: false,
   showBookSettingsCard: false,
   showUserSettingsCard: false,

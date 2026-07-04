@@ -15,8 +15,8 @@
             <div class="card-form-row">
               <label class="card-form-label" x-text="$app.t('pdfExport.layout.widthMm') + ' / ' + $app.t('pdfExport.layout.heightMm')"></label>
               <div class="card-form-field pdfx-inline-pair">
-                <input type="text" x-data="numInput({ step: 1, min: 50, max: 500 })" x-modelable="value" x-model="activeProfile.config.layout.customWidthMm" class="pdfx-num-input">
-                <input type="text" x-data="numInput({ step: 1, min: 50, max: 700 })" x-modelable="value" x-model="activeProfile.config.layout.customHeightMm" class="pdfx-num-input">
+                <input type="text" x-data="numInput({ step: 0.1, min: 50, max: 500 })" x-modelable="value" x-model="activeProfile.config.layout.customWidthMm" class="pdfx-num-input">
+                <input type="text" x-data="numInput({ step: 0.1, min: 50, max: 700 })" x-modelable="value" x-model="activeProfile.config.layout.customHeightMm" class="pdfx-num-input">
               </div>
             </div>
           </template>

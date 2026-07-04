@@ -29,6 +29,7 @@ import { registerStilCard } from '../cards/stil-card.js';
 import { registerFehlerHeatmapCard } from '../cards/fehler-heatmap-card.js';
 import { registerChatCard } from '../cards/chat-card.js';
 import { registerIdeenCard } from '../cards/ideen-card.js';
+import { registerReferenceCard } from '../cards/reference-card.js';
 import { registerRechercheCard } from '../cards/recherche-card.js';
 import { registerBookChatCard } from '../cards/book-chat-card.js';
 import { registerKontinuitaetCard } from '../cards/kontinuitaet-card.js';
@@ -175,6 +176,7 @@ export function registerAllCards() {
   registerKapitelReviewCard();
   registerChatCard();
   registerIdeenCard();
+  registerReferenceCard();
   registerRechercheCard();
   registerBookChatCard();
   registerEditorFindCard();
