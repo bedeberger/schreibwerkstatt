@@ -100,7 +100,9 @@ function setupTocSpy() {
     if (!toc || !activeLink) return;
     const c = toc.getBoundingClientRect();
     const a = activeLink.getBoundingClientRect();
-    const pad = 24;
+    // Grosszügig: oben genug Luft, damit der aktive Eintrag nicht unter die
+    // sticky „Inhaltsverzeichnis"-Überschrift rutscht; unten etwas Kontext.
+    const pad = 44;
     if (a.top < c.top + pad) toc.scrollTop -= (c.top + pad) - a.top;
     else if (a.bottom > c.bottom - pad) toc.scrollTop += a.bottom - (c.bottom - pad);
   }

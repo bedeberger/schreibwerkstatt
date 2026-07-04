@@ -115,7 +115,7 @@
   .share-layout--has-toc .share-toc {
     max-width: none;
     margin: 0;
-    padding: 32px 0 32px 24px;
+    padding: 40px 0 40px 24px;
     position: sticky;
     top: 92px;
     max-height: calc(100vh - 112px);
@@ -127,6 +127,18 @@
     padding: 0;
     border: 0;
     background: none;
+  }
+  /* Überschrift innerhalb des höhen-gedeckelten, intern scrollenden TOC sticky
+     halten — sonst schiebt die Scroll-Spy-Nachführung (share-reader/toc.js)
+     „Inhaltsverzeichnis" aus dem Blick, wenn ein weiter unten liegender Eintrag
+     aktiv wird. So bleibt der Titel beim Auf-/Abscrollen immer links sichtbar. */
+  .share-layout--has-toc .share-toc__heading {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 0 4px;
+    padding-bottom: 8px;
+    background: var(--share-bg);
   }
   /* TOC ausgeblendet → zurück aufs Basis-Raster (zentrierte Lesespalte; mit
      Anmerkungen Text | Kommentare). */
