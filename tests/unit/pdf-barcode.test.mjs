@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { toEan13, checkDigit, isValidEan13, encodeModules, normalizeDigits } = require('../../lib/pdf-barcode.js');
+const { toEan13, checkDigit, isValidEan13, encodeModules, measureEan13, normalizeDigits } = require('../../lib/pdf-barcode.js');
+
+const MM_TO_PT = 72 / 25.4;
 
 test('checkDigit: kanonisches EAN-13-Beispiel 590123412345 → 7', () => {
   assert.equal(checkDigit('590123412345'), 7);
@@ -51,6 +53,22 @@ test('encodeModules: 95 Module, korrekte Guards', () => {
   assert.equal(bits.slice(0, 3), '101', 'Start-Guard');
   assert.equal(bits.slice(92, 95), '101', 'End-Guard');
   assert.equal(bits.slice(45, 50), '01010', 'Center-Guard');
+});
+
+test('measureEan13: SC2/100 % passt in die BISG-Barcode-Fläche 2" × 1.2"', () => {
+  const { width, height } = measureEan13();
+  // 113 Module (11 links + 95 + 7 rechts) × 0.33 mm = 37.29 mm breit.
+  assert.ok(Math.abs(width / MM_TO_PT - 37.29) < 0.01, `Breite ${width / MM_TO_PT}`);
+  // Symbol muss in die reservierte weisse Fläche (50.8 × 30.48 mm) passen,
+  // sonst kollidiert es beim Zentrieren im Cover mit dem Rand.
+  assert.ok(width  <= 50.8  * MM_TO_PT, 'Breite ≤ 2"');
+  assert.ok(height <= 30.48 * MM_TO_PT, 'Höhe ≤ 1.2"');
+});
+
+test('measureEan13: skaliert linear mit opts.scale', () => {
+  const a = measureEan13({ scale: 1 });
+  const b = measureEan13({ scale: 2 });
+  assert.ok(b.width > a.width && b.height > a.height);
 });
 
 test('encodeModules: deterministisch für ein bekanntes Symbol', () => {

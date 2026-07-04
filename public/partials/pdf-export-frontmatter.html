@@ -128,7 +128,7 @@
               <div class="pdfx-font-role collapsible-wrap" x-data="collapsible()">
                 <button type="button" class="collapsible-toggle pdfx-font-role-toggle" x-bind="trigger">
                   <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
-                  <span x-text="$app.t('pdfExport.toc.font.' + role)"></span>
+                  <span x-text="$app.t('pdfExport.font.' + role)"></span>
                   <span class="pdfx-font-role-summary"
                         x-text="activeProfile.config.font[role].family + ' : ' + activeProfile.config.font[role].weight"></span>
                 </button>

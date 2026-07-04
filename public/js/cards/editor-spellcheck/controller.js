@@ -2,24 +2,20 @@
 //
 // Mounting durch Editor-Modul:
 //   const ctl = createSpellcheckController({ root, scrollContainer, getHtml,
-//                                            onApplyReplacement, editorKind,
-//                                            getBookLocale, isEnabled });
+//     onApplyReplacement, editorKind, getBookLocale, isEnabled });
 //   ctl.attach();   // bei Edit-Mode-Enter / Focus-Enter / Block-Activate
 //   ctl.detach();   // bei Exit / Block-Deactivate
 //
-// Pipeline pro attach:
-//   input/MutationObserver -> debounce (getDebounceMs(), Default 1500ms) -> _runCheck() ->
-//   fetch /languagetool/check -> _renderMatches() registriert DOM-Ranges in
-//   CSS.highlights (typo/grammar/style). Browser rendert die wavy-Underline
-//   nativ via ::highlight()-Regeln — keine DOM-Spans pro Match, kein
-//   JS-Reposition bei Scroll. Ranges aktualisieren sich beim Editieren
-//   automatisch via DOM-Mutation; bei strukturellen Aenderungen invalidiert
-//   der naechste Check.
+// Pipeline pro attach: input/MutationObserver -> debounce (getDebounceMs(),
+// Default 1500ms) -> _runCheck() -> fetch /languagetool/check -> _renderMatches()
+// registriert DOM-Ranges in CSS.highlights (typo/grammar/style). Browser rendert
+// die wavy-Underline nativ via ::highlight() — keine DOM-Spans pro Match, kein
+// JS-Reposition bei Scroll. Ranges aktualisieren sich beim Editieren via
+// DOM-Mutation; bei strukturellen Aenderungen invalidiert der naechste Check.
 //
-// Popover wird ins Scroll-Layer eingehaengt (Scroll-Container bei
-// Notebook/Focus, body bei Bucheditor mit Window-Scroll). Position absolute
-// in Scroll-Content-Koordinaten — laeuft beim Scrollen kompositiv mit, ohne
-// Scroll-Listener.
+// Popover wird ins Scroll-Layer eingehaengt (Scroll-Container bei Notebook/Focus,
+// body bei Bucheditor). Position absolute in Scroll-Content-Koordinaten — laeuft
+// beim Scrollen kompositiv mit, ohne Scroll-Listener.
 //
 // Badge bleibt am Editor-Eck (Sibling zu root, gleiches offsetParent) und
 // zeigt Status (loading/clean/matches/error/extension/disabled).
@@ -395,9 +391,8 @@ export function createSpellcheckController({
     popover.setAttribute('contenteditable', 'false');
     popover.setAttribute('data-editor', editorKind);
 
-    // Fokus/Selection im Editor halten: Popover ist contenteditable=false im
-    // Editor — mousedown auf Nicht-Button-Flächen würde sonst die Selection
-    // wegnehmen. preventDefault unterbindet nur Fokus/Selektion, nicht click.
+    // preventDefault haelt die Editor-Selection: mousedown auf Nicht-Button-
+    // Flaechen des Popovers wuerde sie sonst wegnehmen (click bleibt intakt).
     popover.addEventListener('mousedown', (ev) => ev.preventDefault());
 
     const header = document.createElement('div');
