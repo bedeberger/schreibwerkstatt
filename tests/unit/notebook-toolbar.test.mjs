@@ -131,7 +131,7 @@ test('_applySlashItem: markiert dirty', () => {
 
 test('slashItems: leere Query → alle Einträge', () => {
   const ctx = { ...toolbarCardMethods, slashQuery: '', _slashLabels: null, _slashFilterCache: null };
-  assert.equal(ctx.slashItems().length, 13);
+  assert.equal(ctx.slashItems().length, 14);
 });
 
 test('slashItems: Query filtert per Substring auf Label + Key', () => {
