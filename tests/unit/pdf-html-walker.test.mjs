@@ -140,6 +140,23 @@ test('pre behält Zeilenumbrüche als eigene Zeilen', () => {
   assert.deepEqual(blocks[0].lines.map(l => l[0].text), ['Zeile eins', 'Zeile zwei']);
 });
 
+test('figure mit img + figcaption → Bild-Block bleibt erhalten, Caption als kursiver Paragraph', () => {
+  const blocks = parseHtmlToBlocks(
+    '<figure data-bid="f1"><img src="/bild.png" alt="Ein Bild"><figcaption>Bildunterschrift.</figcaption></figure>'
+  );
+  assert.equal(blocks.length, 2);
+  assert.deepEqual(blocks[0], { kind: 'image', src: '/bild.png', alt: 'Ein Bild' });
+  assert.equal(blocks[1].kind, 'paragraph');
+  assert.equal(blocks[1].runs[0].text, 'Bildunterschrift.');
+  assert.equal(blocks[1].runs[0].italic, true);
+});
+
+test('figure ohne figcaption → nur Bild-Block, kein leerer Paragraph', () => {
+  const blocks = parseHtmlToBlocks('<figure data-bid="f1"><img src="/bild.png"></figure>');
+  assert.equal(blocks.length, 1);
+  assert.deepEqual(blocks[0], { kind: 'image', src: '/bild.png', alt: '' });
+});
+
 test('reale Tabelle (thead/tbody, mehrere Zellen) → Fließtext-Fallback ohne Verlust', () => {
   const blocks = parseHtmlToBlocks(
     '<table data-bid="1"><thead><tr><th>Name</th><th>Rolle</th></tr></thead>' +
