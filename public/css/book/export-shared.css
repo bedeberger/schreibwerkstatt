@@ -66,6 +66,16 @@
    damit die volle Kartenbreite genutzt wird (statt nur die Label-Spalte). */
 .export-tab-panel .card-form-row > .book-settings-option { grid-column: 1 / -1; }
 
+/* Gruppen-Titel (.card-form-section-divider) gliedern die dichten Tabs in
+   benannte Bereiche. Der erste Titel eines Tabs sitzt direkt unter der
+   Tableiste — dort die trennende Oberlinie unterdrücken (redundant). */
+.export-tab-panel > .card-form-section-divider:first-child,
+.export-tab-panel .card-form-grid > .card-form-section-divider:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
 /* === Chip-Reihe (Multi-Select-Auswahl als entfernbare Tags) === */
 .export-chip-row {
   display: flex;

@@ -1,0 +1,44 @@
+<!-- Word-Export · Titelei-Tab (Fragment, via @include in docx-export.html) -->
+<!-- Titelei (Inklusions-Toggles; Texte aus Publikation-Tab) -->
+<section class="export-tab-panel" x-bind="panel('frontmatter')">
+  <p class="card-form-field-note">
+    <span x-text="$app.t('docxExport.metaHint')"></span>
+    <span class="internal-link" @click="openBookSettings()" x-text="$app.t('docxExport.metaLink')"></span>
+  </p>
+  <div class="card-form-row">
+    <label class="book-settings-option">
+      <input type="checkbox" x-model="activeProfile.config.frontmatter.dedication">
+      <span x-text="$app.t('docxExport.field.incDedication')"></span>
+    </label>
+  </div>
+  <div class="card-form-row">
+    <label class="book-settings-option">
+      <input type="checkbox" x-model="activeProfile.config.frontmatter.frontMatter">
+      <span x-text="$app.t('docxExport.field.incFrontMatter')"></span>
+    </label>
+  </div>
+  <div class="card-form-row">
+    <label class="book-settings-option">
+      <input type="checkbox" x-model="activeProfile.config.frontmatter.imprint">
+      <span x-text="$app.t('docxExport.field.incImprint')"></span>
+    </label>
+  </div>
+  <div class="card-form-row">
+    <label class="book-settings-option">
+      <input type="checkbox" x-model="activeProfile.config.frontmatter.copyright">
+      <span x-text="$app.t('docxExport.field.incCopyright')"></span>
+    </label>
+  </div>
+  <div class="card-form-row" x-show="activeProfile.config.frontmatter.imprint || activeProfile.config.frontmatter.copyright">
+    <label class="card-form-label" x-text="$app.t('docxExport.field.imprintPosition')"></label>
+    <div x-data="combobox($app.t('docxExport.field.imprintPosition'))"
+         x-modelable="value" x-model="activeProfile.config.frontmatter.imprintPosition"
+         x-effect="options = imprintPositionOptions()"></div>
+  </div>
+  <div class="card-form-row">
+    <label class="book-settings-option">
+      <input type="checkbox" x-model="activeProfile.config.frontmatter.authorBio">
+      <span x-text="$app.t('docxExport.field.incAuthorBio')"></span>
+    </label>
+  </div>
+</section>

@@ -26,6 +26,18 @@ test('Seitennummerierung: Defaults + Clamping der neuen Felder', () => {
   assert.equal(validateConfig({ layout: { pageNumberFirstVisible: 'nope' } }).layout.pageNumberFirstVisible, 1);
 });
 
+test('Titelei-Nummerierung: Enum-Whitelist + Defaults', () => {
+  const d = defaultConfig();
+  assert.equal(d.layout.frontMatterNumbering, 'none');
+  assert.equal(d.layout.frontMatterNumberFirstVisible, 1);
+  assert.equal(validateConfig({ layout: { frontMatterNumbering: 'roman' } }).layout.frontMatterNumbering, 'roman');
+  assert.equal(validateConfig({ layout: { frontMatterNumbering: 'arabic' } }).layout.frontMatterNumbering, 'arabic');
+  // unbekannter Wert fällt auf Default zurück
+  assert.equal(validateConfig({ layout: { frontMatterNumbering: 'bogus' } }).layout.frontMatterNumbering, 'none');
+  assert.equal(validateConfig({ layout: { frontMatterNumberFirstVisible: 3 } }).layout.frontMatterNumberFirstVisible, 3);
+  assert.equal(validateConfig({ layout: { frontMatterNumberFirstVisible: 0 } }).layout.frontMatterNumberFirstVisible, 1);
+});
+
 test('pdfa.standard: enum-Whitelist + enabled leitet ab', () => {
   assert.equal(validateConfig({ pdfa: { standard: 'pdfx' } }).pdfa.standard, 'pdfx');
   assert.equal(validateConfig({ pdfa: { standard: 'pdfx' } }).pdfa.enabled, false);

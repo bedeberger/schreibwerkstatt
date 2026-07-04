@@ -97,6 +97,7 @@
       <div class="docx-body">
         <!-- Layout / Typografie -->
         <section class="export-tab-panel" x-bind="panel('layout')">
+          <p class="card-form-section-divider" x-text="$app.t('docxExport.group.pageFont')"></p>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('docxExport.field.pageSize')"></label>
             <div x-data="combobox($app.t('docxExport.field.pageSize'))"
@@ -133,6 +134,7 @@
               <span x-text="$app.t('docxExport.field.justify')"></span>
             </label>
           </div>
+          <p class="card-form-section-divider" x-text="$app.t('docxExport.group.headerNumbers')"></p>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('docxExport.field.headerMode')"></label>
             <div x-data="combobox($app.t('docxExport.field.headerMode'))"
@@ -155,6 +157,7 @@
 
         <!-- Struktur (Titelseite / Inhaltsverzeichnis / Kapitel) -->
         <section class="export-tab-panel" x-bind="panel('structure')">
+          <p class="card-form-section-divider" x-text="$app.t('docxExport.group.titlePage')"></p>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('docxExport.field.titleMode')"></label>
             <div x-data="combobox($app.t('docxExport.field.titleMode'))"
@@ -167,6 +170,7 @@
               <span x-text="$app.t('docxExport.field.wordCount')"></span>
             </label>
           </div>
+          <p class="card-form-section-divider" x-text="$app.t('docxExport.group.toc')"></p>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('docxExport.field.tocMode')"></label>
             <div x-data="combobox($app.t('docxExport.field.tocMode'))"
@@ -179,6 +183,7 @@
                  x-modelable="value" x-model="activeProfile.config.toc.depth"
                  x-effect="options = tocDepthOptions()"></div>
           </div>
+          <p class="card-form-section-divider" x-text="$app.t('docxExport.group.chapters')"></p>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('docxExport.field.numbering')"></label>
             <div x-data="combobox($app.t('docxExport.field.numbering'))"

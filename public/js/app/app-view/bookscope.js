@@ -1,5 +1,5 @@
 // Teil von appViewMethods (siehe Facade app-view.js).
-import { EVT, EXCLUSIVE_CARDS, FILTER_SCOPES, computeTodayRing, fetchJson, getFilters } from './_shared.js';
+import { EVT, EXCLUSIVE_CARDS, FILTER_SCOPES, computeTodayRing, computeWeekBars, computeWritingStreak, fetchJson, getFilters } from './_shared.js';
 
 export const bookscopeMethods = {
 
@@ -286,6 +286,25 @@ export const bookscopeMethods = {
       tokEsts: this.tokEsts,
       goalChars: progress.dailyProgressDailyGoalChars || 1500,
       r: 14,
+    });
+  },
+
+  // Mini-Popover des Header-Rings: 7-Tage-Balken (Live-Delta für heute) +
+  // aktuelle Schreib-Serie. Gleiche Datenquelle wie der Donut → kein Drift.
+  headerWeekBars() {
+    const progress = this.$store.progress;
+    return computeWeekBars({
+      stats: progress.dailyProgressStats,
+      tokEsts: this.tokEsts,
+      goalChars: progress.dailyProgressDailyGoalChars || 1500,
+    });
+  },
+
+  headerStreak() {
+    const progress = this.$store.progress;
+    return computeWritingStreak({
+      stats: progress.dailyProgressStats,
+      tokEsts: this.tokEsts,
     });
   },
 };

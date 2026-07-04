@@ -162,7 +162,7 @@ async function tool_get_pages(input, ctx) {
   const maxChars = Math.min(MAX_CHARS_PER_PAGE, Math.max(500, input.max_chars_per_page || DEFAULT_CHARS_PER_PAGE));
   const toFetch = ids.slice(0, limit);
   if (!ctx.userToken) {
-    return { error: 'Kein BookStack-Token in der Session.' };
+    return { error: 'Kein Token in der Session.' };
   }
   const results = [];
   const missing = [];
@@ -202,7 +202,7 @@ async function tool_get_pages(input, ctx) {
 async function tool_get_chapter_text(input, ctx) {
   const chapterId = input?.chapter_id;
   if (!Number.isInteger(chapterId)) return { error: 'chapter_id fehlt' };
-  if (!ctx.userToken) return { error: 'Kein BookStack-Token in der Session.' };
+  if (!ctx.userToken) return { error: 'Kein Token in der Session.' };
 
   const chapter = db.prepare(
     'SELECT chapter_id, chapter_name FROM chapters WHERE chapter_id = ? AND book_id = ?'
@@ -284,7 +284,7 @@ async function tool_quote_passage(input, ctx) {
   if (!pageRow || pageRow.book_id !== ctx.bookId) {
     return { error: 'Seite nicht im aktuellen Buch.' };
   }
-  if (!ctx.userToken) return { error: 'Kein BookStack-Token in der Session.' };
+  if (!ctx.userToken) return { error: 'Kein Token in der Session.' };
 
   if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
   const pd = await contentStore.loadPage(pageId, ctx.userToken);
@@ -338,7 +338,7 @@ async function tool_quote_match(input, ctx) {
   if (!pageRow || pageRow.book_id !== ctx.bookId) {
     return { error: 'Seite nicht im aktuellen Buch.' };
   }
-  if (!ctx.userToken) return { error: 'Kein BookStack-Token in der Session.' };
+  if (!ctx.userToken) return { error: 'Kein Token in der Session.' };
 
   if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
   const pd = await contentStore.loadPage(pageId, ctx.userToken);

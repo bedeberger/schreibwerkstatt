@@ -24,5 +24,8 @@ export function registerProgressStore() {
     dailyProgressIsFinished: false,
     dailyProgressDailyGoalChars: null,
     _dailyProgressLoadingBookId: null,
+    // Header-Ring-Mini-Popover (heute · Serie · 7-Tage-Verlauf). UI-Toggle,
+    // lebt hier weil der Ring direkt im Root-Header rendert (keine Host-Karte).
+    popoverOpen: false,
   });
 }

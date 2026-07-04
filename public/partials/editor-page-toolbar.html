@@ -1,11 +1,14 @@
 <!-- Page-Editor-Toolbar (Zoom/FitWidth/Fullscreen/HR). Lebt im sticky
      `.editor-card__topbar` (via Placeholder in editor-notebook.html), damit sie
      über die Sticky-Region permanent sichtbar bleibt — auch beim Scrollen tief
-     in die Seite (Vollbild). Undo/Redo/Fullscreen bleiben inline; die sekundären
-     Controls liegen im Meatball-`⋯`-Menü (gleiches .context-menu-Vokabular +
-     menu()-Primitiv wie die Seiten-Action-Leiste, siehe DESIGN.md „Dropdown-/
-     Aktions-Menü"). Zoom/Toggles nutzen @click.stop, damit das Menü offen bleibt
-     (mehrfach klickbar / Zustand sichtbar); Einmal-Aktionen schliessen. -->
+     in die Seite (Vollbild). Undo/Redo/Fullscreen bleiben immer inline. Die
+     sekundären Controls (HR/Anführungszeichen/Zoom/FitWidth/Steuerzeichen/
+     Entities) stehen auf Desktop direkt als Icon-Buttons in der Leiste
+     (`.page-editor-toolbar__expanded`); erst auf Mobile klappen sie ins
+     Meatball-`⋯`-Menü (`.page-editor-toolbar__more`, gleiches .context-menu-
+     Vokabular + menu()-Primitiv, siehe DESIGN.md „Dropdown-/Aktions-Menü").
+     Beide Präsentationen teilen dieselben Handler; per Media-Query ist immer nur
+     eine sichtbar. Menü-Toggles nutzen @click.stop, damit das Menü offen bleibt. -->
 <div class="page-editor-toolbar" x-show="editMode && !focusActive" x-cloak>
   <button type="button" class="icon-btn"
           :disabled="!notebookCanUndo()"
@@ -27,7 +30,80 @@
           @click="togglePageEditorFullscreen()">
     <svg class="icon" aria-hidden="true"><use :href="pageEditorFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg>
   </button>
-  <span x-data="menu()">
+
+  <!-- Desktop: sekundäre Aktionen inline. `display: contents` → die Buttons +
+       Separatoren liegen direkt im Toolbar-Flex. Auf Mobile ausgeblendet. -->
+  <span class="page-editor-toolbar__expanded">
+    <span class="action-sep" aria-hidden="true"></span>
+    <button type="button" class="icon-btn"
+            :data-tip="t('editor.toolbar.hrTitle')" :aria-label="t('editor.toolbar.hrTitle')"
+            @click="insertHorizontalRule()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#separator-horizontal"/></svg>
+    </button>
+    <button type="button" class="icon-btn"
+            :class="{ 'is-active': quotesNormalizedFlash }"
+            :data-tip="quotesNormalizedFlash
+              ? (quotesNormalizedFlash.count > 0
+                  ? t('editor.toolbar.quotesDone', { count: quotesNormalizedFlash.count })
+                  : t('editor.toolbar.quotesNone'))
+              : t('editor.toolbar.quotesTitle')"
+            :aria-label="t('editor.toolbar.quotesTitle')"
+            @click="normalizeQuotes()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#quote"/></svg>
+    </button>
+    <span class="action-sep" aria-hidden="true"></span>
+    <button type="button" class="icon-btn"
+            :data-tip="t('graph.zoomOut')" :aria-label="t('graph.zoomOut')"
+            @click="pageEditorZoomOut()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#minus"/></svg>
+    </button>
+    <button type="button" class="icon-btn"
+            :data-tip="t('graph.zoomIn')" :aria-label="t('graph.zoomIn')"
+            @click="pageEditorZoomIn()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
+    </button>
+    <button type="button" class="icon-btn"
+            :data-tip="t('graph.reset')" :aria-label="t('graph.reset')"
+            @click="pageEditorZoomReset()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#scan"/></svg>
+    </button>
+    <button type="button" class="icon-btn"
+            :aria-pressed="pageEditorFitWidth"
+            :data-tip="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
+            :aria-label="pageEditorFitWidth ? t('editor.fitWidthOff') : t('editor.fitWidth')"
+            @click="togglePageEditorFitWidth()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#move-horizontal"/></svg>
+    </button>
+    <!-- Steuerzeichen-Anzeige (Absatzmarken ¶ + Soft-Break ↵). Reine
+         CSS-Pseudo-Element-Dekoration auf dem contenteditable — kein Markup im
+         gespeicherten HTML. State pageEditorShowMarks (in editorPrefs). -->
+    <button type="button" class="icon-btn"
+            :aria-pressed="pageEditorShowMarks"
+            :data-tip="pageEditorShowMarks ? t('editor.toolbar.marksOff') : t('editor.toolbar.marksOn')"
+            :aria-label="pageEditorShowMarks ? t('editor.toolbar.marksOff') : t('editor.toolbar.marksOn')"
+            @click="togglePageEditorShowMarks()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=692#pilcrow"/></svg>
+    </button>
+    <span class="action-sep" aria-hidden="true"></span>
+    <!-- Entity-Linking-Toggle (Figuren/Orte-Highlights + Szenen/Ereignisse-Panel). Aendert nur die
+         Buch-Setting (book_settings.entities_enabled, PUT /booksettings/:id/entities-enabled, Event
+         book:settings:updated); der Auf/Zu-Zustand der Klappschiene (entityPanelOpen) bleibt User-Wahl. -->
+    <button type="button" class="icon-btn"
+            :aria-pressed="entitiesEnabledForCurrentBook"
+            :data-tip="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
+            :aria-label="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"
+            @click="toggleEntitiesEnabledForCurrentBook()">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#radio"/></svg>
+    </button>
+  </span>
+
+  <!-- Mobile: dieselben sekundären Aktionen im Meatball-Menü. Auf Desktop
+       ausgeblendet. Der Sichtbarkeits-Wrapper (`__more`) ist bewusst ein eigenes
+       Element um das `menu()`-Primitiv — sonst kollidiert das display:none mit
+       der von menu()#init gesetzten (unlayered) `.menu-anchor { display: inline-flex }`,
+       die layered Regeln immer schlägt (siehe icons.css-Unlayered-Falle). -->
+  <span class="page-editor-toolbar__more">
+   <span x-data="menu()">
     <button type="button" class="icon-btn" x-bind="trigger" :class="{ 'is-active': open }"
             aria-haspopup="menu"
             :data-tip="t('editor.btn.moreActions')" :aria-label="t('editor.btn.moreActions')">
@@ -91,6 +167,7 @@
         <span x-text="entitiesEnabledForCurrentBook ? t('entities.toggle.off') : t('entities.toggle.on')"></span>
       </button>
     </div>
+   </span>
   </span>
   <!-- STT-Diktat-Mic schwebt im Editorfeld unten rechts (siehe
        editor-body-edit.html), nicht hier in der Toolbar. -->

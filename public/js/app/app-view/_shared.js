@@ -1,6 +1,6 @@
 // Geteilte Imports + Modul-Konstanten der appViewMethods-Submodule.
 import { htmlToText, fetchJson, escHtml, decorateMentions } from '../../utils.js';
-import { computeTodayRing } from '../../today-ring.js';
+import { computeTodayRing, computeWeekBars, computeWritingStreak } from '../../today-ring.js';
 import { EXCLUSIVE_CARDS } from '../../cards/feature-registry.js';
 import { contentRepo } from '../../repo/content.js';
 import { readDraft, clearDraft } from '../../editor/draft-storage.js';
@@ -99,4 +99,4 @@ for (const entry of EXCLUSIVE_CARDS) {
 // Reset-Logik beim Buch-/Seitenwechsel. Buchebenen-Features und Editor sind
 // gegenseitig exklusiv (siehe CLAUDE.md-Regel "Feature-Toggle").
 
-export { EVT, EXCLUSIVE_CARDS, clearDraft, computeTodayRing, contentRepo, decorateMentions, escHtml, fetchJson, getDeviceId, getFilters, getLastPageId, htmlToText, readDraft, setLastPageId };
+export { EVT, EXCLUSIVE_CARDS, clearDraft, computeTodayRing, computeWeekBars, computeWritingStreak, contentRepo, decorateMentions, escHtml, fetchJson, getDeviceId, getFilters, getLastPageId, htmlToText, readDraft, setLastPageId };

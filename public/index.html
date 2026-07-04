@@ -369,24 +369,55 @@
          Schreibtag, fuellt sich gegen book_settings.daily_goal_chars (per Buch).
          Klick oeffnet Meine Statistik. -->
     <template x-if="$store.session.currentUser && !isAdminOnly && $store.nav.selectedBookId && $store.progress.dailyProgressBookId == $store.nav.selectedBookId && !$store.progress.dailyProgressIsFinished">
-      <button type="button"
-              class="header-today-ring"
-              :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached, 'header-today-ring--empty': !headerTodayRing().active }"
-              @click="toggleMyStatsCard()"
-              :data-tip="headerTodayRing().active
-                ? t('overview.today.meta', { chars: headerTodayRing().chars.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US'), goal: headerTodayRing().goal.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US') })
-                : t('overview.today.idle')"
-              :aria-label="t('overview.today.aria', { chars: headerTodayRing().chars, goal: headerTodayRing().goal, pct: headerTodayRing().pct })">
-        <svg viewBox="0 0 36 36" aria-hidden="true">
-          <circle cx="18" cy="18" :r="headerTodayRing().r"
-                  fill="none" stroke="var(--color-border)" stroke-width="4"></circle>
-          <circle cx="18" cy="18" :r="headerTodayRing().r"
-                  fill="none" stroke="var(--color-accent)" stroke-width="4"
-                  stroke-linecap="round"
-                  :stroke-dasharray="headerTodayRing().dash + ' ' + headerTodayRing().gap"
-                  transform="rotate(-90 18 18)"></circle>
-        </svg>
-      </button>
+      <span class="header-today-ring-wrap"
+            @click.outside="$store.progress.popoverOpen = false"
+            @keydown.escape.window="$store.progress.popoverOpen = false">
+        <button type="button"
+                class="header-today-ring"
+                :class="{ 'header-today-ring--active': headerTodayRing().active, 'header-today-ring--reached': headerTodayRing().reached, 'header-today-ring--empty': !headerTodayRing().active }"
+                @click="$store.progress.popoverOpen = !$store.progress.popoverOpen"
+                :aria-expanded="$store.progress.popoverOpen"
+                :data-tip="headerTodayRing().active
+                  ? t('overview.today.meta', { chars: headerTodayRing().chars.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US'), goal: headerTodayRing().goal.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US') })
+                  : t('overview.today.idle')"
+                :aria-label="t('overview.today.aria', { chars: headerTodayRing().chars, goal: headerTodayRing().goal, pct: headerTodayRing().pct })">
+          <svg viewBox="0 0 36 36" aria-hidden="true">
+            <circle cx="18" cy="18" :r="headerTodayRing().r"
+                    fill="none" stroke="var(--color-border)" stroke-width="4"></circle>
+            <circle cx="18" cy="18" :r="headerTodayRing().r"
+                    fill="none" stroke="var(--color-accent)" stroke-width="4"
+                    stroke-linecap="round"
+                    :stroke-dasharray="headerTodayRing().dash + ' ' + headerTodayRing().gap"
+                    transform="rotate(-90 18 18)"></circle>
+          </svg>
+        </button>
+        <div class="today-ring-popover" x-show="$store.progress.popoverOpen" x-cloak x-transition.opacity>
+          <div class="today-ring-pop-head">
+            <span class="today-ring-pop-label" x-text="t('todayRing.today')"></span>
+            <span class="today-ring-pop-count"
+                  x-text="headerTodayRing().chars.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US') + ' / ' + headerTodayRing().goal.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US') + ' ' + t('bookstats.unit.z')"></span>
+          </div>
+          <div class="today-ring-pop-streak" x-show="headerStreak() > 0">
+            <span class="today-ring-pop-label" x-text="t('todayRing.streak')"></span>
+            <span class="today-ring-pop-streak-val" x-text="t('mystats.days', { n: headerStreak() })"></span>
+          </div>
+          <div class="today-ring-week" role="img" :aria-label="t('todayRing.week')">
+            <template x-for="bar in headerWeekBars()" :key="bar.iso">
+              <span class="today-ring-week-col">
+                <span class="today-ring-week-track">
+                  <span class="today-ring-week-bar"
+                        :class="{ 'today-ring-week-bar--today': bar.isToday, 'today-ring-week-bar--reached': bar.reached }"
+                        :style="{ '--bar': Math.max(bar.chars > 0 ? 8 : 2, bar.pct) + '%' }"
+                        :data-tip="bar.chars.toLocaleString($store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US') + ' ' + t('bookstats.unit.z')"></span>
+                </span>
+              </span>
+            </template>
+          </div>
+          <button type="button" class="today-ring-pop-link internal-link"
+                  @click="$store.progress.popoverOpen = false; toggleMyStatsCard()"
+                  x-text="t('todayRing.fullStats')"></button>
+        </div>
+      </span>
     </template>
     <button type="button"
             class="icon-btn icon-btn--ghost header-help-btn"

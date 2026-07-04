@@ -1,15 +1,7 @@
       <!-- Kapitel-Tab -->
       <div class="export-tab-panel" x-bind="panel('chapter')">
         <div class="card-form-grid">
-          <div class="card-form-row">
-            <label class="card-form-label" x-text="$app.t('pdfExport.chapter.breakBefore')"></label>
-            <div class="card-form-field">
-              <div x-data="combobox($app.t('pdfExport.chapter.breakBefore'))"
-                   x-modelable="value" x-model="activeProfile.config.chapter.breakBefore"
-                   x-effect="options = [{ value: 'always', label: $app.t('pdfExport.chapter.break.always') }, { value: 'right-page', label: $app.t('pdfExport.chapter.break.rightPage') }, { value: 'none', label: $app.t('pdfExport.chapter.break.none') }]"
-></div>
-            </div>
-          </div>
+          <p class="card-form-section-divider" x-text="$app.t('pdfExport.chapter.group.numbering')"></p>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.numbering')"></label>
             <div class="card-form-field">
@@ -84,6 +76,16 @@
                 </template>
               </div>
               <p class="card-form-field-note" x-text="$app.t('pdfExport.chapter.skipPageCounterPagesHint')"></p>
+            </div>
+          </div>
+          <p class="card-form-section-divider" x-text="$app.t('pdfExport.chapter.group.appearance')"></p>
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('pdfExport.chapter.breakBefore')"></label>
+            <div class="card-form-field">
+              <div x-data="combobox($app.t('pdfExport.chapter.breakBefore'))"
+                   x-modelable="value" x-model="activeProfile.config.chapter.breakBefore"
+                   x-effect="options = [{ value: 'always', label: $app.t('pdfExport.chapter.break.always') }, { value: 'right-page', label: $app.t('pdfExport.chapter.break.rightPage') }, { value: 'none', label: $app.t('pdfExport.chapter.break.none') }]"
+></div>
             </div>
           </div>
           <div class="card-form-row">

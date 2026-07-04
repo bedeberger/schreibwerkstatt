@@ -363,6 +363,80 @@
   .header-today-ring--active circle:nth-of-type(2) { animation: none; }
 }
 
+/* Mini-Popover des Header-Rings: heute · Serie · 7-Tage-Verlauf. Klappt unter
+   dem Ring auf; Klick auf einen Balken zeigt die Zeichen des Tages. */
+.header-today-ring-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.today-ring-popover {
+  position: absolute;
+  top: calc(100% + var(--space-sm));
+  right: 0;
+  z-index: var(--z-popover);
+  width: 15rem;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.today-ring-pop-head,
+.today-ring-pop-streak {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.today-ring-pop-label {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-subtle);
+}
+.today-ring-pop-count { font-weight: 600; color: var(--color-text); }
+.today-ring-pop-streak-val { font-weight: 600; color: var(--color-accent); }
+.today-ring-week {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  height: 44px;
+}
+.today-ring-week-col {
+  flex: 1 1 0;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+.today-ring-week-track {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+.today-ring-week-bar {
+  width: 100%;
+  height: var(--bar);
+  min-height: 2px;
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.today-ring-week-bar--reached { background: var(--color-success); }
+.today-ring-week-bar--today { background: var(--color-accent); }
+.today-ring-week-bar--today.today-ring-week-bar--reached { background: var(--color-success); }
+.today-ring-pop-link {
+  align-self: flex-start;
+  padding: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
 /* Touch: mehr Luft zwischen den Header-Controls. Größe bleibt (28px-Chip-
    Alignment mit Ring/Avatar), nur Abstände wachsen — Vertikal-Padding ≤3px,
    damit die 22px-Controls in der 28px-Höhe bleiben. */

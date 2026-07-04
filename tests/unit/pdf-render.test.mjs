@@ -85,6 +85,27 @@ test('countFrontMatter + pageNumberFirstVisible ändern Page-Count nicht', async
   assert.equal(pageCount(withOpts), pageCount(baseline));
 });
 
+test('frontMatterNumbering=roman ändert Page-Count nicht + rendert ohne Crash', async () => {
+  const cfg = defaultConfig();
+  cfg.cover.enabled = false;      // ohne Cover: Titelseite + TOC bilden die Titelei
+  cfg.toc.enabled = true;
+  cfg.extras.dedication = 'Für alle.';
+  const baseline = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
+  });
+  const roman = {
+    ...cfg,
+    layout: { ...cfg.layout, frontMatterNumbering: 'roman', frontMatterNumberFirstVisible: 1 },
+  };
+  const withRoman = await renderPdfBuffer({
+    book: baseBook, groups: baseGroups, profile: { config: roman }, coverBuf: null, token: null,
+  });
+  assert.equal(buf5(withRoman), '%PDF-', 'kein valides PDF');
+  assert.equal(pageCount(withRoman), pageCount(baseline), 'Titelei-Nummerierung darf keine Seiten hinzufügen');
+});
+
+function buf5(b) { return b.slice(0, 5).toString(); }
+
 test('blankPageAfter erzeugt zusätzliche leere Page pro Kapitel', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;

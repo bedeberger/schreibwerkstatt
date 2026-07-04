@@ -348,6 +348,16 @@
   color: var(--color-primary);
 }
 
+/* Sekundäre Editor-Aktionen: Desktop zeigt sie inline (`display: contents`, die
+   Buttons + Separatoren liegen direkt im Toolbar-Flex), das Meatball-Menü bleibt
+   verborgen. Auf Mobile (<=600px) kehrt sich das um — nur der Kebab bleibt. */
+.page-editor-toolbar__expanded { display: contents; }
+.page-editor-toolbar__more { display: none; }
+@media (max-width: 600px) {
+  .page-editor-toolbar__expanded { display: none; }
+  .page-editor-toolbar__more { display: inline-flex; }
+}
+
 /* Overflow-"⋯"-Menü der Seiten-Action-Leiste: Positionierungs-Anker für das
    .context-menu--dropdown-Popover. */
 .action-overflow {
