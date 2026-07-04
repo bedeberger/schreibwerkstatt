@@ -145,38 +145,46 @@
       </div>
     </div>
 
-    <!-- Kalender-Ansicht -->
-    <div class="rb-cal" x-show="rbHistoryView === 'cal'" x-cloak>
-      <div class="rb-cal-scroll">
-        <div class="rb-cal-grid">
-          <div class="rb-cal-row rb-cal-row--head">
-            <span class="rb-cal-corner"></span>
+    <!-- Kalender-Ansicht (Jahr×Monat-Heatmap, siehe components/year-month-heatmap.css).
+         --ymheat-max deckelt die Höhe bei vielen Jahren (dann scrollt das Raster). -->
+    <div class="ymheat rb-ymheat" x-show="rbHistoryView === 'cal'" x-cloak
+         :style="{ '--ymheat-max': rueckblickCalendar().years.length > 6 ? '70vh' : 'none' }">
+      <div class="ymheat-scroll">
+        <div class="ymheat-grid">
+          <div class="ymheat-row ymheat-row--head">
+            <span class="ymheat-corner"></span>
             <template x-for="(mLabel, mi) in rbMonthLabels()" :key="mi">
-              <span class="rb-cal-month-label" x-text="mLabel"></span>
+              <span class="ymheat-month-label" x-text="mLabel"></span>
             </template>
           </div>
           <template x-for="row in rueckblickCalendar().years" :key="row.year">
-            <div class="rb-cal-row">
-              <button type="button" class="rb-cal-year"
-                      :class="{ 'rb-cal-year--has': row.hasRueckblick, 'rb-cal-year--active': row.selected }"
+            <div class="ymheat-row">
+              <button type="button" class="ymheat-year"
+                      :class="{ 'ymheat-year--has': row.hasRueckblick, 'ymheat-year--active': row.selected }"
                       :disabled="!row.hasRueckblick && !row.hasEntries"
-                      @click="openCalendarYear(row)" :data-tip="rbCalYearTip(row)"
+                      @click="openCalendarYear(row)" :data-tip="rbCalYearTip(row)" :aria-label="rbCalYearTip(row)"
                       x-text="row.year"></button>
               <template x-for="cell in row.months" :key="cell.key">
-                <button type="button" class="rb-cal-cell"
-                        :class="{ 'rb-cal-cell--has': cell.hasRueckblick, 'rb-cal-cell--entries': cell.hasEntries && !cell.hasRueckblick, 'rb-cal-cell--active': cell.selected }"
+                <button type="button" class="ymheat-cell"
+                        :class="'ymheat-cell--lvl' + cell.level + (cell.hasRueckblick ? ' ymheat-cell--has' : '') + (cell.isCurrent ? ' ymheat-cell--current' : '') + (cell.selected ? ' ymheat-cell--active' : '')"
                         :disabled="!cell.hasRueckblick && !cell.hasEntries"
-                        @click="openCalendarCell(cell)" :data-tip="rbCalCellTip(cell)"></button>
+                        @click="openCalendarCell(cell)" :data-tip="rbCalCellTip(cell)" :aria-label="rbCalCellTip(cell)"></button>
               </template>
             </div>
           </template>
         </div>
       </div>
-      <div class="rb-cal-legend">
-        <span class="rb-cal-legend-swatch rb-cal-cell--has"></span>
+      <div class="ymheat-legend">
+        <span class="ymheat-legend-label" x-text="$app.t('rueckblick.cal.legendDensity')"></span>
+        <span class="ymheat-cell ymheat-cell--lvl0"></span>
+        <span class="ymheat-cell ymheat-cell--lvl1"></span>
+        <span class="ymheat-cell ymheat-cell--lvl2"></span>
+        <span class="ymheat-cell ymheat-cell--lvl3"></span>
+        <span class="ymheat-cell ymheat-cell--lvl4"></span>
+        <span class="ymheat-cell ymheat-cell--has ymheat-cell--lvl0"></span>
         <span x-text="$app.t('rueckblick.cal.legendHas')"></span>
-        <span class="rb-cal-legend-swatch rb-cal-cell--entries"></span>
-        <span x-text="$app.t('rueckblick.cal.legendEntries')"></span>
+        <span class="ymheat-cell ymheat-cell--current ymheat-cell--lvl0"></span>
+        <span x-text="$app.t('rueckblick.cal.legendCurrent')"></span>
       </div>
     </div>
 

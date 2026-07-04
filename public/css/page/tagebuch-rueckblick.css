@@ -245,107 +245,13 @@
   flex-wrap: wrap;
 }
 
-/* Kalender-Ansicht der History: Jahr×Monat-Raster der gespeicherten Rückblicke.
-   Gefüllte Akzentzelle = Rückblick vorhanden (Klick öffnet); dezente getönte
-   Zelle = datierte Einträge ohne Rückblick (Klick wählt den Zeitraum vor); flache
-   Grundzelle = leer (disabled). Aktive Auswahl via neutralem Outline-Ring. */
-.card--tagebuchRueckblick .rb-cal {
-  --rb-year-col: 3rem;
+/* Kalender-Ansicht der History nutzt das geteilte Jahr×Monat-Heatmap-Pattern
+   (.ymheat-*, components/year-month-heatmap.css). Hier nur die karten-spezifische
+   Anbindung: Akzent = Karten-Hue (statt globalem Overview-Akzent), Abstand nach
+   oben. Die responsive Höhe steuert das Partial via --ymheat-max. */
+.card--tagebuchRueckblick .rb-ymheat {
+  --ymheat-accent: var(--card-accent);
   margin-top: var(--space-sm);
-}
-.card--tagebuchRueckblick .rb-cal-scroll {
-  max-height: 320px;
-  overflow: auto;
-}
-.card--tagebuchRueckblick .rb-cal-grid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 320px;
-}
-.card--tagebuchRueckblick .rb-cal-row {
-  display: grid;
-  grid-template-columns: var(--rb-year-col) repeat(12, 1fr);
-  gap: var(--space-3);
-  align-items: center;
-}
-.card--tagebuchRueckblick .rb-cal-row--head {
-  position: sticky;
-  top: 0;
-  background: var(--color-bg);
-  z-index: 1;
-  padding-bottom: var(--space-2xs);
-}
-.card--tagebuchRueckblick .rb-cal-corner { min-width: 0; }
-.card--tagebuchRueckblick .rb-cal-month-label {
-  font-size: var(--font-size-micro);
-  color: var(--color-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.card--tagebuchRueckblick .rb-cal-year {
-  font-size: var(--font-size-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-muted);
-  text-align: right;
-  padding: 0 var(--space-6) 0 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.card--tagebuchRueckblick .rb-cal-year:hover:not(:disabled) {
-  color: var(--color-text);
-  text-decoration: underline;
-}
-.card--tagebuchRueckblick .rb-cal-year--has { color: var(--color-text); font-weight: 600; }
-.card--tagebuchRueckblick .rb-cal-year--active { color: var(--card-accent); }
-.card--tagebuchRueckblick .rb-cal-year:disabled { cursor: default; opacity: 0.5; }
-
-.card--tagebuchRueckblick .rb-cal-cell {
-  position: relative;
-  width: 100%;
-  min-width: 12px;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-sm);
-  background: var(--color-tag-bg);
-  border: 0.5px solid transparent;
-  padding: 0;
-  cursor: pointer;
-  transition: filter var(--transition-base);
-}
-.card--tagebuchRueckblick .rb-cal-cell:disabled { cursor: default; opacity: 0.45; }
-.card--tagebuchRueckblick .rb-cal-cell:hover:not(:disabled) { filter: brightness(1.12); }
-.card--tagebuchRueckblick .rb-cal-cell--entries {
-  background: color-mix(in srgb, var(--card-accent) 22%, var(--color-bg));
-}
-.card--tagebuchRueckblick .rb-cal-cell--has {
-  background: var(--card-accent);
-  border-color: var(--card-accent);
-}
-.card--tagebuchRueckblick .rb-cal-cell--active {
-  outline: 2px solid var(--color-text);
-  outline-offset: 2px;
-}
-
-.card--tagebuchRueckblick .rb-cal-legend {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin-top: var(--space-sm);
-  font-size: var(--font-size-xs);
-  color: var(--color-muted);
-  flex-wrap: wrap;
-}
-.card--tagebuchRueckblick .rb-cal-legend-swatch {
-  width: 11px;
-  height: 11px;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
 }
 
 @media (max-width: 720px) {
@@ -353,10 +259,4 @@
     grid-template-columns: 1fr;
     gap: var(--space-2xs);
   }
-}
-
-@media (max-width: 480px) {
-  .card--tagebuchRueckblick .rb-cal { --rb-year-col: 2.4rem; }
-  .card--tagebuchRueckblick .rb-cal-grid { min-width: 260px; }
-  .card--tagebuchRueckblick .rb-cal-month-label { letter-spacing: 0; }
 }

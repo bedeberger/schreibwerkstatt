@@ -201,6 +201,16 @@ test('_hashCategory: anderes Buch → andere Kategorie (push)', () => {
   assert.notEqual(c._hashCategory('#book/42/figuren'), c._hashCategory('#book/99/figuren'));
 });
 
+test('_hashCategory: jeder Rückblick-Eintrag ist eine eigene Kategorie (push)', () => {
+  const c = makeCtx();
+  // Übersicht, Eintrag 5 und Eintrag 8 unterscheiden sich alle → Browser-Zurück
+  // navigiert schrittweise zwischen Einträgen und zur Kalender-Übersicht.
+  assert.equal(c._hashCategory('#book/42/rueckblick'), '42:rueckblick');
+  assert.equal(c._hashCategory('#book/42/rueckblick/5'), '42:rueckblick:5');
+  assert.notEqual(c._hashCategory('#book/42/rueckblick/5'), c._hashCategory('#book/42/rueckblick/8'));
+  assert.notEqual(c._hashCategory('#book/42/rueckblick/5'), c._hashCategory('#book/42/rueckblick'));
+});
+
 // ── _writeHash ───────────────────────────────────────────────────────────────
 test('_writeHash: erster Write → replaceState (kein neuer History-Eintrag)', () => {
   const c = makeCtx();

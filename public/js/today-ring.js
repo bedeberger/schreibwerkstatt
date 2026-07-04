@@ -7,7 +7,7 @@
 // Negativ wird auf 0 geklemmt (Lösch-Edits zählen nicht zurück). Fehlt
 // einer der beiden Werte (z.B. neues Buch ohne Vortagssnapshot), wird 0
 // geliefert — Donut bleibt leer statt falsch optimistisch zu fuellen.
-import { aggregateLiveBookStats, localIsoDate } from './utils.js';
+import { aggregateLiveBookStats, localIsoDate, CHARS_PER_NORMSEITE } from './utils.js';
 
 // Reine Zahl: heute geschriebene Zeichen (Live-Σ minus Vortagssnapshot).
 // Wird sowohl vom Donut als auch von 7-Tage-Bar/Total konsumiert, damit alle
@@ -37,8 +37,8 @@ export function computeCharsTodayDelta(stats = [], tokEsts = {}) {
 
 // Donut-Geometrie + Flags. Caller waehlt Radius r (28 fuer Overview-Tile,
 // 14 fuer Header-Donut).
-export function computeTodayRing({ stats = [], tokEsts = {}, goalChars = 1500, r = 28 } = {}) {
-  const goal = Math.max(1, Number(goalChars) || 1500);
+export function computeTodayRing({ stats = [], tokEsts = {}, goalChars = CHARS_PER_NORMSEITE, r = 28 } = {}) {
+  const goal = Math.max(1, Number(goalChars) || CHARS_PER_NORMSEITE);
   const chars = computeCharsTodayDelta(stats, tokEsts);
   const pct = Math.max(0, Math.min(100, Math.round((chars / goal) * 100)));
   const circ = 2 * Math.PI * r;

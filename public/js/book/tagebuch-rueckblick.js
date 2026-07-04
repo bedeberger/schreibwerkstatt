@@ -5,6 +5,7 @@
 // (auto-escaped) gerendert — kein x-html-Sink.
 
 import { tzOpts, fetchJson } from '../utils.js';
+import { quartileLevelFor, currentMonthKey } from './ymheatmap.js';
 
 // Tagebuch-Seitennamen sind 'YYYY-MM-DD'. Hier rein clientseitig per Regex
 // (kein Bedarf am vollen lib/datum-parse-Fallback).
@@ -303,16 +304,21 @@ export const tagebuchRueckblickMethods = {
   },
 
   _computeRueckblickCalendar(pages, history, selectedId) {
-    const monthsWithEntries = new Set();
+    // Eintragszahl pro Monat ('YYYY-MM') → Dichte-Level (Quartile). Ableitung aus
+    // nav.pages, deckt sich mit der Sidebar-Kalender-Zählung.
+    const monthCounts = new Map();
     let minYear = Infinity, maxYear = -Infinity;
     for (const p of pages) {
       const m = ISO_DATE_RE.exec(p?.name || '');
       if (!m) continue;
       const y = parseInt(m[1], 10);
-      monthsWithEntries.add(`${m[1]}-${m[2]}`);
+      const key = `${m[1]}-${m[2]}`;
+      monthCounts.set(key, (monthCounts.get(key) || 0) + 1);
       if (y < minYear) minYear = y;
       if (y > maxYear) maxYear = y;
     }
+    const levelFor = quartileLevelFor([...monthCounts.values()]);
+    const todayKey = currentMonthKey();
     // Rückblick-Einträge nach Zeitraum ('YYYY-MM' Monat, 'YYYY' Jahr).
     const byZeitraum = new Map();
     for (const e of history) {
@@ -331,10 +337,14 @@ export const tagebuchRueckblickMethods = {
       for (let mi = 1; mi <= 12; mi++) {
         const key = `${yKey}-${String(mi).padStart(2, '0')}`;
         const entry = byZeitraum.get(key) || null;
+        const entries = monthCounts.get(key) || 0;
         months.push({
           key,
           monthIdx: mi,
-          hasEntries: monthsWithEntries.has(key),
+          entries,
+          level: levelFor(entries),
+          hasEntries: entries > 0,
+          isCurrent: key === todayKey,
           hasRueckblick: !!entry,
           entryId: entry?.id ?? null,
           createdAt: entry?.created_at || null,

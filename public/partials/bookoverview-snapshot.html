@@ -12,7 +12,7 @@
       <div class="overview-substats">
         <div class="overview-substat" x-show="overviewLatest()?.chars > 0"
              :data-tip="$app.t('bookstats.metric.normseiten')">
-          <span class="overview-substat-value" x-text="(Math.round((overviewLatest()?.chars || 0) / 1500 * 10) / 10).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 })"></span>
+          <span class="overview-substat-value" x-text="_fmtNormseiten(overviewLatest()?.chars)"></span>
           <span class="overview-substat-unit" x-text="$app.t('bookstats.unit.ns')"></span>
         </div>
         <div class="overview-substat" x-show="overviewLatest()?.words > 0">

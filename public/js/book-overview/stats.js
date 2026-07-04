@@ -1,7 +1,7 @@
 // Schreibstatistik-Tiles: Hero-Snapshot, Sparkline, 7-Tage-Bars, Heute-Ring,
 // Streak-Heatmap. Visualisierungen als reines Inline-SVG (kein Chart.js) —
 // Overview soll instant beim Buchwechsel sichtbar sein, ohne Lazy-Lib-Load.
-import { localIsoDate, localIsoDaysAgo, tzOpts, aggregateLiveBookStats } from '../utils.js';
+import { localIsoDate, localIsoDaysAgo, tzOpts, aggregateLiveBookStats, CHARS_PER_NORMSEITE } from '../utils.js';
 import { computeTodayRing, computeCharsTodayDelta } from '../today-ring.js';
 
 export const statsMethods = {
@@ -294,11 +294,15 @@ export const statsMethods = {
   // Heute-Ring: Donut-Math für Tagesziel. Shared Compute mit dem Header-Donut
   // ueber [public/js/today-ring.js] — beide bleiben deckungsgleich. Memo
   // verhindert Re-Compute pro Render (Tile ruft die Methode 6× pro Render).
-  overviewTodayRing(goalChars = 1500) {
+  overviewTodayRing(goalChars) {
     const a = this.overviewStats || [];
     const tokEsts = window.__app?.tokEsts || {};
-    return this._memo('todayRing:' + goalChars, [a, tokEsts], () =>
-      computeTodayRing({ stats: a, tokEsts, goalChars, r: 28 })
+    // Goal: expliziter Buch-Wert (book_settings.daily_goal_chars) vor
+    // Default = eine Normseite/Tag. Auflösung hier statt im Template, damit
+    // das Charts-Partial die Methode argumentlos aufrufen kann.
+    const goal = Math.max(1, Number(goalChars) || this.overviewDailyGoalChars || CHARS_PER_NORMSEITE);
+    return this._memo('todayRing:' + goal, [a, tokEsts], () =>
+      computeTodayRing({ stats: a, tokEsts, goalChars: goal, r: 28 })
     );
   },
 };

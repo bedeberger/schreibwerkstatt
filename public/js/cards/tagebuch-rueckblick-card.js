@@ -80,9 +80,12 @@ export function registerTagebuchRueckblickCard() {
         if (window.Alpine) window.Alpine.store('nav').rueckblickEntryId = id || null;
       });
       // Permalink-Eingang: Klick auf #…/rueckblick/<id> bei offener Karte.
+      // Wird die id null (Browser-Zurück auf die Kalender-Übersicht #…/rueckblick),
+      // den offenen Eintrag schliessen, damit die Anzeige der URL folgt.
       this.$watch(() => window.Alpine?.store('nav').rueckblickEntryId, (id) => {
         if (!window.__app?.showTagebuchRueckblickCard) return;
         if (id && String(id) !== String(this.selectedRueckblickId)) this._openRueckblickEntryById(id);
+        else if (!id && this.selectedRueckblickId) this.closeRueckblick();
       });
       // Zeitraum-Wechsel (Combobox): vorhandenen Rückblick des Zeitraums anzeigen
       // (kein Auto-Run). So passt die Anzeige zur Neugenerierungs-Sperre — bei

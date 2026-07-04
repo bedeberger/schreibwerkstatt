@@ -343,6 +343,68 @@ router.get('/book-stats/:book_id', (req, res) => {
   res.json(rows);
 });
 
+// Stats-Staleness: hat sich der Buchstand seit dem letzten Sync (page_stats +
+// book_stats_history) geändert? Der Client schickt seine autoritative Seitenliste
+// ({ id, updated_at } aus dem Content-Store); die Server-`pages`-Tabelle ist nur
+// ein fire-and-forget-aktualisierter Cache und taugt hier nicht als Wahrheit.
+// Antwort { stale, reason } — bei `stale` synct der Client im Hintergrund nach.
+// Drei Signale (SSoT, ersetzt die frühere Client-Heuristik a/b/c):
+//   (a) page-edited  — eine Seite hat kein/veraltetes page_stats (updated_at ≠).
+//   (b) new-day      — jüngste Seitenaktivität liegt nach dem letzten Snapshot-Tag.
+//   (c) char-growth  — Σ page_stats.chars weicht > Toleranz vom Snapshot ab
+//                       (Mehrfach-Edits am selben Tag; Tagesgranularität von (b) blind).
+router.post('/stats-stale/:book_id', jsonBody, (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  const pages = Array.isArray(req.body?.pages) ? req.body.pages : [];
+  if (!pages.length) return res.json({ stale: false, reason: 'no-pages' });
+
+  const statsRows = db.prepare(
+    'SELECT page_id, chars, updated_at FROM page_stats WHERE book_id = ?'
+  ).all(bookId);
+  const stats = new Map(statsRows.map(r => [r.page_id, r]));
+
+  // (a) per-Seite-Diff gegen die autoritative Client-Liste.
+  for (const p of pages) {
+    const id = toIntId(p?.id);
+    if (!id) continue;
+    const c = stats.get(id);
+    if (!c || c.updated_at !== (p.updated_at || null)) {
+      return res.json({ stale: true, reason: 'page-edited' });
+    }
+  }
+
+  const lastSnapshot = db.prepare(
+    'SELECT recorded_at, chars FROM book_stats_history WHERE book_id = ? ORDER BY recorded_at DESC LIMIT 1'
+  ).get(bookId);
+  if (!lastSnapshot) return res.json({ stale: true, reason: 'no-snapshot' });
+
+  // (b) jüngster Aktivitätstag > letzter Snapshot-Tag.
+  let latestPageDay = null;
+  for (const p of pages) {
+    const d = p?.updated_at ? String(p.updated_at).slice(0, 10) : null;
+    if (d && (!latestPageDay || d > latestPageDay)) latestPageDay = d;
+  }
+  if (latestPageDay && latestPageDay > lastSnapshot.recorded_at) {
+    return res.json({ stale: true, reason: 'new-day' });
+  }
+
+  // (c) Σ page_stats.chars (nur Seiten der Client-Liste) vs Snapshot.chars.
+  let sumChars = 0;
+  for (const p of pages) {
+    const c = stats.get(toIntId(p?.id));
+    if (c) sumChars += Number(c.chars) || 0;
+  }
+  const snapChars = Number(lastSnapshot.chars) || 0;
+  if (sumChars > 0 && snapChars > 0) {
+    const tolerance = Math.max(50, snapChars * 0.005);
+    if (Math.abs(sumChars - snapChars) > tolerance) {
+      return res.json({ stale: true, reason: 'char-growth' });
+    }
+  }
+  res.json({ stale: false });
+});
+
 // Stil-Heatmap: alle Stil-Metriken pro Seite eines Buchs (inkl. Kapitel-Info).
 // Frontend aggregiert nach Kapitel, erkennt noch nicht berechnete Seiten via metrics_version.
 router.get('/style-stats/:book_id', (req, res) => {

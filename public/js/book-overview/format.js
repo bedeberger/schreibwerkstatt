@@ -1,6 +1,15 @@
 import { EVT } from '../events.js';
+import { charsToNormseiten } from '../utils.js';
 // Format-Helper + Tile-Click-Handler (Cross-Card-Routings).
 export const formatMethods = {
+  // Zeichen → lokalisierte Normseiten-Zahl (1 Dezimale). Kapselt die
+  // CHARS_PER_NORMSEITE-Umrechnung, damit die Formel nicht in jedem Tile
+  // inline dupliziert wird.
+  _fmtNormseiten(chars) {
+    const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+    return charsToNormseiten(chars).toLocaleString(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  },
+
   // Fehler-Typ-Label: i18n-Key versuchen; Fallback humanisiert.
   overviewFehlerLabel(typ) {
     const key = 'fehlerHeatmap.typ.' + typ;

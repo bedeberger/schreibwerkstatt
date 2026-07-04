@@ -7,6 +7,7 @@
 // Compute-Bodies sind als pure `_computeXxx` extrahiert (Alpine-frei testbar);
 // die memoizierten Wrapper nutzen den gemeinsamen `this._memo` aus load.js.
 import { localIsoDate, tzOpts } from '../utils.js';
+import { quartileLevelFor, currentMonthKey } from '../book/ymheatmap.js';
 
 // Tagebuch-Seitennamen sind 'YYYY-MM-DD' (gleiche Mechanik wie diary-calendar).
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})\b/;
@@ -154,16 +155,8 @@ export const diaryMethods = {
       const e = months[k]?.entries || 0;
       if (e > 0) counts.push(e);
     }
-    const sorted = [...counts].sort((a, b) => a - b);
-    const q = (p) => sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
-    const t1 = q(0.25), t2 = q(0.5), t3 = q(0.75);
-    const levelFor = (e) => {
-      if (!e || e <= 0) return 0;
-      if (e <= t1) return 1;
-      if (e <= t2) return 2;
-      if (e <= t3) return 3;
-      return 4;
-    };
+    const levelFor = quartileLevelFor(counts);
+    const todayKey = currentMonthKey();
     const maxEntries = counts.length ? Math.max(...counts) : 0;
 
     const rows = [];
@@ -180,6 +173,7 @@ export const diaryMethods = {
           monthIdx: mi,
           entries: mc?.entries || 0,
           level: levelFor(mc?.entries || 0),
+          isCurrent: key === todayKey,
           hasRueckblick: !!rb,
           createdAt: rb?.created_at || null,
         });

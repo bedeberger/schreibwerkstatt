@@ -1,0 +1,137 @@
+@layer components {
+/* Jahr×Monat-Heatmap: wiederverwendbares Raster (Jahre als Zeilen, 12 Monate als
+   Spalten). Zell-Intensität (Level 0..4) via Quartil-Bucketing über die
+   Monats-Eintragszahlen (siehe book/ymheatmap.js#quartileLevelFor). Akzent über
+   --ymheat-accent (Default var(--color-accent); Konsument setzt ggf. die
+   Karten-Hue). Self-containing (container-type: inline-size) → die @container-
+   Breakpoints greifen in jedem Layout-Slot (Overview-Tile wie Vollkarte).
+   Konsumenten: Rückblick-Karte (interaktiv: leere Zellen disabled, Auswahl-Ring)
+   + Buch-Übersicht (Navigation). Siehe DESIGN.md „Jahr×Monat-Heatmap". */
+
+.ymheat {
+  --ymheat-accent: var(--color-accent);
+  --ymheat-year-col: 3rem;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Vertikal scrollbar bei vielen Jahren, horizontal bei engen Slots. Höhe via
+   --ymheat-max überschreibbar (Default 320px; die Rückblick-Karte deckelt
+   höhenabhängig von der Jahresanzahl, sonst 'none' = voll ausgewachsen). */
+.ymheat-scroll {
+  max-height: var(--ymheat-max, 320px);
+  overflow: auto;
+}
+.ymheat-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 320px;
+}
+.ymheat-row {
+  display: grid;
+  grid-template-columns: var(--ymheat-year-col) repeat(12, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+.ymheat-row--head {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg);
+  z-index: var(--z-base);
+  padding-bottom: var(--space-2xs);
+}
+.ymheat-corner { min-width: 0; }
+.ymheat-month-label {
+  font-size: var(--font-size-micro);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ymheat-year {
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+  text-align: right;
+  padding: 0 var(--space-6) 0 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ymheat-year:hover:not(:disabled) { color: var(--color-text); text-decoration: underline; }
+.ymheat-year--has { color: var(--color-text); font-weight: 600; }
+.ymheat-year--active { color: var(--ymheat-accent); }
+.ymheat-year:disabled { cursor: default; opacity: 0.5; }
+
+.ymheat-cell {
+  position: relative;
+  width: 100%;
+  min-width: 12px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  border: 0.5px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: filter var(--transition-base);
+}
+.ymheat-cell:disabled { cursor: default; opacity: 0.5; }
+.ymheat-cell:hover:not(:disabled) { filter: brightness(1.12); }
+.ymheat-cell--lvl0 { background: var(--color-tag-bg); }
+.ymheat-cell--lvl1 { background: color-mix(in srgb, var(--ymheat-accent) 22%, var(--color-bg)); }
+.ymheat-cell--lvl2 { background: color-mix(in srgb, var(--ymheat-accent) 45%, var(--color-bg)); }
+.ymheat-cell--lvl3 { background: color-mix(in srgb, var(--ymheat-accent) 68%, var(--color-bg)); }
+.ymheat-cell--lvl4 { background: var(--ymheat-accent); }
+
+/* „Rückblick vorhanden"-Marker: eckiger Eckpunkt oben rechts. */
+.ymheat-cell--has { border-color: var(--ymheat-accent); }
+.ymheat-cell--has::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 4px;
+  height: 4px;
+  background: var(--ymheat-accent);
+  border-radius: var(--radius-sm);
+}
+
+/* Aktueller Monat: dezenter Innen-Ring — Orientierung „wo bin ich jetzt". */
+.ymheat-cell--current { box-shadow: inset 0 0 0 1.5px var(--color-text); }
+
+/* Aktive Auswahl (interaktiver Konsument): neutraler Outline-Ring. */
+.ymheat-cell--active { outline: 2px solid var(--color-text); outline-offset: 2px; }
+
+.ymheat-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  flex-wrap: wrap;
+}
+.ymheat-legend-label { margin-right: var(--space-6); }
+.ymheat-legend .ymheat-cell {
+  width: 11px;
+  min-width: 11px;
+  height: 11px;
+  aspect-ratio: auto;
+  flex-shrink: 0;
+  cursor: default;
+}
+.ymheat-legend .ymheat-cell:hover { filter: none; }
+
+@container (max-width: 480px) {
+  .ymheat { --ymheat-year-col: 2.4rem; }
+  .ymheat-grid { min-width: 260px; }
+  .ymheat-month-label { letter-spacing: 0; }
+}
+}

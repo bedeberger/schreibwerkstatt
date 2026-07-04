@@ -122,36 +122,37 @@
 </template>
 
 <!-- Heute-Ring: Tagesziel-Donut, pulsiert bei aktivem Schreibtag.
-     Goal aus book_settings.daily_goal_chars (per Buch), Fallback 1500. -->
+     Goal-Auflösung (book_settings.daily_goal_chars → Default eine Normseite/Tag)
+     steckt in overviewTodayRing(). -->
 <template x-if="!overviewIsFinished && overviewStats && overviewStats.length > 0">
   <div class="overview-tile internal-link"
        @click="_openLengthStats(7, 'delta_chars')"
-       :aria-label="$app.t('overview.today.aria', { chars: _fmtNum(overviewTodayRing(overviewDailyGoalChars || 1500).chars), goal: _fmtNum(overviewTodayRing(overviewDailyGoalChars || 1500).goal), pct: overviewTodayRing(overviewDailyGoalChars || 1500).pct })"
+       :aria-label="$app.t('overview.today.aria', { chars: _fmtNum(overviewTodayRing().chars), goal: _fmtNum(overviewTodayRing().goal), pct: overviewTodayRing().pct })"
        :data-tip="$app.t('overview.openStats')">
     <div class="overview-tile-label" x-text="$app.t('overview.today.title')"></div>
     <div class="overview-donut-row">
       <svg class="overview-donut overview-today-ring"
-           :class="{ 'overview-today-ring--active': overviewTodayRing(overviewDailyGoalChars || 1500).active, 'overview-today-ring--reached': overviewTodayRing(overviewDailyGoalChars || 1500).reached, 'overview-donut--empty': !overviewTodayRing(overviewDailyGoalChars || 1500).active }"
+           :class="{ 'overview-today-ring--active': overviewTodayRing().active, 'overview-today-ring--reached': overviewTodayRing().reached, 'overview-donut--empty': !overviewTodayRing().active }"
            viewBox="0 0 72 72" aria-hidden="true">
-        <circle cx="36" cy="36" :r="overviewTodayRing(overviewDailyGoalChars || 1500).r"
+        <circle cx="36" cy="36" :r="overviewTodayRing().r"
                 fill="none" stroke="var(--color-border)" stroke-width="6"></circle>
-        <circle cx="36" cy="36" :r="overviewTodayRing(overviewDailyGoalChars || 1500).r"
+        <circle cx="36" cy="36" :r="overviewTodayRing().r"
                 fill="none" stroke="var(--color-accent)" stroke-width="6"
                 stroke-linecap="round"
-                :stroke-dasharray="overviewTodayRing(overviewDailyGoalChars || 1500).dash + ' ' + overviewTodayRing(overviewDailyGoalChars || 1500).gap"
+                :stroke-dasharray="overviewTodayRing().dash + ' ' + overviewTodayRing().gap"
                 transform="rotate(-90 36 36)"></circle>
         <text x="36" y="40" text-anchor="middle" class="overview-donut-text"
-              x-text="overviewTodayRing(overviewDailyGoalChars || 1500).pct + '%'"></text>
+              x-text="overviewTodayRing().pct + '%'"></text>
       </svg>
       <div class="overview-donut-meta">
         <div class="overview-donut-meta-checked"
-             x-show="overviewTodayRing(overviewDailyGoalChars || 1500).active"
-             x-text="$app.t('overview.today.meta', { chars: _fmtNum(overviewTodayRing(overviewDailyGoalChars || 1500).chars), goal: _fmtNum(overviewTodayRing(overviewDailyGoalChars || 1500).goal) })"></div>
+             x-show="overviewTodayRing().active"
+             x-text="$app.t('overview.today.meta', { chars: _fmtNum(overviewTodayRing().chars), goal: _fmtNum(overviewTodayRing().goal) })"></div>
         <div class="overview-donut-meta-checked"
-             x-show="!overviewTodayRing(overviewDailyGoalChars || 1500).active"
+             x-show="!overviewTodayRing().active"
              x-text="$app.t('overview.today.idle')"></div>
         <div class="overview-donut-meta-checked"
-             x-show="overviewTodayRing(overviewDailyGoalChars || 1500).reached"
+             x-show="overviewTodayRing().reached"
              x-text="$app.t('overview.today.goalReached')"></div>
       </div>
     </div>

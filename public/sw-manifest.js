@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "73cbdf2bb80f8b64";
+self.__SHELL_BUILD = "692dfcd6c85227e4";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -28,7 +28,6 @@ self.__SHELL_MANIFEST = [
   "/css/book-overview/presence.css",
   "/css/book-overview/recent-actions.css",
   "/css/book-overview/review.css",
-  "/css/book-overview/rueckblick-heatmap.css",
   "/css/book-overview/stats.css",
   "/css/book/book-create-modal.css",
   "/css/book/book-settings.css",
@@ -67,6 +66,7 @@ self.__SHELL_MANIFEST = [
   "/css/components/toggle-switch.css",
   "/css/components/tooltip.css",
   "/css/components/user-chip.css",
+  "/css/components/year-month-heatmap.css",
   "/css/editor/book/book-editor.css",
   "/css/editor/figur-lookup.css",
   "/css/editor/focus/focus-mode.css",
@@ -226,6 +226,7 @@ self.__SHELL_MANIFEST = [
   "/js/book/tree/stats.js",
   "/js/book/tree/ui.js",
   "/js/book/writing-time.js",
+  "/js/book/ymheatmap.js",
   "/js/cards/admin-books-card.js",
   "/js/cards/admin-categories-card.js",
   "/js/cards/admin-devices-card.js",

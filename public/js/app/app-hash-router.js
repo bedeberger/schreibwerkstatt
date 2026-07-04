@@ -101,6 +101,11 @@ export const appHashRouterMethods = {
       : view === 'song' ? 'songs'
       : view === 'szene' ? 'szenen'
       : view;
+    // Tagebuch-Rückblick: jeder Eintrag ist eine eigene History-Kategorie
+    // (id im Category-Key), damit der Browser-Zurück-Button schrittweise zwischen
+    // Einträgen und zurück zur Kalender-Übersicht navigiert. Bewusste Abweichung
+    // von der Figur/Ort/Seite-Konvention (dort id-Wechsel = replace).
+    if (view === 'rueckblick' && parts[3]) return bookId + ':rueckblick:' + parts[3];
     return bookId + ':' + kind;
   },
 

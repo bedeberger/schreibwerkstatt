@@ -1,7 +1,7 @@
 // Kapitel-Tiles: Verteilung (Zeichen), Findings (Lektorat), Lektoratszeit.
 // Alle drei nutzen das gleiche Diverging-Bar-Layout um Median; Bar-Länge =
 // |deltaPct| / maxAbsDelta * 48% (cap, damit Bars nicht an Track-Rand stossen).
-import { fmtExactDuration } from '../utils.js';
+import { fmtExactDuration, charsToNormseiten } from '../utils.js';
 
 export const kapitelMethods = {
   // Kapitel-Verteilung: Zeichen + Wörter + Seiten pro Top-Level-Kapitel.
@@ -39,7 +39,7 @@ export const kapitelMethods = {
       for (const r of roots) {
         const b = buckets.get(Number(r.id));
         if (!b) continue;
-        out.push({ ...b, normseiten: Math.round((b.chars / 1500) * 10) / 10 });
+        out.push({ ...b, normseiten: charsToNormseiten(b.chars) });
       }
       if (out.length === 0) return out;
       const maxChars = Math.max(1, ...out.map(c => c.chars));
