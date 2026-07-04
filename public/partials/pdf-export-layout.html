@@ -84,29 +84,49 @@
             </button>
             <div x-bind="panel" x-cloak class="collapsible-section">
               <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.tokensHint')"></p>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerLeft')"></label>
-                <div class="card-form-field"><input x-model="activeProfile.config.layout.headerLeft" class="pdfx-text-input"></div>
+              <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.hfSidesHint')"></p>
+
+              <!-- Kopf-/Fusszeile als Seiten-Raster: 3 Positionen × 2 Buchseiten.
+                   Recto = rechte/ungerade Seite (gilt auch für alle Seiten, wenn
+                   die Verso-Felder leer bleiben), Verso = linke/gerade Seite. -->
+              <div class="pdfx-hf-zone">
+                <span class="pdfx-hf-zone-title" x-text="$app.t('pdfExport.layout.zoneHeader')"></span>
+                <div class="pdfx-hf-grid">
+                  <span class="pdfx-hf-corner" aria-hidden="true"></span>
+                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posLeft')"></span>
+                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posCenter')"></span>
+                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posRight')"></span>
+
+                  <span class="pdfx-hf-rowhead"><span x-text="$app.t('pdfExport.layout.sideRecto')"></span><small x-text="$app.t('pdfExport.layout.sideRectoHint')"></small></span>
+                  <input x-model="activeProfile.config.layout.headerLeft" class="pdfx-text-input">
+                  <input x-model="activeProfile.config.layout.headerCenter" class="pdfx-text-input">
+                  <input x-model="activeProfile.config.layout.headerRight" class="pdfx-text-input">
+
+                  <span class="pdfx-hf-rowhead"><span x-text="$app.t('pdfExport.layout.sideVerso')"></span><small x-text="$app.t('pdfExport.layout.sideVersoHint')"></small></span>
+                  <input x-model="activeProfile.config.layout.headerVersoLeft" class="pdfx-text-input" :placeholder="activeProfile.config.layout.headerLeft || $app.t('pdfExport.layout.sameAsRecto')">
+                  <input x-model="activeProfile.config.layout.headerVersoCenter" class="pdfx-text-input" :placeholder="activeProfile.config.layout.headerCenter || $app.t('pdfExport.layout.sameAsRecto')">
+                  <input x-model="activeProfile.config.layout.headerVersoRight" class="pdfx-text-input" :placeholder="activeProfile.config.layout.headerRight || $app.t('pdfExport.layout.sameAsRecto')">
+                </div>
               </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerCenter')"></label>
-                <div class="card-form-field"><input x-model="activeProfile.config.layout.headerCenter" class="pdfx-text-input"></div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerRight')"></label>
-                <div class="card-form-field"><input x-model="activeProfile.config.layout.headerRight" class="pdfx-text-input"></div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerLeft')"></label>
-                <div class="card-form-field"><input x-model="activeProfile.config.layout.footerLeft" class="pdfx-text-input"></div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerCenter')"></label>
-                <div class="card-form-field"><input x-model="activeProfile.config.layout.footerCenter" class="pdfx-text-input"></div>
-              </div>
-              <div class="card-form-row">
-                <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerRight')"></label>
-                <div class="card-form-field"><input x-model="activeProfile.config.layout.footerRight" class="pdfx-text-input"></div>
+
+              <div class="pdfx-hf-zone">
+                <span class="pdfx-hf-zone-title" x-text="$app.t('pdfExport.layout.zoneFooter')"></span>
+                <div class="pdfx-hf-grid">
+                  <span class="pdfx-hf-corner" aria-hidden="true"></span>
+                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posLeft')"></span>
+                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posCenter')"></span>
+                  <span class="pdfx-hf-colhead" x-text="$app.t('pdfExport.layout.posRight')"></span>
+
+                  <span class="pdfx-hf-rowhead"><span x-text="$app.t('pdfExport.layout.sideRecto')"></span><small x-text="$app.t('pdfExport.layout.sideRectoHint')"></small></span>
+                  <input x-model="activeProfile.config.layout.footerLeft" class="pdfx-text-input">
+                  <input x-model="activeProfile.config.layout.footerCenter" class="pdfx-text-input">
+                  <input x-model="activeProfile.config.layout.footerRight" class="pdfx-text-input">
+
+                  <span class="pdfx-hf-rowhead"><span x-text="$app.t('pdfExport.layout.sideVerso')"></span><small x-text="$app.t('pdfExport.layout.sideVersoHint')"></small></span>
+                  <input x-model="activeProfile.config.layout.footerVersoLeft" class="pdfx-text-input" :placeholder="activeProfile.config.layout.footerLeft || $app.t('pdfExport.layout.sameAsRecto')">
+                  <input x-model="activeProfile.config.layout.footerVersoCenter" class="pdfx-text-input" :placeholder="activeProfile.config.layout.footerCenter || $app.t('pdfExport.layout.sameAsRecto')">
+                  <input x-model="activeProfile.config.layout.footerVersoRight" class="pdfx-text-input" :placeholder="activeProfile.config.layout.footerRight || $app.t('pdfExport.layout.sameAsRecto')">
+                </div>
               </div>
               <div class="card-form-row">
                 <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageNumberStart')"></label>
@@ -160,33 +180,14 @@
                     <input type="checkbox" x-model="activeProfile.config.layout.showFooterOnChapterStart">
                     <span x-text="$app.t('pdfExport.layout.showFooterOnChapterStart')"></span>
                   </label>
-                </div>
-              </div>
-              <div x-show="activeProfile.config.layout.mirrorMargins" x-cloak>
-                <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.versoSlotsHint')"></p>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerVersoLeft')"></label>
-                  <div class="card-form-field"><input x-model="activeProfile.config.layout.headerVersoLeft" class="pdfx-text-input"></div>
-                </div>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerVersoCenter')"></label>
-                  <div class="card-form-field"><input x-model="activeProfile.config.layout.headerVersoCenter" class="pdfx-text-input"></div>
-                </div>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.headerVersoRight')"></label>
-                  <div class="card-form-field"><input x-model="activeProfile.config.layout.headerVersoRight" class="pdfx-text-input"></div>
-                </div>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerVersoLeft')"></label>
-                  <div class="card-form-field"><input x-model="activeProfile.config.layout.footerVersoLeft" class="pdfx-text-input"></div>
-                </div>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerVersoCenter')"></label>
-                  <div class="card-form-field"><input x-model="activeProfile.config.layout.footerVersoCenter" class="pdfx-text-input"></div>
-                </div>
-                <div class="card-form-row">
-                  <label class="card-form-label" x-text="$app.t('pdfExport.layout.footerVersoRight')"></label>
-                  <div class="card-form-field"><input x-model="activeProfile.config.layout.footerVersoRight" class="pdfx-text-input"></div>
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.layout.showHeaderOnChapterEnd">
+                    <span x-text="$app.t('pdfExport.layout.showHeaderOnChapterEnd')"></span>
+                  </label>
+                  <label class="pdfx-check">
+                    <input type="checkbox" x-model="activeProfile.config.layout.showFooterOnChapterEnd">
+                    <span x-text="$app.t('pdfExport.layout.showFooterOnChapterEnd')"></span>
+                  </label>
                 </div>
               </div>
             </div>

@@ -32,6 +32,31 @@ const TRIM_PRESETS = [
   { value: 'kdp-6x9',       w: 152.4,  h: 228.6, label: 'KDP 6 × 9″ (15.24 × 22.86 cm)' },
 ];
 
+// Papiertyp-Vorlagen für die Rückenbreite. `bulk` = mm Rückenstärke je 1000
+// Innenseiten (= coverSpec.paperBulkMmPer1000). Die KDP-Werte stammen aus deren
+// offiziellen Papier-Kennwerten (Seiten pro Zoll umgerechnet); die restlichen
+// sind Richtwerte für gängiges Buchpapier — im Zweifel das Papierdatenblatt der
+// Druckerei nutzen. `labelKey` → i18n.
+const PAPER_PRESETS = [
+  { value: 'kdp-white',      bulk: 57.2, labelKey: 'pdfExport.cover.paper.kdpWhite' },
+  { value: 'kdp-cream',      bulk: 63.5, labelKey: 'pdfExport.cover.paper.kdpCream' },
+  { value: 'kdp-color-std',  bulk: 59.6, labelKey: 'pdfExport.cover.paper.kdpColorStd' },
+  { value: 'kdp-color-prem', bulk: 66.0, labelKey: 'pdfExport.cover.paper.kdpColorPrem' },
+  { value: 'offset-80',      bulk: 60.0, labelKey: 'pdfExport.cover.paper.offset80' },
+  { value: 'bulk-90',        bulk: 81.0, labelKey: 'pdfExport.cover.paper.bulk90' },
+];
+
+// KDP-Mindest-Bundsteg (innen) in mm, abhängig von der Seitenzahl (KDP-Tabelle,
+// Zoll → mm gerundet). Aussenränder-Minimum ist konstant 6.35 mm (0.25″).
+const KDP_OUTER_MIN_MM = 6.35;
+function kdpMinGutterMm(pageCount) {
+  if (pageCount <= 150) return 9.53;
+  if (pageCount <= 300) return 12.7;
+  if (pageCount <= 500) return 15.88;
+  if (pageCount <= 600) return 19.05;
+  return 22.23;
+}
+
 export function registerPdfExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('pdfExportCard', () => ({
@@ -50,11 +75,28 @@ export function registerPdfExportCard() {
         const pdfxWarn = result.pdfx?.requested && !result.pdfx.applied;
         const coverWarn = !!result.coverInInterior;
         const isWarning = pdfaWarn || pdfxWarn || coverWarn;
+        // Ganzes-Buch-Innenteil gerendert → die echte physische Seitenzahl
+        // (inkl. manueller Umbrüche/Leerseiten) in die Cover-Innenteil-Seitenzahl
+        // spiegeln, die Rückenbreite + KDP-Bundsteg treibt. Nur bei Abweichung
+        // schreiben+persistieren, damit ein unveränderter Re-Export nicht speichert.
+        const cs = self.activeProfile?.config?.coverSpec;
+        const pagesCounted = result.target !== 'cover' && result.scope === 'book'
+          && Number.isInteger(result.interiorPages) && result.interiorPages > 0
+          && cs && cs.pageCount !== result.interiorPages;
+        if (pagesCounted) {
+          cs.pageCount = result.interiorPages;
+          self.saveActiveProfile();
+        }
         const statusKey = pdfxWarn ? 'pdfExport.pdfxWarning'
           : pdfaWarn ? 'pdfExport.pdfaWarning'
           : coverWarn ? 'pdfExport.coverInInteriorWarning'
+          : pagesCounted ? 'pdfExport.donePagesCounted'
           : 'pdfExport.done';
-        return { statusKey, ttl: isWarning ? 8000 : 3500 };
+        return {
+          statusKey,
+          statusParams: pagesCounted ? { n: result.interiorPages } : undefined,
+          ttl: (isWarning || pagesCounted) ? 8000 : 3500,
+        };
       },
     }),
     ...unnumberedChipsSlice({
@@ -86,6 +128,7 @@ export function registerPdfExportCard() {
 
     exportLowRes: 0,
     trimPresetSel: '',
+    paperPresetSel: '',
 
     // coverPreviewVersion bustet den Cache der Rückseiten-Bild-Vorschau
     // (Umschlag). Front-Cover + Autorfoto leben buch-weit in book_publication
@@ -338,6 +381,60 @@ export function registerPdfExportCard() {
       this.activeProfile.config.layout.pageSize = 'custom';
       this.activeProfile.config.layout.customWidthMm = p.w;
       this.activeProfile.config.layout.customHeightMm = p.h;
+    },
+
+    // ── Cover-Tab: Papiertyp → Rückenbreite ──────────────────────────────────
+    paperPresetOptions() {
+      return PAPER_PRESETS.map(p => ({ value: p.value, label: window.__app.t(p.labelKey) }));
+    },
+    applyPaperPreset(value) {
+      const p = PAPER_PRESETS.find(x => x.value === value);
+      if (!p || !this.activeProfile) return;
+      this.activeProfile.config.coverSpec.paperBulkMmPer1000 = p.bulk;
+    },
+
+    // ── Druck-Tab: KDP-Vorgaben + Bundsteg-Prüfung ───────────────────────────
+    // Setzt die bindungs-/druckrelevanten Flags für Amazon KDP und hebt Bund-/
+    // Aussenränder auf die KDP-Mindestwerte an (Seitenzahl aus dem Cover-Tab).
+    applyKdpPreset() {
+      const cfg = this.activeProfile?.config;
+      if (!cfg) return;
+      cfg.print.cropMarks = false;       // KDP-Innenteil ohne Schnittmarken
+      cfg.print.padToEvenPages = true;   // gerade Seitenzahl zwingend
+      cfg.extras.barcode = false;        // KDP setzt eigenen Barcode
+      cfg.layout.mirrorMargins = true;   // Bundsteg (innen = marginsMm.left)
+      const pc = Math.max(0, cfg.coverSpec?.pageCount || 0);
+      if (pc) {
+        const minG = kdpMinGutterMm(pc);
+        if (cfg.layout.marginsMm.left < minG) cfg.layout.marginsMm.left = minG;
+      }
+      for (const edge of ['right', 'top', 'bottom']) {
+        if (cfg.layout.marginsMm[edge] < KDP_OUTER_MIN_MM) cfg.layout.marginsMm[edge] = KDP_OUTER_MIN_MM;
+      }
+    },
+    // Advisory: prüft die aktuellen Ränder gegen die KDP-Minima. ok===null =
+    // Hinweis (Seitenzahl fehlt), ok===false = Verstoss, ok===true = konform.
+    kdpMarginWarnings() {
+      const cfg = this.activeProfile?.config;
+      if (!cfg) return [];
+      const t = window.__app.t;
+      const pc = Math.max(0, cfg.coverSpec?.pageCount || 0);
+      if (!pc) return [{ ok: null, text: t('pdfExport.print.kdpWarnPageCount') }];
+      const m = cfg.layout.marginsMm;
+      const mirror = !!cfg.layout.mirrorMargins;
+      const inner = mirror ? m.left : Math.min(m.left, m.right);
+      const minG = kdpMinGutterMm(pc);
+      const out = [];
+      if (inner + 1e-6 < minG) {
+        out.push({ ok: false, text: t('pdfExport.print.kdpWarnGutter', { have: inner, min: minG, pages: pc }) });
+      }
+      const outers = mirror ? [m.right, m.top, m.bottom] : [m.left, m.right, m.top, m.bottom];
+      const minOuter = Math.min(...outers);
+      if (minOuter + 1e-6 < KDP_OUTER_MIN_MM) {
+        out.push({ ok: false, text: t('pdfExport.print.kdpWarnOuter', { have: minOuter, min: KDP_OUTER_MIN_MM }) });
+      }
+      if (!out.length) out.push({ ok: true, text: t('pdfExport.print.kdpOk', { pages: pc }) });
+      return out;
     },
 
     // ── Font-Preview ──────────────────────────────────────────────────────

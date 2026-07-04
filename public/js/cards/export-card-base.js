@@ -176,8 +176,9 @@ export function exportSnapshotSlice() {
 //   defaultFilename  — Fallback-Dateiname
 //   i18nPrefix       — Karten-Prefix für starting/done/error.network/error.generic
 //   errorFor(self,d) — baut die Fehlermeldung bei !ok-POST (Namespace pro Karte)
-//   resolveDone(self,result) → { statusKey, ttl? } — Done-Status (Warnungen etc.),
-//                              Default: { statusKey: `${prefix}.done`, ttl: 3500 }
+//   resolveDone(self,result) → { statusKey, statusParams?, ttl? } — Done-Status
+//                              (Warnungen etc.), Default: { statusKey:
+//                              `${prefix}.done`, ttl: 3500 }
 export function exportJobSlice(cfg) {
   return {
     exporting: false,
@@ -249,10 +250,10 @@ export function exportJobSlice(cfg) {
           this.exporting = false;
           this.exportProgress = 100;
           const result = job.result || {};
-          const { statusKey, ttl = 3500 } = cfg.resolveDone
+          const { statusKey, statusParams, ttl = 3500 } = cfg.resolveDone
             ? cfg.resolveDone(this, result)
             : { statusKey: `${cfg.i18nPrefix}.done`, ttl: 3500 };
-          this.exportStatus = window.__app.t(statusKey);
+          this.exportStatus = window.__app.t(statusKey, statusParams);
           this._triggerDownload(jobId, result.filename);
           if (this._exportStatusTimer) clearTimeout(this._exportStatusTimer);
           this._exportStatusTimer = setTimeout(() => {

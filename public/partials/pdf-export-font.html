@@ -2,6 +2,7 @@
       <div class="export-tab-panel" x-bind="panel('font')">
         <template x-for="group in [
             { key: 'body',       roles: ['body','heading'] },
+            { key: 'runningHead', roles: ['header','footer'] },
             { key: 'titlePages', roles: ['title','subtitle','byline','dedication','frontMatter','year'] },
             { key: 'backmatter', roles: ['authorBio'] },
             { key: 'imprint',    roles: ['imprint'] }

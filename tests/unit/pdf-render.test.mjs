@@ -32,6 +32,19 @@ function pageCount(buf) {
   return (buf.toString('binary').match(/\/Type\s*\/Page(?!s)/g) || []).length;
 }
 
+// Alle Recto/Verso- + Gerade-Seitenzahl-Paritätsregeln abschalten (Defaults sind
+// an). Strukturelle Page-Count-Delta-Tests brauchen das, damit eingeschobene
+// Leerseiten die Deltas nicht verfälschen; jede Paritätsregel hat einen eigenen
+// dedizierten Test weiter unten.
+function parityOff(cfg) {
+  cfg.toc.startOnRecto = false;
+  cfg.chapter.firstChapterOnRecto = false;
+  cfg.extras.dedicationOnRecto = false;
+  cfg.extras.imprintOnVerso = false;
+  cfg.print.padToEvenPages = false;
+  return cfg;
+}
+
 test('Render produziert valides PDF mit %PDF-Header', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
@@ -107,6 +120,7 @@ test('frontMatterNumbering=roman ändert Page-Count nicht + rendert ohne Crash',
 test('padToEvenPages füllt ungerade Gesamtseitenzahl auf gerade auf', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
+  cfg.print.padToEvenPages = false; // Default ist an — für den off-Vergleich explizit aus
   const off = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
   });
@@ -142,6 +156,7 @@ test('blankPageAfter erzeugt zusätzliche leere Page pro Kapitel', async () => {
 test('Widmung + Impressum erzeugen je eine zusätzliche Seite', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
+  parityOff(cfg); // Parität-Leerseiten würden das Struktur-Delta verfälschen
   const baseline = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
   });
@@ -156,7 +171,7 @@ test('Widmung + Impressum erzeugen je eine zusätzliche Seite', async () => {
 test('Motto/Frontmatter-Seite erzeugt zusätzliche Seite', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
-  cfg.toc.startOnRecto = false; // Recto-Padding würde die Parität ausgleichen
+  parityOff(cfg); // Parität-Leerseiten würden das Struktur-Delta verfälschen
   const baseline = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
   });
@@ -170,6 +185,7 @@ test('Motto/Frontmatter-Seite erzeugt zusätzliche Seite', async () => {
 test('Autor-Seite (Bio-Text) erzeugt zusätzliche Seite', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
+  parityOff(cfg); // Parität-Leerseiten würden das Struktur-Delta verfälschen
   const baseline = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
   });
@@ -183,7 +199,7 @@ test('Autor-Seite (Bio-Text) erzeugt zusätzliche Seite', async () => {
 test('ISBN/Copyright ohne Impressum-Freitext erzeugt trotzdem Impressum-Seite', async () => {
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
-  cfg.toc.startOnRecto = false; // Recto-Padding würde die Parität ausgleichen
+  parityOff(cfg); // Parität-Leerseiten würden das Struktur-Delta verfälschen
   const baseline = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null,
   });
@@ -226,12 +242,13 @@ test('Ungültige ISBN unterdrückt den Barcode ohne Crash', async () => {
 });
 
 test('imprintPosition back: Impressum am Buchende, eine Seite', async () => {
-  const front = defaultConfig(); front.cover.enabled = false;
+  const front = defaultConfig(); front.cover.enabled = false; parityOff(front);
   const baseline = await renderPdfBuffer({
     book: baseBook, groups: baseGroups, profile: { config: front }, coverBuf: null, token: null,
   });
   const cfg = defaultConfig();
   cfg.cover.enabled = false;
+  parityOff(cfg); // Parität-Leerseiten würden das Struktur-Delta verfälschen
   cfg.extras.imprint = '© 2026';
   cfg.extras.imprintPosition = 'back';
   const withBack = await renderPdfBuffer({
@@ -346,10 +363,11 @@ test('TOC mit Page-Numbers stempelt Zahlen rechts ein', async () => {
 test('TOC startOnRecto schiebt Leerseite ein, wenn TOC sonst auf Verso landet', async () => {
   // Kein Cover, keine Widmung/Impressum → nur Titelseite als Titelei.
   // Ohne Recto-Padding beginnt die TOC auf Seite 2 (Verso) → +1 Leerseite.
-  const on = defaultConfig();
+  // Andere Paritätsregeln aus, damit nur startOnRecto wirkt.
+  const on = parityOff(defaultConfig());
   on.cover.enabled = false;
   on.toc.startOnRecto = true;
-  const off = defaultConfig();
+  const off = parityOff(defaultConfig());
   off.cover.enabled = false;
   off.toc.startOnRecto = false;
   const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf: null, token: null });
@@ -359,16 +377,14 @@ test('TOC startOnRecto schiebt Leerseite ein, wenn TOC sonst auf Verso landet', 
 
 test('TOC startOnRecto fügt KEINE Leerseite ein, wenn TOC bereits auf Recto landet', async () => {
   // Titelseite + Widmung (ohne eigenes Recto-Padding) → TOC beginnt auf Seite 3
-  // (Recto), Padding no-op.
-  const on = defaultConfig();
+  // (Recto), Padding no-op. Andere Paritätsregeln aus.
+  const on = parityOff(defaultConfig());
   on.cover.enabled = false;
   on.extras.dedication = 'Für alle, die lesen.';
-  on.extras.dedicationOnRecto = false;
   on.toc.startOnRecto = true;
-  const off = defaultConfig();
+  const off = parityOff(defaultConfig());
   off.cover.enabled = false;
   off.extras.dedication = 'Für alle, die lesen.';
-  off.extras.dedicationOnRecto = false;
   off.toc.startOnRecto = false;
   const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf: null, token: null });
   const bufOff = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: off }, coverBuf: null, token: null });
@@ -378,13 +394,13 @@ test('TOC startOnRecto fügt KEINE Leerseite ein, wenn TOC bereits auf Recto lan
 test('dedicationOnRecto schiebt Leerseite ein, wenn die Widmung sonst auf Verso landet', async () => {
   // Kein Cover, kein Impressum → nur Titelseite (Recto). Ohne Padding beginnt die
   // Widmung auf Seite 2 (Verso); mit dedicationOnRecto wird eine Leerseite davor
-  // eingeschoben → +1 Seite gegenüber der Verso-Variante.
-  const on = defaultConfig();
+  // eingeschoben → +1 Seite gegenüber der Verso-Variante. Andere Paritätsregeln aus.
+  const on = parityOff(defaultConfig());
   on.cover.enabled = false;
   on.toc.enabled = false;
   on.extras.dedication = 'Für alle, die lesen.';
   on.extras.dedicationOnRecto = true;
-  const off = defaultConfig();
+  const off = parityOff(defaultConfig());
   off.cover.enabled = false;
   off.toc.enabled = false;
   off.extras.dedication = 'Für alle, die lesen.';
@@ -392,4 +408,59 @@ test('dedicationOnRecto schiebt Leerseite ein, wenn die Widmung sonst auf Verso 
   const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf: null, token: null });
   const bufOff = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: off }, coverBuf: null, token: null });
   assert.equal(pageCount(bufOn), pageCount(bufOff) + 1);
+});
+
+test('firstChapterOnRecto schiebt Leerseite ein, wenn das erste Kapitel sonst auf Verso landet', async () => {
+  // Kein Cover, keine TOC → nur Titelseite (Recto idx0). Ohne Padding beginnt der
+  // Body auf Seite 2 (Verso); mit firstChapterOnRecto wird eine Leerseite davor
+  // eingeschoben → +1 Seite. Andere Paritätsregeln aus.
+  const on = parityOff(defaultConfig());
+  on.cover.enabled = false;
+  on.toc.enabled = false;
+  on.chapter.firstChapterOnRecto = true;
+  const off = parityOff(defaultConfig());
+  off.cover.enabled = false;
+  off.toc.enabled = false;
+  off.chapter.firstChapterOnRecto = false;
+  const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf: null, token: null });
+  const bufOff = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: off }, coverBuf: null, token: null });
+  assert.equal(pageCount(bufOn), pageCount(bufOff) + 1);
+});
+
+test('imprintOnVerso schiebt Leerseite ein, wenn das Impressum sonst auf Recto landet', async () => {
+  // Mit Cover (idx0 Recto) landet die Titelseite auf Verso (idx1) und das
+  // Frontmatter-Impressum sonst auf Recto (idx2). Mit imprintOnVerso wird eine
+  // Leerseite davor eingeschoben → +1 Seite. Andere Paritätsregeln aus.
+  const sharp = (await import('sharp')).default;
+  const coverBuf = await sharp({ create: { width: 20, height: 30, channels: 3, background: '#ffffff' } })
+    .jpeg().toBuffer();
+  const on = parityOff(defaultConfig());
+  on.cover.enabled = true;
+  on.toc.enabled = false;
+  on.extras.imprint = '© 2026';
+  on.extras.imprintOnVerso = true;
+  const off = parityOff(defaultConfig());
+  off.cover.enabled = true;
+  off.toc.enabled = false;
+  off.extras.imprint = '© 2026';
+  off.extras.imprintOnVerso = false;
+  const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf, token: null });
+  const bufOff = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: off }, coverBuf, token: null });
+  assert.equal(pageCount(bufOn), pageCount(bufOff) + 1);
+});
+
+test('showFooter/HeaderOnChapterEnd=false unterdrückt nur Chrome, keine Ghost-Pages', async () => {
+  // Kapitel-Endseiten-Chrome abschalten darf die Seitenanzahl nicht verändern
+  // (nur Footer/Header der letzten Kapitelseite entfallen). Regressionsguard
+  // gegen die chapterEndSet-Berechnung im Header/Footer-Pass.
+  const on = parityOff(defaultConfig());
+  on.cover.enabled = false;
+  const off = parityOff(defaultConfig());
+  off.cover.enabled = false;
+  off.layout.showFooterOnChapterEnd = false;
+  off.layout.showHeaderOnChapterEnd = false;
+  const bufOn = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: on }, coverBuf: null, token: null });
+  const bufOff = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: off }, coverBuf: null, token: null });
+  assert.equal(bufOff.slice(0, 5).toString(), '%PDF-');
+  assert.equal(pageCount(bufOn), pageCount(bufOff));
 });

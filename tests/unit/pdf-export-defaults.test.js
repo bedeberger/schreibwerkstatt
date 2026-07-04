@@ -11,6 +11,10 @@ test('defaultConfig liefert vollständigen Schema-Baum', () => {
   assert.equal(c.cover.enabled, false);
   assert.equal(c.toc.enabled, true);
   assert.equal(c.toc.startOnRecto, true);
+  assert.equal(c.extras.dedicationOnRecto, true);
+  assert.equal(c.extras.imprintOnVerso, true);
+  assert.equal(c.chapter.firstChapterOnRecto, true);
+  assert.equal(c.print.padToEvenPages, true);
   assert.equal(c.pdfa.enabled, true);
   assert.equal(c.pdfa.standard, 'pdfa');
 });
@@ -241,11 +245,21 @@ test('validateConfig: neue Extras + imprintPosition-Enum', () => {
   assert.ok(validateConfig({ extras: { isbn: 'x'.repeat(50) } }).extras.isbn.length <= 20);
 });
 
-test('validateConfig: print.padToEvenPages — Default aus, Bool-validiert', () => {
-  assert.equal(defaultConfig().print.padToEvenPages, false);
-  assert.equal(validateConfig({ print: { padToEvenPages: true } }).print.padToEvenPages, true);
-  // Nicht-Boolean fällt auf Default zurück.
-  assert.equal(validateConfig({ print: { padToEvenPages: 'yes' } }).print.padToEvenPages, false);
+test('validateConfig: print.padToEvenPages — Default an, Bool-validiert', () => {
+  assert.equal(defaultConfig().print.padToEvenPages, true);
+  assert.equal(validateConfig({ print: { padToEvenPages: false } }).print.padToEvenPages, false);
+  // Nicht-Boolean fällt auf Default (true) zurück.
+  assert.equal(validateConfig({ print: { padToEvenPages: 'yes' } }).print.padToEvenPages, true);
+});
+
+test('validateConfig: extras.imprintOnVerso + chapter.firstChapterOnRecto — Default an, Bool-validiert', () => {
+  assert.equal(defaultConfig().extras.imprintOnVerso, true);
+  assert.equal(defaultConfig().chapter.firstChapterOnRecto, true);
+  assert.equal(validateConfig({ extras: { imprintOnVerso: false } }).extras.imprintOnVerso, false);
+  assert.equal(validateConfig({ chapter: { firstChapterOnRecto: false } }).chapter.firstChapterOnRecto, false);
+  // Nicht-Boolean fällt auf Default (true) zurück.
+  assert.equal(validateConfig({ extras: { imprintOnVerso: 'x' } }).extras.imprintOnVerso, true);
+  assert.equal(validateConfig({ chapter: { firstChapterOnRecto: 'x' } }).chapter.firstChapterOnRecto, true);
 });
 
 test('defaultConfig: coverSpec-Block (Umschlag-PDF) vorhanden + leer', () => {

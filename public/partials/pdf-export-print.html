@@ -1,6 +1,18 @@
       <!-- Druck-Tab (Druckvorstufe / klassische Druckerei) -->
       <div class="export-tab-panel" x-bind="panel('print')">
         <p class="card-form-field-note" x-text="$app.t('pdfExport.print.hint')"></p>
+
+        <!-- KDP-Vorgaben (Amazon Kindle Direct Publishing) -->
+        <div class="pdfx-kdp-preset">
+          <button type="button" @click="applyKdpPreset()" x-text="$app.t('pdfExport.print.kdpPreset')"></button>
+          <p class="card-form-field-note" x-text="$app.t('pdfExport.print.kdpPresetHint')"></p>
+          <ul class="pdfx-kdp-check">
+            <template x-for="w in kdpMarginWarnings()" :key="w.text">
+              <li :class="w.ok === false ? 'is-warn' : (w.ok === true ? 'is-ok' : 'is-info')" x-text="w.text"></li>
+            </template>
+          </ul>
+        </div>
+
         <div class="card-form-grid">
           <div class="card-form-row card-form-row--top">
             <label class="card-form-label" x-text="$app.t('pdfExport.print.trimPreset')"></label>

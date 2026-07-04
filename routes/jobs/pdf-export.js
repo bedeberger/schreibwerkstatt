@@ -115,6 +115,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     let buffer;
     let lowResImages = 0;
     let coverInInterior = false;
+    let interiorPages = null;
 
     if (target === 'cover') {
       // Separates Umschlag-PDF: nur fuer das ganze Buch sinnvoll. Front =
@@ -144,6 +145,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
         scope, chapter, page, meta,
       });
       lowResImages = Array.isArray(meta.dpiWarnings) ? meta.dpiWarnings.length : 0;
+      interiorPages = Number.isInteger(meta.totalPages) ? meta.totalPages : null;
       if (lowResImages) log.warn(`${lowResImages} Bild(er) unter ${profile.config.print?.dpiWarnThreshold || 300} dpi (scope=${scope})`);
       // Druckfertiger Innenteil sollte kein Innen-Cover tragen — Hinweis (non-fatal).
       coverInInterior = !!(scope === 'book' && coverBuf && (profile.config.print?.bleedMm > 0));
@@ -210,6 +212,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       scope,
       target,
       coverInInterior,
+      interiorPages,
       lowResImages,
       dpiThreshold: profile.config.print?.dpiWarnThreshold || 0,
       standard,
