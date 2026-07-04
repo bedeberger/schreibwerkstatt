@@ -13,7 +13,9 @@ const {
 const blogs = require('../../db/blogs');
 const contentStore = require('../../lib/content-store');
 const { createWpClient } = require('../../lib/wp-client');
-const { wpToAppHtml, appToWpHtml } = require('../../lib/wp-html');
+const { wpToAppHtml, appToWpHtmlWithMedia } = require('../../lib/wp-html');
+const { makeImageResolver } = require('../../lib/wp-media');
+const { classifyPull } = require('../../lib/blog-merge');
 const { assertBlogBook } = require('../../lib/buchtyp');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const { toIntId } = require('../../lib/validate');
@@ -25,12 +27,6 @@ const blogSyncRouter = express.Router();
 
 function _abortSignal(jobId) {
   return jobAbortControllers.get(jobId)?.signal || null;
-}
-
-function _newer(a, b) {
-  if (!a) return false;
-  if (!b) return true;
-  return String(a) > String(b);
 }
 
 // Chapter-Resolver: WP-Posts werden nach Veroeffentlichungsjahr gebuendelt.
@@ -239,16 +235,21 @@ async function runBlogPullJob(jobId, bookId, userEmail) {
           skipped++;
           continue;
         }
-        const wpHasNew = _newer(wpModified, link.wp_modified_at);
-        const appHasLocalEdit = _newer(pageRow.updated_at, link.last_pulled_at);
+        const action = classifyPull({
+          hasLink: true,
+          wpModifiedAt: wpModified,
+          linkModifiedAt: link.wp_modified_at,
+          pageUpdatedAt: pageRow.updated_at,
+          lastPulledAt: link.last_pulled_at,
+        });
 
-        if (wpHasNew && appHasLocalEdit) {
+        if (action === 'conflict') {
           blogs.setConflictState(link.page_id, 'detected');
           logger.info(`Blog-Pull: Page ${link.page_id} "${pageRow.name}" (WP-Post ${post.id}) Konflikt erkannt`);
           conflicts++;
           continue;
         }
-        if (wpHasNew && !appHasLocalEdit) {
+        if (action === 'update') {
           await contentStore.savePage(link.page_id, { name: pageName, html: appHtml }, null);
           blogs.markLinkPulled(link.page_id, {
             wpModifiedAt: wpModified,
@@ -285,6 +286,18 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
       password: conn.password,
       signal: _abortSignal(jobId),
     });
+
+    let blogOrigin = '';
+    try { blogOrigin = new URL(conn.baseUrl).origin; } catch { /* validated bei connect */ }
+    // Inline-Bilder: data-URIs / fremd-gehostete Bilder in die WP-Mediathek laden,
+    // bereits blog-gehostete unveraendert lassen. Fehler verwerfen nur das Bild.
+    let imagesUploaded = 0;
+    const _resolveImage = makeImageResolver({ wp, blogOrigin, signal: _abortSignal(jobId), logger });
+    const resolveImage = async (src) => {
+      const r = await _resolveImage(src);
+      if (r && r.src && r.src !== src) imagesUploaded++;
+      return r;
+    };
 
     const ids = (pageIds || []).map(x => parseInt(x, 10)).filter(n => Number.isInteger(n) && n > 0);
     if (!ids.length) throw Object.assign(new Error('BLOG_NO_PAGES'), { code: 'BLOG_NO_PAGES' });
@@ -323,7 +336,7 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
         continue;
       }
 
-      const wpHtml = appToWpHtml(pageRow.html || pageRow.body_html || '<p></p>');
+      const wpHtml = await appToWpHtmlWithMedia(pageRow.html || pageRow.body_html || '<p></p>', { resolveImage });
 
       // Beim Create: der Datum-Prefix `YYYY-MM-DD:` ist app-intern. Der lokale
       // page_name bekommt `YYYY-MM-DD: Rest` (oder nur `YYYY-MM-DD`, falls Rest
@@ -386,8 +399,8 @@ async function runBlogPushJob(jobId, bookId, userEmail, pageIds) {
     }
 
     blogs.touchPush(conn.id);
-    logger.info(`Push: ${pushed} aktualisiert, ${createdRemote} neu in WP, ${conflictSkipped} Konflikt skipped, ${errors.length} Fehler.`);
-    completeJob(jobId, { pushed, createdRemote, conflictSkipped, errors, renamed }, null,
+    logger.info(`Push: ${pushed} aktualisiert, ${createdRemote} neu in WP, ${conflictSkipped} Konflikt skipped, ${imagesUploaded} Bilder hochgeladen, ${errors.length} Fehler.`);
+    completeJob(jobId, { pushed, createdRemote, conflictSkipped, imagesUploaded, errors, renamed }, null,
       `${pushed + createdRemote} gepusht / ${errors.length} Fehler`);
   } catch (e) {
     if (e.name !== 'AbortError') makeJobLogger(jobId).error(`Blog-Push-Fehler: ${e.message}`);

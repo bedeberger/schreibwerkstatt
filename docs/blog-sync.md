@@ -9,7 +9,9 @@ Spec für bidirektionale Synchronisation zwischen einem self-hosted WordPress-Bl
 - **Auth:** Basic-Auth über HTTPS. URL/User/Password pro Buch in den Bucheinstellungen.
 - **Trigger:** manuell. Einmaliger Initial-Import + ad-hoc Pull/Push + on-demand Reconcile (Link-Drift-Check). Kein Cron.
 - **Editor:** WordPress Block-Editor (Gutenberg) only. Classic-Editor-Posts werden importiert, beim Push wieder als Block-HTML rausgeschrieben.
-- **Out-of-Scope:** Categories/Tags-Mapping, Medien-Upload (Featured-Image, Inline-Bilder), Auto-Pull, Mehrere Blogs pro Buch.
+- **Inline-Bilder:** werden bei Import erhalten (`<figure>`/`<img>` bleiben, `wp-image-<n>`-Klasse trägt die Attachment-ID) und bei Push als `wp:image`-Block rausgeschrieben. Bereits blog-gehostete Bilder bleiben unangetastet; data-URIs und fremd-gehostete Bilder werden vor dem Push in die WP-Mediathek hochgeladen (`lib/wp-media.js`, SSRF-guarded). Nicht-Bild-Embeds (`video`/`audio`/`iframe`/`embed`/`object`) werden beidseitig verworfen.
+- **Categories/Tags/Featured-Image:** bewusst kein eigenes Mapping. Der Push sendet nur `content` (`updatePost` ist ein Partial-Update) → WP lässt Kategorien, Tags und Featured-Image unangetastet, sie bleiben also über einen Content-Push erhalten. In-App werden sie nicht gelesen/gesetzt.
+- **Out-of-Scope:** Categories/Tags in-App bearbeiten, Featured-Image setzen, Auto-Pull, Mehrere Blogs pro Buch.
 
 ## Konflikt-Strategie (LWW)
 
@@ -64,8 +66,10 @@ CREATE INDEX idx_blog_page_links_blog ON blog_page_links(blog_id);
 
 | File | Inhalt |
 |---|---|
-| `lib/wp-client.js` | Basic-Auth-Header, HTTPS-Pflicht (`validateBaseUrl`), Pagination via `X-WP-TotalPages`, Retry/Backoff bei 429/5xx. Methoden: `me()`, `listPosts({ page, perPage, modifiedAfter? })`, `getPost(id)`, `createPost(payload)`, `updatePost(id, payload)`. Keine Media/Categories/Tags-Endpoints. |
-| `lib/wp-html.js` | `wpToAppHtml(raw)`: strip alle `<!-- wp:* -->`/`<!-- /wp:* -->` Kommentare, dann durch `lib/html-clean.js` (Single Chokepoint). `appToWpHtml(html)`: parse via linkedom, pro Block-Element passenden Gutenberg-Kommentar wrappen (siehe Block-Mapping). `<img>`/`<figure>` werden gestrippt. |
+| `lib/wp-client.js` | Basic-Auth-Header, HTTPS-Pflicht + SSRF-Guard (`validateBaseUrl`), Pagination via `X-WP-TotalPages`, Retry/Backoff bei 429/5xx. Methoden: `me()`, `listPosts({ page, perPage, modifiedAfter? })`, `getPost(id)`, `createPost(payload)`, `updatePost(id, payload)`, `uploadMedia({ data, filename, mimeType })` (Binär-Upload via `raw`-Body + `Content-Disposition`). Keine Categories/Tags-Endpoints. |
+| `lib/wp-html.js` | `wpToAppHtml(raw)`: strip alle `<!-- wp:* -->`/`<!-- /wp:* -->` Kommentare, `img` auf `src`/`alt`/`class`(`wp-image-<n>`) reduzieren, Nicht-Bild-Embeds + bild-lose Figuren entfernen, dann durch `lib/html-clean.js` (Single Chokepoint). `appToWpHtml(html)`: parse via linkedom, pro Block-Element passenden Gutenberg-Kommentar wrappen (siehe Block-Mapping); `<figure>`/`<img>` → `wp:image`. `appToWpHtmlWithMedia(html, { resolveImage })`: async Variante mit vorgelagertem Media-Pass (jedes `<img>` durch `resolveImage(src)` → src ersetzen / verwerfen). |
+| `lib/wp-media.js` | `makeImageResolver({ wp, blogOrigin, signal, logger, fetchImpl? })` → async `resolveImage(src)`: blog-gehostet → unverändert behalten; data-URI/fremde URL → Bytes holen (SSRF-Guard `assertPublicUrl` pro Hop; Redirects via `redirect: 'manual'` selbst gefolgt + jeder Hop neu validiert, Hop-Limit 5 — verhindert Redirect-Bypass auf interne IPs) + `wp.uploadMedia`. MIME-Allowlist (jpeg/png/gif/webp/avif) + 20-MB-Cap. Fehler → Bild verwerfen (`null`), nie Job-Abbruch. |
+| `lib/blog-merge.js` | Pure `classifyPull({ hasLink, wpModifiedAt, linkModifiedAt, pageUpdatedAt, lastPulledAt })` → `'create'`/`'update'`/`'conflict'`/`'skip'` + `newer(a,b)`. Ausgelagert für testbare LWW-Logik ohne Job-/DB-Kontext. |
 | `db/blogs.js` | CRUD für `blog_connections` + `blog_page_links`. Passwort beim Read via `lib/crypto.js` entschlüsseln, nie an Client returnen. |
 | `routes/blog.js` | `GET /blog/:book_id/status`, `POST /blog/:book_id/connect`, `DELETE /blog/:book_id/disconnect`. `router.param('book_id', bookParamHandler)` aus `lib/log-context.js`. Connect prüft serverseitig `buchtyp === 'blog'` (sonst 400 `BLOG_REQUIRES_BLOG_TYPE`). |
 | `routes/jobs/blog-sync.js` | Job-Typen `blog-import`, `blog-pull`, `blog-push`, `blog-reconcile`. Dedup via `findActiveJobId(type, bookId, userEmail)`. |
@@ -85,7 +89,8 @@ App-HTML → WP-Block-HTML:
 | `<pre>` | `<!-- wp:code -->\n<pre class="wp-block-code">…</pre>\n<!-- /wp:code -->` |
 | `<hr>` | `<!-- wp:separator -->\n<hr class="wp-block-separator"/>\n<!-- /wp:separator -->` |
 | Inline (`strong`, `em`, `a`, `u`) | unverändert innerhalb des Blocks |
-| `<img>`, `<figure>` | strip (Medien ignorieren) |
+| `<figure>`/`<img>` | `<!-- wp:image {"id":N,"sizeSlug":"full"} -->\n<figure class="wp-block-image size-full"><img src="…" alt="…" class="wp-image-N"/>…figcaption…</figure>\n<!-- /wp:image -->` (Attachment-ID `N` nur wenn bekannt; `figcaption` erhalten) |
+| `<video>`, `<audio>`, `<iframe>`, `<embed>`, `<object>` | strip (nicht round-trip-fähig) |
 
 Unit-Test pro Mapping in `tests/unit/wp-html.test.mjs`.
 
@@ -112,8 +117,10 @@ Voraussetzung: Initial-Import durch. Sonst 400 `IMPORT_FIRST`.
 
 ### `runBlogPushJob(bookId, pageIds[])` — manuell, Multi-Select
 
+Vor dem Upload läuft `appToWpHtmlWithMedia(html, { resolveImage })` mit einem `makeImageResolver` (Blog-Origin aus `conn.base_url`): Inline-Bilder werden ggf. in die WP-Mediathek geladen (`job.result.imagesUploaded` zählt neue Uploads). Upload-Fehler verwerfen nur das Bild, nicht den Push.
+
 1. pro `pageId`:
-   - kein Link → `createPost({ title, content: appToWpHtml, status: conn.default_status, slug })` → Link anlegen.
+   - kein Link → `createPost({ title, content: appToWpHtmlWithMedia, status: conn.default_status, slug })` → Link anlegen.
      **Titel-Normalisierung (nur Create):** Der Datum-Prefix `YYYY-MM-DD:` ist **app-intern**. Der lokale `page_name` wird auf `YYYY-MM-DD: Rest` gebracht (Datum = `localIsoDate()`); leerer Rest → nur das Datum; vorhandener Prefix (`^\d{4}-\d{2}-\d{2}(?:\s*:\s*…)?$`) wird durch heute ersetzt. **WordPress bekommt den Titel ohne Datum** (nur `Rest`; leerer Rest → leerer WP-Titel). Lokaler `page_name` zieht via `contentStore.savePage` synchron nach; jede Umbenennung landet in `job.result.renamed: [{ pageId, name }]`, damit das Frontend Sidebar-Tree + offenen Editor-Titel nachzieht (`sync-core.js#_applyPushRenames`). Updates rühren den Titel nicht an.
    - Link da, kein Konflikt → `updatePost(id, …)`, `wp_modified_at` aus Response übernehmen
    - `conflict_state='detected'` → skip, Fehler in Job-Result
@@ -210,9 +217,10 @@ Buchtyp-Label in [prompt-config.json](../prompt-config.json):
 ## Tests
 
 ### Unit (`tests/unit/`)
-- `wp-html.test.mjs` — Block-Wrap/Unwrap Round-Trip, Inline-Erhalt, Image-Strip, alle 8 Block-Mappings
+- `wp-html.test.mjs` — Block-Wrap/Unwrap Round-Trip, Inline-Erhalt, Bild-Erhalt bei Import + `wp:image`-Wrap bei Export (inkl. Attachment-ID + figcaption), Nicht-Bild-Embed-Strip, async Media-Pass (`appToWpHtmlWithMedia`)
 - `wp-client.test.mjs` — Pagination via `X-WP-TotalPages`, 401-Handling, HTTPS-Reject, Backoff bei 429/5xx
-- `blog-merge.test.mjs` — alle 4 LWW-Fälle, Slug-Match bei neuen Posts
+- `wp-media.test.mjs` — Resolver: blog-gehostet unverändert, data-URI/fremde URL → Upload, MIME-Reject, Fetch-Fehler → `null`
+- `blog-merge.test.mjs` — alle 4 LWW-Fälle (`classifyPull`) + `newer`-Vergleich
 
 ### Integration (`tests/integration/`)
 - `blog-sync.test.js` — Express-WP-Stub, Round-Trip: Initial-Import → lokales Edit → Push → Pull → no-op. Konflikt-Pfad: gleichzeitige Änderung beidseits → `conflict_state='detected'`.
