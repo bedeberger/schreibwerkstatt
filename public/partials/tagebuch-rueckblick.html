@@ -26,6 +26,11 @@
         <span x-show="rueckblickLoading" class="spinner"></span>
         <svg x-show="!rueckblickLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scroll"/></svg>
       </button>
+      <button type="button" class="icon-btn icon-btn--ghost" x-show="hasRueckblickResult() || rueckblickEmpty" x-cloak
+              @click="closeRueckblick()"
+              :data-tip="$app.t('rueckblick.close')" :aria-label="$app.t('rueckblick.close')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
+      </button>
     </div>
   </div>
 
@@ -124,35 +129,84 @@
     </div>
   </div>
 
-  <!-- History: früher generierte Rückblicke (re-öffenbar) -->
+  <!-- History: früher generierte Rückblicke (re-öffenbar) — Kalender (default)
+       oder Liste. Kalender zeigt das Jahr×Monat-Raster der gespeicherten
+       Rückblicke; Liste bleibt als durchsuchbarer Zusatz. -->
   <div x-show="rueckblickHistory.length > 0"
        class="card-history-section"
        :class="{ 'card-history-section--borderless': !hasRueckblickResult() && !rueckblickEmpty }">
-    <div class="history-heading" x-text="$app.t('rueckblick.history')"></div>
-    <span class="filter-search-wrap rb-history-search-wrap" x-show="rueckblickHistory.length > 2">
-      <input type="text" class="filter-search-input rb-history-search" x-model="rbHistorySearch"
-             :placeholder="$app.t('rueckblick.historySearch')" :aria-label="$app.t('rueckblick.historySearch')">
-      <button type="button" class="search-clear--icon" x-show="rbHistorySearch" @click="rbHistorySearch=''"
-              :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
-      </button>
-    </span>
-    <template x-for="entry in filteredRueckblickHistory()" :key="entry.id">
-      <div>
-        <div class="history-item" :class="{ 'history-item--active': selectedRueckblickId === entry.id }"
-             @click="openRueckblickHistory(entry)">
-          <span class="rb-history-zeitraum" x-text="zeitraumLabel(entry.zeitraum)"></span>
-          <span class="history-date" x-text="rueckblickEntryDate(entry.created_at)"></span>
-          <span class="tag" x-show="entry.model" x-text="entry.model"></span>
-          <button type="button" class="history-item-delete" @click.stop="deleteRueckblickHistory(entry.id)"
-                  :data-tip="$app.t('common.deleteEntry')" :aria-label="$app.t('common.deleteEntry')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
-          </button>
+    <div class="rb-history-head">
+      <div class="history-heading" x-text="$app.t('rueckblick.history')"></div>
+      <div class="tabs rb-history-tabs">
+        <button type="button" class="tabs-btn" :class="{ 'tabs-btn--active': rbHistoryView === 'cal' }"
+                @click="rbHistoryView = 'cal'" x-text="$app.t('rueckblick.viewCalendar')"></button>
+        <button type="button" class="tabs-btn" :class="{ 'tabs-btn--active': rbHistoryView === 'list' }"
+                @click="rbHistoryView = 'list'" x-text="$app.t('rueckblick.viewList')"></button>
+      </div>
+    </div>
+
+    <!-- Kalender-Ansicht -->
+    <div class="rb-cal" x-show="rbHistoryView === 'cal'" x-cloak>
+      <div class="rb-cal-scroll">
+        <div class="rb-cal-grid">
+          <div class="rb-cal-row rb-cal-row--head">
+            <span class="rb-cal-corner"></span>
+            <template x-for="(mLabel, mi) in rbMonthLabels()" :key="mi">
+              <span class="rb-cal-month-label" x-text="mLabel"></span>
+            </template>
+          </div>
+          <template x-for="row in rueckblickCalendar().years" :key="row.year">
+            <div class="rb-cal-row">
+              <button type="button" class="rb-cal-year"
+                      :class="{ 'rb-cal-year--has': row.hasRueckblick, 'rb-cal-year--active': row.selected }"
+                      :disabled="!row.hasRueckblick && !row.hasEntries"
+                      @click="openCalendarYear(row)" :data-tip="rbCalYearTip(row)"
+                      x-text="row.year"></button>
+              <template x-for="cell in row.months" :key="cell.key">
+                <button type="button" class="rb-cal-cell"
+                        :class="{ 'rb-cal-cell--has': cell.hasRueckblick, 'rb-cal-cell--entries': cell.hasEntries && !cell.hasRueckblick, 'rb-cal-cell--active': cell.selected }"
+                        :disabled="!cell.hasRueckblick && !cell.hasEntries"
+                        @click="openCalendarCell(cell)" :data-tip="rbCalCellTip(cell)"></button>
+              </template>
+            </div>
+          </template>
         </div>
       </div>
-    </template>
-    <div class="rb-empty" x-show="rbHistorySearch && !filteredRueckblickHistory().length" x-cloak
-         x-text="$app.t('rueckblick.historyNoMatch')"></div>
+      <div class="rb-cal-legend">
+        <span class="rb-cal-legend-swatch rb-cal-cell--has"></span>
+        <span x-text="$app.t('rueckblick.cal.legendHas')"></span>
+        <span class="rb-cal-legend-swatch rb-cal-cell--entries"></span>
+        <span x-text="$app.t('rueckblick.cal.legendEntries')"></span>
+      </div>
+    </div>
+
+    <!-- Listen-Ansicht -->
+    <div x-show="rbHistoryView === 'list'" x-cloak>
+      <span class="filter-search-wrap rb-history-search-wrap" x-show="rueckblickHistory.length > 2">
+        <input type="text" class="filter-search-input rb-history-search" x-model="rbHistorySearch"
+               :placeholder="$app.t('rueckblick.historySearch')" :aria-label="$app.t('rueckblick.historySearch')">
+        <button type="button" class="search-clear--icon" x-show="rbHistorySearch" @click="rbHistorySearch=''"
+                :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
+        </button>
+      </span>
+      <template x-for="entry in filteredRueckblickHistory()" :key="entry.id">
+        <div>
+          <div class="history-item" :class="{ 'history-item--active': selectedRueckblickId === entry.id }"
+               @click="openRueckblickHistory(entry)">
+            <span class="rb-history-zeitraum" x-text="zeitraumLabel(entry.zeitraum)"></span>
+            <span class="history-date" x-text="rueckblickEntryDate(entry.created_at)"></span>
+            <span class="tag" x-show="entry.model" x-text="entry.model"></span>
+            <button type="button" class="history-item-delete" @click.stop="deleteRueckblickHistory(entry.id)"
+                    :data-tip="$app.t('common.deleteEntry')" :aria-label="$app.t('common.deleteEntry')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
+            </button>
+          </div>
+        </div>
+      </template>
+      <div class="rb-empty" x-show="rbHistorySearch && !filteredRueckblickHistory().length" x-cloak
+           x-text="$app.t('rueckblick.historyNoMatch')"></div>
+    </div>
   </div>
 
   <!-- Hinweis, solange noch kein Rückblick gespeichert wurde -->

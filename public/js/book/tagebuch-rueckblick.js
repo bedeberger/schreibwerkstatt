@@ -278,4 +278,129 @@ export const tagebuchRueckblickMethods = {
         tzOpts({ day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
     } catch { return iso; }
   },
+
+  // Angezeigten Rückblick schliessen → zurück zur Kalender-/Listen-Übersicht.
+  // Ändert den gewählten Zeitraum NICHT, damit der $watch keinen Eintrag
+  // erneut öffnet (bewusst leere Anzeige). Der „Aktuell"-Hinweis bleibt sichtbar,
+  // falls die Neugenerierung gesperrt ist — er erklärt den deaktivierten Button.
+  closeRueckblick() {
+    this.rueckblickResult = null;
+    this.rueckblickEmpty = false;
+    this.selectedRueckblickId = null;
+    this.clearBeleg();
+  },
+
+  // ── Kalender-Ansicht der History (Jahr×Monat-Raster) ────────────────────────
+  // Rein aus nav.pages (welche Monate haben datierte Einträge?) + rueckblickHistory
+  // (welche Zeiträume haben einen gespeicherten Rückblick?) abgeleitet — kein
+  // Server-Coverage nötig. Monatszelle: gespeicherter Rückblick → öffnen; nur
+  // Einträge → Zeitraum vorwählen (Generieren); leer → inaktiv.
+  rueckblickCalendar() {
+    const pages = Alpine.store('nav').pages || [];
+    const hist = this.rueckblickHistory || [];
+    return this._memo('rbCal', [pages, hist, this.selectedRueckblickId],
+      () => this._computeRueckblickCalendar(pages, hist, this.selectedRueckblickId));
+  },
+
+  _computeRueckblickCalendar(pages, history, selectedId) {
+    const monthsWithEntries = new Set();
+    let minYear = Infinity, maxYear = -Infinity;
+    for (const p of pages) {
+      const m = ISO_DATE_RE.exec(p?.name || '');
+      if (!m) continue;
+      const y = parseInt(m[1], 10);
+      monthsWithEntries.add(`${m[1]}-${m[2]}`);
+      if (y < minYear) minYear = y;
+      if (y > maxYear) maxYear = y;
+    }
+    // Rückblick-Einträge nach Zeitraum ('YYYY-MM' Monat, 'YYYY' Jahr).
+    const byZeitraum = new Map();
+    for (const e of history) {
+      const z = String(e?.zeitraum || '');
+      if (z) byZeitraum.set(z, e);
+      const ym = /^(\d{4})/.exec(z);
+      if (ym) { const y = parseInt(ym[1], 10); if (y < minYear) minYear = y; if (y > maxYear) maxYear = y; }
+    }
+    if (!isFinite(minYear) || !isFinite(maxYear)) return { years: [] };
+
+    const rows = [];
+    for (let y = maxYear; y >= minYear; y--) {
+      const yKey = String(y);
+      const yEntry = byZeitraum.get(yKey) || null;
+      const months = [];
+      for (let mi = 1; mi <= 12; mi++) {
+        const key = `${yKey}-${String(mi).padStart(2, '0')}`;
+        const entry = byZeitraum.get(key) || null;
+        months.push({
+          key,
+          monthIdx: mi,
+          hasEntries: monthsWithEntries.has(key),
+          hasRueckblick: !!entry,
+          entryId: entry?.id ?? null,
+          createdAt: entry?.created_at || null,
+          selected: !!(entry && entry.id === selectedId),
+        });
+      }
+      rows.push({
+        year: y,
+        yearKey: yKey,
+        hasEntries: months.some(m => m.hasEntries),
+        hasRueckblick: !!yEntry,
+        entryId: yEntry?.id ?? null,
+        createdAt: yEntry?.created_at || null,
+        selected: !!(yEntry && yEntry.id === selectedId),
+        months,
+      });
+    }
+    return { years: rows };
+  },
+
+  // 12 lokalisierte Kurz-Monatsnamen (Spaltenköpfe des Kalenders).
+  rbMonthLabels() {
+    const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+    return this._memo('rbMonthLabels', [locale], () => {
+      const fmt = new Intl.DateTimeFormat(locale, tzOpts({ month: 'short' }));
+      const out = [];
+      for (let m = 0; m < 12; m++) out.push(fmt.format(new Date(2024, m, 15, 12)));
+      return out;
+    });
+  },
+
+  // Klick auf eine Monatszelle: vorhandenen Rückblick öffnen, sonst (bei datierten
+  // Einträgen) den Zeitraum vorwählen. Der $watch auf rueckblickZeitraum leert
+  // dann Result + Auswahl, sodass der Generieren-Button greift.
+  openCalendarCell(cell) {
+    if (!cell) return;
+    if (cell.hasRueckblick) {
+      const entry = (this.rueckblickHistory || []).find(e => e.id === cell.entryId);
+      if (entry) this.openRueckblickHistory(entry);
+    } else if (cell.hasEntries) {
+      this.rueckblickZeitraum = cell.key;
+    }
+  },
+
+  openCalendarYear(row) {
+    if (!row) return;
+    if (row.hasRueckblick) {
+      const entry = (this.rueckblickHistory || []).find(e => e.id === row.entryId);
+      if (entry) this.openRueckblickHistory(entry);
+    } else if (row.hasEntries) {
+      this.rueckblickZeitraum = row.yearKey;
+    }
+  },
+
+  // Tooltip einer Monatszelle bzw. eines Jahres im Kalender.
+  rbCalCellTip(cell) {
+    const period = `${this.rbMonthLabels()[cell.monthIdx - 1]} ${cell.key.slice(0, 4)}`;
+    return this._rbCalTip(period, cell);
+  },
+  rbCalYearTip(row) {
+    return this._rbCalTip(String(row.year), row);
+  },
+  _rbCalTip(period, node) {
+    const app = window.__app;
+    if (node.hasRueckblick) return `${period}: ${app.t('rueckblick.cal.tipHas', { date: this.rueckblickEntryDate(node.createdAt) })}`;
+    if (node.hasEntries) return `${period}: ${app.t('rueckblick.cal.tipGenerate')}`;
+    return `${period}: ${app.t('rueckblick.cal.tipEmpty')}`;
+  },
 };

@@ -24,6 +24,7 @@ export function registerTagebuchRueckblickCard() {
     rbHistoryLoaded: false,
     selectedRueckblickId: null,
     rbHistorySearch: '',
+    rbHistoryView: 'cal',
     rbBeleg: { key: null, label: '', belege: [] },
     _rueckblickPollTimer: null,
     _lifecycle: null,
@@ -64,6 +65,7 @@ export function registerTagebuchRueckblickCard() {
           rbHistoryLoaded: false,
           selectedRueckblickId: null,
           rbHistorySearch: '',
+          rbHistoryView: 'cal',
           rbBeleg: { key: null, label: '', belege: [] },
         },
         extraListeners: [
