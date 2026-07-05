@@ -1278,7 +1278,9 @@ CSS: [public/css/components/confirm-dialog.css](public/css/components/confirm-di
 - `.chat-skeleton-wrapper` + `.chat-skeleton-line`
 - Animation `@keyframes skeleton-shimmer` in [public/css/chat.css](public/css/chat.css).
 
-Kein Skeleton ohne Shimmer-Animation. CSS-File-Referenzen: [entity-list.css](public/css/entities/entity-list.css), [chat.css](public/css/chat.css).
+**Seiteninhalt** (Notebook-Editor Read-Modus, Prosa-Schimmer): `.page-content-skeleton` + n× `.page-content-skeleton__line` (`x-for="i in 8"`). Sitzt anstelle der `.page-content-view`, solange `pageContentLoading && !renderedPageHtml` — verhindert die blanke Fläche bei langsamem Netz / kaltem SW-Cache (ein langsamer Seiten-Load liest sonst wie „Inhalt weg"). An dieselbe Lesebreite ausgerichtet. CSS: [page/page-content-skeleton.css](public/css/page/page-content-skeleton.css).
+
+Kein Skeleton ohne Shimmer-Animation. CSS-File-Referenzen: [entity-list.css](public/css/entities/entity-list.css), [chat.css](public/css/chat.css), [page-content-skeleton.css](public/css/page/page-content-skeleton.css).
 
 ---
 
@@ -2288,6 +2290,7 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 |------|--------|
 | [page/page-list.css](public/css/page/page-list.css) | Seiten-Liste in Sidebar, `.tok-stats`, `.tok-totals`. |
 | [page/page-view.css](public/css/page/page-view.css) | `.page-content-view` Reading-Frame, Callouts, Marginalia-Stripe, Mention-/Channel-Chips. |
+| [page/page-content-skeleton.css](public/css/page/page-content-skeleton.css) | `.page-content-skeleton` — Prosa-Schimmer-Lade-Skelett anstelle der `.page-content-view` (Notebook Read-Modus). |
 | [page/sidebar-calendar.css](public/css/page/sidebar-calendar.css) | `.sidebar-calendar` — Monats-Grid + Stepper für Tagebuch-Sidebar. |
 | [page/diary-anniversary.css](public/css/page/diary-anniversary.css) | `.diary-anniversary` / `.diary-range` — Rückblick „An diesem Tag" + Zeitraum-Suche im Kalender-Sidebar. |
 | [page/page-revision-viewer.css](public/css/page/page-revision-viewer.css) | Page-Revision-Diff-Viewer. |

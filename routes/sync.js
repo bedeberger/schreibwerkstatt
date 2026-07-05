@@ -37,6 +37,32 @@ function _errDetail(e) {
   return parts.join(' | ');
 }
 
+// Event-Loop-Yield zwischen Backfill-Batches. Die Stats-/Preview-Schleifen lesen
+// pro Seite synchron aus better-sqlite3 (`loadPage`); bei einem grossen Tagebuch
+// (tausende Seiten) blockiert das sonst den single-threaded Server, sodass ein
+// interaktiver Seiten-GET beim Buchwechsel bis zum 30s-Client-Timeout hinter dem
+// Backfill ansteht. setImmediate gibt den Loop frei — ein blosses `await` yieldet
+// nur Microtasks, lässt aber keine gequeueten HTTP-Requests durch (nur Macrotasks).
+const _yield = () => new Promise((resolve) => setImmediate(resolve));
+
+// Concurrent-Backfill-Coalescing: mehrere Tabs feuern beim Buchwechsel denselben
+// Full-Backfill (/sync/pages + /sync/page-stats ohne ids) gleichzeitig → N-fache
+// synchrone DB-Last auf demselben Buch. Läuft für ein Buch bereits ein Backfill,
+// teilen sich Folge-Requests dessen Promise, statt die Arbeit zu doppeln.
+const _inflightPagesCache = new Map(); // bookId -> Promise
+const _inflightStatsFull = new Map();  // bookId -> Promise
+
+function _coalesce(map, key, fn) {
+  const running = map.get(key);
+  if (running) return running;
+  const p = (async () => {
+    try { return await fn(); }
+    finally { map.delete(key); }
+  })();
+  map.set(key, p);
+  return p;
+}
+
 // Token-Schätzung: Text-Tokens (chars / CHARS_PER_TOKEN), gleiche Quelle wie
 // chars. Hero und Sidebar-Σ zeigen damit ein konstantes Verhältnis. Nur
 // Seiten-HTML zählt — Seiten- und Kapitelnamen fliessen nicht in den Umfang
@@ -157,6 +183,7 @@ async function syncPagesCache(bookId, ctx) {
     const stmtPrev = db.prepare('UPDATE pages SET preview_text = ? WHERE page_id = ?');
     const BATCH = 5;
     for (let i = 0; i < toFetch.length; i += BATCH) {
+      if (i > 0) await _yield();
       await Promise.allSettled(toFetch.slice(i, i + BATCH).map(async p => {
         try {
           const pd = await contentStore.loadPage(p.id, ctx);
@@ -209,6 +236,7 @@ async function syncBook(bookId, ctx) {
   const previewItems = [];
   const indexItems = [];
   for (let i = 0; i < pages.length; i += BATCH) {
+    if (i > 0) await _yield();
     const batch = pages.slice(i, i + BATCH);
     const results = await Promise.allSettled(batch.map(async p => {
       const pd = await contentStore.loadPage(p.id, ctx);
@@ -346,13 +374,82 @@ router.post('/pages/:book_id', async (req, res) => {
     logger.info(`Buch gewechselt (book=${bookId})`);
   }
   try {
-    await syncPagesCache(bookId, null);
+    // Über mehrere Tabs/schnelle Buchwechsel coalescen — fire-and-forget Aufrufer
+    // teilen sich einen laufenden Cache-Update statt ihn zu vervielfachen.
+    await _coalesce(_inflightPagesCache, bookId, () => syncPagesCache(bookId, null));
     res.json({ ok: true });
   } catch (e) {
     logger.error('pages-Cache Sync Fehler: ' + _errDetail(e));
     res.status(500).json({ error: e.message });
   }
 });
+
+// Stats für veraltete/fehlende Seiten neu berechnen. `requestedSet` (Set|null)
+// grenzt auf konkrete Seiten ein (Lazy-Pfad); null = alle. Yield zwischen Batches,
+// damit der Backfill den Event-Loop nicht monopolisiert.
+async function _recomputeStalePageStats(bookId, pages, requestedSet, ctx) {
+  const existing = Object.fromEntries(
+    db.prepare('SELECT page_id, updated_at FROM page_stats WHERE book_id = ?')
+      .all(bookId).map(r => [r.page_id, r.updated_at])
+  );
+  const stale = pages.filter(p => {
+    if (requestedSet && !requestedSet.has(p.id)) return false;
+    const cur = existing[p.id];
+    return cur === undefined || cur !== (p.updated_at || null);
+  });
+
+  const now = new Date().toISOString();
+  const newItems = [];
+  const BATCH = 10;
+  for (let i = 0; i < stale.length; i += BATCH) {
+    if (i > 0) await _yield();
+    const slice = stale.slice(i, i + BATCH);
+    const results = await Promise.allSettled(slice.map(async p => {
+      const pd = await contentStore.loadPage(p.id, ctx);
+      const { words, chars, tok } = computeStats(pd.html || '');
+      return { page_id: p.id, book_id: bookId, tok, words, chars, updated_at: p.updated_at || null, cached_at: now };
+    }));
+    for (const r of results) if (r.status === 'fulfilled') newItems.push(r.value);
+  }
+  if (newItems.length) upsertPageStatsMany(newItems);
+  return { computed: newItems.length, total: pages.length };
+}
+
+// Full-Backfill: vollwertiger pages-Cache-Update (Chapters, Prune, Reconcile) +
+// Stats für alle veralteten Seiten. Wird beim Buchwechsel per Coalescing entzerrt.
+async function _backfillPageStatsFull(bookId, ctx) {
+  const pages = await contentStore.listPages(bookId, ctx);
+  const chapters = await contentStore.listChapters(bookId, ctx);
+  const bookMeta = await contentStore.loadBook(bookId, ctx).catch(() => null);
+  if (bookMeta) upsertBook(bookMeta);
+  _upsertPagesCache(bookId, pages, chapters);
+  return _recomputeStalePageStats(bookId, pages, null, ctx);
+}
+
+// Lazy-Pfad (IntersectionObserver): nur die angefragten pages-Rows einsetzen,
+// kein Chapter-/Prune-Aufwand — viewport-priorisiert, daher nicht coalesced.
+async function _backfillPageStatsLazy(bookId, requestedIds, ctx) {
+  const pages = await contentStore.listPages(bookId, ctx);
+  const bookRow = db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId);
+  if (!bookRow) {
+    const bookMeta = await contentStore.loadBook(bookId, ctx).catch(() => null);
+    if (bookMeta) upsertBook(bookMeta);
+  }
+  const stmt = db.prepare(`
+    INSERT INTO pages (page_id, book_id, page_name, chapter_id, updated_at, last_seen_at)
+    VALUES (?, ?, ?, NULL, ?, ?)
+    ON CONFLICT(page_id) DO UPDATE SET
+      book_id=excluded.book_id, page_name=excluded.page_name,
+      updated_at=excluded.updated_at, last_seen_at=excluded.last_seen_at
+  `);
+  const seenAt = new Date().toISOString();
+  const want = new Set(requestedIds);
+  db.transaction(() => {
+    // updated_at nie NULL — sonst blockiert die Row den Sync-Keyset-Cursor.
+    for (const p of pages) if (want.has(p.id)) stmt.run(p.id, bookId, p.name, p.updated_at || seenAt, seenAt);
+  })();
+  return _recomputeStalePageStats(bookId, pages, want, ctx);
+}
 
 // POST /sync/page-stats/:book_id – leichtgewichtiger Refresh nur der page_stats-Tabelle.
 // Optional `{ ids: [page_id, …] }` priorisiert konkrete Seiten (IntersectionObserver-Lazy-Pfad);
@@ -361,7 +458,6 @@ router.post('/pages/:book_id', async (req, res) => {
 router.post('/page-stats/:book_id', express.json(), async (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  const ctx = null;
 
   const requestedIds = Array.isArray(req.body?.ids)
     ? Array.from(new Set(req.body.ids.map(toIntId).filter(Boolean)))
@@ -371,64 +467,14 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
   }
 
   try {
-    const pages = await contentStore.listPages(bookId, ctx);
-
-    // FK-Vorbereitung: page_stats.book_id → books, page_stats.page_id → pages.
-    if (requestedIds) {
-      // Lazy-Pfad: nur die angefragten pages-Rows einsetzen, kein Chapter-/Prune-Aufwand.
-      const bookRow = db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId);
-      if (!bookRow) {
-        const bookMeta = await contentStore.loadBook(bookId, ctx).catch(() => null);
-        if (bookMeta) upsertBook(bookMeta);
-      }
-      const stmt = db.prepare(`
-        INSERT INTO pages (page_id, book_id, page_name, chapter_id, updated_at, last_seen_at)
-        VALUES (?, ?, ?, NULL, ?, ?)
-        ON CONFLICT(page_id) DO UPDATE SET
-          book_id=excluded.book_id, page_name=excluded.page_name,
-          updated_at=excluded.updated_at, last_seen_at=excluded.last_seen_at
-      `);
-      const seenAt = new Date().toISOString();
-      const want = new Set(requestedIds);
-      db.transaction(() => {
-        // updated_at nie NULL — sonst blockiert die Row den Sync-Keyset-Cursor.
-        for (const p of pages) if (want.has(p.id)) stmt.run(p.id, bookId, p.name, p.updated_at || seenAt, seenAt);
-      })();
-    } else {
-      // Full-Backfill: vollwertiger pages-Cache-Update (Chapters, Prune, Reconcile).
-      const chapters = await contentStore.listChapters(bookId, ctx);
-      const bookMeta = await contentStore.loadBook(bookId, ctx).catch(() => null);
-      if (bookMeta) upsertBook(bookMeta);
-      _upsertPagesCache(bookId, pages, chapters);
-    }
-
-    const existing = Object.fromEntries(
-      db.prepare('SELECT page_id, updated_at FROM page_stats WHERE book_id = ?')
-        .all(bookId).map(r => [r.page_id, r.updated_at])
-    );
-    const requested = requestedIds ? new Set(requestedIds) : null;
-    const stale = pages.filter(p => {
-      if (requested && !requested.has(p.id)) return false;
-      const cur = existing[p.id];
-      return cur === undefined || cur !== (p.updated_at || null);
-    });
-
-    const now = new Date().toISOString();
-    const newItems = [];
-    const BATCH = 10;
-    for (let i = 0; i < stale.length; i += BATCH) {
-      const slice = stale.slice(i, i + BATCH);
-      const results = await Promise.allSettled(slice.map(async p => {
-        const pd = await contentStore.loadPage(p.id, ctx);
-        const { words, chars, tok } = computeStats(pd.html || '');
-        return { page_id: p.id, book_id: bookId, tok, words, chars, updated_at: p.updated_at || null, cached_at: now };
-      }));
-      for (const r of results) if (r.status === 'fulfilled') newItems.push(r.value);
-    }
-    if (newItems.length) upsertPageStatsMany(newItems);
+    // Full-Backfill über mehrere Tabs/schnelle Buchwechsel coalescen; Lazy-Pfad
+    // bleibt eigenständig (klein + viewport-priorisiert).
+    const result = requestedIds
+      ? await _backfillPageStatsLazy(bookId, requestedIds, null)
+      : await _coalesce(_inflightStatsFull, bookId, () => _backfillPageStatsFull(bookId, null));
 
     const map = {};
-    if (requested) {
+    if (requestedIds) {
       const placeholders = requestedIds.map(() => '?').join(',');
       const rows = db.prepare(
         `SELECT page_id, tok, words, chars, updated_at FROM page_stats
@@ -442,8 +488,8 @@ router.post('/page-stats/:book_id', express.json(), async (req, res) => {
       for (const r of rows) map[r.page_id] = { tok: r.tok, words: r.words, chars: r.chars, updated_at: r.updated_at };
     }
 
-    logger.info(`page-stats Buch ${bookId}: ${newItems.length}/${stale.length} neu, ${pages.length} total${requestedIds ? ' (lazy)' : ''}.`);
-    res.json({ stats: map, computed: newItems.length, total: pages.length });
+    logger.info(`page-stats Buch ${bookId}: ${result.computed} neu, ${result.total} total${requestedIds ? ' (lazy)' : ''}.`);
+    res.json({ stats: map, computed: result.computed, total: result.total });
   } catch (e) {
     logger.error('page-stats Sync Fehler: ' + _errDetail(e));
     res.status(500).json({ error: e.message });

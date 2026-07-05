@@ -1,0 +1,21 @@
+/* Lade-Skelett für den Seiteninhalt (Notebook-Editor Read-Modus). Sitzt anstelle
+   der `.page-content-view`, solange `pageContentLoading && !renderedPageHtml` —
+   verhindert die blanke Fläche bei langsamem Netz / kaltem SW-Cache (ein langsamer
+   Seiten-Load liest sonst wie „Inhalt weg"). An dieselbe Lesebreite ausgerichtet.
+   Reusing globaler `skeleton-shimmer`-Keyframe (chat.css/entity-list.css). */
+.page-content-skeleton {
+  margin: var(--space-md) auto;
+  max-width: calc(64ch + 2 * clamp(18px, 4vw, 40px));
+  padding: var(--space-md) clamp(18px, 4vw, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.page-content-skeleton__line {
+  height: 0.85em;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-shimmer-from) 25%, var(--color-neutral-bg) 50%, var(--color-shimmer-from) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.page-content-skeleton__line:nth-child(3n) { width: 62%; }

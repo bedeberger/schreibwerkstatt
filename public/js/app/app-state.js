@@ -122,6 +122,9 @@ const pageState = () => ({
   // Fehler beim Öffnen). Zeigt im View-Modus einen Retry-Block statt einer
   // stillen leeren Seite. Wird bei jedem Ladeversuch (selectPage/Retry) genullt.
   pageLoadError: false,
+  // true, solange der Seiteninhalt beim Öffnen lädt — zeigt im View-Modus ein
+  // Lade-Skelett statt einer blanken Fläche (langsames Netz / kalter SW-Cache).
+  pageContentLoading: false,
   // Re-Entry-Guard für den manuellen Retry-Button (deaktiviert ihn während des
   // Ladens). Im Template gebunden → muss explizit deklariert sein.
   _retryingPageLoad: false,

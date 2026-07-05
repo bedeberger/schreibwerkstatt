@@ -74,6 +74,17 @@
           x-text="t('editor.btn.retryLoad')"></button>
 </div>
 
+<!-- Lade-Skelett: solange der Seiteninhalt lädt und noch nichts gerendert ist,
+     zeigt ein Prosa-Schimmer statt einer blanken Fläche (langsames Netz / kalter
+     SW-Cache). Verschwindet, sobald `renderedPageHtml` gesetzt ist. -->
+<div class="page-content-skeleton"
+     x-show="!editMode && currentPage && pageContentLoading && !pageLoadError && !renderedPageHtml"
+     x-cloak aria-hidden="true">
+  <template x-for="i in 8" :key="i">
+    <div class="page-content-skeleton__line"></div>
+  </template>
+</div>
+
 <div class="page-empty-state"
      x-show="!editMode && currentPage && currentPageEmpty && !pageLoadError && originalHtml !== null"
      x-cloak>

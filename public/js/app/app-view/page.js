@@ -108,6 +108,7 @@ export const pageMethods = {
   async _loadCurrentPageContent(p, { auto = true } = {}) {
     const pageId = p.id;
     this.pageLoadError = false;
+    this.pageContentLoading = true;
     try {
       let pd = await contentRepo.loadPage(pageId);
       // Während des await kann der User weggewechselt haben → nichts anwenden.
@@ -138,6 +139,10 @@ export const pageMethods = {
       this.pageLoadError = true;
       this.setStatus(this.t('chat.pageLoadFailed'));
       return false;
+    } finally {
+      // Skelett nur ausblenden, wenn dieser Load noch die aktuelle Seite betrifft —
+      // bei schnellem Weiterwechsel besitzt der neuere Load das Flag.
+      if (this.currentPage?.id === pageId) this.pageContentLoading = false;
     }
   },
 
