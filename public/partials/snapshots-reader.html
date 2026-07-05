@@ -1,0 +1,90 @@
+<!-- Reader: Fassung nur-lesend oeffnen (Modal-Charakter).
+     Ausgelagert aus snapshots.html (LOC-Split), via `<!-- @include snapshots-reader -->`
+     eingebunden — laeuft im Scope von snapshotsCard (siehe snapshots-card.js). -->
+<div class="snapshot-reader" x-show="readerOpen" x-cloak
+     @keydown.escape.window="readerOpen && closeReader()"
+     role="dialog" aria-modal="true" :aria-label="$app.t('snapshots.reader.title')">
+  <div class="snapshot-reader__backdrop" @click="closeReader()"></div>
+  <div class="snapshot-reader__panel">
+    <header class="snapshot-reader__header">
+      <div class="snapshot-reader__titles">
+        <span class="snapshot-reader__title" x-text="readerSnap ? fassungLabel(readerSnap) : ''"></span>
+        <span class="badge badge-ok" x-show="readerSnap && isPublished(readerSnap)" x-cloak
+              x-text="$app.t('snapshots.publishedTag')"></span>
+        <span class="snapshot-reader__date" x-show="readerSnap"
+              x-text="readerSnap ? $app.formatDate(readerSnap.created_at) : ''"></span>
+      </div>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="closeReader()"
+              :aria-label="$app.t('snapshots.reader.close')" :data-tip="$app.t('snapshots.reader.close')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+      </button>
+    </header>
+
+    <!-- Export-Leiste: Schnell-Formate (Download-Links) + PDF (Profil + Job). -->
+    <div class="snapshot-reader__export">
+      <span class="snapshot-reader__export-label" x-text="$app.t('snapshots.export.heading')"></span>
+      <template x-for="f in quickFormats()" :key="f">
+        <a class="btn-compact" :href="exportUrl(f)" x-text="formatLabel(f)"></a>
+      </template>
+      <div class="snapshot-reader__pdf" x-show="pdfProfiles.length">
+        <div x-data="combobox($app.t('snapshots.export.pdfProfile'))"
+             x-modelable="value" x-model="pdfProfileId"
+             x-effect="options = pdfProfiles.map(p => ({ value: String(p.id), label: p.name }))"></div>
+        <button type="button" class="btn-compact" @click="exportPdf()"
+                :disabled="pdfExporting || !pdfProfileId"
+                x-text="pdfExporting ? $app.t('snapshots.export.creating') : $app.t('snapshots.export.pdfCreate')"></button>
+      </div>
+      <span class="muted-msg muted-msg--sm" x-show="!pdfProfiles.length"
+            x-text="$app.t('snapshots.export.pdfNoProfiles')"></span>
+    </div>
+    <div class="snapshot-reader__status" x-show="pdfStatus" x-cloak x-text="pdfStatus"></div>
+    <div class="snapshot-reader__status muted-msg--error" x-show="pdfError" x-cloak x-text="pdfError"></div>
+
+    <!-- Publikations-Nachweis: eingefrorener Weltaufbau-/Lektorat-Stand zum
+         Zeitpunkt der Fassung (Zaehl-Uebersicht, kein Restore). -->
+    <div class="snapshot-reader__extras" x-show="readerExtraItems().length" x-cloak>
+      <span class="snapshot-reader__extras-label" x-text="$app.t('snapshots.extras.heading')"></span>
+      <template x-for="it in readerExtraItems()" :key="it.label">
+        <span class="tag snapshot-reader__extra"><span x-text="it.value"></span> <span x-text="it.label"></span></span>
+      </template>
+    </div>
+
+    <p class="snapshot-reader__hint" x-text="$app.t('snapshots.reader.hint')"></p>
+
+    <!-- Body: Bucheditor-Look (read-only), pro Seite Inline-Diff gegen den
+         aktuellen Buchstand (gelöscht durchgestrichen, neu unterstrichen). -->
+    <div class="snapshot-reader__body">
+      <div x-show="readerLoading" class="muted-msg" x-text="$app.t('snapshots.reader.loading')"></div>
+      <div x-show="!readerLoading && !readerSections.length" class="muted-msg"
+           x-text="$app.t('snapshots.reader.empty')"></div>
+
+      <div class="book-editor-stream snapshot-reader__stream" x-show="!readerLoading && readerSections.length" x-cloak>
+        <template x-for="s in readerSections" :key="s.key">
+          <div class="book-editor-row">
+            <template x-if="s.kind === 'chapter'">
+              <div class="book-editor-chapter-header" :class="'snapshot-reader__chapter--d' + s.depth">
+                <span class="book-editor-chapter-name" x-text="s.name || $app.t('snapshots.untitled')"></span>
+              </div>
+            </template>
+            <template x-if="s.kind === 'page'">
+              <div class="book-editor-page-card snapshot-reader__page"
+                   :class="{ 'snapshot-reader__page--changed': s.status === 'changed',
+                             'snapshot-reader__page--removed': s.status === 'removed' }">
+                <div class="book-editor-page-header">
+                  <span class="book-editor-page-name" x-text="s.name || $app.t('snapshots.untitled')"></span>
+                  <span class="snapshot-reader__badge" x-show="s.status === 'changed' || s.status === 'removed'"
+                        :class="'snapshot-reader__badge--' + s.status"
+                        x-text="$app.t('snapshots.reader.status.' + s.status)"></span>
+                </div>
+                <div class="book-editor-page-body snapshot-reader__diff" x-html="s.renderHtml"></div>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <p class="snapshot-reader__added-since" x-show="readerAddedSince > 0" x-cloak
+           x-text="$app.t('snapshots.reader.addedSince', { n: readerAddedSince })"></p>
+      </div>
+    </div>
+  </div>
+</div>

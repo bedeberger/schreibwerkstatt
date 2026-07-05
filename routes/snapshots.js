@@ -57,6 +57,30 @@ function _collectMetas(tree) {
   return metas;
 }
 
+// Kompakte Zaehl-Uebersicht des eingefrorenen Analyse-/Lektorat-Stands
+// (extras_json). Publikations-Nachweis „so sah der Weltaufbau/das Lektorat zum
+// Zeitpunkt der Fassung aus" — ohne die MB-grossen Rohdaten auszuliefern. Nur
+// Bloecke mit >0 Zeilen erscheinen. Defekt/leer → null.
+function _extrasSummary(extrasJson) {
+  if (!extrasJson) return null;
+  let parsed;
+  try { parsed = JSON.parse(extrasJson); } catch { return null; }
+  const a = parsed?.analysis || {};
+  const len = (x) => (Array.isArray(x) ? x.length : 0);
+  const out = {
+    figures: len(a.figures),
+    locations: len(a.locations),
+    scenes: len(a.scenes),
+    events: len(a.zeitstrahlEvents),
+    worldFacts: len(a.worldFacts),
+    continuityIssues: len(a.continuityIssues),
+    ideen: len(a.ideen),
+    lektoratFindings: len(parsed?.lektorat?.pageChecks),
+  };
+  const has = Object.values(out).some((n) => n > 0);
+  return has ? out : null;
+}
+
 // Kapitel (inkl. Sub-Kapitel) im node-Tree zaehlen.
 function _countChapters(nodes) {
   let n = 0;
@@ -149,6 +173,40 @@ async function _buildSnapshotPayload(bookId, req) {
   return { content, extrasJson, publicationJson, chars, words, pages: htmlById.size, chapters: _countChapters(nodes) };
 }
 
+// Wiederverwendbarer Capture-Einstieg fuer Auto-Sicherungen aus anderen Routen
+// (z.B. „Buch als fertig markiert" in routes/booksettings.js). Baut denselben
+// selbsttragenden Payload wie „Fassung speichern" und legt eine Zeile an.
+// dedup=true → ueberspringt, wenn die juengste Fassung denselben (chars/pages/
+// chapters)-Stand hat (kein Auto-Duplikat). Wirft NICHT — liefert null bei leerem
+// Buch, Dedup-Treffer oder Fehler (Aufrufer sind best-effort).
+async function captureSnapshot(bookId, req, { label = null, description = null, dedup = false, userEmail = null } = {}) {
+  let payload;
+  try {
+    payload = await _buildSnapshotPayload(bookId, req);
+  } catch (e) {
+    if (e.code !== 'BOOK_EMPTY') logger.warn(`Auto-Capture fehlgeschlagen (book=${bookId}): ${e.message}`);
+    return null;
+  }
+  if (dedup) {
+    const sig = snapshots.latestSignature(bookId);
+    if (sig && sig.chars === payload.chars && sig.pages === payload.pages && sig.chapters === payload.chapters) {
+      return null;
+    }
+  }
+  try {
+    return snapshots.createSnapshot({
+      bookId, label, description,
+      contentJson: JSON.stringify(payload.content), extrasJson: payload.extrasJson,
+      publicationJson: payload.publicationJson,
+      chars: payload.chars, words: payload.words, pages: payload.pages, chapters: payload.chapters,
+      userEmail,
+    });
+  } catch (e) {
+    logger.warn(`Auto-Capture-Insert fehlgeschlagen (book=${bookId}): ${e.message}`);
+    return null;
+  }
+}
+
 // ── List ──────────────────────────────────────────────────────────────────────
 router.get('/:bookId', (req, res) => {
   const bookId = toIntId(req.params.bookId);
@@ -181,13 +239,19 @@ router.get('/:bookId/:id', (req, res) => {
   try { content = JSON.parse(row.content_json); }
   catch { return res.status(500).json({ error_code: 'CORRUPT_SNAPSHOT' }); }
 
-  // extras_json bewusst NICHT mitliefern (v1: kein Restore, Diff nutzt nur Tree).
+  // extras_json (MB-gross) nicht roh mitliefern — nur eine kompakte Zaehl-
+  // Uebersicht (Publikations-Nachweis: Weltaufbau-/Lektorat-Stand zum Capture-
+  // Zeitpunkt). Publikations-Metadaten als TEXT-Meta (ohne Cover/Foto-BLOBs) fuer
+  // den Metadaten-Diff im Vergleich.
+  const publication = snapshotPublication(row.publication_json);
   return res.json({
     snapshot: {
       id: row.id, seq: row.seq, label: row.label, description: row.description,
       chars: row.chars, words: row.words, pages: row.pages, chapters: row.chapters,
-      user_email: row.user_email, created_at: row.created_at,
+      user_email: row.user_email, created_at: row.created_at, published_at: row.published_at || null,
       has_publication: row.publication_json ? 1 : 0,
+      publication: publication ? publication.meta : null,
+      extras_summary: _extrasSummary(row.extras_json),
       content,
     },
   });
@@ -286,7 +350,7 @@ router.post('/:bookId', express.json({ limit: '1mb' }), async (req, res) => {
       id: created.id, seq: created.seq, label, description,
       chars: payload.chars, words: payload.words, pages: payload.pages, chapters: payload.chapters,
       user_email: userEmail,
-      created_at: new Date().toISOString(),
+      created_at: new Date().toISOString(), published_at: null,
       has_extras: payload.extrasJson ? 1 : 0,
       has_publication: payload.publicationJson ? 1 : 0,
     },
@@ -432,7 +496,34 @@ router.post('/:bookId/:id/restore', express.json({ limit: '1mb' }), async (req, 
   return res.json({ ok: true, seq: row.seq, pagesCreated, chaptersCreated });
 });
 
+// ── Publish (Fassung als veroeffentlichte Auflage markieren) ────────────────────
+// Kennzeichnet die Fassung, die als Auflage erschienen ist (Publikations-Anker).
+// Body { published: bool }. Mehrere Fassungen duerfen markiert sein.
+router.post('/:bookId/:id/publish', express.json({ limit: '4kb' }), (req, res) => {
+  const bookId = toIntId(req.params.bookId);
+  const id = toIntId(req.params.id);
+  if (!bookId || !id) return res.status(400).json({ error_code: 'ID_REQUIRED' });
+  setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+
+  const published = !!req.body?.published;
+  try {
+    const ok = snapshots.setPublished(bookId, id, published);
+    if (!ok) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    const row = snapshots.getSnapshot(bookId, id);
+    logger.info(`Fassung ${row?.seq} ${published ? 'als veroeffentlicht markiert' : 'Markierung entfernt'} (book=${bookId}).`);
+    return res.json({ ok: true, published_at: row?.published_at || null });
+  } catch (e) {
+    logger.error(`Snapshot-Publish fehlgeschlagen (book=${bookId}, id=${id}): ${e.message}`);
+    return res.status(500).json({ error_code: 'PUBLISH_FAILED' });
+  }
+});
+
 // ── Delete ──────────────────────────────────────────────────────────────────────
+// Veroeffentlichte Fassungen sind schreibgeschuetzt: Loeschen verlangt ?force=1
+// (Frontend zeigt eine staerkere Bestaetigung), damit ein Publikations-Anker nicht
+// versehentlich verloren geht.
 router.delete('/:bookId/:id', (req, res) => {
   const bookId = toIntId(req.params.bookId);
   const id = toIntId(req.params.id);
@@ -440,6 +531,13 @@ router.delete('/:bookId/:id', (req, res) => {
   setContext({ book: bookId });
   try { requireBookAccess(req, bookId, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
+
+  const force = req.query.force === '1' || req.query.force === 'true';
+  const row = snapshots.getSnapshot(bookId, id);
+  if (!row) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  if (row.published_at && !force) {
+    return res.status(409).json({ error_code: 'SNAPSHOT_PUBLISHED' });
+  }
 
   try {
     const ok = snapshots.deleteSnapshot(bookId, id);
@@ -452,3 +550,4 @@ router.delete('/:bookId/:id', (req, res) => {
 });
 
 module.exports = router;
+module.exports.captureSnapshot = captureSnapshot;

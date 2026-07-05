@@ -9,18 +9,20 @@ import { fetchJson } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
 import { fromSnapshotTree } from '../manuscript-stream.js';
 import { renderSideBySide, renderInline } from '../page-revision-diff.js';
-import { diffSnapshots } from '../book-snapshot-diff.js';
-import { startPoll } from './job-helpers.js';
+import { diffSnapshots, diffPublication } from '../book-snapshot-diff.js';
+import { snapshotsPdfMethods } from './snapshots-pdf-export.js';
 import { EVT } from '../events.js';
 
 export function registerSnapshotsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('snapshotsCard', () => ({
+    ...snapshotsPdfMethods,
     snapshots: [],
     loading: false,
     capturing: false,
     deletingId: null,
     restoringId: null,
+    publishingId: null,
     newLabel: '',
     newDescription: '',
     _bookId: null,
@@ -29,6 +31,7 @@ export function registerSnapshotsCard() {
     compareFrom: '',
     compareTo: '',
     diff: null,            // { summary, entries }
+    pubDiff: [],           // [{ key, kind, from, to }] — geaenderte Publikations-Metadaten
     diffLoading: false,
     diffError: '',
     showUnchanged: false,
@@ -41,6 +44,7 @@ export function registerSnapshotsCard() {
     readerSections: [],    // [{ kind:'chapter'|'page', name, depth, html, id, status, renderHtml, key }]
     readerLoading: false,
     readerAddedSince: 0,   // Seiten, die seit der Fassung neu dazugekommen sind
+    readerExtras: null,    // { figures, locations, … } — eingefrorener Weltaufbau-/Lektorat-Stand
     pdfProfiles: [],
     pdfProfileId: '',
     pdfExporting: false,
@@ -81,6 +85,7 @@ export function registerSnapshotsCard() {
       this.capturing = false;
       this.deletingId = null;
       this.restoringId = null;
+      this.publishingId = null;
       this.newLabel = '';
       this.newDescription = '';
       this._bookId = null;
@@ -92,6 +97,7 @@ export function registerSnapshotsCard() {
       this.compareFrom = '';
       this.compareTo = '';
       this.diff = null;
+      this.pubDiff = [];
       this.diffLoading = false;
       this.diffError = '';
       this.expanded = {};
@@ -125,6 +131,7 @@ export function registerSnapshotsCard() {
         this.compareTo = '';
       }
       this.diff = null;
+      this.pubDiff = [];
       this.expanded = {};
     },
 
@@ -160,14 +167,28 @@ export function registerSnapshotsCard() {
       }
     },
 
-    async deleteSnapshot(snap) {
+    isPublished(snap) {
+      return !!snap?.published_at;
+    },
+
+    async deleteSnapshot(snap, force = false) {
       const app = window.__app;
       const bookId = Alpine.store('nav').selectedBookId;
       if (!snap?.id || !bookId || this.deletingId) return;
-      if (!confirm(app.t('snapshots.deleteConfirm', { n: snap.seq }))) return;
+      if (!force && !confirm(app.t('snapshots.deleteConfirm', { n: snap.seq }))) return;
       this.deletingId = snap.id;
       try {
-        const r = await fetch(`/snapshots/${bookId}/${snap.id}`, { method: 'DELETE' });
+        const url = `/snapshots/${bookId}/${snap.id}${force ? '?force=1' : ''}`;
+        const r = await fetch(url, { method: 'DELETE' });
+        if (r.status === 409) {
+          // Veroeffentlichte Fassung ist schreibgeschuetzt → staerkere Bestaetigung,
+          // dann mit force erneut.
+          this.deletingId = null;
+          if (confirm(app.t('snapshots.deletePublishedConfirm', { n: snap.seq }))) {
+            return this.deleteSnapshot(snap, true);
+          }
+          return;
+        }
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
           throw new Error(body?.error_code || `HTTP ${r.status}`);
@@ -179,6 +200,33 @@ export function registerSnapshotsCard() {
         app.setStatus?.(app.t('snapshots.deleteFailed') + ' ' + (e.message || ''), true, 6000);
       } finally {
         this.deletingId = null;
+      }
+    },
+
+    // ── Veroeffentlichen (Fassung als Auflage markieren) ───────────────────────────
+    async togglePublish(snap) {
+      const app = window.__app;
+      const bookId = Alpine.store('nav').selectedBookId;
+      if (!snap?.id || !bookId || this.publishingId) return;
+      const next = !this.isPublished(snap);
+      this.publishingId = snap.id;
+      try {
+        const r = await fetch(`/snapshots/${bookId}/${snap.id}/publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ published: next }),
+        });
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body?.error_code || `HTTP ${r.status}`);
+        }
+        await this.loadSnapshots(bookId, { fresh: true });
+        app.setStatus?.(app.t(next ? 'snapshots.publishedOn' : 'snapshots.publishedOff', { n: snap.seq }), false, 4000);
+      } catch (e) {
+        console.error('[snapshots:publish]', e);
+        app.setStatus?.(app.t('snapshots.publishFailed') + ' ' + (e.message || ''), true, 6000);
+      } finally {
+        this.publishingId = null;
       }
     },
 
@@ -218,6 +266,7 @@ export function registerSnapshotsCard() {
       this.readerLoading = true;
       this.readerSections = [];
       this.readerAddedSince = 0;
+      this.readerExtras = null;
       this._resetPdfExport();
       // PDF-Profile lazy laden (fuer das Export-Menue im Reader).
       this.loadPdfProfiles();
@@ -228,6 +277,7 @@ export function registerSnapshotsCard() {
           fetchJson(`/snapshots/${bookId}/${snap.id}`),
           fetchJson(`/book-editor/${bookId}/contents`).catch(() => ({ pages: [] })),
         ]);
+        this.readerExtras = snapData?.snapshot?.extras_summary || null;
         const sections = this._buildReaderSections(snapData?.snapshot?.content);
         const currentById = new Map();
         for (const p of (curData?.pages || [])) currentById.set(p.pageId, p.html || '');
@@ -272,8 +322,21 @@ export function registerSnapshotsCard() {
       this.readerSnap = null;
       this.readerSections = [];
       this.readerAddedSince = 0;
+      this.readerExtras = null;
       this._resetPdfExport();
       this._stopPdfPoll();
+    },
+
+    // Eingefrorener Weltaufbau-/Lektorat-Stand als anzeigbare Liste
+    // [{ label, value }] — nur Bloecke mit >0. Publikations-Nachweis im Reader.
+    readerExtraItems() {
+      const e = this.readerExtras;
+      if (!e) return [];
+      const app = window.__app;
+      const keys = ['figures', 'locations', 'scenes', 'events', 'worldFacts', 'continuityIssues', 'ideen', 'lektoratFindings'];
+      return keys
+        .filter(k => Number(e[k]) > 0)
+        .map(k => ({ label: app.t('snapshots.extras.' + k), value: this.formatNum(e[k]) }));
     },
 
     // Snapshot-Tree (buildBookJson-Format) → kanonisches Stream-Modell
@@ -302,102 +365,7 @@ export function registerSnapshotsCard() {
       return `/snapshots/${bookId}/${this.readerSnap.id}/export/${fmt}`;
     },
 
-    async loadPdfProfiles() {
-      try {
-        const d = await fetchJson('/pdf-export/profiles');
-        this.pdfProfiles = Array.isArray(d?.profiles) ? d.profiles : [];
-        const def = this.pdfProfiles.find(p => p.is_default) || this.pdfProfiles[0] || null;
-        if (def && (!this.pdfProfileId || !this.pdfProfiles.some(p => String(p.id) === String(this.pdfProfileId)))) {
-          this.pdfProfileId = String(def.id);
-        }
-      } catch (e) {
-        console.error('[snapshots:pdfProfiles]', e);
-        this.pdfProfiles = [];
-      }
-    },
-
-    pdfProfileOptions() {
-      return this.pdfProfiles.map(p => ({ value: String(p.id), label: p.name }));
-    },
-
-    async exportPdf() {
-      const app = window.__app;
-      const bookId = Alpine.store('nav').selectedBookId;
-      if (!bookId || !this.readerSnap?.id || !this.pdfProfileId || this.pdfExporting) return;
-      this.pdfExporting = true;
-      this.pdfError = '';
-      this.pdfStatus = app.t('snapshots.export.creating');
-      try {
-        const r = await fetch('/jobs/pdf-export', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scope: 'book',
-            entityId: parseInt(bookId, 10),
-            profile_id: parseInt(this.pdfProfileId, 10),
-            snapshot_id: this.readerSnap.id,
-          }),
-        });
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          throw new Error(d?.error_code || `HTTP ${r.status}`);
-        }
-        const { jobId } = await r.json();
-        this.pdfJobId = jobId;
-        this._startPdfPoll(jobId);
-      } catch (e) {
-        console.error('[snapshots:exportPdf]', e);
-        this.pdfExporting = false;
-        this.pdfError = app.t('snapshots.export.pdfFailed') + ' ' + (e.message || '');
-        this.pdfStatus = '';
-      }
-    },
-
-    _startPdfPoll(jobId) {
-      this._stopPdfPoll();
-      startPoll(this, {
-        timerProp: '_pdfPollTimer',
-        jobId,
-        intervalMs: 1000,
-        onProgress: (job) => {
-          const app = window.__app;
-          this.pdfStatus = job.statusText ? app.t(job.statusText, job.statusParams) : app.t('snapshots.export.creating');
-        },
-        onError: (job) => {
-          const app = window.__app;
-          this.pdfExporting = false;
-          this.pdfStatus = '';
-          this.pdfError = app.t('snapshots.export.pdfFailed') + ' ' + (job.error ? app.t(job.error, job.errorParams) : '');
-        },
-        onDone: (job) => {
-          const app = window.__app;
-          this.pdfExporting = false;
-          this.pdfStatus = app.t('snapshots.export.pdfDone');
-          this._triggerPdfDownload(jobId, job.result?.filename);
-          setTimeout(() => { this.pdfStatus = ''; }, 3500);
-        },
-      });
-    },
-
-    _stopPdfPoll() {
-      if (this._pdfPollTimer) { clearInterval(this._pdfPollTimer); this._pdfPollTimer = null; }
-    },
-
-    _triggerPdfDownload(jobId, filename) {
-      const a = document.createElement('a');
-      a.href = `/jobs/pdf-export/${jobId}/file`;
-      a.download = filename || 'fassung.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    },
-
-    _resetPdfExport() {
-      this.pdfExporting = false;
-      this.pdfStatus = '';
-      this.pdfError = '';
-      this.pdfJobId = null;
-    },
+    // PDF-Export (Job + Polling + Download): ...snapshotsPdfMethods, siehe unten.
 
     // ── Anzeige-Helfer ────────────────────────────────────────────────────────────
     // Server kann ein Label als __i18n:key__-Marker persistieren (z.B. die
@@ -412,6 +380,13 @@ export function registerSnapshotsCard() {
       const base = app.t('snapshots.fassung', { n: snap.seq });
       const label = this._resolveLabel(snap.label);
       return label ? `${base} · ${label}` : base;
+    },
+
+    publishedDateLabel(snap) {
+      if (!snap?.published_at) return '';
+      const app = window.__app;
+      const when = app?.formatDate ? app.formatDate(snap.published_at) : snap.published_at;
+      return app.t('snapshots.publishedBadge', { when });
     },
 
     snapOptionLabel(snap) {
@@ -462,6 +437,7 @@ export function registerSnapshotsCard() {
       this.diffLoading = true;
       this.diffError = '';
       this.diff = null;
+      this.pubDiff = [];
       this.expanded = {};
       this.expandLoading = {};
       try {
@@ -473,12 +449,29 @@ export function registerSnapshotsCard() {
         const toContent = b?.snapshot?.content;
         if (!fromContent || !toContent) throw new Error('SNAPSHOT_NOT_FOUND');
         this.diff = diffSnapshots(fromContent, toContent);
+        // Publikations-Metadaten-Diff (Titelei/ISBN/Cover …) — die Felder, die der
+        // Inhalts-Diff nicht sieht.
+        this.pubDiff = diffPublication(a?.snapshot?.publication, b?.snapshot?.publication);
       } catch (e) {
         console.error('[snapshots:compare]', e);
         this.diffError = e.message || 'compare failed';
       } finally {
         this.diffLoading = false;
       }
+    },
+
+    // ── Publikations-Metadaten-Diff (Anzeige) ──────────────────────────────────────
+    pubFieldLabel(key) {
+      return window.__app.t('snapshots.pub.' + key);
+    },
+
+    // Anzeigewert einer Diff-Zelle: Bool → Vorhanden/—, Text → Wert oder „—".
+    pubValueDisplay(entry, side) {
+      const app = window.__app;
+      const v = side === 'from' ? entry.from : entry.to;
+      if (entry.kind === 'bool') return v ? app.t('snapshots.pub.present') : app.t('snapshots.pub.absent');
+      const s = (v == null ? '' : String(v)).trim();
+      return s || '—';
     },
 
     // Sichtbare Diff-Eintraege (unveraenderte standardmaessig ausgeblendet).

@@ -45,6 +45,13 @@
 .snapshots-del-btn { color: var(--color-err-text); }
 .snapshots-del-btn:hover:not(:disabled) { background: var(--color-err-bg); }
 
+/* Veroeffentlicht-Markierung: Badge in der Fassungs-Zelle + aktiver Toggle-Button. */
+.snapshots-published-badge { margin-inline-start: var(--space-xs); }
+.snapshots-publish-btn--on {
+  border-color: var(--color-success);
+  color: var(--color-ok-text);
+}
+
 /* ── Vergleich ──────────────────────────────────────────────────────────────── */
 .snapshots-compare {
   margin-top: var(--space-xl);
@@ -77,6 +84,22 @@
   margin-bottom: var(--space-md);
 }
 .snapshots-summary__chars { margin-inline-start: auto; }
+
+/* Publikations-Metadaten-Diff (Titelei/ISBN/Cover …). */
+.snapshots-pubdiff {
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-inline-start: 3px solid var(--card-accent, var(--color-border));
+  border-radius: var(--radius-sm);
+}
+.snapshots-pubdiff__title {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  margin: 0 0 var(--space-sm);
+}
+.snapshots-pubdiff__from { color: var(--color-err-text); }
+.snapshots-pubdiff__to { color: var(--color-ok-text); }
 
 .snapshots-showall { margin-bottom: var(--space-md); }
 

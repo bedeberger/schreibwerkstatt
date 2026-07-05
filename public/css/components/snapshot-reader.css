@@ -143,6 +143,21 @@
   font-size: 0.85em;
 }
 
+/* Publikations-Nachweis: eingefrorener Weltaufbau-/Lektorat-Stand als Tag-Reihe. */
+.snapshot-reader__extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-lg);
+  margin-bottom: var(--space-sm);
+}
+.snapshot-reader__extras-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  margin-inline-end: var(--space-xs);
+}
+
 /* Mobile: Overlay randlos, Panel volle Breite. */
 @media (max-width: 720px) {
   .snapshot-reader { padding: 0; }

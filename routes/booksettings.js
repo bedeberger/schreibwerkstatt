@@ -2,9 +2,15 @@
 const express = require('express');
 const { getBookSettings, saveBookSettings, setBookEntitiesEnabled } = require('../db/schema');
 const { aclParamGuard } = require('../lib/acl');
+const logger = require('../logger');
+const { captureSnapshot } = require('./snapshots');
 
 const router = express.Router();
 const jsonBody = express.json();
+
+// Label der Fassung, die beim Fertig-Markieren automatisch entsteht (Publikations-
+// Meilenstein). __i18n:-Marker → Betrachter sieht die Bezeichnung in seiner Locale.
+const AUTO_FINISH_LABEL = '__i18n:snapshots.autoFinishLabel__';
 
 const VALID_LANGUAGES = ['de', 'en'];
 const VALID_REGIONS   = ['CH', 'DE', 'US', 'GB'];
@@ -102,7 +108,22 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const orteReal = orte_real ? 1 : 0;
   const zeitlinieReal = zeitlinie_real ? 1 : 0;
   const excludeStats = exclude_from_stats ? 1 : 0;
+
+  // Vorheriger Fertig-Status fuer die Auto-Fassung beim 0→1-Uebergang.
+  const wasFinished = getBookSettings(bookId, req.session?.user?.email || null)?.is_finished ? 1 : 0;
+
   saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal, schauplatzLand, goalTarget, goalDeadline, stilprofil || null, zeitlinieReal, excludeStats);
+
+  // Publikations-Meilenstein: Buch frisch als fertig markiert (0→1) → automatisch
+  // eine Fassung festhalten (dedup gegen die juengste, damit kein Duplikat
+  // entsteht, falls der Stand bereits festgehalten wurde). Best-effort und
+  // fire-and-forget — blockiert das Settings-Speichern nicht und darf nie werfen.
+  if (finished && !wasFinished) {
+    captureSnapshot(bookId, req, {
+      label: AUTO_FINISH_LABEL, dedup: true, userEmail: req.session?.user?.email || null,
+    }).catch((e) => logger.warn(`Auto-Fassung beim Fertig-Markieren fehlgeschlagen (book=${bookId}): ${e.message}`));
+  }
+
   res.json({
     ok: true, language, region,
     buchtyp: buchtyp || null, buch_kontext: buch_kontext || null,

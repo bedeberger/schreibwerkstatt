@@ -115,3 +115,36 @@ export function diffSnapshots(from, to) {
 
   return { summary, entries };
 }
+
+// Publikations-kritische Metadaten-Felder (book_publication), die zwischen zwei
+// Auflagen bewusst geaendert werden — genau die Felder, die der Inhalts-Diff
+// nicht sieht. Reihenfolge = Anzeige-Reihenfolge. `kind:'bool'` → Vorhanden/—
+// (Cover/Foto ohne Byte-Vergleich: nur Zugabe/Wegnahme, kein „geaendert").
+const PUB_TEXT_FIELDS = [
+  'author_name', 'isbn', 'subtitle', 'year', 'publisher', 'series', 'series_index',
+  'dedication', 'imprint', 'copyright', 'frontmatter', 'author_bio',
+];
+const PUB_BOOL_FIELDS = ['has_cover', 'has_author_image'];
+
+function _pubText(v) { return v == null ? '' : String(v).trim(); }
+
+// Vergleicht die eingefrorenen Publikations-Metadaten zweier Fassungen (Form von
+// db/book-publication#getMeta). Liefert nur geaenderte Felder als
+// [{ key, kind:'text'|'bool', from, to }]. Fehlt eine Seite (Fassung ohne
+// eingefrorene Publikation), wird gegen leer verglichen.
+export function diffPublication(fromMeta, toMeta) {
+  const a = fromMeta || {};
+  const b = toMeta || {};
+  const out = [];
+  for (const key of PUB_TEXT_FIELDS) {
+    const from = _pubText(a[key]);
+    const to = _pubText(b[key]);
+    if (from !== to) out.push({ key, kind: 'text', from, to });
+  }
+  for (const key of PUB_BOOL_FIELDS) {
+    const from = !!a[key];
+    const to = !!b[key];
+    if (from !== to) out.push({ key, kind: 'bool', from, to });
+  }
+  return out;
+}

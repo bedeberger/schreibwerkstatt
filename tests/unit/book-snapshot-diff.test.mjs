@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { flattenSnapshot, diffSnapshots } from '../../public/js/book-snapshot-diff.js';
+import { flattenSnapshot, diffSnapshots, diffPublication } from '../../public/js/book-snapshot-diff.js';
 
 function page(srcId, name, html) { return { type: 'page', srcId, name, html }; }
 function chapter(name, children) { return { type: 'chapter', name, children }; }
@@ -65,4 +65,31 @@ test('diffSnapshots: charsFrom/charsTo aus Plain-Text', () => {
   const { summary } = diffSnapshots(from, to);
   assert.equal(summary.charsFrom, 3);
   assert.equal(summary.charsTo, 6);
+});
+
+test('diffPublication: nur geänderte Textfelder, in Feld-Reihenfolge', () => {
+  const from = { author_name: 'Kafka', isbn: '111', subtitle: 'Alt' };
+  const to   = { author_name: 'Kafka', isbn: '222', subtitle: '' };
+  const diff = diffPublication(from, to);
+  assert.deepEqual(diff.map(d => d.key), ['isbn', 'subtitle']);
+  assert.deepEqual(diff[0], { key: 'isbn', kind: 'text', from: '111', to: '222' });
+  assert.equal(diff[1].to, '');
+});
+
+test('diffPublication: Whitespace/null-Normalisierung → keine Scheinänderung', () => {
+  const diff = diffPublication({ isbn: ' 123 ' }, { isbn: '123', subtitle: null });
+  assert.equal(diff.length, 0);
+});
+
+test('diffPublication: Cover/Autorfoto als bool (vorhanden ja/nein)', () => {
+  const diff = diffPublication({ has_cover: false, has_author_image: true }, { has_cover: true, has_author_image: true });
+  assert.equal(diff.length, 1);
+  assert.deepEqual(diff[0], { key: 'has_cover', kind: 'bool', from: false, to: true });
+});
+
+test('diffPublication: null-Meta → gegen leer verglichen, kein Crash', () => {
+  assert.deepEqual(diffPublication(null, null), []);
+  const diff = diffPublication(null, { isbn: '999', has_cover: true });
+  assert.equal(diff.find(d => d.key === 'isbn').to, '999');
+  assert.equal(diff.find(d => d.key === 'has_cover').to, true);
 });

@@ -8993,6 +8993,24 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 235 abgeschlossen (book_snapshots.publication_json).');
   }
 
+  if (version < 236) {
+    // Fassung als veroeffentlichte Auflage markieren: published_at = Zeitpunkt der
+    // Markierung (NULL = nicht veroeffentlicht). Kennzeichnet die Fassung, die als
+    // Auflage erschienen ist (Publikations-Anker), und schuetzt sie vor dem
+    // versehentlichen Loeschen. Additive Spalte, kein FK noetig.
+    const bsCols236 = db.pragma('table_info(book_snapshots)').map(c => c.name);
+    if (!bsCols236.includes('published_at')) {
+      db.prepare('ALTER TABLE book_snapshots ADD COLUMN published_at TEXT').run();
+    }
+
+    const fkErrors236 = db.pragma('foreign_key_check');
+    if (fkErrors236.length) {
+      throw new Error(`Migration 236: foreign_key_check meldet ${fkErrors236.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 236').run();
+    logger.info('DB-Migration auf Version 236 abgeschlossen (book_snapshots.published_at).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

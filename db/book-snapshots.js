@@ -10,6 +10,8 @@
 //   getSnapshot(bookId, id)        → Vollzeile inkl. content_json/extras_json
 //   deleteSnapshot(bookId, id)     → boolean (true = geloescht)
 //   countSnapshots(bookId)         → number
+//   setPublished(bookId, id, on)   → boolean (true = Zeile getroffen)
+//   latestSignature(bookId)        → { chars, pages, chapters } | null (Auto-Capture-Dedup)
 
 const { db } = require('./connection');
 const { NOW_ISO_SQL } = require('./now');
@@ -45,7 +47,7 @@ function createSnapshot({
 function listSnapshots(bookId) {
   return db.prepare(`
     SELECT id, book_id, seq, label, description,
-           chars, words, pages, chapters, user_email, created_at,
+           chars, words, pages, chapters, user_email, created_at, published_at,
            (extras_json IS NOT NULL) AS has_extras,
            (publication_json IS NOT NULL) AS has_publication
     FROM book_snapshots
@@ -70,6 +72,27 @@ function countSnapshots(bookId) {
   return row ? row.n : 0;
 }
 
+// Fassung als veroeffentlicht markieren (published_at = jetzt) bzw. Markierung
+// entfernen (NULL). Mehrere Fassungen duerfen gleichzeitig markiert sein — eine
+// pro Auflage. Book-scoped. Liefert true, wenn eine Zeile getroffen wurde.
+function setPublished(bookId, id, published) {
+  const res = published
+    ? db.prepare(`UPDATE book_snapshots SET published_at = ${NOW_ISO_SQL} WHERE id = ? AND book_id = ?`).run(id, bookId)
+    : db.prepare('UPDATE book_snapshots SET published_at = NULL WHERE id = ? AND book_id = ?').run(id, bookId);
+  return res.changes > 0;
+}
+
+// Content-Signatur der juengsten Fassung (fuer Auto-Capture-Dedup): identische
+// (chars, pages, chapters) → der aktuelle Stand wurde bereits festgehalten.
+function latestSignature(bookId) {
+  const row = db.prepare(`
+    SELECT chars, pages, chapters FROM book_snapshots
+    WHERE book_id = ? ORDER BY created_at DESC, id DESC LIMIT 1
+  `).get(bookId);
+  return row || null;
+}
+
 module.exports = {
   createSnapshot, listSnapshots, getSnapshot, deleteSnapshot, countSnapshots,
+  setPublished, latestSignature,
 };
