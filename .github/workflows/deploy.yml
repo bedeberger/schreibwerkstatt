@@ -12,7 +12,12 @@ jobs:
     timeout-minutes: 5
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      DB_PATH: /tmp/lektorat-ci-${{ github.run_id }}.db
+      # Wegwerf-DB auf tmpfs (RAM) statt Ceph-RBD-Storage: eliminiert alle
+      # SQLite-Writes des Integration-Job-Pipelines vom langsamen Netz-Storage.
+      DB_PATH: /dev/shm/lektorat-ci-${{ github.run_id }}.db
+      # Nur Fehler ins File-Log (schreibwerkstatt.log liegt auf Ceph): die
+      # info-Chatter der Job-Pipelines fällt weg → deutlich weniger Ceph-Writes.
+      LOG_LEVEL: error
 
     steps:
       - uses: actions/checkout@v4
