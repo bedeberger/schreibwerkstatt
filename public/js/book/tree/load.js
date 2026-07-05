@@ -319,8 +319,18 @@ export const treeLoadMethods = {
       this.$store.nav.pages = [];
       this.setStatus(this.t('common.errorColon') + e.message);
     } finally {
+      // treeLoading freigeben, wenn dieser Call der aktuelle Owner ist ODER
+      // niemand mehr Owner ist (Handle === null: _resetBookScopedState hat ihn
+      // beim Abbruch genullt, ohne dass ein Folge-Load ihn übernommen hat).
+      // Ohne diesen Failsafe bleibt die Sidebar bei verwaisten Abbrüchen (Wake-
+      // Refresh, Buchwechsel-Ketten) dauerhaft gedimmt + klick-blockiert
+      // (.tree-card--loading → pointer-events:none). Ein NEUERER Load (Handle
+      // zeigt auf einen fremden Controller) besitzt das Flag weiter und setzt
+      // es selbst zurück — den Fall bewusst NICHT anfassen.
       if (this._bookLoadAbort === loadCtrl) {
         this._bookLoadAbort = null;
+        this.treeLoading = false;
+      } else if (this._bookLoadAbort === null) {
         this.treeLoading = false;
       }
     }

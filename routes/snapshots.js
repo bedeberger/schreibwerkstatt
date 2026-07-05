@@ -24,6 +24,7 @@ const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
 const bookOrder = require('../db/book-order');
 const snapshots = require('../db/book-snapshots');
+const pagePresence = require('../db/page-presence');
 
 const router = express.Router();
 
@@ -386,6 +387,27 @@ router.post('/:bookId/:id/restore', express.json({ limit: '1mb' }), async (req, 
   }
 
   const userEmail = req.session?.user?.email || null;
+
+  // 0) Lock: ein Voll-Restore ersetzt das GANZE Buch. Editiert gerade ein
+  //    ANDERER User am Buch (Live-Presence, stale-gefiltert >90s), gehen seine
+  //    parallelen Writes waehrend Wipe/Recreate verloren → blocken. Die eigene
+  //    Presence (auch auf anderen Geraeten) zaehlt nicht. Der User kann mit
+  //    ?force=1 uebersteuern (Frontend zeigt vorher eine staerkere Bestaetigung
+  //    mit den aktiven Namen).
+  const force = req.query.force === '1' || req.query.force === 'true';
+  if (!force) {
+    const selfLc = (userEmail || '').toLowerCase();
+    let others = [];
+    try {
+      others = pagePresence.listForBook(bookId)
+        .filter((r) => String(r.user_email || '').toLowerCase() !== selfLc);
+    } catch (e) { logger.warn(`Restore-Presence-Check fehlgeschlagen (book=${bookId}): ${e.message}`); }
+    if (others.length) {
+      const editors = [...new Set(others.map((r) => r.user_display_name || r.user_email).filter(Boolean))];
+      logger.info(`Restore blockiert: Buch ${bookId} wird von ${editors.length} anderen editiert.`);
+      return res.status(409).json({ error_code: 'BOOK_BUSY', editors });
+    }
+  }
 
   // 1) Automatische Sicherung des aktuellen Stands → Restore bleibt umkehrbar.
   //    BOOK_EMPTY (Buch hat gerade keine Seiten) ist ok — dann gibt es nichts zu

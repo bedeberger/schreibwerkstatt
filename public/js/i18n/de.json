@@ -1065,6 +1065,8 @@
   "snapshots.restore": "Wiederherstellen",
   "snapshots.restoring": "Stellt wieder her …",
   "snapshots.restoreConfirm": "Buch auf Fassung {n} zurücksetzen? Der gesamte aktuelle Inhalt wird ersetzt. Der jetzige Stand wird vorher automatisch als neue Fassung gesichert.",
+  "snapshots.busyConfirm": "Am Buch arbeitet gerade: {who}. Ein Zurücksetzen ersetzt den gesamten Inhalt — parallele, noch nicht gespeicherte Änderungen gehen dabei verloren. Trotzdem fortfahren?",
+  "snapshots.busyOthers": "andere Personen",
   "snapshots.restored": "Buch auf Fassung {n} zurückgesetzt.",
   "snapshots.restoreFailed": "Wiederherstellung fehlgeschlagen:",
   "snapshots.autoBackupLabel": "Automatische Sicherung",

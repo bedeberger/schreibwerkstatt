@@ -1065,6 +1065,8 @@
   "snapshots.restore": "Restore",
   "snapshots.restoring": "Restoring …",
   "snapshots.restoreConfirm": "Reset the book to version {n}? The entire current content will be replaced. The current state is saved as a new version first.",
+  "snapshots.busyConfirm": "Currently editing this book: {who}. Restoring replaces the entire content — their parallel, unsaved changes will be lost. Continue anyway?",
+  "snapshots.busyOthers": "other people",
   "snapshots.restored": "Book reset to version {n}.",
   "snapshots.restoreFailed": "Restore failed:",
   "snapshots.autoBackupLabel": "Automatic backup",
