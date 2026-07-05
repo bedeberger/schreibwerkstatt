@@ -637,13 +637,12 @@ select[aria-invalid="true"],
 @media (max-width: 700px) {
   /* Engere Gaps: auf Touch werden die Icon-Buttons auf ≥40px Tap-Target
      gestreckt — mit kleinerem Gap packen sie pro Reihe dichter beieinander. */
-  .card-actions { width: 100%; gap: var(--space-xs); }
-  .card-actions button { flex: 1 1 auto; min-width: 0; }
   /* Alle Action-Bars rechtsbündig — die Icons packen wie auf Desktop rechts
      zusammen (statt links gruppiert + ⋯-Overflow einzeln nach rechts gerissen).
      Rechtsbündig hält zugleich das an die ⋯-Overflow-Kante gekoppelte
      `.context-menu--dropdown` (right: 0) vom linken Rand fern. */
-  .card-actions { justify-content: flex-end; }
+  .card-actions { width: 100%; gap: var(--space-xs); justify-content: flex-end; }
+  .card-actions button { flex: 1 1 auto; min-width: 0; }
   /* Gruppierte Editor-Toolbar (Prüfen/Bearbeiten/Fokus/Chat/Ideen/Teilen):
      viele Buttons → natürliche Breite + kompakteres Padding/Schrift, damit sie
      pro Reihe dichter packen (≈2 statt 3 Reihen vor dem Seiteninhalt). Andere
