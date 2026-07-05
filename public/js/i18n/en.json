@@ -1072,6 +1072,7 @@
   "snapshots.compareTitle": "Compare versions",
   "snapshots.compareFrom": "From (older)",
   "snapshots.compareTo": "To (newer)",
+  "snapshots.compareSame": "Please pick two different versions.",
   "snapshots.diffLoading": "Building comparison …",
   "snapshots.diffError": "Comparison failed:",
   "snapshots.summary.added": "{n} added",

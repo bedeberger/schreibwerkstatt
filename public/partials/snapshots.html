@@ -10,6 +10,14 @@
     </div>
     <div class="card-actions">
       <button type="button" class="icon-btn icon-btn--ghost"
+              @click="loadSnapshots($store.nav.selectedBookId, { fresh: true })"
+              :disabled="loading || !$store.nav.selectedBookId"
+              :data-tip="$app.t('common.refresh')"
+              :aria-label="$app.t('common.refresh')">
+        <span x-show="loading" class="spinner"></span>
+        <svg x-show="!loading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+      </button>
+      <button type="button" class="icon-btn icon-btn--ghost"
               @click="captureSnapshot()"
               :disabled="capturing || !$store.nav.selectedBookId"
               :data-tip="capturing ? $app.t('snapshots.saving') : $app.t('snapshots.save')"
@@ -127,16 +135,18 @@
         <div x-data="combobox($app.t('snapshots.compareFrom'))"
              x-modelable="value" x-model="compareFrom"
              x-effect="options = snapshots.map(s => ({ value: String(s.id), label: snapOptionLabel(s) }))"
-             @combobox-change="runCompare()"></div>
+             @combobox-change="onCompareChange('from', $event.detail)"></div>
       </div>
       <div class="snapshots-picker">
         <label class="snapshots-picker__label" x-text="$app.t('snapshots.compareTo')"></label>
         <div x-data="combobox($app.t('snapshots.compareTo'))"
              x-modelable="value" x-model="compareTo"
              x-effect="options = snapshots.map(s => ({ value: String(s.id), label: snapOptionLabel(s) }))"
-             @combobox-change="runCompare()"></div>
+             @combobox-change="onCompareChange('to', $event.detail)"></div>
       </div>
     </div>
+
+    <div x-show="sameSelection()" x-cloak class="muted-msg" x-text="$app.t('snapshots.compareSame')"></div>
 
     <div x-show="diffLoading" x-cloak class="muted-msg" x-text="$app.t('snapshots.diffLoading')"></div>
     <div x-show="diffError" x-cloak class="muted-msg muted-msg--error"

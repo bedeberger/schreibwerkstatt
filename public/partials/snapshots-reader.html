@@ -40,12 +40,20 @@
     <div class="snapshot-reader__status" x-show="pdfStatus" x-cloak x-text="pdfStatus"></div>
     <div class="snapshot-reader__status muted-msg--error" x-show="pdfError" x-cloak x-text="pdfError"></div>
 
-    <!-- Publikations-Nachweis: eingefrorener Weltaufbau-/Lektorat-Stand zum
-         Zeitpunkt der Fassung (Zaehl-Uebersicht, kein Restore). -->
+    <!-- Eingefrorener Weltaufbau-/Lektorat-Stand zum Zeitpunkt der Fassung
+         (Zaehl-Uebersicht, kein Restore). -->
     <div class="snapshot-reader__extras" x-show="readerExtraItems().length" x-cloak>
       <span class="snapshot-reader__extras-label" x-text="$app.t('snapshots.extras.heading')"></span>
       <template x-for="it in readerExtraItems()" :key="it.label">
         <span class="tag snapshot-reader__extra"><span x-text="it.value"></span> <span x-text="it.label"></span></span>
+      </template>
+    </div>
+
+    <!-- Eingefrorene Publikations-Metadaten (Titelei/ISBN/Cover) zum Fassungs-Zeitpunkt. -->
+    <div class="snapshot-reader__extras" x-show="readerPublicationItems().length" x-cloak>
+      <span class="snapshot-reader__extras-label" x-text="$app.t('snapshots.pub.title')"></span>
+      <template x-for="it in readerPublicationItems()" :key="it.key">
+        <span class="tag snapshot-reader__extra" x-text="it.text"></span>
       </template>
     </div>
 

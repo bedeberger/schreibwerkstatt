@@ -20,6 +20,11 @@
   overflow: hidden;
 }
 
+/* Bei offenem Reader den Hintergrund festhalten — nur das Panel scrollt intern.
+   Body-Klasse wird in snapshots-card.js#openSnapshot/closeReader getoggelt
+   (gleiche Mechanik wie body.palette-open / body.focus-mode). */
+body.snapshot-reader-open { overflow: hidden; overscroll-behavior: contain; }
+
 .snapshot-reader__backdrop {
   position: fixed;
   inset: 0;

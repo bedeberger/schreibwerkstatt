@@ -13,6 +13,15 @@ import { diffSnapshots, diffPublication } from '../book-snapshot-diff.js';
 import { snapshotsPdfMethods } from './snapshots-pdf-export.js';
 import { EVT } from '../events.js';
 
+// Modul-Cache fuer Fassungs-Vollzeilen. Das `content_json` einer Fassung kann
+// MB gross sein; es ist aber unveraenderlich pro id (kein retroaktives Update,
+// siehe docs/fassungen.md) → global cachebar, damit weder der Combobox-Wechsel
+// im Vergleich noch das erneute Oeffnen im Reader die Zeile neu ziehen muss.
+// Snapshot-id ist ein globaler PK, deshalb kein book-Scoping noetig. Der
+// (mutierbare) `published_at`-Badge kommt fuer die Anzeige aus der Liste, nicht
+// aus dieser gecachten Zeile.
+const _snapshotCache = new Map(); // snapshotId(String) -> snapshot object
+
 export function registerSnapshotsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('snapshotsCard', () => ({
@@ -45,6 +54,7 @@ export function registerSnapshotsCard() {
     readerLoading: false,
     readerAddedSince: 0,   // Seiten, die seit der Fassung neu dazugekommen sind
     readerExtras: null,    // { figures, locations, … } — eingefrorener Weltaufbau-/Lektorat-Stand
+    readerPublication: null, // eingefrorene Publikations-Metadaten (Titelei/ISBN/Cover-Flags) zum Fassungs-Zeitpunkt
     pdfProfiles: [],
     pdfProfileId: '',
     pdfExporting: false,
@@ -77,6 +87,7 @@ export function registerSnapshotsCard() {
       window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
       window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
       this._stopPdfPoll();
+      document.body.classList.remove('snapshot-reader-open');
     },
 
     reset() {
@@ -171,6 +182,18 @@ export function registerSnapshotsCard() {
       return !!snap?.published_at;
     },
 
+    // Fassungs-Vollzeile (content/publication/extras) — unveraenderlich, daher
+    // aus dem Modul-Cache bedient; erst beim Miss ein Fetch. Genutzt von Vergleich
+    // (runCompare) und Reader (openSnapshot).
+    async _fetchSnapshot(bookId, id) {
+      const key = String(id);
+      if (_snapshotCache.has(key)) return _snapshotCache.get(key);
+      const data = await fetchJson(`/snapshots/${bookId}/${id}`);
+      const snap = data?.snapshot || null;
+      if (snap) _snapshotCache.set(key, snap);
+      return snap;
+    },
+
     async deleteSnapshot(snap, force = false) {
       const app = window.__app;
       const bookId = Alpine.store('nav').selectedBookId;
@@ -263,22 +286,27 @@ export function registerSnapshotsCard() {
       if (!snap?.id || !bookId) return;
       this.readerSnap = snap;
       this.readerOpen = true;
+      document.body.classList.add('snapshot-reader-open');
       this.readerLoading = true;
       this.readerSections = [];
       this.readerAddedSince = 0;
       this.readerExtras = null;
+      this.readerPublication = null;
       this._resetPdfExport();
       // PDF-Profile lazy laden (fuer das Export-Menue im Reader).
       this.loadPdfProfiles();
       try {
         // Fassungs-Inhalt + aktueller Buchstand parallel. Letzterer liefert die
         // Vergleichsbasis fuer den Inline-Diff (Match via srcId == page_id).
-        const [snapData, curData] = await Promise.all([
-          fetchJson(`/snapshots/${bookId}/${snap.id}`),
+        // Fassungs-Zeile aus dem Cache (unveraenderlich); der aktuelle Buchstand
+        // muss frisch sein (mutierbar) → immer Fetch.
+        const [snapshot, curData] = await Promise.all([
+          this._fetchSnapshot(bookId, snap.id),
           fetchJson(`/book-editor/${bookId}/contents`).catch(() => ({ pages: [] })),
         ]);
-        this.readerExtras = snapData?.snapshot?.extras_summary || null;
-        const sections = this._buildReaderSections(snapData?.snapshot?.content);
+        this.readerExtras = snapshot?.extras_summary || null;
+        this.readerPublication = snapshot?.publication || null;
+        const sections = this._buildReaderSections(snapshot?.content);
         const currentById = new Map();
         for (const p of (curData?.pages || [])) currentById.set(p.pageId, p.html || '');
 
@@ -319,10 +347,12 @@ export function registerSnapshotsCard() {
 
     closeReader() {
       this.readerOpen = false;
+      document.body.classList.remove('snapshot-reader-open');
       this.readerSnap = null;
       this.readerSections = [];
       this.readerAddedSince = 0;
       this.readerExtras = null;
+      this.readerPublication = null;
       this._resetPdfExport();
       this._stopPdfPoll();
     },
@@ -337,6 +367,29 @@ export function registerSnapshotsCard() {
       return keys
         .filter(k => Number(e[k]) > 0)
         .map(k => ({ label: app.t('snapshots.extras.' + k), value: this.formatNum(e[k]) }));
+    },
+
+    // Eingefrorene Publikations-Metadaten als kompakter Tag-Strip
+    // [{ key, text }] — nur gesetzte Felder. Kurze Wertfelder als „Label: Wert",
+    // Prosa-/Bild-Felder als reines Vorhandensein-Tag. Reuse der pub.*-Labels
+    // (dieselben wie im Vergleichs-Publikations-Diff).
+    readerPublicationItems() {
+      const p = this.readerPublication;
+      if (!p) return [];
+      const app = window.__app;
+      const label = (k) => app.t('snapshots.pub.' + k);
+      const out = [];
+      const valueKeys = ['author_name', 'subtitle', 'isbn', 'year', 'publisher', 'series', 'series_index'];
+      for (const k of valueKeys) {
+        const v = (p[k] == null ? '' : String(p[k])).trim();
+        if (v) out.push({ key: k, text: `${label(k)}: ${v}` });
+      }
+      const presenceKeys = ['dedication', 'imprint', 'copyright', 'frontmatter', 'author_bio', 'has_cover', 'has_author_image'];
+      for (const k of presenceKeys) {
+        const has = k.startsWith('has_') ? !!p[k] : !!String(p[k] == null ? '' : p[k]).trim();
+        if (has) out.push({ key: k, text: label(k) });
+      }
+      return out;
     },
 
     // Snapshot-Tree (buildBookJson-Format) → kanonisches Stream-Modell
@@ -430,10 +483,25 @@ export function registerSnapshotsCard() {
       return this.compareFrom && this.compareTo && this.compareFrom !== this.compareTo;
     },
 
+    sameSelection() {
+      return !!this.compareFrom && this.compareFrom === this.compareTo;
+    },
+
+    // Combobox-Wechsel: den frisch gewaehlten Wert EXPLIZIT aus dem Event-Detail
+    // uebernehmen, statt auf die (asynchrone) x-modelable-Propagation zu warten.
+    // Sonst rechnet runCompare() im selben Tick noch mit dem alten Wert (Race) →
+    // Diff passt nicht zur angezeigten Auswahl.
+    onCompareChange(which, val) {
+      const v = val == null ? '' : String(val);
+      if (which === 'from') this.compareFrom = v;
+      else this.compareTo = v;
+      this.runCompare();
+    },
+
     async runCompare() {
       const app = window.__app;
       const bookId = Alpine.store('nav').selectedBookId;
-      if (!bookId || !this.canCompare()) { this.diff = null; return; }
+      if (!bookId || !this.canCompare()) { this.diff = null; this.pubDiff = []; this.diffError = ''; return; }
       this.diffLoading = true;
       this.diffError = '';
       this.diff = null;
@@ -442,16 +510,16 @@ export function registerSnapshotsCard() {
       this.expandLoading = {};
       try {
         const [a, b] = await Promise.all([
-          fetchJson(`/snapshots/${bookId}/${this.compareFrom}`),
-          fetchJson(`/snapshots/${bookId}/${this.compareTo}`),
+          this._fetchSnapshot(bookId, this.compareFrom),
+          this._fetchSnapshot(bookId, this.compareTo),
         ]);
-        const fromContent = a?.snapshot?.content;
-        const toContent = b?.snapshot?.content;
+        const fromContent = a?.content;
+        const toContent = b?.content;
         if (!fromContent || !toContent) throw new Error('SNAPSHOT_NOT_FOUND');
         this.diff = diffSnapshots(fromContent, toContent);
         // Publikations-Metadaten-Diff (Titelei/ISBN/Cover …) — die Felder, die der
         // Inhalts-Diff nicht sieht.
-        this.pubDiff = diffPublication(a?.snapshot?.publication, b?.snapshot?.publication);
+        this.pubDiff = diffPublication(a?.publication, b?.publication);
       } catch (e) {
         console.error('[snapshots:compare]', e);
         this.diffError = e.message || 'compare failed';

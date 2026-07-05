@@ -1072,6 +1072,7 @@
   "snapshots.compareTitle": "Fassungen vergleichen",
   "snapshots.compareFrom": "Von (älter)",
   "snapshots.compareTo": "Bis (neuer)",
+  "snapshots.compareSame": "Bitte zwei unterschiedliche Fassungen wählen.",
   "snapshots.diffLoading": "Vergleich wird erstellt …",
   "snapshots.diffError": "Vergleich fehlgeschlagen:",
   "snapshots.summary.added": "{n} hinzugefügt",
