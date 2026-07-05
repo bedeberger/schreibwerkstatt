@@ -455,6 +455,7 @@
   "book.export.html": "HTML",
   "book.export.txt": "Text",
   "book.export.md": "Markdown",
+  "book.export.substack": "Substack (HTML)",
   "book.export.pdfCustom": "PDF (anpassbar) …",
   "book.export.epubCustom": "EPUB (anpassbar) …",
   "publication.exportToolsHint": "Layout, Schrift, Cover und Reflow-Einstellungen werden in den anpassbaren Export-Karten gepflegt.",

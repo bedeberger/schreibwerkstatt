@@ -82,7 +82,7 @@
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   min-height: 2.5rem;
 }
 .site-header-center {

@@ -28,7 +28,14 @@
 /* Karte mit Combobox-Dropdown muss über spätere .card-Geschwister liegen —
    absolut positionierte Dropdown-Listen werden sonst von transform-animierten
    Folgekarten verdeckt (jede .card ist eigener Stacking-Context). */
-.card--book-selector { position: relative; z-index: var(--z-sticky); }
+/* Schmale Toolbar-Leiste — braucht nicht das volle .card-Padding; vertikal
+   gestrafft, damit oberhalb des Layouts kein Weißraum verschenkt wird. */
+.card--book-selector {
+  position: relative;
+  z-index: var(--z-sticky);
+  padding: var(--space-md) var(--space-20);
+  margin-bottom: var(--space-md);
+}
 
 .search-wrap { margin-bottom: var(--space-10); }
 .sidebar-search-wrap {

@@ -13,6 +13,12 @@
   margin-bottom: var(--space-md);
 }
 
+/* Buch-Chat: höheres Fenster (agentische Antworten sind länger) */
+#book-chat-messages {
+  min-height: min(420px, 50dvh);
+  max-height: min(640px, 72dvh);
+}
+
 /* Nachrichten-Zeile */
 .chat-msg {
   display: flex;

@@ -12,6 +12,7 @@ await import('../../../db/schema.js');
 const { buildTxt }  = await import('../../../lib/export-builders/txt.js');
 const { buildMd }   = await import('../../../lib/export-builders/md.js');
 const { buildHtml } = await import('../../../lib/export-builders/html.js');
+const { buildSubstack } = await import('../../../lib/export-builders/substack.js');
 const { buildEpub } = await import('../../../lib/export-builders/epub.js');
 const { buildDocx, buildDocxNormseite } = await import('../../../lib/export-builders/docx.js');
 const { buildPdf }  = await import('../../../lib/export-builders/pdf.js');
@@ -94,6 +95,43 @@ test('html scope=page: Page-Name als Haupttitel', () => {
   const s = buf.toString('utf8');
   assert.ok(s.includes('<title>Seite eins</title>'));
   assert.ok(s.includes('<h1>Seite eins</h1>'));
+});
+
+test('substack: Titel in Meta-Box statt Body-h1, Kapitel-Heading als h2', () => {
+  const s = buildSubstack(bookBundle, { lang: 'de' }).toString('utf8');
+  // Titel liegt in der Meta-Box (kopierbar ins Titelfeld), NICHT als <h1> im Body.
+  assert.ok(s.includes('substack-meta'));
+  assert.ok(s.includes('Mein Buch'));
+  assert.ok(!/<h1>Mein Buch<\/h1>/.test(s));
+  // Top-Kapitel -> h2 (Substacks „Überschrift").
+  assert.ok(s.includes('<h2>K1</h2>'));
+  // In-Body-<h1> der Seite wird auf h2 heruntergestuft (Substack kennt kein h1).
+  assert.ok(!/<h1>Kap 1<\/h1>/.test(s));
+  assert.ok(s.includes('<h2>Kap 1</h2>'));
+  // Paste-fertiges Inline-Markup bleibt erhalten.
+  assert.ok(s.includes('Text eins.'));
+});
+
+test('substack: en-Locale + Bild-Warnung bei nicht-öffentlicher URL', () => {
+  const bundle = {
+    scope: 'page', book, chapter, page,
+    groups: [{ chapterId: 10, chapter, pages: [
+      { p: page, pd: { html: '<p><strong>Hi</strong></p><img src="/local/pic.png" alt="x">' } },
+    ] }],
+  };
+  const s = buildSubstack(bundle, { lang: 'en' }).toString('utf8');
+  assert.ok(s.includes('lang="en"'));
+  assert.ok(s.includes('class="stk-warn"'));   // Warn-Element gerendert
+  assert.ok(s.includes('<strong>Hi</strong>'));
+  // Öffentliche URL loest keine Warnung aus.
+  const bundle2 = {
+    scope: 'page', book, chapter, page,
+    groups: [{ chapterId: 10, chapter, pages: [
+      { p: page, pd: { html: '<img src="https://cdn.example.com/pic.png" alt="x">' } },
+    ] }],
+  };
+  const s2 = buildSubstack(bundle2, { lang: 'en' }).toString('utf8');
+  assert.ok(!s2.includes('class="stk-warn"'));
 });
 
 test('epub: ZIP-Magic + EPUB-Mimetype', async () => {
