@@ -8975,6 +8975,24 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 234 abgeschlossen (pdf_export_profile.spine_image).');
   }
 
+  if (version < 235) {
+    // Eingefrorene Publikations-Metadaten pro Fassung: selbsttragende Kopie von
+    // book_publication (Titelei-Texte + epub_*-Optionen + Cover/Autorfoto als
+    // base64) zum Capture-Zeitpunkt. Fassungs-Export nutzt diese Kopie statt der
+    // Live-Daten, Restore schreibt sie zurueck. Additive Spalte, kein FK noetig.
+    const bsCols235 = db.pragma('table_info(book_snapshots)').map(c => c.name);
+    if (!bsCols235.includes('publication_json')) {
+      db.prepare('ALTER TABLE book_snapshots ADD COLUMN publication_json TEXT').run();
+    }
+
+    const fkErrors235 = db.pragma('foreign_key_check');
+    if (fkErrors235.length) {
+      throw new Error(`Migration 235: foreign_key_check meldet ${fkErrors235.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 235').run();
+    logger.info('DB-Migration auf Version 235 abgeschlossen (book_snapshots.publication_json).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

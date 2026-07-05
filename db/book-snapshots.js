@@ -23,18 +23,18 @@ function _nextSeq(bookId) {
 
 function createSnapshot({
   bookId, label = null, description = null,
-  contentJson, extrasJson = null,
+  contentJson, extrasJson = null, publicationJson = null,
   chars = 0, words = 0, pages = 0, chapters = 0,
   userEmail = null,
 }) {
   const seq = _nextSeq(bookId);
   const res = db.prepare(`
     INSERT INTO book_snapshots
-      (book_id, seq, label, description, content_json, extras_json,
+      (book_id, seq, label, description, content_json, extras_json, publication_json,
        chars, words, pages, chapters, user_email, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?, ${NOW_ISO_SQL})
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?, ${NOW_ISO_SQL})
   `).run(
-    bookId, seq, label, description, contentJson, extrasJson,
+    bookId, seq, label, description, contentJson, extrasJson, publicationJson,
     chars, words, pages, chapters, userEmail,
   );
   return { id: res.lastInsertRowid, seq };
@@ -46,7 +46,8 @@ function listSnapshots(bookId) {
   return db.prepare(`
     SELECT id, book_id, seq, label, description,
            chars, words, pages, chapters, user_email, created_at,
-           (extras_json IS NOT NULL) AS has_extras
+           (extras_json IS NOT NULL) AS has_extras,
+           (publication_json IS NOT NULL) AS has_publication
     FROM book_snapshots
     WHERE book_id = ?
     ORDER BY created_at DESC, id DESC

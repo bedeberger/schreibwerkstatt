@@ -97,3 +97,47 @@ test('snapshotToBundle: leerer/fehlender Tree → keine Gruppen', () => {
   assert.deepEqual(snapshotToBundle({ book: { name: 'x' } }, { bookId: 1 }).groups, []);
   assert.deepEqual(snapshotToBundle(null, { bookId: 1, bookName: 'Fallback' }).book.name, 'Fallback');
 });
+
+// snapshotPublication: loest die eingefrorene book_publication einer Fassung
+// (publication_json) zurueck in die getMeta-Form + Buffer-BLOBs, die die
+// Export-Pfade sonst live konsumieren.
+const { snapshotPublication } = require_('../../lib/snapshot-export.js');
+
+test('snapshotPublication: null/leer/defekt → null', () => {
+  assert.equal(snapshotPublication(null), null);
+  assert.equal(snapshotPublication(''), null);
+  assert.equal(snapshotPublication('{kaputt'), null);
+  assert.equal(snapshotPublication('{}'), null);           // keine meta
+  assert.equal(snapshotPublication('{"meta":null}'), null);
+});
+
+test('snapshotPublication: Textfelder + Cover/Foto decodiert, Flags gespiegelt', () => {
+  const coverBytes = Buffer.from('COVER');
+  const photoBytes = Buffer.from('PHOTO');
+  const json = JSON.stringify({
+    meta: { imprint: 'Impressum KDP', isbn: '9783161484100', epub_justify: true,
+            has_cover: false, has_author_image: false, cover_mime: null },
+    cover: { b64: coverBytes.toString('base64'), mime: 'image/jpeg' },
+    authorImage: { b64: photoBytes.toString('base64'), mime: 'image/png' },
+  });
+  const pub = snapshotPublication(json);
+  assert.equal(pub.meta.imprint, 'Impressum KDP');
+  assert.equal(pub.meta.isbn, '9783161484100');
+  // Flags/Mimes spiegeln die eingefrorenen BLOBs, nicht die im meta gespeicherten Werte.
+  assert.equal(pub.meta.has_cover, true);
+  assert.equal(pub.meta.cover_mime, 'image/jpeg');
+  assert.equal(pub.meta.has_author_image, true);
+  assert.equal(pub.meta.author_image_mime, 'image/png');
+  assert.ok(Buffer.isBuffer(pub.cover.image));
+  assert.equal(pub.cover.image.toString(), 'COVER');
+  assert.equal(pub.authorImage.image.toString(), 'PHOTO');
+});
+
+test('snapshotPublication: nur Textfelder (keine BLOBs) → Flags false', () => {
+  const pub = snapshotPublication(JSON.stringify({ meta: { imprint: 'x', has_cover: true } }));
+  assert.equal(pub.cover, null);
+  assert.equal(pub.authorImage, null);
+  // has_cover aus dem gespeicherten meta wird durch die BLOB-Abwesenheit ueberschrieben.
+  assert.equal(pub.meta.has_cover, false);
+  assert.equal(pub.meta.imprint, 'x');
+});

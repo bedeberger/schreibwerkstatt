@@ -15,7 +15,7 @@ const { getBookSettings, saveBookSettings, setBookEntitiesEnabled } = require('.
 const { treeToNodes, buildBookJson, validateBookJson, planFromNodes } = require('../lib/book-bundle');
 const { collectExtras } = require('../db/book-migration-data');
 const { htmlToPlainText } = require('../lib/html-text');
-const { snapshotToBundle } = require('../lib/snapshot-export');
+const { snapshotToBundle, snapshotPublication } = require('../lib/snapshot-export');
 const { FORMATS } = require('../lib/export-builders');
 const { buildExportMeta, sendExportBuffer } = require('../lib/export-send');
 const { buildExportFilename } = require('../lib/filenames');
@@ -122,7 +122,31 @@ async function _buildSnapshotPayload(bookId, req) {
     logger.warn(`Snapshot-Extras fehlgeschlagen (book=${bookId}): ${e.message}`);
   }
 
-  return { content, extrasJson, chars, words, pages: htmlById.size, chapters: _countChapters(nodes) };
+  // Publikations-Metadaten selbsttragend einfrieren (Titelei/epub_*-Optionen +
+  // Cover/Autorfoto als base64), damit ein Fassungs-Export den Stand zum Capture-
+  // Zeitpunkt nutzt statt der Live-book_publication. Nur wenn eine echte Zeile
+  // existiert (getMeta.created_at) — sonst faellt der Export auf die Live-Defaults.
+  let publicationJson = null;
+  try {
+    const bp = require('../db/book-publication');
+    const meta = bp.getMeta(bookId);
+    if (meta && meta.created_at) {
+      const pub = { meta };
+      if (meta.has_cover) {
+        const c = bp.getCover(bookId);
+        if (c && c.image) pub.cover = { b64: c.image.toString('base64'), mime: c.mime || 'image/jpeg' };
+      }
+      if (meta.has_author_image) {
+        const a = bp.getAuthorImage(bookId);
+        if (a && a.image) pub.authorImage = { b64: a.image.toString('base64'), mime: a.mime || 'image/jpeg' };
+      }
+      publicationJson = JSON.stringify(pub);
+    }
+  } catch (e) {
+    logger.warn(`Snapshot-Publikation fehlgeschlagen (book=${bookId}): ${e.message}`);
+  }
+
+  return { content, extrasJson, publicationJson, chars, words, pages: htmlById.size, chapters: _countChapters(nodes) };
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
@@ -163,6 +187,7 @@ router.get('/:bookId/:id', (req, res) => {
       id: row.id, seq: row.seq, label: row.label, description: row.description,
       chars: row.chars, words: row.words, pages: row.pages, chapters: row.chapters,
       user_email: row.user_email, created_at: row.created_at,
+      has_publication: row.publication_json ? 1 : 0,
       content,
     },
   });
@@ -200,9 +225,12 @@ router.get('/:bookId/:id/export/:fmt', async (req, res) => {
     return res.status(422).json({ error_code: 'CORRUPT_SNAPSHOT' });
   }
 
+  // Eingefrorene Publikation der Fassung bevorzugen (fmt='epub' konsumiert sie);
+  // fehlt sie, faellt buildExportMeta auf die Live-book_publication zurueck.
+  const publication = snapshotPublication(row.publication_json);
   let buf;
   try {
-    buf = await spec.build(bundle, buildExportMeta(bookId, fmt));
+    buf = await spec.build(bundle, buildExportMeta(bookId, fmt, { publication }));
   } catch (e) {
     logger.error(`Fassungs-Export-Build fehlgeschlagen (book=${bookId}, id=${id}, fmt=${fmt}): ${e.message}`);
     return res.status(502).json({ error_code: 'EXPORT_FAILED' });
@@ -243,6 +271,7 @@ router.post('/:bookId', express.json({ limit: '1mb' }), async (req, res) => {
     created = snapshots.createSnapshot({
       bookId, label, description,
       contentJson: JSON.stringify(payload.content), extrasJson: payload.extrasJson,
+      publicationJson: payload.publicationJson,
       chars: payload.chars, words: payload.words, pages: payload.pages, chapters: payload.chapters,
       userEmail,
     });
@@ -257,7 +286,9 @@ router.post('/:bookId', express.json({ limit: '1mb' }), async (req, res) => {
       id: created.id, seq: created.seq, label, description,
       chars: payload.chars, words: payload.words, pages: payload.pages, chapters: payload.chapters,
       user_email: userEmail,
-      created_at: new Date().toISOString(), has_extras: payload.extrasJson ? 1 : 0,
+      created_at: new Date().toISOString(),
+      has_extras: payload.extrasJson ? 1 : 0,
+      has_publication: payload.publicationJson ? 1 : 0,
     },
   });
 });
@@ -300,6 +331,7 @@ router.post('/:bookId/:id/restore', express.json({ limit: '1mb' }), async (req, 
     snapshots.createSnapshot({
       bookId, label: AUTO_BACKUP_LABEL, description: null,
       contentJson: JSON.stringify(cur.content), extrasJson: cur.extrasJson,
+      publicationJson: cur.publicationJson,
       chars: cur.chars, words: cur.words, pages: cur.pages, chapters: cur.chapters,
       userEmail,
     });
@@ -371,6 +403,23 @@ router.post('/:bookId/:id/restore', express.json({ limit: '1mb' }), async (req, 
       );
       if (s.entities_enabled) setBookEntitiesEnabled(bookId, 1);
     } catch (e) { logger.warn(`Restore-Settings fehlgeschlagen (book=${bookId}): ${e.message}`); }
+  }
+
+  // 4b) Eingefrorene Publikation zurueckschreiben (best-effort, Voll-Replace wie
+  //     upsertMeta). Cover/Autorfoto auf den Fassungs-Stand setzen — fehlt das
+  //     BLOB in der Fassung, wird das Live-Bild geloescht (Restore = auf den
+  //     eingefrorenen Stand setzen). Die Auto-Sicherung oben hat den vorherigen
+  //     Publikations-Stand mitgefroren → umkehrbar.
+  const pub = snapshotPublication(row.publication_json);
+  if (pub) {
+    try {
+      const bp = require('../db/book-publication');
+      bp.upsertMeta(bookId, pub.meta);
+      if (pub.cover) bp.setCover(bookId, pub.cover.image, pub.cover.mime);
+      else bp.clearCover(bookId);
+      if (pub.authorImage) bp.setAuthorImage(bookId, pub.authorImage.image, pub.authorImage.mime);
+      else bp.clearAuthorImage(bookId);
+    } catch (e) { logger.warn(`Restore-Publikation fehlgeschlagen (book=${bookId}): ${e.message}`); }
   }
 
   // 5) Statistik neu syncen (Tages-Donut, Buch-Stats).

@@ -26,7 +26,7 @@ const {
 } = require('../../db/book-publication');
 const { loadContents } = require('../../lib/load-contents');
 const { getSnapshot } = require('../../db/book-snapshots');
-const { snapshotToBundle } = require('../../lib/snapshot-export');
+const { snapshotToBundle, snapshotPublication } = require('../../lib/snapshot-export');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
 const { renderCoverBuffer, computeSpineMm } = require('../../lib/pdf-cover-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
@@ -65,6 +65,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     // snapshotId gesetzt → Bundle aus dem selbsttragenden Fassungs-Stand bauen
     // (scope ist dann immer 'book', entityId = bookId). Sonst Live-Buchinhalt.
     let bundle;
+    let frozenPub = null;
     if (snapshotId) {
       const snap = getSnapshot(entityId, snapshotId);
       if (!snap) throw i18nError('job.error.snapshotNotFound');
@@ -73,6 +74,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       catch { throw i18nError('job.error.snapshotCorrupt'); }
       bundle = snapshotToBundle(content, { bookId: entityId });
       if (!bundle.groups.length) throw i18nError('job.error.snapshotCorrupt');
+      frozenPub = snapshotPublication(snap.publication_json);
     } else {
       bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
     }
@@ -94,10 +96,12 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     // Render-Funktionen (pages.js, cover-render) unveraendert config.extras
     // lesen. Render-Toggles (barcode, imprintPosition) bleiben Profil-Sache.
     // Cover/Autorfoto kommen ebenfalls buch-weit (geteilt mit EPUB).
+    // Bei einer Fassung mit eingefrorener Publikation (frozenPub) wird statt der
+    // Live-book_publication der eingefrorene Stand gespiegelt.
     let pubCoverBuf = null;
     let pubAuthorBuf = null;
     if (scope === 'book') {
-      const pub = getBookPublication(book.id);
+      const pub = frozenPub ? frozenPub.meta : getBookPublication(book.id);
       const ex = profile.config.extras;
       ex.authorName  = pub.author_name || '';
       ex.isbn        = pub.isbn || '';
@@ -108,8 +112,13 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       ex.copyright   = pub.copyright || '';
       ex.frontMatter = pub.frontmatter || '';
       ex.authorBio   = pub.author_bio || '';
-      if (pub.has_cover) { const c = getBookPublicationCover(book.id); if (c) pubCoverBuf = c.image; }
-      if (pub.has_author_image) { const a = getBookPublicationAuthorImage(book.id); if (a) pubAuthorBuf = a.image; }
+      if (frozenPub) {
+        if (frozenPub.cover) pubCoverBuf = frozenPub.cover.image;
+        if (frozenPub.authorImage) pubAuthorBuf = frozenPub.authorImage.image;
+      } else {
+        if (pub.has_cover) { const c = getBookPublicationCover(book.id); if (c) pubCoverBuf = c.image; }
+        if (pub.has_author_image) { const a = getBookPublicationAuthorImage(book.id); if (a) pubAuthorBuf = a.image; }
+      }
     }
 
     let buffer;

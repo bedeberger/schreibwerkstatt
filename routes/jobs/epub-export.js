@@ -20,7 +20,7 @@ const appSettings = require('../../lib/app-settings');
 const bp = require('../../db/book-publication');
 const { loadContents } = require('../../lib/load-contents');
 const { getSnapshot } = require('../../db/book-snapshots');
-const { snapshotToBundle } = require('../../lib/snapshot-export');
+const { snapshotToBundle, snapshotPublication } = require('../../lib/snapshot-export');
 const { buildEpub } = require('../../lib/export-builders/epub');
 const { validateEpub } = require('../../lib/epubcheck-validate');
 const { buildExportFilename } = require('../../lib/filenames');
@@ -53,9 +53,11 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, sn
   try {
     updateJob(jobId, { progress: 10, statusText: 'job.phase.loadBook' });
     // snapshotId gesetzt → Bundle aus dem selbsttragenden Fassungs-Stand bauen
-    // (scope ist dann immer 'book', entityId = bookId). Cover/Titelei kommen
-    // weiter buch-weit aus book_publication. Sonst Live-Buchinhalt.
+    // (scope ist dann immer 'book', entityId = bookId). Cover/Titelei kommen dann
+    // aus der eingefrorenen Publikation der Fassung (frozenPub), sonst live aus
+    // book_publication. Sonst Live-Buchinhalt.
     let bundle;
+    let frozenPub = null;
     if (snapshotId) {
       const snap = getSnapshot(entityId, snapshotId);
       if (!snap) throw i18nError('job.error.snapshotNotFound');
@@ -64,6 +66,7 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, sn
       catch { throw i18nError('job.error.snapshotCorrupt'); }
       bundle = snapshotToBundle(content, { bookId: entityId });
       if (!bundle.groups.length) throw i18nError('job.error.snapshotCorrupt');
+      frozenPub = snapshotPublication(snap.publication_json);
     } else {
       bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
     }
@@ -80,13 +83,19 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, sn
       exportedBy: userEmail || '',
     };
     if (book?.id) {
-      const meta = bp.getMeta(book.id);
+      // Eingefrorene Publikation der Fassung bevorzugen (frozenPub), sonst live.
+      const meta = frozenPub ? frozenPub.meta : bp.getMeta(book.id);
       opts.meta = meta;
       // Publikationsname (book_publication.author_name) uebersteuert den Account-Namen.
       opts.author = (meta.author_name || '').trim() || _resolveAuthor(book.id);
       opts.tocTitle = meta.epub_toc_title || undefined;
-      if (meta.has_cover) opts.cover = bp.getCover(book.id);
-      if (meta.has_author_image) opts.authorImage = bp.getAuthorImage(book.id);
+      if (frozenPub) {
+        if (frozenPub.cover) opts.cover = frozenPub.cover;
+        if (frozenPub.authorImage) opts.authorImage = frozenPub.authorImage;
+      } else {
+        if (meta.has_cover) opts.cover = bp.getCover(book.id);
+        if (meta.has_author_image) opts.authorImage = bp.getAuthorImage(book.id);
+      }
     }
 
     let buffer = await buildEpub(bundle, opts);
