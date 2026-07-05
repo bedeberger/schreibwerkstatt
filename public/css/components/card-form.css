@@ -639,12 +639,11 @@ select[aria-invalid="true"],
      gestreckt — mit kleinerem Gap packen sie pro Reihe dichter beieinander. */
   .card-actions { width: 100%; gap: var(--space-xs); }
   .card-actions button { flex: 1 1 auto; min-width: 0; }
-  /* Rechtsbündige Anker verhindern, dass das an die ⋯-Overflow-Kante
-     gekoppelte `.context-menu--dropdown` (right: 0) über den linken Rand
-     hinaus aufklappt. Icon-only Bars ganz rechtsbündig; Grouped Toolbar zieht
-     nur den Overflow-Anker ans Ende (behält sonst ihre gepackte Reihe). */
-  .card-actions:not(.card-actions--grouped) { justify-content: flex-end; }
-  .card-actions--grouped .action-overflow { margin-left: auto; }
+  /* Alle Action-Bars rechtsbündig — die Icons packen wie auf Desktop rechts
+     zusammen (statt links gruppiert + ⋯-Overflow einzeln nach rechts gerissen).
+     Rechtsbündig hält zugleich das an die ⋯-Overflow-Kante gekoppelte
+     `.context-menu--dropdown` (right: 0) vom linken Rand fern. */
+  .card-actions { justify-content: flex-end; }
   /* Gruppierte Editor-Toolbar (Prüfen/Bearbeiten/Fokus/Chat/Ideen/Teilen):
      viele Buttons → natürliche Breite + kompakteres Padding/Schrift, damit sie
      pro Reihe dichter packen (≈2 statt 3 Reihen vor dem Seiteninhalt). Andere

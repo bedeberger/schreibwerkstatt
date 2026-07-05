@@ -514,6 +514,13 @@
     justify-content: flex-end;
     white-space: normal;
   }
+  /* Analyse-Chip bekommt eine eigene volle Zeile; Ring + Hilfe + Avatar
+     rutschen gemeinsam rechtsbündig in die Folgezeile, statt dass der Ring
+     einzeln ans Ende der Analyse-Zeile gerissen wird. */
+  .header-action-cluster {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
   .avatar-menu-panel {
     position: fixed;
     top: auto;
