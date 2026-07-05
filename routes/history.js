@@ -12,6 +12,10 @@ const router = express.Router();
 // Reads (Lektoratverlauf, Reviews, Stats, Heatmap) sind viewer+.
 router.param('book_id', aclParamGuard('viewer'));
 const jsonBody = express.json();
+// Grosser Limit fuer Routen, die die vollstaendige Seitenliste eines Buchs im
+// Body tragen (stats-stale, page-stats/batch). Tagebuecher haben tausende Seiten
+// → { id, updated_at } je Seite sprengt das Default-100-KB-Limit (413).
+const jsonBodyLarge = express.json({ limit: '25mb' });
 
 // Zwei aufeinanderfolgende writing-time-Pings gelten als dieselbe Schreib-Session,
 // solange zwischen ihnen hoechstens so viele Sekunden liegen. Der Heartbeat kommt
@@ -276,7 +280,7 @@ router.get('/page-stats/:book_id', (req, res) => {
 // page_stats hat FK auf pages(page_id) UND books(book_id); ein Mismatch
 // (z.B. stale Frontend-State nach Buchwechsel/Page-Löschung) wuerde sonst die
 // ganze Transaktion abreissen. Skipped Rows werden geloggt, Restliche gehen durch.
-router.post('/page-stats/batch', express.json(), (req, res) => {
+router.post('/page-stats/batch', jsonBodyLarge, (req, res) => {
   const items = req.body;
   if (!Array.isArray(items) || !items.length) return res.json({ ok: true, count: 0 });
 
@@ -358,7 +362,7 @@ router.get('/book-stats/:book_id', (req, res) => {
 //   (b) new-day      — jüngste Seitenaktivität liegt nach dem letzten Snapshot-Tag.
 //   (c) char-growth  — Σ page_stats.chars weicht > Toleranz vom Snapshot ab
 //                       (Mehrfach-Edits am selben Tag; Tagesgranularität von (b) blind).
-router.post('/stats-stale/:book_id', jsonBody, (req, res) => {
+router.post('/stats-stale/:book_id', jsonBodyLarge, (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
   const pages = Array.isArray(req.body?.pages) ? req.body.pages : [];
