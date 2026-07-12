@@ -232,9 +232,20 @@
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#download"/></svg>
         <span x-text="t('pagetreeCtx.export')"></span>
       </button>
+      <div class="context-menu-sep" role="separator"></div>
+      <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+              @click="pagetreeCtxNewChapter()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#folder-plus"/></svg>
+        <span x-text="t('pagetreeCtx.newChapter')"></span>
+      </button>
       <template x-if="pageTreeMenuTarget.kind === 'chapter'">
         <div>
           <div class="context-menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                  @click="pagetreeCtxNewPage()">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg>
+            <span x-text="t('pagetreeCtx.newPage')"></span>
+          </button>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                   @click="pagetreeCtxToggleExclude()">
             <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=693#' + (pageTreeMenuTarget.excluded ? 'rotate-cw' : 'archive')"/></svg>

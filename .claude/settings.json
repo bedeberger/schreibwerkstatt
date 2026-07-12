@@ -39,6 +39,17 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/prompt-disambiguation.js",
+            "statusMessage": "Editor-/Chat-/Kommentar-Mehrdeutigkeit pruefen"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [

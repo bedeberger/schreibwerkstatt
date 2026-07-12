@@ -1,8 +1,12 @@
 import { EVT } from '../events.js';
 import { contentRepo } from '../repo/content.js';
+import { localIsoDate } from '../utils.js';
 // Pagetree-Rechtsklick-Menü. Aktionen pro Node-Typ:
-//   page    → Öffnen, Editieren (Notebook), Teilen, Exportieren
-//   chapter → Öffnen (Header-Activate = Toggle + ggf. Kapitel-Review), Teilen, Exportieren
+//   page    → Öffnen, Editieren (Notebook), Teilen, Exportieren, Neues Kapitel
+//   chapter → Öffnen (Header-Activate = Toggle + ggf. Kapitel-Review), Teilen,
+//             Exportieren, Neues Kapitel, Neue Seite, Aus-/Einschliessen
+//   Neues Kapitel wird hinter dem Ziel-Kapitel (bzw. dem Kapitel der Ziel-Seite)
+//   eingefügt, sonst ans Ende — createChapter positioniert nur Top-Level.
 //
 // State lebt im Root (`pageTreeMenuOpen`/`Pos`/`Target`, deklariert in
 // app-state.js#navigationState). Render-HTML in public/partials/sidebar.html.
@@ -10,7 +14,7 @@ import { contentRepo } from '../repo/content.js';
 // `this` ist die Alpine-Root-Komponente.
 
 const MENU_W = 240;
-const MENU_H = 260;
+const MENU_H = 300;
 
 export const treeContextMenuMethods = {
   _openPagetreeContextMenu(ev, target) {
@@ -137,6 +141,72 @@ export const treeContextMenuMethods = {
     this._hidePagetreeContextMenu();
     if (!target || target.kind !== 'chapter') return;
     this.setChapterExcluded(target.id, !target.excluded);
+  },
+
+  // Neue Seite direkt im angeklickten Kapitel anlegen: Titel per appPrompt,
+  // dann Baum + Flat-Liste lokal einhängen und zur neuen Seite springen.
+  async pagetreeCtxNewPage() {
+    const target = this.pageTreeMenuTarget;
+    this._hidePagetreeContextMenu();
+    if (!target || target.kind !== 'chapter') return;
+    const item = this._findTreeChapter(target.id);
+    if (!item || item.solo) return;
+    const isDiary = typeof this.isTagebuch === 'function' && this.isTagebuch();
+    const name = await this.appPrompt({
+      message: this.t('pagetreeCtx.newPagePrompt'),
+      placeholder: this.t('pagetreeCtx.newPagePlaceholder'),
+      defaultValue: isDiary ? localIsoDate() : '',
+      confirmLabel: this.t('pagetreeCtx.newPageConfirm'),
+    });
+    if (!name) return;
+    try {
+      const created = await contentRepo.createPage({
+        chapter_id: parseInt(target.id, 10),
+        name,
+        html: '<p></p>',
+      });
+      if (!created?.id) return;
+      const newPage = {
+        ...created,
+        priority: created.position, // Sort-Alias wie decoratePage
+        chapterName: item.name,
+      };
+      Alpine.store('nav').pages = [...Alpine.store('nav').pages, newPage];
+      // Reassignment statt push: Property-Set auf `.pages` triggert die
+      // Alpine-Watcher zuverlässig — nested-Array-push tut das nicht immer.
+      item.pages = [...(item.pages || []), newPage];
+      item.open = true;
+      this.tokEsts[newPage.id] = { tok: 0, words: 0, chars: 0 };
+      await this.selectPage(newPage);
+    } catch (e) {
+      this.setStatus?.(this.t('bookOrganizer.saveFailed', { detail: e.message }));
+    }
+  },
+
+  // Neues Kapitel direkt aus dem Kontextmenü. Position: hinter dem
+  // angeklickten Kapitel bzw. hinter dem Kapitel der angeklickten Seite
+  // (nur Top-Level-Kapitel positionierbar — Sub-Kapitel/kein Match → ans Ende,
+  // wie createChapter fallback). createChapter liest `newChapterTitle`.
+  async pagetreeCtxNewChapter() {
+    const target = this.pageTreeMenuTarget;
+    this._hidePagetreeContextMenu();
+    if (!target) return;
+    let afterChapterId = null;
+    if (target.kind === 'chapter') {
+      afterChapterId = target.id;
+    } else if (target.kind === 'page') {
+      afterChapterId = this._findTreePage(target.id)?.chapter_id ?? null;
+    }
+    const name = await this.appPrompt({
+      message: this.t('bookOrganizer.promptChapterName'),
+      placeholder: this.t('bookOrganizer.placeholderChapterName'),
+      confirmLabel: this.t('bookOrganizer.create'),
+    });
+    if (!name) return;
+    this.newChapterTitle = name;
+    // createChapter hängt das Kapitel (open:true) lokal in den Tree — es
+    // erscheint sofort in der Sidebar; keine Karte aufreissen.
+    await this.createChapter({ afterChapterId });
   },
 
   async pagetreeCtxExport() {
