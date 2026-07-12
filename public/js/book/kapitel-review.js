@@ -49,12 +49,13 @@ export const kapitelReviewMethods = {
     this.gotoStelle(name, null);
   },
 
-  // Sobald ein Buch als „strukturiert" erkennbar ist (≥2 Kapitel, mind. eines
-  // mit mehreren Seiten), lohnt sich das Kapitel-Review. Reine Flachbücher
-  // deckt das Seiten-Lektorat ab.
+  // Sobald mindestens ein Kapitel mehrere Seiten hat, lohnt sich das Kapitel-
+  // Review — dann gibt es eine Kapiteleinheit, die als Ganzes bewertet werden
+  // kann (unabhängig von der Kapitelanzahl). Bücher aus lauter Ein-Seiten-
+  // Kapiteln bzw. reinen Solo-Seiten deckt das Seiten-Lektorat ab.
   _bookQualifiesForChapterReview() {
     const chapters = (this.$store.nav.tree || []).filter(i => i.type === 'chapter' && !i.solo);
-    return chapters.length >= 2 && chapters.some(c => c.pages.length > 1);
+    return chapters.some(c => c.pages.length > 1);
   },
 
   kapitelReviewChapterOptions() {

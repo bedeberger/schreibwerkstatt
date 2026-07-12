@@ -45,9 +45,20 @@ test('Parent ohne Pages und ohne Subs bleibt aussen vor', () => {
   assert.ok(!opts.some(o => String(o.id) === 'b'));
 });
 
-test('Buch qualifiziert nicht (<2 Kapitel) → leer', () => {
+test('Einzelnes Kapitel mit mehreren Seiten qualifiziert (Kapiteleinheit bewertbar)', () => {
   const tree = [
     { id: 'a', type: 'chapter', solo: false, parent_id: null, pages: [{ id: 'p1' }, { id: 'p2' }] },
+  ];
+  const c = ctx(tree);
+  const opts = c.kapitelReviewChapterOptions();
+  assert.equal(opts.length, 1);
+  assert.ok(opts.some(o => String(o.id) === 'a'));
+});
+
+test('Buch aus lauter Ein-Seiten-Kapiteln qualifiziert nicht → leer', () => {
+  const tree = [
+    { id: 'a', type: 'chapter', solo: false, parent_id: null, pages: [{ id: 'p1' }] },
+    { id: 'b', type: 'chapter', solo: false, parent_id: null, pages: [{ id: 'p2' }] },
   ];
   const c = ctx(tree);
   assert.deepEqual(c.kapitelReviewChapterOptions(), []);

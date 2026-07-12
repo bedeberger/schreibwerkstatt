@@ -314,12 +314,13 @@ export function registerKapitelReviewCard() {
       }
     },
 
-    // Sobald ein Buch als „strukturiert" erkennbar ist (≥2 Kapitel und
-    // mindestens eines mit mehreren Seiten), lohnt sich das Kapitel-Review für
-    // alle Kapitel – auch für solche mit nur einer Seite.
+    // Sobald mindestens ein Kapitel mehrere Seiten hat, lohnt sich das Kapitel-
+    // Review für alle Kapitel des Buchs – auch für solche mit nur einer Seite.
+    // Bücher aus lauter Ein-Seiten-Kapiteln bzw. reinen Solo-Seiten deckt das
+    // Seiten-Lektorat ab.
     _bookQualifiesForChapterReview() {
       const chapters = (Alpine.store('nav').tree || []).filter(i => i.type === 'chapter' && !i.solo);
-      return chapters.length >= 2 && chapters.some(c => c.pages.length > 1);
+      return chapters.some(c => c.pages.length > 1);
     },
 
     // Liste der Kapitel, die fürs Kapitel-Review anklickbar sind. Parent-Kapitel
