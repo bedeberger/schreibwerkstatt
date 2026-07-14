@@ -8,11 +8,17 @@ import { runQuoteNormalizeHtml } from './shared/quote-normalize.js';
 // `this` bezieht sich auf die Alpine-Komponente.
 
 export const lektoratMethods = {
-  _applyCorrections(html, fehler) {
+  // `outSkipped` (optional): sammelt Korrekturen, die replaceInHtml unangetastet
+  // liess (No-Op) — Ersetzung hätte eine Absatzgrenze gekreuzt oder einen Link
+  // umschlossen und wurde zum Schutz übersprungen. Aufrufer ohne Interesse an den
+  // Skips lassen den Parameter weg.
+  _applyCorrections(html, fehler, outSkipped) {
     let result = html;
     for (const f of fehler) {
       if (!f.original || !f.korrektur || f.original === f.korrektur) continue;
-      result = replaceInHtml(result, f.original, f.korrektur);
+      const next = replaceInHtml(result, f.original, f.korrektur);
+      if (next === result) { if (outSkipped) outSkipped.push(f); continue; }
+      result = next;
     }
     return result;
   },
@@ -27,8 +33,9 @@ export const lektoratMethods = {
     const page = await contentRepo.loadPage(this.currentPage.id, { fresh: true });
     page.html = stripFocusArtefacts(page.html || '');
 
+    const skipped = [];
     let finalHtml = selectedErrors.length > 0
-      ? this._applyCorrections(page.html, selectedErrors)
+      ? this._applyCorrections(page.html, selectedErrors, skipped)
       : page.html;
 
     // KI-Korrekturen/Vorschläge liefern oft gerade `"`/`'` — auf Buch-Style
@@ -57,7 +64,7 @@ export const lektoratMethods = {
     // nicht unmittelbar danach auf "seit Lektorat bearbeitet" flippen.
     this.markPageChecked?.(this.currentPage.id);
     this._syncPageStatsAfterSave?.(this.currentPage, finalHtml);
-    return { finalHtml };
+    return { finalHtml, skipped };
   },
 
 
@@ -242,7 +249,7 @@ export const lektoratMethods = {
     if (selected.length === 0) return;
 
     try {
-      const { finalHtml } = await this._loadApplyAndSave(selected, (pct, text) => {
+      const { finalHtml, skipped } = await this._loadApplyAndSave(selected, (pct, text) => {
         this.saveApplying = pct;
         if (text) this.setStatus(text, true);
       });
@@ -276,7 +283,13 @@ export const lektoratMethods = {
         } catch (e) { console.error('[history saved]', e); }
       }
       this.saveApplying = null;
-      this.setStatus(this.t('lektorat.correctionsSaved'), false, 5000);
+      this.setStatus(
+        skipped.length > 0
+          ? this.t('lektorat.correctionsSavedWithSkips', { count: skipped.length })
+          : this.t('lektorat.correctionsSaved'),
+        false,
+        skipped.length > 0 ? 8000 : 5000,
+      );
       this.correctedHtml = null;
       this.hasErrors = false;
       this.lektoratFindings = [];

@@ -101,7 +101,8 @@ test('POLICIES enthaelt alle erwarteten Tabellen', () => {
   assert.ok(names.includes('lektorat_cache'));
   assert.ok(names.includes('font_cache'));
   assert.ok(names.includes('job_runs'));
-  assert.ok(names.includes('page_checks'));
+  // page_checks (Lektorat-History) wird bewusst NICHT geprunt.
+  assert.ok(!names.includes('page_checks'));
   assert.ok(names.includes('book_stats_history'));
 });
 
@@ -133,9 +134,9 @@ test('job_runs: stale queued bleibt (status-Filter), stale done weg', () => {
   assert.ok(!ids.includes('old-done'));
 });
 
-test('page_checks: nur stale Row weg', () => {
+test('page_checks: bleibt vollstaendig erhalten (nicht geprunt)', () => {
   const rows = db.prepare('SELECT page_id FROM page_checks ORDER BY page_id').all();
-  assert.deepEqual(rows.map(r => r.page_id), [2]);
+  assert.deepEqual(rows.map(r => r.page_id), [1, 2]);
 });
 
 test('book_stats_history: 400 Tage alt weg (TTL 365)', () => {
@@ -143,8 +144,8 @@ test('book_stats_history: 400 Tage alt weg (TTL 365)', () => {
   assert.equal(cnt, 1);
 });
 
-test('summary.totalRemoved >= 7 (eine pro getesteter Tabelle)', () => {
-  assert.ok(summary.totalRemoved >= 7, `erwartet >=7 entfernte Rows, got ${summary.totalRemoved}`);
+test('summary.totalRemoved >= 6 (eine pro getesteter Tabelle, page_checks ausgenommen)', () => {
+  assert.ok(summary.totalRemoved >= 6, `erwartet >=6 entfernte Rows, got ${summary.totalRemoved}`);
 });
 
 test('Tabellen, die nicht im Test-Schema sind, werden uebersprungen', () => {

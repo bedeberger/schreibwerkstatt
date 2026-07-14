@@ -1,4 +1,4 @@
-import { escHtml, findInHtml, countInHtml, replaceInHtml, clearStatusAfter } from '../utils.js';
+import { escHtml, findInHtml, countInHtml, replaceInHtml, matchSpansLink, clearStatusAfter } from '../utils.js';
 import { makeChatMethods } from './chat-base.js';
 import { contentRepo } from '../repo/content.js';
 
@@ -121,12 +121,14 @@ export const chatMethods = {
         setErr(root.t('chat.originalAmbiguous'));
         return;
       }
-      // Block-Grenzen-Vorschlag: countInHtml findet ihn zwar (Tag-agnostische
-      // Text-View), aber replaceInHtml lässt ihn zum Schutz der Absatzstruktur
-      // unangetastet. Ohne Abfang wäre das ein stiller No-Op, der sich unten
-      // fälschlich wie „gespeichert" anfühlt (_applied + Erfolgsmeldung).
+      // Block-Grenzen-/Link-Vorschlag: countInHtml findet ihn zwar (Tag-agnostische
+      // Text-View), aber replaceInHtml lässt ihn zum Schutz der Absatzstruktur bzw.
+      // des Hyperlinks unangetastet. Ohne Abfang wäre das ein stiller No-Op, der
+      // sich unten fälschlich wie „gespeichert" anfühlt (_applied + Erfolgsmeldung).
       if (replaceInHtml(page.html, vorschlag.original, vorschlag.ersatz) === page.html) {
-        setErr(root.t('chat.crossesBlockBoundary'));
+        setErr(matchSpansLink(page.html, vorschlag.original)
+          ? root.t('chat.spansLink')
+          : root.t('chat.crossesBlockBoundary'));
         return;
       }
     } catch (e) {

@@ -150,6 +150,24 @@ function _crossesBlockBoundary(slice) {
   return false;
 }
 
+// True, wenn der Slice ein VOLLSTAENDIG umschlossenes <a>…</a> enthaelt (Open
+// UND Close im Bereich). Das href traegt Information, die die Plaintext-View der
+// KI nie gesehen hat — beim Ersetzen fiele der Link ersatzlos weg (nur der
+// sichtbare Linktext bliebe). Ein Waisen-<a> (Open oder Close ausserhalb) ist
+// dagegen ungefaehrlich: `_splitOrphanTags` klebt den fehlenden Partner wieder
+// an, der Link ueberlebt. Anker verschachteln nicht — depth-Zaehlung reicht.
+function _containsBalancedAnchor(slice) {
+  const tagRe = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
+  let depth = 0;
+  let m;
+  while ((m = tagRe.exec(slice))) {
+    if (m[1].toLowerCase() !== 'a') continue;
+    if (m[0].startsWith('</')) { if (depth > 0) return true; }
+    else depth++;
+  }
+  return false;
+}
+
 /**
  * Findet im Slice Tags ohne Partner: Closes ohne vorheriges Open im Slice
  * (Open liegt VOR dem Slice, Tag muss nach dem Replacement erhalten bleiben),
@@ -183,13 +201,13 @@ function _splitOrphanTags(slice) {
  * dabei darf weder das öffnende noch das schliessende Tag verloren gehen).
  *
  * Kreuzt der Match dagegen eine BLOCK-Grenze (`</p><p>`, `</li><li>`, Heading,
- * Tabelle …), wird NICHT ersetzt — eine solche Ersetzung würde verschachtelte
- * oder aufgespaltene Blöcke erzeugen und damit Absätze zerstören. Die Korrektur
- * wird dann stillschweigend übersprungen (Text bleibt unverändert) statt die
- * Struktur zu beschädigen.
+ * Tabelle …) ODER umschliesst er einen vollständigen Hyperlink (`<a>…</a>`),
+ * wird NICHT ersetzt: eine Block-Grenzen-Ersetzung würde Absätze zerstören, eine
+ * Link-Ersetzung würde das nur der KI-Plaintext-View unbekannte `href` ersatzlos
+ * verwerfen. In beiden Fällen bleibt der Text unverändert statt korrumpiert.
  *
  * Gibt das neue HTML zurück, oder das Original wenn nichts gefunden bzw. der
- * Match eine Block-Grenze kreuzt.
+ * Match eine Block-Grenze kreuzt oder einen Link umschliesst.
  */
 export function replaceInHtml(html, needle, replacement) {
   if (!html || !needle) return html;
@@ -199,10 +217,23 @@ export function replaceInHtml(html, needle, replacement) {
   let inserted = replacement;
   if (removed.includes('<')) {
     if (_crossesBlockBoundary(removed)) return html;
+    if (_containsBalancedAnchor(removed)) return html;
     const { orphanOpens, orphanCloses } = _splitOrphanTags(removed);
     if (orphanOpens.length || orphanCloses.length) {
       inserted = orphanOpens.join('') + replacement + orphanCloses.join('');
     }
   }
   return html.slice(0, m.htmlStart) + inserted + html.slice(m.htmlEnd);
+}
+
+/**
+ * Warum eine `replaceInHtml`-Ersetzung ein No-Op wäre — zur Unterscheidung der
+ * User-Meldung (Absatzgrenze vs. Link). Gibt `true`, wenn der Match einen
+ * vollständigen `<a>…</a>` umschliesst (und deshalb übersprungen wird).
+ */
+export function matchSpansLink(html, needle) {
+  if (!html || !needle) return false;
+  const m = findInHtml(html, needle);
+  if (!m) return false;
+  return _containsBalancedAnchor(html.slice(m.htmlStart, m.htmlEnd));
 }
