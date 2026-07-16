@@ -9,6 +9,7 @@ Browser (anon)       → GET  /share/:token          → SSR-HTML
 Browser (anon)       → GET  /share/:token/threads   → JSON (Threads, no-store)
 Browser (anon)       → POST /share/:token/comment   → Redirect 303 oder JSON (+ optional Anker/parent_id)
 Browser (anon)       → PATCH/DELETE /share/:token/comment/:id → JSON (eigenen Kommentar erledigt/löschen, via reader_token)
+Browser (anon)       → POST /share/:token/tts        → Audio-Bytes (Vorlesen, token-skopiert, no-store)
 Browser (auth Owner) → /share/api/links*            → JSON-CRUD (+ POST .../comments Reply, PATCH .../comments/:id/resolve)
 Browser (auth Owner) → /share/api/book-comments/:id  → JSON (alle Threads des Buchs; Kommentar-Leiste der Leseansicht)
 ```
@@ -59,6 +60,8 @@ Zwei statische Templates werden beim Modulladen einmal in `routes/share.js` per 
 - [public/share.gone.html](../public/share.gone.html) — 410-View für `revoked_at` bzw. `expires_at <= now`.
 
 `fillTemplate(tpl, vars)` ersetzt `{{key}}` einfach. **Alles, was aus DB/User kommt, wird vor der Interpolation per `escHtml()` escaped** — Ausnahme: Page-HTML (Content-Store), das bereits beim Save durch [lib/html-clean.js](../lib/html-clean.js) sanitisiert wurde.
+
+**Vorlesen (TTS / Proof-Listening).** Ist das Feature aktiv (`tts.enabled`), trägt `config_json` einen `tts: { enabled, pause }`-Block; share.html lädt zusätzlich [public/js/share-reader/tts.js](../public/js/share-reader/tts.js) als eigenes Modul (selbst-bootstrappend), das einen schwebenden Vorlese-Dock baut und den Text satzweise über `POST /share/:token/tts` (public, token-skopiert, Synthese-Kern [lib/tts-synth.js](../lib/tts-synth.js)) vorliest. Reines Lesen, keine DOM-Mutation (CSS Custom Highlight). Details: [docs/tts.md](tts.md). **Pre-Auth-Serving:** Der komplette Reader-Modulgraph muss für den anonymen Leser pre-auth erreichbar sein — `PUBLIC_ASSET_PREFIXES` enthält `/js/share-reader/`, `PUBLIC_ASSETS` die geteilten Module (`share-anchor.js`, `avatar.js`, `editor/comment-threads.js`, `scroll-fade.js`, `comment-card-layout.js`, `tts-segment.js`); sonst redirected der Auth-Guard den Modul-Request auf `/login` (nosniff → Modul verweigert, JS-Enhancement fällt still aus).
 
 Reader-Form benutzt **klassischen `<form method="POST">` mit 303-Redirect-Fallback** + progressive Enhancement via [public/js/share-reader.js](../public/js/share-reader.js) (fetch + inline Status). Darum verteilt der POST-Handler je nach `Content-Type` (`application/json` → JSON-Response, sonst → Redirect mit `?cmt=ok|rate|empty|long|err|gone`). Heisst: View funktioniert auch ohne JS.
 

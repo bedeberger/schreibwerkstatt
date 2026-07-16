@@ -6,8 +6,10 @@
      share/theme.css    — Custom-Properties (Light/Dark), Theme-Wahl, prefers-color-scheme.
      share/layout.css   — Reset, Body, Skip-Link, Progress, Header, Optionen-Menü, Main, Intro.
      share/content.css  — Lese-Inhalt (Typografie, Prosa, Szenentrenner, TOC, Mark-Reset).
-     share/comments.css — Leser-Kommentare (Rail, Threads, Anker-Highlights, Composer). */
+     share/comments.css — Leser-Kommentare (Rail, Threads, Anker-Highlights, Composer).
+     share/tts.css      — Vorlesen (Proof-Listening): schwebender Dock + Satz-Highlight. */
 @import url('./share/theme.css');
 @import url('./share/layout.css');
 @import url('./share/content.css');
 @import url('./share/comments.css');
+@import url('./share/tts.css');

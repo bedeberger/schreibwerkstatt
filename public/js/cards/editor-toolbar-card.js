@@ -30,6 +30,7 @@ export function registerEditorToolbarCard() {
     linkX: 0,
     linkY: 0,
     linkUrl: '',
+    linkCanRemove: false,
     _linkRange: null,
     _toolbarAbort: null,
 

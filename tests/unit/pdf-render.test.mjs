@@ -516,3 +516,31 @@ test('showFooter/HeaderOnChapterEnd=false unterdrückt nur Chrome, keine Ghost-P
   assert.equal(bufOff.slice(0, 5).toString(), '%PDF-');
   assert.equal(pageCount(bufOn), pageCount(bufOff));
 });
+
+test('Manuell hinzugefügte Nicht-Kapitel-Seite beginnt auf eigener Seite (wie ein Kapitel)', async () => {
+  // Regression: eine Custom-Seite (chapter_id null, z.B. Nachwort) am Buchende
+  // floss frueher inline in die letzte Kapitelseite und landete bei mirrorMargins
+  // auf der falschen Buchseite (Bundsteg-Kante gespiegelt → «Ränder falsch»). Sie
+  // muss denselben Top-Level-Seitenumbruch wie ein Kapitel bekommen.
+  const shortHtml = '<p>' + 'Kurzer Text. '.repeat(8) + '</p>';
+  const chap = { chapter: { id: 1, name: 'Kapitel' }, pages: [{ p: { id: 1, name: 'A' }, pd: { html: shortHtml } }] };
+  const standaloneEnd = { chapter: null, pages: [{ p: { id: 9, name: 'Nachwort' }, pd: { html: shortHtml } }] };
+  const chapEnd = { chapter: { id: 2, name: 'Nachwort' }, pages: [{ p: { id: 2, name: 'B' }, pd: { html: shortHtml } }] };
+
+  function cfg() {
+    const c = parityOff(defaultConfig());
+    c.cover.enabled = false;
+    c.toc.enabled = false;
+    c.layout.mirrorMargins = true;
+    return c;
+  }
+  const onlyChap    = await renderPdfBuffer({ book: baseBook, groups: [chap],              profile: { config: cfg() }, coverBuf: null, token: null });
+  const withCustom  = await renderPdfBuffer({ book: baseBook, groups: [chap, standaloneEnd], profile: { config: cfg() }, coverBuf: null, token: null });
+  const withChapter = await renderPdfBuffer({ book: baseBook, groups: [chap, chapEnd],      profile: { config: cfg() }, coverBuf: null, token: null });
+
+  assert.equal(withCustom.slice(0, 5).toString(), '%PDF-');
+  // Custom-Seite erzwingt eine eigene Seite (nicht inline in die Kapitelseite gemergt).
+  assert.equal(pageCount(withCustom), pageCount(onlyChap) + 1, 'Custom-Seite muss eine eigene Seite bekommen');
+  // Strukturell identisch zu «Kapitel am Ende» → gleicher Satzspiegel/Recto-Verso.
+  assert.equal(pageCount(withCustom), pageCount(withChapter), 'Custom-Seite muss wie ein Kapitel auf eigener Seite starten');
+});

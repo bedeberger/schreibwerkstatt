@@ -50,6 +50,11 @@
               :aria-label="$app.t('editor.toolbar.linkApply')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
       </button>
+      <button type="button" class="edit-link-btn" x-show="linkCanRemove" @click="_removeLink()"
+              :data-tip="$app.t('editor.toolbar.linkRemove')"
+              :aria-label="$app.t('editor.toolbar.linkRemove')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#unlink"/></svg>
+      </button>
     </div>
   </template>
 

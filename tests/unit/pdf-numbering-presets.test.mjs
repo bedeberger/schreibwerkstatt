@@ -115,3 +115,33 @@ test('applyTrimPreset: setzt custom + Masse; unbekannter Wert ist No-Op', () => 
   presets.applyTrimPreset(config, 'does-not-exist');
   assert.equal(config.layout.customWidthMm, 152.4); // unverändert
 });
+
+test('trimPresetOptions: cm-Label mit .-Dezimal für Nicht-KDP, Override-Label für KDP', () => {
+  const opts = presets.trimPresetOptions();
+  assert.equal(opts.length, presets.TRIM_PRESETS.length);
+  const byValue = Object.fromEntries(opts.map(o => [o.value, o.label]));
+  // Nicht-KDP: berechnetes cm-Label mit '.'-Dezimal (Swiss-konform).
+  assert.equal(byValue['125x200'], '12.5 × 20 cm');
+  assert.equal(byValue['155x230'], '15.5 × 23 cm');
+  // KDP: expliziter Override statt cm-Berechnung.
+  assert.equal(byValue['kdp-6x9'], 'KDP 6 × 9″ (15.24 × 22.86 cm)');
+  // Kein Label enthält ein Komma als Dezimaltrenner.
+  assert.ok(opts.every(o => !/\d,\d/.test(o.label)));
+});
+
+test('applyPaperPreset: setzt Rückenbreite; unbekannter Wert ist No-Op', () => {
+  const config = { coverSpec: { paperBulkMmPer1000: 0 } };
+  presets.applyPaperPreset(config, 'kdp-cream');
+  assert.equal(config.coverSpec.paperBulkMmPer1000, 63.5);
+  presets.applyPaperPreset(config, 'does-not-exist');
+  assert.equal(config.coverSpec.paperBulkMmPer1000, 63.5); // unverändert
+});
+
+test('paperPresetOptions: mappt labelKey durch t, Value passthrough', () => {
+  const opts = presets.paperPresetOptions(t);
+  assert.equal(opts.length, presets.PAPER_PRESETS.length);
+  assert.deepEqual(opts.map(o => o.value), presets.PAPER_PRESETS.map(p => p.value));
+  // Label ist die t()-Auflösung des labelKey (Stub gibt den Key als JSON zurück).
+  const first = opts[0];
+  assert.equal(first.label, t(presets.PAPER_PRESETS[0].labelKey));
+});

@@ -2,7 +2,7 @@
 // `this` = Sub-Komponente (editorToolbarCard), Root-Zugriffe via window.__app.
 // Im Fokus-Modus deaktiviert (Guards + `!$app.focusActive` im Template).
 
-import { getEditEl, WORD_RE, _normalizeLinkUrl, _applyLinkAtRange, findBlock } from './_shared.js';
+import { getEditEl, WORD_RE, _normalizeLinkUrl, _applyLinkAtRange, findBlock, findAnchor } from './_shared.js';
 
 export const bubbleMethods = {
   _updateBubble() {
@@ -48,7 +48,10 @@ export const bubbleMethods = {
   // ── Link-Bar ─────────────────────────────────────────────────────────
   // Cmd/Ctrl+Shift+K oder Bubble-Link-Button öffnet teleportierten Input
   // an Selektion/Caret. Range wird beim Öffnen geclont, weil das Fokussieren
-  // des Inputs die Editor-Selection verliert.
+  // des Inputs die Editor-Selection verliert. Sitzt der Caret/die Selektion in
+  // einem bestehenden <a>, wird dessen href vorbefüllt, die Range auf den ganzen
+  // Link expandiert (damit Commit/Entfernen ihn trifft) und der Entfernen-Button
+  // gezeigt.
   openLinkInput() {
     const app = window.__app;
     if (!app?.editMode || app.focusActive) return;
@@ -59,18 +62,29 @@ export const bubbleMethods = {
     const range = sel.getRangeAt(0);
     if (!editEl.contains(range.commonAncestorContainer) && editEl !== range.commonAncestorContainer) return;
 
-    this._linkRange = range.cloneRange();
+    const anchor = findAnchor(range.startContainer, editEl)
+      || (!range.collapsed ? findAnchor(range.endContainer, editEl) : null);
+    if (anchor) {
+      const aRange = document.createRange();
+      aRange.selectNode(anchor);
+      this._linkRange = aRange;
+      this.linkUrl = anchor.getAttribute('href') || '';
+      this.linkCanRemove = true;
+    } else {
+      this._linkRange = range.cloneRange();
+      const selText = sel.toString().trim();
+      this.linkUrl = /^(https?:|mailto:)/i.test(selText) ? selText : '';
+      this.linkCanRemove = false;
+    }
 
-    let rect = range.getBoundingClientRect();
+    let rect = this._linkRange.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) {
-      const block = findBlock(range.startContainer, editEl) || editEl;
+      const block = findBlock(this._linkRange.startContainer, editEl) || editEl;
       rect = block.getBoundingClientRect();
     }
     this.linkX = rect.left + rect.width / 2;
     this.linkY = rect.top;
 
-    const selText = sel.toString().trim();
-    this.linkUrl = /^(https?:|mailto:)/i.test(selText) ? selText : '';
     this.bubbleShow = false;
     this.linkShow = true;
     this.$nextTick(() => {
@@ -98,9 +112,27 @@ export const bubbleMethods = {
     this._closeLink();
   },
 
+  // Bestehenden Link entfernen: Selektion auf die (beim Öffnen expandierte)
+  // Anchor-Range setzen, execCommand('unlink') strippt das <a>, Text bleibt.
+  _removeLink() {
+    const editEl = getEditEl();
+    const range = this._linkRange;
+    if (!editEl || !range) { this._closeLink(); return; }
+    editEl.focus();
+    const sel = document.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    document.execCommand('unlink', false);
+    window.__app?._markEditDirty?.();
+    this._closeLink();
+  },
+
   _closeLink() {
     this.linkShow = false;
     this.linkUrl = '';
+    this.linkCanRemove = false;
     this._linkRange = null;
     getEditEl()?.focus();
   },

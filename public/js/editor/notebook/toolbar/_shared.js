@@ -102,6 +102,17 @@ export function _applyLinkAtRange(range, url) {
   }
 }
 
+// Nächstliegendes <a>-Element ab node aufwärts, innerhalb von root. null wenn
+// node nicht in einem Link sitzt.
+export function findAnchor(node, root) {
+  let cur = node && node.nodeType === 3 ? node.parentNode : node;
+  while (cur && cur !== root) {
+    if (cur.nodeType === 1 && cur.nodeName === 'A') return cur;
+    cur = cur.parentNode;
+  }
+  return null;
+}
+
 export const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, blockquote, pre, li, div.poem';
 
 // Absatz-artige Top-Level-Blöcke, deren Verschmelzung über eine Absatzgrenze

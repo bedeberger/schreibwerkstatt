@@ -2,13 +2,24 @@
 // nicht-aktiven Sätze des aktiven Blocks. Keine DOM-Mutation → kein Risiko
 // eines Save-Diffs.
 
-// Satzgrenzen via Intl.Segmenter (handhabt Abkürzungen wie „z. B." korrekt).
-// Fallback Regex split nach .!? mit Whitespace. Liefert [start,end]-Paare.
-export function findSentenceRanges(text, locale = 'de') {
-  if (!text) return [];
+// Intl.Segmenter pro Locale einmal instanziieren (Konstruktion ist teuer, das
+// Ergebnis ist stateless). null = Segmenter nicht verfügbar → Regex-Fallback.
+const _segmenters = new Map();
+function getSegmenter(locale) {
+  if (_segmenters.has(locale)) return _segmenters.get(locale);
+  let seg = null;
   if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    try { seg = new Intl.Segmenter(locale, { granularity: 'sentence' }); }
+    catch { seg = null; }
+  }
+  _segmenters.set(locale, seg);
+  return seg;
+}
+
+function computeSentenceRanges(text, locale) {
+  const seg = getSegmenter(locale);
+  if (seg) {
     try {
-      const seg = new Intl.Segmenter(locale, { granularity: 'sentence' });
       const out = [];
       for (const s of seg.segment(text)) {
         const start = s.index;
@@ -25,6 +36,26 @@ export function findSentenceRanges(text, locale = 'de') {
     if (m[0].trim()) out.push([m.index, m.index + m[0].length]);
   }
   return out;
+}
+
+// Satzgrenzen via Intl.Segmenter (handhabt Abkürzungen wie „z. B." korrekt).
+// Fallback Regex split nach .!? mit Whitespace. Liefert [start,end]-Paare.
+//
+// Einträge-Memo (letzter Text + Locale): bewegt sich nur der Cursor im selben
+// Block (Text unverändert), wird nicht neu segmentiert — der teure Segmenter-
+// Lauf entfällt pro Keystroke im Satz-Modus. Rückgabe read-only (kein Caller
+// mutiert das Array).
+let _memoText = null;
+let _memoLocale = null;
+let _memoRanges = null;
+export function findSentenceRanges(text, locale = 'de') {
+  if (!text) return [];
+  if (text === _memoText && locale === _memoLocale) return _memoRanges;
+  const ranges = computeSentenceRanges(text, locale);
+  _memoText = text;
+  _memoLocale = locale;
+  _memoRanges = ranges;
+  return ranges;
 }
 
 // Findet die Satz-Range im Block, die den Caret enthält.

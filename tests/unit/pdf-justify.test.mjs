@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const PDFDocument = require('pdfkit');
 const { _renderRuns } = require('../../lib/pdf-render/runs.js');
-const { _tokenize, _breakLines } = require('../../lib/pdf-render/justify.js');
+const { _tokenize, _breakLines, _renderLine } = require('../../lib/pdf-render/justify.js');
 
 function renderToOps(runs, opts = {}) {
   const doc = new PDFDocument({ compress: false, size: 'A5', margin: 50 });
@@ -97,6 +97,51 @@ test('_tokenize: kollabiert Whitespace, behält Style an Wörtern und \\n als br
   // führender Space vor 'd' (nach br) fällt weg; doppelter Space kollabiert
   assert.deepEqual(kinds, ['a', '_', 'b', '_', 'c', 'br', 'd']);
   assert.equal(items.find(i => i.word === 'c').style.bold, true);
+});
+
+test('_tokenize: klebt Satzzeichen nach Formatierung ans Wort (kein loser Punkt, kein Space davor)', () => {
+  // Häufig: WYSIWYG-Auswahl formatiert das Wort, der Punkt bleibt roman → eigener Run.
+  const noSpace = _tokenize([{ text: 'Das war ' }, { text: 'wichtig', italic: true }, { text: '.' }]);
+  assert.deepEqual(noSpace.map(i => i.br ? 'br' : i.space ? '_' : i.word), ['Das', '_', 'war', '_', 'wichtig.']);
+  assert.equal(noSpace[noSpace.length - 1].style.italic, true, 'Style bleibt am geklebten Wort');
+
+  // Autor hat das trennende Leerzeichen mitformatiert → Space vor dem Punkt muss weg.
+  const withSpace = _tokenize([{ text: 'Das war ' }, { text: 'wichtig ', italic: true }, { text: '.' }]);
+  assert.deepEqual(withSpace.map(i => i.br ? 'br' : i.space ? '_' : i.word), ['Das', '_', 'war', '_', 'wichtig.']);
+});
+
+test('_renderLine: führender Boundary-Space nach Kursiv bleibt erhalten (Regression: "Heimatund")', () => {
+  // pdfkit `_fragment` macht bei gesetztem wordSpacing intern text.trim() und
+  // baut die Wortabstände neu — ein FÜHRENDER Space, der als leading space ins
+  // Segment nach einem </em> fällt, ging verloren (Wörter klebten zusammen).
+  // Stub-doc erfasst jeden text()-Draw mit seiner x-Startposition.
+  const calls = [];
+  const doc = {
+    font() { return doc; },
+    fontSize() { return doc; },
+    fillColor() { return doc; },
+    text(str, x /*, y, opts */) { calls.push({ str, x }); return doc; },
+  };
+  const SP = 4, WS = 2; // Space-Breite + justify-Zusatzabstand
+  const line = { items: [
+    { word: 'Wort', style: {}, w: 20 },
+    { space: true, style: {}, w: SP },
+    { word: 'Heimat', style: { italic: true }, w: 30 },
+    { space: true, style: {}, w: SP },
+    { word: 'und', style: {}, w: 15 },
+  ] };
+  _renderLine(doc, line, 0, 100, { sizePt: 11, ws: WS, textColor: '#000000', linkColor: '#1a4d8f' });
+
+  const wort = calls.find(c => c.str.trim() === 'Wort');
+  const heimat = calls.find(c => c.str.trim() === 'Heimat');
+  const und = calls.find(c => c.str.trim() === 'und');
+  assert.ok(wort && heimat && und, 'alle drei Segmente gezeichnet');
+  // "und" darf nicht am Ende von "Heimat" kleben: Lücke = Space-Breite + ws.
+  const gap = und.x - (heimat.x + 30);
+  assert.ok(Math.abs(gap - (SP + WS)) < 0.001, `Boundary-Space fehlt (gap=${gap}, erwartet ${SP + WS})`);
+  // Segment nach dem Kursivwort wird OHNE führenden Whitespace gezeichnet
+  // (pdfkit würde ihn sonst wegtrimmen) — der Abstand steckt in der x-Position.
+  assert.equal(und.str, 'und', 'führender Space aus dem gezeichneten String entfernt');
 });
 
 test('_breakLines: letzte Zeile ist forced (kein Blocksatz)', () => {

@@ -52,5 +52,8 @@
 
   <script id="share-config" type="application/json">{{config_json}}</script>
   <script src="/js/share-reader.js" type="module"></script>
+  <!-- Vorlesen (Proof-Listening): eigenstaendiges Modul, baut den Dock nur bei
+       aktivem tts.enabled (liest #share-config selbst). -->
+  <script src="/js/share-reader/tts.js" type="module"></script>
 </body>
 </html>

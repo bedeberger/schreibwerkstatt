@@ -24,6 +24,17 @@ export function dynamicTypewriterThreshold(block, fallback = TYPEWRITER_THRESHOL
   return fallback;
 }
 
+// Threshold pro Block gecacht: die line-height (→ Threshold) ändert sich nur bei
+// Blockwechsel oder Resize (Media-Query-Breakpoint), nicht beim Tippen. So läuft
+// getComputedStyle nur bei Blockwechsel statt pro Keystroke. `cache` ist ein
+// { block, value }; der Aufrufer setzt cache.value bei Resize auf null zurück.
+export function cachedTypewriterThreshold(block, cache, fallback = TYPEWRITER_THRESHOLD_PX) {
+  if (cache && cache.value != null && cache.block === block) return cache.value;
+  const value = dynamicTypewriterThreshold(block, fallback);
+  if (cache) { cache.block = block; cache.value = value; }
+  return value;
+}
+
 // Range um 1 Position erweitern, Rect lesen, Probe wegwerfen. Browser liefern
 // für collapsed Ranges am Soft-Wrap-Bruch / direkt nach <br> regelmässig
 // leere getClientRects() und Höhe-0-BoundingClientRect. Eine non-collapsed

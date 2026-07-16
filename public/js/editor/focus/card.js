@@ -23,7 +23,7 @@ import {
 } from './dom-blocks.js';
 import { applySentenceHighlight } from './sentence.js';
 import {
-  dynamicTypewriterThreshold, getCaretRect, typewriterScroll,
+  cachedTypewriterThreshold, getCaretRect, typewriterScroll,
 } from './typewriter.js';
 import { writeFocusSnapshot, clearFocusSnapshot } from './storage.js';
 import { editorHost } from '../shared/editor-host.js';
@@ -181,10 +181,11 @@ export const focusCardMethods = {
       cursorTimer: 0,
       // Short-circuit-Cache für _focusUpdateActive: bleibt der aktive Block
       // gleich (häufigster Fall beim Tippen), sparen wir setActiveBlock /
-      // setNearBlocks / sentence-Highlight komplett ein. _lastGranularity
-      // invalidiert den Cache bei Live-Mode-Switch.
+      // setNearBlocks / sentence-Highlight ein. _lastGranularity invalidiert bei
+      // Live-Mode-Switch.
       _lastBlock: null,
       _lastGranularity: null,
+      _twCache: { block: null, value: null },  // cachedTypewriterThreshold
     };
 
     const markPointer = () => {
@@ -331,6 +332,7 @@ export const focusCardMethods = {
       const top = vv ? vv.offsetTop : 0;
       document.documentElement.style.setProperty('--focus-vh', h + 'px');
       document.documentElement.style.setProperty('--focus-vh-top', top + 'px');
+      ctx._twCache.value = null;  // Resize kann via Media-Query line-height ändern
       // Nur den aktiven Absatz re-validieren, NICHT recentern. Ein Recenter
       // bei jedem Viewport-Tick würde den Editor bei jedem Mobile-KB-Frame
       // oder Desktop-Resize springen lassen („flattern"). Scrollt der User
@@ -527,13 +529,11 @@ export const focusCardMethods = {
         const granularity = editorHost()?.focusGranularity || 'paragraph';
 
         // Defensive gegen den transienten null-Tick: Caret sitzt nach Merge/
-        // Voll-Löschen kurz direkt auf dem Container (findBlockFromNode=null) UND
-        // der Viewport-Center-Fallback findet (noch) nichts. Ohne Schutz würde
-        // setActiveBlock(null) die Hervorhebung killen → sichtbares „alles dimmt
-        // kurz weg". Stattdessen den vorigen aktiven Block beibehalten, solange er
-        // noch im Container hängt; der nächste echte Tick reconciliiert. onBlur
-        // setzt ctx._lastBlock=null und clear't bewusst — der absichtliche Blur-
-        // Clear bleibt also erhalten (kein _lastBlock zum Wiederbeleben).
+        // Voll-Löschen kurz auf dem Container (findBlockFromNode=null) UND der
+        // Viewport-Center-Fallback findet (noch) nichts. Ohne Schutz killte
+        // setActiveBlock(null) die Hervorhebung („alles dimmt kurz weg"). Vorigen
+        // Block halten, solange er noch im Container hängt; nächster Tick fixt's.
+        // onBlur setzt ctx._lastBlock=null → der absichtliche Blur-Clear bleibt.
         if (!block && granularity !== 'typewriter-only'
             && ctx._lastBlock && container.contains(ctx._lastBlock)) {
           block = ctx._lastBlock;
@@ -542,9 +542,11 @@ export const focusCardMethods = {
         const blockChanged = block !== ctx._lastBlock;
         const granularityChanged = granularity !== ctx._lastGranularity;
 
-        // Block-Markierungen jeden Tick neu setzen — günstig (QSA +
-        // classList-Toggles) und garantiert Defense gegen Ghost-Klassen
-        // (z.B. Chromium-Split-Bug, externe DOM-Mutationen).
+        // Block-Markierungen jeden Tick neu setzen — beide Setter sind idempotent
+        // (mutieren nur, wenn sich active-/near-Set wirklich ändert), also beim
+        // Tippen im selben Absatz mutationsfrei. Der unbedingte Aufruf bleibt die
+        // Defense gegen Ghost-Klassen (Chromium-Split-Bug, undo/redo, Paste): er
+        // räumt jede fremde `.focus-paragraph-active` im nächsten Tick ab.
         if (granularity === 'typewriter-only') {
           setActiveBlock(container, null);
           setNearBlocks(container, null);
@@ -554,9 +556,8 @@ export const focusCardMethods = {
         }
 
         // Sentence-Highlight ist der teure Pfad (Range-Iteration über Text-
-        // knoten). Nur neu rechnen, wenn Block wechselt, Granularität wechselt
-        // oder Sentence-Mode aktiv ist (Caret kann Satzgrenze innerhalb eines
-        // Blocks überqueren).
+        // knoten). Nur neu rechnen bei Block-/Granularitätswechsel oder in
+        // Sentence-Mode (Caret kann Satzgrenze im selben Block überqueren).
         if (blockChanged || granularityChanged || granularity === 'sentence') {
           if (granularity === 'sentence') {
             applySentenceHighlight(block, sel);
@@ -573,17 +574,14 @@ export const focusCardMethods = {
         if (scroll && block && !hasSelection) {
           // Ausschliesslich Caret-Rect als Ziel — Block-BBox-Fallback wäre
           // schädlich: bei langen Absätzen mit Soft-Wrap / shift-enter-Brüchen
-          // bewegt sich Block-Mitte nicht mit dem Caret, der Typewriter würde
-          // stehenbleiben. `getCaretRect` hat eine eigene Probe-Range-Expansion
-          // für die Edge-Cases (Wrap-Bruch, nach <br>); liefert sie trotzdem
-          // null (leerer Absatz, kein Fokus), bleibt der Scroll aus — der
-          // nächste echte Input liefert valides Rect.
+          // bewegt sich Block-Mitte nicht mit dem Caret. `getCaretRect` hat eine
+          // eigene Probe-Range-Expansion für Wrap-Bruch/nach-<br>; liefert sie
+          // null (leerer Absatz), bleibt der Scroll aus — nächster Input fixt's.
           const targetRect = getCaretRect(container);
           if (targetRect) {
-            const threshold = dynamicTypewriterThreshold(block);
-            // Anker-Position des Typewriter-Scrolls (z.B. Mitte vs. oberes
-            // Drittel). Host-/Config-gesteuert; nicht gesetzt → Default 0.5
-            // (Mitte) via typewriterScroll, also unverändertes Verhalten.
+            const threshold = cachedTypewriterThreshold(block, ctx._twCache);
+            // Anker-Position des Typewriter-Scrolls (Mitte vs. oberes Drittel).
+            // Host-/Config-gesteuert; nicht gesetzt → Default 0.5 (Mitte).
             const anchorRatio = editorHost()?.typewriterAnchor;
             // Dead-Zone um den Anker: bereits sichtbarer Caret wird beim ersten
             // Tippen nicht unnötig auf die Mitte gezogen (Mini-Ruck auf kurzen

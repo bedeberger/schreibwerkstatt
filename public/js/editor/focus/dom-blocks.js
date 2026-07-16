@@ -133,25 +133,31 @@ export function setActiveBlock(container, block) {
 }
 
 // Window-Mode: Vorgänger + Nachfolger des aktiven Blocks bleiben hell.
+// Idempotent: nur mutieren, wenn sich das near-Set gegenüber dem aktuellen DOM
+// ändert. Beim Tippen im selben Absatz (gleiche Nachbarn) fällt so die sonst
+// unbedingte remove-/re-add-Churn (Style-/Paint-Invalidierung) pro Keystroke weg.
 export function setNearBlocks(container, block, blockSel = BLOCK_SEL) {
   if (!container) return;
-  const olds = container.querySelectorAll('.focus-paragraph-near');
-  for (const el of olds) {
-    el.classList.remove('focus-paragraph-near');
-    if (el.classList.length === 0) el.removeAttribute('class');
-  }
-  if (!block) return;
   const sib = (el, dir) => {
     let n = el?.[dir];
     while (n && (n.nodeType !== 1 || !n.matches(blockSel))) n = n[dir];
     return n;
   };
-  const tag = (el) => {
-    if (!el || el === block) return;
-    if (!el.classList.contains('focus-paragraph-near')) el.classList.add('focus-paragraph-near');
-  };
-  tag(sib(block, 'previousElementSibling'));
-  tag(sib(block, 'nextElementSibling'));
+  const want = new Set();
+  if (block) {
+    const prev = sib(block, 'previousElementSibling');
+    const next = sib(block, 'nextElementSibling');
+    if (prev && prev !== block) want.add(prev);
+    if (next && next !== block) want.add(next);
+  }
+  // Stale near-Marks abräumen (alles, was nicht mehr gewünscht ist).
+  for (const el of container.querySelectorAll('.focus-paragraph-near')) {
+    if (want.has(el)) { want.delete(el); continue; }  // schon korrekt markiert
+    el.classList.remove('focus-paragraph-near');
+    if (el.classList.length === 0) el.removeAttribute('class');
+  }
+  // Fehlende Marks setzen (in `want` verbliebene = noch nicht markiert).
+  for (const el of want) el.classList.add('focus-paragraph-near');
 }
 
 // Räumt sowohl active- als auch near-Klassen + Custom-Highlight ab.
