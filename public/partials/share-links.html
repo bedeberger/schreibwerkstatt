@@ -89,6 +89,9 @@
           </div>
           <div class="share-row__counts">
             <span class="share-row__count" x-text="$app.t('share.views.label', { count: link.view_count || 0 })"></span>
+            <span class="share-row__count" x-text="$app.t('share.views.unique', { count: link.unique_views || 0 })"></span>
+            <span x-show="link.avg_duration_ms" class="share-row__count"
+                  x-text="$app.t('share.views.avgDuration', { time: formatDwell(link.avg_duration_ms) })"></span>
             <button type="button" class="share-row__comments-btn"
                     @click="showCommentsForLink(link)"
                     :data-tip="$app.t('share.comments.show')">

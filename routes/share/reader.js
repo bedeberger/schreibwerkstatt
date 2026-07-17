@@ -199,7 +199,18 @@ function register(router) {
     // bleiben server-seitig (Kern lib/tts-synth.js). Bei ausgeschaltetem Feature
     // baut share-reader.js den Dock gar nicht.
     const ttsCfg = { enabled: tts.isEnabled(), pause: tts.pauseConfig() };
-    const configJson = JSON.stringify({ token, lang, i18n: readerI18n, tts: ttsCfg }).replace(/</g, '\\u003c');
+
+    // Aufruf protokollieren (Gesamtzaehler + share_views-Zeile fuer eindeutige
+    // Besucher/Lesedauer). ip_hash gehasht wie bei Kommentaren. viewId geht an den
+    // Reader, damit er die Verweildauer per Beacon nachtragen kann. DB-Fehler
+    // duerfen die Leseansicht nie blockieren.
+    let viewId = null;
+    try {
+      const ip = req.ip || req.connection?.remoteAddress || '';
+      viewId = shareLinks.recordShareView(token, rateLimit.hashIp(ip));
+    } catch (e) { logger.warn(`[share/view] record fehlgeschlagen: ${e.message}`); }
+
+    const configJson = JSON.stringify({ token, lang, viewId, i18n: readerI18n, tts: ttsCfg }).replace(/</g, '\\u003c');
 
     // Bei Buch-Shares ist content.title bereits der Buchname — keine Doppelung
     // (Buch-Zeile leer, H1 = Buchname). Sonst "Seite/Kapitel · Buch".
@@ -227,13 +238,26 @@ function register(router) {
       app_url: escHtml((appSettings.get('app.public_url') || '').replace(/\/$/, '') || '/'),
     });
 
-    // View-Count non-blocking
-    setImmediate(() => {
-      try { shareLinks.incrementViewCount(token); } catch {}
-    });
-
     res.set('Cache-Control', 'no-store');
     res.status(200).type('html').send(html);
+  });
+
+  // ── Public: Verweildauer eines Aufrufs nachtragen (Beacon) ─────────────────
+  // Der Reader schickt beim Verlassen der Seite (pagehide/visibilitychange) die
+  // sichtbar verbrachte Zeit via navigator.sendBeacon. Write-once pro view_id,
+  // geclampt auf einen sinnvollen Maximalwert (Bot-/Manipulationsschutz fuer die
+  // Owner-Statistik). Antwortet immer 204 — Beacons ignorieren den Body.
+  const MAX_DWELL_MS = 6 * 60 * 60 * 1000; // 6 h
+  router.post('/:token/view-duration', express.json({ limit: '1kb' }), (req, res) => {
+    const token = String(req.params.token || '');
+    if (!TOKEN_RE.test(token)) return res.sendStatus(204);
+    const viewId = parseInt(req.body?.viewId, 10);
+    const durationMs = Math.round(Number(req.body?.durationMs));
+    if (!Number.isInteger(viewId) || viewId <= 0) return res.sendStatus(204);
+    if (!Number.isFinite(durationMs) || durationMs < 0) return res.sendStatus(204);
+    const clamped = Math.min(durationMs, MAX_DWELL_MS);
+    try { shareLinks.setViewDuration(viewId, token, clamped); } catch { /* non-fatal */ }
+    res.sendStatus(204);
   });
 
   // ── Public: Kommentar abgeben ──────────────────────────────────────────────

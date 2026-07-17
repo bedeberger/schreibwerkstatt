@@ -3902,6 +3902,8 @@
   "share.revoked": "Revoked",
   "share.revoke.confirm": "Revoke link? Readers will see a notice page from now on.",
   "share.views.label": "{count} views",
+  "share.views.unique": "{count} unique",
+  "share.views.avgDuration": "avg {time} read",
   "share.unread.badge": "{count} new",
   "share.comments.label": "Comments",
   "share.comments.show": "Show comments",

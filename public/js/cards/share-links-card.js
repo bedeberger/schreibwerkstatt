@@ -163,6 +163,8 @@ export function registerShareLinksCard() {
           const cur = byToken.get(r.token);
           if (!cur) continue;
           cur.view_count = r.view_count;
+          cur.unique_views = r.unique_views;
+          cur.avg_duration_ms = r.avg_duration_ms;
           cur.comment_count = r.comment_count;
           cur.unread_count = r.unread_count;
         }
@@ -367,6 +369,20 @@ export function registerShareLinksCard() {
     // Erstellungs-Datum (gleiches Format wie formatExpires).
     formatCreated(iso) {
       return this.formatExpires(iso);
+    },
+
+    // Durchschnittliche Lesedauer als kompakter Text: „2m 18s" / „45s" / „1h 3m".
+    // Leerer String, wenn (noch) keine Dauer erfasst wurde (z. B. nur Bot-Aufrufe
+    // ohne JS) — die Zeile wird dann ausgeblendet.
+    formatDwell(ms) {
+      if (!ms || ms <= 0) return '';
+      const totalSec = Math.round(ms / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
     },
 
     // Restgültigkeit als ein lesbarer Satz pro Link-Zustand:

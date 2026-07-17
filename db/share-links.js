@@ -53,6 +53,10 @@ function listSharesByOwner(ownerEmail) {
            b.name AS book_name,
            p.page_name AS page_name,
            c.chapter_name AS chapter_name,
+           (SELECT COUNT(DISTINCT sv.ip_hash) FROM share_views sv
+              WHERE sv.share_token = sl.token AND sv.ip_hash IS NOT NULL) AS unique_views,
+           (SELECT CAST(AVG(sv.duration_ms) AS INTEGER) FROM share_views sv
+              WHERE sv.share_token = sl.token AND sv.duration_ms IS NOT NULL) AS avg_duration_ms,
            (SELECT COUNT(*) FROM share_comments sc WHERE sc.share_token = sl.token) AS comment_count,
            (SELECT COUNT(*) FROM share_comments sc
               WHERE sc.share_token = sl.token
@@ -72,6 +76,10 @@ function listSharesByOwnerAndBook(ownerEmail, bookId) {
     SELECT sl.*,
            p.page_name AS page_name,
            c.chapter_name AS chapter_name,
+           (SELECT COUNT(DISTINCT sv.ip_hash) FROM share_views sv
+              WHERE sv.share_token = sl.token AND sv.ip_hash IS NOT NULL) AS unique_views,
+           (SELECT CAST(AVG(sv.duration_ms) AS INTEGER) FROM share_views sv
+              WHERE sv.share_token = sl.token AND sv.duration_ms IS NOT NULL) AS avg_duration_ms,
            (SELECT COUNT(*) FROM share_comments sc WHERE sc.share_token = sl.token) AS comment_count,
            (SELECT COUNT(*) FROM share_comments sc
               WHERE sc.share_token = sl.token
@@ -107,6 +115,33 @@ function updateShareLink(token, ownerEmail, { intro, expiresAt, showToc }) {
 
 function incrementViewCount(token) {
   db.prepare('UPDATE share_links SET view_count = view_count + 1 WHERE token = ?').run(token);
+}
+
+// Einen Aufruf der Leseansicht protokollieren: erhoeht den schnellen
+// Gesamtzaehler (view_count) UND legt eine share_views-Zeile fuer die feinere
+// Statistik an (eindeutige Besucher via ip_hash, Lesedauer folgt per Beacon).
+// Liefert die view_id, damit der Reader die Verweildauer nachtragen kann.
+function recordShareView(token, ipHash = null) {
+  incrementViewCount(token);
+  const r = db.prepare(`
+    INSERT INTO share_views (share_token, ip_hash, viewed_at)
+    VALUES (?, ?, ${NOW_ISO_SQL})
+  `).run(token, ipHash);
+  return r.lastInsertRowid;
+}
+
+// Verweildauer eines Aufrufs nachtragen. Der Reader sendet die bisher sichtbar
+// verbrachte Zeit bei jedem Wechsel in den Hintergrund (visibilitychange/
+// pagehide) — kehrt der Leser zurueck und liest weiter, kommt ein groesserer
+// Wert. Deshalb MAX statt Ueberschreiben: der laengste beobachtete Wert gewinnt,
+// auch wenn die Seite spaeter ohne finales Event gekillt wird. Match zusaetzlich
+// ueber den Token, damit eine fremde view_id nichts trifft. Clamping: Route.
+function setViewDuration(viewId, token, durationMs) {
+  const r = db.prepare(`
+    UPDATE share_views SET duration_ms = MAX(COALESCE(duration_ms, 0), ?)
+    WHERE id = ? AND share_token = ?
+  `).run(durationMs, viewId, token);
+  return r.changes > 0;
 }
 
 function markOwnerSeen(token, ownerEmail) {
@@ -337,6 +372,8 @@ module.exports = {
   revokeShareLink,
   updateShareLink,
   incrementViewCount,
+  recordShareView,
+  setViewDuration,
   markOwnerSeen,
   insertComment,
   insertOwnerReply,

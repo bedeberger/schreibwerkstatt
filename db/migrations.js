@@ -9011,6 +9011,31 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 236 abgeschlossen (book_snapshots.published_at).');
   }
 
+  if (version < 237) {
+    // Share-Link-Zugriffsstatistik: eine Zeile pro Aufruf der SSR-Leseansicht.
+    // ip_hash (SHA-256 + Server-Salt, gleiche Logik wie share_comments) traegt
+    // eindeutige Besucher, ohne Klartext-IP zu speichern; duration_ms wird per
+    // sendBeacon aus dem Reader nachgetragen (NULL = nie eingetroffen, z.B. Bot
+    // ohne JS). view_count auf share_links bleibt der schnelle Gesamtzaehler.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS share_views (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        share_token TEXT NOT NULL REFERENCES share_links(token) ON DELETE CASCADE,
+        ip_hash     TEXT,
+        duration_ms INTEGER,
+        viewed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_share_views_token ON share_views(share_token)');
+
+    const fkErrors237 = db.pragma('foreign_key_check');
+    if (fkErrors237.length) {
+      throw new Error(`Migration 237: foreign_key_check meldet ${fkErrors237.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 237').run();
+    logger.info('DB-Migration auf Version 237 abgeschlossen (share_views).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

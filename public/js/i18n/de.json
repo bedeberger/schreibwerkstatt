@@ -3902,6 +3902,8 @@
   "share.revoked": "Widerrufen",
   "share.revoke.confirm": "Link wirklich widerrufen? Reader sehen danach eine Hinweis-Seite.",
   "share.views.label": "{count} Aufrufe",
+  "share.views.unique": "{count} eindeutige",
+  "share.views.avgDuration": "Ø {time} gelesen",
   "share.unread.badge": "{count} neu",
   "share.comments.label": "Kommentare",
   "share.comments.show": "Kommentare anzeigen",

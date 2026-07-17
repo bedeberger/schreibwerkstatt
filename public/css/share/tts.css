@@ -14,6 +14,12 @@
   pointer-events: none;
 }
 .tts-dock > * { pointer-events: auto; }
+/* Buttons/Status werden per `element.hidden` gesteuert (tts.js). Die
+   `display: inline-flex`-Author-Regeln unten wuerden das UA-`[hidden]`
+   uebersteuern -> Sub-Tasten blieben im Ruhezustand sichtbar. Wie im
+   Notebook-Dock (dort via Alpine x-show) soll der Dock kollabiert starten:
+   nur der Kopfhoerer-Knopf, der Rest erscheint erst bei Wiedergabe. */
+.tts-dock [hidden] { display: none; }
 
 .tts-dock-btn {
   display: inline-flex;
