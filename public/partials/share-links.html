@@ -92,6 +92,12 @@
             <span class="share-row__count" x-text="$app.t('share.views.unique', { count: link.unique_views || 0 })"></span>
             <span x-show="link.avg_duration_ms" class="share-row__count"
                   x-text="$app.t('share.views.avgDuration', { time: formatDwell(link.avg_duration_ms) })"></span>
+            <span x-show="link.avg_max_scroll_pct != null" class="share-row__count"
+                  x-text="formatScroll(link.avg_max_scroll_pct)"></span>
+            <span x-show="link.feedback_count > 0" class="share-row__count share-row__rating">
+              <span class="share-row__stars" aria-hidden="true" x-text="ratingStars(link.avg_rating)"></span>
+              <span x-text="$app.t('share.feedback.summary', { avg: link.avg_rating, count: link.feedback_count })"></span>
+            </span>
             <button type="button" class="share-row__comments-btn"
                     @click="showCommentsForLink(link)"
                     :data-tip="$app.t('share.comments.show')">
@@ -99,8 +105,48 @@
               <span x-show="link.unread_count > 0" class="share-row__unread"
                     x-text="$app.t('share.unread.badge', { count: link.unread_count })"></span>
             </button>
+            <button type="button" class="share-row__stats-btn"
+                    x-show="link.kind !== 'page' || link.feedback_count > 0"
+                    @click="toggleStats(link)"
+                    :aria-expanded="expandedStatsToken === link.token ? 'true' : 'false'"
+                    x-text="expandedStatsToken === link.token ? $app.t('share.stats.hide') : $app.t('share.stats.show')"></button>
           </div>
         </div>
+
+        <!-- Statistik-Panel: Kapitel-Drop-off + Gesamt-Fazits (on-demand). -->
+        <template x-if="expandedStatsToken === link.token">
+          <div class="share-row__stats">
+            <div x-show="statsLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+            <template x-if="!statsLoading && statsReadDepth.length">
+              <div class="share-stats__depth">
+                <h4 class="share-stats__heading" x-text="$app.t('share.readdepth.title')"></h4>
+                <template x-for="ch in statsReadDepth" :key="ch.chapter_id">
+                  <div class="share-depth-row">
+                    <span class="share-depth-row__label" x-text="ch.chapter_name"></span>
+                    <div class="share-depth-bar"><div class="share-depth-bar__fill" :style="{ '--depth': (ch.avg_depth_pct || 0) + '%' }"></div></div>
+                    <span class="share-depth-row__pct" x-text="(ch.avg_depth_pct || 0) + '%'"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <template x-if="!statsLoading && statsFeedback.length">
+              <div class="share-stats__feedback">
+                <h4 class="share-stats__heading" x-text="$app.t('share.feedback.title')"></h4>
+                <template x-for="fb in statsFeedback" :key="fb.id">
+                  <div class="share-fb">
+                    <div class="share-fb__head">
+                      <span class="share-fb__stars" aria-hidden="true" x-text="feedbackStars(fb.rating)"></span>
+                      <span class="share-fb__name" x-text="fb.reader_name || $app.t('share.feedback.anon')"></span>
+                    </div>
+                    <div x-show="fb.body" class="share-fb__body" x-text="fb.body"></div>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <div x-show="!statsLoading && !statsReadDepth.length && !statsFeedback.length"
+                 class="muted-msg" x-text="$app.t('share.stats.empty')"></div>
+          </div>
+        </template>
 
         <div class="share-row__url">
           <input type="text" readonly :value="linkUrl(link.token)" class="share-row__url-input">

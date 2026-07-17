@@ -37,6 +37,11 @@ export function registerShareLinksCard() {
     _lifecycle: null,
     // Live-Poll: aktualisiert Counts/Unread der Links, während die Karte sichtbar ist
     _pollTimer: null,
+    // Aufgeklappte Statistik (Kapitel-Drop-off + Fazits) pro Link (Token oder null)
+    expandedStatsToken: null,
+    statsLoading: false,
+    statsReadDepth: [],   // [{ chapter_id, chapter_name, avg_depth_pct, reached_views }]
+    statsFeedback: [],    // [{ id, reader_name, rating, body, created_at, updated_at }]
 
     shareKindOptions() {
       const app = window.__app;
@@ -165,6 +170,9 @@ export function registerShareLinksCard() {
           cur.view_count = r.view_count;
           cur.unique_views = r.unique_views;
           cur.avg_duration_ms = r.avg_duration_ms;
+          cur.avg_max_scroll_pct = r.avg_max_scroll_pct;
+          cur.avg_rating = r.avg_rating;
+          cur.feedback_count = r.feedback_count;
           cur.comment_count = r.comment_count;
           cur.unread_count = r.unread_count;
         }
@@ -383,6 +391,45 @@ export function registerShareLinksCard() {
       if (h > 0) return `${h}h ${m}m`;
       if (m > 0) return `${m}m ${s}s`;
       return `${s}s`;
+    },
+
+    // Gesamt-Lesetiefe als „Ø 62 % gelesen" (leer wenn nichts erfasst).
+    formatScroll(pct) {
+      if (pct == null || pct < 0) return '';
+      return window.__app.t('share.readdepth.avg', { pct: Math.round(pct) });
+    },
+
+    // Durchschnitts-Sterne als voll/leer-Reihe (Anzeige) — z. B. für avg_rating 3.6
+    // → 4 volle (gerundet) für die kompakte Zeile; die genaue Zahl steht daneben.
+    ratingStars(avg) {
+      const n = Math.round(avg || 0);
+      return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+    },
+
+    // Statistik-Panel eines Links auf-/zuklappen. Beim Öffnen Kapitel-Drop-off +
+    // Fazits nachladen (on-demand, nicht im Poll — teurer JOIN/Scan).
+    async toggleStats(link) {
+      if (this.expandedStatsToken === link.token) { this.expandedStatsToken = null; return; }
+      this.expandedStatsToken = link.token;
+      this.statsReadDepth = [];
+      this.statsFeedback = [];
+      this.statsLoading = true;
+      try {
+        const [depth, fb] = await Promise.all([
+          fetchJson(`/share/api/links/${encodeURIComponent(link.token)}/read-depth`).catch(() => ({ chapters: [] })),
+          fetchJson(`/share/api/links/${encodeURIComponent(link.token)}/feedback`).catch(() => ({ feedback: [] })),
+        ]);
+        this.statsReadDepth = Array.isArray(depth?.chapters) ? depth.chapters : [];
+        this.statsFeedback = Array.isArray(fb?.feedback) ? fb.feedback : [];
+      } finally {
+        this.statsLoading = false;
+      }
+    },
+
+    // Ein-Fazit-Sterne (voll/leer) für die Detail-Liste.
+    feedbackStars(rating) {
+      const n = Math.max(0, Math.min(5, rating || 0));
+      return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
     },
 
     // Restgültigkeit als ein lesbarer Satz pro Link-Zustand:

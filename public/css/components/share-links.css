@@ -107,9 +107,20 @@
 .share-row__counts {
   display: flex;
   align-items: center;
-  gap: var(--space-10);
+  flex-wrap: wrap;
+  gap: var(--space-6) var(--space-10);
   font-size: 13px;
   color: var(--color-muted);
+}
+.share-row__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.share-row__stars,
+.share-fb__stars {
+  color: var(--card-accent);
+  letter-spacing: 1px;
 }
 .share-row__comments-btn {
   display: inline-flex;
@@ -193,7 +204,85 @@
   margin-top: var(--space-sm);
 }
 
+/* Statistik-Toggle + Panel (Kapitel-Drop-off + Gesamt-Fazits). */
+.share-row__stats-btn {
+  padding: var(--pad-badge);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.share-row__stats-btn:hover { background: var(--color-hover); }
+.share-row__stats {
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm) var(--space-10);
+  background: var(--color-tag-bg);
+  border-radius: var(--radius-sm);
+}
+.share-stats__heading {
+  margin: 0 0 var(--space-6);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+.share-stats__feedback { margin-top: var(--space-md); }
+
+.share-depth-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  margin-bottom: var(--space-6);
+  font-size: 13px;
+}
+.share-depth-row__label {
+  flex: 0 0 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.share-depth-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.share-depth-bar__fill {
+  width: var(--depth, 0%);
+  height: 100%;
+  background: var(--card-accent);
+}
+.share-depth-row__pct {
+  flex: 0 0 auto;
+  min-width: 3.5ch;
+  text-align: right;
+  color: var(--color-muted);
+}
+
+.share-fb {
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--color-border);
+}
+.share-fb:first-of-type { border-top: none; }
+.share-fb__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: 13px;
+}
+.share-fb__name { color: var(--color-muted); }
+.share-fb__body {
+  margin-top: var(--space-2xs);
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 600px) {
   .share-row__head { flex-direction: column; align-items: flex-start; }
   .share-row__url { flex-direction: column; align-items: stretch; }
+  .share-depth-row__label { flex-basis: 32%; }
 }

@@ -10,12 +10,10 @@
 // driften. Findet sich der Quote nicht mehr, bleibt der Thread gelistet, aber
 // ohne Inline-Highlight ("Stelle geändert").
 //
-// Diese Datei ist die Facade + der gekoppelte Kern (State, API, Highlights,
-// Thread-Render, Live-Poll). Die selbstständigen Widgets liegen unter
-// share-reader/: dom (el/fmtDate), identity (Reader-Token + Namens-Chip/Modal),
-// menu (Optionen-⋯), theme (Farbschema), toc (Inhaltsverzeichnis), layout
-// (vertikale Verankerung der Karten = Google-Docs-Modell), composer
-// (Selektions-Button + Anmerkungs-Overlay).
+// Facade + gekoppelter Kern (State, API, Highlights, Thread-Render, Live-Poll).
+// Widgets unter share-reader/: dom/identity/menu/theme/toc/layout/composer (hier
+// importiert) sowie dwell/read-depth/resume/reading-prefs/back-to-top/feedback/tts
+// (direkt aus share.html geladen, lesen #share-config selbst).
 
 import { locateRange, locateApprox, resolveCurrentQuote, caretPosFromPoint } from './share-anchor.js';
 import { groupThreads } from './editor/comment-threads.js';

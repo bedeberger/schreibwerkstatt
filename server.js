@@ -288,6 +288,11 @@ const PUBLIC_ASSETS = new Set([
   '/icon-192.png',
   '/icon-512.png',
   '/schreibwerkstatt_icon.svg',
+  // Lucide-Icon-Sprite: der Share-Reader-Vorlese-Dock (share-reader/tts.js)
+  // referenziert Icons via <use href="/icons.svg#…">. Ohne Freigabe landet der
+  // Request des ANONYMEN Lesers im Auth-Guard, kommt als HTML zurueck und der
+  // <use>-Verweis loest nie auf → die Dock-Icons bleiben unsichtbar.
+  '/icons.svg',
   '/schreibwerkstatt_icon.ico',
   '/favicon.ico',
   '/js/admin/admin-login.js',
@@ -329,9 +334,10 @@ const PUBLIC_ASSETS = new Set([
 // (`/login?returnTo=...`) zurückgegeben → Browser verweigert das Stylesheet wegen
 // falschem MIME-Type.
 // /js/share-reader/ deckt alle Reader-Widget-Submodule (dom/identity/menu/theme/
-// toc/progress/layout/composer/tts) ab, die share-reader.js statisch importiert —
-// pre-auth erreichbar fuer den anonymen Leser (siehe Kommentar bei den einzelnen
-// Reader-Modulen in PUBLIC_ASSETS).
+// reading-prefs/toc/progress/layout/composer/feedback/tts sowie die eigenstaendigen
+// dwell/read-depth/resume) ab, die share-reader.js statisch importiert bzw. share.html
+// direkt laedt — pre-auth erreichbar fuer den anonymen Leser (siehe Kommentar bei den
+// einzelnen Reader-Modulen in PUBLIC_ASSETS).
 const PUBLIC_ASSET_PREFIXES = ['/css/', '/fonts/', '/js/share-reader/'];
 // Statische Assets: `no-cache` für alles ausser Bildern. ETag bleibt aktiv —
 // Browser revalidiert bei jedem Reload mit If-None-Match (304 wenn unverändert,

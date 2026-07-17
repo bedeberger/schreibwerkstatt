@@ -17,7 +17,36 @@
   color: var(--share-faint);
 }
 
-/* ── Lesekomfort: Darstellungsregler im Optionen-Menü ────────────────────── */
+/* ── Lesekomfort: „Aa"-Knopf + Popover in der Werkzeug-Leiste ────────────── */
+.share-prefs { position: relative; }
+.share-prefs__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--share-surface);
+  color: var(--share-muted);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.share-prefs__trigger:hover { background: var(--share-hover); }
+.share-prefs__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  padding: 12px 14px;
+  background: var(--share-surface);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius);
+  box-shadow: var(--share-shadow);
+  z-index: 20;
+}
 .share-prefs__group { margin-bottom: 10px; }
 .share-prefs__group:last-child { margin-bottom: 0; }
 .share-prefs__label {

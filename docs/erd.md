@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 237, 116 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 238, 118 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -95,6 +95,9 @@ erDiagram
   app_users ||--o{ share_links       : owns
   share_links ||--o{ share_comments  : has
   share_links ||--o{ share_views      : "access log"
+  share_links ||--o{ share_feedback   : "overall feedback"
+  share_views ||--o{ share_view_sections : "per-chapter depth"
+  chapters ||--o{ share_view_sections : "read depth"
 
   book_categories ||--o{ book_categories : parent
 
@@ -1559,11 +1562,29 @@ erDiagram
     TEXT    created_at
   }
   share_views {
+    INTEGER id             PK
+    TEXT    share_token    FK "FK share_links(token) ON DELETE CASCADE"
+    TEXT    ip_hash        "SHA-256(ip + Server-Salt), nullable — eindeutige Besucher"
+    INTEGER duration_ms    "Lesedauer via Beacon, nullable (MAX-Merge)"
+    INTEGER max_scroll_pct "Gesamt-Lesetiefe 0-100 via Beacon, nullable (MAX-Merge)"
+    TEXT    viewed_at      "DEFAULT NOW_ISO_SQL"
+  }
+  share_view_sections {
+    INTEGER id         PK
+    INTEGER view_id    FK "FK share_views(id) ON DELETE CASCADE"
+    INTEGER chapter_id FK "FK chapters(chapter_id) ON DELETE CASCADE"
+    INTEGER depth_pct  "erreichte Lesetiefe 0-100 in diesem Kapitel (MAX-Merge), UNIQUE(view_id,chapter_id)"
+  }
+  share_feedback {
     INTEGER id           PK
     TEXT    share_token  FK "FK share_links(token) ON DELETE CASCADE"
-    TEXT    ip_hash      "SHA-256(ip + Server-Salt), nullable — eindeutige Besucher"
-    INTEGER duration_ms  "Lesedauer via Beacon, nullable (MAX-Merge)"
-    TEXT    viewed_at    "DEFAULT NOW_ISO_SQL"
+    TEXT    reader_token "opaker Per-Browser-Token, UNIQUE(share_token,reader_token) — 1 Fazit/Leser"
+    TEXT    reader_name  "nullable"
+    INTEGER rating       "Sternewertung 1-5"
+    TEXT    body         "optionales Freitext-Fazit, max 4000, nullable"
+    TEXT    ip_hash      "SHA-256(ip + Server-Salt), nullable"
+    TEXT    created_at   "DEFAULT NOW_ISO_SQL"
+    TEXT    updated_at   "DEFAULT NOW_ISO_SQL"
   }
   api_tokens {
     INTEGER id            PK
@@ -1605,6 +1626,9 @@ erDiagram
   app_users        ||--o{ share_links       : owns
   share_links      ||--o{ share_comments    : has
   share_links      ||--o{ share_views       : "access log"
+  share_links      ||--o{ share_feedback    : "overall feedback"
+  share_views      ||--o{ share_view_sections : "per-chapter depth"
+  chapters         ||--o{ share_view_sections : "read depth"
   share_comments   ||--o{ share_comments    : "reply (parent_id)"
   app_users        ||--o{ share_comments    : "authored reply"
   app_users        ||--o{ api_tokens        : owns
