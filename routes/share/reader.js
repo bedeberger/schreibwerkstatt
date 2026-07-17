@@ -21,8 +21,12 @@ const {
   ANCHOR_BID_RE, READER_TOKEN_RE, READER_EMAIL_RE, TOKEN_RE,
   serializeCommentForReader, escHtml, detectLang, isExpired,
   fillTemplate, paragraphifyIntro, backfillScopeBlockIds, loadContentForLink,
-  buildTocBlock, renderGone,
+  buildTocBlock, renderGone, htmlToPlainLength,
 } = H;
+
+// Lesezeit-Schaetzung: durchschnittliche stille Lesegeschwindigkeit ~1100
+// Zeichen/Min (≈200 WpM Prosa). Zeichen ist die primaere Umfangs-Kennzahl.
+const CHARS_PER_MINUTE = 1100;
 
 function register(router) {
   // ── Public: Manuskript-Bild eines geteilten Inhalts ────────────────────────
@@ -134,6 +138,25 @@ function register(router) {
     const tocBlock = link.show_toc ? buildTocBlock(content, lang) : '';
     const layoutClass = tocBlock ? 'share-layout--has-toc' : '';
 
+    // Umfang + Lesezeit (dem Leser oben angezeigt). Zeichen als Primaerkennzahl,
+    // Minuten als abgeleitete Schaetzung (min. 1).
+    const contentChars = htmlToPlainLength(content.html);
+    const readMinutes = Math.max(1, Math.round(contentChars / CHARS_PER_MINUTE));
+    const metaBlock = contentChars > 0
+      ? `<div class="share-header__meta">
+          <span class="share-header__meta-item">${escHtml(tServerParams('share.reader.char_count', { count: contentChars.toLocaleString(lang === 'en' ? 'en-US' : 'de-CH') }, lang))}</span>
+          <span class="share-header__meta-item">${escHtml(tServerParams('share.reader.reading_time', { min: readMinutes }, lang))}</span>
+        </div>`
+      : '';
+
+    // Lesetiefe-Zuordnung fuer den Reader: pro Kapitel der Anker seiner Ueberschrift
+    // (Buch-Shares). read-depth.js nutzt aufeinanderfolgende Kapitel-Anker als
+    // Grenzen → Ø-Lesetiefe pro Kapitel (chapter_id = echter FK). Kapitel-Shares
+    // haben keine Kapitel-Ueberschrift (omitChapterHeaders) → nur Gesamt-Tiefe.
+    const readDepthChapters = (content.toc || [])
+      .filter(e => e.level === 1 && e.chapterId)
+      .map(e => ({ id: e.chapterId, anchor: e.anchor }));
+
     // SSR-Fallback zeigt nur allgemeine Anmerkungen (kein Anker, kein Reply) in der
     // unteren Sektion. Verankerte Threads werden client-seitig via /threads in die
     // schwebende Leiste hydriert (share-reader.js) — ohne JS nicht positionierbar,
@@ -192,7 +215,14 @@ function register(router) {
       'email_optional_hint', 'email_notice_on', 'name_modal_email',
       'edit', 'edit_save', 'edited_badge', 'new_reply_badge',
       'tts_listen', 'tts_pause', 'tts_resume', 'tts_skip', 'tts_stop',
-      'tts_reading', 'tts_paused', 'tts_loading', 'tts_error'];
+      'tts_reading', 'tts_paused', 'tts_loading', 'tts_error',
+      'resume_reading', 'back_to_top',
+      'prefs_label', 'prefs_font_size', 'prefs_smaller', 'prefs_larger',
+      'prefs_line_width', 'prefs_width_narrow', 'prefs_width_normal', 'prefs_width_wide',
+      'prefs_typeface', 'prefs_serif', 'prefs_sans',
+      'feedback_heading', 'feedback_intro', 'feedback_rating_label', 'feedback_star',
+      'feedback_comment_placeholder', 'feedback_submit', 'feedback_update',
+      'feedback_thanks', 'feedback_error', 'feedback_change'];
     const readerI18n = {};
     for (const k of readerKeys) readerI18n[k] = tServer(`share.reader.${k}`, lang);
     // Vorlesen (TTS): nur `enabled` + Atempausen ans Frontend — Host/Voice/Key
@@ -210,7 +240,10 @@ function register(router) {
       viewId = shareLinks.recordShareView(token, rateLimit.hashIp(ip));
     } catch (e) { logger.warn(`[share/view] record fehlgeschlagen: ${e.message}`); }
 
-    const configJson = JSON.stringify({ token, lang, viewId, i18n: readerI18n, tts: ttsCfg }).replace(/</g, '\\u003c');
+    const configJson = JSON.stringify({
+      token, lang, viewId, i18n: readerI18n, tts: ttsCfg,
+      readDepth: { chapters: readDepthChapters },
+    }).replace(/</g, '\\u003c');
 
     // Bei Buch-Shares ist content.title bereits der Buchname — keine Doppelung
     // (Buch-Zeile leer, H1 = Buchname). Sonst "Seite/Kapitel · Buch".
@@ -228,6 +261,7 @@ function register(router) {
       t_skip: escHtml(tServer('share.reader.skip_to_content', lang)),
       t_comments: escHtml(tServer('share.reader.comments_heading', lang)),
       t_general_heading: escHtml(tServer('share.reader.general_heading', lang)),
+      reading_meta: metaBlock,
       intro_block: introBlock,
       toc_block: tocBlock,
       content_html: content.html,
@@ -258,6 +292,76 @@ function register(router) {
     const clamped = Math.min(durationMs, MAX_DWELL_MS);
     try { shareLinks.setViewDuration(viewId, token, clamped); } catch { /* non-fatal */ }
     res.sendStatus(204);
+  });
+
+  // ── Public: Lesetiefe eines Aufrufs nachtragen (Beacon) ────────────────────
+  // Gesamt-Scrolltiefe (0-100 %) + optional pro Kapitel die erreichte Tiefe. Wie
+  // die Verweildauer per sendBeacon beim Wechsel in den Hintergrund; MAX-Merge in
+  // der DB, view_id token-gebunden. Antwortet immer 204.
+  router.post('/:token/read-depth', express.json({ limit: '8kb' }), (req, res) => {
+    const token = String(req.params.token || '');
+    if (!TOKEN_RE.test(token)) return res.sendStatus(204);
+    const viewId = parseInt(req.body?.viewId, 10);
+    if (!Number.isInteger(viewId) || viewId <= 0) return res.sendStatus(204);
+
+    const rawMax = Math.round(Number(req.body?.maxScrollPct));
+    if (Number.isFinite(rawMax) && rawMax >= 0) {
+      const pct = Math.min(100, rawMax);
+      try { shareLinks.setViewMaxScroll(viewId, token, pct); } catch { /* non-fatal */ }
+    }
+
+    // Pro-Kapitel-Tiefe (max. 500 Eintraege defensiv). chapterId + pct clamped in DB.
+    const chapters = Array.isArray(req.body?.chapters) ? req.body.chapters.slice(0, 500) : [];
+    if (chapters.length) {
+      const sections = chapters
+        .map(c => ({ chapterId: parseInt(c?.chapterId, 10), pct: Number(c?.pct) }))
+        .filter(c => Number.isInteger(c.chapterId) && c.chapterId > 0 && Number.isFinite(c.pct));
+      if (sections.length) {
+        try { shareLinks.recordSectionDepths(viewId, token, sections); } catch { /* non-fatal */ }
+      }
+    }
+    res.sendStatus(204);
+  });
+
+  // ── Public: Gesamt-Fazit abgeben (Sternewertung + optionaler Freitext) ──────
+  // Einmal pro Leser (reader_token, UPSERT). Erneutes Absenden aktualisiert das
+  // eigene Fazit. reader_token ist Pflicht (sonst kein Upsert-Key → Spam-Schutz).
+  router.post('/:token/feedback', express.json({ limit: '8kb' }), (req, res) => {
+    const token = String(req.params.token || '');
+    if (!TOKEN_RE.test(token)) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    const link = shareLinks.getShareLinkByToken(token);
+    if (!link || isExpired(link)) return res.status(404).json({ error_code: 'GONE' });
+
+    const readerToken = String(req.body?.reader_token || '');
+    if (!READER_TOKEN_RE.test(readerToken)) return res.status(400).json({ error_code: 'NO_READER_TOKEN' });
+    const rating = parseInt(req.body?.rating, 10);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error_code: 'BAD_RATING' });
+
+    let body = req.body?.body != null ? String(req.body.body).trim() : null;
+    if (body && body.length > BODY_MAX) return res.status(400).json({ error_code: 'TOO_LONG' });
+    if (!body) body = null;
+    let readerName = req.body?.reader_name != null ? String(req.body.reader_name).trim().slice(0, READER_NAME_MAX) : null;
+    if (!readerName) readerName = null;
+
+    const ip = req.ip || req.connection?.remoteAddress || '';
+    try {
+      shareLinks.upsertFeedback(token, { readerToken, readerName, rating, body, ipHash: rateLimit.hashIp(ip) });
+    } catch (e) {
+      logger.warn(`[share/feedback] upsert fehlgeschlagen: ${e.message}`);
+      return res.status(500).json({ error_code: 'ERR' });
+    }
+    res.json({ ok: true });
+  });
+
+  // ── Public: eigenes Fazit dieses Lesers (Prefill) ──────────────────────────
+  router.get('/:token/feedback/mine', (req, res) => {
+    const token = String(req.params.token || '');
+    if (!TOKEN_RE.test(token)) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    const readerToken = String(req.query?.rt || '');
+    if (!READER_TOKEN_RE.test(readerToken)) return res.set('Cache-Control', 'no-store').json({ feedback: null });
+    let feedback = null;
+    try { feedback = shareLinks.getFeedbackByReader(token, readerToken) || null; } catch { /* non-fatal */ }
+    res.set('Cache-Control', 'no-store').json({ feedback });
   });
 
   // ── Public: Kommentar abgeben ──────────────────────────────────────────────

@@ -9036,6 +9036,56 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 237 abgeschlossen (share_views).');
   }
 
+  if (version < 238) {
+    // Share-Reader: Lesetiefe + Gesamt-Fazit.
+    // (a) max_scroll_pct auf share_views — wie weit (0-100 %) ein Aufruf durch den
+    //     geteilten Inhalt gescrollt ist (per Beacon nachgetragen, MAX-Merge).
+    // (b) share_view_sections — pro Aufruf + Kapitel die erreichte Lesetiefe
+    //     (0-100 %), Basis fuer die Kapitel-Drop-off-Kurve des Autors. chapter_id
+    //     ist ein echter FK (kein Snapshot); Kapitelname kommt per JOIN.
+    // (c) share_feedback — einmaliges Gesamt-Fazit pro Leser (reader_token):
+    //     Sternewertung 1-5 + optionaler Freitext. UPSERT ueber (token, reader_token).
+    const svCols = db.pragma('table_info(share_views)').map(c => c.name);
+    if (!svCols.includes('max_scroll_pct')) {
+      db.exec('ALTER TABLE share_views ADD COLUMN max_scroll_pct INTEGER');
+    }
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS share_view_sections (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        view_id    INTEGER NOT NULL REFERENCES share_views(id) ON DELETE CASCADE,
+        chapter_id INTEGER NOT NULL REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        depth_pct  INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(view_id, chapter_id)
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_share_view_sections_view ON share_view_sections(view_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_share_view_sections_chapter ON share_view_sections(chapter_id)');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS share_feedback (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        share_token  TEXT NOT NULL REFERENCES share_links(token) ON DELETE CASCADE,
+        reader_token TEXT,
+        reader_name  TEXT,
+        rating       INTEGER NOT NULL,
+        body         TEXT,
+        ip_hash      TEXT,
+        created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE(share_token, reader_token)
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_share_feedback_token ON share_feedback(share_token)');
+
+    const fkErrors238 = db.pragma('foreign_key_check');
+    if (fkErrors238.length) {
+      throw new Error(`Migration 238: foreign_key_check meldet ${fkErrors238.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 238').run();
+    logger.info('DB-Migration auf Version 238 abgeschlossen (share_view_sections, share_feedback, max_scroll_pct).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

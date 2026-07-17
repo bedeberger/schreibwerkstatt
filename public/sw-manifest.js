@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "6329110ef4311112";
+self.__SHELL_BUILD = "e2bcf04fed533ca6";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
@@ -111,6 +111,7 @@ self.__SHELL_MANIFEST = [
   "/css/share/comments.css",
   "/css/share/content.css",
   "/css/share/layout.css",
+  "/css/share/reading.css",
   "/css/share/theme.css",
   "/css/share/tts.css",
   "/css/tokens-est.css",
@@ -468,9 +469,12 @@ self.__SHELL_MANIFEST = [
   "/js/share-reader/layout.js",
   "/js/share-reader/menu.js",
   "/js/share-reader/progress.js",
+  "/js/share-reader/read-depth.js",
+  "/js/share-reader/resume.js",
   "/js/share-reader/theme.js",
   "/js/share-reader/toc.js",
   "/js/share-reader/tts.js",
+  "/js/share-reader/wakelock.js",
   "/js/share-theme-init.js",
   "/js/shared/stopwords-de.js",
   "/js/sortable-dnd.js",

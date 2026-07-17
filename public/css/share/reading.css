@@ -1,0 +1,221 @@
+/* Share-Reader: Lesekomfort + Umfang/Lesezeit + Weiterlesen + Nach-oben +
+   Gesamt-Fazit. Alle Farben/Radien aus den --share-*-Tokens (share/theme.css). */
+
+/* ── Umfang + Lesezeit (Header) ──────────────────────────────────────────── */
+.share-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  color: var(--share-muted);
+}
+.share-header__meta-item + .share-header__meta-item::before {
+  content: '·';
+  margin-right: 12px;
+  color: var(--share-faint);
+}
+
+/* ── Lesekomfort: Darstellungsregler im Optionen-Menü ────────────────────── */
+.share-prefs__group { margin-bottom: 10px; }
+.share-prefs__group:last-child { margin-bottom: 0; }
+.share-prefs__label {
+  display: block;
+  margin-bottom: 5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--share-muted);
+}
+.share-prefs__seg {
+  display: flex;
+  gap: 4px;
+}
+.share-prefs__seg-btn {
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--share-surface);
+  color: var(--share-text);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.share-prefs__seg-btn:hover { background: var(--share-hover); }
+.share-prefs__seg-btn--active {
+  background: var(--share-accent);
+  color: var(--share-on-accent);
+  border-color: var(--share-accent);
+}
+
+/* Anwendung der Lesekomfort-Einstellungen auf den Lese-Inhalt.
+   font-scale skaliert die Body-Basisschrift; measure die Lesespaltenbreite;
+   data-reader-font wechselt Serif/Serifenlos. */
+.share-content { font-size: calc(1em * var(--share-reader-font-scale, 1)); }
+.share-main { max-width: var(--share-reader-measure, 70ch); }
+body.share-page[data-reader-font="sans"] {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── Weiterlesen-Chip (Resume-Position) ──────────────────────────────────── */
+.share-resume {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  background: var(--share-surface);
+  color: var(--share-text);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius);
+  box-shadow: var(--share-shadow-md);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+}
+.share-resume__btn {
+  padding: 6px 12px;
+  background: var(--share-accent);
+  color: var(--share-on-accent);
+  border: none;
+  border-radius: var(--share-radius-sm);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.share-resume__dismiss {
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--share-muted);
+  border: none;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ── Nach-oben-Button ────────────────────────────────────────────────────── */
+.share-back-to-top {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 39;
+  width: 42px;
+  height: 42px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--share-surface);
+  color: var(--share-text);
+  border: 1px solid var(--share-border);
+  border-radius: 50%;
+  box-shadow: var(--share-shadow-md);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+.share-back-to-top:hover { background: var(--share-hover); }
+.share-back-to-top--visible { display: inline-flex; }
+
+/* ── Gesamt-Fazit (Sternewertung + Freitext) ─────────────────────────────── */
+.share-feedback {
+  max-width: 70ch;
+  margin: 8px auto 0;
+  padding: 20px 24px 28px;
+}
+.share-feedback__heading {
+  margin: 0 0 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 17px;
+  color: var(--share-text);
+}
+.share-feedback__intro {
+  margin: 0 0 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: var(--share-muted);
+}
+.share-feedback__stars {
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+.share-feedback__star {
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--share-faint);
+  transition: color 0.08s ease;
+}
+.share-feedback__star--on { color: var(--share-accent-2, var(--share-accent)); }
+.share-feedback__comment {
+  display: block;
+  width: 100%;
+  min-height: 80px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--share-surface);
+  color: var(--share-text);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-sm);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  resize: vertical;
+}
+.share-feedback__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.share-feedback__submit {
+  padding: 8px 16px;
+  background: var(--share-accent);
+  color: var(--share-on-accent);
+  border: none;
+  border-radius: var(--share-radius-sm);
+  font: inherit;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.share-feedback__submit:disabled { opacity: 0.5; cursor: default; }
+.share-feedback__status {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: var(--share-muted);
+}
+.share-feedback__thanks {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: var(--share-text);
+}
+.share-feedback__change {
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--share-accent);
+  border: none;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .share-feedback { padding: 18px 16px 24px; }
+  .share-feedback__star { font-size: 26px; }
+}

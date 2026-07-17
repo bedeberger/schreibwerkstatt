@@ -31,6 +31,7 @@ import { setupToc } from './share-reader/toc.js';
 import { setupProgressBar } from './share-reader/progress.js';
 import { createCardLayout } from './share-reader/layout.js';
 import { setupComposer } from './share-reader/composer.js';
+import { setupWakeLock } from './share-reader/wakelock.js';
 
 (function () {
   const cfgEl = document.getElementById('share-config');
@@ -63,6 +64,7 @@ import { setupComposer } from './share-reader/composer.js';
   setupThemeSwitcher({ t, menuSection });
   setupToc({ menuSection });
   setupProgressBar();
+  setupWakeLock();
 
   // Auto-Hide-Scrollbar am TOC (≥1100px eigener Scroll-Container), gleiches
   // Pattern wie Sidebar-Tree + Bucheditor-Inhaltsverzeichnis in der SPA. Die

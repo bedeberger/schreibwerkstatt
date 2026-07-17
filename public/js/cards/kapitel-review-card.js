@@ -428,6 +428,19 @@ export function registerKapitelReviewCard() {
       return this.kapitelReviewHistory?.[String(window.__app.kapitelReviewChapterId)] || [];
     },
 
+    // Notendifferenz eines History-Eintrags gegenüber dem chronologisch
+    // vorherigen Run desselben Kapitels. Die Liste ist newest-first, der
+    // Vorgänger liegt also bei index+1. null, wenn kein Vorgänger existiert,
+    // eine Note fehlt oder die Note unverändert ist.
+    kapitelReviewNoteDelta(index) {
+      const list = this.kapitelReviewCurrentHistory();
+      const cur = list[index]?.review_json?.gesamtnote;
+      const prev = list[index + 1]?.review_json?.gesamtnote;
+      if (typeof cur !== 'number' || typeof prev !== 'number') return null;
+      const d = Math.round((cur - prev) * 100) / 100;
+      return d === 0 ? null : d;
+    },
+
     // Schnell eine Seite im aktuellen Kapitel anlegen — Baum + Flat-Liste lokal
     // einhängen, dann zur neuen Seite springen.
     async createKapitelPage() {

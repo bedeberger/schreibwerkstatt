@@ -16,6 +16,7 @@ const {
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
 const { narrativeLabels } = require('./narrative-labels');
+const { loadChapterReviewKomplettContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
@@ -51,8 +52,6 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
   const effectiveProvider = resolveProvider({ userEmail });
   const { singlePass: SINGLE_PASS_LIMIT, perChunk: PER_CHUNK_LIMIT } = chunkLimitsFor(effectiveProvider);
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
-  // Stilprofil fliesst in SYSTEM_KAPITELREVIEW (Referenz-Framing) → Cache-Bust bei Profil-Änderung.
-  const optionsSig = _sigHash({ narrative, schwerpunkt: reviewSchwerpunkt, includeSubchapters, stilprofil: bookSettings?.stilprofil || '' });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     // Bei includeSubchapters: rekursiv alle Sub-Kapitel-IDs ermitteln und
@@ -71,6 +70,47 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
 
     if (!pages.length) { completeJob(jobId, { empty: true, chapterName }); return; }
     logger.info(`Start: «${chapterName}» chap=${chapterId}${includeSubchapters ? ' (+Sub-Kapitel)' : ''}, ${pages.length} Seiten`);
+
+    // Kapitelname aus dem Tree-Pfad (letztes Segment) – für Kontext-Scoping
+    // (Kontinuität/Zeitstrahl filtern über Namen) und Nachbar-Anzeige.
+    const _nameOf = (cid) => {
+      const pth = chMap[cid] || chMap[Number(cid)] || '';
+      return pth ? pth.split(' › ').pop() : '';
+    };
+    const chapterNames = [...new Set([...chapterIds].map(_nameOf).concat(chapterName).filter(Boolean))];
+
+    // Buchwahrheit (Figuren/Beziehungen/Kontinuität/Zeitstrahl) auf die bewerteten
+    // Kapitel gescopt: schärft die Achsen `figuren` und `kohaerenz` gegen die
+    // Kartei, statt das Kapitel isoliert zu beurteilen.
+    const komplettContext = loadChapterReviewKomplettContext(bookIdInt, email, {
+      chapterIds: [...chapterIds], chapterNames,
+    });
+
+    // Position in der Lesereihenfolge: erlaubt dem Modell, Dramaturgie/Pacing
+    // relativ zur Funktion des Kapitels im Buch zu bewerten statt absolut.
+    const chapterOrder = [];
+    const seenCh = new Set();
+    for (const p of allPages) {
+      const cid = String(p.chapter_id || '');
+      if (!cid || seenCh.has(cid)) continue;
+      seenCh.add(cid);
+      chapterOrder.push(cid);
+    }
+    const posIdxs = chapterOrder.map((c, i) => (chapterIds.has(c) ? i : -1)).filter(i => i >= 0);
+    const position = posIdxs.length ? {
+      index: Math.min(...posIdxs) + 1,
+      total: chapterOrder.length,
+      prevName: Math.min(...posIdxs) > 0 ? _nameOf(chapterOrder[Math.min(...posIdxs) - 1]) : '',
+      nextName: Math.max(...posIdxs) < chapterOrder.length - 1 ? _nameOf(chapterOrder[Math.max(...posIdxs) + 1]) : '',
+    } : null;
+
+    // Stilprofil fliesst in SYSTEM_KAPITELREVIEW (Referenz-Framing) → Cache-Bust bei Profil-Änderung.
+    // Komplettanalyse-Kontext + Position ebenfalls in die Sig, damit ein neuer
+    // Kartei-/Kontinuitätsstand bzw. eine Umgruppierung den Cache invalidiert.
+    const optionsSig = _sigHash({
+      narrative, schwerpunkt: reviewSchwerpunkt, includeSubchapters,
+      stilprofil: bookSettings?.stilprofil || '', komplettContext, position,
+    });
 
     // pages_sig: jede Seite + ihr updated_at + Sub-Tree-Kapitelmenge inkl. deren
     // Pfade. Ändert sich eine Seite, ein Sub-Kapitel-Name/Pfad oder der Modus →
@@ -155,7 +195,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
       const chText = _buildText(contents);
       updateJob(jobId, { progress: 65, statusText: 'job.phase.aiChapterReview' });
       r = await aiCall(jobId, tok,
-        buildChapterReviewPrompt(chapterName, bookName, contents.length, chText, { ...narrative, reviewSchwerpunkt }),
+        buildChapterReviewPrompt(chapterName, bookName, contents.length, chText, { ...narrative, reviewSchwerpunkt, komplettContext, position }),
         SYSTEM_KAPITELREVIEW,
         65, 97, 5000, 0.2, null, undefined, SCHEMA_CHAPTER_REVIEW,
       );
@@ -188,7 +228,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
 
       updateJob(jobId, { progress: 90, statusText: 'job.phase.finalReview' });
       r = await aiCall(jobId, tok,
-        buildChapterReviewMultiPassPrompt(chapterName, bookName, subAnalyses, contents.length, { ...narrative, reviewSchwerpunkt }),
+        buildChapterReviewMultiPassPrompt(chapterName, bookName, subAnalyses, contents.length, { ...narrative, reviewSchwerpunkt, komplettContext, position }),
         SYSTEM_KAPITELREVIEW,
         90, 97, 5000, 0.2, null, undefined, SCHEMA_CHAPTER_REVIEW,
       );

@@ -57,6 +57,10 @@ function listSharesByOwner(ownerEmail) {
               WHERE sv.share_token = sl.token AND sv.ip_hash IS NOT NULL) AS unique_views,
            (SELECT CAST(AVG(sv.duration_ms) AS INTEGER) FROM share_views sv
               WHERE sv.share_token = sl.token AND sv.duration_ms IS NOT NULL) AS avg_duration_ms,
+           (SELECT CAST(AVG(sv.max_scroll_pct) AS INTEGER) FROM share_views sv
+              WHERE sv.share_token = sl.token AND sv.max_scroll_pct IS NOT NULL) AS avg_max_scroll_pct,
+           (SELECT ROUND(AVG(sf.rating), 1) FROM share_feedback sf WHERE sf.share_token = sl.token) AS avg_rating,
+           (SELECT COUNT(*) FROM share_feedback sf WHERE sf.share_token = sl.token) AS feedback_count,
            (SELECT COUNT(*) FROM share_comments sc WHERE sc.share_token = sl.token) AS comment_count,
            (SELECT COUNT(*) FROM share_comments sc
               WHERE sc.share_token = sl.token
@@ -80,6 +84,10 @@ function listSharesByOwnerAndBook(ownerEmail, bookId) {
               WHERE sv.share_token = sl.token AND sv.ip_hash IS NOT NULL) AS unique_views,
            (SELECT CAST(AVG(sv.duration_ms) AS INTEGER) FROM share_views sv
               WHERE sv.share_token = sl.token AND sv.duration_ms IS NOT NULL) AS avg_duration_ms,
+           (SELECT CAST(AVG(sv.max_scroll_pct) AS INTEGER) FROM share_views sv
+              WHERE sv.share_token = sl.token AND sv.max_scroll_pct IS NOT NULL) AS avg_max_scroll_pct,
+           (SELECT ROUND(AVG(sf.rating), 1) FROM share_feedback sf WHERE sf.share_token = sl.token) AS avg_rating,
+           (SELECT COUNT(*) FROM share_feedback sf WHERE sf.share_token = sl.token) AS feedback_count,
            (SELECT COUNT(*) FROM share_comments sc WHERE sc.share_token = sl.token) AS comment_count,
            (SELECT COUNT(*) FROM share_comments sc
               WHERE sc.share_token = sl.token
@@ -142,6 +150,89 @@ function setViewDuration(viewId, token, durationMs) {
     WHERE id = ? AND share_token = ?
   `).run(durationMs, viewId, token);
   return r.changes > 0;
+}
+
+// Gesamt-Lesetiefe eines Aufrufs (0-100 %) nachtragen. Wie bei der Verweildauer
+// MAX-Merge (der Reader meldet die tiefste erreichte Scroll-Position mehrfach)
+// und Token-Match als Schutz gegen fremde view_id. Clamping: Route.
+function setViewMaxScroll(viewId, token, pct) {
+  const r = db.prepare(`
+    UPDATE share_views SET max_scroll_pct = MAX(COALESCE(max_scroll_pct, 0), ?)
+    WHERE id = ? AND share_token = ?
+  `).run(pct, viewId, token);
+  return r.changes > 0;
+}
+
+// Pro-Kapitel-Lesetiefe eines Aufrufs upserten (MAX-Merge). `sections` ist ein
+// Array [{ chapterId, pct }]. Nur Kapitel, die wirklich zu einem Link dieses
+// Aufrufs gehoeren, landen in der Tabelle — die view_id ist token-gebunden, der
+// FK auf chapters(chapter_id) verhindert verwaiste Zeilen. Transaktional, damit
+// ein Beacon mit vielen Kapiteln atomar durchgeht.
+const _upsertSection = db.prepare(`
+  INSERT INTO share_view_sections (view_id, chapter_id, depth_pct)
+  VALUES (?, ?, ?)
+  ON CONFLICT(view_id, chapter_id) DO UPDATE SET depth_pct = MAX(depth_pct, excluded.depth_pct)
+`);
+const _viewBelongsToToken = db.prepare('SELECT 1 FROM share_views WHERE id = ? AND share_token = ?');
+const _recordSectionsTx = db.transaction((viewId, sections) => {
+  for (const s of sections) {
+    if (!Number.isInteger(s.chapterId) || s.chapterId <= 0) continue;
+    const pct = Math.max(0, Math.min(100, Math.round(Number(s.pct) || 0)));
+    try { _upsertSection.run(viewId, s.chapterId, pct); } catch { /* FK-Verstoss (fremdes Kapitel) uebergehen */ }
+  }
+});
+function recordSectionDepths(viewId, token, sections) {
+  if (!_viewBelongsToToken.get(viewId, token)) return false;
+  _recordSectionsTx(viewId, Array.isArray(sections) ? sections : []);
+  return true;
+}
+
+// Kapitel-Drop-off eines Links fuer den Autor: pro Kapitel Ø-Lesetiefe +
+// Anzahl der Aufrufe, die das Kapitel ueberhaupt erreicht haben. Kapitelname per
+// JOIN (kein Snapshot). Sortiert nach Lesereihenfolge (chapters.position).
+function readDepthByToken(token) {
+  return db.prepare(`
+    SELECT c.chapter_id AS chapter_id,
+           c.chapter_name AS chapter_name,
+           CAST(AVG(svs.depth_pct) AS INTEGER) AS avg_depth_pct,
+           COUNT(*) AS reached_views
+    FROM share_view_sections svs
+    JOIN share_views sv ON sv.id = svs.view_id
+    JOIN chapters c ON c.chapter_id = svs.chapter_id
+    WHERE sv.share_token = ?
+    GROUP BY c.chapter_id, c.chapter_name, c.position
+    ORDER BY c.position ASC
+  `).all(token);
+}
+
+// Gesamt-Fazit eines Lesers upserten (einmal pro reader_token). Sternewertung
+// 1-5 + optionaler Freitext. Bei erneutem Absenden aktualisiert der Leser sein
+// eigenes Fazit (UNIQUE(share_token, reader_token)).
+function upsertFeedback(token, { readerToken = null, readerName = null, rating, body = null, ipHash = null }) {
+  db.prepare(`
+    INSERT INTO share_feedback (share_token, reader_token, reader_name, rating, body, ip_hash, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+    ON CONFLICT(share_token, reader_token) DO UPDATE SET
+      reader_name = excluded.reader_name,
+      rating      = excluded.rating,
+      body        = excluded.body,
+      updated_at  = ${NOW_ISO_SQL}
+  `).run(token, readerToken, readerName, rating, body, ipHash);
+}
+
+// Eigenes Fazit dieses Lesers (Prefill im Reader).
+function getFeedbackByReader(token, readerToken) {
+  if (!readerToken) return null;
+  return db.prepare('SELECT rating, body FROM share_feedback WHERE share_token = ? AND reader_token = ?').get(token, readerToken);
+}
+
+// Alle Fazits eines Links fuer den Autor (neueste zuerst).
+function listFeedbackByToken(token) {
+  return db.prepare(`
+    SELECT id, reader_name, rating, body, created_at, updated_at
+    FROM share_feedback WHERE share_token = ?
+    ORDER BY COALESCE(updated_at, created_at) DESC
+  `).all(token);
 }
 
 function markOwnerSeen(token, ownerEmail) {
@@ -374,6 +465,12 @@ module.exports = {
   incrementViewCount,
   recordShareView,
   setViewDuration,
+  setViewMaxScroll,
+  recordSectionDepths,
+  readDepthByToken,
+  upsertFeedback,
+  getFeedbackByReader,
+  listFeedbackByToken,
   markOwnerSeen,
   insertComment,
   insertOwnerReply,

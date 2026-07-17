@@ -17,6 +17,7 @@
       <div class="share-header__book">{{book_name}}</div>
       <h1 class="share-header__title">{{target_name}}</h1>
       <div class="share-header__author">{{t_by}} {{author_name}}</div>
+      {{reading_meta}}
     </div>
     <div class="share-header__tools">
       <div id="share-actions" class="share-actions"></div>
@@ -39,6 +40,9 @@
     </aside>
   </div>
 
+  <!-- Gesamt-Fazit (Sternewertung + Freitext): JS-gefüllt (feedback.js). -->
+  <section class="share-feedback" id="share-feedback" hidden></section>
+
   <!-- Allgemeine Kommentare (nicht verankert) + eigenes Formular, ganz unten. -->
   <section class="share-general" id="share-general" aria-label="{{t_general_heading}}">
     <h2 class="share-general__heading">{{t_general_heading}}</h2>
@@ -57,5 +61,9 @@
   <script src="/js/share-reader/tts.js" type="module"></script>
   <!-- Verweildauer-Beacon: eigenstaendiges Modul, liest #share-config selbst. -->
   <script src="/js/share-reader/dwell.js" type="module"></script>
+  <!-- Lesetiefe-Beacon (Gesamt + pro Kapitel): eigenstaendig, liest #share-config. -->
+  <script src="/js/share-reader/read-depth.js" type="module"></script>
+  <!-- Weiterlesen-Position: eigenstaendig, liest #share-config selbst. -->
+  <script src="/js/share-reader/resume.js" type="module"></script>
 </body>
 </html>

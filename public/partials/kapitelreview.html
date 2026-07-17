@@ -43,9 +43,7 @@
                 :aria-pressed="kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId)"
                 :data-tip="$app.t('kapitelReview.includeSubchaptersTip')"
                 :aria-label="$app.t('kapitelReview.includeSubchapters')">
-          <svg class="icon" aria-hidden="true">
-            <use :href="kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId) ? '/icons.svg?v=693#check' : '/icons.svg?v=693#chevron-down'"/>
-          </svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
         </button>
         <button type="button"
                 class="icon-btn icon-btn--ghost"
@@ -116,6 +114,15 @@
     </div>
   </div>
 
+  <!-- Bewertungsergebnis zuerst: Fortschritt/Status/Output direkt unter dem
+       Header, damit das eigentliche Urteil nicht unter der Seiten-Verwaltung
+       vergraben ist. -->
+  <div class="progress-bar-wrap" x-show="kapitelReviewProgress > 0">
+    <div class="progress-bar" :style="{ '--progress': kapitelReviewProgress + '%' }"></div>
+  </div>
+  <div class="card-status" x-show="kapitelReviewStatus" x-html="kapitelReviewStatus"></div>
+  <div x-show="kapitelReviewOut" x-html="kapitelReviewOut"></div>
+
   <!-- Seitenstatistik des gewählten Kapitels – klickbar zur Seite -->
   <template x-if="kapitelReviewSelectedChapter()">
     <div class="kapitel-pages-section">
@@ -149,7 +156,7 @@
                           @click="toggleSubchapterOpen(sub.id)"
                           :aria-expanded="isSubchapterOpen(sub.id)"
                           :aria-label="$app.t(isSubchapterOpen(sub.id) ? 'sidebar.collapseAll' : 'sidebar.expandAll')">
-                    <span class="history-chevron" :class="{ open: isSubchapterOpen(sub.id) }">›</span>
+                    <span class="history-chevron" :class="{ open: isSubchapterOpen(sub.id) }" aria-hidden="true"></span>
                   </button>
                   <span class="kapitel-subchapter-name internal-link"
                         role="button" tabindex="0"
@@ -212,16 +219,10 @@
     </div>
   </template>
 
-  <div class="progress-bar-wrap" x-show="kapitelReviewProgress > 0">
-    <div class="progress-bar" :style="{ '--progress': kapitelReviewProgress + '%' }"></div>
-  </div>
-  <div class="card-status" x-html="kapitelReviewStatus"></div>
-  <div x-html="kapitelReviewOut"></div>
-
   <!-- Verlauf für das aktuell gewählte Kapitel -->
   <div x-show="kapitelReviewCurrentHistory().length > 0" class="card-history-section">
     <div class="history-heading" x-text="$app.t('kapitelReview.history')"></div>
-    <template x-for="entry in kapitelReviewCurrentHistory()" :key="entry.id">
+    <template x-for="(entry, index) in kapitelReviewCurrentHistory()" :key="entry.id">
       <div>
         <div class="history-item" :class="{ 'history-item--open': selectedKapitelReviewId === entry.id }"
              @click="selectedKapitelReviewId = selectedKapitelReviewId === entry.id ? null : entry.id">
@@ -229,8 +230,13 @@
           <span x-show="entry.review_json?.gesamtnote" class="badge badge-ok review-stars"
             :data-tip="noteTip(entry.review_json?.gesamtnote)"
             x-html="renderStars(entry.review_json?.gesamtnote)"></span>
+          <span x-show="kapitelReviewNoteDelta(index) !== null"
+            class="badge review-trend"
+            :class="kapitelReviewNoteDelta(index) > 0 ? 'badge-ok' : 'badge-err'"
+            :data-tip="$app.t('kapitelReview.trendTip')"
+            x-text="(kapitelReviewNoteDelta(index) > 0 ? '+' : '−') + Math.abs(kapitelReviewNoteDelta(index)).toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 2 })"></span>
           <span class="tag" x-text="entry.model"></span>
-          <span class="history-chevron" :class="{ open: selectedKapitelReviewId === entry.id }">›</span>
+          <span class="history-chevron" :class="{ open: selectedKapitelReviewId === entry.id }" aria-hidden="true"></span>
         </div>
         <div x-show="selectedKapitelReviewId === entry.id" class="history-detail">
           <div x-html="entry.review_json ? _renderKapitelReviewHtml(entry.review_json) : ''"></div>

@@ -194,6 +194,12 @@
   gap: var(--space-2xs);
 }
 
+/* Notentrend-Badge im Kapitel-Review-Verlauf (+/- gegenüber Vorgänger-Run). */
+.review-trend {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 @media (max-width: 700px) {
   .kapitel-page-row { flex-wrap: wrap; }
   .kapitel-page-stats { flex-wrap: wrap; }

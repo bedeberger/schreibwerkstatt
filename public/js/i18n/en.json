@@ -1624,6 +1624,7 @@
   "kapitelReview.pagesAnalyzed": "{n} pages analysed.",
   "kapitelReview.noPages": "Chapter contains no text.",
   "kapitelReview.history": "Previous chapter reviews",
+  "kapitelReview.trendTip": "Grade change compared to the previous review of this chapter",
   "kapitelReview.lastEdit": "Last edited: {when}",
   "kapitelReview.pagesHeading": "Pages in chapter ({n})",
   "kapitelReview.subchaptersHeading": "Sub-chapters ({n})",

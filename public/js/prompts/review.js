@@ -16,6 +16,20 @@ Notenskala (verbindlich – nicht abweichen):
 - Eine Note über 4.5 verlangt eine konkrete Stärke pro Achse; ohne → maximal 4.5.
 - Halbschritte (.0, .5) bevorzugen; .25 / .75 nur wenn die Bewertung klar zwischen zwei Stufen liegt.`;
 
+// Kapitel-eigener Notenanker. Bewertet das handwerkliche Gelingen des Kapitels
+// im Kontext seiner Funktion im Buch, nicht die Marktreife eines ganzen Werks.
+const NOTENSKALA_BLOCK_CHAPTER = `
+Notenskala (verbindlich – bewertet das Kapitel-Handwerk im Kontext des Buchs, nicht die Marktreife eines ganzen Werks):
+- 1.0–2.5: handwerklich mangelhaft – Dramaturgie, Kohärenz oder Perspektive gravierend defekt.
+- 3.0–3.5: Grundidee der Szene(n) trägt, Umsetzung schwach (Leerlauf, unklare Übergänge, flache Figuren).
+- 4.0:     solides Kapitel, funktioniert, ohne herausstechende Wirkung.
+- 4.5:     gut, klare Stärke in mind. zwei Achsen (Dramaturgie / Pacing / Kohärenz / Perspektive / Figuren).
+- 5.0:     sehr gut – trägt die Handlung spürbar, Szenen sitzen.
+- 5.5–6.0: ausgezeichnet bis herausragend – verdichtete, wirkungsvolle Kapitelarbeit.
+- Eine Note über 4.5 verlangt eine konkrete Stärke pro genannter Achse; ohne → maximal 4.5.
+- Bewerte das Kapitel im Kontext seiner Funktion im Buch (siehe Position), nicht als eigenständige Erzählung.
+- Halbschritte (.0, .5) bevorzugen; .25 / .75 nur wenn die Bewertung klar zwischen zwei Stufen liegt.`;
+
 // Bewertungsachsen pro Scope. Werden über `_buildAchsenBlock()` zu einem
 // Prompt-Block geformt – Buch- und Kapitel-Review nutzen denselben Generator,
 // damit das Achsen-Vokabular konsistent bleibt.
@@ -76,7 +90,8 @@ Format der Kapitelanalyse (alle Felder ausfüllen, jeweils 1–2 Sätze, knapp u
 - qualitaet:        Allgemeiner Qualitätseindruck.
 - dramaturgie_kurz: Spannungskurve im Kapitel (Aufbau, Höhepunkt, Schluss).
 - figuren_kurz:     Welche Figuren tragen das Kapitel, wie verändert sich ihre Position.
-- pacing_kurz:      Tempo und Längen, Leerlauf vs. Verdichtung.`;
+- pacing_kurz:      Tempo und Längen, Leerlauf vs. Verdichtung.
+- zitate:           1–2 wörtliche, zeichengenaue Belegstellen aus DIESEM Abschnitt, je mit kind (staerke|schwaeche) und einem Kommentar-Satz. Nur echte Fundstellen – nichts erfinden, sonst leere Liste.`;
 
 /**
  * Erzeugt den Buchtyp-Schwerpunkt-Block für Buchreview- und Kapitelreview-Prompts.
@@ -90,6 +105,25 @@ function _buildReviewSchwerpunktBlock(schwerpunkt) {
   const t = (schwerpunkt || '').trim();
   if (!t) return '';
   return `\nGenre-Schwerpunkt (zusätzlich zu den Achsen, nicht statt ihnen):\n${t}\n`;
+}
+
+/**
+ * Positioniert das Kapitel im Buch und weist das Modell an, Dramaturgie und
+ * Pacing relativ zur Funktion des Kapitels zu bewerten (Aufbau-/Ruhekapitel vs.
+ * Wende-/Schlusskapitel) statt absolut.
+ *
+ * @param {{index:number,total:number,prevName?:string,nextName?:string}|null} position
+ * @returns {string} Block oder '' (wenn keine Position bekannt)
+ */
+function _buildChapterPositionBlock(position) {
+  if (!position || !position.total) return '';
+  const nachbarn = [];
+  if (position.prevName) nachbarn.push(`Vorheriges Kapitel: «${position.prevName}».`);
+  if (position.nextName) nachbarn.push(`Nächstes Kapitel: «${position.nextName}».`);
+  return `
+Position im Buch: Kapitel ${position.index} von ${position.total}.${nachbarn.length ? '\n' + nachbarn.join(' ') : ''}
+Bewerte Dramaturgie und Pacing relativ zur FUNKTION dieses Kapitels im Ganzen, nicht absolut: ein frühes Aufbau-/Ruhekapitel darf bewusst langsamer sein, ein Wende- oder Schlusskapitel muss dramaturgisch einlösen. Ein ruhiges Kapitel an der richtigen Stelle ist kein Pacing-Mangel.
+`;
 }
 
 /**
@@ -219,7 +253,11 @@ Antworte mit diesem JSON-Schema:
   "figuren_kurz": "Welche Figuren tragen das Kapitel, wie verschiebt sich ihre Position (1-2 Sätze)",
   "pacing_kurz": "Tempo und Längen, Leerlauf vs. Verdichtung (1 Satz)",
   "staerken": ["konkrete Stärke 1", "konkrete Stärke 2"],
-  "schwaechen": ["konkrete Schwäche 1", "konkrete Schwäche 2"]
+  "schwaechen": ["konkrete Schwäche 1", "konkrete Schwäche 2"],
+  "zitate": [
+    { "kind": "staerke",  "zitat": "wörtlich aus diesem Abschnitt", "kommentar": "was diese Stelle zeigt" },
+    { "kind": "schwaeche","zitat": "wörtlich aus diesem Abschnitt", "kommentar": "was diese Stelle zeigt" }
+  ]
 }
 </output_format>
 <kapitelinhalt seiten="${pageCount}">
@@ -231,17 +269,19 @@ ${chText}
 // Fokus: Dramaturgie, Pacing, Kohärenz, Perspektive, Figuren – Dinge, die
 // beim Seiten-Lektorat (Mikro-Fehler) und bei der Buchbewertung (Gesamtnote)
 // naturgemäss nicht erfasst werden.
-export function buildChapterReviewPrompt(chapterName, bookName, pageCount, chText, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '' } = {}) {
+export function buildChapterReviewPrompt(chapterName, bookName, pageCount, chText, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '', komplettContext = null, position = null } = {}) {
   const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
   const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
+  const positionBlock = _buildChapterPositionBlock(position);
+  const kontextBlock = _buildKomplettContextBlock(komplettContext);
   return `<aufgabe>
 Bewerte das Kapitel «${chapterName}» aus dem Buch «${bookName}» kritisch und umfassend.
 Der Fokus liegt auf seitenübergreifenden Qualitäten – nicht auf Mikro-Fehlern (dafür gibt es das Seiten-Lektorat).
 </aufgabe>
 ${ACHSEN_BLOCK_CHAPTER}
-${NOTENSKALA_BLOCK}
+${NOTENSKALA_BLOCK_CHAPTER}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
-${schwerpunktBlock}${povBlock}
+${positionBlock}${schwerpunktBlock}${povBlock}${kontextBlock}
 <output_format>
 Antworte mit diesem JSON-Schema:
 {
@@ -338,10 +378,15 @@ Antworte mit diesem JSON-Schema:
 // Kapitel das Input-Budget des Modells sprengt. Sub-Chunks wurden zuvor mit
 // `buildChapterAnalysisPrompt` (SCHEMA_CHAPTER_ANALYSIS) analysiert und werden
 // hier zu einer Kapitelbewertung (SCHEMA_CHAPTER_REVIEW) zusammengeführt.
-export function buildChapterReviewMultiPassPrompt(chapterName, bookName, subAnalyses, totalPageCount, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '' } = {}) {
+export function buildChapterReviewMultiPassPrompt(chapterName, bookName, subAnalyses, totalPageCount, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '', komplettContext = null, position = null } = {}) {
   const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
   const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
+  const positionBlock = _buildChapterPositionBlock(position);
+  const kontextBlock = _buildKomplettContextBlock(komplettContext);
   const synthIn = subAnalyses.map((ca, i) => {
+    const zitate = (ca.zitate || [])
+      .map(z => `  [${z.kind === 'staerke' ? 'staerke' : 'schwaeche'}] «${z.zitat}» – ${z.kommentar || ''}`)
+      .join('\n');
     const lines = [
       `## Abschnitt ${i + 1} (${ca.pageCount} Seiten)`,
       `Themen: ${ca.themen || '–'}`,
@@ -352,6 +397,7 @@ export function buildChapterReviewMultiPassPrompt(chapterName, bookName, subAnal
       `Pacing: ${ca.pacing_kurz || '–'}`,
       `Stärken: ${(ca.staerken || []).join(' | ') || '–'}`,
       `Schwächen: ${(ca.schwaechen || []).join(' | ') || '–'}`,
+      `Belegzitate:${zitate ? '\n' + zitate : ' –'}`,
     ];
     return lines.join('\n');
   }).join('\n\n');
@@ -364,12 +410,13 @@ benennen. Wo eine Achse aus den Teil-Analysen nicht ableitbar ist, dies offen be
 ("aus den Teil-Analysen nicht eindeutig …") statt zu raten.
 </aufgabe>
 ${ACHSEN_BLOCK_CHAPTER}
-${NOTENSKALA_BLOCK}
+${NOTENSKALA_BLOCK_CHAPTER}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
-HINWEIS: Für "beispielzitate" stehen im Multi-Pass keine Volltexte zur Verfügung.
-Wenn aus den Teil-Analysen keine wörtlichen Zitate ableitbar sind, das Feld
-"beispielzitate" auf [] setzen statt zu raten.
-${schwerpunktBlock}${povBlock}
+HINWEIS: Für "beispielzitate" nutze ausschliesslich die je Abschnitt gelieferten
+"Belegzitate" – übernimm sie wörtlich, wähle 2–4 aussagekräftige aus (mind. eine
+staerke und eine schwaeche, sofern vorhanden). Erfinde keine neuen Zitate; liefern
+die Abschnitte gar keine, setze "beispielzitate" auf [].
+${positionBlock}${schwerpunktBlock}${povBlock}${kontextBlock}
 <teil_analysen abschnitte="${subAnalyses.length}" seiten="${totalPageCount}">
 ${synthIn}
 </teil_analysen>
@@ -391,7 +438,10 @@ Antworte mit diesem JSON-Schema:
     { "prio": "mittel",  "kategorie": "stil",        "text": "…" },
     { "prio": "niedrig", "kategorie": "mikro",       "text": "…" }
   ],
-  "beispielzitate": [],
+  "beispielzitate":[
+    { "kind": "staerke",  "zitat": "wörtlich aus einem Belegzitat oben", "kommentar": "was diese Stelle zeigt" },
+    { "kind": "schwaeche","zitat": "wörtlich aus einem Belegzitat oben", "kommentar": "was diese Stelle zeigt" }
+  ],
   "fazit": "Abschliessendes Urteil in 1-2 Sätzen"
 }
 </output_format>`;
@@ -438,6 +488,7 @@ export const SCHEMA_CHAPTER_ANALYSIS = _obj({
   pacing_kurz: _str,
   staerken: { type: 'array', items: _str },
   schwaechen: { type: 'array', items: _str },
+  zitate: { type: 'array', items: _zitatItem },
 });
 
 export const SCHEMA_CHAPTER_REVIEW = _obj({

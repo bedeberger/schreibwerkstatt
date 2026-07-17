@@ -35,7 +35,9 @@ const DEFAULTS = {
 };
 
 // entries: StreamEntry[] (siehe manuscript-stream.js).
-// Liefert { html, toc } — toc = [{ level, label, anchor }] für buildTocBlock.
+// Liefert { html, toc } — toc = [{ level, label, anchor, chapterId, pageId }] für
+// buildTocBlock (label/anchor/level) sowie die Reader-Lesetiefe-Zuordnung
+// (chapterId/pageId → echte Entitäten; additiv, andere Konsumenten ignorieren sie).
 export function renderStreamHtml(entries, opts = {}) {
   const o = { ...DEFAULTS, ...opts };
   const sections = [];
@@ -45,12 +47,12 @@ export function renderStreamHtml(entries, opts = {}) {
     if (e.kind === 'chapter') {
       if (o.omitChapterHeaders) continue;
       const a = o.anchorPrefix + (++n);
-      toc.push({ level: 1, label: e.name || '', anchor: a });
+      toc.push({ level: 1, label: e.name || '', anchor: a, chapterId: e.chapterId ?? null, pageId: null });
       sections.push(`<${o.chapterTag} id="${a}" class="${o.chapterClass}">${escHtml(e.name || '')}</${o.chapterTag}>`);
     } else if (e.kind === 'page') {
       const a = o.anchorPrefix + (++n);
       const level = (e.chapterId && !o.omitChapterHeaders) ? 2 : 1;
-      toc.push({ level, label: e.name || '', anchor: a });
+      toc.push({ level, label: e.name || '', anchor: a, chapterId: e.chapterId ?? null, pageId: e.id ?? null });
       sections.push(`<section class="${o.pageSectionClass}">
             <${o.pageTag} id="${a}" class="${o.pageTitleClass}">${escHtml(e.name || '')}</${o.pageTag}>
             <div class="${o.pageBodyClass}">${e.html || ''}</div>

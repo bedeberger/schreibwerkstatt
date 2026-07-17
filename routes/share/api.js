@@ -254,6 +254,37 @@ function register(router) {
     }
   });
 
+  // Kapitel-Drop-off eines Links (Autor): pro Kapitel Ø-Lesetiefe + Anzahl der
+  // Aufrufe, die es erreicht haben. Nur bei Buch-/Kapitel-Shares gefüllt.
+  router.get('/api/links/:token/read-depth', requireSession, (req, res) => {
+    const ownerEmail = req.session.user.email;
+    const token = String(req.params.token || '');
+    const link = shareLinks.getShareLinkByToken(token);
+    if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    setContext({ book: link.book_id });
+    try {
+      res.json({ chapters: shareLinks.readDepthByToken(token) });
+    } catch (e) {
+      logger.error('[share/api/links/read-depth GET] ' + e.message);
+      res.status(500).json({ error_code: 'DB_ERROR' });
+    }
+  });
+
+  // Gesamt-Fazits eines Links (Autor): Sternewertung + Freitext pro Leser.
+  router.get('/api/links/:token/feedback', requireSession, (req, res) => {
+    const ownerEmail = req.session.user.email;
+    const token = String(req.params.token || '');
+    const link = shareLinks.getShareLinkByToken(token);
+    if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    setContext({ book: link.book_id });
+    try {
+      res.json({ feedback: shareLinks.listFeedbackByToken(token) });
+    } catch (e) {
+      logger.error('[share/api/links/feedback GET] ' + e.message);
+      res.status(500).json({ error_code: 'DB_ERROR' });
+    }
+  });
+
   // Owner-Sprung: ordnet einen verankerten Kommentar (Block via data-bid) der
   // konkreten Seite zu, damit der Editor sie öffnen kann. Page-Share = trivial;
   // Chapter-Share = Block in den Kapitel-Seiten suchen (Anker speichert keine
