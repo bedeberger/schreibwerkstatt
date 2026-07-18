@@ -4,6 +4,7 @@
 // Router (Seite/Kapitel) oder oeffnet die zugehoerige Karte (Figur/Ort).
 
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { formatRelativeShort } from '../utils.js';
 
 const DEBOUNCE_MS = 220;
 const DEFAULT_KINDS = ['page', 'chapter'];
@@ -25,6 +26,7 @@ export function registerSearchCard() {
     likeEntity: null, // { kind, id, label } — „ähnliche Stellen zu dieser Entität"
     indexing: false,
     indexStatus: '',
+    indexInfo: null, // { indexed, lastIndexedAt, staleCount, total, staleModelChunks } vom /semantic/status
     _indexPollTimer: null,
     _debounceTimer: null,
     _abortCtrl: null,
@@ -41,9 +43,12 @@ export function registerSearchCard() {
           const input = this.$el?.querySelector('.search-q');
           if (input) input.focus();
           if (this.q && !this.hits.length) this.runSearch();
+          if (this.semanticAvailable) this.loadIndexStatus();
         },
         onBookChanged: () => {
           if (this.scopeMode === 'book') this.runSearch();
+          this.indexInfo = null;
+          if (this.semanticAvailable) this.loadIndexStatus();
         },
         onViewReset: () => this.resetSearch(),
         extraListeners: [{
@@ -88,7 +93,27 @@ export function registerSearchCard() {
       this.mode = m;
       this.likeEntity = null;
       this.activeKinds = m === 'semantic' ? [...SEMANTIC_KINDS] : [...DEFAULT_KINDS];
+      if (m === 'semantic') this.loadIndexStatus();
       this.runSearch();
+    },
+
+    // Index-Frische fürs aktuelle Buch laden (letzter Index-Lauf + wie viele
+    // Einträge seither geändert). Reiner Lese-Status, kein Embedding-Call.
+    async loadIndexStatus() {
+      const bookId = Alpine.store('nav').selectedBookId;
+      if (!bookId || !this.$store.config?.semanticSearchEnabled) return;
+      try {
+        const r = await fetch('/search/semantic/status?book_id=' + encodeURIComponent(bookId), { credentials: 'same-origin' });
+        if (!r.ok) { this.indexInfo = null; return; }
+        const j = await r.json();
+        this.indexInfo = j.enabled ? j : null;
+      } catch { this.indexInfo = null; }
+    },
+
+    // Formatierte „zuletzt aktualisiert vor …"-Angabe (TZ-aware via utils).
+    get indexLastLabel() {
+      if (!this.indexInfo?.lastIndexedAt) return '';
+      return formatRelativeShort(this.indexInfo.lastIndexedAt, Alpine.store('shell').uiLocale);
     },
 
     kindOptions() {
@@ -264,6 +289,7 @@ export function registerSearchCard() {
           if (j.status === 'done') {
             this.indexing = false;
             this.indexStatus = j.detail || (window.__app?.t?.('search.semantic.indexDone') || 'Fertig');
+            this.loadIndexStatus();
             return;
           }
           if (j.status === 'error' || j.status === 'cancelled') {

@@ -155,4 +155,27 @@ router.get('/semantic', async (req, res) => {
   }
 });
 
+// Index-Frische für die Such-Karte (semantische Suche). Zeigt an, wann der
+// Embedding-Index zuletzt gebaut wurde und wie viele Einträge seither geändert
+// wurden (→ „Index veraltet, neu bauen"). Reiner Lese-Status, kein Embedding-Call.
+router.get('/semantic/status', (req, res) => {
+  const email = _userEmail(req);
+  if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  if (!embed.isEnabled()) return res.json({ enabled: false });
+
+  const bookId = toIntId(req.query.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, 'viewer'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+
+  const { model } = embed.getConfig();
+  try {
+    res.json({ enabled: true, ...semanticChunks.indexStatus(bookId, model) });
+  } catch (e) {
+    logger.error(`[search] GET /search/semantic/status failed: ${e.message}`);
+    res.status(500).json({ error_code: 'STATUS_FAILED', detail: e.message });
+  }
+});
+
 module.exports = router;

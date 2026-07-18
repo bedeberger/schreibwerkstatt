@@ -145,6 +145,24 @@ function indexedBookIds() {
     .all().map(r => r.book_id);
 }
 
+// Index-Frische für die Such-Karte. lastIndexedAt = jüngster Chunk-Timestamp
+// (replaceEntity schreibt bei jedem Lauf alle Chunks einer Entität neu → das ist
+// der Zeitpunkt des letzten Index-Laufs). staleCount = Quell-Entitäten, deren
+// updated_at danach liegt (seither geändert oder neu hinzugekommen) — billiger
+// Heuristik-Zähler ohne Re-Hashing. Plus bookStats (total/byKind/staleModel).
+function indexStatus(bookId, model) {
+  const stats = bookStats(bookId, model);
+  const last = db.prepare(
+    'SELECT MAX(created_at) AS last FROM semantic_chunks WHERE book_id = ? AND model = ?'
+  ).get(bookId, model)?.last || null;
+  if (!last) return { indexed: false, lastIndexedAt: null, staleCount: 0, ...stats };
+  const _changedSince = (table) => db.prepare(
+    `SELECT COUNT(*) AS n FROM ${table} WHERE book_id = ? AND updated_at > ?`
+  ).get(bookId, last).n;
+  const staleCount = _changedSince('pages') + _changedSince('figure_scenes') + _changedSince('figures');
+  return { indexed: true, lastIndexedAt: last, staleCount, ...stats };
+}
+
 // Alle Chunks eines Buches (aktives Modell) löschen — vor einem sauberen
 // Full-Reindex bzw. beim Deaktivieren.
 function clearBook(bookId, model = null) {
@@ -154,5 +172,5 @@ function clearBook(bookId, model = null) {
 
 module.exports = {
   getEntityChunks, replaceEntity, remove, searchSimilar, getEntityVector,
-  bookStats, clearBook, pruneMissing, indexedBookIds,
+  bookStats, clearBook, pruneMissing, indexedBookIds, indexStatus,
 };

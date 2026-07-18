@@ -12,8 +12,24 @@
       @click="setMode('semantic')" x-text="$app.t('search.mode.semantic')"></button>
     <button type="button" class="btn-compact search-index-btn" x-show="mode === 'semantic'"
       :disabled="indexing" @click="buildIndex()"
-      x-text="indexing ? (indexStatus || $app.t('search.semantic.indexing')) : $app.t('search.semantic.buildIndex')"></button>
+      x-text="indexing ? (indexStatus || $app.t('search.semantic.indexing')) : (indexInfo?.indexed ? $app.t('search.semantic.rebuildIndex') : $app.t('search.semantic.buildIndex'))"></button>
     <span class="search-index-status muted-msg muted-msg--sm" x-show="!indexing && indexStatus" x-text="indexStatus"></span>
+  </div>
+
+  <div class="search-index-info muted-msg muted-msg--sm"
+       x-show="mode === 'semantic' && indexInfo && !indexing">
+    <template x-if="!indexInfo?.indexed">
+      <span x-text="$app.t('search.semantic.notIndexed')"></span>
+    </template>
+    <template x-if="indexInfo?.indexed">
+      <span>
+        <span x-text="$app.t('search.semantic.lastIndexed', { when: indexLastLabel })"></span>
+        <span class="search-index-flag" x-show="indexInfo.staleCount > 0"
+              x-text="' · ' + $app.t('search.semantic.stale', { n: indexInfo.staleCount })"></span>
+        <span class="search-index-flag" x-show="indexInfo.staleModelChunks > 0"
+              x-text="' · ' + $app.t('search.semantic.modelChanged')"></span>
+      </span>
+    </template>
   </div>
 
   <div class="search-like-banner" x-show="likeEntity">
