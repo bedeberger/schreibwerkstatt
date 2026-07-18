@@ -294,6 +294,12 @@
 .search-index-btn { margin-left: auto; }
 .search-index-status { white-space: nowrap; }
 
+.search-index-info {
+  margin-top: calc(-1 * var(--space-1));
+  margin-bottom: var(--space-sm);
+}
+.search-index-flag { color: var(--color-warn-text); }
+
 .search-like-banner {
   display: flex;
   align-items: center;
