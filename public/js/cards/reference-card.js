@@ -50,7 +50,13 @@ export function registerReferenceCard() {
       // Verwandt-Tab: „Ganze Seite" verhält sich wie die Geschwister-Tabs und
       // sucht automatisch beim Öffnen bzw. beim Seitenwechsel (embedding-frei).
       this.$watch('referenceTab', (tab) => { if (tab === 'verwandt') this._maybeAutoVerwandt(); });
-      this.$watch('verwandtBasis', (b) => { if (b === 'page' && this.referenceTab === 'verwandt') this._maybeAutoVerwandt(); });
+      // Basis-Wechsel: Treffer stammen aus dem anderen Modus → hart zurücksetzen
+      // (kein Stehenbleiben alter Ergebnisse), dann „ganze Seite" neu suchen.
+      this.$watch('verwandtBasis', () => {
+        if (this.referenceTab !== 'verwandt') return;
+        this._resetVerwandt();
+        this._maybeAutoVerwandt();
+      });
       this.$watch(() => window.__app?.currentPage?.id, () => { if (this.referenceTab === 'verwandt') this._maybeAutoVerwandt(); });
     },
 
@@ -291,6 +297,9 @@ export function registerReferenceCard() {
       this._verwandtAbort?.abort();
       const ctrl = new AbortController();
       this._verwandtAbort = ctrl;
+      // Alte Treffer sofort leeren — während des Ladens bleibt nur der
+      // Ladeindikator sichtbar (keine stehengebliebenen Ergebnisse).
+      this.verwandtHits = [];
       this.verwandtLoading = true;
       this.verwandtError = '';
       this.verwandtNotIndexed = false;
