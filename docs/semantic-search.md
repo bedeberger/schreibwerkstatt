@@ -48,9 +48,11 @@ Such-Karte „Sinngemäss" / „Ähnliche Stellen" ──GET /search/semantic─
 1. `_collectEntities` lädt indexierbaren Rohtext je Kind: Seiten (`loadPageContents`), Szenen (`titel`+`kommentar`), Figuren (`name`+`beschreibung`). Leerer Text → übersprungen.
 2. `chunkText` ([lib/embed-chunk.js](../lib/embed-chunk.js)): ~1500 Zeichen/Chunk, 200 Overlap, bricht bevorzugt an Satz-/Absatzgrenzen.
 3. **Delta-Cache:** pro Chunk `content_hash` (SHA-256, 16 hex). Unveränderter Chunk mit passender `dim` → alter Vektor wird wiederverwendet, kein Embedding-Call. Nur `pending`-Chunks werden in Batches (64) neu embeddet.
-4. `replaceEntity` ersetzt den Chunk-Satz jeder Entität atomar; `pruneMissing` räumt verwaiste Chunks gelöschter Entitäten.
+4. **Inkrementelle Persistenz:** eine Entität wird via `replaceEntity` atomar geschrieben, sobald ihr letzter pending-Chunk embeddet ist (nicht erst am Ende). Bricht das Backend mitten im Lauf ab, überleben die bereits fertigen Entitäten — der Delta-Cache übernimmt sie beim nächsten Lauf, nur der Rest wird neu embeddet. `pruneMissing` räumt am Ende verwaiste Chunks gelöschter Entitäten.
 
 Erstlauf kann dauern (embeddet alles); Folgeläufe embetten nur Geändertes. Fehlt das Backend → `EMBED_DISABLED` (400) bzw. `job.error.embedDisabled`.
+
+**Batch-Retry gegen transiente Aussetzer:** [lib/embed.js](../lib/embed.js)#`_withRetry` wiederholt jeden HTTP-Batch bis zu 3× mit linearem Backoff (800 ms × Versuch), wenn der Fehler transient ist — Netz-Blip (`fetch failed`), Timeout, HTTP 429/5xx, unvollständige Antwort (`err.retriable`). Nicht-transiente Fehler (HTTP 4xx ausser 429) und echter Job-Cancel (`signal`) werfen sofort. So reisst bei grossen Büchern (viele Batches) nicht mehr ein einzelner Backend-Zucker den ganzen Index-Lauf ab.
 
 ### Query — `GET /search/semantic`
 
@@ -85,4 +87,4 @@ Migration **240** ([db/migrations.js](../db/migrations.js)). Polymorph nach `kin
 
 ## Tests
 
-[tests/unit/embed-chunk.test.mjs](../tests/unit/embed-chunk.test.mjs) — Chunking, (De)Serialisierung, Cosinus, Content-Hash (pure Helfer, kein Netz/DB).
+[tests/unit/embed-chunk.test.mjs](../tests/unit/embed-chunk.test.mjs) — Chunking, (De)Serialisierung, Cosinus, Content-Hash (pure Helfer, kein Netz/DB). [tests/unit/embed-retry.test.mjs](../tests/unit/embed-retry.test.mjs) — Batch-Retry (`_withRetry`): transient→Erfolg nach Retries, nicht-transient→sofort, erschöpft→wirft, Job-Cancel→kein Retry.

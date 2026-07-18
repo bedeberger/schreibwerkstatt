@@ -100,15 +100,39 @@ async function runEmbedIndexJob(jobId, bookId, userEmail, userToken) {
     logger.info(`Index ${bookId}: ${totalChunks} Chunks, davon ${pending.length} neu (${totalChunks - pending.length} aus Cache).`);
     updateJob(jobId, { statusText: 'job.phase.embedding', statusParams: { done: 0, total: pending.length }, progress: 15 });
 
+    // Offene Chunk-Zahl pro Entität → eine Entität wird persistiert, sobald ihr
+    // letzter pending-Chunk embeddet ist. So überlebt ein Backend-Tod mitten im
+    // Lauf: bereits fertige Entitäten sind in der DB, der Delta-Cache übernimmt
+    // sie beim nächsten Lauf (nur der Rest wird neu embeddet).
+    const pendingByEntity = new Map();
+    for (const p of pending) {
+      const k = `${p.kind}:${p.id}`;
+      pendingByEntity.set(k, (pendingByEntity.get(k) || 0) + 1);
+    }
+    const persistEntity = (key) => {
+      const rows = rowsByEntity.get(key);
+      const [kind, idStr] = key.split(':');
+      rows.sort((a, b) => a.chunk_ix - b.chunk_ix);
+      semanticChunks.replaceEntity(kind, Number(idStr), bookId, model, dim, rows);
+      rowsByEntity.delete(key);
+    };
+
     // Neue Chunks in Batches embetten (embedBatch chunkt intern auf MAX_BATCH).
     const BATCH = 64;
     for (let i = 0; i < pending.length; i += BATCH) {
       throwIfAborted();
       const slice = pending.slice(i, i + BATCH);
       const vecs = await embed.embedBatch(slice.map(p => p.text), { signal: signal() });
+      const touched = new Set();
       slice.forEach((p, j) => {
-        rowsByEntity.get(`${p.kind}:${p.id}`).push({ chunk_ix: p.ix, content_hash: p.hash, vector: vecs[j], text: p.text });
+        const k = `${p.kind}:${p.id}`;
+        rowsByEntity.get(k).push({ chunk_ix: p.ix, content_hash: p.hash, vector: vecs[j], text: p.text });
+        pendingByEntity.set(k, pendingByEntity.get(k) - 1);
+        touched.add(k);
       });
+      for (const k of touched) {
+        if (pendingByEntity.get(k) === 0) { persistEntity(k); pendingByEntity.delete(k); }
+      }
       const done = Math.min(i + BATCH, pending.length);
       updateJob(jobId, {
         statusText: 'job.phase.embedding', statusParams: { done, total: pending.length },
@@ -116,12 +140,9 @@ async function runEmbedIndexJob(jobId, bookId, userEmail, userToken) {
       });
     }
 
-    // Pro Entität den kompletten Chunk-Satz atomar ersetzen, dann Orphans räumen.
-    for (const [key, rows] of rowsByEntity) {
-      const [kind, idStr] = key.split(':');
-      rows.sort((a, b) => a.chunk_ix - b.chunk_ix);
-      semanticChunks.replaceEntity(kind, Number(idStr), bookId, model, dim, rows);
-    }
+    // Verbleibende Entitäten (nur aus Cache-Chunks, kein pending) atomar schreiben,
+    // dann Orphans räumen.
+    for (const key of [...rowsByEntity.keys()]) persistEntity(key);
     let pruned = 0;
     for (const kind of KINDS) pruned += semanticChunks.pruneMissing(bookId, model, kind, presentIds[kind]);
 
