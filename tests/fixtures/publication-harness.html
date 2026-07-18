@@ -60,6 +60,10 @@
     // Shell-State (App-Meta) lebt in Alpine.store('shell') — book-settings/settings.js
     // liest Alpine.store('shell').promptConfig (Buchtyp-Combobox) + appTimezone.
     window.Alpine.store('shell', { uiLocale: 'de', appTimezone: 'Europe/Zurich', promptConfig: { buchtypen: { de: {} } } });
+    // Config-Store (read-only Feature-Flags) — book-settings-context.html gated den
+    // Faktencheck-Toggle via $store.config.factcheckEnabled.
+    const { registerConfigStore } = await import('/public/js/cards/config-store.js');
+    registerConfigStore();
 
     // Combobox-Stub (echte Impl lebt mid-file in app.js). Tests interagieren
     // nicht mit Comboboxes; Stub verhindert nur Expression-Errors.

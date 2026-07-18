@@ -120,9 +120,9 @@ async function runFaktencheckJob(jobId, bookId, bookName, userEmail, userToken, 
 
   try {
     const prompts = await getPrompts();
-    // Judge nutzt einen schlanken statischen System-Prompt (kein Buchtext-Block nötig) —
-    // getBookPrompts nur, falls später Locale-Kontext gebraucht wird. Bewusst NICHT der
-    // teure SYSTEM_KONTINUITAET_BLOCKS mit eingebettetem Buchtext.
+    // Judge nutzt einen schlanken statischen System-Prompt (der Fakt steht vollständig
+    // im User-Prompt) — bewusst NICHT der teure SYSTEM_KONTINUITAET_BLOCKS mit
+    // eingebettetem Buchtext.
     const systemPrompt = prompts.SYSTEM_FAKTENCHECK;
 
     updateJob(jobId, { statusText: 'job.phase.factcheckCandidates', progress: 5 });
@@ -138,7 +138,7 @@ async function runFaktencheckJob(jobId, bookId, bookName, userEmail, userToken, 
     }
 
     const spanne = _narrativeYearSpan(bookIdInt, email);
-    // Auflösungs-Maps für saveKontinuitaetResult (Kapitel-Namen → chapter_id, Figuren nicht genutzt).
+    // Auflösungs-Maps für saveFaktencheckIssues (Kapitel-Namen → chapter_id; figNameToId ungenutzt, da Faktenfehler keine Figuren tragen).
     const chNameToId = Object.fromEntries(
       db.prepare('SELECT chapter_name, chapter_id FROM chapters WHERE book_id = ?').all(bookIdInt)
         .map(r => [r.chapter_name, r.chapter_id])
