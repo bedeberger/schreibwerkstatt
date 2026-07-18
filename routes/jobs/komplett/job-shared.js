@@ -5,8 +5,10 @@
 
 const { db, getBookSettings } = require('../../../db/schema');
 const appSettings = require('../../../lib/app-settings');
-const { updateJob, settledAll } = require('../shared');
+const { updateJob, settledAll, jobAbortControllers } = require('../shared');
 const { _stelleQuote, _refToString } = require('./utils');
+const embed = require('../../../lib/embed');
+const semanticChunks = require('../../../db/semantic-chunks');
 
 // ── Verify-Stufe für den Multi-Pass-Kontinuitätscheck ────────────────────────
 // Der Fakten-basierte Check sieht nur extrahierte Fakten, nicht den Volltext –
@@ -19,21 +21,44 @@ const _VERIFY_RADIUS = 1500;
 
 // Textfenster rund um das Zitat aus den im Problem referenzierten Kapiteln.
 // Whitespace-normalisiert (matcht den Single-Pass-/Fakten-Textfluss); findet das
-// Zitat und schneidet ±_VERIFY_RADIUS Zeichen aus. Fallback: Kapitel-Anfang.
+// Zitat und schneidet ±_VERIFY_RADIUS Zeichen aus. Rückgabe { text, located }:
+// located=true nur bei wörtlichem Zitat-Treffer, sonst Kapitel-Anfang als
+// Notnagel (located=false) — das Signal steuert den semantischen Fallback unten.
 function _verifyExcerpt(groups, groupOrder, kapitelNames, quote) {
   const texts = [];
   for (const key of groupOrder) {
     const g = groups.get(key);
     if (kapitelNames.includes(g.name)) texts.push(g.pages.map(p => p.text).join('\n'));
   }
-  if (!texts.length) return '';
+  if (!texts.length) return { text: '', located: false };
   const full = texts.join('\n\n').replace(/\s+/g, ' ');
   if (quote) {
     const needle = quote.replace(/\s+/g, ' ').slice(0, 40);
     const idx = full.indexOf(needle);
-    if (idx >= 0) return full.slice(Math.max(0, idx - _VERIFY_RADIUS), Math.min(full.length, idx + needle.length + _VERIFY_RADIUS));
+    if (idx >= 0) return { text: full.slice(Math.max(0, idx - _VERIFY_RADIUS), Math.min(full.length, idx + needle.length + _VERIFY_RADIUS)), located: true };
   }
-  return full.slice(0, _VERIFY_RADIUS * 2);
+  return { text: full.slice(0, _VERIFY_RADIUS * 2), located: false };
+}
+
+// Semantischer Beleg-Fallback: findet die wörtliche Suche das Zitat nicht
+// (Paraphrase, vom Modell rekonstruiertes Zitat, Umformulierung desselben Fakts),
+// liefert eine buchweite Ähnlichkeitssuche über den bestehenden Embedding-Index
+// die thematisch nächste Passage — statt auf den Kapitel-Anfang zurückzufallen.
+// Rein rückwärtsgewandt (nur Kontextbeschaffung). Best-effort/opt-in: fehlt der
+// Index oder das Backend, gibt der Aufrufer den keyword-Notnagel weiter.
+async function _semanticExcerpt(bookId, model, query, signal) {
+  const q = String(query || '').trim();
+  if (!q) return null;
+  let queryVec;
+  try {
+    queryVec = await embed.embedOne(q, { signal });
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e;
+    return null; // Backend down/nicht erreichbar → keyword-Fallback behalten
+  }
+  if (!queryVec) return null;
+  const hits = semanticChunks.searchSimilar(bookId, model, queryVec, { kinds: ['page'], topK: 1 });
+  return hits.length ? hits[0].text : null;
 }
 
 // Filtert die Probleme des Fakten-Checks: verwirft nur explizit als unecht
@@ -41,10 +66,17 @@ function _verifyExcerpt(groups, groupOrder, kapitelNames, quote) {
 // konservativ erhalten. Nur Claude (lokale Provider: zu kleines Kontextfenster
 // für zuverlässige Verify-Urteile, Mutex serialisiert zudem jeden Call).
 async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
-  const { call, prompts, sys, jobId, tok, bookName, groups, groupOrder, log } = ctx;
+  const { call, prompts, sys, jobId, tok, bookName, groups, groupOrder, log, bookIdInt } = ctx;
   const probleme = Array.isArray(result?.probleme) ? result.probleme : [];
   if (!probleme.length) return result;
   updateJob(jobId, { progress: fromPct, statusText: 'job.phase.verifyContradictions' });
+  // Semantischer Beleg-Fallback nur, wenn das Embed-Backend konfiguriert ist UND
+  // dieses Buch bereits einen Index unter dem aktiven Modell hat (opt-in — der Index
+  // ist eine bewusste User-Aktion). Sonst reiner keyword-Pfad wie bisher.
+  const embedModel = embed.isEnabled() ? embed.getConfig().model : null;
+  const semanticOn = !!embedModel && bookIdInt != null &&
+    semanticChunks.bookStats(bookIdInt, embedModel).total > 0;
+  const signal = jobAbortControllers.get(jobId)?.signal;
   // Concurrency-Cap wie Phase 1 (settledAll + ai.claude.phase1_concurrency, Warmup gegen den
   // gecachten Buchtext-Block): bei 40-60 Befunden würde Promise.all sonst Dutzende Claude-Calls
   // gleichzeitig feuern → TPM-Burst (429/overloaded, auch auf andere Pipeline-Calls).
@@ -52,12 +84,24 @@ async function verifyKontinuitaetProbleme(ctx, result, fromPct, toPct) {
   const settled = await settledAll(probleme.map((p) => async () => {
     const kap = Array.isArray(p.kapitel) ? p.kapitel : [];
     if (!kap.length) return { p, keep: true };
-    const exA = _verifyExcerpt(groups, groupOrder, kap, _stelleQuote(p.stelle_a));
-    const exB = _verifyExcerpt(groups, groupOrder, kap, _stelleQuote(p.stelle_b));
-    if (!exA && !exB) return { p, keep: true };
+    const qA = _stelleQuote(p.stelle_a);
+    const qB = _stelleQuote(p.stelle_b);
+    let exA = _verifyExcerpt(groups, groupOrder, kap, qA);
+    let exB = _verifyExcerpt(groups, groupOrder, kap, qB);
+    // Zitat wörtlich nicht gefunden → semantisch die thematisch nächste Passage holen
+    // (Paraphrase). Query = Zitat, sonst der Stellen-Text selbst. Best-effort.
+    if (semanticOn && !exA.located) {
+      const s = await _semanticExcerpt(bookIdInt, embedModel, qA || _refToString(p.stelle_a), signal);
+      if (s) exA = { text: s, located: true };
+    }
+    if (semanticOn && !exB.located) {
+      const s = await _semanticExcerpt(bookIdInt, embedModel, qB || _refToString(p.stelle_b), signal);
+      if (s) exB = { text: s, located: true };
+    }
+    if (!exA.text && !exB.text) return { p, keep: true };
     try {
       const v = await call(jobId, tok,
-        prompts.buildKontinuitaetVerifyPrompt(bookName, p, exA, exB),
+        prompts.buildKontinuitaetVerifyPrompt(bookName, p, exA.text, exB.text),
         sys.SYSTEM_KONTINUITAET_BLOCKS, null, null, 400, 0.3, 600, prompts.SCHEMA_KONTINUITAET_VERIFY);
       return { p, keep: v?.bestaetigt !== false };
     } catch (e) {

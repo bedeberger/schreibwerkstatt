@@ -184,7 +184,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
       // Fakten-basierte Befunde gegen den Originaltext verifizieren (False-Positive-Filter).
       if (effectiveProvider === 'claude') {
         result = await verifyKontinuitaetProbleme(
-          { call, prompts, sys, jobId, tok, bookName, groups, groupOrder, log }, result, 95, 97);
+          { call, prompts, sys, jobId, tok, bookName, groups, groupOrder, log, bookIdInt }, result, 95, 97);
       }
       pt.mark('Check+Verify');
     }

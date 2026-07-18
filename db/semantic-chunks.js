@@ -84,6 +84,20 @@ function searchSimilar(bookId, model, queryVec, { kinds = null, topK = 20, exclu
   return Array.from(best.values()).sort((a, b) => b.score - a.score).slice(0, topK);
 }
 
+// Alle Chunks eines Buches unter einem Modell für den Redundanz-Radar laden:
+// pro Chunk { entity_id, chunk_ix, text, vector:Float32Array }, gefiltert auf die
+// angegebenen kinds (Redundanz vergleicht nur Seiten). Basis des All-Pairs-
+// Cosinus in lib/redundancy.js — kein Embedding-Call, die Vektoren liegen schon.
+function loadChunksForPairing(bookId, model, kinds = ['page']) {
+  const kindSet = new Set(kinds);
+  const out = [];
+  for (const r of _selBookKinds.all(bookId, model)) {
+    if (!kindSet.has(r.kind)) continue;
+    out.push({ entity_id: r.entity_id, chunk_ix: r.chunk_ix, text: r.text, vector: blobToVector(r.vector) });
+  }
+  return out;
+}
+
 // Repräsentativer Vektor einer indizierten Entität = Mittel über ihre Chunks
 // (unter model). Basis der „ähnliche Stellen zu dieser Figur/Szene"-Suche —
 // kein Embedding-Call nötig, der Vektor liegt schon. null wenn nicht indiziert.
