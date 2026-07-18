@@ -44,22 +44,35 @@ const WIDTHS = { narrow: '60ch', normal: '70ch', wide: '82ch' };
     return e;
   }
 
-  // Trigger + Popover (gleiches Öffnen/Schliessen-Muster wie das Optionen-Menü).
-  const wrap = el('div', 'share-prefs');
-  const trigger = el('button', 'share-prefs__trigger', 'Aa');
-  trigger.type = 'button';
-  trigger.setAttribute('aria-haspopup', 'true');
-  trigger.setAttribute('aria-expanded', 'false');
-  trigger.setAttribute('aria-label', t('prefs_label'));
-  const panel = el('div', 'share-prefs__panel');
-  panel.hidden = true;
-  wrap.appendChild(trigger);
-  wrap.appendChild(panel);
-  host.appendChild(wrap);
-  const setOpen = (open) => { panel.hidden = !open; trigger.setAttribute('aria-expanded', open ? 'true' : 'false'); };
-  trigger.addEventListener('click', (e) => { e.stopPropagation(); setOpen(panel.hidden); });
-  document.addEventListener('mousedown', (e) => { if (!panel.hidden && !wrap.contains(e.target)) setOpen(false); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) setOpen(false); });
+  // Bevorzugt in das bestehende Optionen-Menü (⋯) einhängen — gleiche Kategorie
+  // wie der Theme-Switcher, hält die Leseansicht ruhig. share-reader.js baut das
+  // Menü synchron bei seiner Ausführung (vor diesem Modul in share.html), darum
+  // ist `.share-menu__panel` hier schon da. Fehlt es (JS-Enhancement des Menüs
+  // aus), fällt das Modul auf einen eigenen „Aa"-Knopf zurück.
+  let container;
+  const menuPanel = document.querySelector('.share-menu__panel');
+  if (menuPanel) {
+    container = el('div', 'share-menu__section');
+    container.appendChild(el('div', 'share-menu__heading', t('prefs_label')));
+    menuPanel.appendChild(container);
+  } else {
+    const wrap = el('div', 'share-prefs');
+    const trigger = el('button', 'share-prefs__trigger', 'Aa');
+    trigger.type = 'button';
+    trigger.setAttribute('aria-haspopup', 'true');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-label', t('prefs_label'));
+    const panel = el('div', 'share-prefs__panel');
+    panel.hidden = true;
+    wrap.appendChild(trigger);
+    wrap.appendChild(panel);
+    host.appendChild(wrap);
+    const setOpen = (open) => { panel.hidden = !open; trigger.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+    trigger.addEventListener('click', (e) => { e.stopPropagation(); setOpen(panel.hidden); });
+    document.addEventListener('mousedown', (e) => { if (!panel.hidden && !wrap.contains(e.target)) setOpen(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) setOpen(false); });
+    container = panel;
+  }
 
   // Ein Segment-Control (Label + Buttons). get()/set() lesen/schreiben prefs.
   function group(labelText, options, get, set) {
@@ -83,7 +96,7 @@ const WIDTHS = { narrow: '60ch', normal: '70ch', wide: '82ch' };
       seg.appendChild(btn);
     }
     g.appendChild(seg);
-    panel.appendChild(g);
+    container.appendChild(g);
     paint();
   }
 
