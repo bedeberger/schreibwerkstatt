@@ -270,6 +270,7 @@ function saveKontinuitaetResult(bookIdInt, email, kontResult, figNameToId, chNam
   const issues = filtered.map(p => ({
     schwere: p.schwere, typ: p.typ, beschreibung: p.beschreibung,
     stelle_a: p.stelle_a, stelle_b: p.stelle_b, empfehlung: p.empfehlung,
+    quelle: p.quelle || null,
     figuren: (p.figuren || []).map(_refToString).filter(Boolean),
     kapitel: (p.kapitel || []).map(_refToString).filter(Boolean),
   }));

@@ -1,0 +1,103 @@
+@layer components {
+/* === Redundanz-Radar ===
+   Buchweite Doppelungs-Suche: Liste von Seiten-Paaren mit Score-Badge + zwei
+   nebeneinanderliegenden Snippet-Spalten. Akzentfarbe = --card-accent-redundanz
+   (Mapping in card-accents.css). Score-Badges sind eckig (var(--radius-sm)=0).
+*/
+
+.redundanz-intro {
+  margin: 0 0 0.75rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.redundanz-result {
+  padding: 0.25rem 0 1rem;
+}
+
+.redundanz-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.75rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
+.redundanz-meta-note {
+  color: var(--color-warn-text);
+}
+
+.redundanz-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.redundanz-pair {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.redundanz-score {
+  align-self: start;
+  min-width: 3rem;
+  text-align: center;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.redundanz-score--high {
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
+}
+
+.redundanz-score--mid {
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+}
+
+.redundanz-score--low {
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+}
+
+.redundanz-pair-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  min-width: 0;
+}
+
+.redundanz-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.redundanz-snippet {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+@media (max-width: 700px) {
+  .redundanz-pair-sides {
+    grid-template-columns: 1fr;
+  }
+}
+
+}

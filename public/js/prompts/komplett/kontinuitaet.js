@@ -194,6 +194,48 @@ Antworte mit diesem JSON-Schema:
 }`;
 }
 
+// ── Weltfakten-Realitätscheck (Faktencheck-Job) ──────────────────────────────
+// Anders als der Anachronismus-Check (nur Zeitpunkt, Modellwissen) prüft dieser Befund die
+// inhaltliche Korrektheit eines extrahierten Welt-Fakts gegen die REALE Faktenlage — mit
+// Anthropics `web_search` als Grundlage statt Gedächtnis. Ein Kandidat = ein Welt-Fakt
+// (kategorie historie/ereignis/technik/kultur/ort). Nur bei Opt-in-Büchern
+// (book_settings.weltfakten_real_pruefen) — bei bewusst fiktiven Welten sinnlos.
+// Reasoning-First + konservativ: nur «falsch» MIT konkret widersprechender Quelle wird
+// gemeldet; «unklar»/«korrekt» erzeugen keinen Befund. Kreative Abweichung ist kein Fehler,
+// nur ein Hinweis — die Formulierung bleibt entsprechend zurückhaltend.
+// System-Prompt für den Weltfakten-Realitätscheck. Bewusst schlank (kein Buchtext-Block,
+// keine Locale-Augmentierung) — der Judge braucht nur die Rolle + JSON-Only, der zu prüfende
+// Fakt steht vollständig im User-Prompt. Antwort ist EIN JSON-Objekt; Web-Such-Zitate/Prosa
+// davor werden vom JSON-Parse-Fallback (extractBalancedJson) toleriert.
+export const SYSTEM_FAKTENCHECK = 'Du bist ein sorgfältiger, quellenkritischer Faktenprüfer für Romane. Du recherchierst mit der Web-Suche und beurteilst, ob eine im Buch behauptete Tatsache der realen Faktenlage widerspricht. Du unterscheidest strikt zwischen bewusst fiktiven Erzählelementen (kein Fehler) und sachlich falschen, als real gemeinten Tatsachenbehauptungen. Im Zweifel urteilst du «unklar». Antworte ausschließlich mit einem einzelnen JSON-Objekt nach dem im Auftrag genannten Schema.';
+
+export function buildWeltfaktRealityJudgePrompt(bookName, fakt, { erzaehlzeit = null, spanne = null } = {}) {
+  const zeitHint = spanne
+    ? `\n\nZeitlicher Kontext: Die Handlung des Buchs spielt etwa im Zeitraum ${spanne}. Beurteile die Aussage gegen den Wissensstand dieser Zeit, nicht gegen heutiges Wissen (eine zur Erzählzeit gängige, heute überholte Auffassung ist KEIN Fehler).`
+    : '';
+  return `Im Buch «${bookName}» wird die folgende Aussage über die Welt behauptet. Prüfe mit dem Web-Suche-Werkzeug, ob sie der realen, überprüfbaren Faktenlage WIDERSPRICHT. Recherchiere aktiv, bevor du urteilst — verlasse dich nicht auf dein Gedächtnis.
+
+Kategorie: ${fakt.kategorie || 'sonstiges'}
+Aussage: ${fakt.subjekt ? `${fakt.subjekt}: ` : ''}${fakt.fakt}${zeitHint}
+
+WICHTIG:
+- Dies ist ein Roman. Bewusst fiktive Elemente (erfundene Orte/Personen/Institutionen, kontrafaktische Handlung, künstlerische Freiheit) sind KEIN Fehler. Melde nur, wenn eine als real gemeinte, konkret überprüfbare Tatsachenbehauptung nachweislich falsch ist (falsches Datum, falsche Geografie, sachlich unmögliche Angabe).
+- Nur «falsch», wenn du eine konkrete, seriöse Quelle findest, die der Aussage klar widerspricht. Nenne die URL in «quelle».
+- Findest du keine belastbare Quelle oder ist die Aussage plausibel/nicht eindeutig fiktiv-oder-falsch trennbar: «unklar» (kein Befund).
+- Stimmt die Aussage mit der Realität überein: «korrekt».
+- «beschreibung» (nur bei «falsch»): 1 Satz, was real gilt und worin die Abweichung besteht — als Hinweis formuliert, nicht als Vorwurf.
+
+Antworte mit diesem JSON-Schema:
+{
+  "_reasoning": "kurze Abwägung auf Basis der Recherche: was die Quellen sagen, ob fiktiv oder real gemeint",
+  "urteil": "korrekt|falsch|unklar",
+  "schwere": "kritisch|mittel|niedrig",
+  "beschreibung": "1 Satz (nur bei urteil=falsch, sonst leer)",
+  "quelle": "belegende URL (nur bei urteil=falsch, sonst leer)",
+  "empfehlung": "1 Satz Korrektur-/Prüfhinweis (nur bei urteil=falsch, sonst leer)"
+}`;
+}
+
 export function buildKontinuitaetSinglePassPrompt(bookName, bookText, figurenKompakt, orteKompakt, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null } = {}, anachronismus = null) {
   const figurenStr = figurenKompakt && figurenKompakt.length
     ? '\n\n## Bekannte Figuren\n' + figurenKompakt.map(f => `${f.name} (${f.typ || ''}): ${f.beschreibung || ''}`).join('\n')

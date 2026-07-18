@@ -124,6 +124,13 @@
               <span class="form-check-desc" x-text="$app.t('book.settings.zeitlinieReal.desc')"></span>
             </span>
           </label>
+          <label class="form-check" x-show="$store.config.factcheckEnabled" x-cloak>
+            <input type="checkbox" id="bs-weltfakten-real" x-model="bookSettingsWeltfaktenRealPruefen">
+            <span>
+              <span class="form-check-title" x-text="$app.t('book.settings.weltfaktenRealPruefen')"></span>
+              <span class="form-check-desc" x-text="$app.t('book.settings.weltfaktenRealPruefen.desc')"></span>
+            </span>
+          </label>
         </div>
       </div>
     </section>

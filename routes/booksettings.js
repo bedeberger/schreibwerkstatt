@@ -41,7 +41,7 @@ router.get('/:book_id', aclParamGuard('viewer'), (req, res) => {
 router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const bookId = req.bookId;
 
-  const { language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land, zeitlinie_real, exclude_from_stats } = req.body || {};
+  const { language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land, zeitlinie_real, weltfakten_real_pruefen, exclude_from_stats } = req.body || {};
   if (!language || !region) {
     return res.status(400).json({ error_code: 'LANGUAGE_REGION_REQUIRED' });
   }
@@ -107,12 +107,13 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
   const lektorBookChat = allow_lektor_book_chat ? 1 : 0;
   const orteReal = orte_real ? 1 : 0;
   const zeitlinieReal = zeitlinie_real ? 1 : 0;
+  const weltfaktenRealPruefen = weltfakten_real_pruefen ? 1 : 0;
   const excludeStats = exclude_from_stats ? 1 : 0;
 
   // Vorheriger Fertig-Status fuer die Auto-Fassung beim 0→1-Uebergang.
   const wasFinished = getBookSettings(bookId, req.session?.user?.email || null)?.is_finished ? 1 : 0;
 
-  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal, schauplatzLand, goalTarget, goalDeadline, stilprofil || null, zeitlinieReal, excludeStats);
+  saveBookSettings(bookId, language, region, buchtyp || null, buch_kontext || null, erzaehlperspektive || null, erzaehlzeit || null, finished, lektorBookChat, dailyGoal, orteReal, schauplatzLand, goalTarget, goalDeadline, stilprofil || null, zeitlinieReal, excludeStats, weltfaktenRealPruefen);
 
   // Publikations-Meilenstein: Buch frisch als fertig markiert (0→1) → automatisch
   // eine Fassung festhalten (dedup gegen die juengste, damit kein Duplikat
@@ -138,6 +139,7 @@ router.put('/:book_id', aclParamGuard('editor'), jsonBody, (req, res) => {
     orte_real: orteReal,
     schauplatz_land: schauplatzLand,
     zeitlinie_real: zeitlinieReal,
+    weltfakten_real_pruefen: weltfaktenRealPruefen,
     exclude_from_stats: excludeStats,
     locale: `${language}-${region}`,
   });

@@ -39,6 +39,8 @@ export const FEATURES = [
     aliases: ['errors','heatmap','findings','lektorat','typo','tippfehler'] },
   { key: 'kontinuitaet',   kind: 'toggle', group: 'review', labelKey: 'tile.kontinuitaet',   descKey: 'tile.kontinuitaet.desc',   flag: 'showKontinuitaetCard',   toggle: 'toggleKontinuitaetCard',   requiresBook: true, minRole: 'editor', dependsOnKomplett: true, requiresClaude: true,
     aliases: ['continuity','widerspruch','plot-hole','contradiction','consistency'] },
+  { key: 'redundanz',      kind: 'toggle', group: 'review', labelKey: 'tile.redundanz',      descKey: 'tile.redundanz.desc',      flag: 'showRedundanzCard',      toggle: 'toggleRedundanzCard',      requiresBook: true, minRole: 'editor',
+    aliases: ['redundanz','redundancy','doppelung','doppelungen','duplicate','duplikate','wiederholung','wiederholungen','repetition','dupe','semantik','similar'] },
   { key: 'erzaehlprofil',  kind: 'toggle', group: 'review', labelKey: 'tile.erzaehlprofil',  descKey: 'tile.erzaehlprofil.desc',  flag: 'showErzaehlprofilCard',  toggle: 'toggleErzaehlprofilCard',  requiresBook: true, minRole: 'editor', dependsOnKomplett: true, requiresClaude: true,
     aliases: ['pov','perspektive','erzählperspektive','erzaehlperspektive','narration','pacing','spannungskurve','themen','motive','narrative','point of view','erzählprofil'] },
   // Tagebuch-Rückblick: nur bei Buchtyp 'tagebuch'. Rückwärtsgewandte KI-Verdichtung.
@@ -202,6 +204,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'bookStats',      flag: 'showBookStatsCard',      toggle: 'toggleBookStatsCard',      onReclick: 'close', partial: 'bookstats' },
   { key: 'stil',           flag: 'showStilCard',           toggle: 'toggleStilCard',           onReclick: 'close', partial: 'stil-heatmap' },
   { key: 'fehlerHeatmap',  flag: 'showFehlerHeatmapCard',  toggle: 'toggleFehlerHeatmapCard',  onReclick: 'close', partial: 'fehler-heatmap' },
+  { key: 'redundanz',      flag: 'showRedundanzCard',      toggle: 'toggleRedundanzCard',      onReclick: 'close', requiresBook: true, partial: 'redundanz' },
   { key: 'bookChat',       flag: 'showBookChatCard',       toggle: 'toggleBookChatCard',       onReclick: 'refresh', requiresBook: true, auditEvent: 'bookChatOpened', partial: 'chat' },
   { key: 'orte',           flag: 'showOrteCard',           toggle: 'toggleOrteCard',           onReclick: 'refresh', partial: 'orte',
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },

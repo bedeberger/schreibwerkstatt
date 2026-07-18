@@ -19,6 +19,7 @@ const {
 const embed = require('../../lib/embed');
 const { chunkText, contentHash } = require('../../lib/embed-chunk');
 const semanticChunks = require('../../db/semantic-chunks');
+const contentStore = require('../../lib/content-store');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
@@ -158,16 +159,15 @@ async function runEmbedIndexJob(jobId, bookId, userEmail, userToken) {
   }
 }
 
-// Nacht-Cron: hält bestehende Embedding-Indizes frisch. Reiht pro bereits
-// indiziertem Buch einen embed-index-Job ein (Dedup gegen laufende Jobs). Baut
-// bewusst KEINEN neuen Index für nie-indizierte Bücher — das bleibt die
-// Opt-in-Aktion des Users in der Such-Karte (schont das self-hosted Backend).
-// Der Delta-Cache im Job embeddet nur seit gestern geänderte Chunks neu.
-function reindexIndexedBooks() {
+// Nacht-Cron: hält die Embedding-Indizes aller Bücher frisch. Reiht pro Buch
+// einen embed-index-Job ein (Dedup gegen laufende Jobs). Der Delta-Cache im Job
+// embeddet nur seit gestern geänderte Chunks neu — bereits indizierte Bücher
+// sind dadurch billig, nie-indizierte bekommen ihren Erst-Index.
+async function reindexAllBooks() {
   if (!embed.isEnabled()) return { enqueued: 0, skipped: 0, disabled: true };
-  const bookIds = semanticChunks.indexedBookIds();
+  const books = await contentStore.listBooks(null);
   let enqueued = 0, skipped = 0;
-  for (const bookId of bookIds) {
+  for (const { id: bookId } of books) {
     if (findActiveJobId('embed-index', bookId, null)) { skipped++; continue; }
     const jobId = createJob('embed-index', bookId, null, 'job.label.embedIndex', null, bookId);
     enqueueJob(jobId, () => runEmbedIndexJob(jobId, bookId, null, null));
@@ -192,4 +192,4 @@ embedIndexRouter.post('/embed-index', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { embedIndexRouter, runEmbedIndexJob, reindexIndexedBooks };
+module.exports = { embedIndexRouter, runEmbedIndexJob, reindexAllBooks };

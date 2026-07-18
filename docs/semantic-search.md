@@ -16,6 +16,8 @@ Alle drei sind nur sichtbar/aktiv, wenn das Backend konfiguriert ist (`config.se
 
 Es gibt **keine eigene Karte** und **keinen Paletten-Prefix** — die semantische Suche lebt komplett in der bestehenden Such-Karte (`key: 'search'` in [feature-registry.js](../public/js/cards/feature-registry.js)).
 
+**Interner Konsument (kein UI-Einstieg):** die **Kontinuitäts-Verify-Stufe** (Multi-Pass, [docs/komplett.md](komplett.md#phase-8--kontinuitätsprüfung)) nutzt den Index als **best-effort Beleg-Fallback** — findet die wörtliche Textstellen-Suche das Zitat eines Befunds nicht, lädt sie die semantisch nächste Seiten-Passage nach (`searchSimilar`, `kinds:['page']`). Gilt nur, wenn der Index für das Buch existiert; sonst keyword-Pfad. Rein rückwärtsgewandt.
+
 ## Freischalten
 
 Admin → Einstellungen → Tab **„Semantik"** ([admin-settings-embed.html](../public/partials/admin-settings-embed.html)). Settings-Keys (Defaults in [lib/app-settings.js](../lib/app-settings.js)):
@@ -75,7 +77,7 @@ Migration **240** ([db/migrations.js](../db/migrations.js)). Polymorph nach `kin
 
 ## Nacht-Cron
 
-`reindexIndexedBooks()` ([routes/jobs/embed-index.js:145](../routes/jobs/embed-index.js), eingehängt in [server.js:696](../server.js)) reiht pro **bereits indiziertem** Buch (`indexedBookIds()`) einen `embed-index`-Job ein. Baut **bewusst keinen neuen** Index für nie-indizierte Bücher — der Erst-Index bleibt die Opt-in-Aktion des Users (schont das self-hosted Backend). Der Delta-Cache hält den Reindex billig.
+`reindexAllBooks()` ([routes/jobs/embed-index.js](../routes/jobs/embed-index.js), eingehängt in [server.js](../server.js)) reiht pro Buch (`contentStore.listBooks`) einen `embed-index`-Job ein (Dedup gegen laufende Jobs). Der Delta-Cache hält den Reindex billig: bereits indizierte Bücher embedden nur seit gestern geänderte Chunks neu, nie-indizierte Bücher bekommen ihren Erst-Index.
 
 ## Pflicht-Invarianten
 

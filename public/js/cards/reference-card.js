@@ -15,7 +15,7 @@ import { fetchJson } from '../utils.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { selectScenesForView } from '../editor/notebook/entities.js';
 
-const TABS = ['figuren', 'orte', 'szenen', 'ereignisse', 'recherche'];
+const TABS = ['figuren', 'orte', 'szenen', 'ereignisse', 'recherche', 'verwandt'];
 
 export function registerReferenceCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -24,6 +24,17 @@ export function registerReferenceCard() {
     referenceScope: 'page',            // 'page' (aktueller Kontext) | 'book'
     referenceRecherche: [],
     referenceRechercheLoading: false,
+    // Verwandt-Tab (Semantik): auf Knopfdruck ähnliche bestehende Seiten zur
+    // ganzen Seite (like-Modus, embedding-frei) oder zum markierten Absatz
+    // (Freitext-q, Live-Embedding). Read-only, rückwärtsgewandt.
+    verwandtBasis: 'page',            // 'page' (ganze Seite) | 'absatz' (Auswahl/Absatz)
+    verwandtHits: [],
+    verwandtLoading: false,
+    verwandtError: '',
+    verwandtSearched: false,
+    verwandtNotIndexed: false,
+    verwandtKey: null,                // _pageKey() zum Suchzeitpunkt (Staleness)
+    _verwandtAbort: null,
     _refPageText: '',
     _refPageTextKey: null,
     _memos: {},
@@ -36,15 +47,31 @@ export function registerReferenceCard() {
         onBookChanged: () => this._resetReference(),
         onViewReset: () => this._resetReference(),
       });
+      // Verwandt-Tab: „Ganze Seite" verhält sich wie die Geschwister-Tabs und
+      // sucht automatisch beim Öffnen bzw. beim Seitenwechsel (embedding-frei).
+      this.$watch('referenceTab', (tab) => { if (tab === 'verwandt') this._maybeAutoVerwandt(); });
+      this.$watch('verwandtBasis', (b) => { if (b === 'page' && this.referenceTab === 'verwandt') this._maybeAutoVerwandt(); });
+      this.$watch(() => window.__app?.currentPage?.id, () => { if (this.referenceTab === 'verwandt') this._maybeAutoVerwandt(); });
     },
 
-    destroy() { this._lifecycle?.destroy(); },
+    destroy() { this._verwandtAbort?.abort(); this._lifecycle?.destroy(); },
 
     _resetReference() {
       this.referenceRecherche = [];
+      this._resetVerwandt();
       this._refPageText = '';
       this._refPageTextKey = null;
       this._memos = {};
+    },
+
+    _resetVerwandt() {
+      this._verwandtAbort?.abort();
+      this.verwandtHits = [];
+      this.verwandtLoading = false;
+      this.verwandtError = '';
+      this.verwandtSearched = false;
+      this.verwandtNotIndexed = false;
+      this.verwandtKey = null;
     },
 
     // Beim Sichtbarwerden: Katalog-Daten defensiv nachladen (der Slot lebt
@@ -190,7 +217,113 @@ export function registerReferenceCard() {
         case 'szenen':     return this.referenceSzenen().length;
         case 'ereignisse': return this.referenceEreignisse().length;
         case 'recherche':  return this.referenceRechercheItems().length;
+        case 'verwandt':   return this.verwandtResults().length;
         default:           return 0;
+      }
+    },
+
+    // ── Verwandt-Tab (Semantik) ───────────────────────────────────────────────
+    // Ergebnisse sind seiten-spezifisch: bei Seitenwechsel gaten wir über den
+    // _pageKey() (keine Watcher — konsistent mit dem Memo-Pattern der Karte).
+    verwandtResults() {
+      if (this.verwandtKey && this.verwandtKey !== this._pageKey()) return [];
+      return this.verwandtHits;
+    },
+    verwandtStale() {
+      return this.verwandtSearched && !!this.verwandtKey && this.verwandtKey !== this._pageKey();
+    },
+    verwandtScoreLabel(hit) {
+      return Math.round((hit?.score || 0) * 100) + '%';
+    },
+    activateVerwandt(hit) {
+      if (hit?.entity_id != null) window.__app?.gotoPageById?.(hit.entity_id);
+    },
+
+    // Text der aktuellen Auswahl bzw. des Absatzes am Cursor — nur innerhalb des
+    // Notebook-Editor-Textkörpers (.page-content-view, view + edit teilen die Klasse).
+    _verwandtSelectionText() {
+      const sel = window.getSelection?.();
+      if (!sel || !sel.anchorNode) return '';
+      const startEl = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+      if (!startEl?.closest?.('.page-content-view')) return '';
+      const selText = sel.toString().replace(/\s+/g, ' ').trim();
+      if (!sel.isCollapsed && selText) return selText;
+      const block = startEl.closest('p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,div.poem');
+      return (block?.textContent || '').replace(/\s+/g, ' ').trim();
+    },
+
+    // Auto-Suche für „Ganze Seite" (embedding-frei) — beim Tab-Öffnen bzw.
+    // Seitenwechsel. Absatz-Modus braucht eine Auswahl und bleibt manuell.
+    _maybeAutoVerwandt() {
+      if (this.verwandtBasis !== 'page') return;
+      if (!Alpine.store('config')?.semanticSearchEnabled) return;
+      if (!window.__app?.currentPage?.id) return;
+      if (this.verwandtLoading) return;
+      if (this.verwandtSearched && this.verwandtKey === this._pageKey()) return;
+      this.runVerwandt();
+    },
+
+    async runVerwandt() {
+      const app = window.__app;
+      const bookId = Alpine.store('nav').selectedBookId;
+      const pageId = app?.currentPage?.id;
+      if (!Alpine.store('config')?.semanticSearchEnabled || !bookId || !pageId) return;
+
+      const params = new URLSearchParams({ book_id: String(bookId), kind: 'page', limit: '10' });
+      if (this.verwandtBasis === 'absatz') {
+        const text = this._verwandtSelectionText();
+        if (!text) {
+          this._verwandtAbort?.abort();
+          this.verwandtLoading = false;
+          this.verwandtHits = [];
+          this.verwandtSearched = true;
+          this.verwandtNotIndexed = false;
+          this.verwandtKey = this._pageKey();
+          this.verwandtError = app.t('reference.verwandt.noSelection');
+          return;
+        }
+        params.set('q', text.slice(0, 500));
+      } else {
+        params.set('like_kind', 'page');
+        params.set('like_id', String(pageId));
+      }
+
+      this._verwandtAbort?.abort();
+      const ctrl = new AbortController();
+      this._verwandtAbort = ctrl;
+      this.verwandtLoading = true;
+      this.verwandtError = '';
+      this.verwandtNotIndexed = false;
+      this.verwandtSearched = true;
+      const key = this._pageKey();
+
+      try {
+        const r = await fetch('/search/semantic?' + params.toString(), { credentials: 'same-origin', signal: ctrl.signal });
+        if (ctrl.signal.aborted) return;
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          this.verwandtError = j.error_code === 'EMBED_UNAVAILABLE'
+            ? app.t('search.semantic.unavailable')
+            : String(r.status);
+          this.verwandtHits = []; this.verwandtKey = key;
+          return;
+        }
+        const data = await r.json();
+        if (data.notIndexed) {
+          this.verwandtNotIndexed = true;
+          this.verwandtHits = []; this.verwandtKey = key;
+          return;
+        }
+        // Freitext-Modus schliesst die Quellseite nicht serverseitig aus.
+        this.verwandtHits = (Array.isArray(data.hits) ? data.hits : [])
+          .filter(h => !(h.kind === 'page' && String(h.entity_id) === String(pageId)));
+        this.verwandtKey = key;
+      } catch (e) {
+        if (e.name === 'AbortError' || ctrl.signal.aborted) return;
+        this.verwandtError = e.message || 'error';
+        this.verwandtHits = []; this.verwandtKey = key;
+      } finally {
+        if (!ctrl.signal.aborted) this.verwandtLoading = false;
       }
     },
 

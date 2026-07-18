@@ -9177,6 +9177,30 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 241 abgeschlossen (app_users.onboarding_state).');
   }
 
+  if (version < 242) {
+    // Weltfakten-Realitätscheck: Opt-in pro Buch (book_settings.weltfakten_real_pruefen)
+    // + Beleg-URL pro Kontinuitäts-Befund (continuity_issues.quelle). Das Flag ist bewusst
+    // getrennt von zeitlinie_real — ein Buch kann eine reale Kalender-Chronologie haben,
+    // seine Welt-Fakten aber bewusst fiktiv setzen (Alternate History). quelle hält die vom
+    // Faktencheck zitierte Beleg-URL (Web-Suche); NULL bei allen anderen Befund-Typen.
+    // Beides additiv: nullable/Default-0-Spalte, kein FK, kein Recreate.
+    const bsCols242 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols242.includes('weltfakten_real_pruefen')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN weltfakten_real_pruefen INTEGER DEFAULT 0');
+    }
+    const ciCols242 = db.pragma('table_info(continuity_issues)').map(c => c.name);
+    if (!ciCols242.includes('quelle')) {
+      db.exec('ALTER TABLE continuity_issues ADD COLUMN quelle TEXT');
+    }
+
+    const fkErrors242 = db.pragma('foreign_key_check');
+    if (fkErrors242.length) {
+      throw new Error(`Migration 242: foreign_key_check meldet ${fkErrors242.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 242').run();
+    logger.info('DB-Migration auf Version 242 abgeschlossen (book_settings.weltfakten_real_pruefen + continuity_issues.quelle).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

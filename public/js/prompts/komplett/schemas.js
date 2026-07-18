@@ -336,6 +336,20 @@ export const SCHEMA_ATTR_CONTRADICTION = _obj({
   empfehlung: _str,
 });
 
+// Weltfakten-Realitätscheck (Faktencheck-Job): pro extrahiertem Welt-Fakt urteilt das
+// Modell, ob die Aussage der realen Faktenlage widerspricht — mit Web-Suche als Grundlage.
+// Reasoning-First als False-Positive-Abwehr (analog SCHEMA_ATTR_CONTRADICTION). `urteil`
+// dreistufig: nur «falsch» erzeugt einen Befund; «unklar» (keine belastbare Quelle) und
+// «korrekt» werden verworfen. `quelle` = belegende URL (nur bei «falsch» Pflicht).
+export const SCHEMA_FAKT_REALITY = _obj({
+  _reasoning: _str,
+  urteil: { type: 'string', enum: ['korrekt', 'falsch', 'unklar'] },
+  schwere: { type: 'string', enum: ['kritisch', 'mittel', 'niedrig'] },
+  beschreibung: _str,
+  quelle: _str,
+  empfehlung: _str,
+});
+
 // ── Kapitel-Erzählprofil (Phase «Erzählprofil») ──────────────────────────────
 // Pro Kapitel: erkannte Erzählperspektive/-zeit (Enum-Keys deckungsgleich mit
 // routes/jobs/narrative-labels.js POV_LABELS/TEMPUS_LABELS — SSoT-Drift vermeiden),

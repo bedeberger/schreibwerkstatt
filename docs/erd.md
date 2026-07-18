@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 241, 119 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 242, 119 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -351,6 +351,7 @@ erDiagram
     INTEGER orte_real                "0|1, Orte sind reale Schauplätze → Geo-Karte in der Orte-Karte"
     TEXT    schauplatz_land          "ISO-3166-1-alpha-2 Haupt-Schauplatzland (Geocode-Bias + KI-Land-Fallback)"
     INTEGER zeitlinie_real           "0|1, Roman hat echte kalendarische Zeitlinie → Jahres-Stand in der Ereignisse-Ansicht"
+    INTEGER weltfakten_real_pruefen  "0|1, Opt-in: Welt-Fakten gegen reale Faktenlage prüfen (Faktencheck-Job, Web-Suche)"
     INTEGER exclude_from_stats       "0|1, Buch vollständig aus „Meine Statistik\" ausnehmen (Testbücher)"
     TEXT    updated_at
   }
@@ -723,6 +724,7 @@ erDiagram
     TEXT    stelle_a
     TEXT    stelle_b
     TEXT    empfehlung
+    TEXT    quelle "Beleg-URL des Faktencheck-Befunds (typ=faktenfehler); NULL bei allen anderen Typen"
     INTEGER sort_order
     TEXT    updated_at
     INTEGER resolved "erledigt-Flag, gueltig bis naechste Komplettanalyse"

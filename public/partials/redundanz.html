@@ -1,0 +1,81 @@
+<!-- Redundanz-Radar: buchweite Doppelungs-Suche über dem Embedding-Index -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/redundanz-card.js.
+  `showRedundanzCard` + `toggleRedundanzCard` bleiben im Root (Hash-Router,
+  Exklusivität). Rein rückwärtsgewandt: findet quasi-doppelte Seiten-Passagen,
+  schreibt nie in den Buchtext. Setzt einen gebauten Semantik-Index voraus.
+-->
+<div class="card card--redundanz" x-data="redundanzCard" x-show="$app.showRedundanzCard" x-cloak>
+  <div class="card-header">
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('redundanz.title')"></span>
+    </div>
+    <div class="card-actions" x-show="redundanzAvailable && redundanzHasIndex">
+      <div class="tabs">
+        <button type="button" class="tabs-btn"
+                :class="{ 'tabs-btn--active': redundanzThreshold === 'strict' }"
+                :disabled="redundanzLoading"
+                @click="setRedundanzThreshold('strict')"
+                x-text="$app.t('redundanz.threshold.strict')"></button>
+        <button type="button" class="tabs-btn"
+                :class="{ 'tabs-btn--active': redundanzThreshold === 'medium' }"
+                :disabled="redundanzLoading"
+                @click="setRedundanzThreshold('medium')"
+                x-text="$app.t('redundanz.threshold.medium')"></button>
+        <button type="button" class="tabs-btn"
+                :class="{ 'tabs-btn--active': redundanzThreshold === 'loose' }"
+                :disabled="redundanzLoading"
+                @click="setRedundanzThreshold('loose')"
+                x-text="$app.t('redundanz.threshold.loose')"></button>
+      </div>
+      <button type="button" class="primary" data-label-ok
+              :disabled="redundanzLoading"
+              @click="runRedundanz()"
+              x-text="$app.t(redundanzResult ? 'redundanz.rerun' : 'redundanz.run')"></button>
+    </div>
+  </div>
+
+  <p class="redundanz-intro" x-show="redundanzAvailable && redundanzHasIndex" x-text="$app.t('redundanz.intro')"></p>
+
+  <!-- Gating: Backend aus / kein Index -->
+  <div x-show="!redundanzAvailable" class="muted-msg muted-msg--spaced" x-text="$app.t('redundanz.needBackend')"></div>
+  <div x-show="redundanzAvailable && !redundanzHasIndex" class="muted-msg muted-msg--spaced" x-text="$app.t('redundanz.needIndex')"></div>
+
+  <div x-show="redundanzLoading && redundanzProgress > 0" class="progress-bar-wrap">
+    <div class="progress-bar" :style="{ '--progress': redundanzProgress + '%' }"></div>
+  </div>
+  <div x-show="redundanzStatus" class="card-status" x-text="redundanzStatus"></div>
+
+  <!-- Ergebnis -->
+  <template x-if="redundanzResult">
+    <div class="redundanz-result">
+      <div class="redundanz-meta">
+        <span x-text="$app.t('redundanz.meta.summary', { found: redundanzResult.totalFound, chunks: redundanzResult.comparedChunks })"></span>
+        <span x-show="redundanzResult.truncated" class="redundanz-meta-note" x-text="$app.t('redundanz.meta.truncated', { shown: redundanzResult.pairs.length })"></span>
+        <span x-show="redundanzResult.truncatedChunks > 0" class="redundanz-meta-note" x-text="$app.t('redundanz.meta.cappedChunks', { n: redundanzResult.truncatedChunks })"></span>
+      </div>
+
+      <div x-show="!redundanzResult.pairs.length" class="muted-msg muted-msg--spaced" x-text="$app.t('redundanz.empty')"></div>
+
+      <ul class="redundanz-list" x-show="redundanzResult.pairs.length">
+        <template x-for="(pair, i) in redundanzResult.pairs" :key="i">
+          <li class="redundanz-pair">
+            <span class="redundanz-score" :class="redundanzScoreClass(pair.score)"
+                  x-text="Math.round(pair.score * 100) + '%'"></span>
+            <div class="redundanz-pair-sides">
+              <div class="redundanz-side">
+                <span class="tag internal-link" @click="redundanzGotoPage(pair.a_id)" x-text="redundanzPageName(pair.a_id)"></span>
+                <p class="redundanz-snippet" x-text="pair.a_snippet"></p>
+              </div>
+              <div class="redundanz-side">
+                <span class="tag internal-link" @click="redundanzGotoPage(pair.b_id)" x-text="redundanzPageName(pair.b_id)"></span>
+                <p class="redundanz-snippet" x-text="pair.b_snippet"></p>
+              </div>
+            </div>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </template>
+</div>

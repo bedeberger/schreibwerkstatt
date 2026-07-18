@@ -2343,6 +2343,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [analysis/komplett-status.css](public/css/analysis/komplett-status.css) | Komplettanalyse-Status-Header. |
 | [analysis/zeitleiste.css](public/css/analysis/zeitleiste.css) | Globaler Zeitstrahl: Ereignis-Liste + selbstgebautes `.gz-band`-Jahres-Band. |
 | [analysis/kapitel-review.css](public/css/analysis/kapitel-review.css) | Kapitel-Review. |
+| [analysis/redundanz.css](public/css/analysis/redundanz.css) | Redundanz-Radar: Seiten-Paar-Liste mit Score-Badge + zwei Snippet-Spalten. |
 
 ### admin/
 | File | Inhalt |

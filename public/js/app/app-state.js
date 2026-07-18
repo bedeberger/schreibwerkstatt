@@ -270,6 +270,7 @@ const cardsState = () => ({
   showBookStatsCard: false,
   showStilCard: false,
   showFehlerHeatmapCard: false,
+  showRedundanzCard: false,
   showChatCard: false,
   showIdeenCard: false,
   showReferenceCard: false,

@@ -36,5 +36,10 @@ export function registerNavStore() {
     plotBeatId: null,
     rueckblickEntryId: null,
     pendingRueckblickZeitraum: null,
+    // Permalink-Spiegel des effektiven Such-Scopes ('book' | 'all'). Die
+    // searchCard spiegelt (mode==='semantic' || scopeMode==='book') hierher;
+    // der Hash-Router liest ihn beim Cold-Open, um zwischen #book/:id/suche
+    // (buch-skopiert) und #search (buchübergreifend) zu unterscheiden.
+    searchScope: 'book',
   });
 }

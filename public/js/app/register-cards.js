@@ -27,6 +27,7 @@ import { registerFigurenCard } from '../cards/figuren-card.js';
 import { registerFigurWerkstattCard } from '../cards/figur-werkstatt-card.js';
 import { registerStilCard } from '../cards/stil-card.js';
 import { registerFehlerHeatmapCard } from '../cards/fehler-heatmap-card.js';
+import { registerRedundanzCard } from '../cards/redundanz-card.js';
 import { registerChatCard } from '../cards/chat-card.js';
 import { registerIdeenCard } from '../cards/ideen-card.js';
 import { registerReferenceCard } from '../cards/reference-card.js';
@@ -137,6 +138,7 @@ export function registerAllCards() {
   registerProgressStore();
   registerStilCard();
   registerFehlerHeatmapCard();
+  registerRedundanzCard();
   registerBookOverviewCard();
   registerBookStatsCard();
   registerBookSettingsCard();

@@ -24,6 +24,7 @@ export const settingsMethods = {
       this.bookSettingsOrteReal           = !!data.orte_real;
       this.bookSettingsSchauplatzLand     = data.schauplatz_land || '';
       this.bookSettingsZeitlinieReal      = !!data.zeitlinie_real;
+      this.bookSettingsWeltfaktenRealPruefen = !!data.weltfakten_real_pruefen;
       this.bookSettingsExcludeFromStats   = !!data.exclude_from_stats;
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
@@ -171,6 +172,7 @@ export const settingsMethods = {
           orte_real:         this.bookSettingsOrteReal ? 1 : 0,
           schauplatz_land:   this.bookSettingsSchauplatzLand || null,
           zeitlinie_real:    this.bookSettingsZeitlinieReal ? 1 : 0,
+          weltfakten_real_pruefen: this.bookSettingsWeltfaktenRealPruefen ? 1 : 0,
           exclude_from_stats: this.bookSettingsExcludeFromStats ? 1 : 0,
         }),
       });

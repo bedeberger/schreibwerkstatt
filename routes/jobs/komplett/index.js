@@ -9,12 +9,14 @@ const {
   getChapterNarrativeProfile,
   } = require('../../../db/schema');
 const { getNarrativeReport, getAutorenBefund } = require('../../../db/narrative-report');
+const { getBookSettings } = require('../../../db/schema');
 const { toIntId } = require('../../../lib/validate');
 const { resolveProvider } = require('../../../lib/ai');
+const appSettings = require('../../../lib/app-settings');
 const { setContext } = require('../../../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError } = require('../../../lib/acl');
 const { jsonBody, createJob, enqueueJob, findActiveJobId } = require('../shared');
-const { runKomplettAnalyseJob, runKontinuitaetJob, runErzaehlprofilJob, runKomplettAnalyseAll } = require('./job');
+const { runKomplettAnalyseJob, runKontinuitaetJob, runErzaehlprofilJob, runFaktencheckJob, runKomplettAnalyseAll } = require('./job');
 
 const komplettRouter = express.Router();
 // :book_id-Routes (GET kontinuitaet, DELETE chapter-cache) sind viewer+ resp. editor+.
@@ -84,6 +86,30 @@ komplettRouter.post('/kontinuitaet/issue/:issue_id/resolved', jsonBody, (req, re
   res.json({ ok: true, resolved });
 });
 
+// Weltfakten-Realitätscheck eigenständig starten — editor+. Prüft die extrahierten
+// Welt-Fakten mit Web-Suche gegen die reale Faktenlage. Claude-only (web_search ist
+// Server-Tool), Instanz-Kill-Switch ai.komplett.factcheck, Buch-Opt-in weltfakten_real_pruefen.
+komplettRouter.post('/faktencheck', jsonBody, (req, res) => {
+  const { book_name } = req.body;
+  const book_id = toIntId(req.body?.book_id);
+  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  const userEmail = req.session?.user?.email || null;
+  if (resolveProvider({ userEmail }) !== 'claude') return res.status(400).json({ error_code: 'FACTCHECK_CLAUDE_ONLY' });
+  if (appSettings.get('ai.komplett.factcheck') === false) return res.status(400).json({ error_code: 'FACTCHECK_DISABLED' });
+  if (!getBookSettings(book_id, userEmail)?.weltfakten_real_pruefen) return res.status(400).json({ error_code: 'FACTCHECK_NOT_ENABLED_FOR_BOOK' });
+  const userToken = null;
+  const existing = findActiveJobId('faktencheck', book_id, userEmail);
+  if (existing) return res.json({ jobId: existing, existing: true });
+  const label = book_name ? 'job.label.faktencheckBook' : 'job.label.faktencheck';
+  const labelParams = book_name ? { name: book_name } : null;
+  const jobId = createJob('faktencheck', book_id, userEmail, label, labelParams);
+  enqueueJob(jobId, () => runFaktencheckJob(jobId, book_id, book_name || '', userEmail, userToken));
+  res.json({ jobId });
+});
+
 // Erzählprofil eigenständig neu berechnen (nur die Phase «Erzählprofil», ohne die
 // volle Extraktions-Pipeline) — editor+. Nutzt den vorhandenen Figuren-Katalog.
 komplettRouter.post('/erzaehlprofil', jsonBody, (req, res) => {
@@ -132,4 +158,4 @@ komplettRouter.delete('/chapter-cache/:book_id', (req, res) => {
   res.json({ ok: true, deleted });
 });
 
-module.exports = { komplettRouter, runKomplettAnalyseAll, runKomplettAnalyseJob, runKontinuitaetJob, runErzaehlprofilJob };
+module.exports = { komplettRouter, runKomplettAnalyseAll, runKomplettAnalyseJob, runKontinuitaetJob, runErzaehlprofilJob, runFaktencheckJob };

@@ -3,8 +3,60 @@
 // via _loadKontinuitaetHistory (GET) angezeigt; Anzeige + Filter + Resolve-Toggle.
 
 import { fetchJson } from '../utils.js';
+import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
 
 export const kontinuitaetMethods = {
+  // ── Weltfakten-Faktencheck ──────────────────────────────────────────────────
+  // Eigener KI-Job (/jobs/faktencheck): prüft extrahierte Welt-Fakten per Web-Suche
+  // gegen die reale Faktenlage. Ergebnisse (typ='faktenfehler') werden an den
+  // neuesten Kontinuitäts-Check angehängt und erscheinen in derselben Liste. Nur
+  // wenn instanzweit freigeschaltet (Karte zeigt den Button nur dann) UND das Buch
+  // opt-in hat (sonst 400 → Hinweis auf die Bucheinstellungen).
+  async faktencheckRun() {
+    const root = window.__app;
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId || this.kontinuitaetLoading) return;
+    this.kontinuitaetLoading = true;
+    this.kontinuitaetProgress = 1;
+    this.kontinuitaetStatus = runningJobStatus(root.t, 'kontinuitaet.faktencheck.starting');
+    const clearRunState = () => {
+      this.kontinuitaetLoading = false;
+      this.kontinuitaetProgress = 0;
+      this.kontinuitaetStatus = '';
+    };
+    try {
+      const resp = await fetch('/jobs/faktencheck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: bookId, book_name: root.selectedBookName || '' }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.jobId) {
+        clearRunState();
+        if (data.error_code === 'FACTCHECK_NOT_ENABLED_FOR_BOOK') {
+          this.kontinuitaetStatus = `<span>${root.t('kontinuitaet.faktencheck.hint')}</span>`;
+        }
+        return;
+      }
+      startPoll(this, {
+        jobId: data.jobId,
+        timerProp: '_kontinuitaetPollTimer',
+        progressProp: 'kontinuitaetProgress',
+        onProgress: (job) => {
+          this.kontinuitaetStatus = runningJobStatus(
+            root.t, job.statusText, job.tokensIn, job.tokensOut,
+            Alpine.store('config').claudeMaxTokens, job.progress, job.tps, job.statusParams);
+        },
+        onDone: async () => { clearRunState(); await this._loadKontinuitaetHistory(); },
+        onError: async () => { clearRunState(); },
+        onNotFound: () => { clearRunState(); },
+      });
+    } catch (e) {
+      clearRunState();
+      console.error('[faktencheckRun]', e);
+    }
+  },
+
   async _loadKontinuitaetHistory() {
     try {
       const data = await fetchJson('/jobs/kontinuitaet/' + Alpine.store('nav').selectedBookId);

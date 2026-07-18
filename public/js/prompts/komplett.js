@@ -55,6 +55,8 @@ export {
   buildKontinuitaetVerifyPrompt,
   buildKontinuitaetSinglePassPrompt,
   buildAttributeContradictionJudgePrompt,
+  buildWeltfaktRealityJudgePrompt,
+  SYSTEM_FAKTENCHECK,
 } from './komplett/kontinuitaet.js';
 
 export {
@@ -83,6 +85,7 @@ export {
   SCHEMA_COVERAGE_AUDIT,
   SCHEMA_FIGUREN_ALIAS_CLUSTER,
   SCHEMA_ATTR_CONTRADICTION,
+  SCHEMA_FAKT_REALITY,
   SCHEMA_NAME_RESOLUTION,
   SCHEMA_ERZAEHLPROFIL,
   SCHEMA_ERZAEHLPROFIL_CHAPTER,

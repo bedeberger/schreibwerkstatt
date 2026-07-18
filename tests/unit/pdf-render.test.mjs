@@ -381,6 +381,122 @@ test('mirrorMargins: Text-Cursor folgt dem gespiegelten Rand (Regression: Verso-
   doc.end();
 });
 
+test('page-geometry: TrimBox/BleedBox exakt + mirror+bleed kombiniert', async () => {
+  // Deckt zwei Lücken ab: (1) die exakten Beschnitt-Koordinaten (nicht nur
+  // TrimBox-Existenz) und (2) mirror + bleed GEMEINSAM in einem Setup — der
+  // bestehende Cursor-Test läuft mit bleedPt: 0.
+  const PDFDocument = (await import('pdfkit')).default;
+  const { createPageGeometry } = await import('../../lib/pdf-render/page-geometry.js');
+  const { MM_TO_PT } = await import('../../lib/pdf-render/layout.js');
+
+  const bleedPt = 3 * MM_TO_PT;
+  const W = 595, H = 842;
+  // Basis-Ränder inkl. Bleed (wie index.js sie baut): left = Bund (gross),
+  // right = Aussenkante (klein).
+  const margins = {
+    top: 25 * MM_TO_PT + bleedPt, right: 15 * MM_TO_PT + bleedPt,
+    bottom: 25 * MM_TO_PT + bleedPt, left: 30 * MM_TO_PT + bleedPt,
+  };
+  const doc = new PDFDocument({ size: [W, H], margins, autoFirstPage: false, bufferPages: true });
+  doc.on('data', () => {});
+  const geo = createPageGeometry(doc, {
+    layout: { bodyInsetMm: {} }, margins, bleedPt, mirror: true, frontMatterAllowed: true, blankPageIdxs: new Set(),
+  });
+  geo.attach();
+
+  for (let i = 0; i < 4; i++) {
+    doc.addPage();
+    const idx = doc.bufferedPageRange().start + doc.bufferedPageRange().count - 1;
+    const verso = idx % 2 === 1;
+    const tb = doc.page.dictionary.data.TrimBox;
+    const bb = doc.page.dictionary.data.BleedBox;
+    assert.ok(tb, `Seite ${idx}: TrimBox fehlt`);
+    // Endformat sitzt exakt Bleed-Offset innerhalb der Medienkante.
+    for (const [got, exp, label] of [[tb[0], bleedPt, 'x0'], [tb[1], bleedPt, 'y0'], [tb[2], W - bleedPt, 'x1'], [tb[3], H - bleedPt, 'y1']]) {
+      assert.ok(Math.abs(got - exp) < 0.01, `Seite ${idx} TrimBox.${label}=${got} != ${exp}`);
+    }
+    assert.deepEqual(bb, [0, 0, W, H], `Seite ${idx}: BleedBox muss die volle Medienkante sein`);
+    // Spiegelung greift TROTZ Bleed: Verso tauscht den Bund nach aussen.
+    const expLeftMm = verso ? 15 : 30;
+    assert.ok(Math.abs(doc.page.margins.left - (expLeftMm * MM_TO_PT + bleedPt)) < 0.01,
+      `Seite ${idx}: linker Rand (mirror+bleed) muss ${expLeftMm}mm+Bleed sein`);
+  }
+  doc.end();
+});
+
+test('Beschnitt: TrimBox trägt die exakten Bleed-Koordinaten (durch die Pipeline)', async () => {
+  const { MM_TO_PT } = await import('../../lib/pdf-render/layout.js');
+  const cfg = defaultConfig(); cfg.cover.enabled = false; cfg.print.bleedMm = 3;
+  const buf = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null });
+  const bin = buf.toString('binary');
+  const media = bin.match(/\/MediaBox\s*\[([^\]]+)\]/);
+  const trim = bin.match(/\/TrimBox\s*\[([^\]]+)\]/);
+  assert.ok(media && trim, 'MediaBox/TrimBox fehlen im gerenderten PDF');
+  const [, , W, H] = media[1].trim().split(/\s+/).map(Number);
+  const t = trim[1].trim().split(/\s+/).map(Number);
+  const bleedPt = 3 * MM_TO_PT;
+  assert.ok(Math.abs(t[0] - bleedPt) < 0.05 && Math.abs(t[1] - bleedPt) < 0.05, `TrimBox-Ursprung ${t[0]}/${t[1]} != Bleed ${bleedPt}`);
+  assert.ok(Math.abs(t[2] - (W - bleedPt)) < 0.05 && Math.abs(t[3] - (H - bleedPt)) < 0.05, `TrimBox-Ecke ${t[2]}/${t[3]} != ${W - bleedPt}/${H - bleedPt}`);
+});
+
+test('mirror+bleed durch die Pipeline: Render ok, TrimBox vorhanden, Page-Count wie ohne Mirror', async () => {
+  const cfg = defaultConfig(); cfg.cover.enabled = false; cfg.toc.enabled = false; cfg.print.bleedMm = 3;
+  const noMirror = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null });
+  cfg.layout.mirrorMargins = true;
+  const mirrored = await renderPdfBuffer({ book: baseBook, groups: baseGroups, profile: { config: cfg }, coverBuf: null, token: null });
+  assert.equal(pageCount(mirrored), pageCount(noMirror), 'mirror+bleed darf Page-Count nicht ändern');
+  assert.ok(mirrored.toString('binary').includes('/TrimBox'), 'TrimBox fehlt bei mirror+bleed');
+});
+
+test('TOC bei mirrorMargins: jede Zeile folgt dem Bundsteg IHRER Buchseite (Verso ≠ Recto)', async () => {
+  // Regression: eine mehrseitige TOC (Userin: 50 Kapitel) muss den Bundsteg pro
+  // Verso/Recto-Seite spiegeln wie der Body — nicht auf allen Seiten den Recto-
+  // Innenrand erzwingen. Wir spionieren die x-Position jedes Eintrags-Writes und
+  // den linken Rand der Zielseite ab.
+  const PDFDocument = (await import('pdfkit')).default;
+  const { createPageGeometry } = await import('../../lib/pdf-render/page-geometry.js');
+  const { MM_TO_PT } = await import('../../lib/pdf-render/layout.js');
+  const { _renderToc } = await import('../../lib/pdf-render/pages.js');
+
+  const margins = { top: 25 * MM_TO_PT, right: 15 * MM_TO_PT, bottom: 25 * MM_TO_PT, left: 30 * MM_TO_PT };
+  const doc = new PDFDocument({ size: [595, 842], margins, autoFirstPage: false, bufferPages: true });
+  doc.on('data', () => {});
+  doc.registerFont('toc', 'Helvetica');
+  doc.registerFont('toc-title', 'Helvetica-Bold');
+  const geo = createPageGeometry(doc, {
+    layout: { bodyInsetMm: {} }, margins, bleedPt: 0, mirror: true, frontMatterAllowed: true, blankPageIdxs: new Set(),
+  });
+  geo.attach();
+
+  const writes = [];
+  const origText = doc.text.bind(doc);
+  doc.text = function (str, x, y, opts) {
+    if (typeof x === 'number' && typeof str === 'string' && str.startsWith('Kapitel')) {
+      writes.push({ x, mLeft: doc.page.margins.left });
+    }
+    return origText(str, x, y, opts);
+  };
+
+  // level 0 + keine Nummer → Eintrags-x == linker Rand der Seite (numColW=0).
+  const entries = Array.from({ length: 60 }, (_, i) => ({
+    title: `Kapitel ${i + 1}`, num: '', level: 0, blockIdx: i, itemIdx: -1, pageIdx: -1,
+  }));
+  const toc = { enabled: true, depth: 1, showPageNumbers: false, title: 'Inhalt', leader: 'none', indentMm: 6 };
+  const font = { toc: { sizePt: 11, lineHeight: 1.45 }, tocTitle: { sizePt: 20 } };
+
+  _renderToc(doc, toc, entries, 'de', font);
+  doc.end();
+
+  assert.ok(writes.length >= 40, `zu wenige TOC-Einträge geschrieben (${writes.length})`);
+  for (const w of writes) {
+    assert.ok(Math.abs(w.x - w.mLeft) < 0.5, `Eintrag-x=${w.x} muss dem Seitenrand ${w.mLeft} folgen`);
+  }
+  // Beide Bund-Seiten kommen vor → die TOC spiegelt tatsächlich über die Seiten.
+  const seenMm = new Set(writes.map(w => Math.round(w.mLeft / MM_TO_PT)));
+  assert.ok(seenMm.has(30), 'Recto-Seite (30mm Bund) fehlt');
+  assert.ok(seenMm.has(15), 'Verso-Seite (15mm) fehlt — TOC spiegelt den Bundsteg nicht');
+});
+
 test('widowOrphanControl: schiebt Absatz auf neue Seite statt Single-Line-Witwe/Waise', async () => {
   // Vier mittellange Absätze, plus ein letzter Absatz, der eine Single-Line-
   // Witwe/Waise produzieren würde. Mit Kontrolle wird er als Ganzes

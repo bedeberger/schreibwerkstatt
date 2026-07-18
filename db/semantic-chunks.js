@@ -151,14 +151,6 @@ function pruneMissing(bookId, model, kind, keepIds) {
   return removed;
 }
 
-// Bücher, die überhaupt schon einen (irgendein Modell) Index haben. Basis für
-// den Nacht-Cron: der hält nur *bestehende* Indizes frisch, baut aber keinen
-// neuen für Bücher, für die der User die semantische Suche nie aktiviert hat.
-function indexedBookIds() {
-  return db.prepare('SELECT DISTINCT book_id FROM semantic_chunks ORDER BY book_id')
-    .all().map(r => r.book_id);
-}
-
 // Index-Frische für die Such-Karte. lastIndexedAt = jüngster Chunk-Timestamp
 // (replaceEntity schreibt bei jedem Lauf alle Chunks einer Entität neu → das ist
 // der Zeitpunkt des letzten Index-Laufs). staleCount = Quell-Entitäten, deren
@@ -186,5 +178,6 @@ function clearBook(bookId, model = null) {
 
 module.exports = {
   getEntityChunks, replaceEntity, remove, searchSimilar, getEntityVector,
-  bookStats, clearBook, pruneMissing, indexedBookIds, indexStatus,
+  bookStats, clearBook, pruneMissing, indexStatus,
+  loadChunksForPairing,
 };

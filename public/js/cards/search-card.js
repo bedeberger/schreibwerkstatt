@@ -39,6 +39,10 @@ export function registerSearchCard() {
         showFlag: 'showSearchCard',
         showNeedsBookId: false,
         onShow: async () => {
+          // Scope aus dem Hash-Router-Spiegel wiederherstellen (Deep-Link/Reload):
+          // #book/:id/suche → 'book', #search → 'all'.
+          const s = Alpine.store('nav').searchScope;
+          if (s === 'all' || s === 'book') this.scopeMode = s;
           await this.$nextTick();
           const input = this.$el?.querySelector('.search-q');
           if (input) input.focus();
@@ -47,6 +51,13 @@ export function registerSearchCard() {
         },
         onBookChanged: () => {
           if (this.scopeMode === 'book') this.runSearch();
+          // Index-Status ist buch-skopiert: laufenden Poll des vorigen Buches
+          // stoppen und die Build-Anzeige (indexing/indexStatus) zurücksetzen,
+          // sonst bleibt der Status des alten Buches stehen bzw. der alte Job
+          // schreibt sein Ergebnis dem neuen Buch zu.
+          if (this._indexPollTimer) { clearTimeout(this._indexPollTimer); this._indexPollTimer = null; }
+          this.indexing = false;
+          this.indexStatus = '';
           this.indexInfo = null;
           if (this.semanticAvailable) this.loadIndexStatus();
         },
@@ -63,6 +74,13 @@ export function registerSearchCard() {
           },
         }],
       });
+
+      // Effektiven Scope in den nav-Store spiegeln, damit der Hash-Router zwischen
+      // #book/:id/suche und #search wählt. Semantik ist immer buch-skopiert.
+      this.$watch(
+        () => (this.mode === 'semantic' || this.scopeMode === 'book') ? 'book' : 'all',
+        (v) => { Alpine.store('nav').searchScope = v; },
+      );
     },
 
     destroy() {

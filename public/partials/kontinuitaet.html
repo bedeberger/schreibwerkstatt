@@ -113,13 +113,13 @@
                 <template x-if="!kontinuitaetResolveStelle(issue.stelle_a, issue, 'a')">
                   <span class="kapitel-badge kapitel-badge--primary" x-text="issue.stelle_a"></span>
                 </template>
-                <span class="kontinuitaet-arrow">↔</span>
-                <template x-if="kontinuitaetResolveStelle(issue.stelle_b, issue, 'b')">
+                <span class="kontinuitaet-arrow" x-show="issue.stelle_b">↔</span>
+                <template x-if="issue.stelle_b && kontinuitaetResolveStelle(issue.stelle_b, issue, 'b')">
                   <span class="kapitel-badge kapitel-badge--primary internal-link"
                         :data-tip="$app.t('kontinuitaet.gotoTitle', { name: kontinuitaetResolveStelle(issue.stelle_b, issue, 'b').name })"
                         @click.stop="kontinuitaetGotoStelle(issue.stelle_b, issue, 'b')" x-text="issue.stelle_b"></span>
                 </template>
-                <template x-if="!kontinuitaetResolveStelle(issue.stelle_b, issue, 'b')">
+                <template x-if="issue.stelle_b && !kontinuitaetResolveStelle(issue.stelle_b, issue, 'b')">
                   <span class="kapitel-badge kapitel-badge--secondary" x-text="issue.stelle_b"></span>
                 </template>
               </span>
@@ -131,6 +131,10 @@
               <div x-show="issue.empfehlung" class="entity-meta-row kontinuitaet-empfehlung">
                 <span class="entity-meta-label kontinuitaet-empfehlung-label" x-text="$app.t('kontinuitaet.empfehlung')"></span>
                 <span class="entity-meta-value kontinuitaet-empfehlung-value" x-text="issue.empfehlung"></span>
+              </div>
+              <div x-show="issue.quelle" class="entity-meta-row kontinuitaet-quelle">
+                <span class="entity-meta-label" x-text="$app.t('kontinuitaet.faktencheck.source')"></span>
+                <a class="entity-meta-value kontinuitaet-quelle-link" :href="issue.quelle" target="_blank" rel="noopener noreferrer" x-text="issue.quelle"></a>
               </div>
               <div class="kontinuitaet-detail-actions">
                 <button type="button" class="kontinuitaet-resolve-btn"
@@ -145,6 +149,27 @@
 
     </div>
   </template>
+
+  <!-- Weltfakten-Faktencheck: prüft extrahierte Welt-Fakten per Web-Suche gegen die
+       reale Faktenlage. Nur sichtbar, wenn instanzweit freigeschaltet (Claude + Kill-
+       Switch); das Buch-Opt-in wird serverseitig geprüft (400 → Hinweis). -->
+  <div class="collapsible-wrap faktencheck" x-show="$store.config.factcheckEnabled" x-cloak x-data="collapsible()">
+    <button type="button" class="collapsible-toggle" x-bind="trigger">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+      <span x-text="$app.t('kontinuitaet.faktencheck.start')"></span>
+    </button>
+    <div x-bind="panel" class="collapsible-section" x-cloak>
+      <p class="nameguard-intro" x-text="$app.t('kontinuitaet.faktencheck.hint')"></p>
+      <div class="nameguard-actions">
+        <button type="button" class="secondary"
+                @click="faktencheckRun()"
+                :disabled="kontinuitaetLoading || !$store.nav.selectedBookId">
+          <span x-show="!kontinuitaetLoading" x-text="$app.t('kontinuitaet.faktencheck.start')"></span>
+          <span x-show="kontinuitaetLoading" x-text="$app.t('kontinuitaet.faktencheck.starting')"></span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Namens-/Konsistenz-Waechter: regelbasierte Erkennung buchweiter
        Schreibvarianten von Eigennamen (Figuren + Orte). Eigene klappbare Sektion,

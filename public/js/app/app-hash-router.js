@@ -1,7 +1,7 @@
 import { EVT } from '../events.js';
 // URL-Hash-Permalinks + History-Management.
 // Schema: #profil | #admin/<users|settings|usage[/<tab>]> | #book/:bookId[/page/:pageId|/figur/:figId|/ort/:ortId|/werkstatt[/:draftId]|/kapitel[/:chapterId]|/<view>]
-// Views: figuren, werkstatt, orte, szenen, ereignisse, kontinuitaet, bewertung, kapitel, chat, stats, stil, fehler, einstellungen, finetune, export
+// Views: figuren, werkstatt, orte, szenen, ereignisse, kontinuitaet, bewertung, kapitel, chat, stats, stil, fehler, suche, einstellungen, finetune, export
 // Admin-Usage-Tabs: users (default, weggelassen) | jobs | chat | summary | features | time
 //
 // Entwurfsentscheidungen:
@@ -18,8 +18,13 @@ export const appHashRouterMethods = {
     if (this.showMyStatsCard) return '#meine-statistik';
     if (this.showHelpCard) return '#hilfe';
     if (this.showOnboardingCard) return '#erste-schritte';
-    // Volltextsuche ist book-unabhaengig — eigener Top-Level-Hash.
-    if (this.showSearchCard) return '#search';
+    // Volltextsuche: buch-skopiert (#book/:id/suche) wenn ein Buch gewählt ist
+    // und der effektive Scope 'book' ist; sonst buchübergreifend (#search).
+    if (this.showSearchCard) {
+      const bid = this.$store.nav.selectedBookId;
+      if (bid && this.$store.nav.searchScope === 'book') return '#book/' + bid + '/suche';
+      return '#search';
+    }
     // Folder-Import ist book-unabhaengig (new-book oder merge).
     if (this.showFolderImportCard) return '#import';
     if (this.showAdminUsersCard) return '#admin/users';
@@ -74,6 +79,7 @@ export const appHashRouterMethods = {
     else if (this.showBookStatsCard) parts.push('stats');
     else if (this.showStilCard) parts.push('stil');
     else if (this.showFehlerHeatmapCard) parts.push('fehler');
+    else if (this.showRedundanzCard) parts.push('redundanz');
     else if (this.showBookSettingsCard) parts.push('einstellungen');
     else if (this.showFinetuneExportCard) parts.push('finetune');
     else if (this.showSnapshotsCard) parts.push('fassungen');
@@ -214,6 +220,10 @@ export const appHashRouterMethods = {
       this._applyingHash = true;
       this._inHashApply = true;
       try {
+        // #search = buchübergreifend: Scope-Spiegel auf 'all' setzen, bevor die
+        // Karte öffnet (onShow liest ihn), sonst kippt der Default 'book' die URL
+        // sofort auf #book/:id/suche zurück.
+        this.$store.nav.searchScope = 'all';
         if (!this.showSearchCard) await this.toggleSearchCard();
       } finally {
         this._applyingHash = false;
@@ -450,6 +460,17 @@ export const appHashRouterMethods = {
         case 'fehler':
           if (!this.showFehlerHeatmapCard) await this.toggleFehlerHeatmapCard();
           break;
+        case 'redundanz':
+          if (!this.showRedundanzCard) await this.toggleRedundanzCard();
+          break;
+        case 'suche':
+          // Buch-skopierte Volltextsuche. Scope-Spiegel auf 'book' setzen, bevor
+          // die Karte öffnet (onShow liest ihn), sonst bliebe der zuletzt genutzte
+          // Scope stehen und die URL kippte auf #search.
+          this.$store.nav.searchScope = 'book';
+          if (!this.showSearchCard) await this.toggleSearchCard();
+          else { this._closeOtherMainCards('search'); this._scrollToCardByKey('search'); }
+          break;
         case 'einstellungen':
           if (!this.showBookSettingsCard) await this.toggleBookSettingsCard();
           break;
@@ -498,7 +519,7 @@ export const appHashRouterMethods = {
       'showRechercheCard',
       'showKontinuitaetCard', 'showErzaehlprofilCard', 'showTagebuchRueckblickCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
-      'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
+      'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard', 'showRedundanzCard',
       'showBookSettingsCard', 'showUserSettingsCard', 'showMyStatsCard', 'showHelpCard', 'showOnboardingCard',
       'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
       'showAdminCategoriesCard', 'showAdminBooksCard', 'showAdminLogsCard', 'showAdminParseFailsCard',
@@ -530,6 +551,7 @@ export const appHashRouterMethods = {
       () => this.$store.catalogUi.selectedOrtId,
       () => this.$store.catalogUi.selectedSongId,
       () => this.$store.catalogUi.selectedSzeneId,
+      () => this.$store.nav.searchScope,
     ];
     for (const getter of storeWatched) {
       const off = this.$watch(getter, () => this._updateHash());

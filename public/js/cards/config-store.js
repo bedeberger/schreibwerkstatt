@@ -45,6 +45,7 @@ export function registerConfigStore() {
     languagetoolDebounceMs: 1500,
     researchChatEnabled: false,
     semanticSearchEnabled: false,
+    factcheckEnabled: false,
     apiProvider: 'claude',
     effectiveProvider: 'claude',
     claudeModel: 'claude-sonnet-4-6',

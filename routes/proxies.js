@@ -145,6 +145,10 @@ router.get('/config', (req, res) => {
     komplett: {
       continuity:      effectiveProvider === 'claude',
       narrativeProfile: effectiveProvider === 'claude',
+      // Weltfakten-Realitätscheck: Claude-only (web_search-Server-Tool) UND per Instanz
+      // freigeschaltet (Web-Suche kostet). Das Buch-Opt-in weltfakten_real_pruefen gated
+      // zusätzlich pro Buch (Frontend prüft es am Buch, nicht hier).
+      factcheck:       effectiveProvider === 'claude' && appSettings.get('ai.komplett.factcheck') === true,
     },
   });
 });

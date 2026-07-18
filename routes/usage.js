@@ -19,6 +19,7 @@ const ALLOWED_KEYS = new Set([
   'review',
   'stil',
   'fehlerHeatmap',
+  'redundanz',
   'kontinuitaet',
   'erzaehlprofil',
   'tagebuchRueckblick',

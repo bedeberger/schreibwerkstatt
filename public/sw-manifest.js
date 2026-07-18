@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "c8c194b0501482ec";
+self.__SHELL_BUILD = "453e9cd7b33542fe";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-backup.css",
   "/css/admin/admin-home.css",
@@ -20,6 +20,7 @@ self.__SHELL_MANIFEST = [
   "/css/analysis/kapitel-review.css",
   "/css/analysis/komplett-status.css",
   "/css/analysis/kontinuitaet.css",
+  "/css/analysis/redundanz.css",
   "/css/analysis/zeitleiste.css",
   "/css/book-overview/base.css",
   "/css/book-overview/coverage.css",
@@ -221,6 +222,7 @@ self.__SHELL_MANIFEST = [
   "/js/book/plot/lifecycle.js",
   "/js/book/plot/threads.js",
   "/js/book/recherche.js",
+  "/js/book/redundanz.js",
   "/js/book/review.js",
   "/js/book/songs.js",
   "/js/book/stil-heatmap.js",
@@ -318,6 +320,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/plot-card.js",
   "/js/cards/progress-store.js",
   "/js/cards/recherche-card.js",
+  "/js/cards/redundanz-card.js",
   "/js/cards/reference-card.js",
   "/js/cards/search-card.js",
   "/js/cards/session-store.js",
@@ -621,6 +624,7 @@ self.__SHELL_MANIFEST = [
   "/partials/plot-thread-bar.html",
   "/partials/plot.html",
   "/partials/recherche.html",
+  "/partials/redundanz.html",
   "/partials/reference.html",
   "/partials/search.html",
   "/partials/share-links.html",

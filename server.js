@@ -57,7 +57,7 @@ const figuresRouter = require('./routes/figures');
 const locationsRouter = require('./routes/locations');
 const songsRouter = require('./routes/songs');
 const { router: jobsRouter, runKomplettAnalyseAll } = require('./routes/jobs');
-const { reindexIndexedBooks } = require('./routes/jobs/embed-index');
+const { reindexAllBooks } = require('./routes/jobs/embed-index');
 const chatRouter = require('./routes/chat');
 const ideenRouter = require('./routes/ideen');
 const researchRouter = require('./routes/research');
@@ -689,14 +689,10 @@ try {
         logger.error('Cron page_locks-Cleanup Fehler: ' + e.message);
       }
 
-      // Semantische Suche: bestehende Embedding-Indizes frisch halten. Reiht pro
-      // bereits indiziertem Buch einen Job ein (Delta-Cache → nur geänderte
-      // Chunks neu embeddet); baut keinen neuen Index für nie-indizierte Bücher.
-      try {
-        reindexIndexedBooks();
-      } catch (e) {
-        logger.error('Cron Embedding-Reindex Fehler: ' + e.message);
-      }
+      // Semantische Suche: Embedding-Indizes aller Bücher frisch halten. Reiht
+      // pro Buch einen Job ein (Delta-Cache → nur geänderte Chunks neu
+      // embeddet); nie-indizierte Bücher bekommen ihren Erst-Index.
+      reindexAllBooks().catch(e => logger.error('Cron Embedding-Reindex Fehler: ' + e.message));
     });
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: Buchstatistik-Sync + Job-Cleanup + Cache-TTL-Cleanup + page_locks-Purge täglich 23:00 (${cronTz})`);

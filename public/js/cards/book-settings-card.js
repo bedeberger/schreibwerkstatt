@@ -53,6 +53,7 @@ export function registerBookSettingsCard() {
     bookSettingsOrteReal: false,
     bookSettingsSchauplatzLand: '',
     bookSettingsZeitlinieReal: false,
+    bookSettingsWeltfaktenRealPruefen: false,
     bookSettingsExcludeFromStats: false,
     // Sharing: Access-Liste + Invite-Form.
     bookAccessList: [],

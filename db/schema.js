@@ -973,10 +973,10 @@ function deleteFinetuneAiCache(bookId, userEmail) {
 
 // ── Buch-Einstellungen (Sprache + Region) ─────────────────────────────────────
 
-const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, entities_enabled, orte_real, schauplatz_land, zeitlinie_real, exclude_from_stats FROM book_settings WHERE book_id = ?');
+const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, entities_enabled, orte_real, schauplatz_land, zeitlinie_real, weltfakten_real_pruefen, exclude_from_stats FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
-  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land, zeitlinie_real, exclude_from_stats, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land, zeitlinie_real, weltfakten_real_pruefen, exclude_from_stats, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(book_id) DO UPDATE SET
     language=excluded.language, region=excluded.region,
     buchtyp=excluded.buchtyp, buch_kontext=excluded.buch_kontext,
@@ -990,6 +990,7 @@ const _upsertBookSettings = db.prepare(`
     orte_real=excluded.orte_real,
     schauplatz_land=excluded.schauplatz_land,
     zeitlinie_real=excluded.zeitlinie_real,
+    weltfakten_real_pruefen=excluded.weltfakten_real_pruefen,
     exclude_from_stats=excluded.exclude_from_stats,
     updated_at=excluded.updated_at
 `);
@@ -1021,6 +1022,7 @@ function getBookSettings(bookId, userEmail = null) {
     entities_enabled: row.entities_enabled ? 1 : 0,
     orte_real: row.orte_real ? 1 : 0,
     zeitlinie_real: row.zeitlinie_real ? 1 : 0,
+    weltfakten_real_pruefen: row.weltfakten_real_pruefen ? 1 : 0,
     exclude_from_stats: row.exclude_from_stats ? 1 : 0,
   };
   if (userEmail) {
@@ -1028,10 +1030,10 @@ function getBookSettings(bookId, userEmail = null) {
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
-      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null, zeitlinie_real: 0, exclude_from_stats: 0 };
+      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null, zeitlinie_real: 0, weltfakten_real_pruefen: 0, exclude_from_stats: 0 };
     }
   }
-  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null, zeitlinie_real: 0, exclude_from_stats: 0 };
+  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null, zeitlinie_real: 0, weltfakten_real_pruefen: 0, exclude_from_stats: 0 };
 }
 
 /** Locale-Key für ein Buch: z.B. "de-CH", "en-US". */
@@ -1042,7 +1044,7 @@ function getBookLocale(bookId, userEmail = null) {
 
 /** Speichert/aktualisiert Sprache, Region, Buchtyp, Buchkontext, Erzählperspektive, Erzählzeit, is_finished, allow_lektor_book_chat, daily_goal_chars.
  *  `entities_enabled` wird hier nicht angefasst — Quick-Toggle aus der Notebook-Toolbar laeuft ueber setBookEntitiesEnabled. */
-function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0, schauplatzLand = null, goalTargetChars = null, goalDeadline = null, stilprofil = null, zeitlinieReal = 0, excludeFromStats = 0) {
+function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaehlperspektive = null, erzaehlzeit = null, isFinished = 0, allowLektorBookChat = 0, dailyGoalChars = null, orteReal = 0, schauplatzLand = null, goalTargetChars = null, goalDeadline = null, stilprofil = null, zeitlinieReal = 0, excludeFromStats = 0, weltfaktenRealPruefen = 0) {
   _upsertBookSettings.run(
     parseInt(bookId), language, region,
     buchtyp || null, buchKontext || null,
@@ -1056,6 +1058,7 @@ function saveBookSettings(bookId, language, region, buchtyp, buchKontext, erzaeh
     orteReal ? 1 : 0,
     schauplatzLand || null,
     zeitlinieReal ? 1 : 0,
+    weltfaktenRealPruefen ? 1 : 0,
     excludeFromStats ? 1 : 0,
     new Date().toISOString()
   );
@@ -1091,8 +1094,8 @@ const _insContinuityCheck = db.prepare(
 );
 const _insContinuityIssue = db.prepare(
   `INSERT INTO continuity_issues
-   (check_id, book_id, user_email, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung, sort_order, updated_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`
+   (check_id, book_id, user_email, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung, quelle, sort_order, updated_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})`
 );
 const _insContinuityIssueFig = db.prepare(
   `INSERT INTO continuity_issue_figures (issue_id, figure_id, figur_name, sort_order) VALUES (?, ?, ?, ?)`
@@ -1107,17 +1110,67 @@ const _insContinuityIssueCh = db.prepare(
  *  figNameToId / chNameToId: Auflösungs-Maps (Name → fig_id / chapter_id).
  *  Gibt { checkId, normalizedIssues } zurück, wobei normalizedIssues die
  *  Frontend-Form mit fig_ids/chapter_ids enthält (kompatibel zur alten Antwort). */
-function saveContinuityCheck(bookId, userEmail, summary, model, issues, figNameToId, chNameToId) {
-  const bookIdInt = parseInt(bookId);
-  const email = userEmail || null;
-  const normalizedIssues = [];
-  let checkId = null;
+// Eine Issue-Zeile + Figuren-/Kapitel-Bridges anlegen und die Frontend-Normalform
+// zurückgeben. Geteilt von saveContinuityCheck (Voll-Check) und saveFaktencheckIssues
+// (Anhang an bestehenden Check). figIdToRowId: TEXT-fig_id → INTEGER figures.id.
+function _persistOneContinuityIssue(cid, bookIdInt, email, it, sortIndex, figNameToId, figIdToRowId, chNameToId) {
+  const { lastInsertRowid: issueId } = _insContinuityIssue.run(
+    cid, bookIdInt, email,
+    it.schwere || null, it.typ || null, it.beschreibung || null,
+    it.stelle_a || null, it.stelle_b || null, it.empfehlung || null,
+    it.quelle || null,
+    sortIndex,
+  );
+  const figNames = Array.isArray(it.figuren) ? it.figuren.map(_toRefString).filter(Boolean) : [];
+  const fig_ids = [];
+  const seenFig = new Set();
+  figNames.forEach((name, j) => {
+    const fid = figNameToId?.[name] || null;
+    const key = (fid || '') + '|' + name;
+    if (seenFig.has(key)) return;
+    seenFig.add(key);
+    if (fid) fig_ids.push(fid);
+    const figureRowId = fid ? (figIdToRowId[fid] ?? null) : null;
+    _insContinuityIssueFig.run(issueId, figureRowId, name, j);
+  });
+  const chNames = Array.isArray(it.kapitel) ? it.kapitel.map(_toRefString).filter(Boolean) : [];
+  const chapter_ids = [];
+  const seenCh = new Set();
+  chNames.forEach((name, j) => {
+    const cidCh = chNameToId?.[name] ?? null;
+    const key = (cidCh ?? '') + '|' + name;
+    if (seenCh.has(key)) return;
+    seenCh.add(key);
+    if (cidCh != null) chapter_ids.push(cidCh);
+    if (cidCh != null) _insContinuityIssueCh.run(issueId, cidCh, j);
+  });
+  return {
+    id: issueId,
+    schwere: it.schwere || null, typ: it.typ || null,
+    beschreibung: it.beschreibung || null,
+    stelle_a: it.stelle_a || null, stelle_b: it.stelle_b || null,
+    empfehlung: it.empfehlung || null,
+    quelle: it.quelle || null,
+    figuren: figNames, fig_ids,
+    kapitel: chNames, chapter_ids,
+  };
+}
+
+function _figIdToRowIdMap(bookIdInt, email) {
   // continuity_issue_figures.figure_id ist INTEGER (figures.id) seit Mig 73 —
   // figNameToId liefert TEXT-fig_id, zusaetzlicher Lookup TEXT → INT.
   const figRows = db.prepare(
     'SELECT id, fig_id FROM figures WHERE book_id = ? AND user_email IS ?'
   ).all(bookIdInt, email);
-  const figIdToRowId = Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
+  return Object.fromEntries(figRows.map(r => [r.fig_id, r.id]));
+}
+
+function saveContinuityCheck(bookId, userEmail, summary, model, issues, figNameToId, chNameToId) {
+  const bookIdInt = parseInt(bookId);
+  const email = userEmail || null;
+  const normalizedIssues = [];
+  let checkId = null;
+  const figIdToRowId = _figIdToRowIdMap(bookIdInt, email);
   db.transaction(() => {
     const { lastInsertRowid: cid } = _insContinuityCheck.run(
       bookIdInt, email, summary || '', model || null,
@@ -1125,47 +1178,44 @@ function saveContinuityCheck(bookId, userEmail, summary, model, issues, figNameT
     checkId = cid;
     const issuesArr = Array.isArray(issues) ? issues : [];
     for (let i = 0; i < issuesArr.length; i++) {
-      const it = issuesArr[i] || {};
-      const { lastInsertRowid: issueId } = _insContinuityIssue.run(
-        cid, bookIdInt, email,
-        it.schwere || null, it.typ || null, it.beschreibung || null,
-        it.stelle_a || null, it.stelle_b || null, it.empfehlung || null,
-        i,
-      );
-      const figNames = Array.isArray(it.figuren) ? it.figuren.map(_toRefString).filter(Boolean) : [];
-      const fig_ids = [];
-      const seenFig = new Set();
-      figNames.forEach((name, j) => {
-        const fid = figNameToId?.[name] || null;
-        const key = (fid || '') + '|' + name;
-        if (seenFig.has(key)) return;
-        seenFig.add(key);
-        if (fid) fig_ids.push(fid);
-        const figureRowId = fid ? (figIdToRowId[fid] ?? null) : null;
-        _insContinuityIssueFig.run(issueId, figureRowId, name, j);
-      });
-      const chNames = Array.isArray(it.kapitel) ? it.kapitel.map(_toRefString).filter(Boolean) : [];
-      const chapter_ids = [];
-      const seenCh = new Set();
-      chNames.forEach((name, j) => {
-        const cidCh = chNameToId?.[name] ?? null;
-        const key = (cidCh ?? '') + '|' + name;
-        if (seenCh.has(key)) return;
-        seenCh.add(key);
-        if (cidCh != null) chapter_ids.push(cidCh);
-        if (cidCh != null) _insContinuityIssueCh.run(issueId, cidCh, j);
-      });
-      normalizedIssues.push({
-        schwere: it.schwere || null, typ: it.typ || null,
-        beschreibung: it.beschreibung || null,
-        stelle_a: it.stelle_a || null, stelle_b: it.stelle_b || null,
-        empfehlung: it.empfehlung || null,
-        figuren: figNames, fig_ids,
-        kapitel: chNames, chapter_ids,
-      });
+      const { id, ...rest } = _persistOneContinuityIssue(cid, bookIdInt, email, issuesArr[i] || {}, i, figNameToId, figIdToRowId, chNameToId);
+      normalizedIssues.push(rest);
     }
   })();
   return { checkId, normalizedIssues };
+}
+
+// Faktencheck-Befunde (typ='faktenfehler') an den NEUESTEN Kontinuitäts-Check anhängen,
+// statt einen konkurrierenden Check anzulegen (getLatestContinuityCheck zeigt nur den
+// neuesten → ein eigener Check würde die Kontinuitäts-Befunde verdecken). Idempotent:
+// vorhandene faktenfehler-Zeilen dieses Checks werden zuerst gelöscht (Bridges via CASCADE),
+// dann die neuen eingefügt. Gibt es noch keinen Check (Faktencheck vor jeder Komplettanalyse),
+// wird einer angelegt. summaryFallback nur für diesen Neuanlage-Fall. Die Kontinuitäts-Befunde
+// (andere typ) des Checks bleiben unberührt. */
+function saveFaktencheckIssues(bookId, userEmail, model, issues, figNameToId, chNameToId, summaryFallback = '') {
+  const bookIdInt = parseInt(bookId);
+  const email = userEmail || null;
+  const figIdToRowId = _figIdToRowIdMap(bookIdInt, email);
+  const issuesArr = Array.isArray(issues) ? issues : [];
+  const normalizedIssues = [];
+  db.transaction(() => {
+    let row = db.prepare(
+      'SELECT id FROM continuity_checks WHERE book_id = ? AND user_email IS ? ORDER BY checked_at DESC LIMIT 1'
+    ).get(bookIdInt, email);
+    let cid = row?.id;
+    if (!cid) {
+      ({ lastInsertRowid: cid } = _insContinuityCheck.run(bookIdInt, email, summaryFallback || '', model || null));
+    } else {
+      db.prepare("DELETE FROM continuity_issues WHERE check_id = ? AND typ = 'faktenfehler'").run(cid);
+    }
+    // Neue faktenfehler ans Ende einsortieren (sort_order nach den bestehenden Issues).
+    const maxSort = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM continuity_issues WHERE check_id = ?').get(cid).m;
+    for (let i = 0; i < issuesArr.length; i++) {
+      const { id, ...rest } = _persistOneContinuityIssue(cid, bookIdInt, email, issuesArr[i] || {}, maxSort + 1 + i, figNameToId, figIdToRowId, chNameToId);
+      normalizedIssues.push(rest);
+    }
+  })();
+  return { normalizedIssues };
 }
 
 /** Lädt den letzten Kontinuitäts-Check eines Buchs in Frontend-Form
@@ -1181,7 +1231,7 @@ function getLatestContinuityCheck(bookId, userEmail) {
   `).get(bookIdInt, email);
   if (!row) return null;
   const issueRows = db.prepare(`
-    SELECT id, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung, resolved
+    SELECT id, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung, quelle, resolved
     FROM continuity_issues
     WHERE check_id = ?
     ORDER BY sort_order, id
@@ -1219,6 +1269,7 @@ function getLatestContinuityCheck(bookId, userEmail) {
     resolved: !!r.resolved,
     schwere: r.schwere, typ: r.typ, beschreibung: r.beschreibung,
     stelle_a: r.stelle_a, stelle_b: r.stelle_b, empfehlung: r.empfehlung,
+    quelle: r.quelle || null,
     figuren: figByIssue.get(r.id)?.figuren || [],
     fig_ids: figByIssue.get(r.id)?.fig_ids || [],
     kapitel: chByIssue.get(r.id)?.kapitel || [],
@@ -1532,6 +1583,7 @@ module.exports = {
   saveSongsToDb,
   backfillLocationChaptersFromScenes,
   saveContinuityCheck,
+  saveFaktencheckIssues,
   getLatestContinuityCheck,
   getContinuityIssueBookId,
   setContinuityIssueResolved,
