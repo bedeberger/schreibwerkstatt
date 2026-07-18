@@ -106,8 +106,9 @@ export const conflictMethods = {
       trackMerge('silent_success');
       return { merged: true, saveHtml, expectedAt: remoteUpdatedAt };
     }
-    writeDraft(app.currentPage.id, localHtml, app.originalHtml, app.currentPage.updated_at);
-    app.lastDraftSavedAt = Date.now();
+    const draftOk = writeDraft(app.currentPage.id, localHtml, app.originalHtml, app.currentPage.updated_at);
+    app.draftPersistFailed = !draftOk;
+    if (draftOk) app.lastDraftSavedAt = Date.now();
     app.saveOffline = true;
     this._openConflictResolution({ merged: m.merged, conflicts: m.conflicts, source, remoteUpdatedAt });
     return { conflict: true };
@@ -183,8 +184,9 @@ export const conflictMethods = {
         // Fallback (Merge null: Flag off / leere Base / Read-Fehler): die
         // aufgelöste Arbeit als Draft sichern, Offline-/Konflikt-Banner zeigen.
         // conflictResolution bleibt offen — User kann erneut übernehmen/abbrechen.
-        writeDraft(cr.pageId, finalHtml, app.originalHtml, app.currentPage?.updated_at);
-        app.lastDraftSavedAt = Date.now();
+        const draftOk = writeDraft(cr.pageId, finalHtml, app.originalHtml, app.currentPage?.updated_at);
+        app.draftPersistFailed = !draftOk;
+        if (draftOk) app.lastDraftSavedAt = Date.now();
         app.saveOffline = true;
         app.editConflict = readConflictBody(e);
         app.setStatus(app.t('edit.conflict.kept'), false, 8000);

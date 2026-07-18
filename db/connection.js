@@ -1,7 +1,19 @@
 const path = require('path');
 const Database = require('better-sqlite3');
+const { applyPendingRestore } = require('./apply-pending-restore');
 
 const DB_FILE = process.env.DB_PATH || path.join(__dirname, '..', 'schreibwerkstatt.db');
+
+// Admin-DB-Restore: liegt eine validierte Pending-Datei vor, wird die DB VOR dem
+// Oeffnen geswappt (Sicherheitskopie inklusive). Schlaegt das fehl, brechen wir
+// den Boot ab — lieber sichtbar als still auf einer halb-getauschten DB laufen.
+try {
+  applyPendingRestore(DB_FILE);
+} catch (e) {
+  console.error(`[db-restore] Pending-Restore FEHLGESCHLAGEN, Boot abgebrochen: ${e.message}`);
+  throw e;
+}
+
 const db = new Database(DB_FILE);
 db.pragma('journal_mode = WAL');
 // Wegwerf-Test-DBs brauchen keine Crash-Durability. `synchronous = OFF` (DB_FSYNC=off,

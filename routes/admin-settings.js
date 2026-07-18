@@ -202,6 +202,24 @@ router.post('/test-image', async (req, res) => {
   }
 });
 
+// POST /admin/settings/test-embed — Health-Probe des Embedding-Endpunkts.
+// Embeddet einen Mini-String und meldet die tatsächlich gelieferte Dimension
+// (Sanity gegen die konfigurierte embed.dim). ok wenn ein Vektor zurückkommt.
+router.post('/test-embed', async (req, res) => {
+  const embed = require('../lib/embed');
+  const enabled = appSettings.get('embed.enabled') === true;
+  const { host, dim: cfgDim } = embed.getConfig();
+  if (!host) return res.json({ ok: false, error: 'NO_HOST', enabled });
+  const t0 = Date.now();
+  try {
+    const vec = await embed.embedOne('Testsatz für die semantische Suche.');
+    const dim = vec ? vec.length : 0;
+    return res.json({ ok: dim > 0, dim, configured_dim: cfgDim, dim_mismatch: dim > 0 && dim !== cfgDim, latency_ms: Date.now() - t0, enabled });
+  } catch (e) {
+    return res.json({ ok: false, error: e.name === 'AbortError' ? 'TIMEOUT' : e.message, latency_ms: Date.now() - t0, enabled });
+  }
+});
+
 // POST /admin/settings/test-geocode — Health-Probe der konfigurierten
 // Geocoding-Quelle. Fragt eine bekannte Stadt ab; ok wenn >=1 Treffer.
 router.post('/test-geocode', async (req, res) => {

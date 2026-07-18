@@ -295,5 +295,36 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Fehlerdichte-Trend über die Fassungen (Chart.js-Linie) */
+.fehler-trend {
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+.fehler-trend-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.fehler-trend-title {
+  font-weight: 600;
+}
+.fehler-trend-sub {
+  font-size: var(--font-size-xs, 11px);
+  color: var(--color-muted);
+}
+.fehler-trend-chart-wrap {
+  position: relative;
+  height: 260px;
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .fehler-trend-chart-wrap {
+    height: 200px;
+  }
+}
 
 }

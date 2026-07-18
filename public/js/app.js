@@ -32,9 +32,11 @@ import { appChromeMethods } from './app/app-chrome.js';
 import { appKomplettMethods } from './app/app-komplett.js';
 import { appJobsCoreMethods } from './app/app-jobs-core.js';
 import { appCollabMethods } from './app/app-collab.js';
+import { appOutboxMethods } from './app/app-outbox.js';
 import { appViewMethods } from './app/app-view.js';
 import { appNavigationMethods } from './app/app-navigation.js';
 import { appHashRouterMethods } from './app/app-hash-router.js';
+import { appOnboardingMethods } from './app/app-onboarding.js';
 import { rootGetterDescriptors } from './app/app-root-getters.js';
 import { appInitMethods } from './app/app-init.js';
 import { installFetchGuard } from './app/boot/fetch-guard.js';
@@ -299,9 +301,11 @@ document.addEventListener('alpine:init', () => {
     ...appKomplettMethods,
     ...appJobsCoreMethods,
     ...appCollabMethods,
+    ...appOutboxMethods,
     ...appViewMethods,
     ...appNavigationMethods,
     ...appHashRouterMethods,
+    ...appOnboardingMethods,
     ...featuresUsageMethods,
     });
     Object.defineProperties(obj, rootGetterDescriptors);

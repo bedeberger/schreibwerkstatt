@@ -212,6 +212,8 @@
   --card-accent-songs: var(--card-accent-songs-base);
   --card-accent-folderimport-base: #5a7a4a;
   --card-accent-folderimport: var(--card-accent-folderimport-base);
+  --card-accent-onboarding-base: #3a8a6a;
+  --card-accent-onboarding: var(--card-accent-onboarding-base);
   --card-accent-blog-base: #4a7aa0;
   --card-accent-blog: var(--card-accent-blog-base);
   --card-accent-hubspot-base: #c45a3a;
@@ -441,6 +443,7 @@
   --card-accent-search: oklch(from var(--card-accent-search-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-songs: oklch(from var(--card-accent-songs-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-folderimport: oklch(from var(--card-accent-folderimport-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
+  --card-accent-onboarding: oklch(from var(--card-accent-onboarding-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-blog: oklch(from var(--card-accent-blog-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-hubspot: oklch(from var(--card-accent-hubspot-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-share: oklch(from var(--card-accent-share-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);

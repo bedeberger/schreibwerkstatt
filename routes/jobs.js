@@ -24,6 +24,7 @@ const { researchLinkRouter } = require('./jobs/research-link');
 const { bookImportRouter } = require('./jobs/book-import');
 const { blogSyncRouter } = require('./jobs/blog-sync');
 const { hubspotSyncRouter } = require('./jobs/hubspot-sync');
+const { embedIndexRouter } = require('./jobs/embed-index');
 
 // Budget-Enforcement greift VOR allen Sub-Routern, sonst lassen sich
 // die Job-POSTs unter /jobs/* nicht mit einer einzigen Middleware kapseln.
@@ -56,6 +57,7 @@ router.use('/', researchLinkRouter);
 router.use('/', bookImportRouter);
 router.use('/', blogSyncRouter);
 router.use('/', hubspotSyncRouter);
+router.use('/', embedIndexRouter);
 router.use('/', sharedRouter);
 
 module.exports = { router, runKomplettAnalyseAll };

@@ -138,7 +138,7 @@ export const appChromeMethods = {
   // Scrollens und fadet nach kurzer Idle-Zeit wieder aus. CSS reserviert den
   // Gutter dauerhaft (kein Layout-Shift), JS toggelt nur `.is-scrolling`.
   _initSidebarScrollFade() {
-    this._bindScrollFade(document.querySelector('.layout-sidebar > #partial-sidebar'));
+    this._bindScrollFade(document.querySelector('.layout-sidebar > #partial-sidebar > .card'));
   },
 
   // Dünner Wrapper um die geteilte scroll-fade.js#bindScrollFade — als Methode am

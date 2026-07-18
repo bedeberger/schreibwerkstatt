@@ -13,6 +13,7 @@
              && !showAdminParseFailsCard
              && !showAdminJsErrorsCard
              && !showAdminDevicesCard
+             && !showAdminBackupCard
              && !showUserSettingsCard"
      x-cloak>
   <div class="card-header">
@@ -81,6 +82,13 @@
       <div class="overview-tile-label" x-text="t('admin.home.devicesLabel')"></div>
       <div class="overview-tile-value" x-text="t('admin.devices.title')"></div>
       <div class="overview-tile-desc" x-text="t('tile.adminDevices.desc')"></div>
+    </button>
+    <button type="button"
+            class="overview-tile internal-link card--admin-backup"
+            @click="toggleAdminBackupCard()">
+      <div class="overview-tile-label" x-text="t('admin.home.backupLabel')"></div>
+      <div class="overview-tile-value" x-text="t('admin.backup.title')"></div>
+      <div class="overview-tile-desc" x-text="t('tile.adminBackup.desc')"></div>
     </button>
   </div>
 </div>

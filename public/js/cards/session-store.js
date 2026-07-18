@@ -17,6 +17,10 @@
 //                  User ungespeicherte Inhalte retten kann.
 //   serverOffline  — true wenn der Server nicht erreichbar ist (Health-/Fetch-Fail).
 //   isOffline      — true wenn der Browser offline ist (navigator.onLine === false).
+//   pendingSyncCount — Anzahl Seiten mit lokal gesichertem, noch nicht
+//                  synchronisiertem Entwurf (Reconnect-Outbox, app-outbox.js).
+//                  Speist den Offline-Banner. Die aktuell offene Edit-Seite ist
+//                  ausgenommen (sie ist „live", sonst flackert der Zähler).
 //   devMode        — Local-Dev-/Dev-Admin-Modus (LOCAL_DEV_MODE). Blendet z.B.
 //                  den Logout-Eintrag der Command-Palette aus.
 
@@ -27,6 +31,7 @@ export function registerSessionStore() {
     sessionExpired: false,
     serverOffline: false,
     isOffline: false,
+    pendingSyncCount: 0,
     devMode: false,
   });
 }

@@ -378,6 +378,76 @@ router.patch('/settings', jsonBody, (req, res) => {
   res.json({ ok: true, ...toResponse(getUser(email)) });
 });
 
+// ── Onboarding („Erste Schritte") ────────────────────────────────────────────
+// Persistierter Teil (welcomeDismissed/completed) in app_users.onboarding_state;
+// die Checklisten-Schritte werden aus echtem State abgeleitet (self-healing).
+
+function parseOnboardingState(user) {
+  let s = {};
+  try { s = user?.onboarding_state ? JSON.parse(user.onboarding_state) : {}; }
+  catch { s = {}; }
+  return { welcomeDismissed: !!s.welcomeDismissed, completed: !!s.completed };
+}
+
+// Abgeleiteter Fortschritt: Buch angelegt → Text geschrieben → KI-Analyse
+// gelaufen → geteilt. Alle Quellen sind Aggregat-/ACL-/Nicht-Content-Tabellen
+// (book_access, page_stats, figures, locations, share_links) — kein direkter
+// Zugriff auf pages/chapters/books (Content-Store-Regel).
+function onboardingSteps(email) {
+  const owned = listBookIdsForUser(email).filter(r => r.role === 'owner').map(r => r.book_id);
+  const steps = { book: owned.length > 0, page: false, analysis: false, share: false };
+  if (owned.length) {
+    const ph = owned.map(() => '?').join(',');
+    const pg = db.prepare(`SELECT COUNT(*) AS c FROM page_stats WHERE book_id IN (${ph}) AND chars > 0`).get(...owned);
+    steps.page = (pg?.c || 0) > 0;
+    const fig = db.prepare(`SELECT COUNT(*) AS c FROM figures WHERE book_id IN (${ph})`).get(...owned);
+    const loc = db.prepare(`SELECT COUNT(*) AS c FROM locations WHERE book_id IN (${ph})`).get(...owned);
+    steps.analysis = ((fig?.c || 0) + (loc?.c || 0)) > 0;
+  }
+  const sh = db.prepare('SELECT COUNT(*) AS c FROM share_links WHERE owner_email = ? AND revoked_at IS NULL').get(email);
+  steps.share = (sh?.c || 0) > 0;
+  return steps;
+}
+
+/** Onboarding-State + abgeleiteter Checklisten-Fortschritt des Users. */
+router.get('/onboarding', (req, res) => {
+  const email = req.session.user.email;
+  const user = getUser(email);
+  if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
+  res.json({ state: parseOnboardingState(user), steps: onboardingSteps(email) });
+});
+
+/** Persistierten Onboarding-State teilweise aktualisieren
+ *  (welcomeDismissed / completed). */
+router.patch('/onboarding', jsonBody, (req, res) => {
+  const email = req.session.user.email;
+  const user = getUser(email);
+  if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
+  const cur = parseOnboardingState(user);
+  const body = req.body || {};
+  const next = { ...cur };
+  if (typeof body.welcomeDismissed === 'boolean') next.welcomeDismissed = body.welcomeDismissed;
+  if (typeof body.completed === 'boolean') next.completed = body.completed;
+  appUsers.setOnboardingState(email, next);
+  res.json({ ok: true, state: next, steps: onboardingSteps(email) });
+});
+
+/** Beispielbuch anlegen (gemeinfreie Prosa, kein KI-Call). Idempotent pro User:
+ *  existiert es schon, kommt dessen book_id zurueck (deduplicated=true). */
+router.post('/onboarding/demo-book', async (req, res) => {
+  const email = req.session.user.email;
+  try {
+    const { createDemoBook } = require('../lib/demo-book');
+    const result = await createDemoBook(email);
+    setContext({ book: result.bookId });
+    logger.info(`Beispielbuch ${result.deduplicated ? 'wiederverwendet' : 'angelegt'} (id=${result.bookId})`, { user: email });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    logger.error(`Beispielbuch anlegen fehlgeschlagen: ${e.message}`, { user: email });
+    res.status(500).json({ error_code: 'DEMO_BOOK_FAILED', detail: e.message });
+  }
+});
+
 // User-Selbst-Invite. Gate via app_users.can_invite_users; Admins
 // duerfen ueber /admin/users/invite mit role='admin' arbeiten, hier zwingend
 // role='user'. Use-Case: Buch-Sharing-Dialog laedt frische Email ein.

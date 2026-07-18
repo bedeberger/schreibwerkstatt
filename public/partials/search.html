@@ -5,15 +5,32 @@
     <span class="card-subtitle" x-text="$app.t('search.subtitle')"></span>
   </div>
 
-  <div class="search-q-row">
+  <div class="search-mode-row" x-show="semanticAvailable">
+    <button type="button" class="search-mode-btn" :class="{ 'is-active': mode === 'fts' }"
+      @click="setMode('fts')" x-text="$app.t('search.mode.fts')"></button>
+    <button type="button" class="search-mode-btn" :class="{ 'is-active': mode === 'semantic' }"
+      @click="setMode('semantic')" x-text="$app.t('search.mode.semantic')"></button>
+    <button type="button" class="btn-compact search-index-btn" x-show="mode === 'semantic'"
+      :disabled="indexing" @click="buildIndex()"
+      x-text="indexing ? (indexStatus || $app.t('search.semantic.indexing')) : $app.t('search.semantic.buildIndex')"></button>
+    <span class="search-index-status muted-msg muted-msg--sm" x-show="!indexing && indexStatus" x-text="indexStatus"></span>
+  </div>
+
+  <div class="search-like-banner" x-show="likeEntity">
+    <span x-text="$app.t('search.semantic.similarTo', { label: likeEntity?.label || '' })"></span>
+    <button type="button" class="btn-compact" @click="clearLike()"
+      :title="$app.t('search.clear')" :aria-label="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+  </div>
+
+  <div class="search-q-row" x-show="!likeEntity">
     <span class="search-affix">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#search"/></svg>
       <input
         type="search"
         class="search-q"
         x-model="q"
-        :placeholder="$app.t('search.placeholder')"
-        :aria-label="$app.t('search.placeholder')"
+        :placeholder="mode === 'semantic' ? $app.t('search.semantic.placeholder') : $app.t('search.placeholder')"
+        :aria-label="mode === 'semantic' ? $app.t('search.semantic.placeholder') : $app.t('search.placeholder')"
         @input="onInput()"
         @keydown.enter.prevent="runSearch()"
       />

@@ -33,6 +33,23 @@
 
   <div x-show="fehlerHeatmapStatus" class="card-status" x-html="fehlerHeatmapStatus"></div>
 
+  <!-- Fehlerdichte-Trend über die Fassungen: folgt dem oben gewählten Modus
+       (offen/angenommen/alle), y = Fehler pro 1000 Wörter. -->
+  <section class="fehler-trend">
+    <div class="fehler-trend-head">
+      <span class="fehler-trend-title" x-text="$app.t('fehlerHeatmap.trend.title')"></span>
+      <span class="fehler-trend-sub" x-text="$app.t('fehlerHeatmap.trend.sub')"></span>
+    </div>
+    <template x-if="fehlerTrendHasData()">
+      <div class="fehler-trend-chart-wrap">
+        <canvas id="fehler-trend-chart"></canvas>
+      </div>
+    </template>
+    <template x-if="!fehlerTrendHasData()">
+      <div class="muted-msg" x-text="$app.t('fehlerHeatmap.trend.hint')"></div>
+    </template>
+  </section>
+
   <div x-show="!fehlerHeatmapLoading && (!fehlerHeatmapData?.chapters || fehlerHeatmapData.chapters.length === 0)"
        class="muted-msg muted-msg--spaced" x-text="$app.t('fehlerHeatmap.emptyState')"></div>
 

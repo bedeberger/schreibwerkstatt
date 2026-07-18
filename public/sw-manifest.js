@@ -4,8 +4,9 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "a46bd3ba226e54b6";
+self.__SHELL_BUILD = "a63bfdbbc445ccbb";
 self.__SHELL_MANIFEST = [
+  "/css/admin/admin-backup.css",
   "/css/admin/admin-home.css",
   "/css/admin/admin-settings.css",
   "/css/admin/admin-usage.css",
@@ -58,6 +59,7 @@ self.__SHELL_MANIFEST = [
   "/css/components/job-toast.css",
   "/css/components/manuscript-stream.css",
   "/css/components/my-stats.css",
+  "/css/components/onboarding.css",
   "/css/components/share-links.css",
   "/css/components/snapshot-reader.css",
   "/css/components/snapshots.css",
@@ -122,6 +124,7 @@ self.__SHELL_MANIFEST = [
   "/css/tokens/spacing.css",
   "/css/tokens/typography.css",
   "/icons.svg",
+  "/js/admin/admin-backup.js",
   "/js/admin/admin-books.js",
   "/js/admin/admin-categories.js",
   "/js/admin/admin-devices.js",
@@ -140,6 +143,8 @@ self.__SHELL_MANIFEST = [
   "/js/app/app-jobs-core.js",
   "/js/app/app-komplett.js",
   "/js/app/app-navigation.js",
+  "/js/app/app-onboarding.js",
+  "/js/app/app-outbox.js",
   "/js/app/app-root-getters.js",
   "/js/app/app-state.js",
   "/js/app/app-ui.js",
@@ -231,6 +236,7 @@ self.__SHELL_MANIFEST = [
   "/js/book/tree/ui.js",
   "/js/book/writing-time.js",
   "/js/book/ymheatmap.js",
+  "/js/cards/admin-backup-card.js",
   "/js/cards/admin-books-card.js",
   "/js/cards/admin-categories-card.js",
   "/js/cards/admin-devices-card.js",
@@ -300,6 +306,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/my-stats-trends-methods.js",
   "/js/cards/my-stats-trends.js",
   "/js/cards/nav-store.js",
+  "/js/cards/onboarding-card.js",
   "/js/cards/orte-card.js",
   "/js/cards/page-history-card.js",
   "/js/cards/page-revisions-card.js",
@@ -497,6 +504,7 @@ self.__SHELL_MANIFEST = [
   "/js/utils/html.js",
   "/js/utils/markdown.js",
   "/js/utils/net.js",
+  "/partials/admin-backup.html",
   "/partials/admin-books.html",
   "/partials/admin-categories.html",
   "/partials/admin-devices.html",
@@ -509,6 +517,7 @@ self.__SHELL_MANIFEST = [
   "/partials/admin-settings-api.html",
   "/partials/admin-settings-auth.html",
   "/partials/admin-settings-cron.html",
+  "/partials/admin-settings-embed.html",
   "/partials/admin-settings-geocode.html",
   "/partials/admin-settings-image.html",
   "/partials/admin-settings-jobs.html",
@@ -592,6 +601,7 @@ self.__SHELL_MANIFEST = [
   "/partials/my-stats-insights.html",
   "/partials/my-stats-rhythm.html",
   "/partials/my-stats.html",
+  "/partials/onboarding.html",
   "/partials/organizer-page-actions.html",
   "/partials/orte.html",
   "/partials/page-history.html",

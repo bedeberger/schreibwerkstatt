@@ -30,6 +30,7 @@ export const lifecycleMethods = {
     clearDraft(pageId ?? app.currentPage?.id);
     app.lastAutosaveAt = Date.now();
     app.lastDraftSavedAt = null;
+    app.draftPersistFailed = false;
     app.editDirty = false;
     app.saveOffline = false;
     app.editConflict = null;
@@ -60,6 +61,7 @@ export const lifecycleMethods = {
     app.editDirty = false;
     app.editSaving = false;
     app.saveOffline = false;
+    app.draftPersistFailed = false;
     app.pendingDraft = null;
     app.lastDraftSavedAt = null;
     app.pageEditorFullscreen = false;
@@ -390,14 +392,18 @@ export const lifecycleMethods = {
       app.editDirty = false;
       clearDraft(app.currentPage.id);
       app.lastDraftSavedAt = null;
+      app.draftPersistFailed = false;
       return;
     }
     const newText = htmlToText(newHtml).trim();
     if (!newText) return;
 
-    // Immer zuerst lokal sichern, dann erst Netzwerkversuch.
-    writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
-    app.lastDraftSavedAt = Date.now();
+    // Immer zuerst lokal sichern, dann erst Netzwerkversuch. Schlägt die lokale
+    // Sicherung fehl (localStorage voll), sichtbar machen — der Offline-Fall
+    // hätte sonst stillen Datenverlust (Save-Indicator zeigt `unsaved`).
+    const draftOk = writeDraft(app.currentPage.id, newHtml, app.originalHtml, app.currentPage.updated_at);
+    app.draftPersistFailed = !draftOk;
+    if (draftOk) app.lastDraftSavedAt = Date.now();
 
     // Bewusst KEIN navigator.onLine-Gate vor dem PUT: der Flag meldet (Sleep/Wake,
     // VPN-Wechsel, Netzwerk-Interface-Flap) faelschlich `false` und feuert danach

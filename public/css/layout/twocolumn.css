@@ -9,7 +9,7 @@
   .layout {
     display: grid;
     grid-template-columns: var(--sidebar-w, 280px) 1fr;
-    gap: 0 1.75rem;
+    gap: 0 1.25rem;
     align-items: start;
   }
   .layout.layout--no-sidebar {
@@ -38,6 +38,16 @@
   }
 }
 
+/* Sidebar-Karte trägt ein schmaleres horizontales Padding als die globale
+   `.card` (20px) — der Tree ist eine dichte Navigationsliste, kein Fließtext,
+   und die doppelte Karten-Rinne (Sidebar-Padding + Gap + Content-Padding)
+   wirkt sonst zu breit. Nur inline, damit der vertikale Karten-Rhythmus
+   (Header-Border, Badge-Reihe) unangetastet bleibt. Lokal auf die Sidebar
+   skopiert, nicht global — sonst zöge es jede Karte der App mit. */
+.layout-sidebar #partial-sidebar > .card {
+  padding-inline: var(--space-14);
+}
+
 /* Resize-Handle: sitzt am rechten Rand der Sidebar, ragt halb in den
    Grid-Gap. JS injiziert das Element in `.layout-sidebar` und schreibt
    `--sidebar-w` auf `.layout`. Persistenz in localStorage('sidebar-width').
@@ -48,11 +58,15 @@
 }
 
 /* Sticky-Sidebar mit eigenem Scroll: bei vielen Kapiteln wächst der Tree sonst
-   ins Endlose und schiebt den Main-Content weg. Scroll liegt auf dem inneren
-   `#partial-sidebar` (Tree), nicht auf `.layout-sidebar` selbst — so bleibt die
-   Sidebar Positions-Kontext für das absolut gesetzte `.sidebar-resize-handle`,
-   das dadurch nicht mit dem Tree wegscrollt. Nur Desktop: mobil stapelt die
-   Sidebar über den Karten und darf nicht in der Höhe begrenzt werden. */
+   ins Endlose und schiebt den Main-Content weg. Scroll + reservierter
+   Scrollbar-Gutter liegen auf der Tree-`.card` selbst (nicht auf dem
+   `#partial-sidebar`-Wrapper) — so sitzt der stabile Gutter INNERHALB des
+   Kartenrands. Läge er auf dem Wrapper, entstünde zwischen sichtbarem
+   Kartenrand und Spaltenkante eine dauerhafte Scrollbar-Breite Leerraum, die
+   den Abstand zur Content-Karte aufbläht und den mittig im Grid-Gap sitzenden
+   `.sidebar-resize-handle` optisch aus der Mitte schiebt. `.layout-sidebar`
+   bleibt Positions-Kontext für das absolut gesetzte Handle. Nur Desktop:
+   mobil stapelt die Sidebar über den Karten und darf nicht höhenbegrenzt sein. */
 @media (min-width: 960px) {
   .layout-sidebar {
     position: sticky;
@@ -62,6 +76,12 @@
     flex-direction: column;
   }
   .layout-sidebar > #partial-sidebar {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .layout-sidebar > #partial-sidebar > .card {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -75,25 +95,25 @@
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
   }
-  .layout-sidebar > #partial-sidebar.is-scrolling {
+  .layout-sidebar > #partial-sidebar > .card.is-scrolling {
     scrollbar-color: var(--color-muted) transparent;
   }
-  .layout-sidebar > #partial-sidebar::-webkit-scrollbar {
+  .layout-sidebar > #partial-sidebar > .card::-webkit-scrollbar {
     width: 8px;
   }
-  .layout-sidebar > #partial-sidebar::-webkit-scrollbar-thumb {
+  .layout-sidebar > #partial-sidebar > .card::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: var(--radius-sm);
     transition: background var(--transition-slow);
   }
-  .layout-sidebar > #partial-sidebar.is-scrolling::-webkit-scrollbar-thumb {
+  .layout-sidebar > #partial-sidebar > .card.is-scrolling::-webkit-scrollbar-thumb {
     background: var(--color-muted);
   }
 }
 .sidebar-resize-handle {
   position: absolute;
   top: 0;
-  right: calc(-1 * (1.75rem / 2) - 3px);
+  right: calc(-1 * (1.25rem / 2) - 3px);
   width: 6px;
   height: 100%;
   cursor: col-resize;

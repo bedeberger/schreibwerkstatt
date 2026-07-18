@@ -17,6 +17,7 @@ const { executeTool, validateFinalAnswerCitations } = require('../book-chat-tool
 const { generateSessionTitle } = require('../chat-title');
 const { makeAgenticChatJob, buildAgenticHistory } = require('../agentic-chat');
 const { imageGenEnabled } = require('../../../lib/image-gen');
+const embed = require('../../../lib/embed');
 const { setContext } = require('../../../lib/log-context');
 const appSettings = require('../../../lib/app-settings');
 const { recordChatLedgerForMessage } = require('../../../db/cost-ledger');
@@ -361,9 +362,13 @@ const runBookChatJobAgent = makeAgenticChatJob({
     const { SYSTEM_BOOK_CHAT: bookChatSys } = await getBookPrompts(session.book_id, userEmail);
     const maxToolIter = _bookChatMaxToolIter();
     const systemPrompt = buildBookChatAgentSystemPrompt(session.book_name || '', figuren, review, bookChatSys, maxToolIter);
-    // generate_image nur anbieten, wenn der Bild-Endpunkt konfiguriert ist — sonst
-    // spart das Input-Tokens und das Modell ruft kein totes Werkzeug.
-    const tools = imageGenEnabled() ? BOOK_CHAT_TOOLS : BOOK_CHAT_TOOLS.filter(t => t.name !== 'generate_image');
+    // generate_image / search_similar nur anbieten, wenn der jeweilige Endpunkt
+    // (Bild bzw. Embeddings) konfiguriert ist — sonst spart das Input-Tokens und
+    // das Modell ruft kein totes Werkzeug.
+    const imgOn = imageGenEnabled();
+    const embOn = embed.isEnabled();
+    const tools = BOOK_CHAT_TOOLS.filter(t =>
+      (t.name !== 'generate_image' || imgOn) && (t.name !== 'search_similar' || embOn));
     return {
       systemPrompt,
       tools,

@@ -46,6 +46,18 @@ export const appInitMethods = {
       if (this.$store.shell.themePref === 'auto') this._applyTheme();
     }, { signal });
     window.addEventListener(EVT.SESSION_EXPIRED, () => { this.$store.session.sessionExpired = true; }, { signal });
+    // Browser-Offline-Zustand an den Session-Store koppeln → speist den
+    // Offline-Banner (index.html, gegated gegen sessionExpired/serverOffline).
+    // Rein informativ: navigator.onLine liefert zwar False-Positives (VPN-/
+    // Interface-Flap), gated aber keinen Save-Pfad — der `online`-Event holt
+    // den Banner zuverlaessig zurueck. Initialwert sofort setzen, damit ein
+    // Boot ohne Netz den Banner nicht erst beim naechsten Toggle zeigt.
+    this.$store.session.isOffline = (navigator.onLine === false);
+    window.addEventListener('offline', () => { this.$store.session.isOffline = true; }, { signal });
+    window.addEventListener('online', () => { this.$store.session.isOffline = false; }, { signal });
+    // Reconnect-Outbox: flusht ALLE offline gesicherten Notebook-Drafts (nicht
+    // nur die offene Seite) beim Wiederverbinden + speist den Pending-Zähler.
+    this._installOutbox(signal);
     window.addEventListener(EVT.JOB_FINISHED, (e) => this._onJobFinished(e.detail), { signal });
     this._initSttDictation?.(signal);
     this._initTtsProof?.(signal);
@@ -139,6 +151,9 @@ export const appInitMethods = {
       if (cfg.ollamaModel) this.$store.config.ollamaModel = cfg.ollamaModel;
       if (cfg.openaiCompatModel) this.$store.config.openaiCompatModel = cfg.openaiCompatModel;
       this.$store.session.currentUser = cfg.user || null;
+      // First-Login-Willkommens-Banner („Erste Schritte"): non-blocking laden,
+      // sobald ein User da ist. Serverseitig gemerkt (welcomeDismissed).
+      if (cfg.user) this._loadOnboardingWelcome?.();
       this.$store.session.devMode = !!cfg.devMode;
       this.$store.shell.promptConfig = cfg.promptConfig || {};
       if (cfg.userSettings?.theme && cfg.userSettings.theme !== this.$store.shell.themePref) {
@@ -188,6 +203,7 @@ export const appInitMethods = {
       }
       this.$store.tts.enabled = !!cfg.tts?.enabled;
       this.$store.config.researchChatEnabled = !!cfg.researchChat?.enabled;
+      this.$store.config.semanticSearchEnabled = !!cfg.semanticSearch?.enabled;
       if (cfg.tts?.pause) {
         const frag = Number(cfg.tts.pause.fragmentMs);
         const para = Number(cfg.tts.pause.paragraphMs);

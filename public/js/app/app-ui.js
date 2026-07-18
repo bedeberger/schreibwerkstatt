@@ -194,10 +194,14 @@ export const appUiMethods = {
   escPreserveStrong,
 
   _saveStatus() {
-    // Reihenfolge: aktive Vorgänge zuerst (saving), dann Fehlerzustände
-    // (offline), dann normale Resultate (draft/saved). saveOffline bleibt
-    // sticky bis nächster erfolgreicher Save → User sieht Retry-Zustand
-    // durchgehend, nicht nur im Moment des Fehlers.
+    // Reihenfolge: lokaler Persist-Fehler zuerst (unsaved — Inhalt liegt nicht
+    // einmal in localStorage, stärkstes Signal), dann aktive Vorgänge (saving),
+    // dann Fehlerzustände (offline), dann normale Resultate (draft/saved).
+    // saveOffline/draftPersistFailed bleiben sticky bis zum nächsten
+    // erfolgreichen Save → User sieht den Fehlerzustand durchgehend.
+    if (this.draftPersistFailed) {
+      return { ts: this.lastDraftSavedAt || 0, kind: 'unsaved' };
+    }
     if (this.editSaving) {
       return { ts: this.lastDraftSavedAt || this.lastAutosaveAt || 0, kind: 'saving' };
     }
@@ -240,6 +244,7 @@ export const appUiMethods = {
   saveIndicatorText() {
     const { ts, kind } = this._saveStatus();
     const when = ts ? this._formatSaveTs(ts) : '';
+    if (kind === 'unsaved') return this.t('edit.status.unsaved');
     if (kind === 'saving') return this.t('edit.status.saving');
     if (kind === 'offline') {
       return when
@@ -254,6 +259,7 @@ export const appUiMethods = {
   // Tooltip pro Kind — Detail zum Status-Pill (data-tip CSS-Hover).
   saveIndicatorTip() {
     const kind = this._saveStatus().kind;
+    if (kind === 'unsaved') return this.t('edit.status.unsavedTip');
     if (kind === 'saving') return this.t('edit.status.savingTip');
     if (kind === 'offline') return this.t('edit.status.offlineTip');
     if (kind === 'draft') return this.t('editor.draftTitle');

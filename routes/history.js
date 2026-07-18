@@ -6,6 +6,7 @@ const { setContext } = require('../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError } = require('../lib/acl');
 const { resolvePageBookId } = require('../lib/content-ownership');
 const { buildRueckblickCoverage } = require('./jobs/rueckblick-dates');
+const snapshots = require('../db/book-snapshots');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -660,6 +661,34 @@ router.get('/fehler-heatmap/:book_id', (req, res) => {
     totals,
     details: detailsOut,
   });
+});
+
+// Fehlerdichte-Trend über die Fassungen: pro book_snapshots-Zeile die verdichtete
+// Lektorat-Kennzahl (offen/angenommen/alle je Typ) + Wörter-Nenner, aufsteigend
+// nach seq. Die Fehler-Heatmap-Karte zeichnet daraus den Verlauf. Momentaufnahme-
+// Metrik pro Meilenstein — keine Live-Aggregation (die liefert /fehler-heatmap).
+router.get('/fehler-trend/:book_id', (req, res) => {
+  const bookId = toIntId(req.params.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
+  setContext({ book: bookId });
+  if (!_guardBook(req, res, bookId, 'viewer')) return;
+
+  const rows = snapshots.listLektoratTrend(bookId);
+  const versions = rows.map((r) => {
+    let metrics = null;
+    if (r.lektorat_metrics) {
+      try { metrics = JSON.parse(r.lektorat_metrics); } catch { metrics = null; }
+    }
+    return {
+      seq: r.seq,
+      label: r.label || null,
+      words: r.words || 0,
+      created_at: r.created_at,
+      published: !!r.published_at,
+      metrics, // { open, applied, all } je { total, byTyp } — oder null (keine Lektorat-Daten)
+    };
+  });
+  res.json({ versions });
 });
 
 // Schreibzeit-Tracking: Heartbeat des Frontends (alle ~30 s, solange

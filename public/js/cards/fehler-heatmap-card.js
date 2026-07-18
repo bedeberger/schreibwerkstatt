@@ -1,6 +1,15 @@
 // Alpine.data('fehlerHeatmapCard') — Sub-Komponente der Fehler-Heatmap.
+//
+// Neben der Heatmap-Matrix zeigt die Karte den Fehlerdichte-Trend über die
+// Fassungen (Chart.js). Die Chart-Instanz + Theme-Observer leben als Modul-State
+// in fehler-heatmap.js (Alpine-Proxy würde die Chart-Instanz beschädigen);
+// destroy() + Ausblenden räumen beide auf.
 
-import { fehlerHeatmapMethods } from '../book/fehler-heatmap.js';
+import {
+  fehlerHeatmapMethods,
+  _destroyFehlerTrendChart,
+  _disconnectFehlerTrendThemeObserver,
+} from '../book/fehler-heatmap.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerFehlerHeatmapCard() {
@@ -11,22 +20,45 @@ export function registerFehlerHeatmapCard() {
     fehlerHeatmapStatus: '',
     fehlerHeatmapMode: 'open',
     activeFehlerDetailKey: null,
+    fehlerTrendData: [],
     _lifecycle: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         showFlag: 'showFehlerHeatmapCard',
-        load: () => this.loadFehlerHeatmap(),
+        load: async () => {
+          await this.loadFehlerHeatmap();
+          await this.loadFehlerTrend();
+        },
         resetStateView: {
           fehlerHeatmapData: null,
           fehlerHeatmapStatus: '',
           fehlerHeatmapLoading: false,
           activeFehlerDetailKey: null,
+          fehlerTrendData: [],
         },
+        onViewReset: (e, ctx) => {
+          ctx.fehlerHeatmapData = null;
+          ctx.fehlerHeatmapStatus = '';
+          ctx.fehlerHeatmapLoading = false;
+          ctx.activeFehlerDetailKey = null;
+          ctx.fehlerTrendData = [];
+          _destroyFehlerTrendChart();
+        },
+      });
+
+      // Chart beim Ausblenden zerstören, damit Chart.js' Resize-Handler nicht auf
+      // dem versteckten Canvas crasht. Reopen baut es frisch (renderFehlerTrendChart).
+      this.$watch(() => window.__app.showFehlerHeatmapCard, (visible) => {
+        if (!visible) _destroyFehlerTrendChart();
       });
     },
 
-    destroy() { this._lifecycle?.destroy(); },
+    destroy() {
+      this._lifecycle?.destroy();
+      _destroyFehlerTrendChart();
+      _disconnectFehlerTrendThemeObserver();
+    },
 
     ...fehlerHeatmapMethods,
   }));

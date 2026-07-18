@@ -139,10 +139,19 @@ async function _buildSnapshotPayload(bookId, req) {
   }
 
   // Extras (Analyse + Lektorat) synchron einsammeln — reiner DB-Read, kein KI-Call.
+  // Aus den eingefrorenen page_checks gleich die verdichtete Fehler-Kennzahl
+  // (offen/angenommen/alle je Typ) ableiten → Basis für den Fehlerdichte-Trend
+  // über die Fassungen, ohne den extras_json-Blob ausliefern zu müssen.
   let extrasJson = null;
+  let lektoratMetrics = null;
   try {
     const extras = collectExtras(bookId, { analysis: true, lektorat: true });
     if (extras && (extras.analysis || extras.lektorat)) extrasJson = JSON.stringify(extras);
+    const checks = extras?.lektorat?.pageChecks;
+    if (Array.isArray(checks) && checks.length) {
+      const { computeLektoratMetrics } = require('../lib/lektorat-metrics');
+      lektoratMetrics = JSON.stringify(computeLektoratMetrics(checks));
+    }
   } catch (e) {
     logger.warn(`Snapshot-Extras fehlgeschlagen (book=${bookId}): ${e.message}`);
   }
@@ -171,7 +180,7 @@ async function _buildSnapshotPayload(bookId, req) {
     logger.warn(`Snapshot-Publikation fehlgeschlagen (book=${bookId}): ${e.message}`);
   }
 
-  return { content, extrasJson, publicationJson, chars, words, pages: htmlById.size, chapters: _countChapters(nodes) };
+  return { content, extrasJson, publicationJson, lektoratMetrics, chars, words, pages: htmlById.size, chapters: _countChapters(nodes) };
 }
 
 // Wiederverwendbarer Capture-Einstieg fuer Auto-Sicherungen aus anderen Routen
@@ -198,7 +207,7 @@ async function captureSnapshot(bookId, req, { label = null, description = null, 
     return snapshots.createSnapshot({
       bookId, label, description,
       contentJson: JSON.stringify(payload.content), extrasJson: payload.extrasJson,
-      publicationJson: payload.publicationJson,
+      publicationJson: payload.publicationJson, lektoratMetrics: payload.lektoratMetrics,
       chars: payload.chars, words: payload.words, pages: payload.pages, chapters: payload.chapters,
       userEmail,
     });
@@ -336,7 +345,7 @@ router.post('/:bookId', express.json({ limit: '1mb' }), async (req, res) => {
     created = snapshots.createSnapshot({
       bookId, label, description,
       contentJson: JSON.stringify(payload.content), extrasJson: payload.extrasJson,
-      publicationJson: payload.publicationJson,
+      publicationJson: payload.publicationJson, lektoratMetrics: payload.lektoratMetrics,
       chars: payload.chars, words: payload.words, pages: payload.pages, chapters: payload.chapters,
       userEmail,
     });
@@ -417,7 +426,7 @@ router.post('/:bookId/:id/restore', express.json({ limit: '1mb' }), async (req, 
     snapshots.createSnapshot({
       bookId, label: AUTO_BACKUP_LABEL, description: null,
       contentJson: JSON.stringify(cur.content), extrasJson: cur.extrasJson,
-      publicationJson: cur.publicationJson,
+      publicationJson: cur.publicationJson, lektoratMetrics: cur.lektoratMetrics,
       chars: cur.chars, words: cur.words, pages: cur.pages, chapters: cur.chapters,
       userEmail,
     });

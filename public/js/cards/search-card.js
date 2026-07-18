@@ -8,6 +8,8 @@ import { setupCardLifecycle } from './card-lifecycle.js';
 const DEBOUNCE_MS = 220;
 const DEFAULT_KINDS = ['page', 'chapter'];
 const ALL_KINDS = ['page', 'chapter', 'book', 'figure', 'location', 'scene', 'idea'];
+// Semantische Suche kennt nur die drei indizierten Kinds (Embedding-Index).
+const SEMANTIC_KINDS = ['page', 'scene', 'figure'];
 
 export function registerSearchCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -19,6 +21,11 @@ export function registerSearchCard() {
     errorMessage: '',
     activeKinds: [...DEFAULT_KINDS],
     scopeMode: 'book', // 'book' | 'all'
+    mode: 'fts', // 'fts' | 'semantic'
+    likeEntity: null, // { kind, id, label } — „ähnliche Stellen zu dieser Entität"
+    indexing: false,
+    indexStatus: '',
+    _indexPollTimer: null,
     _debounceTimer: null,
     _abortCtrl: null,
     _searchSeq: 0,
@@ -42,6 +49,13 @@ export function registerSearchCard() {
         extraListeners: [{
           type: 'card:refresh',
           handler: (e) => { if (e?.detail?.name === 'search') this.runSearch(); },
+        }, {
+          // Root/Entity-Karten stossen „ähnliche Stellen zu X" an (findSimilar).
+          type: 'search:similar',
+          handler: (e) => {
+            const d = e?.detail;
+            if (d?.kind && d?.id) this.runSimilarToEntity(d.kind, d.id, d.label || '');
+          },
         }],
       });
     },
@@ -49,6 +63,7 @@ export function registerSearchCard() {
     destroy() {
       this._lifecycle?.destroy();
       if (this._debounceTimer) clearTimeout(this._debounceTimer);
+      if (this._indexPollTimer) clearTimeout(this._indexPollTimer);
       this._abortCtrl?.abort();
     },
 
@@ -58,10 +73,26 @@ export function registerSearchCard() {
       this.fallback = false;
       this.errorMessage = '';
       this.loading = false;
+      this.likeEntity = null;
+    },
+
+    // Semantik-Suche ist verfügbar, wenn das Backend konfiguriert ist UND ein Buch
+    // gewählt ist (Vektoren leben pro Buch).
+    get semanticAvailable() {
+      return !!this.$store.config?.semanticSearchEnabled && !!Alpine.store('nav').selectedBookId;
+    },
+
+    setMode(m) {
+      if (m === this.mode) return;
+      if (m === 'semantic' && !this.semanticAvailable) return;
+      this.mode = m;
+      this.likeEntity = null;
+      this.activeKinds = m === 'semantic' ? [...SEMANTIC_KINDS] : [...DEFAULT_KINDS];
+      this.runSearch();
     },
 
     kindOptions() {
-      return ALL_KINDS;
+      return this.mode === 'semantic' ? SEMANTIC_KINDS : ALL_KINDS;
     },
 
     isKindActive(k) {
@@ -87,6 +118,7 @@ export function registerSearchCard() {
     },
 
     async runSearch() {
+      if (this.mode === 'semantic') return this.likeEntity ? this.runSemantic({ like: this.likeEntity }) : this.runSemantic();
       const query = (this.q || '').trim();
       if (query.length < 2) {
         this.hits = [];
@@ -134,6 +166,118 @@ export function registerSearchCard() {
       } finally {
         if (seq === this._searchSeq) this.loading = false;
       }
+    },
+
+    // Semantische Suche (Embedding-basiert, immer buch-skopiert). Zwei Modi:
+    // Freitext (q) oder „ähnliche Stellen zu Entität" (opts.like = {kind,id,label}).
+    async runSemantic({ like = null } = {}) {
+      const bookId = Alpine.store('nav').selectedBookId;
+      if (!this.$store.config?.semanticSearchEnabled || !bookId) {
+        this.hits = []; this.loading = false; return;
+      }
+      const query = (this.q || '').trim();
+      if (!like && query.length < 2) {
+        this.hits = []; this.errorMessage = ''; this.loading = false; return;
+      }
+      this._searchSeq += 1;
+      const seq = this._searchSeq;
+      this._abortCtrl?.abort();
+      const ctrl = new AbortController();
+      this._abortCtrl = ctrl;
+      this.loading = true;
+      this.errorMessage = '';
+
+      const params = new URLSearchParams({ book_id: String(bookId), kind: this.activeKinds.join(','), limit: '30' });
+      if (like) { params.set('like_kind', like.kind); params.set('like_id', String(like.id)); }
+      else params.set('q', query);
+
+      try {
+        const r = await fetch('/search/semantic?' + params.toString(), { credentials: 'same-origin', signal: ctrl.signal });
+        if (seq !== this._searchSeq) return;
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          this.errorMessage = j.error_code === 'EMBED_UNAVAILABLE'
+            ? (window.__app?.t?.('search.semantic.unavailable') || 'Embedding-Endpunkt nicht erreichbar')
+            : `${r.status}`;
+          this.hits = []; return;
+        }
+        const data = await r.json();
+        this.hits = Array.isArray(data.hits) ? data.hits : [];
+        this.fallback = false;
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+        if (seq !== this._searchSeq) return;
+        this.errorMessage = e.message || 'error';
+        this.hits = [];
+      } finally {
+        if (seq === this._searchSeq) this.loading = false;
+      }
+    },
+
+    // „Ähnliche Stellen zu dieser Figur/Szene/Seite" — von Entity-Karten via
+    // window-Event 'search:similar' angestossen (Root öffnet vorher die Karte).
+    runSimilarToEntity(kind, id, label) {
+      if (!this.semanticAvailable) return;
+      this.mode = 'semantic';
+      this.q = '';
+      this.activeKinds = [...SEMANTIC_KINDS];
+      this.likeEntity = { kind, id, label: label || '' };
+      this.runSemantic({ like: this.likeEntity });
+    },
+
+    clearLike() {
+      this.likeEntity = null;
+      this.hits = [];
+    },
+
+    // Embedding-Index für das aktuelle Buch (neu) aufbauen. Delta-Cache im Job
+    // embeddet nur geänderte Chunks neu; Erstlauf kann dauern.
+    async buildIndex() {
+      const bookId = Alpine.store('nav').selectedBookId;
+      if (!bookId || this.indexing) return;
+      this.indexing = true;
+      this.indexStatus = window.__app?.t?.('search.semantic.indexStarting') || '';
+      try {
+        const r = await fetch('/jobs/embed-index', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book_id: bookId }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.jobId) {
+          this.indexing = false;
+          this.indexStatus = window.__app?.t?.('search.semantic.indexError') || 'Fehler';
+          return;
+        }
+        this._pollIndex(j.jobId);
+      } catch (e) {
+        this.indexing = false;
+        this.indexStatus = e.message || 'error';
+      }
+    },
+
+    _pollIndex(jobId) {
+      const tick = async () => {
+        try {
+          const r = await fetch('/jobs/' + encodeURIComponent(jobId), { credentials: 'same-origin' });
+          const j = await r.json().catch(() => ({}));
+          if (j.status === 'done') {
+            this.indexing = false;
+            this.indexStatus = j.detail || (window.__app?.t?.('search.semantic.indexDone') || 'Fertig');
+            return;
+          }
+          if (j.status === 'error' || j.status === 'cancelled') {
+            this.indexing = false;
+            this.indexStatus = window.__app?.t?.('search.semantic.indexError') || 'Fehler';
+            return;
+          }
+          this.indexStatus = `${j.progress || 0}%`;
+          this._indexPollTimer = setTimeout(tick, 1200);
+        } catch {
+          this._indexPollTimer = setTimeout(tick, 2000);
+        }
+      };
+      tick();
     },
 
     hitKindLabel(kind) {

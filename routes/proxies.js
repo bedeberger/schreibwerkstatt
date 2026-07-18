@@ -130,6 +130,14 @@ router.get('/config', (req, res) => {
         && effectiveProvider === 'claude'
         && !!String(appSettings.get('ai.claude.api_key') || '').trim(),
     },
+    // Semantische Suche (Embeddings, self-hosted). enabled=true + host schaltet
+    // den Semantik-Suchmodus, die „ähnliche Stellen"-Buttons und das Buch-Chat-
+    // Tool `search_similar` frei. Provider-unabhängig (eigener Embedding-Endpunkt,
+    // nicht der Chat-Provider). Host/Model/Key verlassen den Server nie.
+    semanticSearch: {
+      enabled: appSettings.get('embed.enabled') === true
+        && !!String(appSettings.get('embed.host') || '').trim(),
+    },
     // Komplettanalyse-Zusatzphasen «Kontinuität» + «Erzählprofil»: die
     // qualitätskritischen Stufen (Single-Pass, Verify-Filter, Attribut-Check)
     // gibt es nur bei Claude → für Nicht-Claude-User Karten ausgeblendet und die

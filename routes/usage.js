@@ -46,6 +46,7 @@ const ALLOWED_KEYS = new Set([
   'search',
   'shareLinks',
   'help',
+  'onboarding',
 ]);
 
 function userEmailOrNull(req) {

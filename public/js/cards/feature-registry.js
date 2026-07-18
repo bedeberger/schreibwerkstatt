@@ -100,7 +100,11 @@ export const FEATURES = [
   // Hilfe — buch-unabhaengig, fuer jeden Auth-User. Funktionsueberblick fuer
   // den Einstieg (kein requiresBook/Pages, minRole viewer → immer sichtbar).
   { key: 'help',           kind: 'toggle', group: 'tools',  labelKey: 'tile.help',           descKey: 'tile.help.desc',           flag: 'showHelpCard',          toggle: 'toggleHelpCard',           minRole: 'viewer',
-    aliases: ['hilfe','help','funktionen','features','anleitung','guide','einstieg','onboarding','intro','ueberblick','overview','start','getting-started','faq'] },
+    aliases: ['hilfe','help','funktionen','features','anleitung','guide','einstieg','intro','ueberblick','overview','faq'] },
+  // Erste Schritte — buch-unabhaengig, fuer jeden Auth-User. Fortschritts-
+  // Checkliste fuer den Einstieg + Beispielbuch-Import (kein requiresBook).
+  { key: 'onboarding',     kind: 'toggle', group: 'tools',  labelKey: 'tile.onboarding',     descKey: 'tile.onboarding.desc',     flag: 'showOnboardingCard',    toggle: 'toggleOnboardingCard',     minRole: 'viewer',
+    aliases: ['onboarding','erste-schritte','einstieg','start','getting-started','tour','checkliste','beispielbuch','demo','einfuehrung','walkthrough'] },
 ];
 
 // Globale Aktionen (kind:'action'). Eigene Sektion in der Palette.
@@ -218,6 +222,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'adminParseFails',flag: 'showAdminParseFailsCard',toggle: 'toggleAdminParseFailsCard',onReclick: 'close', partial: 'admin-parse-fails' },
   { key: 'adminJsErrors',  flag: 'showAdminJsErrorsCard',  toggle: 'toggleAdminJsErrorsCard',  onReclick: 'close', partial: 'admin-js-errors' },
   { key: 'adminDevices',   flag: 'showAdminDevicesCard',   toggle: 'toggleAdminDevicesCard',   onReclick: 'refresh', partial: 'admin-devices' },
+  { key: 'adminBackup',    flag: 'showAdminBackupCard',    toggle: 'toggleAdminBackupCard',    onReclick: 'refresh', partial: 'admin-backup' },
   { key: 'finetuneExport', flag: 'showFinetuneExportCard', toggle: 'toggleFinetuneExportCard', onReclick: 'close', partial: 'finetune-export' },
   { key: 'snapshots',      flag: 'showSnapshotsCard',      toggle: 'toggleSnapshotsCard',      onReclick: 'refresh', requiresBook: true, partial: 'snapshots' },
   { key: 'export',         flag: 'showExportCard',         toggle: 'toggleExportCard',         onReclick: 'close', partial: 'export' },
@@ -230,6 +235,7 @@ export const EXCLUSIVE_CARDS = [
   { key: 'search',         flag: 'showSearchCard',         toggle: 'toggleSearchCard',         onReclick: 'refresh', partial: 'search' },
   { key: 'shareLinks',     flag: 'showShareLinksCard',     toggle: 'toggleShareLinksCard',     onReclick: 'refresh', requiresBook: true, partial: 'share-links' },
   { key: 'help',           flag: 'showHelpCard',           toggle: 'toggleHelpCard',           onReclick: 'close', partial: 'help' },
+  { key: 'onboarding',     flag: 'showOnboardingCard',     toggle: 'toggleOnboardingCard',     onReclick: 'refresh', partial: 'onboarding' },
 ];
 
 export const FEATURE_GROUPS = ['review', 'world', 'manuscript', 'export', 'tools', 'app'];

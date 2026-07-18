@@ -49,5 +49,7 @@
   .card--admin-parse-fails { --card-accent: var(--color-err-border); }
   .card--admin-js-errors  { --card-accent: var(--color-err-border); }
   .card--admin-devices    { --card-accent: var(--color-accent); }
+  .card--admin-backup     { --card-accent: var(--color-accent); }
   .card--share            { --card-accent: var(--card-accent-share); }
+  .card--onboarding       { --card-accent: var(--card-accent-onboarding); }
 }

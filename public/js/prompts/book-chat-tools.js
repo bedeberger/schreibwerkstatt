@@ -65,6 +65,19 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
+    name: 'search_similar',
+    description: 'Semantische Ähnlichkeitssuche (Embeddings) über das ganze Buch: findet Passagen/Szenen/Figuren, die einem Suchtext BEDEUTUNGSMÄSSIG nahestehen — auch wenn andere Wörter benutzt werden. Genau das Gegenstück zu `search_passages`: nutze `search_passages` für konkrete Wörter/Namen, `search_similar` für Fragen nach Sinn/Stimmung/Motiv ("wo herrscht dieselbe resignierte Stimmung wie hier", "ähnliche Szenen wie ein Abschied am Bahnhof", "Stellen, die diese Figur ähnlich beschreiben"). Liefert nach Ähnlichkeit sortierte Treffer {kind,entity_id,title,snippet,score}. Danach ggf. `get_pages`/`get_chapter_text` für den Volltext. Rein rückwärtsgewandt — findet Bestehendes, erfindet nichts.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query:   { type: 'string',  description: 'Freitext, dessen Bedeutung gesucht wird (eine Beschreibung, ein Beispielsatz, ein Motiv). Für Stichwortsuche stattdessen `search_passages`.' },
+        kinds:   { type: 'array', items: { type: 'string', enum: ['page', 'scene', 'figure'] }, description: 'Optional: auf Treffertypen einschränken (Seiten/Szenen/Figuren). Default: alle drei.' },
+        limit:   { type: 'integer', description: 'Maximale Trefferzahl (default 20, max 50).' },
+      },
+      required: ['query'],
+    },
+  },
+  {
     name: 'get_pages',
     description: 'Lädt den vollen Text bestimmter Seiten (bei Bedarf für Zitate oder Detail-Analyse). Bis zu 20 Seiten pro Aufruf – bei kleinen Büchern kannst du in einem Call das ganze Buch laden (Page-IDs vorher via list_chapters holen). Falls für die Seite ein gespeichertes Lektorat existiert, kommt es als latest_check {checked_at, error_count, fazit, stilanalyse} mit. Schwergewichtig (Volltext) – nicht nutzen für blosse Trefferlisten oder „wo kommt X vor?", dafür `search_passages` / `get_figure_mentions`. Für ein ganzes Kapitel bequemer: `get_chapter_text`. Nicht zur Massen-Inspektion ganzer Bücher aufrufen, wenn ein Aggregat-Tool (z.B. `get_stil_metrics`, `get_lektorat_hotspots`) die Frage direkt beantwortet.',
     input_schema: {

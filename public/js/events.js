@@ -41,6 +41,9 @@ export const EVT = {
   EDITOR_FOCUS_EXIT: 'editor:focus:exit',       // kein detail
   EDITOR_FOCUS_ENTER_FROM_PAGEVIEW: 'editor:focus:enter-from-pageview', // kein detail
 
+  // ── Editor: Draft/Offline-Sync ───────────────────────────────────────────
+  DRAFT_CHANGED: 'draft:changed',               // kein detail (Draft-Bestand hat sich geändert)
+
   // ── Editor: Synonyme ─────────────────────────────────────────────────────
   EDITOR_SYNONYM_OPEN: 'editor:synonym:open',   // detail: { word, rect }
   EDITOR_SYNONYM_CLOSE_MENU: 'editor:synonym:close-menu',     // kein detail

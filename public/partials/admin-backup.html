@@ -1,0 +1,81 @@
+<!-- Admin: Backup (kontoweites DB-Backup + Restore) -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/admin-backup-card.js.
+  `showAdminBackupCard` + `toggleAdminBackupCard` im Root. Nur sichtbar bei
+  $store.session.currentUser.role === 'admin'. Download = konsistenter gzip-SQLite-Snapshot
+  der ganzen Instanz. Restore = Upload → Validierung → Neustart (Boot-Swap).
+-->
+<div class="card card--admin-backup" x-data="adminBackupCard" x-show="$app.showAdminBackupCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('admin.backup.title')"></span>
+    <div class="card-actions">
+      <button type="button" class="icon-btn icon-btn--ghost" @click="backupRefresh()" :disabled="backupLoading"
+              :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <p class="muted-msg" x-text="$app.t('admin.backup.intro')"></p>
+
+  <div x-show="backupLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <div x-show="backupError" class="error-msg" x-text="backupError"></div>
+
+  <!-- Aktueller Stand -->
+  <dl class="admin-backup-meta" x-show="backupInfoData && !backupLoading">
+    <div class="admin-backup-meta-row">
+      <dt x-text="$app.t('admin.backup.dbSize')"></dt>
+      <dd x-text="backupFmtBytes(backupInfoData?.bytes)"></dd>
+    </div>
+    <div class="admin-backup-meta-row">
+      <dt x-text="$app.t('admin.backup.schemaVersion')"></dt>
+      <dd x-text="backupInfoData?.schemaVersion ?? '—'"></dd>
+    </div>
+  </dl>
+
+  <!-- Download -->
+  <section class="admin-backup-section" x-show="!backupLoading">
+    <h3 class="admin-backup-section-title" x-text="$app.t('admin.backup.downloadTitle')"></h3>
+    <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.backup.downloadDesc')"></p>
+    <button type="button" class="btn-compact primary" @click="backupDownload()" :disabled="backupDownloading"
+            x-text="backupDownloading ? $app.t('admin.backup.downloading') : $app.t('admin.backup.downloadBtn')"></button>
+  </section>
+
+  <!-- Restore (Danger-Zone) -->
+  <section class="admin-backup-danger" x-show="!backupLoading">
+    <div class="admin-backup-danger-title" x-text="$app.t('admin.backup.restoreTitle')"></div>
+    <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.backup.restoreDesc')"></p>
+    <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.backup.restoreSecretWarn')"></p>
+
+    <!-- Datei-Auswahl + Validierung -->
+    <div class="admin-backup-restore-row" x-show="!backupRestoreResult && !backupRestarting">
+      <input type="file" x-ref="backupFileInput"
+             accept=".gz,.sqlite,.db,application/gzip,application/octet-stream"
+             @change="backupPickFile($event)">
+      <button type="button" class="btn-compact danger" @click="backupUploadRestore()"
+              :disabled="!backupFile || backupRestoring"
+              x-text="backupRestoring ? $app.t('admin.backup.checking') : $app.t('admin.backup.restoreCheckBtn')"></button>
+    </div>
+
+    <div x-show="backupRestoreError" class="error-msg" x-text="backupRestoreError"></div>
+
+    <!-- Validiert → zweite Bestätigung (destruktiv + Neustart) -->
+    <div class="admin-backup-confirm" x-show="backupRestoreResult && !backupRestarting">
+      <p class="admin-backup-confirm-ok"
+         x-text="$app.t('admin.backup.validated', { size: backupFmtBytes(backupRestoreResult?.bytes), version: backupRestoreResult?.schemaVersion })"></p>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.backup.restartWarn')"></p>
+      <div class="admin-backup-restore-row">
+        <button type="button" class="btn-compact danger" @click="backupConfirmRestart()"
+                x-text="$app.t('admin.backup.restoreConfirmBtn')"></button>
+        <button type="button" class="btn-compact" @click="backupCancelRestore()"
+                x-text="$app.t('common.cancel')"></button>
+      </div>
+    </div>
+
+    <!-- Neustart läuft -->
+    <div class="admin-backup-restarting" x-show="backupRestarting">
+      <p class="muted-msg" x-show="!backupRestartTimedOut" x-text="$app.t('admin.backup.restarting')"></p>
+      <p class="error-msg" x-show="backupRestartTimedOut" x-text="$app.t('admin.backup.restartTimeout')"></p>
+    </div>
+  </section>
+</div>

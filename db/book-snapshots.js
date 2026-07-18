@@ -27,17 +27,17 @@ function createSnapshot({
   bookId, label = null, description = null,
   contentJson, extrasJson = null, publicationJson = null,
   chars = 0, words = 0, pages = 0, chapters = 0,
-  userEmail = null,
+  userEmail = null, lektoratMetrics = null,
 }) {
   const seq = _nextSeq(bookId);
   const res = db.prepare(`
     INSERT INTO book_snapshots
       (book_id, seq, label, description, content_json, extras_json, publication_json,
-       chars, words, pages, chapters, user_email, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?, ${NOW_ISO_SQL})
+       chars, words, pages, chapters, user_email, lektorat_metrics, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, ${NOW_ISO_SQL})
   `).run(
     bookId, seq, label, description, contentJson, extrasJson, publicationJson,
-    chars, words, pages, chapters, userEmail,
+    chars, words, pages, chapters, userEmail, lektoratMetrics,
   );
   return { id: res.lastInsertRowid, seq };
 }
@@ -92,7 +92,19 @@ function latestSignature(bookId) {
   return row || null;
 }
 
+// Fehlerdichte-Trend: die Fassungen des Buchs mit ihrer verdichteten Lektorat-
+// Kennzahl (lektorat_metrics), aufsteigend nach seq (Meilenstein-Reihenfolge).
+// Nur Meta + Wörter-Nenner + Metrics-JSON — kein content_json/extras_json.
+function listLektoratTrend(bookId) {
+  return db.prepare(`
+    SELECT id, seq, label, words, created_at, published_at, lektorat_metrics
+    FROM book_snapshots
+    WHERE book_id = ?
+    ORDER BY seq ASC
+  `).all(bookId);
+}
+
 module.exports = {
   createSnapshot, listSnapshots, getSnapshot, deleteSnapshot, countSnapshots,
-  setPublished, latestSignature,
+  setPublished, latestSignature, listLektoratTrend,
 };

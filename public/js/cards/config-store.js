@@ -24,6 +24,9 @@
 //             nutzen eigene Defaults und ignorieren den Wert.
 //   researchChatEnabled — Recherche-Chat-Umschalter (/config `researchChat.enabled`,
 //             true wenn effektiver Provider Claude + API-Key + Kill-Switch an).
+//   semanticSearchEnabled — Semantik-Suche/„ähnliche Stellen"/Chat-Tool
+//             `search_similar` (/config `semanticSearch.enabled`, true wenn
+//             Embedding-Backend konfiguriert). Provider-unabhängig.
 //   apiProvider — globaler KI-Provider ('claude'/'ollama'/'openai-compat'), aus
 //             /config (globaler ai.provider, OHNE Per-User-Override). Steuert die
 //             Provider-Anzeige im Avatar-Menü; configurePrompts liest den Wert
@@ -41,6 +44,7 @@ export function registerConfigStore() {
     languagetoolEnabled: false,
     languagetoolDebounceMs: 1500,
     researchChatEnabled: false,
+    semanticSearchEnabled: false,
     apiProvider: 'claude',
     effectiveProvider: 'claude',
     claudeModel: 'claude-sonnet-4-6',

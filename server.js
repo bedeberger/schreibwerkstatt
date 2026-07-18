@@ -511,6 +511,7 @@ app.use('/admin/js-errors', require('./routes/admin-js-errors'));
 app.use('/admin/registration-requests', require('./routes/admin-registration-requests'));
 app.use('/admin/api-tokens',            require('./routes/admin-api-tokens'));
 app.use('/admin/devices',               require('./routes/admin-devices'));
+app.use('/admin/backup',                require('./routes/admin-backup'));
 app.use('/local/categories', require('./routes/categories'));
 app.use('/blog', require('./routes/blog'));
 app.use('/hubspot', require('./routes/hubspot'));

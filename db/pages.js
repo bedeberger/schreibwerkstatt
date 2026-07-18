@@ -120,6 +120,8 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
   // nicht abbrechen.
   let _searchIndex = null;
   try { _searchIndex = require('../lib/search'); } catch {}
+  let _semanticChunks = null;
+  try { _semanticChunks = require('./semantic-chunks'); } catch {}
 
   db.transaction(() => {
     if (stalePageIds.length > 0) {
@@ -147,6 +149,9 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
       db.exec('DROP TABLE _stale_pages');
       if (_searchIndex) {
         try { for (const pid of stalePageIds) _searchIndex.remove('page', pid); } catch (_e) {}
+      }
+      if (_semanticChunks) {
+        try { for (const pid of stalePageIds) _semanticChunks.remove('page', pid); } catch (_e) {}
       }
     }
 

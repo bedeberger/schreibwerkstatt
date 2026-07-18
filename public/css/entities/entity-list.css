@@ -137,6 +137,11 @@
   color: var(--color-text);
   line-height: 1.5;
 }
+/* „Ähnliche Stellen"-Aktion in Entity-Detail (Szenen) + Figuren-Detail */
+.entity-detail-actions,
+.figur-detail-actions {
+  margin: 0 0 0.5rem;
+}
 .entity-meta-row {
   display: flex;
   align-items: baseline;

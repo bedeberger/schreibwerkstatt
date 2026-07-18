@@ -1,0 +1,198 @@
+/* Erste Schritte — Onboarding-Fortschritts-Checkliste (Karte `.card--onboarding`)
+   + First-Login-Willkommens-Banner. Akzent pro Karte via var(--card-accent)
+   (SSoT card-accents.css). Markup: public/partials/onboarding.html; Banner in
+   public/index.html. Fortschritt kommt serverseitig (GET /me/onboarding). */
+
+.onboarding-intro {
+  margin: 0 0 var(--space-lg);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+  max-width: 60ch;
+}
+
+.onboarding-dismiss {
+  margin-left: auto;
+  font-size: var(--font-size-mini);
+}
+
+/* Fortschrittszeile: Balken + „X/N". Balken nutzt das globale .progress-bar. */
+.onboarding-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin: 0 0 var(--space-lg);
+}
+.onboarding-progress .progress-bar-wrap {
+  flex: 1 1 auto;
+}
+.onboarding-progress-count {
+  flex: 0 0 auto;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+.onboarding-alldone {
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-bg);
+  color: var(--color-accent-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.onboarding-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.onboarding-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent, var(--color-accent));
+  border-radius: var(--radius-md);
+}
+.onboarding-step.is-done {
+  opacity: 0.72;
+}
+.onboarding-step-num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7em;
+  height: 1.7em;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-bg);
+  color: var(--color-accent-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.onboarding-step.is-done .onboarding-step-num {
+  background: var(--card-accent, var(--color-accent));
+  color: #fff;
+}
+.onboarding-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.onboarding-step-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.onboarding-step-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+}
+.onboarding-step-state {
+  flex: 0 0 auto;
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-bg);
+  color: var(--color-accent-text);
+  font-size: var(--font-size-mini);
+  font-weight: 600;
+}
+.onboarding-step-cta {
+  flex: 0 0 auto;
+}
+
+/* Beispielbuch-Box: hervorgehobener Handlungsaufruf unter der Checkliste. */
+.onboarding-demo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin: var(--space-lg) 0 0;
+  padding: var(--space-lg);
+  border: 1px dashed var(--card-accent, var(--color-accent));
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.onboarding-demo-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.onboarding-demo-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.onboarding-demo-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+}
+
+.onboarding-error {
+  margin: var(--space-md) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-err-text);
+}
+.onboarding-palette-hint {
+  margin: var(--space-lg) 0 0;
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  line-height: var(--lh-base);
+}
+
+/* First-Login-Willkommens-Banner: schlanke, wegklickbare Leiste, die einmalig
+   auf die „Erste Schritte"-Karte zeigt. Persistiert wird das Wegklicken
+   serverseitig (welcomeDismissed). Steht oben im Content-Bereich. */
+.onboarding-welcome-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent-onboarding);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.onboarding-welcome-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+.onboarding-welcome-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 640px) {
+  .onboarding-step {
+    flex-wrap: wrap;
+  }
+  .onboarding-step-cta,
+  .onboarding-step-state {
+    margin-left: calc(1.7em + var(--space-md));
+  }
+  .onboarding-demo {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .onboarding-welcome-banner {
+    flex-wrap: wrap;
+  }
+}

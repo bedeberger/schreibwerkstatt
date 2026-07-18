@@ -9086,6 +9086,97 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 238 abgeschlossen (share_view_sections, share_feedback, max_scroll_pct).');
   }
 
+  if (version < 239) {
+    // Fehlerdichte-Trend über Fassungen: book_snapshots trägt beim Capture eine
+    // verdichtete Lektorat-Kennzahl (offene/angenommene/alle Findings je Typ),
+    // damit die Fehler-Heatmap-Karte den Verlauf über die Fassungen zeichnen kann,
+    // ohne den MB-grossen extras_json-Blob auszuliefern.
+    const bsCols = db.pragma('table_info(book_snapshots)').map(c => c.name);
+    if (!bsCols.includes('lektorat_metrics')) {
+      db.exec('ALTER TABLE book_snapshots ADD COLUMN lektorat_metrics TEXT');
+    }
+
+    // Backfill: die bestehenden Fassungen frieren die page_checks bereits in
+    // extras_json ein → daraus dieselbe Kennzahl rückwirkend berechnen. Fassungen
+    // ohne Lektorat-Extras bleiben NULL.
+    const { computeLektoratMetrics } = require('../lib/lektorat-metrics');
+    const snaps = db.prepare(
+      'SELECT id, extras_json FROM book_snapshots WHERE extras_json IS NOT NULL AND lektorat_metrics IS NULL'
+    ).all();
+    const setMetrics = db.prepare('UPDATE book_snapshots SET lektorat_metrics = ? WHERE id = ?');
+    let backfilled = 0;
+    for (const s of snaps) {
+      let checks;
+      try { checks = JSON.parse(s.extras_json)?.lektorat?.pageChecks; }
+      catch { continue; }
+      if (!Array.isArray(checks) || !checks.length) continue;
+      setMetrics.run(JSON.stringify(computeLektoratMetrics(checks)), s.id);
+      backfilled += 1;
+    }
+
+    const fkErrors239 = db.pragma('foreign_key_check');
+    if (fkErrors239.length) {
+      throw new Error(`Migration 239: foreign_key_check meldet ${fkErrors239.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 239').run();
+    logger.info(`DB-Migration auf Version 239 abgeschlossen (book_snapshots.lektorat_metrics, ${backfilled} Fassungen backfilled).`);
+  }
+
+  if (version < 240) {
+    // Semantische Suche (Embeddings): pro Buch werden Seiten/Szenen/Figuren in
+    // Chunks embeddet und als Float32-Vektor abgelegt. Reiner Ableitungs-Index —
+    // jederzeit aus den Quelltabellen neu berechenbar (wie search_index/FTS),
+    // darum ist entity_id polymorph nach `kind` (kein einzelner FK möglich); die
+    // Aufräumung läuft explizit über db/semantic-chunks.js#remove beim Entity-
+    // Delete, plus book_id-CASCADE als Netz beim Buch-Delete. content_hash trägt
+    // den Delta-Cache (unveränderter Chunk → kein erneuter Embedding-Call), model
+    // hält Mehr-Modell-Koexistenz beim Umstellen (Query filtert aufs aktive).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS semantic_chunks (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind         TEXT NOT NULL CHECK(kind IN ('page','scene','figure')),
+        entity_id    INTEGER NOT NULL,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        chunk_ix     INTEGER NOT NULL DEFAULT 0,
+        content_hash TEXT NOT NULL,
+        model        TEXT NOT NULL,
+        dim          INTEGER NOT NULL,
+        vector       BLOB NOT NULL,
+        text         TEXT NOT NULL,
+        created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE(kind, entity_id, chunk_ix, model)
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_semchunk_book ON semantic_chunks(book_id, kind)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_semchunk_entity ON semantic_chunks(kind, entity_id)');
+
+    const fkErrors240 = db.pragma('foreign_key_check');
+    if (fkErrors240.length) {
+      throw new Error(`Migration 240: foreign_key_check meldet ${fkErrors240.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 240').run();
+    logger.info('DB-Migration auf Version 240 abgeschlossen (semantic_chunks).');
+  }
+
+  if (version < 241) {
+    // Onboarding-Fortschritt pro User: app_users.onboarding_state (JSON-Blob).
+    // Haelt nur den persistierten Teil — { welcomeDismissed, completed }; die
+    // eigentlichen Checklisten-Schritte (Buch/Seite/Analyse/Teilen) werden
+    // serverseitig aus echtem State abgeleitet (nicht hier gespeichert), damit
+    // sie self-healing bleiben. Additiv: nullable Spalte, kein FK, kein Recreate.
+    const auCols241 = db.pragma('table_info(app_users)').map(c => c.name);
+    if (!auCols241.includes('onboarding_state')) {
+      db.exec('ALTER TABLE app_users ADD COLUMN onboarding_state TEXT');
+    }
+
+    const fkErrors241 = db.pragma('foreign_key_check');
+    if (fkErrors241.length) {
+      throw new Error(`Migration 241: foreign_key_check meldet ${fkErrors241.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 241').run();
+    logger.info('DB-Migration auf Version 241 abgeschlossen (app_users.onboarding_state).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

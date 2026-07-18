@@ -17,6 +17,7 @@ export const appHashRouterMethods = {
     if (this.showUserSettingsCard) return '#profil';
     if (this.showMyStatsCard) return '#meine-statistik';
     if (this.showHelpCard) return '#hilfe';
+    if (this.showOnboardingCard) return '#erste-schritte';
     // Volltextsuche ist book-unabhaengig — eigener Top-Level-Hash.
     if (this.showSearchCard) return '#search';
     // Folder-Import ist book-unabhaengig (new-book oder merge).
@@ -33,6 +34,7 @@ export const appHashRouterMethods = {
     if (this.showAdminParseFailsCard) return '#admin/parse-fails';
     if (this.showAdminJsErrorsCard) return '#admin/js-errors';
     if (this.showAdminDevicesCard) return '#admin/devices';
+    if (this.showAdminBackupCard) return '#admin/backup';
     if (!this.$store.nav.selectedBookId) return '';
     const parts = ['book', this.$store.nav.selectedBookId];
     if (this.showEditorCard && this.currentPage?.id) {
@@ -91,6 +93,7 @@ export const appHashRouterMethods = {
     if (parts[0] === 'profil') return 'profil';
     if (parts[0] === 'meine-statistik') return 'meine-statistik';
     if (parts[0] === 'hilfe') return 'hilfe';
+    if (parts[0] === 'erste-schritte') return 'erste-schritte';
     if (parts[0] === 'search') return 'search';
     if (parts[0] === 'admin') return 'admin:' + (parts[1] || '');
     if (parts[0] !== 'book' || !parts[1]) return null;
@@ -219,6 +222,18 @@ export const appHashRouterMethods = {
       return;
     }
 
+    if (parts[0] === 'erste-schritte') {
+      this._applyingHash = true;
+      this._inHashApply = true;
+      try {
+        if (!this.showOnboardingCard) await this.toggleOnboardingCard();
+      } finally {
+        this._applyingHash = false;
+        this._inHashApply = false;
+      }
+      return;
+    }
+
     if (parts[0] === 'import') {
       this._applyingHash = true;
       this._inHashApply = true;
@@ -258,6 +273,8 @@ export const appHashRouterMethods = {
           if (!this.showAdminJsErrorsCard) await this.toggleAdminJsErrorsCard();
         } else if (sub === 'devices') {
           if (!this.showAdminDevicesCard) await this.toggleAdminDevicesCard();
+        } else if (sub === 'backup') {
+          if (!this.showAdminBackupCard) await this.toggleAdminBackupCard();
         }
       } finally {
         this._applyingHash = false;
@@ -482,10 +499,10 @@ export const appHashRouterMethods = {
       'showKontinuitaetCard', 'showErzaehlprofilCard', 'showTagebuchRueckblickCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
       'showBookStatsCard', 'showStilCard', 'showFehlerHeatmapCard',
-      'showBookSettingsCard', 'showUserSettingsCard', 'showMyStatsCard', 'showHelpCard',
+      'showBookSettingsCard', 'showUserSettingsCard', 'showMyStatsCard', 'showHelpCard', 'showOnboardingCard',
       'showAdminUsersCard', 'showAdminSettingsCard', 'showAdminUsageCard', 'adminUsageTab',
       'showAdminCategoriesCard', 'showAdminBooksCard', 'showAdminLogsCard', 'showAdminParseFailsCard',
-      'showAdminJsErrorsCard', 'showAdminDevicesCard',
+      'showAdminJsErrorsCard', 'showAdminDevicesCard', 'showAdminBackupCard',
       'showFinetuneExportCard',
       'showSnapshotsCard',
       'showExportCard',

@@ -7,6 +7,7 @@ const { aclParamGuard } = require('../lib/acl');
 const { bookParamHandler } = require('../lib/log-context');
 const { parseDatum } = require('../lib/datum-parse');
 const searchIndex = require('../lib/search');
+const semanticChunks = require('../db/semantic-chunks');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -575,7 +576,7 @@ router.delete('/scenes/:book_id/stale', (req, res) => {
     const del = db.prepare('DELETE FROM figure_scenes WHERE id = ?');
     for (const id of ids) del.run(id);
   })();
-  for (const id of ids) searchIndex.remove('scene', id);
+  for (const id of ids) { searchIndex.remove('scene', id); semanticChunks.remove('scene', id); }
   res.json({ ok: true, deleted: { scenes: ids.length } });
 });
 
@@ -596,7 +597,7 @@ router.delete('/:book_id/stale', (req, res) => {
     const del = db.prepare('DELETE FROM figures WHERE id = ?');
     for (const id of ids) del.run(id);
   })();
-  for (const id of ids) searchIndex.remove('figure', id);
+  for (const id of ids) { searchIndex.remove('figure', id); semanticChunks.remove('figure', id); }
   res.json({ ok: true, deleted: { figures: ids.length } });
 });
 
@@ -616,6 +617,7 @@ router.delete('/scenes/:book_id/:id', (req, res) => {
   if (!row.stale) return res.status(409).json({ error_code: 'NOT_STALE' });
   db.prepare('DELETE FROM figure_scenes WHERE id = ?').run(id);
   searchIndex.remove('scene', id);
+  semanticChunks.remove('scene', id);
   res.json({ ok: true });
 });
 
@@ -636,6 +638,7 @@ router.delete('/:book_id/:id', (req, res) => {
   if (!row.stale) return res.status(409).json({ error_code: 'NOT_STALE' });
   db.prepare('DELETE FROM figures WHERE id = ?').run(id);
   searchIndex.remove('figure', id);
+  semanticChunks.remove('figure', id);
   res.json({ ok: true });
 });
 

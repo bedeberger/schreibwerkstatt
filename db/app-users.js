@@ -24,7 +24,8 @@ const _stmtFindByEmail = db.prepare(`
          invited_by, invited_at, created_at, last_login_at,
          theme, default_buchtyp, default_language, default_region,
          focus_granularity, daily_goal_minutes,
-         monthly_budget_usd, budget_mode, ai_provider_override
+         monthly_budget_usd, budget_mode, ai_provider_override,
+         onboarding_state
     FROM app_users
    WHERE email = ?
 `);
@@ -101,6 +102,19 @@ function setAiProviderOverride(email, provider) {
     throw new Error("setAiProviderOverride: provider must be null|'claude'|'ollama'|'llama'");
   }
   _stmtSetAiProvider.run(v, e);
+}
+
+// Onboarding-Fortschritt (persistierter Teil: welcomeDismissed/completed) als
+// JSON-Blob. NULL = noch nichts weggeklickt/abgeschlossen. Die Checklisten-
+// Schritte selbst werden aus echtem State abgeleitet (routes/usersettings.js),
+// nicht hier gespeichert.
+const _stmtSetOnboarding = db.prepare(`
+  UPDATE app_users SET onboarding_state = ? WHERE email = ?
+`);
+function setOnboardingState(email, state) {
+  const e = _normEmail(email);
+  if (!e) return;
+  _stmtSetOnboarding.run(state == null ? null : JSON.stringify(state), e);
 }
 
 const _stmtSetBudget = db.prepare(`
@@ -402,7 +416,7 @@ module.exports = {
   getUser, listUsers, getActiveAdminEmails, createUser, touchLogin,
   touchUserLastSeen, updateUserSettings, addUserActivity,
   setStatus, setGlobalRole, setCanInviteUsers, setBudget, softDeleteUser,
-  setAiProviderOverride,
+  setAiProviderOverride, setOnboardingState,
   recordAuditEvent, listAuditForUser,
   createInvite, findInviteByToken, findInviteById, inviteStatus,
   acceptInvite, revokeInvite, listActiveInvites,

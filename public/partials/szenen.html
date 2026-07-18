@@ -179,6 +179,10 @@
           </div>
           <div x-show="$store.catalogUi.selectedSzeneId === s.id" class="entity-detail" x-cloak>
             <p x-show="s.kommentar" x-text="s.kommentar" class="entity-detail-text"></p>
+            <div class="entity-detail-actions" x-show="$store.config.semanticSearchEnabled">
+              <button type="button" class="btn-compact" @click.stop="$app.findSimilar('scene', s.id, s.titel)"
+                x-text="$app.t('search.semantic.similarEntity')"></button>
+            </div>
             <div x-show="(s.fig_ids || []).length > 0" class="entity-meta-row">
               <span class="entity-meta-label" x-text="$app.t('orte.figuren')"></span>
               <template x-for="figId in (s.fig_ids || [])" :key="figId">

@@ -2,7 +2,35 @@
 // Daten kommen live aus /history/fehler-heatmap/:book_id — kein KI-Call, keine Sync-Phase.
 // Methoden werden in Alpine.data('fehlerHeatmapCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson, formatNumber, heatmapCellVars, minMaxBy } from '../utils.js';
+import { fetchJson, formatNumber, heatmapCellVars, minMaxBy, tzOpts } from '../utils.js';
+import { loadChart } from '../lazy-libs.js';
+
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// Chart.js-Instanz + Theme-Observer als Modul-State (ausserhalb Alpines Proxy,
+// der die Chart-Instanz sonst beschädigt) — analog bookstats.js.
+let _trendChart = null;
+let _trendThemeObserver = null;
+
+function _ensureTrendThemeObserver(component) {
+  if (_trendThemeObserver) return;
+  _trendThemeObserver = new MutationObserver(() => {
+    if (!_trendChart || !window.__app.showFehlerHeatmapCard) return;
+    component.renderFehlerTrendChart();
+  });
+  _trendThemeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+}
+
+export function _disconnectFehlerTrendThemeObserver() {
+  if (_trendThemeObserver) { _trendThemeObserver.disconnect(); _trendThemeObserver = null; }
+}
+
+export function _destroyFehlerTrendChart() {
+  if (_trendChart) { _trendChart.destroy(); _trendChart = null; }
+}
 
 // Cluster-Gruppierung der Typen-Spalten. Reihenfolge in den Cluster-Arrays = Spalten-Reihenfolge.
 // Muss mit VALID_TYPEN in routes/jobs/lektorat.js kompatibel sein.
@@ -51,6 +79,125 @@ export const fehlerHeatmapMethods = {
     this.fehlerHeatmapMode = mode;
     this.activeFehlerDetailKey = null;
     await this.loadFehlerHeatmap();
+    // Trend-Daten tragen alle drei Modi — kein Refetch, nur neu zeichnen.
+    this.renderFehlerTrendChart();
+  },
+
+  // ── Fehlerdichte-Trend über die Fassungen ─────────────────────────────────
+  async loadFehlerTrend() {
+    if (!Alpine.store('nav').selectedBookId) return;
+    try {
+      const data = await fetchJson(`/history/fehler-trend/${Alpine.store('nav').selectedBookId}`);
+      this.fehlerTrendData = data?.versions || [];
+    } catch (e) {
+      console.error('[loadFehlerTrend]', e);
+      this.fehlerTrendData = [];
+    }
+    this.$nextTick(() => requestAnimationFrame(() => this.renderFehlerTrendChart()));
+  },
+
+  // Fassungen mit Lektorat-Kennzahl + gültigem Wörter-Nenner — nur diese tragen
+  // einen Dichte-Punkt. Reihenfolge aus dem Backend (seq aufsteigend).
+  _fehlerTrendPoints() {
+    return (this.fehlerTrendData || []).filter(v => v.metrics && v.words > 0);
+  },
+
+  // Genug Datenpunkte für einen sichtbaren Verlauf? Sonst Hinweis statt Chart.
+  fehlerTrendHasData() {
+    return this._fehlerTrendPoints().length >= 2;
+  },
+
+  // Fehler pro 1000 Wörter für eine Fassung im aktuellen Modus.
+  _fehlerTrendPer1k(v) {
+    const total = v.metrics?.[this.fehlerHeatmapMode]?.total;
+    if (total == null || !(v.words > 0)) return null;
+    return Math.round((total / v.words) * 1000 * 10) / 10;
+  },
+
+  async renderFehlerTrendChart() {
+    const canvas = document.getElementById('fehler-trend-chart');
+    if (!canvas) return;
+    if (!this.fehlerTrendHasData()) { _destroyFehlerTrendChart(); return; }
+
+    if (typeof window.Chart === 'undefined') {
+      try { await loadChart(); }
+      catch (e) {
+        const ph = document.createElement('div');
+        ph.className = 'muted-msg muted-msg--block';
+        ph.textContent = e.message;
+        canvas.replaceWith(ph);
+        return;
+      }
+    }
+
+    // Immer frisch aufbauen (Update-Pfad liest keine neuen Canvas-Dimensionen
+    // nach einem display:none↔block-Wechsel — bliebe sonst leer).
+    _destroyFehlerTrendChart();
+
+    const points = this._fehlerTrendPoints();
+    const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
+    const labels = points.map(v => v.label || window.__app.t('fehlerHeatmap.trend.versionLabel', { n: v.seq }));
+    const data = points.map(v => this._fehlerTrendPer1k(v));
+
+    const accent = cssVar('--color-primary');
+    const muted = cssVar('--color-muted');
+    const gridLine = cssVar('--color-border');
+
+    _ensureTrendThemeObserver(this);
+
+    _trendChart = new window.Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: window.__app.t('fehlerHeatmap.trend.yLabel'),
+          data,
+          borderColor: accent,
+          backgroundColor: accent + '12',
+          borderWidth: 2,
+          tension: 0.35,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: accent,
+          fill: true,
+          spanGaps: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const v = points[items[0]?.dataIndex];
+                if (!v) return '';
+                const when = v.created_at ? new Date(v.created_at).toLocaleDateString(localeTag, tzOpts({ day: '2-digit', month: '2-digit', year: '2-digit' })) : '';
+                return when ? `${items[0].label} · ${when}` : items[0].label;
+              },
+              label: (ctx) => {
+                const y = ctx.parsed.y;
+                if (y == null) return '';
+                return ` ${formatNumber(y, Alpine.store('shell').uiLocale, 1)} ${window.__app.t('fehlerHeatmap.trend.per1kUnit')}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: { grid: { color: gridLine }, ticks: { font: { size: 11 }, color: muted } },
+          y: {
+            grid: { color: gridLine },
+            beginAtZero: true,
+            ticks: {
+              font: { size: 11 },
+              color: muted,
+              callback: (v) => formatNumber(v, Alpine.store('shell').uiLocale, 1),
+            },
+          },
+        },
+      },
+    });
   },
 
   fehlerHeatmapChapterKey(ch) {

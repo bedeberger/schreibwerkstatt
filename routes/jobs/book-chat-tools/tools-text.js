@@ -8,6 +8,8 @@ const contentStore = require('../../../lib/content-store');
 const { htmlToPlainText } = require('../../../lib/html-text');
 const { findDialogRanges } = require('../../../lib/page-index');
 const searchIndex = require('../../../lib/search');
+const embed = require('../../../lib/embed');
+const semanticChunks = require('../../../db/semantic-chunks');
 const {
   MAX_CHARS_PER_PAGE,
   DEFAULT_CHARS_PER_PAGE,
@@ -567,8 +569,46 @@ function tool_find_first_last_mention(input, ctx) {
   };
 }
 
+// ── search_similar ────────────────────────────────────────────────────────────
+// Semantische Ähnlichkeitssuche über die Embedding-Vektoren (semantic_chunks).
+// Gegenstück zu search_passages: findet nach BEDEUTUNG, nicht nach Wortlaut.
+function _resolveSimilarTitle(kind, entityId) {
+  if (kind === 'page') return db.prepare('SELECT page_name AS t FROM pages WHERE page_id = ?').get(entityId)?.t;
+  if (kind === 'scene') return db.prepare('SELECT titel AS t FROM figure_scenes WHERE id = ?').get(entityId)?.t;
+  if (kind === 'figure') return db.prepare('SELECT name AS t FROM figures WHERE id = ?').get(entityId)?.t;
+  return null;
+}
+
+async function tool_search_similar(input, ctx) {
+  if (!embed.isEnabled()) return { error: 'Embedding-Backend nicht konfiguriert.' };
+  const query = (input.query || '').trim();
+  if (!query) return { error: 'query fehlt' };
+  const { model } = embed.getConfig();
+  const allowed = ['page', 'scene', 'figure'];
+  const kinds = Array.isArray(input.kinds) && input.kinds.length
+    ? input.kinds.filter(k => allowed.includes(k)) : allowed;
+  const topK = Math.min(Math.max(1, input.limit || 20), 50);
+
+  let queryVec;
+  try { queryVec = await embed.embedOne(query, { signal: ctx.jobSignal }); }
+  catch (e) { return { error: `Embedding-Endpunkt nicht erreichbar: ${e.message}` }; }
+
+  const raw = semanticChunks.searchSimilar(ctx.bookId, model, queryVec, { kinds, topK });
+  const results = [];
+  for (const h of raw) {
+    const title = _resolveSimilarTitle(h.kind, h.entity_id);
+    if (title == null) continue; // gelöschte Entität → überspringen
+    results.push({
+      kind: h.kind, entity_id: h.entity_id, title,
+      snippet: String(h.text || '').slice(0, 240), score: Math.round(h.score * 1000) / 1000,
+    });
+  }
+  return _truncateResult({ query, count: results.length, results });
+}
+
 module.exports = {
   tool_search_passages,
+  tool_search_similar,
   tool_get_pages,
   tool_get_chapter_text,
   tool_quote_passage,

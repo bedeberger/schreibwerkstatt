@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 238, 118 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 241, 119 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -363,6 +363,7 @@ erDiagram
     TEXT    content_json  "buildBookJson-Output ({book, tree:[node…]}) mit Seiten-HTML inline"
     TEXT    extras_json   "collectExtras (Analyse + Lektorat) für Restore"
     TEXT    publication_json "eingefrorene book_publication (Titelei/epub_*/Cover+Foto base64) für Fassungs-Export + Restore"
+    TEXT    lektorat_metrics "verdichtete Lektorat-Kennzahl beim Capture (JSON {open,applied,all}×{total,byTyp}) für den Fehlerdichte-Trend in der Heatmap-Karte"
     INTEGER chars
     INTEGER words
     INTEGER pages
@@ -1179,6 +1180,7 @@ erDiagram
     REAL    monthly_budget_usd "NULL = kein numerisches Limit"
     TEXT    budget_mode        "none | soft | hard (Default none)"
     TEXT    ai_provider_override "NULL = follows global ai.provider; CHECK in ('claude','ollama','llama')"
+    TEXT    onboarding_state  "JSON { welcomeDismissed, completed }; NULL = frisch (Mig 241)"
   }
   user_invites {
     INTEGER id              PK "AUTOINCREMENT"
@@ -1480,6 +1482,20 @@ erDiagram
     TEXT key        PK
     TEXT value
     TEXT updated_at
+  }
+
+  semantic_chunks {
+    INTEGER id           PK "AUTOINCREMENT"
+    TEXT    kind         "page | scene | figure"
+    INTEGER entity_id    "polymorph nach kind (kein FK)"
+    INTEGER book_id      FK "→ books ON DELETE CASCADE"
+    INTEGER chunk_ix
+    TEXT    content_hash "Delta-Cache"
+    TEXT    model        "Mehr-Modell-Koexistenz"
+    INTEGER dim
+    BLOB    vector       "Float32-Embedding"
+    TEXT    text
+    TEXT    created_at
   }
 
   blog_connections {

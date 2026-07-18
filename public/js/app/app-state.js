@@ -195,10 +195,20 @@ const notebookState = () => ({
   _quotesFlashTimer: null,
   lastAutosaveAt: null,
   lastDraftSavedAt: null,
+  // true, wenn der letzte lokale Draft-Write fehlschlug (localStorage voll) —
+  // der Inhalt liegt dann NICHT lokal gesichert vor (Datenverlust-Risiko im
+  // Offline-Fall). Speist den höchstprioren `unsaved`-Zustand des Save-
+  // Indicators (app-ui.js#_saveStatus). Wird bei erfolgreichem Write/Save
+  // wieder genullt.
+  draftPersistFailed: false,
   _autosaveIdleTimer: null,
   _autosaveMaxTimer: null,
   _draftTimer: null,
   _onlineHandler: null,
+  // Re-Entry-Guard der Reconnect-Outbox (app-outbox.js): verhindert, dass
+  // sich überlappende online/focus/visibilitychange-Trigger den Draft-Flush
+  // parallel starten. Kurzlebig, nur innerhalb von _flushOutbox gesetzt.
+  _outboxFlushing: false,
 });
 
 // Fokus-State-Slice. Eigener Slice, damit alle vier Editor-Modi-Flags
@@ -268,6 +278,10 @@ const cardsState = () => ({
   showUserSettingsCard: false,
   showMyStatsCard: false,
   showHelpCard: false,
+  showOnboardingCard: false,
+  // First-Login-Willkommens-Banner (zeigt einmalig auf „Erste Schritte").
+  // Serverseitig gemerkt (welcomeDismissed); Loader _loadOnboardingWelcome.
+  onboardingWelcome: false,
   showAdminUsersCard: false,
   showAdminSettingsCard: false,
   showAdminUsageCard: false,
@@ -277,6 +291,7 @@ const cardsState = () => ({
   showAdminParseFailsCard: false,
   showAdminJsErrorsCard: false,
   showAdminDevicesCard: false,
+  showAdminBackupCard: false,
   adminUsageTab: 'users',
   showFinetuneExportCard: false,
   showSnapshotsCard: false,

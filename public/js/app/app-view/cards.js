@@ -95,6 +95,18 @@ export const cardsMethods = {
     this.showIdeenCard = true;
   },
 
+  // „Ähnliche Stellen zu dieser Figur/Szene/Seite" (semantische Suche): öffnet
+  // die Such-Karte und stösst dort die Entity-Ähnlichkeitssuche an. Von den
+  // Entity-Karten (Figuren/Szenen) via `$app.findSimilar(...)` gerufen. No-op,
+  // wenn das Embedding-Backend nicht konfiguriert ist.
+  async findSimilar(kind, id, label) {
+    if (!this.$store.config?.semanticSearchEnabled) return;
+    if (!this.showSearchCard) await this.toggleSearchCard();
+    else await this._ensurePartial('search');
+    await this.$nextTick();
+    window.dispatchEvent(new CustomEvent('search:similar', { detail: { kind, id, label: label || '' } }));
+  },
+
   // Kapitel-Ideen: lebt parallel zur Kapitelreview-Karte (gleicher Slot wie
   // Page-Modus). Kein _closeOtherMainCards — Kapitelreview bleibt offen.
   async toggleChapterIdeenCard(chapterId) {

@@ -36,10 +36,12 @@ export const autosaveMethods = {
     if (isNoChange(html, app.originalHtml)) {
       clearDraft(app.currentPage.id);
       app.lastDraftSavedAt = null;
+      app.draftPersistFailed = false;
       return;
     }
-    writeDraft(app.currentPage.id, html, app.originalHtml, app.currentPage.updated_at);
-    app.lastDraftSavedAt = Date.now();
+    const ok = writeDraft(app.currentPage.id, html, app.originalHtml, app.currentPage.updated_at);
+    app.draftPersistFailed = !ok;
+    if (ok) app.lastDraftSavedAt = Date.now();
   },
 
 
