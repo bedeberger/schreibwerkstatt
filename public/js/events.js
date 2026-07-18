@@ -36,6 +36,9 @@ export const EVT = {
   PALETTE_CLOSE: 'palette:close',               // kein detail
   PALETTE_RERENDER: 'palette:rerender',         // kein detail
 
+  // ── Semantische Suche ────────────────────────────────────────────────────
+  SEARCH_SIMILAR: 'search:similar',             // detail: { kind, id, label }
+
   // ── Editor: Focus-Modus (Trampoline aus dem Root) ────────────────────────
   EDITOR_FOCUS_ENTER: 'editor:focus:enter',     // detail: { granularity? }
   EDITOR_FOCUS_EXIT: 'editor:focus:exit',       // kein detail

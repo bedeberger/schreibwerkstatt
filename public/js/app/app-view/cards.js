@@ -104,7 +104,7 @@ export const cardsMethods = {
     if (!this.showSearchCard) await this.toggleSearchCard();
     else await this._ensurePartial('search');
     await this.$nextTick();
-    window.dispatchEvent(new CustomEvent('search:similar', { detail: { kind, id, label: label || '' } }));
+    window.dispatchEvent(new CustomEvent(EVT.SEARCH_SIMILAR, { detail: { kind, id, label: label || '' } }));
   },
 
   // Kapitel-Ideen: lebt parallel zur Kapitelreview-Karte (gleicher Slot wie
