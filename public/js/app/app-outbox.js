@@ -79,9 +79,15 @@ export const appOutboxMethods = {
   },
 
   // Ein Draft. Rückgabe: 'ok' | 'conflict' | 'offline' | 'skip'.
+  // 'offline' bricht die Schleife ab (Netz weg), 'skip'/'conflict' lassen den
+  // Draft liegen, aber flushen die übrigen weiter.
   async _flushOneDraft(pageId) {
     const draft = readDraft(pageId);
     if (!draft || !draft.html) { clearDraft(pageId); return 'ok'; }
+    // Race-Schutz: hat der User diese Seite inzwischen (während des async-Flushs)
+    // zum Editieren geöffnet, gehört sie dem Live-Editor (autosave.js) — headless
+    // nicht dazwischenfunken, sonst clearen wir den Draft unter seinen Füssen weg.
+    if (this.editMode && Number(this.currentPage?.id) === pageId) return 'skip';
     const name = this._pageNameById(pageId);
     if (!name) return 'skip'; // Fremd-Buch/unbekannt → beim Laden des Buchs erneut
     try {
@@ -93,7 +99,15 @@ export const appOutboxMethods = {
       return 'ok';
     } catch (e) {
       if (isPageConflict(e)) return this._flushMergeDraft(pageId, draft, name);
-      return 'offline'; // Netzfehler → abbrechen, Draft bleibt erhalten
+      // Server hat geantwortet (err.status gesetzt) → kein Netzausfall. Ob
+      // 4xx (gelöscht/kein Zugriff/invalide) oder 5xx: Retry-in-Schleife bringt
+      // nichts. Draft bleiben lassen, aber die übrigen NICHT blockieren (skip
+      // statt offline) — sonst hängt ein einzelner Poison-Draft die ganze Queue.
+      if (typeof e?.status === 'number') {
+        console.warn('[outbox] Draft nicht synchronisierbar, übersprungen', { pageId, status: e.status, code: e.code });
+        return 'skip';
+      }
+      return 'offline'; // kein Status = echter Netzfehler → Rest später
     }
   },
 
@@ -106,7 +120,7 @@ export const appOutboxMethods = {
     if (!base) return 'conflict'; // kein Ancestor → nur manuell auflösbar
     let remote;
     try { remote = await contentRepo.loadPage(pageId, { fresh: true }); }
-    catch { return 'offline'; }
+    catch (e) { return (typeof e?.status === 'number') ? 'conflict' : 'offline'; }
     if (!remote?.updated_at) return 'conflict';
     let m;
     try { m = mergeBlocks(base, draft.html, remote.html || ''); }
@@ -119,6 +133,6 @@ export const appOutboxMethods = {
       });
       clearDraft(pageId);
       return 'ok';
-    } catch { return 'offline'; }
+    } catch (e) { return (typeof e?.status === 'number') ? 'conflict' : 'offline'; }
   },
 };

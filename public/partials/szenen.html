@@ -146,7 +146,6 @@
       </div>
       <span class="filter-count" x-text="szenenFiltered.length + ' / ' + $store.catalog.szenen.length"></span>
     </div>
-
     <!-- Kompakte Szenen-Liste -->
     <div x-show="viewMode === 'list'" class="entity-list entity-list--accented">
       <template x-for="(s, i) in szenenFiltered" :key="s.id || i">
@@ -179,10 +178,7 @@
           </div>
           <div x-show="$store.catalogUi.selectedSzeneId === s.id" class="entity-detail" x-cloak>
             <p x-show="s.kommentar" x-text="s.kommentar" class="entity-detail-text"></p>
-            <div class="entity-detail-actions" x-show="$store.config.semanticSearchEnabled">
-              <button type="button" class="btn-compact" @click.stop="$app.findSimilar('scene', s.id, s.titel)"
-                x-text="$app.t('search.semantic.similarEntity')"></button>
-            </div>
+            <button type="button" class="btn-compact entity-detail-actions" x-show="$store.config.semanticSearchEnabled" @click.stop="$app.findSimilar('scene', s.id, s.titel)" x-text="$app.t('search.semantic.similarEntity')"></button>
             <div x-show="(s.fig_ids || []).length > 0" class="entity-meta-row">
               <span class="entity-meta-label" x-text="$app.t('orte.figuren')"></span>
               <template x-for="figId in (s.fig_ids || [])" :key="figId">

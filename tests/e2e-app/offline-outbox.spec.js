@@ -80,6 +80,33 @@ test('Outbox synct offline-Draft einer nicht geöffneten Seite beim Flush', asyn
   guard.assertClean('Outbox-Flush');
 });
 
+test('Outbox überspringt die gerade offene Edit-Seite (kein Dazwischenfunken)', async ({ page }) => {
+  const guard = attachConsoleGuard(page);
+  await bootApp(page);
+  await selectSeededBook(page);
+
+  // Erste Seite im Notebook-Editor öffnen (Edit-Modus).
+  await page.evaluate(async () => {
+    await window.__app.selectPage(window.Alpine.store('nav').pages[0]);
+    window.__app.startEdit();
+  });
+  await page.waitForFunction(() => window.__app.editMode === true, null, { timeout: 10000 });
+
+  // Draft für genau diese offene Seite seeden + flushen. Die Outbox darf ihn
+  // NICHT synchronisieren/clearen — die Seite gehört dem Live-Editor.
+  const stillThere = await page.evaluate(async () => {
+    const pid = window.__app.currentPage.id;
+    localStorage.setItem('editor_draft_' + pid, JSON.stringify({
+      html: '<p>live edit</p>', originalHtml: '', originalUpdatedAt: null, savedAt: Date.now(),
+    }));
+    await window.__app._flushOutbox();
+    return localStorage.getItem('editor_draft_' + pid) !== null;
+  });
+  expect(stillThere).toBe(true);
+
+  guard.assertClean('Outbox-Skip-offene-Seite');
+});
+
 test('Save-Indicator zeigt `unsaved`, wenn der lokale Draft-Write fehlschlägt (Speicher voll)', async ({ page }) => {
   const guard = attachConsoleGuard(page);
   await bootApp(page);
