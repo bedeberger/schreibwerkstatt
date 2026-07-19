@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <title>Referenz-Karte · Verwandt-Tab Test Harness</title>
+  <link rel="stylesheet" href="/public/css/tokens.css">
+  <style>
+    body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
+    .page-content-view { border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; }
+    [x-cloak] { display: none; }
+  </style>
+</head>
+<body>
+  <!-- Schlanke Reproduktion: ein editierbarer .page-content-view (wie der
+       Notebook-Editor) neben dem Verwandt-Panel. Der Suchen-Button ist ein
+       fokussierbarer <button> — sein Klick stiehlt den Fokus aus dem
+       contenteditable und kollabiert die Live-Selection. Der Test prüft, dass
+       der Absatz-Modus trotzdem den zuletzt erfassten Auswahltext nutzt. -->
+  <div id="root" x-data="referenceCard" x-init="referenceTab = 'verwandt'">
+    <div class="page-content-view page-content-view--editing" contenteditable="true">
+      <p id="para1">Der erste Absatz handelt vom Wald und dem Fluss dahinter.</p>
+      <p id="para2">Ein zweiter Absatz erzaehlt von den Bergen im Norden.</p>
+    </div>
+
+    <div x-show="referenceTab === 'verwandt'">
+      <button data-test="basis-page" type="button" @click="verwandtBasis = 'page'">page</button>
+      <button data-test="basis-absatz" type="button" @click="verwandtBasis = 'absatz'">absatz</button>
+      <button data-test="search" type="button" @click="runVerwandt()" :disabled="verwandtLoading">search</button>
+
+      <div data-test="loading" x-show="verwandtLoading">loading</div>
+      <div data-test="error" x-text="verwandtError"></div>
+      <div data-test="count" x-text="verwandtResults().length"></div>
+      <template x-for="hit in verwandtResults()" :key="'vw-' + hit.entity_id">
+        <div class="hit" :data-test="'hit-' + hit.entity_id" x-text="hit.title"></div>
+      </template>
+    </div>
+  </div>
+
+  <script type="module">
+    const { registerReferenceCard } = await import('/public/js/cards/reference-card.js');
+
+    document.addEventListener('alpine:init', () => {
+      window.__app = window.Alpine.reactive({
+        showReferenceCard: true,
+        currentPage: { id: 7, updated_at: '2026-01-01T00:00:00Z', chapter_id: 3 },
+        originalHtml: '<p>Der erste Absatz handelt vom Wald und dem Fluss dahinter.</p>',
+        t: (k) => k,
+        loadFiguren: () => {},
+        loadOrte: () => {},
+        loadSzenen: () => {},
+        _reloadZeitstrahl: () => {},
+        gotoPageById: (id) => { window.__gotoCalled = id; },
+      });
+      window.Alpine.magic('app', () => window.__app);
+      window.Alpine.store('nav', { selectedBookId: 1, tree: [{ id: 3, name: 'Kapitel Eins' }] });
+      window.Alpine.store('config', { semanticSearchEnabled: true });
+      window.Alpine.store('catalog', { figuren: [], orte: [], szenen: [], globalZeitstrahl: [] });
+      registerReferenceCard();
+    });
+
+    document.addEventListener('alpine:initialized', () => {
+      queueMicrotask(() => { window.harnessReady = true; });
+    });
+
+    const s = document.createElement('script');
+    s.src = '/public/vendor/alpine-3.15.12.min.js';
+    document.head.appendChild(s);
+  </script>
+</body>
+</html>

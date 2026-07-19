@@ -35,6 +35,7 @@ export function registerReferenceCard() {
     verwandtNotIndexed: false,
     verwandtKey: null,                // _pageKey() zum Suchzeitpunkt (Staleness)
     _verwandtAbort: null,
+    _verwandtSelText: '',             // zuletzt in .page-content-view erfasste Auswahl/Absatz
     _refPageText: '',
     _refPageTextKey: null,
     _memos: {},
@@ -57,7 +58,16 @@ export function registerReferenceCard() {
         this._resetVerwandt();
         this._maybeAutoVerwandt();
       });
-      this.$watch(() => window.__app?.currentPage?.id, () => { if (this.referenceTab === 'verwandt') this._maybeAutoVerwandt(); });
+      this.$watch(() => window.__app?.currentPage?.id, () => {
+        // Auswahl der alten Seite verwerfen; „ganze Seite" ggf. neu suchen.
+        this._verwandtSelText = '';
+        if (this.referenceTab === 'verwandt') this._maybeAutoVerwandt();
+      });
+      // Auswahl/Absatz laufend mitschreiben, solange der Cursor im Editor-Text
+      // steht. Beim Klick auf den Suchen-Button ist die Live-Selection bereits
+      // verloren (Fokus-Steal) — darum den zuletzt erfassten Text puffern.
+      document.addEventListener('selectionchange', () => this._captureVerwandtSel(),
+        { signal: this._lifecycle.signal });
     },
 
     destroy() { this._verwandtAbort?.abort(); this._lifecycle?.destroy(); },
@@ -65,6 +75,7 @@ export function registerReferenceCard() {
     _resetReference() {
       this.referenceRecherche = [];
       this._resetVerwandt();
+      this._verwandtSelText = '';
       this._refPageText = '';
       this._refPageTextKey = null;
       this._memos = {};
@@ -247,15 +258,23 @@ export function registerReferenceCard() {
 
     // Text der aktuellen Auswahl bzw. des Absatzes am Cursor — nur innerhalb des
     // Notebook-Editor-Textkörpers (.page-content-view, view + edit teilen die Klasse).
+    // Puffer: der Suchen-Button stiehlt beim Klick den Fokus und kollabiert die
+    // Live-Selection, darum liefern wir den zuletzt erfassten Text.
     _verwandtSelectionText() {
+      return this._verwandtSelText;
+    },
+    // Läuft auf jedem `selectionchange`: steht der Cursor/die Auswahl im Editor-
+    // Text, den Absatz-/Auswahltext puffern; sonst den letzten Wert behalten
+    // (Fokuswechsel auf die Karte darf ihn nicht löschen).
+    _captureVerwandtSel() {
       const sel = window.getSelection?.();
-      if (!sel || !sel.anchorNode) return '';
+      if (!sel || !sel.anchorNode) return;
       const startEl = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
-      if (!startEl?.closest?.('.page-content-view')) return '';
+      if (!startEl?.closest?.('.page-content-view')) return;
       const selText = sel.toString().replace(/\s+/g, ' ').trim();
-      if (!sel.isCollapsed && selText) return selText;
+      if (!sel.isCollapsed && selText) { this._verwandtSelText = selText; return; }
       const block = startEl.closest('p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,div.poem');
-      return (block?.textContent || '').replace(/\s+/g, ' ').trim();
+      this._verwandtSelText = (block?.textContent || '').replace(/\s+/g, ' ').trim();
     },
 
     // Auto-Suche für „Ganze Seite" (embedding-frei) — beim Tab-Öffnen bzw.
