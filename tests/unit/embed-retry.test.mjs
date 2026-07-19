@@ -11,9 +11,21 @@ import { createRequire } from 'node:module';
 process.env.DB_PATH = path.join(os.tmpdir(), `sw-embed-retry-${process.pid}.db`);
 
 const require = createRequire(import.meta.url);
-const { _withRetry } = require('../../lib/embed.js');
+const { _withRetry, _stripLoneSurrogates } = require('../../lib/embed.js');
 
 const retriable = (msg) => { const e = new Error(msg); e.retriable = true; return e; };
+
+test('_stripLoneSurrogates: entfernt einzelne Surrogate, behält gültige Paare', () => {
+  // 🙈 (U+1F648) = gültiges Paar 🙈 → bleibt unverändert.
+  const emoji = 'abc\u{1F648}def';
+  assert.equal(_stripLoneSurrogates(emoji), emoji);
+  // Lone Low-Surrogate (Chunk-Split-Artefakt) → entfernt, sonst JSON-\udXXX → UTF-8-Crash am Endpunkt.
+  assert.equal(_stripLoneSurrogates('abc\uDE48def'), 'abcdef');
+  // Lone High-Surrogate → ebenfalls entfernt.
+  assert.equal(_stripLoneSurrogates('abc\uD83Ddef'), 'abcdef');
+  // Sauberer Text bleibt unverändert.
+  assert.equal(_stripLoneSurrogates('Hallo Welt'), 'Hallo Welt');
+});
 
 test('_withRetry: transienter Fehler → Erfolg nach Retries', async () => {
   let calls = 0;
