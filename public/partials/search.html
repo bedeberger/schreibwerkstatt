@@ -14,6 +14,8 @@
       :disabled="indexing" @click="buildIndex()"
       x-text="indexing ? (indexStatus || $app.t('search.semantic.indexing')) : (indexInfo?.indexed ? $app.t('search.semantic.rebuildIndex') : $app.t('search.semantic.buildIndex'))"></button>
     <span class="search-index-status muted-msg muted-msg--sm" x-show="!indexing && indexStatus" x-text="indexStatus"></span>
+    <span class="search-enh-flag muted-msg muted-msg--sm" x-show="mode === 'semantic' && semanticEnhancedLabel"
+          x-text="semanticEnhancedLabel"></span>
   </div>
 
   <div class="search-index-info muted-msg muted-msg--sm"

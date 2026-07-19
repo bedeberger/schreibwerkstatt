@@ -49,12 +49,12 @@ test('_verifyExcerpt: kein passendes Kapitel → leer, located:false', () => {
 
 test('verifyKontinuitaetProbleme: paraphrasiertes Zitat → semantische Passage im Verify-Prompt', async () => {
   const orig = {
-    isEnabled: embed.isEnabled, getConfig: embed.getConfig, embedOne: embed.embedOne,
+    isEnabled: embed.isEnabled, getConfig: embed.getConfig, embedQuery: embed.embedQuery,
     bookStats: semanticChunks.bookStats, searchSimilar: semanticChunks.searchSimilar,
   };
   embed.isEnabled = () => true;
   embed.getConfig = () => ({ model: 'test-model' });
-  embed.embedOne = async () => Float32Array.from([1, 0, 0]);
+  embed.embedQuery = async () => Float32Array.from([1, 0, 0]);
   semanticChunks.bookStats = () => ({ total: 1 });
   const searchCalls = [];
   semanticChunks.searchSimilar = (bookId, model, vec, opts) => {
@@ -88,7 +88,7 @@ test('verifyKontinuitaetProbleme: paraphrasiertes Zitat → semantische Passage 
     assert.deepEqual(searchCalls[0].opts.kinds, ['page']);
     assert.equal(searchCalls[0].bookId, 77);
   } finally {
-    Object.assign(embed, { isEnabled: orig.isEnabled, getConfig: orig.getConfig, embedOne: orig.embedOne });
+    Object.assign(embed, { isEnabled: orig.isEnabled, getConfig: orig.getConfig, embedQuery: orig.embedQuery });
     Object.assign(semanticChunks, { bookStats: orig.bookStats, searchSimilar: orig.searchSimilar });
   }
 });

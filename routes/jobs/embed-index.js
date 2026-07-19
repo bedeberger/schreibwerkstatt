@@ -58,7 +58,7 @@ async function runEmbedIndexJob(jobId, bookId, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   try {
     if (!embed.isEnabled()) throw i18nError('job.error.embedDisabled');
-    const { model, dim } = embed.getConfig();
+    const { model, dim, passagePrefix } = embed.getConfig();
     const signal = () => jobAbortControllers.get(jobId)?.signal;
     const throwIfAborted = () => {
       if (signal()?.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
@@ -87,12 +87,17 @@ async function runEmbedIndexJob(jobId, bookId, userEmail, userToken) {
         const existing = semanticChunks.getEntityChunks(kind, ent.id, model);
         chunks.forEach((text, ix) => {
           totalChunks++;
-          const hash = contentHash(text);
+          // Was tatsächlich embeddet wird (inkl. passage_prefix für asymmetrische
+          // Modelle). Der Hash deckt den Präfix ab → Präfixwechsel invalidiert den
+          // Delta-Cache und erzwingt Reindex. Der gespeicherte text bleibt roh
+          // (Snippet-Quelle).
+          const embedInput = passagePrefix ? passagePrefix + text : text;
+          const hash = contentHash(embedInput);
           const prev = existing.get(ix);
           if (prev && prev.content_hash === hash && prev.vector.length === dim) {
             rowsByEntity.get(key).push({ chunk_ix: ix, content_hash: hash, vector: prev.vector, text });
           } else {
-            pending.push({ kind, id: ent.id, ix, text, hash });
+            pending.push({ kind, id: ent.id, ix, text, embedInput, hash });
           }
         });
       }
@@ -123,7 +128,7 @@ async function runEmbedIndexJob(jobId, bookId, userEmail, userToken) {
     for (let i = 0; i < pending.length; i += BATCH) {
       throwIfAborted();
       const slice = pending.slice(i, i + BATCH);
-      const vecs = await embed.embedBatch(slice.map(p => p.text), { signal: signal() });
+      const vecs = await embed.embedBatch(slice.map(p => p.embedInput), { signal: signal() });
       const touched = new Set();
       slice.forEach((p, j) => {
         const k = `${p.kind}:${p.id}`;

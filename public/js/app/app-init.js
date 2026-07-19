@@ -204,6 +204,8 @@ export const appInitMethods = {
       this.$store.tts.enabled = !!cfg.tts?.enabled;
       this.$store.config.researchChatEnabled = !!cfg.researchChat?.enabled;
       this.$store.config.semanticSearchEnabled = !!cfg.semanticSearch?.enabled;
+      this.$store.config.semanticHybrid = !!cfg.semanticSearch?.hybrid;
+      this.$store.config.semanticRerank = !!cfg.semanticSearch?.rerank;
       this.$store.config.factcheckEnabled = !!cfg.komplett?.factcheck;
       if (cfg.tts?.pause) {
         const frag = Number(cfg.tts.pause.fragmentMs);

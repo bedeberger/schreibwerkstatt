@@ -51,7 +51,7 @@ async function _semanticExcerpt(bookId, model, query, signal) {
   if (!q) return null;
   let queryVec;
   try {
-    queryVec = await embed.embedOne(q, { signal });
+    queryVec = await embed.embedQuery(q, { signal });
   } catch (e) {
     if (e?.name === 'AbortError') throw e;
     return null; // Backend down/nicht erreichbar → keyword-Fallback behalten

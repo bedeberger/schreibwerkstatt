@@ -66,8 +66,10 @@ const _selBookKinds = db.prepare(
 // — kein sqlite-vec nötig. Filtert aufs aktive Modell (model), optional auf
 // kinds und schliesst die Quell-Entität aus (exclude), damit „ähnliche Stellen
 // zu dieser Szene" nicht die Szene selbst zurückgibt. Ein Treffer pro Entität
-// (bester Chunk), nach Score sortiert, top-K.
-function searchSimilar(bookId, model, queryVec, { kinds = null, topK = 20, excludeKind = null, excludeEntityId = null } = {}) {
+// (bester Chunk), nach Score sortiert, top-K. minScore: Cosinus-Untergrenze —
+// die Ähnlichkeitssuche liefert nie „keine Treffer", darum schneidet der Floor
+// den schwachen Long-Tail ab (0 = aus).
+function searchSimilar(bookId, model, queryVec, { kinds = null, topK = 20, excludeKind = null, excludeEntityId = null, minScore = 0 } = {}) {
   const kindSet = kinds && kinds.length ? new Set(kinds) : null;
   const best = new Map(); // key `${kind}:${entity_id}` → { kind, entity_id, chunk_ix, text, score }
   for (const r of _selBookKinds.all(bookId, model)) {
@@ -75,6 +77,7 @@ function searchSimilar(bookId, model, queryVec, { kinds = null, topK = 20, exclu
     if (excludeKind && r.kind === excludeKind && r.entity_id === excludeEntityId) continue;
     const score = cosineSim(queryVec, blobToVector(r.vector));
     if (!Number.isFinite(score)) continue;
+    if (score < minScore) continue;
     const key = `${r.kind}:${r.entity_id}`;
     const cur = best.get(key);
     if (!cur || score > cur.score) {

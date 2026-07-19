@@ -10,4 +10,24 @@
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('embed')" x-text="$app.t('admin.settings.test.embed')"></button>
       </div>
+
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.embed.qualityTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.embed.qualityHint')"></p>
+      <div x-data="settingField({ k: 'embed.min_score', type: 'num', base: 'embed.minScore', num: { min: 0, max: 1, step: 0.05 }, help: true })"></div>
+      <div x-data="settingField({ k: 'embed.hybrid', type: 'toggle', base: 'embed.hybrid' })"></div>
+      <div x-data="settingField({ k: 'embed.query_prefix', base: 'embed.queryPrefix', help: true })"></div>
+      <div x-data="settingField({ k: 'embed.passage_prefix', base: 'embed.passagePrefix', help: true })"></div>
+
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.rerank.title')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.rerank.hint')"></p>
+      <div x-data="settingField({ k: 'rerank.enabled', type: 'toggle', base: 'rerank.enabled' })"></div>
+      <div x-data="settingField({ k: 'rerank.host', type: 'url', base: 'rerank.host', help: true })"></div>
+      <div x-data="settingField({ k: 'rerank.model', base: 'rerank.model', help: true })"></div>
+      <div x-data="settingField({ k: 'rerank.top_n', type: 'num', base: 'rerank.topN', num: { integer: true, min: 5, max: 100 }, help: true })"></div>
+      <div x-data="settingField({ k: 'rerank.min_score', type: 'num', base: 'rerank.minScore', num: { min: 0, max: 1, step: 0.05 }, help: true })"></div>
+      <div x-data="settingField({ k: 'rerank.timeout_ms', type: 'num', base: 'rerank.timeoutMs', num: { integer: true, min: 5000, max: 600000 }, help: true })"></div>
+      <div x-data="settingField({ k: 'rerank.api_key', type: 'password', base: 'rerank.apiKey', help: true })"></div>
+      <div class="admin-settings-actions">
+        <button type="button" @click="adminSettingsTest('rerank')" x-text="$app.t('admin.settings.test.rerank')"></button>
+      </div>
     </section>

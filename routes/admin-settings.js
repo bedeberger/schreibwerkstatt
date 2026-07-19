@@ -220,6 +220,27 @@ router.post('/test-embed', async (req, res) => {
   }
 });
 
+// POST /admin/settings/test-rerank — Health-Probe des Reranker-Endpunkts.
+// Rerankt zwei Mini-Dokumente gegen eine Anfrage und meldet, ob eine sortierte
+// Score-Liste zurückkommt. ok wenn >=1 Treffer.
+router.post('/test-rerank', async (req, res) => {
+  const rerank = require('../lib/rerank');
+  const enabled = appSettings.get('rerank.enabled') === true;
+  const { host } = rerank.getConfig();
+  if (!host) return res.json({ ok: false, error: 'NO_HOST', enabled });
+  const t0 = Date.now();
+  try {
+    const order = await rerank.rerank('Abschied am Bahnhof', [
+      'Sie standen am Gleis und winkten dem Zug nach.',
+      'Das Rezept braucht drei Eier und Mehl.',
+    ]);
+    const ok = Array.isArray(order) && order.length > 0;
+    return res.json({ ok, count: order.length, latency_ms: Date.now() - t0, enabled });
+  } catch (e) {
+    return res.json({ ok: false, error: e.name === 'AbortError' ? 'TIMEOUT' : e.message, latency_ms: Date.now() - t0, enabled });
+  }
+});
+
 // POST /admin/settings/test-geocode — Health-Probe der konfigurierten
 // Geocoding-Quelle. Fragt eine bekannte Stadt ab; ok wenn >=1 Treffer.
 router.post('/test-geocode', async (req, res) => {

@@ -134,10 +134,20 @@ router.get('/config', (req, res) => {
     // den Semantik-Suchmodus, die „ähnliche Stellen"-Buttons und das Buch-Chat-
     // Tool `search_similar` frei. Provider-unabhängig (eigener Embedding-Endpunkt,
     // nicht der Chat-Provider). Host/Model/Key verlassen den Server nie.
-    semanticSearch: {
-      enabled: appSettings.get('embed.enabled') === true
-        && !!String(appSettings.get('embed.host') || '').trim(),
-    },
+    semanticSearch: (() => {
+      const enabled = appSettings.get('embed.enabled') === true
+        && !!String(appSettings.get('embed.host') || '').trim();
+      return {
+        enabled,
+        // Ableitungs-Flags nur für einen dezenten UI-Hinweis in der Such-Karte —
+        // Host/Model/Key bleiben serverseitig. hybrid = FTS5-Fusion aktiv;
+        // rerank = Cross-Encoder-Nachordnung aktiv.
+        hybrid: enabled && appSettings.get('embed.hybrid') !== false,
+        rerank: enabled
+          && appSettings.get('rerank.enabled') === true
+          && !!String(appSettings.get('rerank.host') || '').trim(),
+      };
+    })(),
     // Komplettanalyse-Zusatzphasen «Kontinuität» + «Erzählprofil»: die
     // qualitätskritischen Stufen (Single-Pass, Verify-Filter, Attribut-Check)
     // gibt es nur bei Claude → für Nicht-Claude-User Karten ausgeblendet und die

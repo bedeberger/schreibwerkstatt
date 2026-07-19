@@ -128,6 +128,18 @@ export function registerSearchCard() {
       } catch { this.indexInfo = null; }
     },
 
+    // Dezenter Hinweis, welche Qualitäts-Stufen serverseitig aktiv sind (Hybrid-
+    // Fusion / Reranking). Leer, wenn keine aktiv oder nicht im Semantik-Modus.
+    get semanticEnhancedLabel() {
+      if (this.mode !== 'semantic') return '';
+      const c = Alpine.store('config');
+      const t = window.__app?.t;
+      const parts = [];
+      if (c?.semanticHybrid) parts.push(t ? t('search.semantic.hybrid') : 'Hybrid');
+      if (c?.semanticRerank) parts.push(t ? t('search.semantic.rerank') : 'Reranking');
+      return parts.join(' · ');
+    },
+
     // Formatierte „zuletzt aktualisiert vor …"-Angabe (TZ-aware via utils).
     get indexLastLabel() {
       if (!this.indexInfo?.lastIndexedAt) return '';

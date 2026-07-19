@@ -45,6 +45,8 @@ export function registerConfigStore() {
     languagetoolDebounceMs: 1500,
     researchChatEnabled: false,
     semanticSearchEnabled: false,
+    semanticHybrid: false,
+    semanticRerank: false,
     factcheckEnabled: false,
     apiProvider: 'claude',
     effectiveProvider: 'claude',

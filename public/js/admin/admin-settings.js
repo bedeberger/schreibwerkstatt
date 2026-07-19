@@ -107,6 +107,7 @@ export const adminSettingsMethods = {
                : kind === 'tts'          ? '/admin/settings/test-tts'
                : kind === 'image'        ? '/admin/settings/test-image'
                : kind === 'embed'        ? '/admin/settings/test-embed'
+               : kind === 'rerank'       ? '/admin/settings/test-rerank'
                : kind === 'geocode'      ? '/admin/settings/test-geocode'
                : kind === 'tiles'        ? '/admin/settings/test-tiles'
                : null;

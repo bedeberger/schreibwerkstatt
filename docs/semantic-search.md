@@ -4,6 +4,18 @@ Bedeutungs-basierte Suche über ein Buch: Seiten, Szenen und Figuren werden in C
 
 Der Index ist ein **reiner Ableitungs-Index** (wie FTS5): jederzeit aus den Quelltabellen neu berechenbar. Host/Model/Key liegen in `app_settings` (`embed.*`) und verlassen den Server nie.
 
+## Trefferqualität — die drei Stufen des Freitext-Pfads
+
+Der **Freitext**-Query (`?q=…`, Such-Karte + Buch-Chat-Tool `search_similar`) läuft über die zentrale Pipeline [lib/semantic-retrieval.js](../lib/semantic-retrieval.js)#`semanticQuery`; jede Stufe ist optional und gated:
+
+1. **Retrieval + Score-Floor** — Embedding-Cosinus (`searchSimilar`). `embed.min_score` (Default 0.25) ist die Cosinus-Untergrenze: die Ähnlichkeitssuche liefert nie „keine Treffer" (jede Anfrage hat einen nächsten Nachbarn), der Floor schneidet den schwachen Long-Tail ab, damit unter den guten Treffern kein Rauschen steht. **Gilt nur für Freitext**, nicht für „ähnliche Stellen zu Entität" (dort zählt Recall — der gemittelte Entitäts-Vektor rankt niedriger).
+2. **Hybrid-Fusion (`embed.hybrid`, Default an)** — die lexikalische FTS5/bm25-Rangliste ([lib/search.js](../lib/search.js)) wird per **Reciprocal Rank Fusion** ([lib/semantic-fusion.js](../lib/semantic-fusion.js), pure, `RRF_K=60`) in die semantische gemischt. RRF fusioniert über die Rang-Position (nicht über inkompatible Score-Skalen) → exakte Begriffe/Eigennamen (die reine Embeddings verlieren) kommen zurück, Paraphrasen (die FTS verliert) bleiben.
+3. **Reranking (`rerank.*`, Default aus)** — ein Cross-Encoder ([lib/rerank.js](../lib/rerank.js), self-hosted OpenAI/Jina-`/v1/rerank`, z.B. LocalAI/TEI) ordnet die Top-`rerank.top_n` Fusions-Kandidaten neu, indem er (Anfrage, Textstelle) direkt bewertet — schärfere Relevanz als Vektor-Distanz allein. `rerank.min_score` filtert danach. **Non-fatal:** fällt der Endpunkt aus, greift still die RRF-/Cosinus-Reihenfolge. Setzt aktivierte semantische Suche voraus (`isEnabled()` prüft zusätzlich `embed.isEnabled()`).
+
+**Instruction-Präfixe** (`embed.query_prefix`/`embed.passage_prefix`, Default leer): für asymmetrische Modelle (e5: `query: `/`passage: `). Query-seitig via [lib/embed.js](../lib/embed.js)#`embedQuery` (alle Query-Aufrufer nutzen es), Passage-seitig im Index-Job — der `passage_prefix` fliesst in den Chunk-`content_hash` → Präfixwechsel invalidiert den Delta-Cache und erzwingt Reindex. **bge-m3 braucht die Präfixe NICHT** (leer lassen).
+
+`/config` exponiert die Ableitungs-Flags `semanticSearch.hybrid`/`.rerank` für einen dezenten Hinweis in der Such-Karte (`semanticEnhancedLabel`); Host/Model/Key bleiben serverseitig. Admin-Test: `POST /admin/settings/test-embed` + `POST /admin/settings/test-rerank`.
+
 ## Drei Einstiegspunkte
 
 Alle drei sind nur sichtbar/aktiv, wenn das Backend konfiguriert ist (`config.semanticSearchEnabled`, siehe [Freischalten](#freischalten)).

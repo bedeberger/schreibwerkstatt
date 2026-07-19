@@ -19,6 +19,7 @@ const bookAccess = require('../db/book-access');
 const searchIndex = require('../lib/search');
 const semanticChunks = require('../db/semantic-chunks');
 const embed = require('../lib/embed');
+const semanticRetrieval = require('../lib/semantic-retrieval');
 const { db } = require('../db/connection');
 const logger = require('../logger');
 
@@ -135,19 +136,24 @@ router.get('/semantic', async (req, res) => {
   const likeId = req.query.like_id ? toIntId(req.query.like_id) : null;
 
   try {
-    let queryVec = null;
-    let exclude = { excludeKind: null, excludeEntityId: null };
+    let raw;
     if (likeKind && likeId && SEMANTIC_KINDS.includes(likeKind)) {
-      queryVec = semanticChunks.getEntityVector(likeKind, likeId, model);
+      // „Ähnliche Stellen zu Entität": kein Query-Text → weder Hybrid noch
+      // Rerank (beide brauchen eine Anfrage-Zeichenkette). Kein Score-Floor —
+      // hier zählt Recall (der gemittelte Entitäts-Vektor rankt tendenziell
+      // niedriger als eine Freitext-Anfrage).
+      const queryVec = semanticChunks.getEntityVector(likeKind, likeId, model);
       if (!queryVec) return res.json({ hits: [], mode: 'semantic', notIndexed: true });
-      exclude = { excludeKind: likeKind, excludeEntityId: likeId };
+      raw = semanticChunks.searchSimilar(bookId, model, queryVec, {
+        kinds, topK, excludeKind: likeKind, excludeEntityId: likeId,
+      });
     } else {
       const q = (req.query.q || '').toString().trim();
       if (q.length < 2) return res.json({ hits: [], mode: 'semantic' });
       if (q.length > 500) return res.status(400).json({ error_code: 'QUERY_TOO_LONG' });
-      queryVec = await embed.embedOne(q);
+      // Freitext: Retrieval → Hybrid-Fusion → Reranking (siehe lib/semantic-retrieval).
+      raw = await semanticRetrieval.semanticQuery(bookId, q, { kinds, topK });
     }
-    const raw = semanticChunks.searchSimilar(bookId, model, queryVec, { kinds, topK, ...exclude });
     res.json({ hits: _resolveSemanticHits(raw), mode: 'semantic' });
   } catch (e) {
     logger.error(`[search] GET /search/semantic failed: ${e.message}`);

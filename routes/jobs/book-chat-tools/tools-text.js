@@ -9,7 +9,7 @@ const { htmlToPlainText } = require('../../../lib/html-text');
 const { findDialogRanges } = require('../../../lib/page-index');
 const searchIndex = require('../../../lib/search');
 const embed = require('../../../lib/embed');
-const semanticChunks = require('../../../db/semantic-chunks');
+const semanticRetrieval = require('../../../lib/semantic-retrieval');
 const {
   MAX_CHARS_PER_PAGE,
   DEFAULT_CHARS_PER_PAGE,
@@ -583,17 +583,17 @@ async function tool_search_similar(input, ctx) {
   if (!embed.isEnabled()) return { error: 'Embedding-Backend nicht konfiguriert.' };
   const query = (input.query || '').trim();
   if (!query) return { error: 'query fehlt' };
-  const { model } = embed.getConfig();
   const allowed = ['page', 'scene', 'figure'];
   const kinds = Array.isArray(input.kinds) && input.kinds.length
     ? input.kinds.filter(k => allowed.includes(k)) : allowed;
   const topK = Math.min(Math.max(1, input.limit || 20), 50);
 
-  let queryVec;
-  try { queryVec = await embed.embedOne(query, { signal: ctx.jobSignal }); }
+  // Volle Qualitäts-Pipeline (Retrieval → Hybrid-Fusion → Reranking), damit der
+  // agentische Chat dieselben scharfen Treffer bekommt wie die Such-Karte.
+  let raw;
+  try { raw = await semanticRetrieval.semanticQuery(ctx.bookId, query, { kinds, topK, signal: ctx.jobSignal }); }
   catch (e) { return { error: `Embedding-Endpunkt nicht erreichbar: ${e.message}` }; }
 
-  const raw = semanticChunks.searchSimilar(ctx.bookId, model, queryVec, { kinds, topK });
   const results = [];
   for (const h of raw) {
     const title = _resolveSimilarTitle(h.kind, h.entity_id);
