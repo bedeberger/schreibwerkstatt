@@ -10,14 +10,12 @@
     </div>
     <div class="card-header-aside">
       <div class="card-actions card-actions--grouped">
-        <button type="button" class="icon-btn icon-btn--ghost" x-show="$store.config.researchChatEnabled"
-                :class="{ 'is-active': researchChatOpen }"
+        <button type="button" class="icon-btn icon-btn--ghost" x-show="$store.config.researchChatEnabled" :class="{ 'is-active': researchChatOpen }"
                 :aria-pressed="researchChatOpen"
                 @click="toggleResearchChat()"
                 :aria-label="$app.t('recherche.chat.toggle')"
                 :data-tip="$app.t('recherche.chat.toggle')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#message-square"/></svg></button>
-        <button type="button" class="icon-btn icon-btn--ghost"
-                :aria-pressed="rechercheFullscreen"
+        <button type="button" class="icon-btn icon-btn--ghost" :aria-pressed="rechercheFullscreen"
                 @click="toggleRechercheFullscreen()"
                 :aria-label="rechercheFullscreen ? $app.t('recherche.fullscreenExit.tip') : $app.t('recherche.fullscreen.tip')"
                 :data-tip="rechercheFullscreen ? $app.t('recherche.fullscreenExit.tip') : $app.t('recherche.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="rechercheFullscreen ? '/icons.svg?v=693#minimize-2' : '/icons.svg?v=693#maximize-2'"/></svg></button>
@@ -436,5 +434,4 @@
       </div>
     </template>
   </div>
-
 </div>

@@ -63,7 +63,7 @@ const CATEGORIES = [
     allow: {
       'public/partials/buchorganizer.html': 516,
       'public/partials/admin-usage.html': 452,
-      'public/partials/recherche.html': 438,
+      'public/partials/recherche.html': 437,
       'public/partials/editor-notebook.html': 350,
       'public/partials/figur-werkstatt.html': 406,
       'public/partials/figuren.html': 377,
