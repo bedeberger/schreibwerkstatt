@@ -143,6 +143,7 @@
   color: var(--color-text);
 }
 .search-q:focus { outline: none; border-color: var(--color-border-focus); }
+.search-q::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 .search-clear {
   position: absolute;
   right: 6px;

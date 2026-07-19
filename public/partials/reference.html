@@ -150,13 +150,15 @@
       <template x-if="referenceHasContext()">
         <div class="display-contents">
           <div class="verwandt-controls">
-            <div class="verwandt-basis">
-              <button type="button" class="btn-compact" :class="{ 'is-active': verwandtBasis === 'page' }" @click="verwandtBasis = 'page'" x-text="$app.t('reference.verwandt.basisPage')"></button>
-              <button type="button" class="btn-compact" :class="{ 'is-active': verwandtBasis === 'absatz' }" @click="verwandtBasis = 'absatz'" x-text="$app.t('reference.verwandt.basisAbsatz')"></button>
+            <div class="seg-toggle">
+              <button type="button" :class="{ 'seg-toggle--active': verwandtBasis === 'page' }" @click="verwandtBasis = 'page'" x-text="$app.t('reference.verwandt.basisPage')"></button>
+              <button type="button" :class="{ 'seg-toggle--active': verwandtBasis === 'absatz' }" @click="verwandtBasis = 'absatz'" x-text="$app.t('reference.verwandt.basisAbsatz')"></button>
             </div>
-            <button type="button" class="btn-compact verwandt-search-btn" @click="runVerwandt()" :disabled="verwandtLoading">
-              <span x-show="verwandtLoading" class="spinner"></span>
-              <span x-text="verwandtLoading ? $app.t('reference.verwandt.searching') : $app.t('reference.verwandt.search')"></span>
+            <button type="button" class="icon-btn verwandt-search-btn" @click="runVerwandt()" :disabled="verwandtLoading"
+                    :data-tip="verwandtLoading ? $app.t('reference.verwandt.searching') : $app.t('reference.verwandt.search')"
+                    :aria-label="verwandtLoading ? $app.t('reference.verwandt.searching') : $app.t('reference.verwandt.search')">
+              <span x-show="verwandtLoading" class="spinner" aria-hidden="true"></span>
+              <svg x-show="!verwandtLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#search"/></svg>
             </button>
           </div>
           <div class="reference-scope-note" x-show="verwandtBasis === 'absatz'" x-text="$app.t('reference.verwandt.absatzHint')"></div>
