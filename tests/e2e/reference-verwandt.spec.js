@@ -31,6 +31,8 @@ async function setup(page, semanticRequests) {
 // selectionchange (die Karte puffert den Text).
 async function selectParagraph(page, id) {
   await page.evaluate((pid) => {
+    const editor = document.querySelector('.page-content-view');
+    editor.focus();  // ohne Fokus feuert kein blur beim Button-Klick
     const el = document.getElementById(pid);
     const range = document.createRange();
     range.selectNodeContents(el);

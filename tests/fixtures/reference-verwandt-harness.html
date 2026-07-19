@@ -58,6 +58,15 @@
       registerReferenceCard();
     });
 
+    // Reproduziert den echten Fokus-Verlust: verlaesst der Cursor das
+    // contenteditable (Klick auf den Suchen-Button), committet/re-rendert der
+    // Notebook-Editor und die Live-Selection kollabiert. Der Absatz-Modus darf
+    // sich darum nicht auf die Selection zum Klick-Zeitpunkt verlassen.
+    document.addEventListener('alpine:initialized', () => {
+      document.querySelector('.page-content-view')
+        .addEventListener('blur', () => window.getSelection().removeAllRanges());
+    });
+
     document.addEventListener('alpine:initialized', () => {
       queueMicrotask(() => { window.harnessReady = true; });
     });
