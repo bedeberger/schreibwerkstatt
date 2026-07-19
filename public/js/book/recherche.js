@@ -61,8 +61,31 @@ export const rechercheMethods = {
     if (!bookId || this._linkTargetsBookId === bookId) return;
     try {
       this.linkTargets = await fetchJson(`/research/link-targets?book_id=${bookId}`);
+      this._sortLinkTargetsByTree();
       this._linkTargetsBookId = bookId;
     } catch { this.linkTargets = {}; }
+  },
+
+  // Seiten + Kapitel im Picker/Filter in Buchtree-Reihenfolge bringen (identisch
+  // zur Sidebar), statt in der flachen `position`-Server-Sortierung, die die
+  // Kapitel-Hierarchie nicht abbildet. Welt-Entitäten (Figuren/Orte/Szenen/
+  // Beats/Stränge) behalten ihre kuratierte bzw. gewichtete Server-Sortierung.
+  _sortLinkTargetsByTree() {
+    const nav = Alpine.store('nav');
+    const pageOrder = window.__app?._pageIdOrderMap;
+    if (pageOrder && Array.isArray(this.linkTargets.page)) {
+      const rank = (id) => pageOrder.has(id) ? pageOrder.get(id) : Number.MAX_SAFE_INTEGER;
+      this.linkTargets.page = [...this.linkTargets.page].sort((a, b) => rank(a.id) - rank(b.id));
+    }
+    if (Array.isArray(nav?.tree) && Array.isArray(this.linkTargets.chapter)) {
+      const chapterOrder = new Map();
+      let i = 0;
+      for (const item of nav.tree) {
+        if (item.type === 'chapter' && !item.solo) chapterOrder.set(item.id, i++);
+      }
+      const rank = (id) => chapterOrder.has(id) ? chapterOrder.get(id) : Number.MAX_SAFE_INTEGER;
+      this.linkTargets.chapter = [...this.linkTargets.chapter].sort((a, b) => rank(a.id) - rank(b.id));
+    }
   },
 
   resetRecherche() {
@@ -116,9 +139,14 @@ export const rechercheMethods = {
     return (this.tagPool || []).map(r => ({ value: r.tag, label: `${r.tag} (${r.n})` }));
   },
 
-  // Alle Verknüpfungs-Kategorien (geteilt zwischen Filter + Link-Picker).
+  // Alle Verknüpfungs-Kategorien (geteilt zwischen Filter + Sortierung).
   linkKinds() {
     return LINK_KINDS.map(k => ({ value: k, label: this.linkKindLabel(k) }));
+  },
+  // Kategorien im Verknüpfen-Picker: Seite zuerst (häufigstes Ziel).
+  linkPickerKinds() {
+    const ordered = ['page', ...LINK_KINDS.filter(k => k !== 'page')];
+    return ordered.map(k => ({ value: k, label: this.linkKindLabel(k) }));
   },
   // Sortier-Modi: feste Felder + „nach verknüpfter Entität" (link:<dimension>).
   sortOptions() {
@@ -351,7 +379,7 @@ export const rechercheMethods = {
   async openLinkPicker(item) {
     await this.ensureLinkTargets();
     this.linkPickerItemId = item.id;
-    this.linkPickerKind = 'figure';
+    this.linkPickerKind = 'page';
     this.linkPickerTargetId = '';
   },
   cancelLinkPicker() { this.linkPickerItemId = null; this.linkPickerTargetId = ''; },
@@ -378,6 +406,24 @@ export const rechercheMethods = {
   async confirmLinkPicker() {
     if (!this.linkPickerItemId || !this.linkPickerTargetId) return;
     return this.addLink(this.linkPickerItemId, this.linkPickerKind, this.linkPickerTargetId);
+  },
+
+  // Sprung zum verknüpften Element: baut den Deep-Link-Hash und überlässt die
+  // eigentliche Navigation (Karte öffnen, Eintrag fokussieren, Exklusivität)
+  // dem Hash-Router als SSoT. Kind → Router-View-Segment; thread hat keinen
+  // Deep-Link-Arg (nur Board öffnen), alle anderen springen per target_id.
+  gotoLink(link) {
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId || !link) return;
+    const VIEW = {
+      figure: 'figur', location: 'ort', scene: 'szene',
+      beat: 'plot', thread: 'plot', chapter: 'kapitel', page: 'page',
+    };
+    const view = VIEW[link.target_kind];
+    if (!view) return;
+    const arg = (link.target_kind !== 'thread' && link.target_id != null)
+      ? `/${link.target_id}` : '';
+    location.hash = `#book/${bookId}/${view}${arg}`;
   },
 
   async removeLink(item, link) {

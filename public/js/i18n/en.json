@@ -3764,6 +3764,7 @@
   "recherche.link.pickKind": "Category…",
   "recherche.link.pickTarget": "Choose entry…",
   "recherche.link.confirm": "Add",
+  "recherche.link.goto": "Jump to linked element",
   "recherche.linkKind.figure": "Character",
   "recherche.linkKind.location": "Location",
   "recherche.linkKind.scene": "Scene",

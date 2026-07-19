@@ -339,8 +339,12 @@
             <div class="research-links" x-show="item.links && item.links.length">
               <template x-for="link in item.links" :key="link.link_id">
                 <span class="research-link-chip" :class="'research-link-chip--' + link.target_kind">
-                  <span class="research-link-kind" x-text="linkKindLabel(link.target_kind)"></span>
-                  <span x-text="link.label"></span>
+                  <button type="button" class="research-link-goto" @click="gotoLink(link)"
+                          :data-tip="$app.t('recherche.link.goto')"
+                          :aria-label="$app.t('recherche.link.goto') + ': ' + link.label">
+                    <span class="research-link-kind" x-text="linkKindLabel(link.target_kind)"></span>
+                    <span class="research-link-goto-label" x-text="link.label"></span>
+                  </button>
                   <button type="button" class="research-chip-x" @click="removeLink(item, link)" :aria-label="$app.t('recherche.link.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
                 </span>
               </template>
@@ -352,7 +356,7 @@
                 <span class="recherche-linkpicker-label" x-text="$app.t('recherche.link.pickerLabel')"></span>
                 <div x-data="combobox($app.t('recherche.link.pickKind'))"
                      x-modelable="value" x-model="linkPickerKind"
-                     x-effect="options = linkKinds()"
+                     x-effect="options = linkPickerKinds()"
                      @combobox-change="linkPickerTargetId = ''"></div>
                 <div x-data="entityPicker({ entity: 'target', placeholder: $app.t('recherche.link.pickTarget'), items: () => linkTargets, kind: () => linkPickerKind })"
                      x-modelable="value" x-model="linkPickerTargetId" class="recherche-linkpicker-target"></div>

@@ -316,13 +316,28 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 .research-link-chip--chapter  { --link-accent: var(--card-accent-kapitel); }
 .research-link-chip--page     { --link-accent: var(--card-accent-bookstats); }
 
+/* Klickbarer Kern des Chips: springt zum verknüpften Element (Hash-Router). */
+.research-link-goto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.research-link-goto:hover .research-link-goto-label,
+.research-link-goto:focus-visible .research-link-goto-label { text-decoration: underline; }
+
 .research-link-kind {
   font-weight: 500;
   text-transform: uppercase;
   font-size: 0.72em;
   letter-spacing: 0.06em;
   color: var(--link-accent, var(--color-muted));
-  margin-right: var(--space-2xs);
 }
 .research-chip-x {
   display: inline-flex;

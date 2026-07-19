@@ -3764,6 +3764,7 @@
   "recherche.link.pickKind": "Kategorie…",
   "recherche.link.pickTarget": "Eintrag wählen…",
   "recherche.link.confirm": "Hinzufügen",
+  "recherche.link.goto": "Zum verknüpften Element springen",
   "recherche.linkKind.figure": "Figur",
   "recherche.linkKind.location": "Ort",
   "recherche.linkKind.scene": "Szene",
