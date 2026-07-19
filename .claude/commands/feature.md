@@ -25,6 +25,7 @@ Bestimme (bei Unklarheit **nachfragen**):
 5. **Dedup:** `findActiveJobId(type, entityId, userEmail)` aus `routes/jobs/shared/` (nicht `runningJobs.get`).
 6. **Logging-Context:** `setContext({ book: book_id })` nach `toIntId`-Validierung.
 7. i18n-Keys für `statusText`/Labels als Keys (`job.phase.xxx`) in **beiden** Locales.
+8. **Stats-Label:** neuen Job-Typ in `JOB_TYPE_LABELS` ([routes/jobs/shared/jobs.js](routes/jobs/shared/jobs.js)) auf einen `job.label.xxx`-Key mappen (in beiden Locales anlegen) — sonst erscheint er in den Job-Statistiken (Bucheinstellungen) nur mit roher ID. Ausnahme: Sub-Job eines Superjobs (z.B. komplett-analyse) → stattdessen in `STATS_EXCLUDED_TYPES` aufnehmen.
 
 ## Teil B — Frontend (neue Karte)
 

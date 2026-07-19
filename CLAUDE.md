@@ -137,6 +137,7 @@ CLAUDE.md beschreibt **ausschliesslich den aktuellen Stand**. Keine Historie, ke
 5. Schema-Validierung nach `callAI` nicht vergessen
 6. Dedup-Check im POST-Handler: `findActiveJobId(type, entityId, userEmail)` aus `routes/jobs/shared/` (NICHT `runningJobs.get(...) && jobs.has(...)` — matcht sonst auch fertige Jobs)
 7. Logging-Context: `setContext({ book: book_id })` (aus [lib/log-context.js](lib/log-context.js)) im POST-Handler nach `toIntId`-Validierung, damit der `book`-Slot im Log-Tag gefüllt ist (siehe Harte Regel „Logging-Context")
+8. Stats-Label: neuen Job-Typ in `JOB_TYPE_LABELS` ([routes/jobs/shared/jobs.js](routes/jobs/shared/jobs.js)) auf einen `job.label.xxx`-i18n-Key mappen (Key in **beiden** Locales anlegen) — sonst erscheint der Job in den Job-Statistiken (Bucheinstellungen) nur mit roher Typ-ID. Ausnahme: reiner Sub-Job eines Superjobs (wie die komplett-analyse-Sub-Typen) → stattdessen in `STATS_EXCLUDED_TYPES` aufnehmen, damit er gar nicht als eigene Zeile erscheint.
 
 ### Frontend (neue Karte als `Alpine.data`-Sub-Komponente)
 

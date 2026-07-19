@@ -278,6 +278,15 @@ const JOB_TYPE_LABELS = {
   'werkstatt-consistency': 'job.label.werkstattConsistency',
   'plot-brainstorm':       'job.label.plotBrainstormType',
   'plot-consistency':      'job.label.plotConsistency',
+  'docx-export':           'job.label.docxExport',
+  'embed-index':           'job.label.embedIndex',
+  'erzaehlprofil':         'job.label.erzaehlprofil',
+  'faktencheck':           'job.label.faktencheck',
+  'redundancy':            'job.label.redundancy',
+  'research-chat':         'job.label.researchChat',
+  'research-link':         'job.label.researchLink',
+  'rueckblick':            'job.label.rueckblick',
+  'stilprofil':            'job.label.stilprofil',
 };
 
 // Job-Typen, die vom Superjob (komplett-analyse) abgedeckt werden und nicht in der Statistik erscheinen sollen
