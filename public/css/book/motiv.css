@@ -50,6 +50,7 @@
 
 /* ── KI-Vorschläge (Brainstorm) ───────────────────────────────────────── */
 .motiv-suggestions { padding: var(--space-xs) 0; }
+.motiv-suggestions-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
 .motiv-suggestion-list { display: flex; flex-direction: column; gap: var(--space-2xs); }
 .motiv-suggestion {
   display: flex;

@@ -206,6 +206,14 @@ export const appInitMethods = {
       this.$store.config.semanticSearchEnabled = !!cfg.semanticSearch?.enabled;
       this.$store.config.semanticHybrid = !!cfg.semanticSearch?.hybrid;
       this.$store.config.semanticRerank = !!cfg.semanticSearch?.rerank;
+      if (cfg.redundancy) {
+        const d = this.$store.config.redundancyThresholds;
+        this.$store.config.redundancyThresholds = {
+          strict: Number(cfg.redundancy.thresholdStrict) || d.strict,
+          medium: Number(cfg.redundancy.thresholdMedium) || d.medium,
+          loose:  Number(cfg.redundancy.thresholdLoose)  || d.loose,
+        };
+      }
       this.$store.config.factcheckEnabled = !!cfg.komplett?.factcheck;
       if (cfg.tts?.pause) {
         const frag = Number(cfg.tts.pause.fragmentMs);

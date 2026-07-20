@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { prepare, scanBlock, finalizePairs, findRedundantPairs } = require('../../lib/redundancy.js');
+const { prepare, scanBlock, finalizePairs, findRedundantPairs, findFigureDuplicates } = require('../../lib/redundancy.js');
 
 // Kleiner Helfer: Chunk mit langem Text (über MIN_CHARS) + Vektor.
 function chunk(entity_id, chunk_ix, vector, extra = '') {
@@ -71,6 +71,56 @@ test('prepare: zu kurze Chunks + Nullvektoren fallen raus', () => {
   const { vecs, metas } = prepare(chunks);
   assert.equal(vecs.length, 1);
   assert.equal(metas[0].entity_id, 3);
+});
+
+// ── Figuren-Dubletten ────────────────────────────────────────────────────────
+function fig(id, name, vector) {
+  return { id, name, vector };
+}
+
+test('findFigureDuplicates: nahe Vektoren über Schwelle werden ein Paar', () => {
+  const figs = [
+    fig(1, 'Berthold', [1, 0, 0]),
+    fig(2, 'Der Alte', [0.99, 0.02, 0]), // fast identisch, anderer Name
+    fig(3, 'Mara', [0, 1, 0]),           // orthogonal → kein Treffer
+  ];
+  const { pairs, totalFound } = findFigureDuplicates(figs, { threshold: 0.9 });
+  assert.equal(totalFound, 1);
+  assert.equal(pairs.length, 1);
+  assert.deepEqual([pairs[0].a_id, pairs[0].b_id], [1, 2]);
+});
+
+test('findFigureDuplicates: gleiche/überlappende Namen → duplicate, verschiedene → alias', () => {
+  const figs = [
+    fig(1, 'Anna Meier', [1, 0, 0]),
+    fig(2, 'Anna Meyer', [1, 0, 0]),      // Token „anna" geteilt → duplicate
+    fig(3, 'Konrektor Zangl', [0, 1, 0]),
+    fig(4, 'Der Zauberer', [0, 1, 0]),    // kein geteiltes Token → alias
+  ];
+  const { pairs } = findFigureDuplicates(figs, { threshold: 0.9 });
+  const byPair = Object.fromEntries(pairs.map(p => [`${p.a_id}${p.b_id}`, p.dupeKind]));
+  assert.equal(byPair['12'], 'duplicate');
+  assert.equal(byPair['34'], 'alias');
+});
+
+test('findFigureDuplicates: alias-Paare zuerst (das nicht-triviale Signal)', () => {
+  const figs = [
+    fig(1, 'Anna Meier', [1, 0, 0]),
+    fig(2, 'Anna Meier', [1, 0, 0]),   // duplicate (Score 1.0)
+    fig(3, 'Xaver', [0, 1, 0]),
+    fig(4, 'Der Fremde', [0, 0.99, 0.01]), // alias (Score < 1.0)
+  ];
+  const { pairs } = findFigureDuplicates(figs, { threshold: 0.9 });
+  assert.equal(pairs.length, 2);
+  assert.equal(pairs[0].dupeKind, 'alias', 'alias trotz niedrigerem Score zuerst');
+  assert.equal(pairs[1].dupeKind, 'duplicate');
+});
+
+test('findFigureDuplicates: leere/1er-Liste + Nullvektor → keine Paare', () => {
+  assert.equal(findFigureDuplicates([]).totalFound, 0);
+  assert.equal(findFigureDuplicates([fig(1, 'A', [1, 0])]).totalFound, 0);
+  const withZero = findFigureDuplicates([fig(1, 'A', [0, 0, 0]), fig(2, 'B', [1, 0, 0])], { threshold: 0.5 });
+  assert.equal(withZero.totalFound, 0, 'Nullvektor fällt raus → kein Vergleichspartner');
 });
 
 test('scanBlock: blockweiser Scan == Voll-Scan (Zerlegung ändert Ergebnis nicht)', () => {

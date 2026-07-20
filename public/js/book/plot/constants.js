@@ -21,3 +21,18 @@ export const _intensityBottomPct = (i) => 10 + ((i - 1) / 4) * 80;
 // wie der Consistency-Job, der den Beat nur per Titel-String referenziert). EINE
 // Quelle für derived.js (Index/Match) und ai.js (Sprung) — divergierte sonst still.
 export const normTitle = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Beat-Verankerung: Soll (status) gegen Ist (Fundstellen im Text) klassifizieren.
+// Reine Funktion (kein Alpine-Kontext) → unit-testbar. Werte:
+//   'confirmed'  im_buch + Fundstellen  → passt (grün)
+//   'drift'      im_buch + 0 Fundstellen → Warnung: als eingearbeitet markiert,
+//                aber im Text nicht auffindbar (rot)
+//   'found'      geplant + Fundstellen  → Hinweis: evtl. schon geschrieben (amber)
+//   'none'       geplant + 0 / verworfen → kein Badge
+// occCount = plot_beat_occurrences-Zahl des Beats (0 wenn nie/nicht verankert).
+export function classifyBeatAnchor(status, occCount, verworfen) {
+  if (verworfen) return 'none';                       // verworfene Beats werden nicht verankert
+  const has = (occCount || 0) > 0;
+  if (status === 'im_buch') return has ? 'confirmed' : 'drift';
+  return has ? 'found' : 'none';                      // status 'geplant' (oder unbekannt)
+}

@@ -2,7 +2,7 @@
 // Stränge/Swimlanes, Hybrid-Akte, Grid-Render-Plan, Live-Vererbung, Akt-Farben.
 // Reine Compute aus Board-State (memoized), keine Server-Mutationen.
 
-import { STATUSES, DIST_SEGMENTS, ACT_PALETTE } from '../constants.js';
+import { STATUSES, DIST_SEGMENTS, ACT_PALETTE, classifyBeatAnchor } from '../constants.js';
 
 export const boardMethods = {
   // ── Derived (memoized) ──────────────────────────────────────────────────────
@@ -246,5 +246,24 @@ export const boardMethods = {
   motifAccent(m) {
     const key = m && m.farbe;
     return (key && ACT_PALETTE.includes(key)) ? `var(--palette-${key})` : 'var(--card-accent-motiv)';
+  },
+
+  // ── Beat-Verankerung (Soll status vs. Ist-Fundstellen aus plot_beat_occurrences) ──
+  // Klassifikation via reiner Funktion (constants.js, unit-getestet). Der Server
+  // hängt occ_count + occ_top an jeden Beat (routes/plot.js). 'none' → kein Badge.
+  beatAnchorState(beat) {
+    return classifyBeatAnchor(beat && beat.status, beat && beat.occ_count, beat && beat.verworfen);
+  },
+
+  // Tooltip des Anchor-Badges: Zustands-Satz + die Top-Fundstellen (Seitenname).
+  beatAnchorTip(beat) {
+    const app = window.__app;
+    const state = this.beatAnchorState(beat);
+    if (state === 'none') return '';
+    const head = app.t('plot.anchor.state.' + state, { n: beat.occ_count || 0 });
+    const names = (beat.occ_top || [])
+      .map(o => o.page_name || (o.scene_titel ? `„${o.scene_titel}"` : ''))
+      .filter(Boolean);
+    return names.length ? `${head} — ${names.join(', ')}` : head;
   },
 };

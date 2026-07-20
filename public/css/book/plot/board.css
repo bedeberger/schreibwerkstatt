@@ -236,6 +236,43 @@
   .plot-beat-warn--mittel  { color: var(--color-mittel); }
   .plot-beat-warn--niedrig { color: var(--color-muted); }
 
+  /* Verankerungs-Badge am Beat — Soll (status) vs. Ist (Fundstellen im Buchtext,
+     aus der semantischen Suche). Eckiges Mini-Chip mit Fundstellen-Zahl; 'drift'
+     (als eingearbeitet markiert, aber nicht im Text gefunden) warnt ohne Zahl. */
+  .plot-beat-anchor {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 var(--space-2xs);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .plot-beat-anchor--confirmed {
+    color: var(--color-stark);
+    border-color: color-mix(in oklch, var(--color-stark) 40%, transparent);
+    background: color-mix(in oklch, var(--color-stark) 12%, transparent);
+  }
+  .plot-beat-anchor--found {
+    color: var(--color-mittel);
+    border-color: color-mix(in oklch, var(--color-mittel) 40%, transparent);
+    background: color-mix(in oklch, var(--color-mittel) 12%, transparent);
+  }
+  .plot-beat-anchor--drift {
+    color: var(--color-schwach);
+    border-color: color-mix(in oklch, var(--color-schwach) 45%, transparent);
+    background: color-mix(in oklch, var(--color-schwach) 14%, transparent);
+    cursor: default;
+    font-weight: 700;
+  }
+
   /* Kurzes Hervorheben beim Springen aus einem Befund zum Beat. */
   @keyframes plotBeatFlash {
     0%, 100% { box-shadow: none; }

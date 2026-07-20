@@ -18,6 +18,12 @@
       <div x-data="settingField({ k: 'embed.query_prefix', base: 'embed.queryPrefix', help: true })"></div>
       <div x-data="settingField({ k: 'embed.passage_prefix', base: 'embed.passagePrefix', help: true })"></div>
 
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.redundancy.title')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.redundancy.hint')"></p>
+      <div x-data="settingField({ k: 'redundancy.threshold_strict', type: 'num', base: 'redundancy.thresholdStrict', num: { min: 0, max: 1, step: 0.01 }, help: true })"></div>
+      <div x-data="settingField({ k: 'redundancy.threshold_medium', type: 'num', base: 'redundancy.thresholdMedium', num: { min: 0, max: 1, step: 0.01 }, help: true })"></div>
+      <div x-data="settingField({ k: 'redundancy.threshold_loose', type: 'num', base: 'redundancy.thresholdLoose', num: { min: 0, max: 1, step: 0.01 }, help: true })"></div>
+
       <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.rerank.title')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.rerank.hint')"></p>
       <div x-data="settingField({ k: 'rerank.enabled', type: 'toggle', base: 'rerank.enabled' })"></div>

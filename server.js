@@ -59,6 +59,7 @@ const songsRouter = require('./routes/songs');
 const { router: jobsRouter, runKomplettAnalyseAll } = require('./routes/jobs');
 const { reindexAllBooks } = require('./routes/jobs/embed-index');
 const { scanAllBooks: scanAllMotifs } = require('./routes/jobs/motif-scan');
+const { anchorAllBooks: anchorAllBeats } = require('./routes/jobs/beat-anchor');
 const chatRouter = require('./routes/chat');
 const ideenRouter = require('./routes/ideen');
 const researchRouter = require('./routes/research');
@@ -695,11 +696,13 @@ try {
       // Semantische Suche: Embedding-Indizes aller Bücher frisch halten. Reiht
       // pro Buch einen Job ein (Delta-Cache → nur geänderte Chunks neu
       // embeddet); nie-indizierte Bücher bekommen ihren Erst-Index. Danach den
-      // Motiv-Ist-Index nachziehen (motif-scan pro Buch/User mit Motiven) — die
-      // Scan-Jobs reihen sich hinter die Embed-Jobs ein und lesen den frischen Index.
+      // Motiv-Ist-Index + Plot-Beat-Verankerung nachziehen (motif-scan / beat-anchor
+      // pro Buch/User) — beide reihen sich hinter die Embed-Jobs ein und lesen den
+      // frischen Index. Keiner ruft callAI; sie nutzen nur den Embedding-/FTS-Index.
       reindexAllBooks()
         .then(() => scanAllMotifs())
-        .catch(e => logger.error('Cron Embedding-Reindex/Motiv-Scan Fehler: ' + e.message));
+        .then(() => anchorAllBeats())
+        .catch(e => logger.error('Cron Embedding-Reindex/Motiv-Scan/Beat-Anchor Fehler: ' + e.message));
     });
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: Buchstatistik-Sync + Job-Cleanup + Cache-TTL-Cleanup + page_locks-Purge täglich 23:00 (${cronTz})`);

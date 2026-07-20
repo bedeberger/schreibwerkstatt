@@ -15,7 +15,10 @@ function _json(url, method, body) {
 }
 
 export const brainstormMethods = {
-  async runBrainstorm() {
+  // force=true verwirft den Delta-Cache und brainstormt das ganze Buch neu
+  // („Neu einlesen" — frische kreative Vorschläge auch bei unverändertem Text).
+  // Standard nutzt den Cache: nur geänderte Kapitel lösen einen KI-Call aus.
+  async runBrainstorm(force = false) {
     const bookId = this.$store.nav.selectedBookId;
     if (!bookId || this.brainstorming) return;
     this.brainstorming = true;
@@ -24,7 +27,7 @@ export const brainstormMethods = {
       const { jobId } = await fetchJson('/jobs/motif-brainstorm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: bookId }),
+        body: JSON.stringify({ book_id: bookId, force: force === true }),
       });
       this.motivBrainstormJobId = jobId;
       startPoll(this, {
@@ -98,6 +101,9 @@ export const brainstormMethods = {
       if (!detail?.result) throw new Error('no result');
       this.suggestions = detail.result.vorschlaege || [];
       this.selectedBrainstormRunId = detail.id;
+      // Das Vorschlags-Panel steht oben, die Historie unten — beim Reopen dorthin
+      // scrollen, sonst wirkt der Klick wirkungslos (Panel ausserhalb des Sichtfelds).
+      this.$nextTick(() => this.$root?.querySelector('.motiv-suggestions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } catch (e) {
       this.errorMessage = window.__app.t('motiv.error.runLoad');
     }

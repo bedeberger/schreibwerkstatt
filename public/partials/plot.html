@@ -26,6 +26,18 @@
           <span x-show="consistencyLoading" class="spinner"></span>
           <svg x-show="!consistencyLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
         </button>
+        <!-- Beat-Verankerung: findet je Beat die Fundstellen im Buchtext (Ist-Index
+             via semantische Suche/FTS, kein callAI) → Drift-Badges auf den Karten.
+             Hebt sich hervor (is-active), wenn der Ist-Index veraltet ist. -->
+        <button type="button" class="icon-btn icon-btn--ghost"
+                :class="{ 'is-active': beatAnchorStale && !anchorLoading }"
+                @click="runBeatAnchor()"
+                :disabled="anchorLoading || !beats.length"
+                :data-tip="anchorSemanticActive() ? $app.t('plot.anchor.run') : $app.t('plot.anchor.runLiteral')"
+                :aria-label="$app.t('plot.anchor.run')">
+          <span x-show="anchorLoading" class="spinner"></span>
+          <svg x-show="!anchorLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scan"/></svg>
+        </button>
         <button type="button" class="icon-btn icon-btn--ghost"
                 :class="{ 'is-active': plotFullscreen }"
                 :aria-pressed="plotFullscreen"
@@ -61,6 +73,9 @@
 
   <!-- Skeleton -->
   <div x-show="loading && !acts.length" class="card-status" x-text="$app.t('plot.loading')"></div>
+
+  <!-- Beat-Verankerungs-Lauf (Ist-Index gegen den Buchtext) -->
+  <div x-show="anchorLoading" class="card-status" x-html="anchorStatus || $app.t('plot.anchor.running')"></div>
 
   <!-- Leer-Hinweis -->
   <div x-show="!acts.length && !loading" class="card-empty">
@@ -216,88 +231,7 @@
   <div id="partial-plot-board-flat"></div>
   <div id="partial-plot-board-grid"></div>
 
-  <!-- Consistency unterhalb des Boards: Fortschritt + KI-Ergebnis, gefolgt von der
-       Prüfungs-Historie ganz unten. Run-Button sitzt im Card-Header. -->
-  <div x-show="consistencyLoading" class="plot-job-bar">
-    <div class="progress-bar-wrap" x-show="consistencyProgress > 0">
-      <div class="progress-bar" :style="{ '--progress': consistencyProgress + '%' }"></div>
-    </div>
-    <div class="plot-job-bar-row">
-      <span class="card-status" x-show="consistencyStatus" x-html="consistencyStatus"></span>
-      <button type="button" class="btn-compact btn-compact--ghost" @click="cancelConsistency()" x-text="$app.t('plot.consistency.cancel')"></button>
-    </div>
-  </div>
-
-  <div x-show="consistencyResult" class="plot-consistency-panel" x-cloak>
-    <div class="plot-consistency-head">
-      <span class="bewertung-section-title" x-text="$app.t('plot.consistency.title')"></span>
-      <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="dismissConsistency()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
-      </button>
-    </div>
-    <p class="plot-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult && consistencyResult.fazit"></p>
-    <div x-show="consistencyResult && !consistencyResult.konflikte.length" class="card-status" x-text="$app.t('plot.consistency.noFindings')"></div>
-    <div class="plot-konflikt-list">
-      <template x-for="(k, idx) in (consistencyResult ? consistencyResult.konflikte : [])" :key="idx">
-        <div class="plot-konflikt internal-link" :class="{ 'plot-konflikt--open': selectedKonfliktIdx === idx }"
-             :aria-expanded="selectedKonfliktIdx === idx"
-             @click="selectedKonfliktIdx = selectedKonfliktIdx === idx ? null : idx">
-          <div class="plot-konflikt-head">
-            <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('plot.severity.' + k.schwere)"></span>
-            <span class="plot-konflikt-beat" :class="{ 'internal-link': k.beat && k.beat !== '—' }"
-                  :data-tip="(k.beat && k.beat !== '—') ? $app.t('plot.consistency.gotoBeat') : null"
-                  @click="if (k.beat && k.beat !== '—') { gotoKonfliktBeat(k); $event.stopPropagation(); }"
-                  x-text="k.beat"></span>
-            <span class="plot-konflikt-problem" x-text="k.problem"></span>
-            <span class="history-chevron" :class="{ open: selectedKonfliktIdx === idx }" aria-hidden="true"></span>
-          </div>
-          <div x-show="selectedKonfliktIdx === idx && k.vorschlag" class="plot-konflikt-vorschlag" x-cloak>
-            <span class="entity-meta-label" x-text="$app.t('plot.consistency.suggestion')"></span>
-            <span x-text="k.vorschlag"></span>
-          </div>
-        </div>
-      </template>
-    </div>
-  </div>
-
-  <!-- Konsistenz-Prüfungs-Historie: persistierte Läufe pro Buch. Klick lädt das
-       Result oberhalb ins Consistency-Panel (selectedRunId). Wie Werkstatt-Run-Verlauf. -->
-  <div class="history-bar" x-show="consistencyRuns.length > 0" x-cloak>
-    <div class="history-heading" x-text="$app.t('plot.consistency.runs', { count: consistencyRuns.length })"></div>
-    <template x-for="r in consistencyRuns" :key="r.id">
-      <div class="history-item" :class="{ 'history-item--open': selectedRunId === r.id }"
-           @click="openConsistencyRun(r.id)">
-        <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-        <span class="tag" x-text="$app.t('plot.consistency.konfliktCount', { n: r.konflikt_count })"></span>
-        <span x-show="r.model" class="tag" x-text="r.model"></span>
-        <span class="history-chevron" :class="{ open: selectedRunId === r.id }" aria-hidden="true"></span>
-        <button type="button" class="history-item-delete"
-                @click.stop="deleteConsistencyRun(r.id)"
-                :data-tip="$app.t('common.deleteEntry')"
-                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
-      </div>
-    </template>
-  </div>
-
-  <!-- Brainstorm-Lauf-Historie: persistierte Läufe pro Buch (zusätzlich pro Akt/
-       Strang). Klick lädt die Vorschläge zurück ins Inline-Panel des Akts/der Zelle
-       (selectedBrainstormRunId). Läufe mit gelöschtem Akt sind nicht reaktivierbar. -->
-  <div class="history-bar" x-show="brainstormRuns.length > 0" x-cloak>
-    <div class="history-heading" x-text="$app.t('plot.brainstorm.runs', { count: brainstormRuns.length })"></div>
-    <template x-for="r in brainstormRuns" :key="r.id">
-      <div class="history-item" :class="{ 'history-item--open': selectedBrainstormRunId === r.id, 'history-item--disabled': r.act_id === null }"
-           @click="r.act_id !== null && openBrainstormRun(r)">
-        <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-        <span class="tag" x-text="r.act_name || $app.t('plot.brainstorm.actDeleted')"></span>
-        <span x-show="r.thread_name" class="tag tag--werkstatt" x-text="r.thread_name"></span>
-        <span class="tag" x-text="$app.t('plot.brainstorm.vorschlagCount', { n: r.vorschlag_count })"></span>
-        <span x-show="r.model" class="tag" x-text="r.model"></span>
-        <span class="history-chevron" :class="{ open: selectedBrainstormRunId === r.id }" aria-hidden="true" x-show="r.act_id !== null"></span>
-        <button type="button" class="history-item-delete"
-                @click.stop="deleteBrainstormRun(r.id)"
-                :data-tip="$app.t('common.deleteEntry')"
-                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
-      </div>
-    </template>
-  </div>
+  <!-- KI-Konsistenz (Fortschritt + Ergebnis) + Lauf-Historien (Konsistenz + Brainstorm).
+       Ausgelagert (File-Limit), via _loadPartials in den plotCard-Scope injiziert. -->
+  <div id="partial-plot-ki-runs"></div>
 </div>

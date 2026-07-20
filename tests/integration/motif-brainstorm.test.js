@@ -63,3 +63,55 @@ test('motif-brainstorm: normalisiert + filtert Katalog-/Batch-Dubletten', async 
   const detail = motifsDb.getBrainstormRun(job.result.runId);
   assert.deepEqual(detail.result.vorschlaege.map(x => x.name), ['Schuld & Vergebung', 'Regen', 'Spiegel']);
 });
+
+test('motif-brainstorm: Delta-Cache — HIT bei unverändertem Buch, force + Katalog', async () => {
+  const B2 = 990202;
+  ctx.mockAi.reset();
+  ctx.dbSeed.reset();
+  ctx.dbSeed.setBook({
+    books: [{ id: B2, name: 'Cache-Buch' }],
+    chapters: [{ id: 5201, book_id: B2, name: 'Kapitel 1' }],
+    pages: [{ id: 6201, book_id: B2, chapter_id: 5201, name: 'Seite A' }],
+    pageBodies: { 6201: '<p>Der Regen fiel; Schuld lastete auf ihr wie Wasser.</p>' },
+  });
+  motifsDb.deleteBrainstormCache(B2, USER); // sauberer Start
+
+  ctx.mockAi.on({ systemIncludes: 'MOTIVE' }, {
+    vorschlaege: [
+      { typ: 'motiv', name: 'Regen', beschreibung: 'Nässe', trigger_terms: ['Regen'] },
+      { typ: 'thema', name: 'Schuld', beschreibung: 'Kern', trigger_terms: [] },
+    ],
+  });
+
+  async function run(force) {
+    const jobId = shared.createJob('motif-brainstorm', B2, USER, 'job.label.motivBrainstorm', null, B2);
+    shared.enqueueJob(jobId, () => motifBrainstorm.runMotifBrainstormJob(jobId, B2, USER, { force }));
+    return waitForJob(shared, jobId);
+  }
+
+  // 1) Erster Lauf: Cache-MISS → genau 1 KI-Call.
+  ctx.mockAi.log.length = 0;
+  let job = await run(false);
+  assert.equal(job.status, 'done');
+  assert.equal(ctx.mockAi.log.length, 1, 'erster Lauf ruft die KI');
+  assert.deepEqual(job.result.vorschlaege.map(x => x.name), ['Regen', 'Schuld']);
+
+  // 2) Re-Run ohne Änderung: Cache-HIT → kein KI-Call, identisches Ergebnis.
+  ctx.mockAi.log.length = 0;
+  job = await run(false);
+  assert.equal(ctx.mockAi.log.length, 0, 'unveränderter Re-Run trifft den Cache');
+  assert.deepEqual(job.result.vorschlaege.map(x => x.name), ['Regen', 'Schuld']);
+
+  // 3) Katalog-Änderung bustet den Cache NICHT (Katalog absichtlich nicht in der
+  //    Signatur), aber die Dedup filtert das jetzt katalogisierte Motiv frisch raus.
+  motifsDb.createMotif(B2, USER, { name: 'Regen' });
+  ctx.mockAi.log.length = 0;
+  job = await run(false);
+  assert.equal(ctx.mockAi.log.length, 0, 'Katalog-Änderung trifft weiter den Cache');
+  assert.deepEqual(job.result.vorschlaege.map(x => x.name), ['Schuld'], 'katalogisiertes Motiv rausgefiltert');
+
+  // 4) force → Cache verworfen → erneuter KI-Call.
+  ctx.mockAi.log.length = 0;
+  job = await run(true);
+  assert.equal(ctx.mockAi.log.length, 1, 'force erzwingt einen frischen KI-Call');
+});

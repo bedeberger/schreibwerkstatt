@@ -29,6 +29,9 @@ export const lifecycleMethods = {
       this.acts = Array.isArray(data.acts) ? data.acts : [];
       this.threads = Array.isArray(data.threads) ? data.threads : [];
       this.beats = Array.isArray(data.beats) ? data.beats : [];
+      // Ist-Index-Staleness (Beats seit letztem Anchor-Lauf geändert) → Header
+      // bietet „Verankerung aktualisieren" an.
+      this.beatAnchorStale = !!(data.beatAnchor && data.beatAnchor.stale);
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.load');
@@ -106,6 +109,8 @@ export const lifecycleMethods = {
     this.selectedRunId = null;
     this.brainstormRuns = [];
     this.selectedBrainstormRunId = null;
+    this.beatAnchorStale = false;
+    this.anchorProgress = 0;
     this._pendingFocusBeatId = null;
     if (window.Alpine) window.Alpine.store('nav').plotBeatId = null;
     this.plotFilters = { kapitel: '', figurId: '', draftFigurId: '', status: '', text: '' };

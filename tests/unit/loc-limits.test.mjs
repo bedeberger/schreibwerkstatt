@@ -71,7 +71,6 @@ const CATEGORIES = [
       'public/partials/admin-users.html': 351,
       'public/partials/epub-export.html': 321,
       'public/partials/plot-board-grid.html': 307,
-      'public/partials/plot.html': 304,
       'public/partials/user-settings.html': 268,
       'public/partials/szenen.html': 273,
       'public/partials/orte.html': 277,

@@ -76,6 +76,30 @@
           </li>
         </template>
       </ul>
+
+      <!-- Figuren-Dubletten: mögliche doppelte/umbenannte Figuren (rein rückwärtsgewandt, kein Auto-Merge) -->
+      <template x-if="redundanzResult.figures && redundanzResult.figures.figuresCompared >= 2">
+        <div class="redundanz-figs">
+          <h3 class="redundanz-figs-title" x-text="$app.t('redundanz.fig.title')"></h3>
+          <p class="redundanz-figs-hint" x-text="$app.t('redundanz.fig.hint')"></p>
+          <div x-show="!redundanzResult.figures.pairs.length" class="muted-msg muted-msg--spaced" x-text="$app.t('redundanz.fig.empty')"></div>
+          <ul class="redundanz-list" x-show="redundanzResult.figures.pairs.length">
+            <template x-for="(pair, i) in redundanzResult.figures.pairs" :key="'f' + i">
+              <li class="redundanz-pair">
+                <span class="redundanz-score" :class="redundanzScoreClass(pair.score)"
+                      x-text="Math.round(pair.score * 100) + '%'"></span>
+                <div class="redundanz-fig-pair">
+                  <span class="tag internal-link" @click="redundanzGotoFigur(pair.a_id)" x-text="redundanzFigurName(pair.a_id, pair.a_name)"></span>
+                  <span class="redundanz-fig-sep" aria-hidden="true">↔</span>
+                  <span class="tag internal-link" @click="redundanzGotoFigur(pair.b_id)" x-text="redundanzFigurName(pair.b_id, pair.b_name)"></span>
+                  <span class="tag redundanz-dupe-kind" :class="'redundanz-dupe-kind--' + pair.dupeKind"
+                        x-text="redundanzDupeKindLabel(pair.dupeKind)"></span>
+                </div>
+              </li>
+            </template>
+          </ul>
+        </div>
+      </template>
     </div>
   </template>
 </div>

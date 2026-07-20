@@ -282,6 +282,7 @@ const JOB_TYPE_LABELS = {
   'embed-index':           'job.label.embedIndex',
   'motif-scan':            'job.label.motivScan',
   'motif-brainstorm':      'job.label.motivBrainstorm',
+  'beat-anchor':           'job.label.beatAnchor',
   'erzaehlprofil':         'job.label.erzaehlprofil',
   'faktencheck':           'job.label.faktencheck',
   'redundancy':            'job.label.redundancy',

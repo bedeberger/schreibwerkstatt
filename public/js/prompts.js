@@ -15,6 +15,7 @@ import * as reviewNs from './prompts/review.js';
 import * as komplettNs from './prompts/komplett.js';
 import * as synonymNs from './prompts/synonym.js';
 import * as tagebuchNs from './prompts/tagebuch.js';
+import * as motivNs from './prompts/motiv.js';
 
 // FNV-1a 32-bit über einen String → base36. Deterministisch, dependency-frei,
 // in Browser + Node identisch. Zweck ist Cache-Busting, nicht Kryptografie:
@@ -60,6 +61,9 @@ function _promptsContentHash() {
     synonymNs.SCHEMA_SYNONYM,
     tagebuchNs.SCHEMA_RUECKBLICK,
     tagebuchNs.SCHEMA_RUECKBLICK_SYNTH,
+    // Motiv-Brainstorm: seit dem Delta-Cache (motif_brainstorm_cache) persistent
+    // gecacht — Schema-Änderung muss die Cache-Version (PROMPTS_VERSION) bumpen.
+    motivNs.SCHEMA_MOTIV_BRAINSTORM,
   ]);
   return _hashContent(_allLocalePromptsSnapshot() + schemaPart);
 }

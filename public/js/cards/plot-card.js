@@ -117,6 +117,16 @@ export function registerPlotCard() {
     _brainstormJobId: null,
     _brainstormPollTimer: null,
 
+    // KI: Beat-Verankerung (Ist-Index gegen den Buchtext, kein callAI). Treibt das
+    // Drift-Badge pro Beat. `beatAnchorStale` kommt aus dem /plot-Payload (Beats
+    // seit letztem Anchor-Lauf geändert → „Verankerung aktualisieren" anbieten).
+    anchorLoading: false,
+    anchorStatus: '',
+    anchorProgress: 0,
+    beatAnchorStale: false,
+    _anchorJobId: null,
+    _anchorPollTimer: null,
+
     // KI: Consistency
     consistencyLoading: false,
     consistencyStatus: '',
@@ -146,7 +156,7 @@ export function registerPlotCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'plot',
         showFlag: 'showPlotCard',
-        timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer'],
+        timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer', '_anchorPollTimer'],
         // Sortable vor dem ersten Board-Render laden — _reattachSortables (via
         // loadBoard / $watch) bindet die Beat-Zellen, sobald window.Sortable da ist.
         onShow: async () => { await loadSortable(); await this.loadBoard(); },

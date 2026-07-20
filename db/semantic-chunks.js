@@ -101,6 +101,40 @@ function loadChunksForPairing(bookId, model, kinds = ['page']) {
   return out;
 }
 
+// Gemittelte Profil-Vektoren aller Figuren eines Buchs für den Figuren-Dubletten-
+// Radar (lib/redundancy.js#findFigureDuplicates). EIN Vektor je Figur (Mittel über
+// ihre Chunks unter model). Der JOIN auf figures scoped auf den anfragenden User
+// und filtert stale-Figuren — der embed-index indexiert Figuren buchweit über alle
+// User und OHNE stale-Filter, ein ungefilterter Vergleich brächte Fremd-User- und
+// verwaiste Figuren als Falsch-Treffer. Rückgabe: [{ id, name, vector:Float32Array }].
+function loadFigureVectorsForPairing(bookId, userEmail, model) {
+  const rows = db.prepare(`
+    SELECT sc.entity_id, sc.vector, f.name
+      FROM semantic_chunks sc
+      JOIN figures f ON f.id = sc.entity_id
+     WHERE sc.book_id = ? AND sc.model = ? AND sc.kind = 'figure'
+       AND f.book_id = ? AND f.user_email IS ? AND f.stale = 0
+     ORDER BY sc.entity_id, sc.chunk_ix
+  `).all(bookId, model, bookId, userEmail || null);
+  const acc = new Map(); // entity_id → { name, sum:Float32Array, count }
+  for (const r of rows) {
+    const v = blobToVector(r.vector);
+    let e = acc.get(r.entity_id);
+    if (!e) { e = { name: r.name, sum: new Float32Array(v.length), count: 0 }; acc.set(r.entity_id, e); }
+    if (v.length !== e.sum.length) continue; // Fremdmodell-Rest überspringen
+    for (let i = 0; i < v.length; i++) e.sum[i] += v[i];
+    e.count++;
+  }
+  const out = [];
+  for (const [id, e] of acc) {
+    if (!e.count) continue;
+    const vec = new Float32Array(e.sum.length);
+    for (let i = 0; i < vec.length; i++) vec[i] = e.sum[i] / e.count;
+    out.push({ id, name: e.name, vector: vec });
+  }
+  return out;
+}
+
 // Repräsentativer Vektor einer indizierten Entität = Mittel über ihre Chunks
 // (unter model). Basis der „ähnliche Stellen zu dieser Figur/Szene"-Suche —
 // kein Embedding-Call nötig, der Vektor liegt schon. null wenn nicht indiziert.
@@ -182,5 +216,5 @@ function clearBook(bookId, model = null) {
 module.exports = {
   getEntityChunks, replaceEntity, remove, searchSimilar, getEntityVector,
   bookStats, clearBook, pruneMissing, indexStatus,
-  loadChunksForPairing,
+  loadChunksForPairing, loadFigureVectorsForPairing,
 };

@@ -388,6 +388,39 @@ function deleteBrainstormRun(id, userEmail) {
   return _stmtDeleteBrainstormRun.run(parseInt(id), userEmail).changes;
 }
 
+// ── KI-Brainstorm Delta-Cache ────────────────────────────────────────────────
+// Pro Chunk (Kapitel bzw. __singlepass__) der rohe Modell-Output, keyed auf
+// pages_sig (page_id:updated_at + Settings + Kapitelname + Modell/Prompt-Version).
+// pages_sig ist NICHT im PK → INSERT OR REPLACE ueberschreibt die Chunk-Zeile bei
+// Aenderung (keine Akkumulation). Analog chapter_extract_cache. Roher Output VOR
+// seen-Dedup — die Dedup laeuft jeden Lauf frisch (siehe motif-brainstorm.js).
+const _stmtLoadBrainstormCache = db.prepare(`
+  SELECT result_json FROM motif_brainstorm_cache
+   WHERE book_id = ? AND user_email = ? AND provider = ? AND chunk_key = ? AND pages_sig = ?
+`);
+const _stmtSaveBrainstormCache = db.prepare(`
+  INSERT OR REPLACE INTO motif_brainstorm_cache
+    (book_id, user_email, provider, chunk_key, pages_sig, result_json, cached_at)
+  VALUES (?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})
+`);
+const _stmtDeleteBrainstormCache = db.prepare(
+  'DELETE FROM motif_brainstorm_cache WHERE book_id = ? AND user_email = ?'
+);
+
+function loadBrainstormCache(bookId, userEmail, chunkKey, pagesSig, provider = '') {
+  const row = _stmtLoadBrainstormCache.get(parseInt(bookId), userEmail || '', provider || '', chunkKey, pagesSig);
+  if (!row) return null;
+  try { return JSON.parse(row.result_json); } catch { return null; }
+}
+function saveBrainstormCache(bookId, userEmail, chunkKey, pagesSig, result, provider = '') {
+  _stmtSaveBrainstormCache.run(
+    parseInt(bookId), userEmail || '', provider || '', chunkKey, pagesSig, JSON.stringify(result),
+  );
+}
+function deleteBrainstormCache(bookId, userEmail) {
+  return _stmtDeleteBrainstormCache.run(parseInt(bookId), userEmail || '').changes;
+}
+
 // ── Graph-Payload ───────────────────────────────────────────────────────────
 // Ein Aufruf liefert alles fürs Konstellations-Rendering: Themen, Motive (jeweils
 // mit Soll-Links + Ist-Count), Beziehungen, plus das persistierte Knoten-Layout.
@@ -424,6 +457,8 @@ module.exports = {
   replaceOccurrences, listOccurrences,
   // KI-Brainstorm-Lauf-Historie
   insertBrainstormRun, listBrainstormRuns, getBrainstormRun, deleteBrainstormRun,
+  // KI-Brainstorm Delta-Cache
+  loadBrainstormCache, saveBrainstormCache, deleteBrainstormCache,
   // Graph-Layout (View-Präferenz)
   getLayout, saveLayout,
   // Aggregat

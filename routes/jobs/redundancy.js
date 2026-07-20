@@ -15,7 +15,7 @@ const {
 } = require('./shared');
 const embed = require('../../lib/embed');
 const semanticChunks = require('../../db/semantic-chunks');
-const { prepare, scanBlock, finalizePairs } = require('../../lib/redundancy');
+const { prepare, scanBlock, finalizePairs, findFigureDuplicates } = require('../../lib/redundancy');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
@@ -35,10 +35,17 @@ const MAX_CHUNKS = 6000;
 const TOP_K = 60;
 // Outer-Indizes pro Scan-Block, danach einmal an den Event-Loop zurückgeben.
 const BLOCK = 50;
+// Figuren-Dubletten laufen mit einem FESTEN hohen Floor, unabhängig vom Seiten-
+// Schwellwert-Band der Karte: Figuren-Profile (name+beschreibung) sind kurz und
+// archetyp-lastig, ihre Vektor-Nähe ist verrauscht → nur nahezu deckungsgleiche
+// Profile sind ein Dubletten-Signal. Die lexikalische Namens-Fusion (alias vs.
+// duplicate) passiert in findFigureDuplicates.
+const FIGURE_DUPE_THRESHOLD = 0.88;
+const FIGURE_TOP_K = 40;
 
 const _yield = () => new Promise(r => setImmediate(r));
 
-async function runRedundancyJob(jobId, bookId, threshold) {
+async function runRedundancyJob(jobId, bookId, threshold, userEmail) {
   const logger = makeJobLogger(jobId);
   try {
     if (!embed.isEnabled()) throw i18nError('job.error.embedDisabled');
@@ -73,11 +80,27 @@ async function runRedundancyJob(jobId, bookId, threshold) {
     }
 
     const { pairs, totalFound, truncated } = finalizePairs(best, metas, { topK: TOP_K });
+
+    // Figuren-Dubletten (billiger Zusatz-Abschnitt: ein Vektor pro Figur). Rein
+    // rückwärtsgewandt — Signal an den Autor, kein Auto-Merge. Non-fatal: ein
+    // Fehler hier verwirft nie das Seiten-Ergebnis.
+    updateJob(jobId, { statusText: 'job.phase.redundancyFigures', progress: 97 });
+    let figures = { pairs: [], totalFound: 0, truncated: false, figuresCompared: 0 };
+    try {
+      const figVecs = semanticChunks.loadFigureVectorsForPairing(bookId, userEmail, model);
+      const figRes = figVecs.length >= 2
+        ? findFigureDuplicates(figVecs, { threshold: FIGURE_DUPE_THRESHOLD, topK: FIGURE_TOP_K })
+        : { pairs: [], totalFound: 0, truncated: false };
+      figures = { ...figRes, figuresCompared: figVecs.length, threshold: FIGURE_DUPE_THRESHOLD };
+    } catch (e) {
+      logger.warn(`Figuren-Dubletten übersprungen (${bookId}): ${e.message}`);
+    }
+
     updateJob(jobId, { progress: 98 });
     completeJob(jobId, {
       model, threshold, comparedChunks: n, comparedPairs,
-      totalFound, truncated, truncatedChunks, pairs,
-    }, null, `${totalFound} Paar(e) ≥ ${threshold} (${n} Chunks verglichen)`);
+      totalFound, truncated, truncatedChunks, pairs, figures,
+    }, null, `${totalFound} Passagen-Paar(e) · ${figures.totalFound} Figuren-Paar(e)`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Redundanz-Radar Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);
@@ -102,7 +125,7 @@ redundancyRouter.post('/redundancy', jsonBody, (req, res) => {
   if (existing) return res.json({ jobId: existing, existing: true });
   const threshold = _clampThreshold(req.body?.threshold);
   const jobId = createJob('redundancy', book_id, userEmail, 'job.label.redundancy', null, book_id);
-  enqueueJob(jobId, () => runRedundancyJob(jobId, book_id, threshold));
+  enqueueJob(jobId, () => runRedundancyJob(jobId, book_id, threshold, userEmail));
   res.json({ jobId });
 });
 

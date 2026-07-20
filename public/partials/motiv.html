@@ -24,6 +24,11 @@
           <svg x-show="!brainstorming" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
         </button>
         <button type="button" class="icon-btn icon-btn--ghost"
+                @click="runBrainstorm(true)" :disabled="brainstorming"
+                :data-tip="$app.t('motiv.brainstorm.runFresh')" :aria-label="$app.t('motiv.brainstorm.runFresh')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#zap"/></svg>
+        </button>
+        <button type="button" class="icon-btn icon-btn--ghost"
                 @click="runScan()" :disabled="scanning || !motifs.length"
                 :data-tip="$app.t('motiv.scan.run')" :aria-label="$app.t('motiv.scan.run')">
           <span x-show="scanning" class="spinner"></span>
@@ -56,7 +61,13 @@
 
   <!-- KI-Vorschläge (Brainstorm): übernehmen legt Thema/Motiv an, nie im Text -->
   <div class="motiv-suggestions" x-show="suggestions.length" x-cloak>
-    <h4 class="motiv-panel-heading" x-text="$app.t('motiv.brainstorm.title')"></h4>
+    <div class="motiv-suggestions-head">
+      <h4 class="motiv-panel-heading" x-text="$app.t('motiv.brainstorm.title')"></h4>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="_clearSuggestionPanel()"
+              :data-tip="$app.t('motiv.brainstorm.closePanel')" :aria-label="$app.t('motiv.brainstorm.closePanel')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+      </button>
+    </div>
     <div class="motiv-suggestion-list">
       <template x-for="(s, i) in suggestions" :key="i">
         <div class="motiv-suggestion">
@@ -80,26 +91,6 @@
         </div>
       </template>
     </div>
-  </div>
-
-  <!-- KI-Brainstorm-Lauf-Historie: persistierte Läufe pro Buch. Klick lädt die
-       Vorschläge zurück ins Panel oben (selectedBrainstormRunId). Wie der Plot-/
-       Werkstatt-Run-Verlauf. -->
-  <div class="history-bar" x-show="brainstormRuns.length > 0" x-cloak>
-    <div class="history-heading" x-text="$app.t('motiv.brainstorm.runs', { count: brainstormRuns.length })"></div>
-    <template x-for="r in brainstormRuns" :key="r.id">
-      <div class="history-item" :class="{ 'history-item--open': selectedBrainstormRunId === r.id }"
-           @click="openBrainstormRun(r)">
-        <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
-        <span class="tag" x-text="$app.t('motiv.brainstorm.vorschlagCount', { n: r.vorschlag_count })"></span>
-        <span x-show="r.model" class="tag" x-text="r.model"></span>
-        <span class="history-chevron" :class="{ open: selectedBrainstormRunId === r.id }" aria-hidden="true"></span>
-        <button type="button" class="history-item-delete"
-                @click.stop="deleteBrainstormRun(r.id)"
-                :data-tip="$app.t('common.deleteEntry')"
-                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
-      </div>
-    </template>
   </div>
 
   <!-- Anlege-Leiste -->
@@ -143,6 +134,26 @@
 
     <!-- Seitenpanel (nested Partial — HTML-Partial-LOC-Limit) -->
     <div id="partial-motiv-panel"></div>
+  </div>
+
+  <!-- KI-Brainstorm-Lauf-Historie: persistierte Läufe pro Buch, unter Graph +
+       Panel. Klick lädt die Vorschläge zurück ins Panel oben (selectedBrainstormRunId)
+       und scrollt dorthin. Wie der Plot-/Werkstatt-Run-Verlauf. -->
+  <div class="history-bar" x-show="brainstormRuns.length > 0" x-cloak>
+    <div class="history-heading" x-text="$app.t('motiv.brainstorm.runs', { count: brainstormRuns.length })"></div>
+    <template x-for="r in brainstormRuns" :key="r.id">
+      <div class="history-item" :class="{ 'history-item--open': selectedBrainstormRunId === r.id }"
+           @click="openBrainstormRun(r)">
+        <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
+        <span class="tag" x-text="$app.t('motiv.brainstorm.vorschlagCount', { n: r.vorschlag_count })"></span>
+        <span x-show="r.model" class="tag" x-text="r.model"></span>
+        <span class="history-chevron" :class="{ open: selectedBrainstormRunId === r.id }" aria-hidden="true"></span>
+        <button type="button" class="history-item-delete"
+                @click.stop="deleteBrainstormRun(r.id)"
+                :data-tip="$app.t('common.deleteEntry')"
+                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+      </div>
+    </template>
   </div>
 
   <!-- @include motiv-graph-menu -->

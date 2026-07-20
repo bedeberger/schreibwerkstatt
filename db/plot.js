@@ -751,6 +751,98 @@ function deletePlotBrainstormRun(id, userEmail) {
   return _stmtDeleteBrainstormRun.run(parseInt(id), userEmail).changes;
 }
 
+// ── Ist-Index (plot_beat_occurrences) ───────────────────────────────────────
+// Abgeleitete Beat-Verankerung: wo ein geplanter Beat semantisch/wörtlich im
+// Buchtext auftaucht (Job beat-anchor). Full-Replace pro Beat je Lauf — kein
+// Handpflegen, kein content_hash. Pendant zu motifs#replaceOccurrences.
+
+// Lean-Liste für den Anchor-Job: nur die Felder, die als Query dienen + der
+// Status für die spätere Drift-Klassifikation. Kein Figuren-/Motiv-Scan.
+const _stmtListBeatsForAnchor = db.prepare(`
+  SELECT id, titel, beschreibung, status, verworfen
+    FROM plot_beats
+   WHERE book_id = ? AND user_email = ?
+`);
+function listBeatsForAnchor(bookId, userEmail) {
+  return _stmtListBeatsForAnchor.all(parseInt(bookId), userEmail);
+}
+
+const _stmtDeleteOccForBeat = db.prepare('DELETE FROM plot_beat_occurrences WHERE beat_id = ?');
+const _stmtInsertBeatOcc = db.prepare(`
+  INSERT INTO plot_beat_occurrences (beat_id, book_id, kind, page_id, scene_id, score, snippet, source, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL})
+`);
+
+// Full-Replace der Fundstellen eines Beats (ein Anchor-Ergebnis). rows:
+// [{ kind:'page'|'scene', pageId?, sceneId?, score, snippet, source }].
+const replaceBeatOccurrences = db.transaction((beatId, bookId, rows) => {
+  _stmtDeleteOccForBeat.run(parseInt(beatId));
+  for (const r of rows || []) {
+    const isPage = r.kind === 'page';
+    _stmtInsertBeatOcc.run(
+      parseInt(beatId), parseInt(bookId), r.kind,
+      isPage ? parseInt(r.pageId) : null,
+      isPage ? null : parseInt(r.sceneId),
+      r.score != null ? Number(r.score) : null,
+      r.snippet != null ? String(r.snippet).slice(0, 500) : null,
+      r.source,
+    );
+  }
+});
+
+// Alle Fundstellen der Beats eines Buchs am Stück (Seiten-/Szenen-Kontext via
+// JOIN, kein Snapshot) → Map beat_id → { count, top[] }. Der Board-Payload hängt
+// count + die Top-Treffer (nach Score) an jeden Beat fürs Drift-Badge. Szenen
+// erben ihre Seite (figure_scenes.page_id) fürs Anspringen.
+const _stmtBeatOccForBook = db.prepare(`
+  SELECT o.beat_id, o.kind, o.score, o.snippet, o.source,
+         COALESCE(o.page_id, s.page_id) AS page_id,
+         COALESCE(p.page_name, sp.page_name) AS page_name,
+         s.titel AS scene_titel
+    FROM plot_beat_occurrences o
+    JOIN plot_beats b ON b.id = o.beat_id
+    LEFT JOIN pages p         ON p.page_id = o.page_id
+    LEFT JOIN figure_scenes s ON s.id = o.scene_id
+    LEFT JOIN pages sp        ON sp.page_id = s.page_id
+   WHERE b.book_id = ? AND b.user_email = ?
+   ORDER BY o.score DESC, o.id
+`);
+const BEAT_OCC_TOP_N = 4;
+function beatOccurrenceMap(bookId, userEmail) {
+  const map = new Map();
+  for (const r of _stmtBeatOccForBook.all(parseInt(bookId), userEmail)) {
+    let e = map.get(r.beat_id);
+    if (!e) { e = { count: 0, top: [] }; map.set(r.beat_id, e); }
+    e.count += 1;
+    if (e.top.length < BEAT_OCC_TOP_N) {
+      e.top.push({
+        kind: r.kind, page_id: r.page_id, page_name: r.page_name,
+        scene_titel: r.scene_titel, snippet: r.snippet, score: r.score, source: r.source,
+      });
+    }
+  }
+  return map;
+}
+
+// Stale-Heuristik fürs „Verankerung aktualisieren"-Angebot: gibt es Beats, die
+// nach dem jüngsten Occurrence-Lauf geändert wurden (oder nie verankert)? Billige
+// updated_at-Heuristik analog zur Motiv-Werkstatt (semanticChunks.indexStatus).
+const _stmtBeatAnchorStale = db.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0) AS beats,
+    (SELECT MAX(updated_at) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0) AS beat_max,
+    (SELECT MAX(o.created_at) FROM plot_beat_occurrences o
+       JOIN plot_beats b ON b.id = o.beat_id
+      WHERE b.book_id = ? AND b.user_email = ?) AS occ_max
+`);
+function beatAnchorStale(bookId, userEmail) {
+  const bid = parseInt(bookId);
+  const r = _stmtBeatAnchorStale.get(bid, userEmail, bid, userEmail, bid, userEmail);
+  if (!r || !r.beats) return false;          // nichts zu verankern → nicht stale
+  if (!r.occ_max) return true;               // noch nie gelaufen
+  return !!(r.beat_max && r.beat_max > r.occ_max); // Beat seit letztem Lauf geändert
+}
+
 module.exports = {
   listActs, getAct, createAct, updateAct, deleteAct, reorderActs,
   threadHasOwnActs, forkThreadActs, unforkThreadActs,
@@ -760,4 +852,5 @@ module.exports = {
   resolveFigureIds, resolveDraftFigureIds, resolveMotifIds,
   insertPlotConsistencyRun, listPlotConsistencyRuns, getPlotConsistencyRun, deletePlotConsistencyRun,
   insertPlotBrainstormRun, listPlotBrainstormRuns, getPlotBrainstormRun, deletePlotBrainstormRun,
+  listBeatsForAnchor, replaceBeatOccurrences, beatOccurrenceMap, beatAnchorStale,
 };

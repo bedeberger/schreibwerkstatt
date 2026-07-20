@@ -4,7 +4,10 @@
 // Job (POST /jobs/redundancy); diese Methoden triggern ihn, pollen und rendern
 // die Paar-Liste. Gespreadet in cards/redundanz-card.js.
 
-// Schwelle-Bänder (bge-m3-Cosinus) → Zahl. Server clamped zusätzlich.
+// Fallback-Bänder (bge-m3-Cosinus), falls /config noch nicht geladen ist. Die
+// massgeblichen Werte stehen in Alpine.store('config').redundancyThresholds
+// (App-Settings redundancy.*, im Admin-Semantik-Tab modellabhängig justierbar).
+// Server clamped zusätzlich auf 0.70–0.97.
 const THRESHOLDS = { strict: 0.88, medium: 0.82, loose: 0.76 };
 
 // Kein `get x()` in diesem gespreadeten Modul — Spread würde Getter beim Mount
@@ -12,7 +15,8 @@ const THRESHOLDS = { strict: 0.88, medium: 0.82, loose: 0.76 };
 // (redundanzAvailable, redundanzHasIndex) leben inline im Karten-Literal.
 export const redundanzMethods = {
   redundanzThresholdValue() {
-    return THRESHOLDS[this.redundanzThreshold] ?? THRESHOLDS.medium;
+    const t = this.$store?.config?.redundancyThresholds || THRESHOLDS;
+    return t[this.redundanzThreshold] ?? t.medium ?? THRESHOLDS.medium;
   },
 
   setRedundanzThreshold(band) {
@@ -104,5 +108,23 @@ export const redundanzMethods = {
 
   redundanzGotoPage(pageId) {
     window.__app?.gotoPageById?.(Number(pageId));
+  },
+
+  // Figuren-Dubletten (zweiter Ergebnis-Abschnitt) ──────────────────────────
+  // Figurennamen drift-frei aus dem Katalog-Store auflösen (kein Snapshot-Name
+  // aus dem Job-Ergebnis); Fallback: der zum Analysezeitpunkt gespeicherte Name.
+  redundanzFigurName(figId, fallback) {
+    const f = (Alpine.store('catalog')?.figuren || []).find(x => String(x.id) === String(figId));
+    return f?.name || fallback || ('#' + figId);
+  },
+
+  redundanzGotoFigur(figId) {
+    window.__app?.openFigurById?.(Number(figId));
+  },
+
+  // Badge-Text für die Art des Fundes (alias = namensverschieden, das
+  // nicht-triviale Signal; duplicate = namensgleich/-überlappend).
+  redundanzDupeKindLabel(kind) {
+    return window.__app?.t?.('redundanz.fig.kind.' + (kind === 'alias' ? 'alias' : 'duplicate')) || '';
   },
 };

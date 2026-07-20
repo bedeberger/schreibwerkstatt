@@ -324,6 +324,69 @@ export const aiMethods = {
     } catch { return iso; }
   },
 
+  // ── Beat-Verankerung (Ist-Index gegen den Buchtext) ──────────────────────
+  // Kein callAI — der Job (beat-anchor) nutzt nur den bestehenden Embedding-/
+  // FTS-Index. Findet je Beat die Fundstellen im Text und treibt so das Drift-
+  // Badge (Soll status vs. Ist). Rein rückwärtsgewandt.
+  anchorSemanticActive() {
+    return !!this.$store.config?.semanticSearchEnabled;
+  },
+
+  async runBeatAnchor() {
+    const app = window.__app;
+    if (!this.beats.length || this.anchorLoading) return;
+    this.anchorLoading = true;
+    this.anchorStatus = '';
+    this.anchorProgress = 0;
+    this.errorMessage = '';
+    try {
+      const resp = await fetchJson('/jobs/beat-anchor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId }),
+      });
+      this._anchorJobId = resp.jobId;
+      startPoll(this, {
+        timerProp: '_anchorPollTimer',
+        jobId: resp.jobId,
+        progressProp: 'anchorProgress',
+        onProgress: (job) => {
+          this.anchorStatus = runningJobStatus(app.t.bind(app),
+            job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut,
+            job.progress, job.tokensPerSec, job.statusParams);
+        },
+        onDone: async () => {
+          this.anchorLoading = false;
+          this.anchorStatus = '';
+          this._anchorJobId = null;
+          this.beatAnchorStale = false;
+          await this.loadBoard(); // occ_count/occ_top neu → Badges aktualisieren sich
+        },
+        onError: (job) => {
+          this.anchorLoading = false;
+          this.anchorStatus = '';
+          this._anchorJobId = null;
+          this.errorMessage = app.t(job.error || 'plot.error.anchor', job.errorParams || {});
+        },
+        onNotFound: () => {
+          this.anchorLoading = false;
+          this.anchorStatus = '';
+          this._anchorJobId = null;
+        },
+      });
+    } catch (e) {
+      this.anchorLoading = false;
+      this.errorMessage = app.t('plot.error.anchor');
+    }
+  },
+
+  // Vom Anchor-Badge zur stärksten Fundstelle im Manuskript springen (Top-Treffer
+  // = höchster Score, vom Server vorsortiert). Verlässt die Plot-Karte → Seite.
+  gotoBeatOccurrence(beat) {
+    const top = (beat && beat.occ_top || [])[0];
+    if (top && top.page_id) window.__app.gotoPageById(top.page_id);
+  },
+
   // Ganze Plot-Karte ins Native-Vollbild — mehr horizontaler Platz fürs Akt-Board.
   // Status-Sync via fullscreenchange-Listener in plot-card.js (plotFullscreen).
   async togglePlotFullscreen() {
@@ -337,11 +400,15 @@ export const aiMethods = {
   _clearJobs() {
     if (this._brainstormPollTimer) { clearInterval(this._brainstormPollTimer); this._brainstormPollTimer = null; }
     if (this._consistencyPollTimer) { clearInterval(this._consistencyPollTimer); this._consistencyPollTimer = null; }
+    if (this._anchorPollTimer) { clearInterval(this._anchorPollTimer); this._anchorPollTimer = null; }
     this.brainstormLoading = false;
     this.consistencyLoading = false;
+    this.anchorLoading = false;
     this.brainstormStatus = '';
     this.consistencyStatus = '';
+    this.anchorStatus = '';
     this._brainstormJobId = null;
     this._consistencyJobId = null;
+    this._anchorJobId = null;
   },
 };

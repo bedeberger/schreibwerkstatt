@@ -88,10 +88,18 @@ router.get('/', (req, res) => {
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
   if (!_guard(req, res, bookId)) return;
+  // Ist-Index der Beat-Verankerung an jeden Beat hängen (count + Top-Fundstellen)
+  // → Drift-Badge im Frontend (Soll `status` vs. Ist-Fundstellen). Kein Extra-Call.
+  const occMap = plotDb.beatOccurrenceMap(bookId, userEmail);
+  const beats = plotDb.listBeats(bookId, userEmail).map(b => {
+    const occ = occMap.get(b.id);
+    return { ...b, occ_count: occ ? occ.count : 0, occ_top: occ ? occ.top : [] };
+  });
   res.json({
     acts: plotDb.listActs(bookId, userEmail),
     threads: plotDb.listThreads(bookId, userEmail),
-    beats: plotDb.listBeats(bookId, userEmail),
+    beats,
+    beatAnchor: { stale: plotDb.beatAnchorStale(bookId, userEmail) },
   });
 });
 

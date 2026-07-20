@@ -9394,6 +9394,75 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 246 abgeschlossen (Motiv-Werkstatt: motif_brainstorm_runs).');
   }
 
+  if (version < 247) {
+    // Plot-Werkstatt: abgeleiteter Ist-Index der Beat-Verankerung — wo ein geplan-
+    // ter Beat semantisch/woertlich im Buchtext auftaucht. Pendant zu
+    // motif_occurrences: Full-Replace pro Beat je Anchor-Lauf (kein content_hash,
+    // die Erkennung nutzt den bestehenden Embedding-/FTS-Index und ist billig).
+    // Rein rueckwaertsgewandt — Ableitung, nie generativ. beat_id CASCADE (stirbt
+    // mit dem Beat), book_id CASCADE. kind page/scene sentinel-frei via CHECK.
+    db.exec(`CREATE TABLE IF NOT EXISTS plot_beat_occurrences (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        beat_id    INTEGER NOT NULL REFERENCES plot_beats(id) ON DELETE CASCADE,
+        book_id    INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        kind       TEXT    NOT NULL CHECK(kind IN ('page','scene')),
+        page_id    INTEGER REFERENCES pages(page_id) ON DELETE CASCADE,
+        scene_id   INTEGER REFERENCES figure_scenes(id) ON DELETE CASCADE,
+        score      REAL,
+        snippet    TEXT,
+        source     TEXT    NOT NULL CHECK(source IN ('semantic','trigger')),
+        created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        CHECK (
+          (kind = 'page'  AND page_id IS NOT NULL AND scene_id IS NULL) OR
+          (kind = 'scene' AND scene_id IS NOT NULL AND page_id IS NULL)
+        )
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_occ_beat ON plot_beat_occurrences(beat_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_occ_book ON plot_beat_occurrences(book_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_occ_page ON plot_beat_occurrences(page_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_occ_scene ON plot_beat_occurrences(scene_id)');
+
+    const fkErrors247 = db.pragma('foreign_key_check');
+    if (fkErrors247.length) {
+      throw new Error(`Migration 247: foreign_key_check meldet ${fkErrors247.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 247').run();
+    logger.info('DB-Migration auf Version 247 abgeschlossen (Plot-Werkstatt: plot_beat_occurrences).');
+  }
+
+  if (version < 248) {
+    // Motiv-Werkstatt: Delta-Cache fuer den KI-Brainstorm (umfangreicher callAI-
+    // Pfad). Analog chapter_extract_cache/book_extract_cache: pro Chunk der rohe
+    // Modell-Output, keyed auf pages_sig (page_id:updated_at + Buch-Settings +
+    // Kapitelname + Modell/Prompt-Version). Ein Re-Run liest nur Kapitel neu,
+    // deren Signatur sich aenderte. pages_sig ist bewusst NICHT Teil des PK →
+    // INSERT OR REPLACE ueberschreibt die Chunk-Zeile bei Aenderung (keine
+    // Akkumulation). chunk_key ist eine opake Cache-Adresse ('<chapter_id>' |
+    // '<chapter_id>__sub<N>' | '__ungrouped__' | '__singlepass__'), kein Domaenen-
+    // Diskriminator. Roher Output (VOR seen-Dedup) → die Dedup gegen Katalog +
+    // Cross-Chunk laeuft jeden Lauf frisch, unabhaengig davon welche Chunks HIT
+    // sind. book_id CASCADE (Cache stirbt mit dem Buch). Provider im PK →
+    // kein Cross-Provider-Bleeding.
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_brainstorm_cache (
+        book_id     INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        provider    TEXT    NOT NULL DEFAULT '',
+        chunk_key   TEXT    NOT NULL,
+        pages_sig   TEXT    NOT NULL,
+        result_json TEXT    NOT NULL,
+        cached_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        PRIMARY KEY (book_id, user_email, provider, chunk_key)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_mbc_book_user ON motif_brainstorm_cache(book_id, user_email)');
+
+    const fkErrors248 = db.pragma('foreign_key_check');
+    if (fkErrors248.length) {
+      throw new Error(`Migration 248: foreign_key_check meldet ${fkErrors248.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 248').run();
+    logger.info('DB-Migration auf Version 248 abgeschlossen (Motiv-Werkstatt: motif_brainstorm_cache).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

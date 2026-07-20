@@ -27,6 +27,9 @@
 //   semanticSearchEnabled — Semantik-Suche/„ähnliche Stellen"/Chat-Tool
 //             `search_similar` (/config `semanticSearch.enabled`, true wenn
 //             Embedding-Backend konfiguriert). Provider-unabhängig.
+//   redundancyThresholds — Cosinus-Schwellen der drei Redundanz-Radar-Bänder
+//             (strict/medium/loose, /config `redundancy.*`). Modellabhängig; der
+//             Radar sendet den Wert des gewählten Bandes an /jobs/redundancy.
 //   apiProvider — globaler KI-Provider ('claude'/'ollama'/'openai-compat'), aus
 //             /config (globaler ai.provider, OHNE Per-User-Override). Steuert die
 //             Provider-Anzeige im Avatar-Menü; configurePrompts liest den Wert
@@ -47,6 +50,7 @@ export function registerConfigStore() {
     semanticSearchEnabled: false,
     semanticHybrid: false,
     semanticRerank: false,
+    redundancyThresholds: { strict: 0.88, medium: 0.82, loose: 0.76 },
     factcheckEnabled: false,
     apiProvider: 'claude',
     effectiveProvider: 'claude',

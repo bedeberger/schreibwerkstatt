@@ -148,6 +148,14 @@ router.get('/config', (req, res) => {
           && !!String(appSettings.get('rerank.host') || '').trim(),
       };
     })(),
+    // Redundanz-Radar: die drei Band-Schwellen (streng/mittel/locker). Der Radar
+    // liest den embed-Index, darum sind es modellabhängige Cosinus-Werte, die im
+    // Admin-Semantik-Tab justierbar sind. Keine Credentials — reine UI-Kalibrierung.
+    redundancy: {
+      thresholdStrict: Number(appSettings.get('redundancy.threshold_strict')),
+      thresholdMedium: Number(appSettings.get('redundancy.threshold_medium')),
+      thresholdLoose:  Number(appSettings.get('redundancy.threshold_loose')),
+    },
     // Komplettanalyse-Zusatzphasen «Kontinuität» + «Erzählprofil»: die
     // qualitätskritischen Stufen (Single-Pass, Verify-Filter, Attribut-Check)
     // gibt es nur bei Claude → für Nicht-Claude-User Karten ausgeblendet und die
