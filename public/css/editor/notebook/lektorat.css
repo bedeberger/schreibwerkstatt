@@ -8,16 +8,23 @@
 }
 
 @media (min-width: 1100px) {
+  /* Flex statt Grid + nur `max-height` (kein festes `height`): die Box wächst mit
+     dem Inhalt und wird erst bei viel Text auf 75vh gedeckelt. `align-items:
+     stretch` gibt beiden Spalten dann eine definite Höhe (= gedeckelte Container-
+     Höhe), sodass ihr `overflow-y: auto` unabhängig scrollt statt herauszuquellen.
+     Bei kurzer Seite schrumpft der Container → kein reservierter Weissraum. */
   .lektorat-split {
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    grid-template-columns: none;
     gap: 1rem;
-    height: 75vh;
-    min-height: 300px;
-    max-height: 900px;
+    max-height: 75vh;
   }
-  .lektorat-split-preview {
+  .lektorat-split-preview,
+  .lektorat-split-findings {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
     overflow-y: auto;
-    height: 100%;
   }
   /* Read-Modus-Wrap (TTS-Dock-Container) reicht die Hoehe durch, damit das
      `height:100%` der Content-View greift. */
@@ -29,8 +36,6 @@
     border-radius: var(--radius-md);
   }
   .lektorat-split-findings {
-    overflow-y: auto;
-    height: 100%;
     padding-right: var(--space-xs);
   }
 }

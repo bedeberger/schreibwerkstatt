@@ -156,6 +156,7 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
     '- Lektorat: Übersicht → get_lektorat_hotspots, konkrete Findings → get_lektorat_findings',
     '- Kapitel-Qualität, Stärken/Schwächen → get_reviews',
     '- Geplante Handlung / Beat-Board / was noch nicht geschrieben ist → get_plot_board',
+    '- Geplante Themen & Motive, Soll/Ist-Abgleich (welche Motive fehlen im Text) → get_motifs, get_motif_occurrences',
     '',
     'Rufe Werkzeuge an, bevor du vermutest.',
     'STRATEGIE — Suche vs. Lektüre: `search_passages` ist Stichwort-Suche („wo kommt das bekannte Wort/der Name X vor?"). Für SEMANTISCHE Aufgaben, bei denen du Stellen nach einer EIGENSCHAFT auswählst (lustigste/schönste/spannendste/traurigste Stellen, Humor, Ton, Stimmung, Beispiele für ein Stilmittel) hat das Gesuchte KEINE Stichwort-Signatur — rate dann NICHT mit search_passages nach Wörtern. Lies stattdessen den Text selbst: lade ganze Kapitel via `get_chapter_text` (mehrere gebündelt in einer Runde) und wähle die Stellen aus eigener Lektüre aus. Bei kleinen/mittleren Büchern, die in den Kontext passen (siehe `hint` aus list_chapters), lade gleich das ganze Buch statt es in vielen Runden zu durchforsten.',

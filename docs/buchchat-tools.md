@@ -37,7 +37,7 @@ Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([l
 
 ## Tools
 
-34 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read) und `generate_image` (Seiteneffekt + externer Bild-Call — bewusste Ausnahme zum Read-Only-/deterministisch-/kein-KI-Call-Vertrag, siehe unten).
+37 Tools, gruppiert nach Domäne. Alle Read-Only ausser `final_answer` (Pflicht-Endpunkt, kein DB-Read) und `generate_image` (Seiteneffekt + externer Bild-Call — bewusste Ausnahme zum Read-Only-/deterministisch-/kein-KI-Call-Vertrag, siehe unten).
 
 ### Buch/Kapitel-Überblick
 
@@ -120,6 +120,13 @@ Der agentische Loop ruft `callAIWithTools` → `_callClaudeWithToolsAttempt` ([l
 | Tool | Input | Zweck | Quelle |
 |------|-------|-------|--------|
 | `get_plot_board` | `status?` (`geplant`/`im_buch`), `act_id?` | Geplantes Beat-Board (vorwärtsgerichtete Planung, getrennt vom geschriebenen Text): Akte → Beats mit Titel, Beschreibung (Preview 600 Zeichen), Status (binär; `verworfen` als eigenes Flag pro Beat), Zielkapitel (`chapter_name`), beteiligte Katalog- + Werkstatt-Figuren (auf Namen aufgelöst). `status_counts` = Gesamtverteilung über alle Beats inkl. `verworfen`-Zählung (immer, vor Filter). Pro Buch + User. Leeres Board → `hint` statt Fehler. | `plot_acts` + `plot_beats` (via [db/plot.js](../db/plot.js)) + `figures`/`draft_figures` (Namens-Maps) |
+
+### Motiv-Werkstatt
+
+| Tool | Input | Zweck | Quelle |
+|------|-------|-------|--------|
+| `get_motifs` | – | Motiv-Konstellation (planend + überwachend): Themen (Cluster) → Motive (Naben) mit Beschreibung, `trigger_terms`, Motiv↔Motiv-`relations` und dem **Soll/Ist-Abgleich** pro Motiv: `soll` (verknüpfte Figuren/Beats/Kapitel/Seiten laut Plan), `ist_count` (reale Fundstellen aus `motif_occurrences`), `geist:true` (geplant, aber 0 Fundstellen). `geister`-Gesamtzähler. Fundstellen-Detail via `get_motif_occurrences`. Pro Buch + User. | `getGraph` aus [db/motifs.js](../db/motifs.js) (`themes`+`motifs`+Bridges+`motif_occurrences`-Counts) |
+| `get_motif_occurrences` | `motif_id` ∨ `motif_name`, `limit?` (default 40, max 200) | Ist-Fundstellen eines Motivs: `kind` page (mit `page_name`/`chapter_name`) oder scene (mit `scene_titel`), `source` (`semantic`/`trigger`), `score`, `snippet`. Nach Score sortiert. | `listOccurrences` aus [db/motifs.js](../db/motifs.js) |
 
 ### Bild-Generierung
 

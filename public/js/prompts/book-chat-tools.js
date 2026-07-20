@@ -327,6 +327,24 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
+    name: 'get_motifs',
+    description: 'Liefert die Motiv-Werkstatt-Konstellation dieses Users: Themen (abstrakte Cluster wie "Schuld & Vergebung") → Motive (konkrete wiederkehrende Naben wie Wasser, Spiegel, ein Lied) mit Beschreibung, trigger_terms, Beziehungen (Motiv↔Motiv, z.B. verstärkt/kontrastiert) und dem Soll/Ist-Abgleich pro Motiv. soll = wo das Motiv laut PLAN tragen soll (verknüpfte Figuren/Beats/Kapitel/Seiten). ist_count = wie oft die KI-Motiverkennung es REAL im Text fand. geist=true = geplant, aber 0 Fundstellen (fallengelassenes oder noch nicht geschriebenes Motiv). Beantwortet "welche Motive/Themen plant der User?", "welche geplanten Motive fehlen im Text (Geister)?", "wie hängen die Motive zusammen?", "trägt Motiv X laut Plan, wo es soll?". Rein rückwärtsgewandt/planend — nie generativ im Buchtext. Pro Buch + User. Fundstellen-Detail eines Motivs über get_motif_occurrences. Leere Werkstatt heisst nur: keine Motiv-Planung angelegt.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_motif_occurrences',
+    description: 'Liefert die realen Fundstellen (Ist) eines Motivs im Text: wo die KI-Motiverkennung es fand — nach Seite (mit Kapitel) oder Szene, mit Textausschnitt (snippet), Score und source (semantic = Embedding-Ähnlichkeit, trigger = wörtlicher trigger_terms-Treffer via FTS). Beantwortet "wo genau taucht das Wasser-Motiv auf?", "in welchen Kapiteln trägt Motiv X?". Auswahl per `motif_id` oder `motif_name` (aus get_motifs; exakt oder Substring, case-insensitive). Keine Fundstellen = Geist-Motiv oder Scan lief noch nicht.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        motif_id:   { type: 'integer', description: 'Motiv-ID aus get_motifs.' },
+        motif_name: { type: 'string',  description: 'Alternative: Name des Motivs (exakt oder Substring).' },
+        limit:      { type: 'integer', description: 'Max. Anzahl Fundstellen (default 40, max 200). Nach Score sortiert.' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'find_first_last_mention',
     description: 'Liefert erste + letzte Erwähnung einer Figur (page_figure_mentions) oder eines Orts (location_chapters). Schmaler als `get_figure_mentions` – nur die zwei Endpunkte, ohne Per-Kapitel-Aggregat. Beantwortet "wo erscheint X zuerst?", "wann verschwindet X aus dem Buch?". Pflicht: `figur_id` ∨ `figur_name` ∨ `loc_id`. Ohne Index (Komplettanalyse fehlt): freundlicher Fehler statt 0-Werten.',
     input_schema: {

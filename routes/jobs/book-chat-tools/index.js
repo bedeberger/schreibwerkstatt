@@ -13,6 +13,7 @@ const analysis = require('./tools-analysis');
 const revisions = require('./tools-revisions');
 const werkstatt = require('./tools-werkstatt');
 const plot = require('./tools-plot');
+const motif = require('./tools-motif');
 const image = require('./tools-image');
 const { validateFinalAnswerCitations } = require('./citations');
 
@@ -57,6 +58,9 @@ const TOOLS = {
   get_werkstatt_draft:    werkstatt.tool_get_werkstatt_draft,
 
   get_plot_board:         plot.tool_get_plot_board,
+
+  get_motifs:             motif.tool_get_motifs,
+  get_motif_occurrences:  motif.tool_get_motif_occurrences,
 
   generate_image:         image.tool_generate_image,
 };

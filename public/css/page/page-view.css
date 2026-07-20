@@ -69,7 +69,10 @@
   position: absolute;
   top: 0.4em;
   bottom: 0.4em;
-  right: 0;
+  /* Aus dem Textkasten heraus in das Content-View-Padding schieben, sodass der
+     Streifen an der rechten Blatt-Kante klebt statt im Text zu schweben.
+     Offset = negatives Content-View-Padding (clamp) + kleiner Innenabstand. */
+  right: calc(-1 * clamp(18px, 4vw, 40px) + var(--space-2xs));
   width: 3px;
   background: var(--color-style-border);
   border-radius: var(--radius-sm);
