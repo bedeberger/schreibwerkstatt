@@ -30,7 +30,7 @@ function bootstrap() {
   // K Objektiv-Läufe + 1 Stil-Lauf. Die Konsolidierung des Splits ist separat
   // unit-getestet (tests/unit/lektorat-consolidate.test.mjs); die Integration-
   // Tests prüfen Cache-HIT/MISS und Pipeline, nicht die Fan-out-Anzahl.
-  upsert.run('ai.lektorat_objective_runs', JSON.stringify(1));
+  upsert.run('ai.lektorat_split', JSON.stringify(false));
 
   // app_users-Rows fuer Test-Identitaeten — Backfill/Backend-Migrate-Job
   // schreiben in book_access (FK auf app_users.email). Ohne Seed bricht
