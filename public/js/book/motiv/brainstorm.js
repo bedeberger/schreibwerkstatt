@@ -40,6 +40,8 @@ export const brainstormMethods = {
           // Frisch persistierten Lauf als ausgewählt markieren + Historie neu laden.
           this.selectedBrainstormRunId = job.result?.runId || null;
           this.loadBrainstormRuns();
+          // Panel + Historie stehen unten (überdecken den Graphen nicht) → hinscrollen.
+          if (this.suggestions.length) this._scrollToSuggestions();
         },
         onNotFound: () => { this.brainstorming = false; this.motivBrainstormJobId = null; },
         onError: () => { this.brainstorming = false; this.motivBrainstormJobId = null; this.errorMessage = window.__app.t('motiv.error.brainstorm'); },
@@ -101,12 +103,16 @@ export const brainstormMethods = {
       if (!detail?.result) throw new Error('no result');
       this.suggestions = detail.result.vorschlaege || [];
       this.selectedBrainstormRunId = detail.id;
-      // Das Vorschlags-Panel steht oben, die Historie unten — beim Reopen dorthin
-      // scrollen, sonst wirkt der Klick wirkungslos (Panel ausserhalb des Sichtfelds).
-      this.$nextTick(() => this.$root?.querySelector('.motiv-suggestions')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      this._scrollToSuggestions();
     } catch (e) {
       this.errorMessage = window.__app.t('motiv.error.runLoad');
     }
+  },
+
+  // Zum Vorschlags-Panel scrollen (steht unten beim Verlauf). Geteilt von frischem
+  // Lauf + Reopen, damit der geöffnete Lauf sichtbar wird, ohne den Graphen zu decken.
+  _scrollToSuggestions() {
+    this.$nextTick(() => this.$root?.querySelector('.motiv-suggestions')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
   },
 
   async deleteBrainstormRun(runId) {

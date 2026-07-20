@@ -59,40 +59,6 @@
 
   <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>
 
-  <!-- KI-Vorschläge (Brainstorm): übernehmen legt Thema/Motiv an, nie im Text -->
-  <div class="motiv-suggestions" x-show="suggestions.length" x-cloak>
-    <div class="motiv-suggestions-head">
-      <h4 class="motiv-panel-heading" x-text="$app.t('motiv.brainstorm.title')"></h4>
-      <button type="button" class="icon-btn icon-btn--ghost" @click="_clearSuggestionPanel()"
-              :data-tip="$app.t('motiv.brainstorm.closePanel')" :aria-label="$app.t('motiv.brainstorm.closePanel')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
-      </button>
-    </div>
-    <div class="motiv-suggestion-list">
-      <template x-for="(s, i) in suggestions" :key="i">
-        <div class="motiv-suggestion">
-          <div class="motiv-sugg-body">
-            <span class="badge-source" x-text="$app.t('motiv.brainstorm.typ.' + s.typ)"></span>
-            <span class="motiv-sugg-name" x-text="s.name"></span>
-            <span class="motiv-sugg-desc" x-text="s.beschreibung" x-show="s.beschreibung"></span>
-            <span class="motiv-sugg-triggers" x-show="s.trigger_terms && s.trigger_terms.length"
-                  x-text="(s.trigger_terms || []).join(', ')"></span>
-          </div>
-          <div class="motiv-sugg-actions">
-            <div class="motiv-sugg-theme" x-show="s.typ === 'motiv' && themes.length"
-                 x-data="combobox($app.t('motiv.motif.themeOptional'), $app.t('motiv.noTheme'))"
-                 x-modelable="value" x-model="s.themeIdDraft" x-effect="options = themeOptions()"></div>
-            <button type="button" class="btn-compact" @click="adoptSuggestion(s)" x-text="$app.t('motiv.brainstorm.adopt')"></button>
-            <button type="button" class="icon-btn icon-btn--ghost" @click="dismissSuggestion(s)"
-                    :data-tip="$app.t('motiv.brainstorm.dismiss')" :aria-label="$app.t('motiv.brainstorm.dismiss')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
-            </button>
-          </div>
-        </div>
-      </template>
-    </div>
-  </div>
-
   <!-- Anlege-Leiste -->
   <div class="motiv-toolbar">
     <div class="motiv-toolbar-group">
@@ -137,8 +103,8 @@
   </div>
 
   <!-- KI-Brainstorm-Lauf-Historie: persistierte Läufe pro Buch, unter Graph +
-       Panel. Klick lädt die Vorschläge zurück ins Panel oben (selectedBrainstormRunId)
-       und scrollt dorthin. Wie der Plot-/Werkstatt-Run-Verlauf. -->
+       Panel. Klick lädt die Vorschläge in das Panel direkt darunter
+       (selectedBrainstormRunId). Wie der Plot-/Werkstatt-Run-Verlauf. -->
   <div class="history-bar" x-show="brainstormRuns.length > 0" x-cloak>
     <div class="history-heading" x-text="$app.t('motiv.brainstorm.runs', { count: brainstormRuns.length })"></div>
     <template x-for="r in brainstormRuns" :key="r.id">
@@ -154,6 +120,42 @@
                 :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
       </div>
     </template>
+  </div>
+
+  <!-- KI-Vorschläge (Brainstorm): unten beim Verlauf, damit sie den Graphen nicht
+       überdecken. Frischer Lauf wie wieder-geöffneter Lauf füllen dasselbe Panel;
+       übernehmen legt Thema/Motiv an, nie im Text. -->
+  <div class="motiv-suggestions" x-show="suggestions.length" x-cloak>
+    <div class="motiv-suggestions-head">
+      <h4 class="motiv-panel-heading" x-text="$app.t('motiv.brainstorm.title')"></h4>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="_clearSuggestionPanel()"
+              :data-tip="$app.t('motiv.brainstorm.closePanel')" :aria-label="$app.t('motiv.brainstorm.closePanel')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+      </button>
+    </div>
+    <div class="motiv-suggestion-list">
+      <template x-for="(s, i) in suggestions" :key="i">
+        <div class="motiv-suggestion">
+          <div class="motiv-sugg-body">
+            <span class="badge-source" x-text="$app.t('motiv.brainstorm.typ.' + s.typ)"></span>
+            <span class="motiv-sugg-name" x-text="s.name"></span>
+            <span class="motiv-sugg-desc" x-text="s.beschreibung" x-show="s.beschreibung"></span>
+            <span class="motiv-sugg-triggers" x-show="s.trigger_terms && s.trigger_terms.length"
+                  x-text="(s.trigger_terms || []).join(', ')"></span>
+          </div>
+          <div class="motiv-sugg-actions">
+            <div class="motiv-sugg-theme" x-show="s.typ === 'motiv' && themes.length"
+                 x-data="combobox($app.t('motiv.motif.themeOptional'), $app.t('motiv.noTheme'))"
+                 x-modelable="value" x-model="s.themeIdDraft" x-effect="options = themeOptions()"></div>
+            <button type="button" class="btn-compact" @click="adoptSuggestion(s)" x-text="$app.t('motiv.brainstorm.adopt')"></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="dismissSuggestion(s)"
+                    :data-tip="$app.t('motiv.brainstorm.dismiss')" :aria-label="$app.t('motiv.brainstorm.dismiss')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
   </div>
 
   <!-- @include motiv-graph-menu -->
