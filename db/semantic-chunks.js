@@ -57,8 +57,11 @@ function remove(kind, entityId) {
   _delEntityAll.run(kind, entityId);
 }
 
+// ORDER BY macht die MAX_CHUNKS-Kappung im Redundanz-Radar deterministisch: ohne
+// stabile Reihenfolge schnitte .slice() in SQLite-rowid-Ordnung, und welche Passagen
+// bei einem Buch über dem Cap fehlen, wäre zwischen Läufen nicht reproduzierbar.
 const _selBookKinds = db.prepare(
-  'SELECT kind, entity_id, chunk_ix, text, vector FROM semantic_chunks WHERE book_id = ? AND model = ?'
+  'SELECT kind, entity_id, chunk_ix, text, vector FROM semantic_chunks WHERE book_id = ? AND model = ? ORDER BY entity_id, chunk_ix'
 );
 
 // Brute-Force-Ähnlichkeitssuche innerhalb eines Buches gegen queryVec. Bei
