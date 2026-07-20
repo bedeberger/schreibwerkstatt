@@ -26,6 +26,7 @@ const { blogSyncRouter } = require('./jobs/blog-sync');
 const { hubspotSyncRouter } = require('./jobs/hubspot-sync');
 const { embedIndexRouter } = require('./jobs/embed-index');
 const { motifScanRouter } = require('./jobs/motif-scan');
+const { motifBrainstormRouter } = require('./jobs/motif-brainstorm');
 const { redundancyRouter } = require('./jobs/redundancy');
 
 // Budget-Enforcement greift VOR allen Sub-Routern, sonst lassen sich
@@ -61,6 +62,7 @@ router.use('/', blogSyncRouter);
 router.use('/', hubspotSyncRouter);
 router.use('/', embedIndexRouter);
 router.use('/', motifScanRouter);
+router.use('/', motifBrainstormRouter);
 router.use('/', redundancyRouter);
 router.use('/', sharedRouter);
 

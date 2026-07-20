@@ -26,6 +26,10 @@ Ein Motiv gilt als **Geist** („geplant, aber fehlt"), wenn es Soll-Verknüpfun
 
 Dedup pro (kind, entity): der semantische Treffer gewinnt (höhere Vertrauensstufe), ein Ort zählt einmal (Ist-Dichte). Fehlt das Embedding-Backend, läuft der Scan rein wörtlich; Motive ohne Trigger bekommen dann 0 Fundstellen (alte werden trotzdem geräumt). Nacht-Cron (`scanAllBooks`, [server.js](../server.js)) zieht den Ist-Index nach dem `embed-index`-Reindex nach — pro (Buch, User) mit katalogisierten Motiven.
 
+## KI-Brainstorm (Job `motif-brainstorm`)
+
+[routes/jobs/motif-brainstorm.js](../routes/jobs/motif-brainstorm.js) — **einziger `callAI`-Pfad** der Werkstatt. Liest den Buchtext (aufs `SINGLE_PASS_LIMIT` gekürzt) + den bestehenden Katalog und schlägt 4–8 wiederkehrende Motive/Themen vor, die noch **nicht** katalogisiert sind (`typ` thema/motiv, `name`, `beschreibung`, `trigger_terms`). Prompt/Schema in [public/js/prompts/motiv.js](../public/js/prompts/motiv.js) (Facade-Re-Export in `prompts.js`; nicht cache-gatet). Vorschläge sind **transient** (kein DB-Persist) — das Frontend zeigt sie als Karten, der Autor übernimmt einzeln (→ `POST /motifs` bzw. `/motifs/themes`) oder verwirft. Dubletten zum Katalog werden serverseitig gefiltert. Schreibt **nie** in den Buchtext.
+
 ## Frontend — Konstellations-Graph
 
 - **Karte** `motivCard` ([public/js/cards/motiv-card.js](../public/js/cards/motiv-card.js)), Partial [public/partials/motiv.html](../public/partials/motiv.html), Fachmethoden-Facade [public/js/book/motiv.js](../public/js/book/motiv.js) → Submodule `motiv/{lifecycle,crud,graph,scan}.js`.

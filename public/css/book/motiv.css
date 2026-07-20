@@ -23,6 +23,7 @@
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
+  font-family: inherit;
   font-size: var(--font-size-sm);
 }
 .motiv-add-input:focus { border-color: var(--card-accent); outline: none; }
@@ -47,15 +48,35 @@
 
 .motiv-progress { padding: var(--space-2xs) 0 var(--space-xs); }
 
+/* ── KI-Vorschläge (Brainstorm) ───────────────────────────────────────── */
+.motiv-suggestions { padding: var(--space-xs) 0; }
+.motiv-suggestion-list { display: flex; flex-direction: column; gap: var(--space-2xs); }
+.motiv-suggestion {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--card-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-card-bg);
+}
+.motiv-sugg-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.motiv-sugg-name { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text); }
+.motiv-sugg-desc { font-size: var(--font-size-xs); color: var(--color-muted); }
+.motiv-sugg-triggers { font-size: var(--font-size-micro); color: var(--color-muted); font-style: italic; }
+.motiv-sugg-actions { display: flex; align-items: center; gap: var(--space-2xs); flex-shrink: 0; }
+
 /* ── Zwei-Spalten-Layout ──────────────────────────────────────────────── */
 .motiv-layout {
   display: grid;
   grid-template-columns: 1fr 20rem;
   gap: var(--space-md);
-  align-items: stretch;
+  align-items: start;
 }
 .motiv-graph-container {
-  min-height: 60vh;
+  height: clamp(320px, 46vh, 560px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);
@@ -94,6 +115,7 @@
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
+  font-family: inherit;
   font-size: var(--font-size-sm);
   font-weight: 600;
 }
@@ -112,6 +134,7 @@
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
+  font-family: inherit;
   font-size: var(--font-size-sm);
 }
 .motiv-inline-input:focus,
@@ -171,7 +194,7 @@
 /* ── Mobile: gestapelt ────────────────────────────────────────────────── */
 @media (max-width: 960px) {
   .motiv-layout { grid-template-columns: 1fr; }
-  .motiv-graph-container { min-height: 50vh; }
+  .motiv-graph-container { height: clamp(300px, 60vh, 480px); }
   .motiv-panel { max-height: none; }
   .motiv-layer-toggles { margin-left: 0; }
 }

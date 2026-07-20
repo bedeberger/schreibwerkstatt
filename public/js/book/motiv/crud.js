@@ -54,6 +54,34 @@ export const crudMethods = {
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },
+  // Motiv direkt anlegen (aus dem Graph-Kontextmenü) — mit Default-Namen, optional
+  // einem Thema zugeordnet, danach im Panel selektiert + Namensfeld fokussiert zum
+  // sofortigen Umbenennen.
+  async createMotifAt(themeId) {
+    this.closeGraphMenu();
+    this.busy = true;
+    try {
+      const body = { book_id: this._bookId(), name: window.__app.t('motiv.motif.newName') };
+      if (themeId) body.theme_id = Number(themeId);
+      const m = await _json('/motifs', 'POST', body);
+      await this.loadBoard();
+      this.selectMotif(m.id);
+      this.$nextTick(() => this.$root?.querySelector('.motiv-name-input')?.focus());
+    } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+    finally { this.busy = false; }
+  },
+  // Thema direkt anlegen (aus dem Graph-Kontextmenü) — mit Default-Namen; umbenannt
+  // wird inline in der Themen-Liste des Panels.
+  async createThemeQuick() {
+    this.closeGraphMenu();
+    this.busy = true;
+    try {
+      await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name: window.__app.t('motiv.theme.newName') });
+      await this.loadBoard();
+    } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+    finally { this.busy = false; }
+  },
+
   // Feld-Patch eines Motivs (name/beschreibung/theme_id/trigger_terms).
   async saveMotifField(motif, patch) {
     try { await _json(`/motifs/${motif.id}`, 'PATCH', patch); await this.loadBoard(); }

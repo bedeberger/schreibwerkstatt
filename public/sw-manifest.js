@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "b8a567875df07d52";
+self.__SHELL_BUILD = "5f305e7a63b327f9";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-backup.css",
   "/css/admin/admin-home.css",
@@ -208,6 +208,7 @@ self.__SHELL_MANIFEST = [
   "/js/book/kontinuitaet.js",
   "/js/book/lektorat-time.js",
   "/js/book/motiv.js",
+  "/js/book/motiv/brainstorm.js",
   "/js/book/motiv/crud.js",
   "/js/book/motiv/graph.js",
   "/js/book/motiv/lifecycle.js",
@@ -464,6 +465,7 @@ self.__SHELL_MANIFEST = [
   "/js/prompts/komplett/schema-strings.js",
   "/js/prompts/komplett/schemas.js",
   "/js/prompts/lektorat.js",
+  "/js/prompts/motiv.js",
   "/js/prompts/plot.js",
   "/js/prompts/recherche.js",
   "/js/prompts/review.js",
@@ -607,6 +609,8 @@ self.__SHELL_MANIFEST = [
   "/partials/kapitelreview.html",
   "/partials/komplett-status.html",
   "/partials/kontinuitaet.html",
+  "/partials/motiv-graph-menu.html",
+  "/partials/motiv-panel.html",
   "/partials/motiv.html",
   "/partials/my-stats-book-goals.html",
   "/partials/my-stats-insights.html",

@@ -6,10 +6,12 @@ import { lifecycleMethods } from './motiv/lifecycle.js';
 import { crudMethods } from './motiv/crud.js';
 import { graphMethods } from './motiv/graph.js';
 import { scanMethods } from './motiv/scan.js';
+import { brainstormMethods } from './motiv/brainstorm.js';
 
 export const motivMethods = {
   ...lifecycleMethods,
   ...crudMethods,
   ...graphMethods,
   ...scanMethods,
+  ...brainstormMethods,
 };

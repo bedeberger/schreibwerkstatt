@@ -237,6 +237,12 @@ export {
 } from './prompts/plot.js';
 
 export {
+  buildMotivSystemPrompt,
+  buildMotivBrainstormPrompt,
+  SCHEMA_MOTIV_BRAINSTORM,
+} from './prompts/motiv.js';
+
+export {
   buildDateDetectPrompt,
   SCHEMA_DATE_DETECT,
 } from './prompts/import.js';

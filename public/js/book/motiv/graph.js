@@ -64,12 +64,13 @@ export const graphMethods = {
     const nodes = [];
     const edges = [];
 
-    // Themen-Anker.
+    // Themen-Anker. shape:'circle' rendert das Label INNERHALB der farbigen
+    // Blase (wächst mit dem Text) — dafür ist die weisse Schrift gedacht.
     for (const t of this.themes) {
       nodes.push({
-        id: `t${t.id}`, label: t.name, shape: 'dot', size: 24,
+        id: `t${t.id}`, label: t.name, shape: 'circle', margin: 10, widthConstraint: { maximum: 140 },
         color: { background: _themeColor(t.id, this.themes), border: _themeColor(t.id, this.themes) },
-        font: { color: '#fff', size: 15, strokeWidth: 3, strokeColor: 'rgba(0,0,0,.45)' },
+        font: { color: '#fff', size: 14 },
       });
     }
 
@@ -140,7 +141,15 @@ export const graphMethods = {
 
     this._motivNetwork.on('click', (params) => {
       const nid = params.nodes?.[0];
+      this.closeGraphMenu();
       if (nid && /^m\d+$/.test(nid)) this.selectMotif(Number(nid.slice(1)));
+    });
+    // Rechtsklick auf einen Knoten (oder die leere Fläche) öffnet das Kontextmenü —
+    // Thema-Knoten → Motiv anlegen, Motiv-Knoten → bearbeiten/anlegen/löschen.
+    this._motivNetwork.on('oncontext', (params) => {
+      params.event.preventDefault();
+      const nid = this._motivNetwork?.getNodeAt(params.pointer.DOM);
+      this.openGraphMenu(params.event, nid);
     });
     // Nach der Stabilisierung Physik einfrieren (ruhiges Bild, weiter zieh-/zoombar).
     this._motivNetwork.once('stabilizationIterationsDone', () => {
@@ -169,5 +178,63 @@ export const graphMethods = {
 
   fitGraph() {
     this._motivNetwork?.fit({ animation: { duration: 400 } });
+  },
+
+  // ── Graph-Kontextmenü (Rechtsklick auf Knoten / leere Fläche) ────────────
+  // Cursor-verankert: an der Klickposition öffnen, nur an den Viewport-Rand
+  // clampen (kein Flip nötig, siehe Harte Regel „Flip-up-Popover").
+  openGraphMenu(ev, nodeId) {
+    this.graphMenuNodeId = nodeId || null;
+    this.graphMenuPos = this._computeGraphMenuPos(ev.clientX, ev.clientY, 220, 180);
+    this.graphMenuOpen = true;
+    this._attachGraphMenuListeners();
+    this.$nextTick(() => {
+      const el = this.$refs.graphMenu;
+      if (!el) return;
+      this.graphMenuPos = this._computeGraphMenuPos(ev.clientX, ev.clientY, el.offsetWidth, el.offsetHeight);
+    });
+  },
+
+  _computeGraphMenuPos(x, y, pw, ph) {
+    const left = Math.max(8, Math.min(window.innerWidth - pw - 8, x));
+    const top = Math.max(8, Math.min(window.innerHeight - ph - 8, y));
+    return { top, left };
+  },
+
+  closeGraphMenu() {
+    this.graphMenuOpen = false;
+    this.graphMenuNodeId = null;
+    this._detachGraphMenuListeners();
+  },
+
+  _attachGraphMenuListeners() {
+    if (this._graphMenuCloseHandler) return;
+    this._graphMenuCloseHandler = () => this.closeGraphMenu();
+    window.addEventListener('scroll', this._graphMenuCloseHandler, true);
+    window.addEventListener('resize', this._graphMenuCloseHandler);
+  },
+
+  _detachGraphMenuListeners() {
+    if (!this._graphMenuCloseHandler) return;
+    window.removeEventListener('scroll', this._graphMenuCloseHandler, true);
+    window.removeEventListener('resize', this._graphMenuCloseHandler);
+    this._graphMenuCloseHandler = null;
+  },
+
+  // Knoten-Typ für den offenen Menü-Kontext: 'theme' | 'motif' | 'canvas'.
+  graphMenuKind() {
+    const id = this.graphMenuNodeId;
+    if (!id) return 'canvas';
+    if (/^t\d+$/.test(id)) return 'theme';
+    if (/^m\d+$/.test(id)) return 'motif';
+    return 'other';
+  },
+  graphMenuTheme() {
+    const id = this.graphMenuNodeId;
+    return (id && /^t\d+$/.test(id)) ? (this.themes.find(t => t.id === Number(id.slice(1))) || null) : null;
+  },
+  graphMenuMotif() {
+    const id = this.graphMenuNodeId;
+    return (id && /^m\d+$/.test(id)) ? this.motifById(Number(id.slice(1))) : null;
   },
 };

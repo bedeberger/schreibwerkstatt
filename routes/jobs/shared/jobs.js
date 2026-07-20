@@ -281,6 +281,7 @@ const JOB_TYPE_LABELS = {
   'docx-export':           'job.label.docxExport',
   'embed-index':           'job.label.embedIndex',
   'motif-scan':            'job.label.motivScan',
+  'motif-brainstorm':      'job.label.motivBrainstorm',
   'erzaehlprofil':         'job.label.erzaehlprofil',
   'faktencheck':           'job.label.faktencheck',
   'redundancy':            'job.label.redundancy',

@@ -1,0 +1,66 @@
+<!-- Graph-Kontextmenü (Fragment-Include aus motiv.html) — ein einzelnes, nach
+     <body> teleportiertes .context-menu (JS-positioniert in openGraphMenu). Der
+     Graph sitzt in einem eigenen Canvas-Container; cursor-verankert an die
+     Rechtsklick-Position. Läuft im Scope der motivCard (Include vor Alpine-Init). -->
+<template x-teleport="body">
+  <div class="context-menu" x-ref="graphMenu" x-show="graphMenuOpen" x-cloak
+       :style="`top:${graphMenuPos.top}px;left:${graphMenuPos.left}px`"
+       @click.outside="closeGraphMenu()" @keydown.escape.window="closeGraphMenu()" role="menu">
+    <!-- Thema-Knoten -->
+    <template x-if="graphMenuKind() === 'theme' && graphMenuTheme()">
+      <div>
+        <div class="context-menu-header" x-text="graphMenuTheme().name"></div>
+        <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                @click.stop="createMotifAt(graphMenuTheme().id)">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+          <span x-text="$app.t('motiv.graph.menu.addMotif')"></span>
+        </button>
+        <div class="context-menu-sep" role="separator"></div>
+        <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger"
+                @click.stop="deleteTheme(graphMenuTheme()); closeGraphMenu()">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+          <span x-text="$app.t('motiv.graph.menu.deleteTheme')"></span>
+        </button>
+      </div>
+    </template>
+
+    <!-- Motiv-Knoten -->
+    <template x-if="graphMenuKind() === 'motif' && graphMenuMotif()">
+      <div>
+        <div class="context-menu-header" x-text="graphMenuMotif().name"></div>
+        <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                @click.stop="selectMotif(graphMenuMotif().id); closeGraphMenu()">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+          <span x-text="$app.t('motiv.graph.menu.editMotif')"></span>
+        </button>
+        <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                @click.stop="createMotifAt(graphMenuMotif().theme_id || null)">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+          <span x-text="$app.t('motiv.graph.menu.addMotif')"></span>
+        </button>
+        <div class="context-menu-sep" role="separator"></div>
+        <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger"
+                @click.stop="deleteMotif(graphMenuMotif()); closeGraphMenu()">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+          <span x-text="$app.t('motiv.graph.menu.deleteMotif')"></span>
+        </button>
+      </div>
+    </template>
+
+    <!-- Leere Fläche -->
+    <template x-if="graphMenuKind() === 'canvas'">
+      <div>
+        <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                @click.stop="createMotifAt(null)">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+          <span x-text="$app.t('motiv.graph.menu.addMotif')"></span>
+        </button>
+        <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                @click.stop="createThemeQuick()">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+          <span x-text="$app.t('motiv.graph.menu.addTheme')"></span>
+        </button>
+      </div>
+    </template>
+  </div>
+</template>

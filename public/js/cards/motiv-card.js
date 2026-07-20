@@ -26,6 +26,10 @@ export function registerMotivCard() {
     layerFigures: false,
     layerBeats: false,
     layerChapters: false,
+    // Graph-Kontextmenü (Rechtsklick)
+    graphMenuOpen: false,
+    graphMenuNodeId: null,
+    graphMenuPos: { top: 0, left: 0 },
     // Eingabe-Drafts
     newThemeName: '',
     newMotifName: '',
@@ -41,6 +45,10 @@ export function registerMotivCard() {
     scanning: false,
     scanProgress: 0,
     motivScanJobId: null,
+    // Brainstorm-Job (KI-Vorschläge)
+    brainstorming: false,
+    motivBrainstormJobId: null,
+    suggestions: [],
     // interne (nicht-reaktive) Felder
     _beatsLoaded: false,
     _memos: {},
@@ -49,13 +57,15 @@ export function registerMotivCard() {
     _motivEdges: null,
     _motivHash: '',
     _scanPollTimer: null,
+    _brainstormPollTimer: null,
+    _graphMenuCloseHandler: null,
     _lifecycle: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'motiv',
         showFlag: 'showMotivCard',
-        timerKeys: ['_scanPollTimer'],
+        timerKeys: ['_scanPollTimer', '_brainstormPollTimer'],
         onShow: () => this.loadBoard(),
         onBookChanged: () => {
           this.resetMotiv();
@@ -67,6 +77,7 @@ export function registerMotivCard() {
     },
 
     destroy() {
+      this._detachGraphMenuListeners();
       this._destroyGraph();
       this._lifecycle?.destroy();
     },
