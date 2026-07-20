@@ -833,13 +833,15 @@ function beatOccurrenceMap(bookId, userEmail, opts = {}) {
   return map;
 }
 
-// Stale-Heuristik fürs „Verankerung aktualisieren"-Angebot: gibt es Beats, die
-// nach dem jüngsten Occurrence-Lauf geändert wurden (oder nie verankert)? Billige
-// updated_at-Heuristik analog zur Motiv-Werkstatt (semanticChunks.indexStatus).
+// Stale-Heuristik fürs „Verankerung aktualisieren"-Angebot: gibt es `im_buch`-Beats,
+// die nach dem jüngsten Occurrence-Lauf geändert wurden (oder nie verankert)? Nur
+// `im_buch` zählt — geplante/verworfene Beats werden nicht verankert, dürfen also
+// kein Neulauf-Angebot auslösen. Billige updated_at-Heuristik analog zur Motiv-
+// Werkstatt (semanticChunks.indexStatus).
 const _stmtBeatAnchorStale = db.prepare(`
   SELECT
-    (SELECT COUNT(*) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0) AS beats,
-    (SELECT MAX(updated_at) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0) AS beat_max,
+    (SELECT COUNT(*) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0 AND status = 'im_buch') AS beats,
+    (SELECT MAX(updated_at) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0 AND status = 'im_buch') AS beat_max,
     (SELECT MAX(o.created_at) FROM plot_beat_occurrences o
        JOIN plot_beats b ON b.id = o.beat_id
       WHERE b.book_id = ? AND b.user_email = ?) AS occ_max

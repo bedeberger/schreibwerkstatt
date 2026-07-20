@@ -16,7 +16,7 @@ const BEATS = [
 ];
 const ANCHOR = {
   10: { count: 2, top: [{ page_name: 'S. 12', snippet: 'Er schnürte sein Bündel' }] },
-  12: { count: 1, top: [{ page_name: 'S. 40' }] },
+  12: { count: 1, top: [{ page_name: 'S. 40' }] }, // geplant → nur „im Buch"-Beats werden verankert, kein Marker
   14: { count: 3, top: [{ page_name: 'S. 5' }] }, // verworfen → darf NICHT als Beleg erscheinen
 };
 
@@ -36,9 +36,9 @@ test('im_buch OHNE Textbeleg → Drift-Marker', () => {
   assert.match(line(p, 'Verrat'), /KEIN Textbeleg/);
 });
 
-test('geplant + Textbeleg → „bereits Textstellen vorhanden"', () => {
+test('geplant bekommt nie einen Beleg-Marker (nur „im Buch"-Beats werden verankert)', () => {
   const p = buildPlotConsistencyPrompt(ACTS, BEATS, [], [], [], '', [], [], [], [], [], [], ANCHOR, {});
-  assert.match(line(p, 'Finale'), /bereits Textstellen vorhanden: S\. 40/);
+  assert.doesNotMatch(line(p, 'Finale'), /⟨/);
 });
 
 test('geplant ohne Beleg → kein Marker', () => {
