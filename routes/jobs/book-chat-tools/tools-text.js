@@ -34,6 +34,11 @@ function _buildSearchRegex(pattern, regex) {
 // Buch-weite Suchen mit eindeutigen Begriffen.
 const SEARCH_FTS_CANDIDATE_LIMIT = 200;
 
+// Pro Kandidatenseite an den Reranker gegebener Volltext-Ausschnitt. Deckelt die
+// Payload — der Cross-Encoder braucht keinen ganzen Kapitelroman, um die Relevanz
+// zu einem Suchmuster einzuschätzen.
+const RERANK_DOC_MAXCHARS = 2000;
+
 async function tool_search_passages(input, ctx) {
   const pattern = (input.pattern || '').trim();
   if (!pattern) return { error: 'pattern fehlt' };
@@ -91,6 +96,19 @@ async function tool_search_passages(input, ctx) {
   if (candidatePageIds) {
     const rank = new Map(candidatePageIds.map((id, i) => [id, i]));
     orderedPages = pages.slice().sort((a, b) => (rank.get(a.page_id) ?? Infinity) - (rank.get(b.page_id) ?? Infinity));
+
+    // Reranking (falls aktiv): den bm25-Kandidatenpool per Cross-Encoder gegen
+    // das Suchmuster nach Bedeutung umsortieren, bevor gescannt wird. Bei
+    // natürlichsprachlichen Mustern landen so die relevantesten Seiten zuerst im
+    // Scan (wichtig wegen max_results-/Deadline-Cut). Die Literal-/Regex-Treffer
+    // bleiben unangetastet — es wird nur die Scan-Reihenfolge geschärft, nichts
+    // verworfen. Non-fatal: Endpunkt aus/nicht erreichbar → bm25-Reihenfolge.
+    const order = await semanticRetrieval.rerankOrder(
+      pattern,
+      orderedPages.map(p => htmlToPlainText(p.body_html || '').slice(0, RERANK_DOC_MAXCHARS)),
+      { signal: ctx.jobSignal },
+    );
+    if (order) orderedPages = order.map(i => orderedPages[i]);
   }
 
   const results = [];

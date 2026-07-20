@@ -36,9 +36,10 @@
         </template>
       </span>
       <!-- Verankerungs-Badge (Soll status vs. Ist-Fundstellen aus der semantischen
-           Suche). 'confirmed'/'found' zeigen die Fundstellen-Zahl und öffnen bei
-           Klick das Fundstellen-Popover (Liste → Sprung zur Textstelle); 'drift'
-           (im_buch ohne Fund) warnt (nicht navigierbar). 'none' rendert nichts. -->
+           Suche). Nur „im Buch"-Beats werden verankert: 'confirmed' zeigt die
+           Fundstellen-Zahl und öffnet bei Klick das Fundstellen-Popover (Liste →
+           Sprung zur Textstelle); 'drift' (im_buch ohne Fund) warnt (nicht
+           navigierbar). 'none' (geplant/verworfen) rendert nichts. -->
       <button type="button" class="plot-beat-anchor" :class="'plot-beat-anchor--' + beatAnchorState(beat)"
               x-show="beatAnchorState(beat) !== 'none'"
               @click.stop="beat.occ_count && openBeatOccPopover($event, beat)"

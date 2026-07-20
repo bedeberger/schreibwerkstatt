@@ -79,8 +79,16 @@ async function runBeatAnchorJob(jobId, bookId, userEmail) {
     };
 
     const useSemantic = embed.isEnabled();
-    // Verworfene Beats werden nicht verankert (aus der aktiven Planung raus).
-    const beats = plotDb.listBeatsForAnchor(bookId, userEmail).filter(b => !b.verworfen);
+    // Nur eingearbeitete Beats werden im Text verankert: geprüft wird, ob ein als
+    // „im Buch" markierter Beat tatsächlich im Manuskript auffindbar ist (Soll-Ist-
+    // Drift). Für „geplant"/verworfene Beats gibt es kein Soll „im Text", also nichts
+    // zu prüfen. Deren evtl. vorhandenen Alt-Fundstellen werden geleert, damit kein
+    // Stale-Index zurückbleibt, wenn ein Beat aus „im Buch" zurückgestuft/verworfen wird.
+    const allBeats = plotDb.listBeatsForAnchor(bookId, userEmail);
+    const beats = allBeats.filter(b => b.status === 'im_buch' && !b.verworfen);
+    for (const b of allBeats) {
+      if (b.status !== 'im_buch' || b.verworfen) plotDb.replaceBeatOccurrences(b.id, bookId, []);
+    }
     updateJob(jobId, { statusText: 'job.phase.beatAnchor', statusParams: { done: 0, total: beats.length }, progress: 5 });
 
     let totalOcc = 0;

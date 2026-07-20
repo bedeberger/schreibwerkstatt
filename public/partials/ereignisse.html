@@ -2,7 +2,7 @@
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/ereignisse-card.js.
   Fachdaten (globalZeitstrahl) leben in Alpine.store('catalog') und werden
-  über den Root-Proxy als $store.catalog.globalZeitstrahl exponiert. ereignisseFilters
+  direkt als $store.catalog.globalZeitstrahl gelesen (kein Root-Proxy). ereignisseFilters
   bleibt am Root (app-navigation schreibt darauf). Meta-State + UI-Helper
   (filteredEreignisse, ereignisseKapitelListe, ereignisseSeitenListe,
   ereignisseSubtypListe, formatEventDate, eventSpanYears) leben hier in der

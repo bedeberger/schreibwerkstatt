@@ -993,7 +993,6 @@
   "plot.anchor.running": "Anchoring beats in the manuscript…",
   "plot.anchor.state.confirmed": "{n} matches in the text",
   "plot.anchor.state.drift": "Marked as written, but not found in the text",
-  "plot.anchor.state.found": "Possibly already written – {n} matches in the text",
   "plot.anchor.popover.title": "Matches in the text ({n})",
   "plot.anchor.popover.hint": "Click to list the matches",
   "plot.anchor.popover.jump": "Jump to the passage",

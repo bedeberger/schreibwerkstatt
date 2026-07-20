@@ -16,11 +16,8 @@ test('im_buch + 0 Fundstellen → drift (als eingearbeitet markiert, aber nicht 
   assert.equal(classifyBeatAnchor('im_buch', undefined, 0), 'drift');
 });
 
-test('geplant + Fundstellen → found (evtl. schon geschrieben)', () => {
-  assert.equal(classifyBeatAnchor('geplant', 2, 0), 'found');
-});
-
-test('geplant + 0 Fundstellen → none (kein Badge, das ist der Normalfall)', () => {
+test('geplant wird nie verankert → nie ein Badge, egal ob Fundstellen (Stale) vorliegen', () => {
+  assert.equal(classifyBeatAnchor('geplant', 2, 0), 'none');
   assert.equal(classifyBeatAnchor('geplant', 0, 0), 'none');
   assert.equal(classifyBeatAnchor('geplant', null, 0), 'none');
 });
@@ -28,11 +25,11 @@ test('geplant + 0 Fundstellen → none (kein Badge, das ist der Normalfall)', ()
 test('verworfene Beats werden nie klassifiziert (kein Badge), unabhängig von Status/Fund', () => {
   assert.equal(classifyBeatAnchor('im_buch', 5, 1), 'none');   // sonst confirmed
   assert.equal(classifyBeatAnchor('im_buch', 0, 1), 'none');   // sonst drift
-  assert.equal(classifyBeatAnchor('geplant', 3, 1), 'none');   // sonst found
+  assert.equal(classifyBeatAnchor('geplant', 3, 1), 'none');
 });
 
-test('unbekannter/leerer Status wird wie geplant behandelt (kein falsches Drift)', () => {
+test('unbekannter/leerer Status trägt nie ein Badge (nur im_buch wird verankert)', () => {
   assert.equal(classifyBeatAnchor('', 0, 0), 'none');
-  assert.equal(classifyBeatAnchor(undefined, 4, 0), 'found');
+  assert.equal(classifyBeatAnchor(undefined, 4, 0), 'none');
   assert.equal(classifyBeatAnchor(null, 0, 0), 'none');
 });

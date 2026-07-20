@@ -265,11 +265,6 @@
     border-color: color-mix(in oklch, var(--color-stark) 40%, transparent);
     background: color-mix(in oklch, var(--color-stark) 12%, transparent);
   }
-  .plot-beat-anchor--found {
-    color: var(--color-mittel);
-    border-color: color-mix(in oklch, var(--color-mittel) 40%, transparent);
-    background: color-mix(in oklch, var(--color-mittel) 12%, transparent);
-  }
   .plot-beat-anchor--drift {
     color: var(--color-schwach);
     border-color: color-mix(in oklch, var(--color-schwach) 45%, transparent);

@@ -154,6 +154,24 @@ function getEntityVector(kind, entityId, model) {
   return acc;
 }
 
+// Repräsentativer Text einer indizierten Entität = ihre Chunk-Texte in chunk_ix-
+// Reihenfolge verkettet (unter model), auf maxChars begrenzt. Query-String für das
+// Reranking der „ähnliche Stellen zu dieser Entität"-Suche — der Cross-Encoder
+// bewertet (Text, Text)-Paare, der gemittelte Vektor aus getEntityVector taugt nur
+// fürs Retrieval. '' wenn nicht indiziert.
+function getEntityText(kind, entityId, model, maxChars = 2000) {
+  const rows = db.prepare(
+    'SELECT text FROM semantic_chunks WHERE kind = ? AND entity_id = ? AND model = ? ORDER BY chunk_ix'
+  ).all(kind, entityId, model);
+  let out = '';
+  for (const r of rows) {
+    if (!r.text) continue;
+    out += (out ? '\n' : '') + r.text;
+    if (out.length >= maxChars) break;
+  }
+  return out.slice(0, maxChars);
+}
+
 // Index-Status pro Buch (für die Karte/Admin): Chunks + distinkte Entitäten je
 // kind unter dem aktiven Modell, plus ob unter Fremdmodellen Chunks liegen
 // (→ „Reindex nötig nach Modellwechsel").
@@ -214,7 +232,7 @@ function clearBook(bookId, model = null) {
 }
 
 module.exports = {
-  getEntityChunks, replaceEntity, remove, searchSimilar, getEntityVector,
+  getEntityChunks, replaceEntity, remove, searchSimilar, getEntityVector, getEntityText,
   bookStats, clearBook, pruneMissing, indexStatus,
   loadChunksForPairing, loadFigureVectorsForPairing,
 };

@@ -23,16 +23,15 @@ export const _intensityBottomPct = (i) => 10 + ((i - 1) / 4) * 80;
 export const normTitle = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 // Beat-Verankerung: Soll (status) gegen Ist (Fundstellen im Text) klassifizieren.
-// Reine Funktion (kein Alpine-Kontext) → unit-testbar. Werte:
+// Reine Funktion (kein Alpine-Kontext) → unit-testbar. Nur „im Buch"-Beats werden
+// überhaupt verankert (siehe routes/jobs/beat-anchor.js) — geplante/verworfene
+// haben kein Soll „im Text" und tragen darum nie ein Badge. Werte:
 //   'confirmed'  im_buch + Fundstellen  → passt (grün)
 //   'drift'      im_buch + 0 Fundstellen → Warnung: als eingearbeitet markiert,
 //                aber im Text nicht auffindbar (rot)
-//   'found'      geplant + Fundstellen  → Hinweis: evtl. schon geschrieben (amber)
-//   'none'       geplant + 0 / verworfen → kein Badge
+//   'none'       geplant / verworfen    → kein Badge
 // occCount = plot_beat_occurrences-Zahl des Beats (0 wenn nie/nicht verankert).
 export function classifyBeatAnchor(status, occCount, verworfen) {
-  if (verworfen) return 'none';                       // verworfene Beats werden nicht verankert
-  const has = (occCount || 0) > 0;
-  if (status === 'im_buch') return has ? 'confirmed' : 'drift';
-  return has ? 'found' : 'none';                      // status 'geplant' (oder unbekannt)
+  if (verworfen || status !== 'im_buch') return 'none';
+  return (occCount || 0) > 0 ? 'confirmed' : 'drift';
 }

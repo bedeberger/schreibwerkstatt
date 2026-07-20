@@ -993,7 +993,6 @@
   "plot.anchor.running": "Beats werden im Buchtext verankert…",
   "plot.anchor.state.confirmed": "{n} Fundstellen im Text",
   "plot.anchor.state.drift": "Als eingearbeitet markiert, aber im Text nicht gefunden",
-  "plot.anchor.state.found": "Evtl. schon geschrieben – {n} Fundstellen im Text",
   "plot.anchor.popover.title": "Fundstellen im Text ({n})",
   "plot.anchor.popover.hint": "Klick zeigt die Fundstellen",
   "plot.anchor.popover.jump": "Zur Textstelle springen",

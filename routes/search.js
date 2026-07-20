@@ -127,7 +127,6 @@ router.get('/semantic', async (req, res) => {
   try { requireBookAccess(req, bookId, 'viewer'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
 
-  const { model } = embed.getConfig();
   const rawKinds = _parseKinds(req.query.kind).filter(k => SEMANTIC_KINDS.includes(k));
   const kinds = rawKinds.length ? rawKinds : SEMANTIC_KINDS;
   const topK = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 50);
@@ -136,24 +135,20 @@ router.get('/semantic', async (req, res) => {
   const likeId = req.query.like_id ? toIntId(req.query.like_id) : null;
 
   try {
-    let raw;
     if (likeKind && likeId && SEMANTIC_KINDS.includes(likeKind)) {
-      // „Ähnliche Stellen zu Entität": kein Query-Text → weder Hybrid noch
-      // Rerank (beide brauchen eine Anfrage-Zeichenkette). Kein Score-Floor —
-      // hier zählt Recall (der gemittelte Entitäts-Vektor rankt tendenziell
-      // niedriger als eine Freitext-Anfrage).
-      const queryVec = semanticChunks.getEntityVector(likeKind, likeId, model);
-      if (!queryVec) return res.json({ hits: [], mode: 'semantic', notIndexed: true });
-      raw = semanticChunks.searchSimilar(bookId, model, queryVec, {
-        kinds, topK, excludeKind: likeKind, excludeEntityId: likeId,
-      });
-    } else {
-      const q = (req.query.q || '').toString().trim();
-      if (q.length < 2) return res.json({ hits: [], mode: 'semantic' });
-      if (q.length > 500) return res.status(400).json({ error_code: 'QUERY_TOO_LONG' });
-      // Freitext: Retrieval → Hybrid-Fusion → Reranking (siehe lib/semantic-retrieval).
-      raw = await semanticRetrieval.semanticQuery(bookId, q, { kinds, topK });
+      // „Ähnliche Stellen zu Entität": Retrieval über den gemittelten Entitäts-
+      // Vektor, danach optionales Reranking gegen den Entitäts-Text (siehe
+      // lib/semantic-retrieval#similarToEntity). Kein Hybrid — hier gibt es keinen
+      // Anfragetext für die FTS-Seite.
+      const sim = await semanticRetrieval.similarToEntity(bookId, likeKind, likeId, { kinds, topK });
+      if (sim.notIndexed) return res.json({ hits: [], mode: 'semantic', notIndexed: true });
+      return res.json({ hits: _resolveSemanticHits(sim.hits), mode: 'semantic' });
     }
+    const q = (req.query.q || '').toString().trim();
+    if (q.length < 2) return res.json({ hits: [], mode: 'semantic' });
+    if (q.length > 500) return res.status(400).json({ error_code: 'QUERY_TOO_LONG' });
+    // Freitext: Retrieval → Hybrid-Fusion → Reranking (siehe lib/semantic-retrieval).
+    const raw = await semanticRetrieval.semanticQuery(bookId, q, { kinds, topK });
     res.json({ hits: _resolveSemanticHits(raw), mode: 'semantic' });
   } catch (e) {
     logger.error(`[search] GET /search/semantic failed: ${e.message}`);

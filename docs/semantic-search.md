@@ -12,6 +12,10 @@ Der **Freitext**-Query (`?q=…`, Such-Karte + Buch-Chat-Tool `search_similar`) 
 2. **Hybrid-Fusion (`embed.hybrid`, Default an)** — die lexikalische FTS5/bm25-Rangliste ([lib/search.js](../lib/search.js)) wird per **Reciprocal Rank Fusion** ([lib/semantic-fusion.js](../lib/semantic-fusion.js), pure, `RRF_K=60`) in die semantische gemischt. RRF fusioniert über die Rang-Position (nicht über inkompatible Score-Skalen) → exakte Begriffe/Eigennamen (die reine Embeddings verlieren) kommen zurück, Paraphrasen (die FTS verliert) bleiben.
 3. **Reranking (`rerank.*`, Default aus)** — ein Cross-Encoder ([lib/rerank.js](../lib/rerank.js), self-hosted OpenAI/Jina-`/v1/rerank`, z.B. LocalAI/TEI) ordnet die Top-`rerank.top_n` Fusions-Kandidaten neu, indem er (Anfrage, Textstelle) direkt bewertet — schärfere Relevanz als Vektor-Distanz allein. `rerank.min_score` filtert danach. **Non-fatal:** fällt der Endpunkt aus, greift still die RRF-/Cosinus-Reihenfolge. Setzt aktivierte semantische Suche voraus (`isEnabled()` prüft zusätzlich `embed.isEnabled()`).
 
+**Zwei weitere Pfade nutzen denselben Reranker** (beide in [lib/semantic-retrieval.js](../lib/semantic-retrieval.js), damit `lib/rerank.js` seinen einzigen Konsumenten behält):
+- **„Ähnliche Stellen zu Entität"** (`similarToEntity`): das reine Vektor-Retrieval dieses Pfads ist am unschärfsten (gemittelter Entitäts-Vektor). Bei aktivem Reranker wird der Kandidatenpool anschliessend gegen den **Entitäts-Text** (`getEntityText`, Chunk-Texte verkettet, max. 2000 Zeichen) geschärft. Kein Hybrid (kein Anfragetext für FTS).
+- **Buch-Chat `search_passages`** (Wort-genaue FTS-Literalsuche): `rerankOrder` sortiert den bm25-Kandidatenpool per Cross-Encoder gegen das Suchmuster **nur um** (nichts wird verworfen), damit bei natürlichsprachlichen Mustern die relevantesten Seiten zuerst gescannt werden (`max_results`-/Deadline-Cut). Die Literal-/Regex-Treffer selbst bleiben unangetastet.
+
 **Instruction-Präfixe** (`embed.query_prefix`/`embed.passage_prefix`, Default leer): für asymmetrische Modelle (e5: `query: `/`passage: `). Query-seitig via [lib/embed.js](../lib/embed.js)#`embedQuery` (alle Query-Aufrufer nutzen es), Passage-seitig im Index-Job — der `passage_prefix` fliesst in den Chunk-`content_hash` → Präfixwechsel invalidiert den Delta-Cache und erzwingt Reindex. **bge-m3 braucht die Präfixe NICHT** (leer lassen).
 
 `/config` exponiert die Ableitungs-Flags `semanticSearch.hybrid`/`.rerank` für einen dezenten Hinweis in der Such-Karte (`semanticEnhancedLabel`); Host/Model/Key bleiben serverseitig. Admin-Test: `POST /admin/settings/test-embed` + `POST /admin/settings/test-rerank`.
@@ -73,7 +77,7 @@ Erstlauf kann dauern (embeddet alles); Folgeläufe embetten nur Geändertes. Feh
 [routes/search.js:118](../routes/search.js). Rolle **`viewer`**, immer buch-skopiert. Zwei Modi:
 
 - **Freitext** (`q`, 2–500 Zeichen): `embed.embedOne(q)` → Query-Vektor.
-- **„Ähnliche Stellen zu Entität"** (`like_kind`+`like_id`): `getEntityVector` mittelt die vorhandenen Chunk-Vektoren der Entität — **kein** Embedding-Call. Die Quell-Entität wird aus den Treffern ausgeschlossen.
+- **„Ähnliche Stellen zu Entität"** (`like_kind`+`like_id`): läuft über `similarToEntity`. `getEntityVector` mittelt die vorhandenen Chunk-Vektoren der Entität — **kein** Embedding-Call. Die Quell-Entität wird aus den Treffern ausgeschlossen. Bei aktivem Reranker wird der Pool danach gegen den Entitäts-Text nachgeordnet (siehe [Trefferqualität](#trefferqualität--die-drei-stufen-des-freitext-pfads)).
 
 `searchSimilar` ([db/semantic-chunks.js:70](../db/semantic-chunks.js)) scannt alle Chunks des Buches unter dem **aktiven Modell** linear (Buchgröße → Millisekunden, kein sqlite-vec nötig), nimmt pro Entität den besten Chunk, sortiert nach Score, top-K. Backend nicht erreichbar → `EMBED_UNAVAILABLE` (503) → Frontend zeigt `search.semantic.unavailable`.
 

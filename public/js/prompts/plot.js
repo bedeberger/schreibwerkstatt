@@ -27,22 +27,19 @@ const STATUS_LABEL = {
 // implizit als beteiligt (Regel-Hinweis im Prompt, hier nicht pro Beat wiederholt).
 // Textbeleg-Marker eines Beats (nur Consistency, wenn ein befüllter Verankerungs-
 // Index vorliegt): ob/wo der Beat semantisch im ECHTEN Manuskript auftaucht.
-// „im Buch" ohne Beleg = Drift-Signal; „geplant" mit Beleg = evtl. schon
-// geschrieben. Ähnlichkeit, kein Beweis — die KI urteilt am Ausschnitt.
+// Nur „im Buch"-Beats werden verankert — „im Buch" ohne Beleg = Drift-Signal.
+// Geplante/verworfene Beats tragen keinen Marker (sie werden nicht durchsucht).
+// Ähnlichkeit, kein Beweis — die KI urteilt am Ausschnitt.
 function _beatAnchorMarker(beat, anchorMap) {
-  if (!anchorMap || beat.verworfen) return '';
+  if (!anchorMap || beat.verworfen || beat.status !== 'im_buch') return '';
   const a = anchorMap[beat.id];
   const has = a && a.count > 0;
+  if (!has) return ' ⟨KEIN Textbeleg im Manuskript gefunden⟩';
   const wo = (n) => (a.top || []).slice(0, n)
     .map(t => t.page_name || (t.scene_titel ? `Szene „${t.scene_titel}"` : null))
     .filter(Boolean).join(', ');
-  if (beat.status === 'im_buch') {
-    if (!has) return ' ⟨KEIN Textbeleg im Manuskript gefunden⟩';
-    const snip = a.top[0] && a.top[0].snippet ? `: „${_trunc(a.top[0].snippet, 120)}"` : '';
-    return ` ⟨Textbeleg ${wo(2)}${snip}⟩`;
-  }
-  // status 'geplant'
-  return has ? ` ⟨bereits Textstellen vorhanden: ${wo(2)}⟩` : '';
+  const snip = a.top[0] && a.top[0].snippet ? `: „${_trunc(a.top[0].snippet, 120)}"` : '';
+  return ` ⟨Textbeleg ${wo(2)}${snip}⟩`;
 }
 
 function _boardOutline(acts, beats, threadInfo = null, anchorMap = null) {
@@ -342,10 +339,9 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   // wenn ein befüllter Index vorliegt (sonst hiesse „KEIN Textbeleg" bloss „nie
   // gescannt", nicht „nicht im Buch" → falsche Drift-Flut).
   const anchorSeg = anchorMap ? `
-TEXTBELEGE (semantische Suche über das ECHTE Manuskript): Hinter Beats stehen ⟨…⟩-Marker, die zeigen, ob und wo ein Beat tatsächlich im Buchtext auftaucht. Sie sind dein wichtigster Realitätsanker — genauer als der Szenen-Index:
+TEXTBELEGE (semantische Suche über das ECHTE Manuskript): Nur "im Buch"-Beats werden gegen den Text abgeglichen; hinter ihnen stehen ⟨…⟩-Marker, die zeigen, ob und wo der Beat tatsächlich im Buchtext auftaucht. Sie sind dein wichtigster Realitätsanker — genauer als der Szenen-Index:
 - "im Buch" + „KEIN Textbeleg" → starkes Drift-Signal: der Plan behauptet etwas, das die Textsuche NICHT findet. Priorisiere das und nenne den Beat samt Seite, falls bekannt.
 - "im Buch" + Textbeleg → im Text belegt; beanstande ihn NICHT als „fehlt", ausser der Beleg-Ausschnitt passt inhaltlich erkennbar nicht zum Beat.
-- "geplant" + „bereits Textstellen vorhanden" → evtl. schon geschrieben: schlage vor, den Status auf „im Buch" zu ziehen.
 Der Marker ist Ähnlichkeit, kein Beweis — urteile am Beleg-Ausschnitt, nicht blind. Nenne die belegende Seite im "problem"/"vorschlag", damit die Autorin sie anspringen kann.${anchorInfo.stale ? ' HINWEIS: Der Beleg-Index ist evtl. veraltet (Beats seit dem letzten Verankerungs-Lauf geändert) — behandle fehlende Belege bei offensichtlich frisch bearbeiteten Beats mit Vorsicht.' : ''}
 ` : '';
   // Zeitstrahl-spezifischer Prüfpunkt nur, wenn ein Figuren-Zeitstrahl vorliegt.
