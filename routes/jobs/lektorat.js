@@ -32,75 +32,7 @@ const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const { resolvePageBookId } = require('../../lib/content-ownership');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
-const { consensusFindings, mergePasses } = require('../../lib/lektorat-consolidate');
-
-// Claude-Split (Objektiv-Pass + Stil-Pass): Anzahl Objektiv-Läufe für den Konsens
-// und die Konsens-Schwelle. Admin-tunebar (analog ai.lektorat_batch_concurrency).
-// Lokale Provider splitten nicht → immer 1 Lauf, kombinierter Prompt.
-function objektivRuns() {
-  const n = parseInt(appSettings.get('ai.lektorat_objective_runs'), 10);
-  return Number.isFinite(n) && n > 0 ? n : 3;
-}
-function consensusThreshold() {
-  const n = parseInt(appSettings.get('ai.lektorat_consensus_threshold'), 10);
-  return Number.isFinite(n) && n > 0 ? n : 2;
-}
-
-// Kern-KI-Schritt des Lektorats. Cloud (Claude): Objektiv-Pass K× parallel
-// (Konsens ≥ Schwelle → maximale Präzision, filtert lauf-instabile Einzelgänger)
-// PLUS Stil-Pass 1× (kombinierter Prompt ohne objektive Typen, liefert
-// szenen/stilanalyse/fazit) — alles parallel, danach Span-Overlap-Merge zu einer
-// dublettenfreien fehler-Liste. Der identische Objektiv-Prompt macht die Läufe
-// 2..K bei Claude fast gratis (voller Prompt-Cache-Hit). Lokale Provider: genau
-// EIN kombinierter Call, unverändert. Rückgabe hat stets die Form
-// { fehler, szenen, stilanalyse, fazit } — Cache/History/Frontend bleiben gleich.
-async function _lektoratAnalyze({ jobId, tok, text, local, prompts, system, promptOpts, single, fromPct, toPct }) {
-  const {
-    buildLektoratPrompt, buildBatchLektoratPrompt,
-    buildObjektivLektoratPrompt, buildStilLektoratPrompt,
-    SCHEMA_LEKTORAT, SCHEMA_LEKTORAT_OBJEKTIV,
-  } = prompts;
-  const K = local ? 1 : objektivRuns();
-
-  if (K <= 1) {
-    const prompt = single ? buildLektoratPrompt(text, promptOpts) : buildBatchLektoratPrompt(text, promptOpts);
-    const result = await aiCall(jobId, tok, prompt, system, fromPct, toPct, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT);
-    if (!Array.isArray(result?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
-    return result;
-  }
-
-  if (!tok.inflight) tok.inflight = new Map();   // parallele Live-Token-Summierung
-  const objektivOpts = {
-    figuren: promptOpts.figuren, figurenBeziehungen: promptOpts.figurenBeziehungen,
-    orte: promptOpts.orte, pageName: promptOpts.pageName, chapterName: promptOpts.chapterName,
-    langCode: promptOpts.langCode,
-  };
-  const objektivPrompt = buildObjektivLektoratPrompt(text, objektivOpts);
-  const stilPrompt = buildStilLektoratPrompt(text, promptOpts);
-  const objCall = () => aiCall(jobId, tok, objektivPrompt, system, null, null, 4000, 0.2, null, undefined, SCHEMA_LEKTORAT_OBJEKTIV);
-
-  // Stil-Pass parallel starten – eigener User-Prompt, profitiert nicht vom
-  // Objektiv-Cache (teilt nur den kleinen System-Block).
-  const stilPromise = aiCall(jobId, tok, stilPrompt, system, null, null, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT);
-
-  // Objektiv-Läufe STAFFELN statt sofort alle parallel: den ersten Lauf voll
-  // abschliessen, damit er den Prompt-Cache primet (voller Input = System +
-  // identischer Objektiv-Prompt). Erst danach die restlichen K-1 parallel – die
-  // lesen dann den warmen Cache (cache_read statt K× Voll-Input). Gleichzeitiges
-  // Feuern verfehlt den Cache komplett (jeder Lauf zahlt den vollen Input).
-  const objRuns = [await objCall()];
-  if (K > 1) {
-    const rest = await Promise.all(Array.from({ length: K - 1 }, objCall));
-    objRuns.push(...rest);
-  }
-  const stilResult = await stilPromise;
-
-  if (!Array.isArray(stilResult?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
-  const objFehlerRuns = objRuns.map(r => (Array.isArray(r?.fehler) ? r.fehler : []));
-  const objConsensus = consensusFindings(objFehlerRuns, text, { threshold: consensusThreshold() });
-  const fehler = mergePasses([objConsensus, stilResult.fehler], text);
-  return { fehler, szenen: stilResult.szenen, stilanalyse: stilResult.stilanalyse, fazit: stilResult.fazit };
-}
+const { lektoratAnalyze, objektivRuns } = require('./lektorat-split');
 
 // Lokale Provider (ollama/llama) bekommen einen deutlich abgespeckten Lektorat-Prompt:
 // kein Vorseiten-Kontext (BookStack-Roundtrip gespart), keine Figuren-Beziehungen,
@@ -334,7 +266,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
         result.fehler = finalizeFehler(result.fehler, locale);
       }
     } else {
-      result = await _lektoratAnalyze({
+      result = await lektoratAnalyze({
         jobId, tok, text, local, prompts, system: SYSTEM_LEKTORAT, single: true,
         fromPct: 10, toPct: 97,
         promptOpts: {
@@ -489,7 +421,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
           // Bei Pool>1 sind feinere Pct-Ranges pro Item nicht sinnvoll
           // (mehrere Calls schreiben gleichzeitig den Job-Progress); progress wird
           // unten aus done/total nach jedem fertigen Item gesetzt.
-          result = await _lektoratAnalyze({
+          result = await lektoratAnalyze({
             jobId, tok, text, local, prompts, system: SYSTEM_LEKTORAT, single: false,
             fromPct: null, toPct: null,
             promptOpts: {
