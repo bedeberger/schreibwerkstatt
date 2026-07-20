@@ -77,12 +77,23 @@ async function _lektoratAnalyze({ jobId, tok, text, local, prompts, system, prom
   };
   const objektivPrompt = buildObjektivLektoratPrompt(text, objektivOpts);
   const stilPrompt = buildStilLektoratPrompt(text, promptOpts);
+  const objCall = () => aiCall(jobId, tok, objektivPrompt, system, null, null, 4000, 0.2, null, undefined, SCHEMA_LEKTORAT_OBJEKTIV);
 
-  const [objRuns, stilResult] = await Promise.all([
-    Promise.all(Array.from({ length: K }, () =>
-      aiCall(jobId, tok, objektivPrompt, system, null, null, 4000, 0.2, null, undefined, SCHEMA_LEKTORAT_OBJEKTIV))),
-    aiCall(jobId, tok, stilPrompt, system, null, null, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT),
-  ]);
+  // Stil-Pass parallel starten – eigener User-Prompt, profitiert nicht vom
+  // Objektiv-Cache (teilt nur den kleinen System-Block).
+  const stilPromise = aiCall(jobId, tok, stilPrompt, system, null, null, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT);
+
+  // Objektiv-Läufe STAFFELN statt sofort alle parallel: den ersten Lauf voll
+  // abschliessen, damit er den Prompt-Cache primet (voller Input = System +
+  // identischer Objektiv-Prompt). Erst danach die restlichen K-1 parallel – die
+  // lesen dann den warmen Cache (cache_read statt K× Voll-Input). Gleichzeitiges
+  // Feuern verfehlt den Cache komplett (jeder Lauf zahlt den vollen Input).
+  const objRuns = [await objCall()];
+  if (K > 1) {
+    const rest = await Promise.all(Array.from({ length: K - 1 }, objCall));
+    objRuns.push(...rest);
+  }
+  const stilResult = await stilPromise;
 
   if (!Array.isArray(stilResult?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
   const objFehlerRuns = objRuns.map(r => (Array.isArray(r?.fehler) ? r.fehler : []));

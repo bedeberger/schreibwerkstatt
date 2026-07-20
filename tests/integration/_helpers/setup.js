@@ -26,6 +26,11 @@ function bootstrap() {
   upsert.run('ai.claude.max_tokens_out', JSON.stringify(2000));
   upsert.run('ai.provider', JSON.stringify('claude'));
   upsert.run('jobs.max_concurrent', JSON.stringify(1));
+  // Claude-Split abschalten: ein kombinierter Lektorat-Call pro Seite statt
+  // K Objektiv-Läufe + 1 Stil-Lauf. Die Konsolidierung des Splits ist separat
+  // unit-getestet (tests/unit/lektorat-consolidate.test.mjs); die Integration-
+  // Tests prüfen Cache-HIT/MISS und Pipeline, nicht die Fan-out-Anzahl.
+  upsert.run('ai.lektorat_objective_runs', JSON.stringify(1));
 
   // app_users-Rows fuer Test-Identitaeten — Backfill/Backend-Migrate-Job
   // schreiben in book_access (FK auf app_users.email). Ohne Seed bricht
