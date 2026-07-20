@@ -59,6 +59,42 @@
   min-width: 0;
 }
 
+/* Label-Zeile: übersetzter Name links, technischer Config-Key als Marker rechts. */
+.setting-field__labelrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.setting-field__label {
+  color: var(--color-text);
+  font-weight: 600;
+  min-width: 0;
+}
+
+/* Toggle-Felder: Switch + Key-Marker horizontal, Help darunter (via .setting-field-Grid). */
+.setting-field__toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.setting-field__key {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  background: var(--color-tag-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-xs);
+  white-space: nowrap;
+}
+
 .admin-settings-actions {
   margin-top: var(--space-md);
   display: flex;

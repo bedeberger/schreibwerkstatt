@@ -1,5 +1,5 @@
     <!-- Cron-Tab -->
     <section x-show="adminSettingsTab === 'cron'" class="admin-settings-section">
-      <div x-data="settingField({ k: 'app.timezone', help: 'admin.settings.help.appTimezone' })"></div>
-      <div x-data="settingField({ k: 'cron.stale_days', type: 'num', num: { step: 1, min: 1, max: 365 } })"></div>
+      <div x-data="settingField({ k: 'app.timezone', label: 'admin.settings.label.appTimezone', help: 'admin.settings.help.appTimezone' })"></div>
+      <div x-data="settingField({ k: 'cron.stale_days', type: 'num', label: 'admin.settings.label.cronStaleDays', num: { step: 1, min: 1, max: 365 } })"></div>
     </section>

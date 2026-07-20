@@ -1,23 +1,23 @@
     <!-- Auth-Tab -->
     <section x-show="adminSettingsTab === 'auth'" class="admin-settings-section">
-      <div x-data="settingField({ k: 'app.public_url', type: 'url', ph: 'https://app.example.com' })"></div>
-      <div x-data="settingField({ k: 'auth.google.client_id', secret: true })"></div>
-      <div x-data="settingField({ k: 'auth.google.client_secret', type: 'password' })"></div>
-      <div x-data="settingField({ k: 'auth.allow_open_signup', type: 'toggle' })"></div>
-      <div x-data="settingField({ k: 'auth.registration.expire_days', type: 'num', num: { integer: true, min: 1, max: 365 }, help: 'admin.settings.help.registrationExpireDays' })"></div>
+      <div x-data="settingField({ k: 'app.public_url', type: 'url', label: 'admin.settings.label.appPublicUrl', ph: 'https://app.example.com' })"></div>
+      <div x-data="settingField({ k: 'auth.google.client_id', label: 'admin.settings.label.authGoogleClientId', secret: true })"></div>
+      <div x-data="settingField({ k: 'auth.google.client_secret', type: 'password', label: 'admin.settings.label.authGoogleClientSecret' })"></div>
+      <div x-data="settingField({ k: 'auth.allow_open_signup', type: 'toggle', label: 'admin.settings.label.authAllowOpenSignup' })"></div>
+      <div x-data="settingField({ k: 'auth.registration.expire_days', type: 'num', label: 'admin.settings.label.authRegistrationExpireDays', num: { integer: true, min: 1, max: 365 }, help: 'admin.settings.help.registrationExpireDays' })"></div>
 
       <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.rateLimitTitle')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.rateLimitHint')"></p>
-      <div x-data="settingField({ k: 'auth.register.rate_limit_max', type: 'num', num: { integer: true, min: 1, max: 1000 } })"></div>
-      <div x-data="settingField({ k: 'auth.register.rate_limit_window_min', type: 'num', num: { integer: true, min: 1, max: 1440 } })"></div>
-      <div x-data="settingField({ k: 'auth.admin_login.max_fails', type: 'num', num: { integer: true, min: 1, max: 1000 } })"></div>
-      <div x-data="settingField({ k: 'auth.admin_login.window_min', type: 'num', num: { integer: true, min: 1, max: 1440 } })"></div>
+      <div x-data="settingField({ k: 'auth.register.rate_limit_max', type: 'num', label: 'admin.settings.label.authRegisterRateLimitMax', num: { integer: true, min: 1, max: 1000 } })"></div>
+      <div x-data="settingField({ k: 'auth.register.rate_limit_window_min', type: 'num', label: 'admin.settings.label.authRegisterRateLimitWindow', num: { integer: true, min: 1, max: 1440 } })"></div>
+      <div x-data="settingField({ k: 'auth.admin_login.max_fails', type: 'num', label: 'admin.settings.label.authAdminLoginMaxFails', num: { integer: true, min: 1, max: 1000 } })"></div>
+      <div x-data="settingField({ k: 'auth.admin_login.window_min', type: 'num', label: 'admin.settings.label.authAdminLoginWindow', num: { integer: true, min: 1, max: 1440 } })"></div>
 
       <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.captchaTitle')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.captchaHint')"></p>
-      <div x-data="settingField({ k: 'auth.altcha.enabled', type: 'toggle' })"></div>
-      <div x-data="settingField({ k: 'auth.altcha.complexity', type: 'num', num: { integer: true, min: 1000, max: 5000000 }, help: 'admin.settings.help.altchaComplexity' })"></div>
-      <div x-data="settingField({ k: 'auth.altcha.challenge_ttl_min', type: 'num', num: { integer: true, min: 1, max: 120 }, help: 'admin.settings.help.altchaChallengeTtl' })"></div>
+      <div x-data="settingField({ k: 'auth.altcha.enabled', type: 'toggle', label: 'admin.settings.label.authAltchaEnabled' })"></div>
+      <div x-data="settingField({ k: 'auth.altcha.complexity', type: 'num', label: 'admin.settings.label.authAltchaComplexity', num: { integer: true, min: 1000, max: 5000000 }, help: 'admin.settings.help.altchaComplexity' })"></div>
+      <div x-data="settingField({ k: 'auth.altcha.challenge_ttl_min', type: 'num', label: 'admin.settings.label.authAltchaChallengeTtl', num: { integer: true, min: 1, max: 120 }, help: 'admin.settings.help.altchaChallengeTtl' })"></div>
 
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('oauth')" x-text="$app.t('admin.settings.test.oauth')"></button>

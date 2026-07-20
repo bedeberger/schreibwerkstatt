@@ -6,24 +6,24 @@
         <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">myaccount.google.com/apppasswords</a>
       </p>
 
-      <div x-data="settingField({ k: 'smtp.gmail.user', type: 'email', ph: 'name@gmail.com' })"></div>
-      <div x-data="settingField({ k: 'smtp.gmail.app_password', type: 'password' })"></div>
-      <div x-data="settingField({ k: 'smtp.from_name', ph: 'Schreibwerkstatt' })"></div>
-      <div x-data="settingField({ k: 'smtp.reply_to', type: 'email', ph: '(optional)' })"></div>
-      <div x-data="settingField({ k: 'smtp.rate_limit_per_minute', type: 'num', num: { step: 1, min: 1, max: 500 } })"></div>
+      <div x-data="settingField({ k: 'smtp.gmail.user', type: 'email', label: 'admin.settings.label.smtpGmailUser', ph: 'name@gmail.com' })"></div>
+      <div x-data="settingField({ k: 'smtp.gmail.app_password', type: 'password', label: 'admin.settings.label.smtpGmailAppPassword' })"></div>
+      <div x-data="settingField({ k: 'smtp.from_name', label: 'admin.settings.label.smtpFromName', ph: 'Schreibwerkstatt' })"></div>
+      <div x-data="settingField({ k: 'smtp.reply_to', type: 'email', label: 'admin.settings.label.smtpReplyTo', ph: '(optional)' })"></div>
+      <div x-data="settingField({ k: 'smtp.rate_limit_per_minute', type: 'num', label: 'admin.settings.label.smtpRateLimitPerMinute', num: { step: 1, min: 1, max: 500 } })"></div>
 
-      <div x-data="settingField({ k: 'mail.notify.admin_recipient', type: 'email', ph: '(optional)', help: 'admin.settings.mail.adminRecipientHint' })"></div>
+      <div x-data="settingField({ k: 'mail.notify.admin_recipient', type: 'email', label: 'admin.settings.label.mailNotifyAdminRecipient', ph: '(optional)', help: 'admin.settings.mail.adminRecipientHint' })"></div>
 
       <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.mail.notifyTitle')"></span></h4>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.mail.notifyHint')"></p>
-      <div x-data="settingField({ k: 'mail.notify.admin_on_job_fail', type: 'toggle' })"></div>
-      <div x-data="settingField({ k: 'mail.notify.admin_on_token_cap', type: 'toggle' })"></div>
-      <div x-data="settingField({ k: 'mail.notify.user_on_budget_overrun', type: 'toggle' })"></div>
-      <div x-data="settingField({ k: 'mail.notify.admin_on_budget_overrun', type: 'toggle' })"></div>
-      <div x-data="settingField({ k: 'mail.notify.owner_on_share_comment', type: 'toggle' })"></div>
-      <div x-data="settingField({ k: 'mail.notify.reader_on_owner_reply', type: 'toggle' })"></div>
-      <div x-data="settingField({ k: 'mail.notify.job_fail_throttle_min', type: 'num', num: { integer: true, min: 0, max: 1440 } })"></div>
-      <div x-data="settingField({ k: 'mail.notify.skip_errors', ph: 'job.cancelled,BUDGET_EXCEEDED,…', help: 'admin.settings.mail.skipErrorsHint' })"></div>
+      <div x-data="settingField({ k: 'mail.notify.admin_on_job_fail', type: 'toggle', label: 'admin.settings.label.mailNotifyAdminOnJobFail' })"></div>
+      <div x-data="settingField({ k: 'mail.notify.admin_on_token_cap', type: 'toggle', label: 'admin.settings.label.mailNotifyAdminOnTokenCap' })"></div>
+      <div x-data="settingField({ k: 'mail.notify.user_on_budget_overrun', type: 'toggle', label: 'admin.settings.label.mailNotifyUserOnBudgetOverrun' })"></div>
+      <div x-data="settingField({ k: 'mail.notify.admin_on_budget_overrun', type: 'toggle', label: 'admin.settings.label.mailNotifyAdminOnBudgetOverrun' })"></div>
+      <div x-data="settingField({ k: 'mail.notify.owner_on_share_comment', type: 'toggle', label: 'admin.settings.label.mailNotifyOwnerOnShareComment' })"></div>
+      <div x-data="settingField({ k: 'mail.notify.reader_on_owner_reply', type: 'toggle', label: 'admin.settings.label.mailNotifyReaderOnOwnerReply' })"></div>
+      <div x-data="settingField({ k: 'mail.notify.job_fail_throttle_min', type: 'num', label: 'admin.settings.label.mailNotifyJobFailThrottle', num: { integer: true, min: 0, max: 1440 } })"></div>
+      <div x-data="settingField({ k: 'mail.notify.skip_errors', label: 'admin.settings.label.mailNotifySkipErrors', ph: 'job.cancelled,BUDGET_EXCEEDED,…', help: 'admin.settings.mail.skipErrorsHint' })"></div>
 
       <div class="admin-settings-actions">
         <button type="button" @click="adminSettingsTest('smtp')" x-text="$app.t('admin.settings.test.smtp')"></button>

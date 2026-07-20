@@ -86,15 +86,25 @@ export function settingFieldData(cfg = {}) {
       return '<small x-show="helpText" class="muted-msg muted-msg--sm" x-text="helpText"></small>';
     },
 
+    // Technischer Config-Key als sekundärer Marker neben dem übersetzten Label.
+    // `_k` ist ein konstanter Setting-Key (`[a-z0-9._-]`), kein User-Input.
+    _keyMarker() {
+      return `<code class="setting-field__key">${this._k}</code>`;
+    },
+
     _render() {
       const k = this._k;
       const mkey = `adminSettingsForm['${k}']`;
       const help = this._help_small();
 
       if (this._type === 'toggle') {
-        // toggleSwitch rendert das Label rechts vom Switch; Help darunter.
+        // toggleSwitch rendert das Label rechts vom Switch; Key-Marker daneben,
+        // Help darunter.
         return [
-          `<div x-data="toggleSwitch({ label: () => labelText })" x-modelable="value" x-model="${mkey}"></div>`,
+          '<div class="setting-field__toggle-row">',
+          `  <div x-data="toggleSwitch({ label: () => labelText })" x-modelable="value" x-model="${mkey}"></div>`,
+          `  ${this._keyMarker()}`,
+          '</div>',
           help,
         ].join('\n');
       }
@@ -122,7 +132,10 @@ export function settingFieldData(cfg = {}) {
 
       return [
         '<label>',
-        '  <span x-text="labelText"></span>',
+        '  <span class="setting-field__labelrow">',
+        '    <span class="setting-field__label" x-text="labelText"></span>',
+        `    ${this._keyMarker()}`,
+        '  </span>',
         `  ${control}`,
         maskedSmall,
         help,

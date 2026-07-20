@@ -1,8 +1,8 @@
     <!-- Jobs-Tab -->
     <section x-show="adminSettingsTab === 'jobs'" class="admin-settings-section">
-      <div x-data="settingField({ k: 'jobs.max_concurrent', type: 'num', num: { step: 1, min: 1, max: 8 } })"></div>
-      <div x-data="settingField({ k: 'jobs.book_chat.mode', type: 'select', opts: [{ value: 'auto', label: 'auto' }, { value: 'agent', label: 'agent' }, { value: 'classic', label: 'classic' }] })"></div>
-      <div x-data="settingField({ k: 'jobs.book_chat.max_tool_iter', type: 'num', num: { step: 1, min: 1, max: 50 } })"></div>
-      <div x-data="settingField({ k: 'jobs.book_chat.token_budget', type: 'num', num: { step: 1, min: 0, max: 2000000 } })"></div>
-      <div x-data="settingField({ k: 'jobs.book_chat.rag_top_k', type: 'num', num: { step: 1, min: 1, max: 200 } })"></div>
+      <div x-data="settingField({ k: 'jobs.max_concurrent', type: 'num', label: 'admin.settings.label.jobsMaxConcurrent', num: { step: 1, min: 1, max: 8 } })"></div>
+      <div x-data="settingField({ k: 'jobs.book_chat.mode', type: 'select', label: 'admin.settings.label.jobsBookChatMode', opts: [{ value: 'auto', label: 'auto' }, { value: 'agent', label: 'agent' }, { value: 'classic', label: 'classic' }] })"></div>
+      <div x-data="settingField({ k: 'jobs.book_chat.max_tool_iter', type: 'num', label: 'admin.settings.label.jobsBookChatMaxToolIter', num: { step: 1, min: 1, max: 50 } })"></div>
+      <div x-data="settingField({ k: 'jobs.book_chat.token_budget', type: 'num', label: 'admin.settings.label.jobsBookChatTokenBudget', num: { step: 1, min: 0, max: 2000000 } })"></div>
+      <div x-data="settingField({ k: 'jobs.book_chat.rag_top_k', type: 'num', label: 'admin.settings.label.jobsBookChatRagTopK', num: { step: 1, min: 1, max: 200 } })"></div>
     </section>

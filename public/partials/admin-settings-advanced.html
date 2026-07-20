@@ -5,18 +5,18 @@
       <div class="admin-settings-subsection">
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.section.global')"></span></h4>
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedGlobal')"></p>
-        <div x-data="settingField({ k: 'app.name', ph: 'Schreibwerkstatt', help: 'admin.settings.help.appName' })"></div>
-        <div x-data="settingField({ k: 'ai.chat_temperature', type: 'num', num: { step: 0.01, decimals: 2, min: 0, max: 2 } })"></div>
-        <div x-data="settingField({ k: 'ai.lektorat_batch_concurrency', type: 'num', num: { step: 1, min: 1, max: 8 } })"></div>
+        <div x-data="settingField({ k: 'app.name', label: 'admin.settings.label.appName', ph: 'Schreibwerkstatt', help: 'admin.settings.help.appName' })"></div>
+        <div x-data="settingField({ k: 'ai.chat_temperature', type: 'num', label: 'admin.settings.label.aiChatTemperature', num: { step: 0.01, decimals: 2, min: 0, max: 2 } })"></div>
+        <div x-data="settingField({ k: 'ai.lektorat_batch_concurrency', type: 'num', label: 'admin.settings.label.aiLektoratBatchConcurrency', num: { step: 1, min: 1, max: 8 } })"></div>
         <div x-data="settingField({ k: 'ai.lektorat_split', type: 'toggle', label: 'admin.settings.label.lektoratSplit', help: 'admin.settings.help.lektoratSplit' })"></div>
         <div x-data="settingField({ k: 'ai.lektorat_objective_runs', type: 'num', num: { integer: true, min: 1, max: 6 }, label: 'admin.settings.label.lektoratObjectiveRuns', help: 'admin.settings.help.lektoratObjectiveRuns' })"></div>
         <div x-data="settingField({ k: 'ai.lektorat_consensus_threshold', type: 'num', num: { integer: true, min: 1, max: 6 }, label: 'admin.settings.label.lektoratConsensusThreshold', help: 'admin.settings.help.lektoratConsensusThreshold' })"></div>
-        <div x-data="settingField({ k: 'ai.komplett.extract_max_tokens', type: 'num', num: { integer: true, min: 1024, max: 200000 }, help: 'admin.settings.help.komplettExtractMaxTokens' })"></div>
-        <div x-data="settingField({ k: 'ai.chars_per_token', type: 'num', num: { step: 0.1, min: 1, max: 10 }, help: 'admin.settings.help.charsPerToken' })"></div>
-        <div x-data="settingField({ k: 'app.page_revision_limit', type: 'num', num: { integer: true, min: 1, max: 500 }, help: 'admin.settings.help.pageRevisionLimit' })"></div>
-        <div x-data="settingField({ k: 'editor.lock_ttl_min', type: 'num', num: { integer: true, min: 1, max: 1440 }, help: 'admin.settings.help.editorLockTtl' })"></div>
-        <div x-data="settingField({ k: 'share.comment.rate_limit_max', type: 'num', num: { integer: true, min: 1, max: 1000 }, help: 'admin.settings.help.shareCommentRateLimit' })"></div>
-        <div x-data="settingField({ k: 'share.comment.rate_limit_window_min', type: 'num', num: { integer: true, min: 1, max: 1440 } })"></div>
-        <div x-data="settingField({ k: 'macclient.github_token', type: 'password', help: 'admin.settings.help.macclientGithubToken' })"></div>
+        <div x-data="settingField({ k: 'ai.komplett.extract_max_tokens', type: 'num', label: 'admin.settings.label.komplettExtractMaxTokens', num: { integer: true, min: 1024, max: 200000 }, help: 'admin.settings.help.komplettExtractMaxTokens' })"></div>
+        <div x-data="settingField({ k: 'ai.chars_per_token', type: 'num', label: 'admin.settings.label.aiCharsPerToken', num: { step: 0.1, min: 1, max: 10 }, help: 'admin.settings.help.charsPerToken' })"></div>
+        <div x-data="settingField({ k: 'app.page_revision_limit', type: 'num', label: 'admin.settings.label.appPageRevisionLimit', num: { integer: true, min: 1, max: 500 }, help: 'admin.settings.help.pageRevisionLimit' })"></div>
+        <div x-data="settingField({ k: 'editor.lock_ttl_min', type: 'num', label: 'admin.settings.label.editorLockTtl', num: { integer: true, min: 1, max: 1440 }, help: 'admin.settings.help.editorLockTtl' })"></div>
+        <div x-data="settingField({ k: 'share.comment.rate_limit_max', type: 'num', label: 'admin.settings.label.shareCommentRateLimitMax', num: { integer: true, min: 1, max: 1000 }, help: 'admin.settings.help.shareCommentRateLimit' })"></div>
+        <div x-data="settingField({ k: 'share.comment.rate_limit_window_min', type: 'num', label: 'admin.settings.label.shareCommentRateLimitWindow', num: { integer: true, min: 1, max: 1440 } })"></div>
+        <div x-data="settingField({ k: 'macclient.github_token', type: 'password', label: 'admin.settings.label.macclientGithubToken', help: 'admin.settings.help.macclientGithubToken' })"></div>
       </div>
     </section>
