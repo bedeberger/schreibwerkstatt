@@ -21,7 +21,7 @@
               <!-- Thema-Farbe: Swatch öffnet ein Palette-Popover (theme-aware --palette-*). -->
               <div class="motiv-color-swatch-wrap">
                 <button type="button" class="motiv-color-swatch"
-                        :style="{ '--col-accent': t.farbe ? ('var(--palette-' + t.farbe + ')') : 'var(--card-accent)' }"
+                        :style="{ '--col-accent': 'var(--palette-' + themeSwatchKey(t) + ')' }"
                         @click.stop="toggleThemeColorPicker(t.id)"
                         :data-tip="$app.t('motiv.theme.color')" :aria-label="$app.t('motiv.theme.color')"></button>
                 <div class="motiv-color-popover" x-show="themeColorPickerId === t.id" x-cloak

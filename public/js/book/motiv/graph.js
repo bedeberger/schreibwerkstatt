@@ -9,20 +9,25 @@ import { fetchJson } from '../../utils.js';
 
 // Themen-Palette: primär die vom Autor gewählte Farbe (themes.farbe = Palette-
 // Schlüssel, theme-aware --palette-*-Tokens wie in der Plot-Werkstatt); ohne Wahl
-// deterministisch nach Index. Motive erben die Farbe ihres Themas.
+// deterministisch nach Index in dieselbe Palette. Motive erben die Farbe ihres
+// Themas. Graph (Canvas) und Swatch-Leiste teilen defaultThemeColorKey als SSoT,
+// damit die Farben nie auseinanderdriften.
 export const THEME_COLOR_KEYS = ['blue', 'green', 'amber', 'orange', 'red', 'wine', 'pink', 'purple', 'brown', 'gray'];
-const THEME_PALETTE = ['#4a52a0', '#0f766e', '#b45309', '#9333ea', '#be123c', '#15803d', '#0369a1', '#a16207'];
 const NEUTRAL = '#8a8f98';
 const LAYER = { figure: '#0891b2', beat: '#7c3a48', chapter: '#65758b' };
+
+// Auto-Farbe (Palette-Schlüssel) für ein Thema am gegebenen Listen-Index.
+export function defaultThemeColorKey(ix) {
+  return THEME_COLOR_KEYS[((ix % THEME_COLOR_KEYS.length) + THEME_COLOR_KEYS.length) % THEME_COLOR_KEYS.length];
+}
 
 // paletteVars: Palette-Schlüssel → konkreter Farbwert (vis-network zeichnet auf
 // Canvas, CSS-Custom-Props werden dort NICHT aufgelöst → zur Render-Zeit gelesen).
 function _themeColor(themeId, themes, paletteVars) {
   const ix = themes.findIndex(t => t.id === themeId);
   if (ix < 0) return NEUTRAL;
-  const chosen = themes[ix].farbe;
-  if (chosen && paletteVars && paletteVars[chosen]) return paletteVars[chosen];
-  return THEME_PALETTE[ix % THEME_PALETTE.length];
+  const key = themes[ix].farbe || defaultThemeColorKey(ix);
+  return (paletteVars && paletteVars[key]) || paletteVars[defaultThemeColorKey(ix)] || NEUTRAL;
 }
 
 export const graphMethods = {

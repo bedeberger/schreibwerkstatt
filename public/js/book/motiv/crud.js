@@ -3,7 +3,7 @@
 // aktualisieren (loadBoard) statt Teil-Patches — die Boards sind klein.
 
 import { fetchJson } from '../../utils.js';
-import { THEME_COLOR_KEYS } from './graph.js';
+import { THEME_COLOR_KEYS, defaultThemeColorKey } from './graph.js';
 import { highlightOccurrenceOnPage } from './highlight.js';
 
 function _json(url, method, body) {
@@ -42,6 +42,11 @@ export const crudMethods = {
   },
   // Palette-Schlüssel für den Farbwähler (theme-aware --palette-*-Tokens).
   themeColorKeys() { return THEME_COLOR_KEYS; },
+  // Effektiver Palette-Schlüssel eines Themas (gewählt oder Auto nach Index) —
+  // SSoT für die Swatch-Leiste, deckungsgleich mit der Graph-Farbe.
+  themeSwatchKey(theme) {
+    return theme.farbe || defaultThemeColorKey(this.themes.findIndex(t => t.id === theme.id));
+  },
   toggleThemeColorPicker(themeId) {
     this.themeColorPickerId = this.themeColorPickerId === themeId ? null : themeId;
   },
