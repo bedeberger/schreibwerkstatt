@@ -276,7 +276,7 @@
 }
 
 .gz-chronology-total-value {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-mini);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--card-accent, var(--color-text));
