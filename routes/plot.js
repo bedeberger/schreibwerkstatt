@@ -13,6 +13,7 @@ const { toIntId } = require('../lib/validate');
 const { resolveChapterBookId } = require('../lib/content-ownership');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
+const appSettings = require('../lib/app-settings');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -89,8 +90,11 @@ router.get('/', (req, res) => {
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
   if (!_guard(req, res, bookId)) return;
   // Ist-Index der Beat-Verankerung an jeden Beat hängen (count + Top-Fundstellen)
-  // → Drift-Badge im Frontend (Soll `status` vs. Ist-Fundstellen). Kein Extra-Call.
-  const occMap = plotDb.beatOccurrenceMap(bookId, userEmail);
+  // → Drift-Badge + Fundstellen-Popover im Frontend (Soll `status` vs. Ist). Kein
+  // Extra-Call. navigableOnly: nur anspringbare Fundstellen (Szene ohne Seite fällt
+  // raus); minScore: konfigurierbarer Score-Floor blendet schwache Treffer aus.
+  const minScore = Number(appSettings.get('plot.anchor.min_score')) || 0;
+  const occMap = plotDb.beatOccurrenceMap(bookId, userEmail, { minScore, navigableOnly: true });
   const beats = plotDb.listBeats(bookId, userEmail).map(b => {
     const occ = occMap.get(b.id);
     return { ...b, occ_count: occ ? occ.count : 0, occ_top: occ ? occ.top : [] };

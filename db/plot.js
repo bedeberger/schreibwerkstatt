@@ -808,9 +808,18 @@ const _stmtBeatOccForBook = db.prepare(`
    ORDER BY o.score DESC, o.id
 `);
 const BEAT_OCC_TOP_N = 8;
-function beatOccurrenceMap(bookId, userEmail) {
+// opts.minScore: Score-Floor (0 = aus) — blendet schwache semantische Treffer aus
+// count UND top aus, damit Drift-Badge-Zahl und Popover-Liste konsistent bleiben.
+// FTS-/Trigger-Treffer haben score=null (wörtlicher Match) → nie vom Floor betroffen.
+// opts.navigableOnly: nicht anspringbare Fundstellen (Szene ohne verknüpfte Seite,
+// page_id null) überspringen — ein Ziel ohne Seite kann man nicht öffnen.
+function beatOccurrenceMap(bookId, userEmail, opts = {}) {
+  const minScore = Number(opts.minScore) || 0;
+  const navigableOnly = !!opts.navigableOnly;
   const map = new Map();
   for (const r of _stmtBeatOccForBook.all(parseInt(bookId), userEmail)) {
+    if (navigableOnly && !r.page_id) continue;
+    if (minScore > 0 && r.score != null && r.score < minScore) continue;
     let e = map.get(r.beat_id);
     if (!e) { e = { count: 0, top: [] }; map.set(r.beat_id, e); }
     e.count += 1;
