@@ -233,6 +233,61 @@ router.get('/:bookId', (req, res) => {
   }
 });
 
+// ── Drift (lohnt sich eine neue Fassung?) ───────────────────────────────────────
+// Vergleicht den aktuellen Buchstand mit der juengsten Fassung, OHNE eine anzulegen:
+//   text  — Anteil des editierten Wort-Volumens (0% unveraendert, ~100% Umschrieb)
+//   publication/settings — geaenderte Titelei-/Einstellungs-Felder
+// `worthwhile` = Text-Drift >= Schwelle ODER Publikation/Einstellungen geaendert.
+// Baut den aktuellen Payload wie der Capture (reiner DB-Read, kein KI-Call).
+router.get('/:bookId/drift', async (req, res) => {
+  const bookId = toIntId(req.params.bookId);
+  if (!bookId) return res.status(400).json({ error_code: 'ID_REQUIRED' });
+  setContext({ book: bookId });
+  try { requireBookAccess(req, bookId, 'viewer'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+
+  const baseline = snapshots.getLatestSnapshot(bookId);
+  if (!baseline) return res.json({ hasBaseline: false });
+
+  let baselineContent, baselineSettings;
+  try {
+    baselineContent = JSON.parse(baseline.content_json);
+    baselineSettings = baselineContent?.book?.settings || null;
+  } catch {
+    return res.status(422).json({ error_code: 'CORRUPT_SNAPSHOT' });
+  }
+  const basePub = snapshotPublication(baseline.publication_json);
+  const baselinePubMeta = basePub ? basePub.meta : null;
+
+  let payload;
+  try {
+    payload = await _buildSnapshotPayload(bookId, req);
+  } catch (e) {
+    if (e.code === 'BOOK_EMPTY') return res.json({ hasBaseline: false, empty: true });
+    logger.error(`Drift-Check fehlgeschlagen (book=${bookId}): ${e.message}`);
+    return res.status(502).json({ error_code: 'DRIFT_FAILED' });
+  }
+  const currentSettings = payload.content?.book?.settings || null;
+  const curPub = snapshotPublication(payload.publicationJson);
+  const currentPubMeta = curPub ? curPub.meta : null;
+
+  const { computeDrift } = require('../lib/snapshot-drift');
+  const drift = computeDrift({
+    baselineContent, currentContent: payload.content,
+    baselinePubMeta, currentPubMeta,
+    baselineSettings, currentSettings,
+  });
+
+  return res.json({
+    hasBaseline: true,
+    baseline: {
+      id: baseline.id, seq: baseline.seq, label: baseline.label,
+      created_at: baseline.created_at,
+    },
+    drift,
+  });
+});
+
 // ── Get (content only, fuer Diff) ──────────────────────────────────────────────
 router.get('/:bookId/:id', (req, res) => {
   const bookId = toIntId(req.params.bookId);

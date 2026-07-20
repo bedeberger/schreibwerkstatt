@@ -11,6 +11,7 @@ import { fromSnapshotTree } from '../manuscript-stream.js';
 import { renderInline } from '../page-revision-diff.js';
 import { snapshotsPdfMethods } from './snapshots-pdf-export.js';
 import { snapshotsCompareMethods } from './snapshots-compare.js';
+import { snapshotsDriftMethods } from './snapshots-drift.js';
 import { EVT } from '../events.js';
 
 // Modul-Cache fuer Fassungs-Vollzeilen. Das `content_json` einer Fassung kann
@@ -27,6 +28,7 @@ export function registerSnapshotsCard() {
   window.Alpine.data('snapshotsCard', () => ({
     ...snapshotsPdfMethods,
     ...snapshotsCompareMethods,
+    ...snapshotsDriftMethods,
     snapshots: [],
     loading: false,
     capturing: false,
@@ -36,6 +38,11 @@ export function registerSnapshotsCard() {
     newLabel: '',
     newDescription: '',
     _bookId: null,
+
+    // Drift-Check: lohnt sich seit der letzten Fassung eine neue?
+    drift: null,           // { hasBaseline, baseline?, drift? } aus GET …/drift
+    driftLoading: false,
+    driftDismissed: false, // Hinweis weggeklickt (fuer die aktuelle Drift-Signatur)
 
     // Vergleich.
     compareFrom: '',
@@ -101,6 +108,9 @@ export function registerSnapshotsCard() {
       this.newLabel = '';
       this.newDescription = '';
       this._bookId = null;
+      this.drift = null;
+      this.driftLoading = false;
+      this.driftDismissed = false;
       this._resetCompare();
       this.closeReader();
     },
@@ -131,6 +141,8 @@ export function registerSnapshotsCard() {
       } finally {
         this.loading = false;
       }
+      // Drift gegen die juengste Fassung nachladen (nur wenn es eine gibt).
+      this.loadDrift(bookId);
     },
 
     // Default: juengste vs. zweitjuengste Fassung (Liste ist DESC sortiert).

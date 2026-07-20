@@ -203,7 +203,7 @@ export { BOOK_CHAT_TOOLS } from './book-chat-tools.js';
 //     JSON-Format-Trailer. Bewusst OHNE Breakpoint, weil der Block jede Runde
 //     andere Seiten trägt — ein Breakpoint wäre ein cache_write ohne je gelesen
 //     zu werden. Steht am Ende, damit Block 1 ein stabiler Präfix bleibt.
-export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, review, systemOverride = null) {
+export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, review, systemOverride = null, opts = {}) {
   const stable = [
     systemOverride ?? SYSTEM_BOOK_CHAT,
     '',
@@ -225,9 +225,17 @@ export function buildBookChatSystemPrompt(bookName, relevantPages, figuren, revi
 
   const volatil = [];
   if (relevantPages && relevantPages.length > 0) {
-    volatil.push('=== RELEVANTE BUCHSEITEN ===');
+    // excerpt=true: die Textstellen sind semantisch retrievte Chunk-Auszüge (Mini-RAG),
+    // nicht ganze Seiten — das Modell darf daraus nicht auf Vollständigkeit der Seite schliessen.
+    const excerpt = opts.excerpt === true;
+    if (excerpt) {
+      volatil.push('=== RELEVANTE TEXTSTELLEN AUS DEM BUCH ===');
+      volatil.push('(Bedeutungs-relevanteste Auszüge, nach Ähnlichkeit sortiert; können unvollständig sein.)');
+    } else {
+      volatil.push('=== RELEVANTE BUCHSEITEN ===');
+    }
     for (const page of relevantPages) {
-      volatil.push(`--- Seite: ${page.name} ---`);
+      volatil.push(excerpt ? `--- Auszug aus Seite: ${page.name} ---` : `--- Seite: ${page.name} ---`);
       volatil.push(page.text);
       volatil.push('');
     }

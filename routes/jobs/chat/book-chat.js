@@ -18,6 +18,7 @@ const { generateSessionTitle } = require('../chat-title');
 const { makeAgenticChatJob, buildAgenticHistory } = require('../agentic-chat');
 const { imageGenEnabled } = require('../../../lib/image-gen');
 const embed = require('../../../lib/embed');
+const { semanticQuery } = require('../../../lib/semantic-retrieval');
 const { setContext } = require('../../../lib/log-context');
 const appSettings = require('../../../lib/app-settings');
 const { recordChatLedgerForMessage } = require('../../../db/cost-ledger');
@@ -46,6 +47,45 @@ function _scorePageRelevance(query, text, stopwords = _BOOK_CHAT_STOPWORDS) {
     score += Math.min((textLow.match(re) || []).length, 5);
   }
   return score;
+}
+
+// Mini-RAG-Retrieval für den klassischen Buch-Chat: zieht die semantisch relevantesten
+// Chunk-Auszüge (ein bester Chunk pro Seite) über die geteilte Pipeline
+// lib/semantic-retrieval.js#semanticQuery (Cosinus + Hybrid-RRF + optional Rerank — exakt
+// dieselbe wie das agentische search_similar-Tool und die Such-Karte) und füllt damit das
+// Text-Budget. Seiten-Metadaten (Name/Slug) werden einmal via listPages aufgelöst; der
+// Chunk-Text kommt aus dem Index, es werden KEINE Seiten-Volltexte geladen. Gibt null
+// zurück, wenn kein Index existiert bzw. die Anfrage keine Treffer liefert (Caller fällt
+// dann auf Keyword-Scoring über alle Seiten zurück). Wirft nur bei Abort/Backend-Fehler.
+async function _selectPassagesSemantic(bookId, query, budgetChars, signal, userToken) {
+  const topK = parseInt(appSettings.get('jobs.book_chat.rag_top_k'), 10) || 40;
+  const hits = await semanticQuery(bookId, query, { kinds: ['page'], topK, signal });
+  if (!hits.length) return null;
+
+  let pages;
+  try { pages = await contentStore.listPages(bookId, userToken); }
+  catch (e) {
+    if (e?.status) throw i18nError('job.error.contentStorePageList', { status: e.status });
+    throw e;
+  }
+  const metaById = new Map(pages.map(p => [p.id, p]));
+
+  const selectedPages = [];
+  const seen = new Set();
+  let usedChars = 0;
+  for (const h of hits) {
+    if (usedChars >= budgetChars) break;
+    if (h.kind !== 'page' || seen.has(h.entity_id)) continue;
+    const meta = metaById.get(h.entity_id);
+    if (!meta) continue; // Seite gelöscht, Chunk noch im Index
+    const text = String(h.text || '').slice(0, budgetChars - usedChars);
+    if (text.length < 50) continue;
+    seen.add(h.entity_id);
+    selectedPages.push({ name: meta.name, id: meta.id, slug: meta.slug, book_slug: meta.book_slug, text });
+    usedChars += text.length;
+  }
+  if (!selectedPages.length) return null;
+  return { selectedPages, usedChars, totalPages: pages.length };
 }
 
 // Per-Job-Claude-Override für den Buch-Chat (klassisch + agentisch), analog zur
@@ -107,55 +147,11 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     const cacheKey = `${session.book_id}:${userEmail}`;
     const jobSignal = jobAbortControllers.get(jobId)?.signal;
 
-    // ── Schritt 1: Seiten aus Cache oder frisch via Content-Store laden ─────────
-    let pageContents;
-    const cached = bookPageCache.get(cacheKey);
-    if (cached && Date.now() - cached.loadedAt < BOOK_PAGE_CACHE_TTL_MS) {
-      pageContents = cached.pages;
-      updateJob(jobId, { statusText: 'job.phase.pagesFromCache', progress: 40 });
-    } else {
-      updateJob(jobId, { statusText: 'job.phase.pageListLoading', progress: 8 });
-      let pages;
-      try { pages = await contentStore.listPages(session.book_id, userToken); }
-      catch (e) {
-        if (e?.status) throw i18nError('job.error.contentStorePageList', { status: e.status });
-        throw e;
-      }
-
-      const BATCH = 5;
-      pageContents = [];
-      for (let i = 0; i < pages.length; i += BATCH) {
-        if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
-        updateJob(jobId, {
-          statusText: 'job.phase.loadingPagesBatch',
-          statusParams: { loaded: Math.min(i + BATCH, pages.length), total: pages.length },
-          progress: 10 + Math.round((i / Math.max(pages.length, 1)) * 30),
-        });
-        const batch = pages.slice(i, i + BATCH);
-        const results = await Promise.allSettled(batch.map(async p => {
-          try {
-            const pd = await contentStore.loadPage(p.id, userToken);
-            const text = htmlToText(pd.html || '').trim();
-            return text ? { name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug, text } : null;
-          } catch { return null; }
-        }));
-        for (const r of results) {
-          if (r.status === 'fulfilled' && r.value) pageContents.push(r.value);
-        }
-      }
-      // FIFO-Eviction: ältesten Eintrag entfernen wenn Cache voll
-      if (bookPageCache.size >= BOOK_PAGE_CACHE_MAX) {
-        const firstKey = bookPageCache.keys().next().value;
-        bookPageCache.delete(firstKey);
-      }
-      bookPageCache.set(cacheKey, { pages: pageContents, loadedAt: Date.now() });
-    }
-
-    // ── Schritt 2: Historien-Rolling-Window (Anker + letzte 10 Nachrichten) ─────
+    // ── Historien-Rolling-Window (Anker + letzte 10 Nachrichten) ────────────────
     const historyWithoutLast = buildAgenticHistory(session.id).slice(0, -1);
     const historyChars = historyWithoutLast.reduce((s, m) => s + (m.content?.length || 0), 0);
 
-    // ── Schritt 3: Dynamisches Text-Budget ──────────────────────────────────────
+    // ── Dynamisches Text-Budget (seiten-unabhängig) ─────────────────────────────
     // aiCfg.inputBudgetChars = (context_window − max_tokens_out − Sicherheitspuffer) · chars_per_token
     // pro effektivem Provider. Davon noch Platz für System-Prompt und History reservieren.
     const SYSTEM_OVERHEAD_CHARS = 8000;   // ~2k Tokens für System-Prompt-Overhead
@@ -164,51 +160,119 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       Math.floor((aiCfg.inputBudgetChars - historyChars - SYSTEM_OVERHEAD_CHARS) * 0.98)
     );
 
-    // ── Schritt 4: Relevanz-Scoring + Seitenauswahl ─────────────────────────────
-    updateJob(jobId, { statusText: 'job.phase.selectingPages', progress: 42 });
-    const scored = pageContents.map(p => ({ ...p, score: _scorePageRelevance(message, p.text, bookChatStopwords) }));
-    const anyScore = scored.some(p => p.score > 0);
-    if (anyScore) scored.sort((a, b) => b.score - a.score);
-
-    const selectedPages = [];
+    // ── Retrieval: Mini-RAG mit Keyword-Fallback ────────────────────────────────
+    // Bei aktivem Embedding-Index zieht die semantische Pipeline die bedeutungs-
+    // relevantesten Chunk-Auszüge — dichterer, präziserer Kontext als reines Keyword-
+    // Scoring, und ohne alle Seiten zu laden. Fällt auf das Keyword-Scoring über alle
+    // Seiten zurück, wenn kein Index existiert, das Backend ausfällt oder die Anfrage
+    // keine semantischen Treffer liefert.
+    let selectedPages = [];
     let usedChars = 0;
-    if (!anyScore && scored.length > 0) {
-      // Gleichmässige Verteilung: jede Seite bekommt denselben Anteil → Querschnitt durch das Buch
-      const perPage = Math.floor(TEXT_CHAR_BUDGET / scored.length);
-      for (const p of scored) {
-        const text = p.text.slice(0, perPage);
-        if (text.length >= 100) {
+    let totalPages = 0;
+    let retrievalMode = 'keyword';
+
+    if (embed.isEnabled()) {
+      updateJob(jobId, { statusText: 'job.phase.selectingPages', progress: 20 });
+      try {
+        const sem = await _selectPassagesSemantic(session.book_id, message, TEXT_CHAR_BUDGET, jobSignal, userToken);
+        if (sem) {
+          ({ selectedPages, usedChars, totalPages } = sem);
+          retrievalMode = 'semantic';
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        logger.warn(`Semantisches Retrieval fehlgeschlagen (${e.message}) – Fallback auf Keyword-Scoring.`);
+      }
+    }
+
+    if (retrievalMode === 'keyword') {
+      // ── Alle Seiten aus Cache oder frisch via Content-Store laden ─────────────
+      let pageContents;
+      const cached = bookPageCache.get(cacheKey);
+      if (cached && Date.now() - cached.loadedAt < BOOK_PAGE_CACHE_TTL_MS) {
+        pageContents = cached.pages;
+        updateJob(jobId, { statusText: 'job.phase.pagesFromCache', progress: 40 });
+      } else {
+        updateJob(jobId, { statusText: 'job.phase.pageListLoading', progress: 8 });
+        let pages;
+        try { pages = await contentStore.listPages(session.book_id, userToken); }
+        catch (e) {
+          if (e?.status) throw i18nError('job.error.contentStorePageList', { status: e.status });
+          throw e;
+        }
+
+        const BATCH = 5;
+        pageContents = [];
+        for (let i = 0; i < pages.length; i += BATCH) {
+          if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+          updateJob(jobId, {
+            statusText: 'job.phase.loadingPagesBatch',
+            statusParams: { loaded: Math.min(i + BATCH, pages.length), total: pages.length },
+            progress: 10 + Math.round((i / Math.max(pages.length, 1)) * 30),
+          });
+          const batch = pages.slice(i, i + BATCH);
+          const results = await Promise.allSettled(batch.map(async p => {
+            try {
+              const pd = await contentStore.loadPage(p.id, userToken);
+              const text = htmlToText(pd.html || '').trim();
+              return text ? { name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug, text } : null;
+            } catch { return null; }
+          }));
+          for (const r of results) {
+            if (r.status === 'fulfilled' && r.value) pageContents.push(r.value);
+          }
+        }
+        // FIFO-Eviction: ältesten Eintrag entfernen wenn Cache voll
+        if (bookPageCache.size >= BOOK_PAGE_CACHE_MAX) {
+          const firstKey = bookPageCache.keys().next().value;
+          bookPageCache.delete(firstKey);
+        }
+        bookPageCache.set(cacheKey, { pages: pageContents, loadedAt: Date.now() });
+      }
+
+      // ── Relevanz-Scoring + Seitenauswahl ──────────────────────────────────────
+      updateJob(jobId, { statusText: 'job.phase.selectingPages', progress: 42 });
+      const scored = pageContents.map(p => ({ ...p, score: _scorePageRelevance(message, p.text, bookChatStopwords) }));
+      const anyScore = scored.some(p => p.score > 0);
+      if (anyScore) scored.sort((a, b) => b.score - a.score);
+
+      if (!anyScore && scored.length > 0) {
+        // Gleichmässige Verteilung: jede Seite bekommt denselben Anteil → Querschnitt durch das Buch
+        const perPage = Math.floor(TEXT_CHAR_BUDGET / scored.length);
+        for (const p of scored) {
+          const text = p.text.slice(0, perPage);
+          if (text.length >= 100) {
+            selectedPages.push({ name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug, text });
+            usedChars += text.length;
+          }
+        }
+      } else {
+        // Relevanz-sortiert: Top-Seiten zuerst bis Budget erschöpft
+        for (const p of scored) {
+          if (usedChars >= TEXT_CHAR_BUDGET) break;
+          const remaining = TEXT_CHAR_BUDGET - usedChars;
+          const text = p.text.slice(0, remaining);
           selectedPages.push({ name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug, text });
           usedChars += text.length;
         }
       }
-    } else {
-      // Relevanz-sortiert: Top-Seiten zuerst bis Budget erschöpft
-      for (const p of scored) {
-        if (usedChars >= TEXT_CHAR_BUDGET) break;
-        const remaining = TEXT_CHAR_BUDGET - usedChars;
-        const text = p.text.slice(0, remaining);
-        selectedPages.push({ name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug, text });
-        usedChars += text.length;
-      }
+      totalPages = pageContents.length;
     }
 
-    const cacheAge = bookPageCache.has(cacheKey)
-      ? Math.round((Date.now() - bookPageCache.get(cacheKey).loadedAt) / 1000) + 's'
-      : 'MISS';
     logger.info(
-      `Kontext: ${selectedPages.length}/${pageContents.length} Seiten ` +
+      `Kontext: ${selectedPages.length}/${totalPages} ${retrievalMode === 'semantic' ? 'Auszüge' : 'Seiten'} ` +
       `(${usedChars}/${TEXT_CHAR_BUDGET} Zeichen, Hist ${Math.round(historyChars / 1000)}k Zeichen, ` +
-      `${anyScore ? 'Keyword-Scoring' : 'Gleichverteilung'}, Cache ${cacheAge}).`
+      `Retrieval=${retrievalMode}).`
     );
 
     // ── System-Prompt + KI-Aufruf ───────────────────────────────────────────────
     const figuren = getFiguren(session.book_id, userEmail);
     const review  = getLatestReview(session.book_id, userEmail);
-    const systemPrompt = buildBookChatSystemPrompt(session.book_name || '', selectedPages, figuren, review, bookChatSys);
+    const systemPrompt = buildBookChatSystemPrompt(session.book_name || '', selectedPages, figuren, review, bookChatSys, { excerpt: retrievalMode === 'semantic' });
     const contextInfo = {
       pages:      selectedPages.map(p => ({ name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug })),
-      totalPages: pageContents.length,
+      totalPages,
+      retrievalMode,
       figuren:    figuren.length > 0,
       review:     !!review,
     };
@@ -255,9 +319,9 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       assistant_message_id: asstMsgResult.lastInsertRowid,
       tokensIn, tokensOut,
       pagesUsed: selectedPages.length,
-      pagesTotal: pageContents.length,
+      pagesTotal: totalPages,
       ...(sessionTitle ? { sessionTitle } : {}),
-    }, bookChatTps, `«${session.book_name || '-'}» session=${sessionId}, ${selectedPages.length}/${pageContents.length} Seiten`);
+    }, bookChatTps, `«${session.book_name || '-'}» session=${sessionId}, ${selectedPages.length}/${totalPages} Seiten`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Fehler: ${e.message}`, { stack: e.stack });
     failJob(jobId, e);

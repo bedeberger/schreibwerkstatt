@@ -62,6 +62,16 @@ function getSnapshot(bookId, id) {
   return db.prepare('SELECT * FROM book_snapshots WHERE id = ? AND book_id = ?').get(id, bookId) || null;
 }
 
+// Vollzeile der juengsten Fassung (fuer den Drift-Check: aktueller Buchstand vs.
+// letzte Fassung). Inkl. content_json/publication_json — kann MB gross sein, daher
+// nur fuer die serverseitige Drift-Berechnung, nicht fuer die Liste.
+function getLatestSnapshot(bookId) {
+  return db.prepare(`
+    SELECT * FROM book_snapshots
+    WHERE book_id = ? ORDER BY created_at DESC, id DESC LIMIT 1
+  `).get(bookId) || null;
+}
+
 function deleteSnapshot(bookId, id) {
   const res = db.prepare('DELETE FROM book_snapshots WHERE id = ? AND book_id = ?').run(id, bookId);
   return res.changes > 0;
@@ -105,6 +115,6 @@ function listLektoratTrend(bookId) {
 }
 
 module.exports = {
-  createSnapshot, listSnapshots, getSnapshot, deleteSnapshot, countSnapshots,
+  createSnapshot, listSnapshots, getSnapshot, getLatestSnapshot, deleteSnapshot, countSnapshots,
   setPublished, latestSignature, listLektoratTrend,
 };

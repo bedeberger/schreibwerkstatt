@@ -32,6 +32,8 @@ Alle drei sind nur sichtbar/aktiv, wenn das Backend konfiguriert ist (`config.se
 
 Es gibt **keine eigene Karte** und **keinen Paletten-Prefix** — die semantische Suche lebt komplett in der bestehenden Such-Karte (`key: 'search'` in [feature-registry.js](../public/js/cards/feature-registry.js)).
 
+**Interner Konsument (kein UI-Einstieg): der klassische Buch-Chat.** `runBookChatJob` (Nicht-Claude / `jobs.book_chat.mode='classic'`, [docs/chats.md](chats.md#buch-chat)) nutzt `semanticQuery` als **Mini-RAG-Retriever**: statt alle Seiten zu laden + Keyword-Scoring zieht `_selectPassagesSemantic` bei aktivem Index die relevantesten Chunk-Auszüge (ein bester Chunk pro Seite, `kinds:['page']`, `jobs.book_chat.rag_top_k`) in den System-Prompt. Non-fatal: kein Index / Backend down / keine Treffer → Keyword-Fallback. So bekommt der agentenlose Chat dieselbe scharfe Retrieval-Qualität wie das Tool `search_similar`.
+
 **Interner Konsument (kein UI-Einstieg):** die **Kontinuitäts-Verify-Stufe** (Multi-Pass, [docs/komplett.md](komplett.md#phase-8--kontinuitätsprüfung)) nutzt den Index als **best-effort Beleg-Fallback** — findet die wörtliche Textstellen-Suche das Zitat eines Befunds nicht, lädt sie die semantisch nächste Seiten-Passage nach (`searchSimilar`, `kinds:['page']`). Gilt nur, wenn der Index für das Buch existiert; sonst keyword-Pfad. Rein rückwärtsgewandt.
 
 ## Freischalten

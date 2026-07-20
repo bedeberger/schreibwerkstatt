@@ -1,0 +1,18 @@
+<!-- Drift-Hinweis „lohnt sich eine neue Fassung?" — via Fragment-Include aus
+     snapshots.html eingebunden (LOC-Split). Wegklickbar; kommt erst wieder, wenn
+     sich die Drift-Signatur aendert. Siehe docs/fassungen.md. -->
+<div class="snapshots-drift" x-show="showDrift()" x-cloak
+     :class="{ 'snapshots-drift--worth': driftWorthwhile() }"
+     role="status">
+  <button type="button" class="icon-btn icon-btn--ghost snapshots-drift__close"
+          @click="dismissDrift()"
+          :data-tip="$app.t('common.dismiss')" :aria-label="$app.t('common.dismiss')">
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+  </button>
+  <p class="snapshots-drift__head" x-text="driftHeadline()"></p>
+  <div class="snapshots-drift__tags">
+    <template x-for="item in driftItems()" :key="item.key">
+      <span class="tag" x-text="item.text"></span>
+    </template>
+  </div>
+</div>

@@ -26,6 +26,43 @@
    .entity-grid-table th/td-Default-Regel (hoehere Specificity). */
 .snapshots-table .snapshots-num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Drift-Hinweis „lohnt sich eine neue Fassung?" — operational-status-Achse
+   (System-Hinweis, kein Content-Callout). Neutral = gedimmt; --worth = amber-getoent
+   (Empfehlung), linker Accent-Border. */
+.snapshots-drift {
+  position: relative;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  padding-inline-end: calc(var(--space-md) + 1.75rem);
+  border-inline-start: 3px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+.snapshots-drift__close {
+  position: absolute;
+  inset-block-start: var(--space-xs);
+  inset-inline-end: var(--space-xs);
+}
+.snapshots-drift--worth {
+  border-inline-start-color: var(--color-warn-text);
+  background: var(--color-warn-bg);
+}
+.snapshots-drift__head {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+.snapshots-drift--worth .snapshots-drift__head {
+  color: var(--color-warn-text);
+  font-weight: 600;
+}
+.snapshots-drift__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
 .snapshots-desc {
   display: block;
   color: var(--color-muted);
