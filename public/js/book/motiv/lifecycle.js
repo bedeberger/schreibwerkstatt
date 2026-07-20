@@ -48,6 +48,7 @@ export const lifecycleMethods = {
     this.editBeschreibung = '';
     this.editTriggers = '';
     this.allBeats = [];
+    this.allActs = [];
     this._beatsLoaded = false;
     this.allDraftFiguren = [];
     this._draftFigurenLoaded = false;

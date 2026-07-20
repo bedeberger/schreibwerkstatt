@@ -37,6 +37,12 @@
                 :data-tip="$app.t('motiv.graph.resetLayout')" :aria-label="$app.t('motiv.graph.resetLayout')">
           <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#undo"/></svg>
         </button>
+        <button type="button" class="icon-btn icon-btn--ghost"
+                :class="{ 'is-active': motivFullscreen }"
+                :aria-pressed="motivFullscreen"
+                @click="toggleMotivFullscreen()"
+                :aria-label="motivFullscreen ? $app.t('motiv.fullscreenExit.tip') : $app.t('motiv.fullscreen.tip')"
+                :data-tip="motivFullscreen ? $app.t('motiv.fullscreenExit.tip') : $app.t('motiv.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="motivFullscreen ? '/icons.svg?v=693#minimize-2' : '/icons.svg?v=693#maximize-2'"/></svg></button>
       </div>
     </div>
   </div>

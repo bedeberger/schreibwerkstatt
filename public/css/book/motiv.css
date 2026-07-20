@@ -102,6 +102,15 @@
   border-left: 3px solid var(--card-accent);
   padding-left: var(--space-xs);
 }
+/* Heading, das zugleich collapsible-toggle ist (Fundstellen-Sektion): Button-Reset
+   + volle Breite klickbar, aber Heading-Optik statt uppercase/muted. */
+.motiv-panel-heading.collapsible-toggle {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
 .motiv-theme-list { display: flex; flex-direction: column; gap: var(--space-2xs); }
 .motiv-theme-rows { display: flex; flex-direction: column; gap: var(--space-2xs); }
 .motiv-theme-row { display: flex; align-items: center; gap: var(--space-2xs); }
@@ -266,6 +275,30 @@
    sonst verschiebt die Auswahl das benachbarte Freitextfeld. */
 .motiv-relation-add > .combobox-wrap,
 .motiv-relation-add > .motiv-inline-input { flex: 1 1 40%; min-width: 0; width: auto; }
+
+/* ── Vollbild: ganze Karte nimmt den Viewport, Graph füllt den Resthöhenraum
+     unter Header/Toolbar (Panel behält seine Spalte). ───────────────────── */
+.card--motiv:fullscreen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-surface);
+  padding: var(--space-lg);
+  z-index: var(--z-overlay);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.card--motiv:fullscreen .motiv-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.card--motiv:fullscreen .motiv-graph-container {
+  height: 100%;
+}
+.card--motiv:fullscreen .motiv-panel {
+  max-height: none;
+  align-self: stretch;
+}
 
 /* ── Mobile: gestapelt ────────────────────────────────────────────────── */
 @media (max-width: 960px) {

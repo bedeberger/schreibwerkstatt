@@ -4,6 +4,7 @@
 
 import { motivMethods } from '../book/motiv.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { attachFullscreenSync } from '../fullscreen.js';
 
 export function registerMotivCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -13,6 +14,7 @@ export function registerMotivCard() {
     motifs: [],
     relations: [],
     allBeats: [],
+    allActs: [],
     // Werkstatt-Figuren (draft_figures) fürs Figuren-Verknüpfungs-Combobox (Gruppe „Plotwerkstatt")
     allDraftFiguren: [],
     // UI-Status
@@ -23,6 +25,9 @@ export function registerMotivCard() {
     selectedMotifId: null,
     occurrences: [],
     occLoading: false,
+    // Fundstellen-Sektion auf-/zugeklappt (pro Motiv in localStorage persistiert,
+    // gesetzt bei jeder Auswahl in selectMotif; Default offen).
+    occExpanded: true,
     // Edit-Puffer der Kern-Felder (Name/Thema/Beschreibung/Trigger) — explizit
     // gespeichert via Save/Cancel-Leiste, kein Feld-Autosave.
     editThemeId: '',
@@ -54,6 +59,9 @@ export function registerMotivCard() {
     scanning: false,
     scanProgress: 0,
     motivScanJobId: null,
+    // Native-Fullscreen-Status (gespiegelt vom fullscreenchange-Listener) — mehr
+    // Platz für die Konstellation. Toggle in graphMethods.toggleMotivFullscreen.
+    motivFullscreen: false,
     // Embedding-Index-Refresh (für semantische Erkennung)
     indexing: false,
     // Index in dieser Sitzung schon aktualisiert? Blendet den Refresh-Hinweis aus.
@@ -93,6 +101,22 @@ export function registerMotivCard() {
         },
         onViewReset: () => this.resetMotiv(),
         onCardRefresh: () => this.loadBoard(),
+      });
+
+      // Auf-/Zuklappen der Fundstellen-Sektion pro Motiv persistieren.
+      this.$watch('occExpanded', (v) => {
+        if (this.selectedMotifId) this._persistOccExpanded(this.selectedMotifId, v);
+      });
+
+      // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit) und den
+      // vis-network-Graph auf die neue Containergrösse neu zeichnen.
+      attachFullscreenSync({
+        resolveWrap: () => this.$root,
+        signal: this._lifecycle.signal,
+        onChange: (active) => {
+          this.motivFullscreen = active;
+          this.$nextTick(() => this._motivNetwork?.redraw());
+        },
       });
     },
 

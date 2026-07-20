@@ -259,13 +259,16 @@ export const crudMethods = {
 
   // ── Auswahl + Fundstellen ────────────────────────────────────────────────
   // Plot-Beats fürs Verknüpfungs-Combobox (lazy, einmal pro Board-Load).
+  // Akte werden mitgeladen, damit die Beats im Combobox nach Akt gruppiert
+  // erscheinen (opt.group) statt als flache Liste.
   async _ensureBeats() {
     if (this._beatsLoaded) return;
     this._beatsLoaded = true;
     try {
       const data = await fetchJson(`/plot?book_id=${this._bookId()}`);
-      this.allBeats = (data.beats || []).map(b => ({ id: b.id, titel: b.titel }));
-    } catch (e) { this.allBeats = []; }
+      this.allBeats = (data.beats || []).map(b => ({ id: b.id, titel: b.titel, actId: b.act_id }));
+      this.allActs = (data.acts || []).map(a => ({ id: a.id, name: a.name }));
+    } catch (e) { this.allBeats = []; this.allActs = []; }
   },
   // Werkstatt-Figuren (draft_figures) fürs Figuren-Combobox (Gruppe „Plotwerkstatt").
   async _ensureDraftFiguren() {
@@ -282,6 +285,7 @@ export const crudMethods = {
     this.occurrences = [];
     this._loadMotifBuffer(this.motifById(id));
     if (!id) return;
+    this.occExpanded = this._readOccExpanded(id);
     this._ensureBeats();
     this._ensureDraftFiguren();
     this.occLoading = true;
@@ -291,6 +295,20 @@ export const crudMethods = {
     } catch (e) { /* Fundstellen sind optional; kein harter Fehler */ }
     finally { this.occLoading = false; }
     this._highlightNode(id);
+  },
+
+  // Auf-/Zuklapp-Zustand der Fundstellen-Sektion pro Motiv (localStorage; Default
+  // offen → nur der zugeklappte Zustand wird gespeichert, offen räumt den Key).
+  _occExpandedKey(id) { return `sw:motiv:occ-expanded:${id}`; },
+  _readOccExpanded(id) {
+    try { return localStorage.getItem(this._occExpandedKey(id)) !== '0'; }
+    catch (e) { return true; }
+  },
+  _persistOccExpanded(id, open) {
+    try {
+      if (open) localStorage.removeItem(this._occExpandedKey(id));
+      else localStorage.setItem(this._occExpandedKey(id), '0');
+    } catch (e) { /* localStorage optional */ }
   },
 
   gotoOccurrence(occ) {

@@ -99,7 +99,7 @@ export const exportMethods = {
   exportPageOptions() {
     const app = window.__app;
     if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
-    return Alpine.store('nav').pages.map(p => ({ value: p.id, label: p.name }));
+    return Alpine.store('nav').pages.map(p => ({ value: p.id, label: p.name, group: p.chapterName || '' }));
   },
 
   _handoffToPdfCustom() {

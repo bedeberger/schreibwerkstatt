@@ -6,6 +6,7 @@
 
 import { loadVis } from '../../lazy-libs.js';
 import { fetchJson } from '../../utils.js';
+import { toggleWrapFullscreen } from '../../fullscreen.js';
 
 // Themen-Palette: primär die vom Autor gewählte Farbe (themes.farbe = Palette-
 // Schlüssel, theme-aware --palette-*-Tokens wie in der Plot-Werkstatt); ohne Wahl
@@ -33,10 +34,10 @@ function _themeColor(themeId, themes, paletteVars) {
 export const graphMethods = {
   _graphSignature() {
     const m = this.motifs.map(x =>
-      `${x.id}:${x.theme_id || 0}:${x.occurrenceCount || 0}:${(x.figures || []).length}:${(x.draftFigures || []).length}:${(x.beats || []).length}:${(x.chapters || []).length}`
+      `${x.id}:${x.name || ''}:${x.theme_id || 0}:${x.occurrenceCount || 0}:${(x.figures || []).length}:${(x.draftFigures || []).length}:${(x.beats || []).length}:${(x.chapters || []).length}`
     ).join('|');
     const r = this.relations.map(x => `${x.from_motif_id}-${x.to_motif_id}:${x.typ}`).join('|');
-    const t = this.themes.map(x => `${x.id}:${x.farbe || ''}`).join(',');
+    const t = this.themes.map(x => `${x.id}:${x.name || ''}:${x.farbe || ''}`).join(',');
     const layers = `${this.layerFigures}${this.layerBeats}${this.layerChapters}`;
     return [m, r, t, layers, this.$store.shell?.uiLocale].join('##');
   },
@@ -260,6 +261,17 @@ export const graphMethods = {
 
   fitGraph() {
     this._motivNetwork?.fit({ animation: { duration: 400 } });
+  },
+
+  // Ganze Motiv-Karte ins Native-Vollbild — mehr Platz für die Konstellation.
+  // Status-Sync via fullscreenchange-Listener in motiv-card.js (motivFullscreen),
+  // der den Graph auf die neue Containergrösse neu zeichnet.
+  async toggleMotivFullscreen() {
+    try {
+      await toggleWrapFullscreen(this.$root);
+    } catch {
+      this.errorMessage = window.__app.t('motiv.error.fullscreen');
+    }
   },
 
   // Gespeicherte Anordnung verwerfen → Physik-Layout frisch berechnen. Persistiert
