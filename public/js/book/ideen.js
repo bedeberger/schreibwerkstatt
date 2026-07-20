@@ -51,6 +51,8 @@ export const ideenMethods = {
   // ── Meatball-Menu (Popover) ───────────────────────────────────────────────
   openMenu(ev, idee) {
     if (this.menuOpenId === idee.id) { this.closeMenu(); return; }
+    // Hover-Tooltip des Triggers wegblenden — er hinge sonst über dem Menü.
+    window.dispatchEvent(new CustomEvent('tooltip:hide'));
     this._triggerRect = ev.currentTarget.getBoundingClientRect();
     // Schätzung vor dem Render; danach mit der echten Popover-Grösse nachjustieren.
     // Erledigte Ideen haben ein kürzeres Menü (nur Wieder öffnen + Löschen) — eine

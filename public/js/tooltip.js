@@ -12,6 +12,18 @@
   let bubble = null;
   let currentTarget = null;
 
+  // Quell-Element kann aus dem DOM fallen, während der Tooltip sichtbar ist
+  // (Alpine x-show/Re-Render, Karten-/Seitenwechsel, Button rendert sich beim
+  // Klick selbst neu). Dabei feuert kein mouseout — das Element wird nicht
+  // verlassen, sondern entfernt. Ohne diesen Watcher bliebe der Tooltip
+  // verwaist stehen, bis der nächste Hover/Klick ihn wegräumt.
+  const removalWatcher =
+    typeof MutationObserver === 'function'
+      ? new MutationObserver(() => {
+          if (currentTarget && !document.contains(currentTarget)) hide();
+        })
+      : null;
+
   function ensureLayer() {
     if (layer) return;
     layer = document.createElement('div');
@@ -37,6 +49,7 @@
 
   function hide() {
     currentTarget = null;
+    if (removalWatcher) removalWatcher.disconnect();
     if (!layer) return;
     layer.classList.remove('tip-visible');
     layer.setAttribute('aria-hidden', 'true');
@@ -84,6 +97,9 @@
     layer.classList.add('tip-visible');
     layer.setAttribute('aria-hidden', 'false');
     position(target);
+    if (removalWatcher) {
+      removalWatcher.observe(document.body, { childList: true, subtree: true });
+    }
   }
 
   function findTip(node) {
@@ -110,12 +126,10 @@
   document.addEventListener('focusout', () => hide());
   window.addEventListener('scroll', hide, true);
   window.addEventListener('resize', hide);
+  // Programmatisches Ausblenden (z.B. wenn ein Klick ein Popover über demselben
+  // Trigger öffnet und der Hover-Tooltip sonst darüber hängen bliebe).
+  window.addEventListener('tooltip:hide', hide);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hide();
   });
-  // Source-Element kann aus dem DOM verschwinden (Alpine x-show, Re-Render).
-  // Vor jedem Klick prüfen und ggf. Tooltip ausblenden.
-  document.addEventListener('click', (e) => {
-    if (currentTarget && !document.contains(currentTarget)) hide();
-  }, true);
 })();

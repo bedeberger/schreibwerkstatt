@@ -219,6 +219,7 @@ Eine eigenständige, per-Boolean klappbare Sektion nutzt **`Alpine.data('collaps
 - **Button-Klasse:** `icon-btn icon-btn--ghost` (transparent bis Hover, einheitliche 28×28-Chips). **Nicht** der umrandete `.icon-btn` (default/outlined) für Header-Cluster.
 - **Aktiver Toggle** (Panel offen, Fullscreen ein): `:class="{ 'is-active': … }"` + `:aria-pressed` — nicht eine eigene `.primary`/`.active`-Klasse.
 - **Schliessen im Cluster:** liegt der Close-Button mit weiteren Aktionen in derselben `.card-actions`-Reihe, ist er ebenfalls `icon-btn icon-btn--ghost` mit `#x`-Sprite (nicht der abgesetzte `.btn-card-close`, der nur für den allein-stehenden, absolut positionierten Header-Close gilt — siehe [Action-Icon-Library](#action-icon-library-verbindlich) „Schliessen").
+- **Mobile (`≤700px`):** Header mit `.card-header-titlebar` bleibt eine **Zeile** — die Aktionen (`.card-actions` / `.card-header-aside`) bleiben oben rechts verankert, die Titelspalte schrumpft und der Titel bricht bei Bedarf um (nicht die Icons in eine eigene Zeile drücken). Geregelt zentral über `.card-header:has(.card-header-titlebar)` in [card-form.css](public/css/components/card-form.css) — pro Karte nichts deklarieren. Reine Text-Button-Leisten **ohne** Titelspalte (`.card-header > .card-actions`, z.B. Export/Admin) sind ausgenommen und behalten den Full-Width-Stack.
 
 Referenz-Cluster: [public/partials/recherche.html](public/partials/recherche.html) (Chat / Vollbild / Schliessen als Ghost-Trio).
 

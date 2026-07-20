@@ -48,6 +48,8 @@ export function menuData() {
     toggle() { this.open ? this.close() : this.openMenu(); },
     openMenu() {
       this.open = true;
+      // Hover-Tooltip des Triggers wegblenden — er hinge sonst über dem Menü.
+      window.dispatchEvent(new CustomEvent('tooltip:hide'));
       // Ersten Eintrag fokussieren (Tastatur-Bedienung). Der native Button-
       // Outline ist das Fokus-Signal (kein eigener Ring, siehe Fokus-Regel).
       this.$nextTick(() => {

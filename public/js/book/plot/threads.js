@@ -88,6 +88,8 @@ export const threadsMethods = {
   // JS-positioniert aus dem Trigger-Rect (Pattern wie das Ideen-Meatball-Menü).
   openThreadMenu(ev, laneId) {
     if (this.threadActionsOpenId === laneId) { this.closeThreadMenu(); return; }
+    // Hover-Tooltip des Triggers wegblenden — er hinge sonst über dem Menü.
+    window.dispatchEvent(new CustomEvent('tooltip:hide'));
     this._threadTriggerRect = ev.currentTarget.getBoundingClientRect();
     // Schätzung vor dem Render; danach mit der echten Popover-Grösse nachjustieren,
     // damit das Menü beim Hochklappen nicht mit einer festen Höhe über den Button

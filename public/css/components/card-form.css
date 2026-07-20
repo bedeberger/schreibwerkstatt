@@ -190,9 +190,32 @@
   font-variant-numeric: tabular-nums;
   margin-left: var(--space-2xs);
 }
+/* Mobile: Header mit Titelspalte bleibt eine Zeile — die Aktionen (Icon-Buttons
+   in .card-actions / .card-header-aside) bleiben oben rechts verankert statt in
+   eine eigene Zeile darunter umzubrechen. Die Titelspalte schrumpft
+   (flex 1 1 0 / min-width 0) und der Titel bricht bei Bedarf um.
+   Reine Text-Button-Leisten OHNE Titelspalte (Export/Admin) sind ausgenommen
+   und behalten ihren Full-Width-Stack (base .card-header column-Regel). */
 @media (max-width: 700px) {
-  .card-header--subline { flex-direction: column; align-items: stretch; }
-  .card-header-aside { width: 100%; flex-wrap: wrap; }
+  .card-header:has(.card-header-titlebar) {
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+  }
+  /* Das base-Mobile padding-right (Platz fuer den absolut positionierten
+     Close-Button) nur behalten, wenn wirklich ein Close-Button im Header sitzt.
+     Sonst wuerden die Icons unnoetig weit vom rechten Rand einruecken. */
+  .card-header:has(.card-header-titlebar):not(:has(> .btn-card-close)) {
+    padding-right: 0;
+  }
+  .card-header:has(.card-header-titlebar) > .card-actions,
+  .card-header:has(.card-header-titlebar) > .card-header-aside {
+    width: auto;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: var(--space-md);
+  }
 }
 
 /* === Form elements === */

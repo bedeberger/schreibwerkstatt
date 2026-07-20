@@ -389,6 +389,8 @@ export const aiMethods = {
   openBeatOccPopover(ev, beat) {
     if (!beat || !(beat.occ_top || []).length) return;
     if (this.beatOccPopoverBeatId === beat.id) { this.closeBeatOccPopover(); return; }
+    // Hover-Tooltip des Anker-Badges wegblenden — er hinge sonst über dem Popover.
+    window.dispatchEvent(new CustomEvent('tooltip:hide'));
     this._occTriggerRect = ev.currentTarget.getBoundingClientRect();
     // Schätzung vor dem Render, danach mit der echten Popover-Grösse nachjustieren
     // (sonst schiebt sich das Menü beim Hochklappen mit fester Höhe über den Button).
