@@ -56,6 +56,8 @@ export function registerMotivCard() {
     motivScanJobId: null,
     // Embedding-Index-Refresh (für semantische Erkennung)
     indexing: false,
+    // Index in dieser Sitzung schon aktualisiert? Blendet den Refresh-Hinweis aus.
+    indexRefreshed: false,
     // Brainstorm-Job (KI-Vorschläge)
     brainstorming: false,
     motivBrainstormJobId: null,

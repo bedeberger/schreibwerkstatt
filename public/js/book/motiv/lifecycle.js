@@ -52,6 +52,7 @@ export const lifecycleMethods = {
     this.allDraftFiguren = [];
     this._draftFigurenLoaded = false;
     this.errorMessage = '';
+    this.indexRefreshed = false;
     this._savedPositions = null;
     this._memos = {};
   },
