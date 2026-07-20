@@ -221,8 +221,10 @@ export const crudMethods = {
     if (!motif || idVal == null || idVal === '') return;
     let item = null;
     if (kind === 'figures') {
-      const f = (this.$store.catalog.figuren || []).find(x => x.fig_id === idVal);
-      if (f) item = { figId: f.fig_id, name: f.name };
+      // Katalog-Figuren tragen die TEXT-fig_id im `.id`-Feld (siehe /figures: id = f.fig_id),
+      // NICHT in `.fig_id`. Die Soll-Brücke speichert sie als `figId`.
+      const f = (this.$store.catalog.figuren || []).find(x => String(x.id) === String(idVal));
+      if (f) item = { figId: f.id, name: f.name };
     } else if (kind === 'draftFigures') {
       const d = (this.allDraftFiguren || []).find(x => String(x.id) === String(idVal));
       if (d) item = { id: Number(d.id), name: d.name };

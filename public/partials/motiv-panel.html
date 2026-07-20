@@ -122,7 +122,7 @@
              Wert trägt ein Präfix (fig:/draft:), addFigureLink löst die richtige Brücke auf. -->
         <div x-data="combobox($app.t('motiv.link.addFigure'), '')" x-modelable="value" x-model="linkFigTmp"
              x-effect="options = [
-               ...($store.catalog.figuren||[]).map(f=>({value:'fig:'+f.fig_id, label:f.name, group:$app.t('motiv.link.figureGroup.katalog')})),
+               ...($store.catalog.figuren||[]).map(f=>({value:'fig:'+f.id, label:f.name, group:$app.t('motiv.link.figureGroup.katalog')})),
                ...(allDraftFiguren||[]).map(d=>({value:'draft:'+d.id, label:d.name, group:$app.t('motiv.link.figureGroup.werkstatt')}))
              ]"
              @combobox-change="if(linkFigTmp){ addFigureLink(linkFigTmp); linkFigTmp='' }"></div>

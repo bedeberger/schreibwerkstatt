@@ -124,7 +124,7 @@ export const graphMethods = {
         for (const f of (m.figures || [])) {
           const nid = `f${f.figId}`;
           if (!nodes.some(n => n.id === nid)) {
-            const cat = figCatalog.find(x => x.fig_id === f.figId);
+            const cat = figCatalog.find(x => String(x.id) === String(f.figId));
             nodes.push({ id: nid, label: (cat?.name || f.name || '?'), shape: 'diamond', size: 9, color: LAYER.figure, font: { color: mutedColor, size: 11 } });
           }
           edges.push({ from: `m${m.id}`, to: nid, dashes: [2, 3], color: { color: LAYER.figure, opacity: 0.6 }, width: 1 });
