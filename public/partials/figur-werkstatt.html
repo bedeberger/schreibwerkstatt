@@ -325,6 +325,27 @@
                   </div>
                 </template>
               </div>
+              <!-- Belegstellen: die Manuskript-Textstellen, gegen die geprüft wurde
+                   (semantische Suche). Klick springt an die Seite. -->
+              <div class="werkstatt-belege" x-data="collapsible(false)"
+                   x-show="consistencyResult && consistencyResult.textbelege && consistencyResult.textbelege.length" x-cloak>
+                <button type="button" class="collapsible-toggle" x-bind="trigger">
+                  <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+                  <span x-text="$app.t('werkstatt.consistency.belege', { count: consistencyResult && consistencyResult.textbelege ? consistencyResult.textbelege.length : 0 })"></span>
+                </button>
+                <div class="werkstatt-belege-body" x-bind="panel" x-cloak>
+                  <p class="entity-meta-label" x-text="$app.t('werkstatt.consistency.belegHint')"></p>
+                  <template x-for="(b, bi) in (consistencyResult ? consistencyResult.textbelege : [])" :key="bi">
+                    <div class="werkstatt-beleg">
+                      <button type="button" class="tag internal-link werkstatt-beleg-link"
+                              @click.stop="gotoBeleg(b.page_id)"
+                              :data-tip="$app.t('werkstatt.consistency.gotoBeleg')"
+                              x-text="belegPageLabel(b.page_id)"></button>
+                      <span class="werkstatt-beleg-snippet" x-text="b.snippet"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
             </div>
           </div>
         </template>

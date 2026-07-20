@@ -136,7 +136,12 @@
     border-left: 3px solid var(--color-muted);
     border-radius: var(--radius-sm);
     padding: var(--space-sm);
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+    /* Nur transform animieren (Compositor-billig). box-shadow/border-color NICHT
+       in die Transition: sie zu animieren erzwingt Repaint pro Frame — beim
+       H-Scroll gleiten die Karten unter dem Cursor durch, jede triggert Hover
+       und ruckelt das Board. Schatten erscheint jetzt sofort (ein Repaint statt
+       einer 150-ms-Repaint-Kaskade). */
+    transition: transform var(--transition-fast);
   }
   .plot-beat:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
@@ -271,6 +276,68 @@
     background: color-mix(in oklch, var(--color-schwach) 14%, transparent);
     cursor: default;
     font-weight: 700;
+  }
+
+
+  /* Anchor-Fundstellen-Popover: nutzt die .context-menu-Hülle (Teleport, Shadow,
+     Fade). Die Zeilen sind reicher als ein Aktions-Menüeintrag (Seitenname +
+     Score + Snippet zweizeilig), darum eigene Item-Klasse. */
+  .plot-occ-popover {
+    min-width: 240px;
+    max-width: min(360px, calc(100vw - var(--space-md)));
+  }
+  .plot-occ-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    width: 100%;
+    padding: var(--space-xs) var(--space-md);
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    text-align: left;
+    cursor: pointer;
+  }
+  .plot-occ-item:hover:not(:disabled),
+  .plot-occ-item:focus-visible {
+    background: var(--color-hover);
+    outline: none;
+  }
+  .plot-occ-item:disabled {
+    opacity: var(--opacity-disabled);
+    cursor: default;
+  }
+  .plot-occ-item-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+  }
+  .plot-occ-item-name {
+    flex: 1 1 auto;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .plot-occ-item-score {
+    flex: 0 0 auto;
+    font-size: var(--font-size-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-muted);
+  }
+  .plot-occ-item-snippet {
+    font-size: var(--font-size-xs);
+    color: var(--color-muted);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .plot-occ-more {
+    padding: var(--space-2xs) var(--space-md) var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-muted);
   }
 
   /* Kurzes Hervorheben beim Springen aus einem Befund zum Beat. */

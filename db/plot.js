@@ -807,7 +807,7 @@ const _stmtBeatOccForBook = db.prepare(`
    WHERE b.book_id = ? AND b.user_email = ?
    ORDER BY o.score DESC, o.id
 `);
-const BEAT_OCC_TOP_N = 4;
+const BEAT_OCC_TOP_N = 8;
 function beatOccurrenceMap(bookId, userEmail) {
   const map = new Map();
   for (const r of _stmtBeatOccForBook.all(parseInt(bookId), userEmail)) {

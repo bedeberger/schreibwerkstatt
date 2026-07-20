@@ -99,6 +99,8 @@ export const lifecycleMethods = {
     this.threadColorPickerId = null;
     this.threadActionsOpenId = null;
     this._detachThreadMenuListeners?.();
+    this.beatOccPopoverBeatId = null;
+    this._detachOccPopoverListeners?.();
     this._dragBeatId = null;
     this.brainstormResult = null;
     this.brainstormActId = null;

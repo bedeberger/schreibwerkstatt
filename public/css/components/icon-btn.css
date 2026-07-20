@@ -112,6 +112,26 @@
   pointer-events: none;
 }
 
+/* Achtungs-Punkt an einem Icon-Button: kleiner Eck-Marker, der auf einen
+   erledigenswerten Zustand hinweist (z.B. veralteter Ist-Index), ohne den
+   Button als Toggle einzufärben. Für Aktions-Buttons, wo is-active semantisch
+   falsch (kein Umschalt-Zustand) und als Dauer-Highlight irritierend wäre. */
+.icon-btn--attention {
+  position: relative;
+}
+.icon-btn--attention::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-surface);
+  pointer-events: none;
+}
+
 /* Icon-Glyph-Normalisierung: alle Icon-only Action-/Close-Buttons rendern ihr
    <svg.icon> auf dieselbe feste Grösse (--icon-size-action) statt auf ihre je
    eigene font-size (.icon = 1em). Ohne das driften die Glyphen (Card-Close 18px,

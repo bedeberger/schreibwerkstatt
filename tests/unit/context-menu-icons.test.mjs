@@ -99,6 +99,9 @@ test('Context-Menu-Trigger: aria-haspopup="menu" sitzt nur auf Icon-Buttons (kei
       // Avatar-/Identitäts-Trigger zeigen ein Profilbild bzw. Initialen, kein
       // Aktions-Icon — bewusst ein eigenes Pattern (avatar-menu), kein Meatball.
       if (hasClass(btn, 'avatar-btn')) continue;
+      // Plot-Anchor-Badge trägt die Fundstellen-Zahl als Text (Content-Trigger, kein
+      // Aktions-Icon) und öffnet das Content-Fundstellen-Popover — Ausnahme wie Avatar.
+      if (hasClass(btn, 'plot-beat-anchor')) continue;
       if (!hasSpriteIcon(btn)) {
         const txt = (btn.textContent || '').replace(/\s+/g, '');
         offenders.push(`${file}: Menü-Trigger ohne Sprite-Icon (Text "${txt.slice(0, 12)}") → more-horizontal-Icon nutzen`);

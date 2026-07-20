@@ -132,6 +132,7 @@ export const beatsMethods = {
       draft_figure_ids: [...(beat.draft_fig_ids || [])],
       motif_ids: (beat.motifs || []).map(m => m.id),
     };
+    this.beatFigTmp = '';
   },
   cancelEditBeat() { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; },
 
@@ -159,6 +160,26 @@ export const beatsMethods = {
   // Intensität setzen — erneuter Klick auf den aktiven Wert löscht ihn (null).
   setBeatDraftIntensitaet(n) {
     this.beatDraft.intensitaet = (this.beatDraft.intensitaet === n) ? null : n;
+  },
+
+  // Kombinierte Figuren-Combobox (zwei Quellen als opt-Gruppen, wie in der
+  // Motiv-Werkstatt): Präfix fig: → Katalog-Figur (TEXT-fig_id), draft: →
+  // Werkstatt-Figur (INTEGER draft_figures.id). Fügt nur hinzu (Set-dedupe);
+  // Entfernen läuft über die Chip-Buttons (toggleBeatDraft*Figure).
+  addBeatFigureLink(val) {
+    if (val == null || val === '') return;
+    const s = String(val);
+    if (s.startsWith('draft:')) {
+      const id = parseInt(s.slice(6));
+      if (Number.isInteger(id) && !this.beatDraft.draft_figure_ids.includes(id)) {
+        this.beatDraft.draft_figure_ids = [...this.beatDraft.draft_figure_ids, id];
+      }
+    } else {
+      const id = s.startsWith('fig:') ? s.slice(4) : s;
+      if (!this.beatDraft.figure_ids.includes(id)) {
+        this.beatDraft.figure_ids = [...this.beatDraft.figure_ids, id];
+      }
+    }
   },
 
   toggleBeatDraftFigure(figId) {

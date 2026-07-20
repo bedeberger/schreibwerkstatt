@@ -15,7 +15,7 @@
 //
 //   <div x-data="entityPicker({ entity: 'figur', grouped: true, multiple: true,
 //                               placeholder: $app.t('…'),
-//                               noGroupLabel: $app.t('plot.beat.noChapterGroup') })"
+//                               noGroupLabel: $app.t('…') })"
 //        x-modelable="value" x-model="beatDraft.figure_ids"></div>
 //
 //   <div x-data="entityPicker({ entity: 'werkstatt', multiple: true,

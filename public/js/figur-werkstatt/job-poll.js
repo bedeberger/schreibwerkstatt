@@ -33,6 +33,7 @@ export const JOB_KINDS = {
     mapResult: (job) => ({
       konflikte: job.result.konflikte || [],
       fazit: job.result.fazit || '',
+      textbelege: job.result.textbelege || [],
     }),
     onDoneExtra: (self) => { self.selectedKonfliktIdx = null; },
   },

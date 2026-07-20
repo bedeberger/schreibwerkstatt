@@ -36,12 +36,13 @@
         </template>
       </span>
       <!-- Verankerungs-Badge (Soll status vs. Ist-Fundstellen aus der semantischen
-           Suche). 'confirmed'/'found' zeigen die Fundstellen-Zahl und springen zur
-           stärksten Stelle; 'drift' (im_buch ohne Fund) warnt (nicht navigierbar).
-           'none' rendert nichts. -->
+           Suche). 'confirmed'/'found' zeigen die Fundstellen-Zahl und öffnen bei
+           Klick das Fundstellen-Popover (Liste → Sprung zur Textstelle); 'drift'
+           (im_buch ohne Fund) warnt (nicht navigierbar). 'none' rendert nichts. -->
       <button type="button" class="plot-beat-anchor" :class="'plot-beat-anchor--' + beatAnchorState(beat)"
               x-show="beatAnchorState(beat) !== 'none'"
-              @click.stop="beat.occ_count && gotoBeatOccurrence(beat)"
+              @click.stop="beat.occ_count && openBeatOccPopover($event, beat)"
+              aria-haspopup="menu" :aria-expanded="beatOccPopoverBeatId === beat.id"
               :data-tip="beatAnchorTip(beat)" :aria-label="beatAnchorTip(beat)">
         <span x-show="beat.occ_count" x-text="beat.occ_count"></span>
         <span x-show="!beat.occ_count" aria-hidden="true">!</span>
@@ -109,11 +110,20 @@
     <label class="plot-edit-label" x-text="$app.t('plot.beat.chapter')"></label>
     <div x-data="entityPicker({ entity: 'chapter', placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
          x-modelable="value" x-model="beatDraft.chapter_id"></div>
-    <label class="plot-edit-label" x-show="$store.catalog.figuren.length" x-text="$app.t('plot.beat.figuren')"></label>
-    <div x-show="$store.catalog.figuren.length"
-         x-data="entityPicker({ entity: 'figur', grouped: true, multiple: true, placeholder: $app.t('plot.beat.figurenPick'), noGroupLabel: $app.t('plot.beat.noChapterGroup') })"
-         x-modelable="value" x-model="beatDraft.figure_ids"></div>
-    <div class="plot-fig-chips" x-show="beatFigureChips().length">
+    <!-- Figuren: eine Combobox, zwei Quellen als opt-Gruppen (Katalog =
+         Komplettanalyse, Werkstatt = Plotwerkstatt-Drafts) — spart Platz wie in
+         der Motiv-Werkstatt. Wert trägt Präfix fig:/draft:, addBeatFigureLink
+         legt in der richtigen Draft-Liste an. -->
+    <label class="plot-edit-label" x-show="$store.catalog.figuren.length || draftFiguren.length"
+           x-text="$app.t('plot.beat.figuren')"></label>
+    <div x-show="$store.catalog.figuren.length || draftFiguren.length"
+         x-data="combobox($app.t('plot.beat.figurenPick'), '')" x-modelable="value" x-model="beatFigTmp"
+         x-effect="options = [
+           ...($store.catalog.figuren||[]).map(f=>({value:'fig:'+f.id, label:(f.kurzname||f.name), group:$app.t('plot.beat.figureGroup.katalog')})),
+           ...(draftFiguren||[]).map(d=>({value:'draft:'+d.id, label:d.name, group:$app.t('plot.beat.figureGroup.werkstatt')}))
+         ]"
+         @combobox-change="if(beatFigTmp){ addBeatFigureLink(beatFigTmp); beatFigTmp='' }"></div>
+    <div class="plot-fig-chips" x-show="beatFigureChips().length || beatWerkstattChips().length">
       <template x-for="chip in beatFigureChips()" :key="chip.id">
         <span class="tag plot-fig-chip">
           <span x-text="chip.label"></span>
@@ -123,12 +133,6 @@
           </button>
         </span>
       </template>
-    </div>
-    <label class="plot-edit-label" x-show="draftFiguren.length" x-text="$app.t('plot.beat.werkstattFiguren')"></label>
-    <div x-show="draftFiguren.length"
-         x-data="entityPicker({ entity: 'werkstatt', multiple: true, placeholder: $app.t('plot.beat.werkstattPick'), items: () => draftFiguren })"
-         x-modelable="value" x-model="beatDraft.draft_figure_ids"></div>
-    <div class="plot-fig-chips" x-show="beatWerkstattChips().length">
       <template x-for="chip in beatWerkstattChips()" :key="'d' + chip.id">
         <span class="tag tag--werkstatt plot-fig-chip">
           <span x-text="chip.label"></span>
@@ -170,7 +174,7 @@
               @click="toggleBeatVerworfen(beat)"
               :data-tip="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')"
               :aria-label="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')">
-        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=691#' + (beat.verworfen ? 'rotate-cw' : 'minus')"/></svg>
+        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=691#' + (beat.verworfen ? 'rotate-ccw' : 'minus')"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger plot-beat-delete" @click="deleteBeat(beat)" :data-tip="$app.t('plot.beat.delete')" :aria-label="$app.t('plot.beat.delete')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>

@@ -127,7 +127,19 @@ export const SCHEMA_BRAINSTORM = _obj({
 // bestehende Figuren (Name+Rolle) + Orte (Name+Typ). Findet Widersprüche,
 // Lücken und Klischees. Severity-Vokabular kompatibel zu .severity-tag--*.
 
-export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKontext, bestehendeFiguren, bestehendeOrte, beziehungen = [], eigeneAuftritte = null, plotBeats = []) {
+// Textstellen aus der semantischen Suche: die tatsächliche Prosa, wie die Figur im
+// Manuskript geschrieben ist (Consistency-Erdung). Anders als _auftritteSeg (Szenen-
+// Titel/Ereignis-Labels) ist das der Wortlaut → die KI prüft den Mindmap-Plan gegen
+// die geschriebene Realität. Ähnlichkeitstreffer, kein Beweis.
+function _textbelegeSeg(textbelege) {
+  const lines = (textbelege || []).slice(0, 6)
+    .filter(t => t && typeof t.snippet === 'string' && t.snippet.trim())
+    .map((t, i) => `${i + 1}. „${t.snippet.trim()}"`);
+  if (!lines.length) return '';
+  return `\nSO IST DIE FIGUR IM MANUSKRIPT GESCHRIEBEN (Textstellen aus der semantischen Suche — der tatsächliche Wortlaut, nicht der Plan):\n${lines.join('\n')}\n`;
+}
+
+export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKontext, bestehendeFiguren, bestehendeOrte, beziehungen = [], eigeneAuftritte = null, plotBeats = [], textbelege = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const archSeg = archetype ? ` (Archetyp: ${archetype})` : '';
   const figLines = _figurenLines(bestehendeFiguren);
@@ -139,6 +151,10 @@ export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKo
   const auftritteSeg = _auftritteSeg(eigeneAuftritte);
   const auftritteCheck = auftritteSeg
     ? '\n- Widersprüche zwischen Mindmap-Plan und dem, was im Buch bereits über die Figur geschrieben steht (Szenen/Ereignisse oben)'
+    : '';
+  const tbSeg = _textbelegeSeg(textbelege);
+  const tbCheck = tbSeg
+    ? '\n- Mindmap-Plan vs. geschriebene Figur: Widersprechen die obigen Textstellen dem geplanten Profil (Persönlichkeit, Stimme, Want/Need/Wound/Lie, Bogen)? Wird eine geplante Eigenschaft im Text nicht getragen oder sogar konterkariert? Zitiere die belegende Stelle knapp im "problem". Die Textstellen sind Ähnlichkeitstreffer, kein Beweis — urteile am Wortlaut; findet sich zu einer geplanten Eigenschaft KEINE Stelle, ist das KEIN Fehler (die Figur ist evtl. noch nicht geschrieben).'
     : '';
   // Cross-Feature: geplante Handlung der Figur (Plot-Werkstatt). Erlaubt den Abgleich
   // „geplanter Figurenbogen ↔ geplante Beats" — die wertvollste Cross-Prüfung, die
@@ -156,7 +172,7 @@ export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKo
   return `Du prüfst eine in Entwicklung befindliche Romanfigur auf Stimmigkeit mit der Buchwelt. Die Autorin arbeitet die Figur als Mindmap aus; deine Aufgabe ist es, Widersprüche, Lücken und Klischees zu benennen — schonungslos, aber konstruktiv.
 
 FIGUR: ${figurName}${archSeg}
-${ctxSeg}${figSeg}${bezSeg}${ortSeg}${auftritteSeg}${plotSeg}
+${ctxSeg}${figSeg}${bezSeg}${ortSeg}${auftritteSeg}${tbSeg}${plotSeg}
 FIGUR-MINDMAP (JSON):
 ${JSON.stringify(mindmapJson)}
 
@@ -164,7 +180,7 @@ Prüfe auf:
 - Widersprüche innerhalb der Mindmap (z.B. Hintergrund passt nicht zur Stimme)
 - Konflikte mit Buchkontext (z.B. Beruf passt nicht zum Setting/Epoche)
 - Konflikte mit bestehenden Figuren (z.B. Doppelung von Rolle/Funktion, namentliche Verwechslungsgefahr)
-- Konflikte mit Schauplätzen (z.B. Wohnort existiert nicht)${auftritteCheck}${plotCheck}
+- Konflikte mit Schauplätzen (z.B. Wohnort existiert nicht)${auftritteCheck}${tbCheck}${plotCheck}
 - Klischees und blasse Stellen, die mehr Substanz brauchen
 - Fehlende Aspekte, die für eine glaubwürdige Figur unverzichtbar wären
 

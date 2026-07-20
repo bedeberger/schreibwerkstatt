@@ -380,11 +380,66 @@ export const aiMethods = {
     }
   },
 
-  // Vom Anchor-Badge zur stärksten Fundstelle im Manuskript springen (Top-Treffer
-  // = höchster Score, vom Server vorsortiert). Verlässt die Plot-Karte → Seite.
-  gotoBeatOccurrence(beat) {
-    const top = (beat && beat.occ_top || [])[0];
-    if (top && top.page_id) window.__app.gotoPageById(top.page_id);
+  // ── Anchor-Fundstellen-Popover ────────────────────────────────────────────
+  // Klick aufs Anchor-Badge listet die Top-Fundstellen (occ_top, nach Score
+  // vorsortiert) in einem nach <body> teleportierten .context-menu; jede Zeile
+  // springt an die belegende Textstelle. Die Beat-Karte lebt in einem
+  // overflow/transform-Scrollcontainer, in dem ein verankertes Popover geclippt
+  // würde → JS-positioniert aus dem Trigger-Rect (Pattern wie das Strang-Menü).
+  openBeatOccPopover(ev, beat) {
+    if (!beat || !(beat.occ_top || []).length) return;
+    if (this.beatOccPopoverBeatId === beat.id) { this.closeBeatOccPopover(); return; }
+    this._occTriggerRect = ev.currentTarget.getBoundingClientRect();
+    // Schätzung vor dem Render, danach mit der echten Popover-Grösse nachjustieren
+    // (sonst schiebt sich das Menü beim Hochklappen mit fester Höhe über den Button).
+    this.beatOccPopoverPos = this._computeOccPopoverPos(this._occTriggerRect, 280, 220);
+    this.beatOccPopoverBeatId = beat.id;
+    this._attachOccPopoverListeners();
+    this.$nextTick(() => {
+      const el = this.$refs.occPopover;
+      if (!el || !this._occTriggerRect) return;
+      this.beatOccPopoverPos = this._computeOccPopoverPos(this._occTriggerRect, el.offsetWidth, el.offsetHeight);
+    });
+  },
+
+  _computeOccPopoverPos(r, pw, ph) {
+    const left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.right - pw));
+    const top = (r.bottom + ph + 8 > window.innerHeight)
+      ? Math.max(8, r.top - ph - 4)
+      : r.bottom + 4;
+    return { top, left };
+  },
+
+  closeBeatOccPopover() {
+    this.beatOccPopoverBeatId = null;
+    this._detachOccPopoverListeners();
+  },
+
+  // Der offene Beat (für das teleportierte Popover ausserhalb der Beat-Schleife).
+  beatOccPopoverBeat() {
+    if (this.beatOccPopoverBeatId == null) return null;
+    return (this.beats || []).find(b => b.id === this.beatOccPopoverBeatId) || null;
+  },
+
+  _attachOccPopoverListeners() {
+    if (this._occPopoverCloseHandler) return;
+    this._occPopoverCloseHandler = () => this.closeBeatOccPopover();
+    window.addEventListener('scroll', this._occPopoverCloseHandler, true);
+    window.addEventListener('resize', this._occPopoverCloseHandler);
+  },
+
+  _detachOccPopoverListeners() {
+    if (!this._occPopoverCloseHandler) return;
+    window.removeEventListener('scroll', this._occPopoverCloseHandler, true);
+    window.removeEventListener('resize', this._occPopoverCloseHandler);
+    this._occPopoverCloseHandler = null;
+  },
+
+  // Aus dem Popover an eine konkrete Fundstelle springen. Verlässt die Plot-Karte
+  // → Seite (Szenen erben serverseitig ihre page_id fürs Anspringen).
+  gotoOccurrence(occ) {
+    this.closeBeatOccPopover();
+    if (occ && occ.page_id) window.__app.gotoPageById(occ.page_id);
   },
 
   // Ganze Plot-Karte ins Native-Vollbild — mehr horizontaler Platz fürs Akt-Board.

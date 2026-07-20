@@ -446,7 +446,7 @@ mit `myCardOptions() { return this.cardData.map(...); }` am Karten-Scope.
 **Die Bausteine** (alle weiter unten im Detail dokumentiert):
 - [Icon-System](#icon-system-lucide-sprite) — Lucide-Sprite `<svg class="icon"><use href="/icons.svg#name"/></svg>`. **Einzige** Icon-Quelle.
 - [Icon-Button](#icon-button-icon-btn) — `.icon-btn` (outlined) / `.icon-btn--ghost` (transparent bis Hover) für Icon-only-Aktionen. `.icon-btn--success` (grüner Bestätigungs-Akzent).
-- [Icon-Button-Count-Badge](#icon-button-count-badge-icon-btn-badge) — Zähler oben rechts (`.icon-btn-badge`).
+- [Icon-Button-Count-Badge](#icon-button-count-badge-icon-btn-badge) — Zähler oben rechts (`.icon-btn-badge`); Achtungs-Punkt ohne Zahl via `.icon-btn--attention`.
 - [Toolbar-Action-Group](#toolbar-action-group-segmentierter-icon-cluster-neben-form-feldern) — segmentierte Icon-Reihe.
 - [Context-Menu → Dropdown-Variante](#context-menu-rechtsklick-popover) — `⋯`-Overflow (`.context-menu--dropdown`) für sekundäre Aktionen, Einträge mit `.context-menu-item--icon`.
 - [Sofort-Tooltip](#sofort-tooltip-data-tip--default-variante) — `data-tip` (Pflicht bei Icon-only) + `aria-label`.
@@ -1540,7 +1540,8 @@ Teleportierte Variante (ein **einzelnes** Menü ausserhalb der Liste, offene Zei
 **Regeln:**
 - Verankerte Variante: Wrapper braucht `position: relative` + **kein** `transform`/`contain`/`will-change` auf Ancestors bis zur Karte (sonst Containing-Block-/Clip-Falle → teleportierte Variante nehmen).
 - Konsumenten-Marker-Klasse für JS-Hooks (Outside-Click-Query) zusätzlich zu `.context-menu` erlaubt (Muster `.pagetree-context-menu`, `.werkstatt-context-menu`) — sie trägt **kein** eigenes Styling.
-- Neues Menü erfindet **kein** eigenes Popover-CSS und keine eigene Item-/Sep-Klasse. Fehlt ein Icon im Sprite, erst [public/icons.svg](public/icons.svg) ergänzen (Lucide), dann verwenden.
+- Neues **Aktions**-Menü erfindet **kein** eigenes Popover-CSS und keine eigene Item-/Sep-Klasse. Fehlt ein Icon im Sprite, erst [public/icons.svg](public/icons.svg) ergänzen (Lucide), dann verwenden.
+- **Content-Popover-Ausnahme:** Ein Popover, das keine Aktions-Einträge, sondern **reichen Inhalt** listet (mehrzeilige Zeilen mit Titel + Metadaten/Snippet), darf die `.context-menu`-Hülle + die teleportierte JS-Positionierung (`_compute*Pos`, Flip-Messung, scroll/resize-Close) wiederverwenden **und** eine eigene Zeilenklasse definieren — die Aktions-Item-Klasse (`.context-menu-item--icon`, einzeilig) passt nicht. Konsument: Plot-Anchor-Fundstellen-Popover ([plot.html](public/partials/plot.html), `.plot-occ-*` in [board.css](public/css/book/plot/board.css), `openBeatOccPopover` in [plot/ai.js](public/js/book/plot/ai.js)) — Seitenname + Score + Snippet zweizeilig, Klick springt an die Textstelle. Content-Popover ist **nicht** durch context-menu-icons.test.mjs gegated (keine Icon-Einträge).
 
 ---
 
@@ -1562,6 +1563,7 @@ Teleportierte Variante (ein **einzelnes** Menü ausserhalb der Liste, offene Zei
 - `.icon-btn-badge-wrap` — `position: relative; display: inline-flex`; übernimmt ein eventuelles `x-show` des Buttons.
 - `.icon-btn-badge` — absolut oben-rechts, primary-Fläche, `--color-text-inverse`, `pointer-events: none`.
 - `.icon-btn--success` — grüner Akzent für Bestätigungs-Icon-Buttons (Speichern, Korrekturen übernehmen).
+- `.icon-btn--attention` — kleiner Achtungs-Punkt oben rechts (kein Counter, keine Zahl) für **Aktions**-Buttons, die auf einen erledigenswerten Zustand hinweisen (z.B. veralteter Ist-Index → „Lauf neu starten"). Toggle-artiges `.is-active` wäre hier semantisch falsch (kein Umschalt-Zustand) und als Dauer-Highlight irritierend, wenn der Zustand der Normalfall ist. Markup: `:class="{ 'icon-btn--attention': istVeraltet }"` direkt am Button — kein Wrap nötig, der Punkt liegt als `::after` auf. Beispiel: Verankerungs-Button in der Plot-Werkstatt-Kopfzeile.
 
 ---
 

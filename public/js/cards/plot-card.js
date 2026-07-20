@@ -59,6 +59,9 @@ export function registerPlotCard() {
     // Beat-Edit / -Add
     editingBeatId: null,
     beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', intensitaet: null, figure_ids: [], draft_figure_ids: [], motif_ids: [] },
+    // Temp-Wert der kombinierten Figuren-Combobox (Katalog + Werkstatt als
+    // opt-Gruppen); combobox-change decodiert das Präfix und leert das Feld.
+    beatFigTmp: '',
     addingActId: null,
     // Grid-Add-Beat: Zell-Schlüssel `${actId}:${threadId|null}` (statt addingActId).
     addingCell: null,
@@ -87,6 +90,13 @@ export function registerPlotCard() {
     // Scrollcontainer, in dem ein verankertes Popover geclippt würde.
     threadActionsOpenId: null,
     threadMenuPos: { top: 0, left: 0 },
+
+    // ID des Beats, dessen Anchor-Fundstellen-Popover offen ist (Single-Select).
+    // Das Popover ist ein einzelnes, nach <body> teleportiertes .context-menu
+    // (JS-positioniert) — die Beat-Karte lebt in einem overflow/transform-
+    // Scrollcontainer, in dem ein verankertes Popover geclippt würde.
+    beatOccPopoverBeatId: null,
+    beatOccPopoverPos: { top: 0, left: 0 },
 
     // Eingeklappte „verworfen"-Beats pro Akt ({ [actId]: true }).
     verworfenOpen: {},
@@ -182,6 +192,13 @@ export function registerPlotCard() {
       this.$watch('acts', () => this._scheduleReattach());
       this.$watch('threads', () => this._scheduleReattach());
 
+      // Karte schliessen (anderes Feature / Home) darf keinen offenen Beat-Edit
+      // hinterlassen — sonst öffnet die Karte beim nächsten Mal direkt im Beat.
+      // setupCardLifecycle kennt nur die true-Flanke; den Reset hängen wir hier an.
+      this.$watch(() => window.__app.showPlotCard, (visible) => {
+        if (!visible && this.editingBeatId != null) this.cancelEditBeat();
+      });
+
       // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit).
       // $root = die Karten-Wurzel (.card--plot), unabhängig vom Klick-Kontext.
       attachFullscreenSync({
@@ -205,6 +222,7 @@ export function registerPlotCard() {
 
     destroy() {
       this._destroySortables();
+      this._detachOccPopoverListeners?.();
       this._lifecycle?.destroy();
     },
 

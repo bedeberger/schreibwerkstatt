@@ -40,6 +40,17 @@ export const runsMethods = {
     }
   },
 
+  // Textbeleg-Fundstelle (Consistency): Seitenname aus dem nav-Store auflösen
+  // (das Frontend hat die Seitenliste des Buchs bereits geladen — der Job schickt
+  // nur die page_id). Fallback auf ein generisches Label.
+  belegPageLabel(pageId) {
+    const p = (Alpine.store('nav').pages || []).find(x => String(x.id) === String(pageId));
+    return (p && (p.name || p.page_name)) || window.__app.t('werkstatt.consistency.belegGeneric');
+  },
+  gotoBeleg(pageId) {
+    if (pageId != null) window.__app.gotoPageById(pageId);
+  },
+
   // Toggle: Klick auf aktiv markierten Eintrag schliesst Result; sonst Detail
   // laden und brainstormResult/consistencyResult füllen wie ein Live-Lauf.
   async openRun(runId, kind) {
@@ -68,6 +79,7 @@ export const runsMethods = {
         this.consistencyResult = {
           konflikte: run.result.konflikte || [],
           fazit: run.result.fazit || '',
+          textbelege: run.result.textbelege || [],
         };
         this.selectedKonfliktIdx = null;
         this.brainstormResult = null;

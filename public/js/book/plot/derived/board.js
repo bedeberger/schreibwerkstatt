@@ -54,9 +54,9 @@ export const boardMethods = {
   // Verwerfen-Achse). Eigene Liste, damit die Edit-Status-Tabs binär bleiben.
   distStatusList() { return DIST_SEGMENTS; },
 
-  // Figuren-Picker-Optionen (Katalog gruppiert nach Kapitel, Werkstatt flach)
-  // baut die generische `entityPicker`-Komponente selbst — siehe
-  // public/js/cards/entity-picker.js (entity 'figur' mit grouped / 'werkstatt').
+  // Die Figuren-Auswahl läuft über EINE `combobox` mit zwei opt-Gruppen
+  // (Katalog + Werkstatt, Präfix fig:/draft:) — Markup + addBeatFigureLink in
+  // plot-beat-cell.html / beats.js. Die Chips darunter lesen die Labels hier.
 
   // Aktuell gewählte Katalog-Figuren des Edit-Drafts als entfernbare Chips.
   beatFigureChips() {
@@ -261,9 +261,9 @@ export const boardMethods = {
     const state = this.beatAnchorState(beat);
     if (state === 'none') return '';
     const head = app.t('plot.anchor.state.' + state, { n: beat.occ_count || 0 });
-    const names = (beat.occ_top || [])
-      .map(o => o.page_name || (o.scene_titel ? `„${o.scene_titel}"` : ''))
-      .filter(Boolean);
-    return names.length ? `${head} — ${names.join(', ')}` : head;
+    // Klickbare Zustände (Fundstellen vorhanden): Hinweis aufs Popover statt einer
+    // langen Namensliste im Tooltip. 'drift' (kein Fund) bleibt beim reinen Satz.
+    if (beat.occ_count) return `${head} — ${app.t('plot.anchor.popover.hint')}`;
+    return head;
   },
 };

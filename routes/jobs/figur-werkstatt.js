@@ -16,6 +16,8 @@ const { setContext } = require('../../lib/log-context');
 const { db } = require('../../db/connection');
 const { getDraftFigure, insertWerkstattRun } = require('../../db/draft-figures');
 const plotDb = require('../../db/plot');
+const embed = require('../../lib/embed');
+const { semanticQuery } = require('../../lib/semantic-retrieval');
 const { getUser } = require('../../db/app-users');
 const { resolveI18n, resolveI18nTree } = require('../../lib/i18n-server');
 
@@ -132,6 +134,46 @@ function _loadFigurPlotBeats(draft, userEmail, logger) {
   }
 }
 
+// „Wie ist die Figur im Manuskript tatsächlich geschrieben?" — Textstellen aus der
+// semantischen Suche über den echten Buchtext (kinds page/scene). Anders als
+// _loadFigurAuftritte (Szenen-Titel/Ereignis-Labels = strukturierte Extrakte) liefert
+// das die tatsächliche PROSA → der Consistency-Check erdet Mindmap-Behauptungen an
+// der geschriebenen Realität. Query = Name + Archetyp (identifizierend, NICHT die zu
+// prüfenden Eigenschaften — sonst zöge man nur bestätigende Stellen an; die Hybrid-
+// Fusion trägt den Namen wörtlich, die Semantik findet auch namenlose Erwähnungen).
+// Nur bei aktivem Embedding-Backend; ohne Treffer (Figur evtl. noch nicht geschrieben)
+// leer. Best-effort: ein Fehler hier failt den Job (Kern = Mindmap) nicht.
+const _TB_TAG = /<\/?[^>]+>/g;
+function _tbSnippet(s) {
+  return String(s || '').replace(_TB_TAG, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
+}
+// Szene → Seite (figure_scenes ist keine pages/chapters/books-Tabelle → Direkt-SQL
+// erlaubt); die page_id macht den Beleg im Frontend anspringbar.
+const _stmtScenePageId = db.prepare('SELECT page_id FROM figure_scenes WHERE id = ? AND book_id = ?');
+async function _loadFigurTextbelege(draft, userEmail, logger) {
+  try {
+    if (!embed.isEnabled()) return [];
+    const query = [draft.name, draft.archetype].map(s => String(s || '').trim()).filter(Boolean).join('. ');
+    if (!query) return [];
+    const hits = await semanticQuery(draft.book_id, query, { kinds: ['page', 'scene'], topK: 6 });
+    const out = [];
+    const seenPages = new Set();
+    for (const h of hits) {
+      let pageId = null;
+      if (h.kind === 'page') pageId = h.entity_id;
+      else if (h.kind === 'scene') pageId = _stmtScenePageId.get(parseInt(h.entity_id), parseInt(draft.book_id))?.page_id ?? null;
+      if (pageId == null || seenPages.has(pageId)) continue; // ein Ort einmal (Dichte, nicht Wiederholung)
+      seenPages.add(pageId);
+      const snippet = _tbSnippet(h.text);
+      if (snippet) out.push({ page_id: pageId, snippet });
+    }
+    return out;
+  } catch (e) {
+    logger?.warn?.(`Textbeleg-Kontext fehlgeschlagen draft=${draft.id}: ${e.message}`);
+    return [];
+  }
+}
+
 // ── Brainstorm-Job ──────────────────────────────────────────────────────────
 
 async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
@@ -226,13 +268,17 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     const eigeneAuftritte = _loadFigurAuftritte(draft.source_figure_id, draft.book_id, userEmail);
     // Cross-Feature: geplante Handlung der Figur (Plot-Beats) für den Bogen-Abgleich.
     const plotBeats = _loadFigurPlotBeats(draft, userEmail, logger);
+    // Textbeleg-Erdung: wie die Figur im Manuskript tatsächlich geschrieben ist
+    // (semantische Suche über den echten Buchtext). Grundiert den Abgleich
+    // „Mindmap-Plan vs. geschriebene Figur".
+    const textbelege = await _loadFigurTextbelege(draft, userEmail, logger);
 
-    logger.info(`Consistency Start: draft=${draftId} figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} szenen=${eigeneAuftritte.szenen.length} ereignisse=${eigeneAuftritte.ereignisse.length} plotBeats=${plotBeats.length}`);
+    logger.info(`Consistency Start: draft=${draftId} figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} szenen=${eigeneAuftritte.szenen.length} ereignisse=${eigeneAuftritte.ereignisse.length} plotBeats=${plotBeats.length} textbelege=${textbelege.length}`);
     updateJob(jobId, { statusText: 'job.werkstatt.consistency.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte, beziehungen, eigeneAuftritte, plotBeats),
+      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte, beziehungen, eigeneAuftritte, plotBeats, textbelege),
       SYSTEM_FIGUREN,
       10, 95, 2500, 0.3, 3000, undefined, SCHEMA_CONSISTENCY,
     );
@@ -253,10 +299,12 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     const runId = insertWerkstattRun({
       draftId, bookId: draft.book_id, userEmail,
       kind: 'consistency',
-      result: { konflikte, fazit },
+      // textbelege mitpersistieren → Re-Open eines Laufs zeigt die Belegstellen,
+      // gegen die geprüft wurde (klickbar im Panel). Alt-Läufe ohne Feld: leer.
+      result: { konflikte, fazit, textbelege },
       model: _modelName(),
     });
-    completeJob(jobId, { konflikte, fazit, runId, tokensIn: tok.in, tokensOut: tok.out },
+    completeJob(jobId, { konflikte, fazit, textbelege, runId, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${konflikte.length} Konflikte`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Consistency-Fehler draft=${draftId}: ${e.message}`, { stack: e.stack });

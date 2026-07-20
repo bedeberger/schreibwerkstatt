@@ -28,9 +28,9 @@
         </button>
         <!-- Beat-Verankerung: findet je Beat die Fundstellen im Buchtext (Ist-Index
              via semantische Suche/FTS, kein callAI) → Drift-Badges auf den Karten.
-             Hebt sich hervor (is-active), wenn der Ist-Index veraltet ist. -->
+             Achtungs-Punkt (icon-btn--attention), wenn der Ist-Index veraltet ist. -->
         <button type="button" class="icon-btn icon-btn--ghost"
-                :class="{ 'is-active': beatAnchorStale && !anchorLoading }"
+                :class="{ 'icon-btn--attention': beatAnchorStale && !anchorLoading }"
                 @click="runBeatAnchor()"
                 :disabled="anchorLoading || !beats.length"
                 :data-tip="anchorSemanticActive() ? $app.t('plot.anchor.run') : $app.t('plot.anchor.runLiteral')"
@@ -230,6 +230,9 @@
   <!-- Board: flach (ohne Stränge) ODER Akte×Stränge-Grid (mit Strängen) -->
   <div id="partial-plot-board-flat"></div>
   <div id="partial-plot-board-grid"></div>
+
+  <!-- Anchor-Fundstellen-Popover (teleportiert, ausgelagert; File-Limit). -->
+  <div id="partial-plot-anchor-popover"></div>
 
   <!-- KI-Konsistenz (Fortschritt + Ergebnis) + Lauf-Historien (Konsistenz + Brainstorm).
        Ausgelagert (File-Limit), via _loadPartials in den plotCard-Scope injiziert. -->

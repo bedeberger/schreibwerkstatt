@@ -1,0 +1,31 @@
+<!-- Anchor-Fundstellen-Popover: nach <body> teleportiertes, JS-positioniertes
+     .context-menu (openBeatOccPopover). Einmal auf Kartenebene für BEIDE Boards
+     (flach + Grid) — die Beat-Karte lebt in einem overflow/transform-Scrollcontainer,
+     in dem ein verankertes Popover geclippt würde. Offener Beat via beatOccPopoverBeat().
+     Content-Popover (reiche Zeilen), kein Aktions-Menü — Pattern-Ausnahme siehe DESIGN.md. -->
+<template x-teleport="body">
+  <div class="context-menu plot-occ-popover" x-ref="occPopover" role="menu"
+       x-show="beatOccPopoverBeatId !== null && !!beatOccPopoverBeat()" x-cloak
+       :style="`top:${beatOccPopoverPos.top}px;left:${beatOccPopoverPos.left}px`"
+       @click.outside="closeBeatOccPopover()" @keydown.escape.window="closeBeatOccPopover()">
+    <template x-if="beatOccPopoverBeat()">
+      <div>
+        <div class="context-menu-header" x-text="$app.t('plot.anchor.popover.title', { n: beatOccPopoverBeat().occ_count || 0 })"></div>
+        <template x-for="(occ, i) in (beatOccPopoverBeat().occ_top || [])" :key="i">
+          <button type="button" role="menuitem" class="plot-occ-item"
+                  :disabled="!occ.page_id"
+                  @click.stop="gotoOccurrence(occ)"
+                  :aria-label="$app.t('plot.anchor.popover.jump')">
+            <span class="plot-occ-item-head">
+              <span class="plot-occ-item-name" x-text="occ.page_name || (occ.scene_titel ? '„' + occ.scene_titel + '“' : $app.t('plot.anchor.popover.unknownPlace'))"></span>
+              <span class="plot-occ-item-score" x-show="occ.score != null && Math.round(occ.score * 100) >= 1" x-text="Math.round((occ.score || 0) * 100) + '%'"></span>
+            </span>
+            <span class="plot-occ-item-snippet" x-show="occ.snippet" x-text="occ.snippet"></span>
+          </button>
+        </template>
+        <div class="plot-occ-more" x-show="(beatOccPopoverBeat().occ_count || 0) > (beatOccPopoverBeat().occ_top || []).length"
+             x-text="$app.t('plot.anchor.popover.more', { n: (beatOccPopoverBeat().occ_count || 0) - (beatOccPopoverBeat().occ_top || []).length })"></div>
+      </div>
+    </template>
+  </div>
+</template>
