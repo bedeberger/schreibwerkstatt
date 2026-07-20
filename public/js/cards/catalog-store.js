@@ -17,6 +17,12 @@ export function registerCatalogStore() {
     // Abgeleitete Jahres-Kennzahlen der Zeitstrahl-Ansicht (nur bei
     // book_settings.zeitlinie_real befüllt, sonst null). Siehe ereignisse.js.
     zeitstrahlChronology: null,
+    // Kanonische Zeitstrahl-Daten (zeitstrahl_events) sind geladen. Verhindert,
+    // dass der figuren-basierte Fallback (_buildGlobalZeitstrahl) die vom Server
+    // geladene SSoT überschreibt — sonst clobbert ein paralleles loadFiguren die
+    // datierten Events und das Jahres-Band flackert/verschwindet. Reset bei
+    // Buchwechsel via clear().
+    zeitstrahlServerLoaded: false,
 
     clear() {
       this.figuren = [];
@@ -25,6 +31,7 @@ export function registerCatalogStore() {
       this.szenen = [];
       this.globalZeitstrahl = [];
       this.zeitstrahlChronology = null;
+      this.zeitstrahlServerLoaded = false;
     },
   });
 }

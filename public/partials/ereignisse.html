@@ -19,21 +19,25 @@
     </div>
   </div>
 
-  <!-- Jahres-Stand pro Kapitel (nur bei „echter Zeitlinie" in den Buch-Einstellungen) -->
-  <div class="gz-chronology" x-show="$store.catalog.zeitstrahlChronology && $store.catalog.globalZeitstrahl.length > 0" x-cloak>
-    <ul class="gz-chronology-list" x-show="$store.catalog.zeitstrahlChronology?.chapters?.length">
+  <!-- Jahres-Stand pro Kapitel (nur bei „echter Zeitlinie" in den Buch-Einstellungen).
+       Klappbar: Trigger zeigt die Gesamt-Zeitspanne, Panel die Kapitel-Aufschlüsselung. -->
+  <div class="gz-chronology" x-data="collapsible()"
+       x-show="$store.catalog.zeitstrahlChronology && $store.catalog.globalZeitstrahl.length > 0" x-cloak>
+    <button type="button" class="collapsible-toggle gz-chronology-toggle" x-bind="trigger"
+            :disabled="!$store.catalog.zeitstrahlChronology?.chapters?.length">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+      <span class="gz-chronology-total-label" x-text="$app.t('events.chronologySpan')"></span>
+      <span class="gz-chronology-total-value"
+            x-text="$store.catalog.zeitstrahlChronology ? ($store.catalog.zeitstrahlChronology.minYear === $store.catalog.zeitstrahlChronology.maxYear ? String($store.catalog.zeitstrahlChronology.minYear) : $app.t('events.span', { start: $store.catalog.zeitstrahlChronology.minYear, ende: $store.catalog.zeitstrahlChronology.maxYear })) : ''"></span>
+    </button>
+    <ul class="gz-chronology-list" x-bind="panel" x-cloak>
       <template x-for="c in ($store.catalog.zeitstrahlChronology?.chapters || [])" :key="c.chapter_id">
         <li class="gz-chronology-row">
           <span class="gz-chronology-kap" x-text="c.name"></span>
-          <span class="gz-chronology-year" x-text="c.minYear === c.maxYear ? c.minYear : (c.minYear + '–' + c.maxYear)"></span>
+          <span class="gz-chronology-year" x-text="c.minYear === c.maxYear ? String(c.minYear) : $app.t('events.span', { start: c.minYear, ende: c.maxYear })"></span>
         </li>
       </template>
     </ul>
-    <div class="gz-chronology-total">
-      <span class="gz-chronology-total-label" x-text="$app.t('events.chronologySpan')"></span>
-      <span class="gz-chronology-total-value"
-            x-text="$store.catalog.zeitstrahlChronology ? ($store.catalog.zeitstrahlChronology.minYear === $store.catalog.zeitstrahlChronology.maxYear ? $store.catalog.zeitstrahlChronology.minYear : $store.catalog.zeitstrahlChronology.minYear + '–' + $store.catalog.zeitstrahlChronology.maxYear) : ''"></span>
-    </div>
   </div>
 
   <!-- Fortschritt Ermittlung -->
