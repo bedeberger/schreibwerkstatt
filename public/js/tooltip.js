@@ -2,6 +2,8 @@
 // Ein einziges DOM-Element wird bei Hover/Focus auf ein [data-tip]-Element
 // positioniert und befüllt. Hält die Pseudo-Slots auf den Targets frei,
 // damit ::before/::after dort für eigene Decorations verfügbar bleiben.
+import { EVT } from './events.js';
+
 (function () {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (window.__tooltipLayerInstalled) return;
@@ -128,7 +130,7 @@
   window.addEventListener('resize', hide);
   // Programmatisches Ausblenden (z.B. wenn ein Klick ein Popover über demselben
   // Trigger öffnet und der Hover-Tooltip sonst darüber hängen bliebe).
-  window.addEventListener('tooltip:hide', hide);
+  window.addEventListener(EVT.TOOLTIP_HIDE, hide);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hide();
   });

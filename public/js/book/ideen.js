@@ -4,6 +4,7 @@
 // via getOpenIdeen: Page-Ideen + Chapter-Ideen des umliegenden Kapitels).
 
 import { fetchJson } from '../utils.js';
+import { EVT } from '../events.js';
 
 // Aktive Scope-IDs aus Root lesen. Liefert { kind, id } oder null.
 function _activeScope(app) {
@@ -52,7 +53,7 @@ export const ideenMethods = {
   openMenu(ev, idee) {
     if (this.menuOpenId === idee.id) { this.closeMenu(); return; }
     // Hover-Tooltip des Triggers wegblenden — er hinge sonst über dem Menü.
-    window.dispatchEvent(new CustomEvent('tooltip:hide'));
+    window.dispatchEvent(new CustomEvent(EVT.TOOLTIP_HIDE));
     this._triggerRect = ev.currentTarget.getBoundingClientRect();
     // Schätzung vor dem Render; danach mit der echten Popover-Grösse nachjustieren.
     // Erledigte Ideen haben ein kürzeres Menü (nur Wieder öffnen + Löschen) — eine

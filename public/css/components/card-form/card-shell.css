@@ -1,0 +1,219 @@
+@layer components {
+/* === Card ===
+   Top-Border ist Akzentband: 2px in `--card-accent` (SSoT card-accents.css).
+   Fallback `--color-surface` im Wash bzw. `--color-border` am Band macht
+   Karten ohne `card--<key>` neutral statt farblos-inkonsistent.
+   Flaches Modell: kein Baseline-/Hover-Schatten — die Karte lebt von Border +
+   Akzentband + Akzent-Wash; Hover verstärkt die Border Richtung Akzent.
+   Wash: hauchdünner Farbverlauf aus dem Karten-Akzent, der im Header-Bereich
+   beginnt und in die Surface ausläuft — macht die 32 Akzente als Orientierung
+   wahrnehmbar, ohne die Fläche einzufärben. */
+.card {
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--card-accent, var(--color-surface)) 4%, var(--color-surface)),
+      var(--color-surface) 110px
+    );
+  border-radius: var(--radius-lg);
+  border: var(--border-thin) solid var(--color-border);
+  border-top: var(--border-thick) solid var(--card-accent, var(--color-border));
+  padding: var(--space-20);
+  margin-bottom: var(--space-lg);
+  /* `backwards` (nicht `both`): wendet den `from`-Zustand vor dem Start an
+     (kein Eintritts-Flash), revertiert aber nach Ende auf den Basiszustand.
+     Mit `both` bliebe `transform: translateY(0)` (Identitäts-Matrix) dauerhaft
+     gesetzt — das etabliert einen Containing-Block für `position: fixed` und
+     verschiebt das viewport-verankerte Combobox-Dropdown (Bottom-Sheet/Popup)
+     in die Karte hinein statt an den Bildschirm. */
+  animation: cardFadeIn var(--transition-emphasized) backwards;
+  transition: border-color var(--transition-base);
+}
+/* Explizite Seiten statt border-color-Shorthand: der würde auch das
+   2px-Akzentband oben auf den Mix-Ton umfärben. */
+.card:hover {
+  border-inline-color: color-mix(in oklab, var(--card-accent, var(--color-border)) 22%, var(--color-border));
+  border-bottom-color: color-mix(in oklab, var(--card-accent, var(--color-border)) 22%, var(--color-border));
+}
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-10);
+  padding-bottom: var(--space-md);
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+  position: relative;
+}
+
+@media (max-width: 700px) {
+  .card-header { flex-direction: column; align-items: flex-start; }
+  /* Column-Stack schiebt den Close-Button sonst nach unten-links; oben-rechts
+     verankern + rechts nur dann Platz reservieren, wenn wirklich ein Close-Button
+     als Direkt-Kind im Header sitzt — sonst ruecken reine Action-Icon-Leisten
+     (z.B. Seitenbaum-Header) unnoetig weit vom rechten Rand ein.
+     Nur Direkt-Kind — `.btn-card-close` wird auch in Session-/History-Zeilen
+     wiederverwendet, die nicht im Header sitzen. */
+  .card-header:has(> .btn-card-close) { padding-right: var(--space-xl); }
+  .card-header > .btn-card-close { position: absolute; top: 0; right: 0; margin-left: 0; }
+}
+
+.card-title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: var(--font-size-lg);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  font-optical-sizing: auto;
+  text-wrap: balance;
+  /* Titel zieht dezent Richtung Karten-Akzent — Tinte bleibt dominant
+     (Kontrast), der Farbklang ordnet die Karte ein. Fallback currentColor
+     mixt Text mit Text → neutral bei Karten ohne Akzent. */
+  color: color-mix(in oklab, var(--card-accent, currentColor) 30%, var(--color-text));
+}
+
+/* Eyebrow: kleine, gesperrte Caps-Zeile ueber dem .card-title. Editorial-
+   Pattern fuer Kontext-Label (z.B. Buchname, Sektion, Rubrik) wenn der
+   Titel selbst die Funktion benennt. Sitzt in .card-header-titlebar VOR
+   dem .card-title (DOM-Order = visuelle Order, column-flex). */
+.card-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+/* Inline-editable Variante (Editor-Card-Header): textarea, sieht aus wie Span;
+   bei Focus erscheint Border + Surface-Bg. Höhe wird vom JS aus scrollHeight
+   gesetzt (Auto-Grow), daher resize:none + overflow:hidden. Wrapping via
+   overflow-wrap:anywhere bricht auch lange Single-Word-Titel. Doppelklasse-
+   Selektor hebelt globale input/textarea-Regeln aus (Specificity 0,2,0). */
+.card-title.card-title--input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  color: inherit;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: var(--font-size-lg);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  display: block;
+  /* Floor gegen scrollHeight=0 wenn Auto-Grow misst während Karte display:none
+     (Boot mit Vollbild-Pref, Card-Switch-Race). Eine Zeile bleibt sichtbar. */
+  min-height: 1.2em;
+}
+.card-title.card-title--input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  background: var(--color-surface);
+  padding: 2px 6px;
+  margin: -3px -7px;
+}
+.card-title.card-title--input:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+/* Header mit Subline: Title oben, Meta-Zeile (Timestamp/Save-Indicator/Links) darunter, Aside
+   (Badges + Buttons) rechts. Genutzt vom Editor + Karten mit Stand-/Timestamp-Info (figuren, orte, …). */
+.card-header--subline { align-items: flex-start; }
+.card-header-titlebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  /* basis 0 (nicht auto): sonst sprengt die max-content-Subline samt Close-Button die flex-wrap-Zeile. */
+  flex: 1 1 0;
+}
+.card-header-titlebar .card-title { line-height: 1.2; }
+.card-subline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+.card-subline .save-indicator { margin-left: 0; }
+.card-subline-link {
+  color: var(--color-muted);
+  text-decoration: none;
+  border-bottom: var(--border-thin) solid transparent;
+  transition: color var(--transition-base), border-color var(--transition-base);
+}
+.card-subline-link:hover {
+  color: var(--color-text);
+  border-bottom-color: var(--color-border);
+}
+.card-subline-sep {
+  color: var(--color-subtle);
+  user-select: none;
+}
+.card-header-aside {
+  display: flex;
+  align-items: center;
+  gap: var(--space-14);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+  margin-left: auto;
+}
+.card-subline .editor-sync-status,
+.card-subline .tok-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.editor-sync-push .icon,
+.editor-sync-conflict .icon,
+.editor-sync-view .icon { width: 0.9em; height: 0.9em; }
+.editor-sync-push-pct {
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  margin-left: var(--space-2xs);
+}
+/* Mobile: Header mit Titelspalte bleibt eine Zeile — die Aktionen (Icon-Buttons
+   in .card-actions / .card-header-aside) bleiben oben rechts verankert statt in
+   eine eigene Zeile darunter umzubrechen. Die Titelspalte schrumpft
+   (flex 1 1 0 / min-width 0) und der Titel bricht bei Bedarf um.
+   Reine Text-Button-Leisten OHNE Titelspalte (Export/Admin) sind ausgenommen
+   und behalten ihren Full-Width-Stack (base .card-header column-Regel). */
+@media (max-width: 700px) {
+  .card-header:has(.card-header-titlebar) {
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+  }
+  .card-header:has(.card-header-titlebar) > .card-actions,
+  .card-header:has(.card-header-titlebar) > .card-header-aside {
+    width: auto;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: var(--space-md);
+  }
+}
+
+}

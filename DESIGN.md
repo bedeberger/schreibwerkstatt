@@ -134,7 +134,7 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 
 **Use:** Ein-/Austritte von Karten, Popovers und Menüs. Drei sanktionierte Mechaniken — keine weiteren Motion-Vokabeln erfinden.
 
-1. **Karten-Eintritt: `cardFadeIn`** (CSS-Keyframe in [card-form.css](public/css/components/card-form.css), `--transition-emphasized` = 0.3s `--ease-out`, `translateY(8px)` → 0). Kommt automatisch mit `.card`; kein `x-transition` zusätzlich (siehe „Karten").
+1. **Karten-Eintritt: `cardFadeIn`** (CSS-Keyframe in [card-form.css](public/css/components/card-form/card-shell.css), `--transition-emphasized` = 0.3s `--ease-out`, `translateY(8px)` → 0). Kommt automatisch mit `.card`; kein `x-transition` zusätzlich (siehe „Karten").
 2. **Popover-/Menü-Eintritt: `@starting-style`** — display-getriebene Elemente (Alpine `x-show`, selbst gerenderte Dropdowns) faden rein per `transition: opacity var(--transition-base)` + `@starting-style { .x { opacity: 0; } }`. **Nur Opacity** — kein Transform, damit Flip-/Anchor-Messungen (`offsetHeight` im `$nextTick`) unbeeinflusst bleiben. Austritt bleibt instant (x-show setzt `display:none` direkt; ein CSS-only-Exit-Fade ist mit x-show nicht erreichbar). Referenz: `.context-menu` ([context-menu.css](public/css/components/context-menu.css)), `.combobox-dropdown` ([combobox.css](public/css/components/combobox.css)).
 3. **Kartenwechsel: View Transition** — der generische Karten-Toggle (`_toggleCardGeneric` + Helper `_withCardTransition` in [_shared.js](public/js/app/app-view/_shared.js)) wickelt Flag-Wechsel in `document.startViewTransition` (Cross-Fade der Hauptansicht). Progressive Enhancement: ohne Support läuft der Callback direkt. Regeln: Netzwerk (`_ensurePartial`) **vor** der Transition; DOM-Endzustand (inkl. `$nextTick`) **im** Callback. Reduced-Motion wird in [tokens/motion.css](public/css/tokens/motion.css) via `::view-transition-*`-Override gekappt. Bespoke-Toggles, die den Cross-Fade wollen, nutzen denselben Helper.
 
@@ -185,7 +185,7 @@ Eine eigenständige, per-Boolean klappbare Sektion nutzt **`Alpine.data('collaps
 
 **Regeln:**
 - Wurzel `<div class="card card--<key>" x-data="xxxCard" x-show="$app.showXxxCard" x-cloak>`. **`card--<key>` Pflicht** — auch wenn die Karte den Akzent (noch) nicht visuell nutzt, hängt die `--card-accent`-Custom-Property dran und steht für künftige Anchor-Bar/Title-Underline/Severity-Marker bereit.
-- **Animation: nur CSS (`cardFadeIn` aus [public/css/components/card-form.css](public/css/components/card-form.css), 0.3s `--ease-out`).** Kein `x-transition` auf `.card` — translateY × scale konkurriert sichtbar bei grossen Karten (Szenen, Figuren), wirkt wabbelig. Neues Karten-Element nur `x-show="…" x-cloak`.
+- **Animation: nur CSS (`cardFadeIn` aus [public/css/components/card-form.css](public/css/components/card-form/card-shell.css), 0.3s `--ease-out`).** Kein `x-transition` auf `.card` — translateY × scale konkurriert sichtbar bei grossen Karten (Szenen, Figuren), wirkt wabbelig. Neues Karten-Element nur `x-show="…" x-cloak`.
 - **Fläche: flach + Akzent-Wash.** Kein Baseline-/Hover-Schatten auf `.card` — die Kante tragen Border (`--border-thin`) + 2px-Akzentband. Der Hintergrund ist ein hauchdünner Verlauf aus dem Karten-Akzent (`color-mix` 4% in `--color-surface`, läuft nach ~110px in die Surface aus). Hover verstärkt die Seiten-/Unterkanten Richtung Akzent (`border-inline-color`/`border-bottom-color` — nie der `border-color`-Shorthand, der würde das Akzentband umfärben).
 - **Titel-Tintung:** `.card-title` zieht via `color-mix` 30% Richtung `--card-accent` (Fallback neutral). Kommt automatisch mit — pro Karte nichts deklarieren.
 - Header: `.card-header` mit `.card-header--subline` für Buchtitel + Timestamp.
@@ -202,7 +202,7 @@ Eine eigenständige, per-Boolean klappbare Sektion nutzt **`Alpine.data('collaps
 - Kleine, gesperrte Caps-Zeile über dem `.card-title` für Kontext-Label (Buchname, Sektion, Rubrik), wenn der Titel selbst die Funktion benennt.
 - Markup: `.card-eyebrow` als erstes Element in `.card-header-titlebar`, danach `.card-title`. Column-Flex sorgt für visuelle Order.
 - Use-Case: Titel = Funktion ("Übersicht", "Statistik", "Lektorat"), Eyebrow = Subjekt (Buchname). Vermeidet redundante Titel-Strings vom Typ "Übersicht: {name}".
-- CSS in [public/css/components/card-form.css](public/css/components/card-form.css), Konsumenten setzen nur Markup.
+- CSS in [public/css/components/card-form.css](public/css/components/card-form/card-shell.css), Konsumenten setzen nur Markup.
 
 ```html
 <div class="card-header">
@@ -219,7 +219,7 @@ Eine eigenständige, per-Boolean klappbare Sektion nutzt **`Alpine.data('collaps
 - **Button-Klasse:** `icon-btn icon-btn--ghost` (transparent bis Hover, einheitliche 28×28-Chips). **Nicht** der umrandete `.icon-btn` (default/outlined) für Header-Cluster.
 - **Aktiver Toggle** (Panel offen, Fullscreen ein): `:class="{ 'is-active': … }"` + `:aria-pressed` — nicht eine eigene `.primary`/`.active`-Klasse.
 - **Schliessen im Cluster:** liegt der Close-Button mit weiteren Aktionen in derselben `.card-actions`-Reihe, ist er ebenfalls `icon-btn icon-btn--ghost` mit `#x`-Sprite (nicht der abgesetzte `.btn-card-close`, der nur für den allein-stehenden, absolut positionierten Header-Close gilt — siehe [Action-Icon-Library](#action-icon-library-verbindlich) „Schliessen").
-- **Mobile (`≤700px`):** Header mit `.card-header-titlebar` bleibt eine **Zeile** — die Aktionen (`.card-actions` / `.card-header-aside`) bleiben oben rechts verankert, die Titelspalte schrumpft und der Titel bricht bei Bedarf um (nicht die Icons in eine eigene Zeile drücken). Geregelt zentral über `.card-header:has(.card-header-titlebar)` in [card-form.css](public/css/components/card-form.css) — pro Karte nichts deklarieren. Reine Text-Button-Leisten **ohne** Titelspalte (`.card-header > .card-actions`, z.B. Export/Admin) sind ausgenommen und behalten den Full-Width-Stack.
+- **Mobile (`≤700px`):** Header mit `.card-header-titlebar` bleibt eine **Zeile** — die Aktionen (`.card-actions` / `.card-header-aside`) bleiben oben rechts verankert, die Titelspalte schrumpft und der Titel bricht bei Bedarf um (nicht die Icons in eine eigene Zeile drücken). Geregelt zentral über `.card-header:has(.card-header-titlebar)` in [card-form.css](public/css/components/card-form/card-shell.css) — pro Karte nichts deklarieren. Reine Text-Button-Leisten **ohne** Titelspalte (`.card-header > .card-actions`, z.B. Export/Admin) sind ausgenommen und behalten den Full-Width-Stack.
 
 Referenz-Cluster: [public/partials/recherche.html](public/partials/recherche.html) (Chat / Vollbild / Schliessen als Ghost-Trio).
 
@@ -712,7 +712,7 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 
 ### Grid (Label links, Wert rechts)
 
-`.card-form-grid` / `.card-form-row` / `.card-form-label` (CSS in [public/css/components/card-form.css](public/css/components/card-form.css), 170 px-Label-Spalte). Modifier `.card-form-row--top` für oben-ausgerichtete Rows mit Textareas.
+`.card-form-grid` / `.card-form-row` / `.card-form-label` (CSS in [public/css/components/card-form.css](public/css/components/card-form/form-elements.css), 170 px-Label-Spalte). Modifier `.card-form-row--top` für oben-ausgerichtete Rows mit Textareas.
 
 ```html
 <div class="card-form-grid">
@@ -723,7 +723,7 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 </div>
 ```
 
-### Wertspalten-Bausteine (CSS in [public/css/components/card-form.css](public/css/components/card-form.css))
+### Wertspalten-Bausteine (CSS in [public/css/components/card-form.css](public/css/components/card-form/form-elements.css))
 
 | Klasse | Verwendung |
 |--------|------------|
@@ -752,7 +752,7 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 
 **Regel:** Radio-Auswahlen nutzen ausschliesslich `Alpine.data('radioGroup')` aus [public/js/radio-group.js](public/js/radio-group.js). **Kein handgeschriebenes `<label><input type="radio">…`-Markup** mehr (kein paralleles `.book-settings-option`-Vokabular pro Karte) — sonst driftet die Geometrie auseinander und Felder werden inkonsistent. Bei Berührung einer bestehenden handgeschriebenen Radio-Gruppe: mitziehen, nicht „später".
 
-**Use:** beschriftete Auswahl aus wenigen, gleichrangigen Werten, die alle sichtbar bleiben sollen (Sprache, Region). Für lange/durchsuchbare Listen stattdessen `combobox`; für Einzel-Boolean eine Checkbox (`.form-check`). Selbst-rendernde Komponente analog `combobox`/`numInput` — Markup wird aus `options` generiert, ist also überall identisch. CSS: `.form-radio-group` / `.form-radio-option` in [card-form.css](public/css/components/card-form.css).
+**Use:** beschriftete Auswahl aus wenigen, gleichrangigen Werten, die alle sichtbar bleiben sollen (Sprache, Region). Für lange/durchsuchbare Listen stattdessen `combobox`; für Einzel-Boolean eine Checkbox (`.form-check`). Selbst-rendernde Komponente analog `combobox`/`numInput` — Markup wird aus `options` generiert, ist also überall identisch. CSS: `.form-radio-group` / `.form-radio-option` in [card-form.css](public/css/components/card-form/form-elements.css).
 
 Pflicht-Pattern (Wrapper-Div leer lassen, nur Attribute setzen):
 
@@ -888,7 +888,7 @@ Inline-Box unterhalb von Form-Feldern, die aus den eingegebenen Werten **live** 
 
 ### Validation-State auf Inputs (Pflicht bei Fehler)
 
-Inputs mit Fehler bekommen `aria-invalid="true"` + `aria-describedby="<error-id>"`. Visuell rote Border via `[aria-invalid="true"]`-Selektor in [card-form.css](public/css/components/card-form.css). Kein eigener `.form-input--invalid`-State daneben — `aria-invalid` ist Pflicht-Attribut, der Selektor leitet daraus die Optik ab.
+Inputs mit Fehler bekommen `aria-invalid="true"` + `aria-describedby="<error-id>"`. Visuell rote Border via `[aria-invalid="true"]`-Selektor in [card-form.css](public/css/components/card-form/form-elements.css). Kein eigener `.form-input--invalid`-State daneben — `aria-invalid` ist Pflicht-Attribut, der Selektor leitet daraus die Optik ab.
 
 ```html
 <input id="bs-foo" :aria-invalid="!!fooError" aria-describedby="bs-foo-err">
@@ -930,7 +930,7 @@ In einer Form-Zeile (Inputs, Comboboxes, Buttons nebeneinander in Flex/Grid mit 
 
 Stolperfalle: `combobox(placeholder)` ist **default compact**. Steht der combobox neben einem nackten `<input>` oder `<button>` ohne `.btn-compact`, sieht das ungleich aus → Object-Form `combobox({ placeholder, compact: false })` verwenden. Umgekehrt: wenn die Zeile sonst nur Compact-Elemente hat (Filter-Bars, Table-Row-Controls), bleibt der Default-Compact-Combobox richtig.
 
-**Spezifitäts-Falle bei nativen typed-Inputs (`<input type=date|number|month|datetime-local|…>`, `<select>`):** Diese werden von der generischen Form-Liste in [card-form.css](public/css/components/card-form.css) (`input[type=date], …, select { … }`, Spezifität **0,1,1**, volle Feldgrösse: `--font-size-base`, `--size-default-padding-y`, 1px Border, `width:100%`) getroffen. Eine eigene Compact-Klasse als **nackter** Selektor (`.xxx-date-input`, 0,1,0) **verliert** dagegen → das Feld rendert voll-gross und sitzt höher als die `.btn-compact`/Compact-Combobox daneben. Fix: Compact-Selektor höher scopen (`.parent .xxx-date-input`, 0,2,0) **und** `width: auto` setzen. Bei iOS-Zoom-Override (≥16px auf Mobile) die Mobile-Regel mit gleicher Spezifität + gleichem Breakpoint (768px) nachziehen, sonst überstimmt die neue Desktop-Regel sie. Referenz-Fix: [my-stats.css](public/css/components/my-stats.css) `.mystats-range-custom .mystats-date-input`, identisch in [recherche.css](public/css/entities/recherche.css) für `.filter-search-input`. (Gleiche Falle ist in der Filter-Bar-Sektion unten dokumentiert.)
+**Spezifitäts-Falle bei nativen typed-Inputs (`<input type=date|number|month|datetime-local|…>`, `<select>`):** Diese werden von der generischen Form-Liste in [card-form/form-elements.css](public/css/components/card-form/form-elements.css) (`input[type=date], …, select { … }`, Spezifität **0,1,1**, volle Feldgrösse: `--font-size-base`, `--size-default-padding-y`, 1px Border, `width:100%`) getroffen. Eine eigene Compact-Klasse als **nackter** Selektor (`.xxx-date-input`, 0,1,0) **verliert** dagegen → das Feld rendert voll-gross und sitzt höher als die `.btn-compact`/Compact-Combobox daneben. Fix: Compact-Selektor höher scopen (`.parent .xxx-date-input`, 0,2,0) **und** `width: auto` setzen. Bei iOS-Zoom-Override (≥16px auf Mobile) die Mobile-Regel mit gleicher Spezifität + gleichem Breakpoint (768px) nachziehen, sonst überstimmt die neue Desktop-Regel sie. Referenz-Fix: [my-stats.css](public/css/components/my-stats.css) `.mystats-range-custom .mystats-date-input`, identisch in [recherche.css](public/css/entities/recherche.css) für `.filter-search-input`. (Gleiche Falle ist in der Filter-Bar-Sektion unten dokumentiert.)
 
 Filter-Bars (`.filter-bar`, `.admin-usage-filter`, `.admin-users-requests-filter`) sind bewusst rein compact (Search-Input + Compact-Combobox + Compact-Buttons) — kein Mix zulässig.
 
@@ -1827,7 +1827,7 @@ Nicht eigene Toolbar-Layouts pro Karte erfinden.
 </div>
 ```
 
-**Klassen** ([public/css/components/card-form.css](public/css/components/card-form.css)):
+**Klassen** ([public/css/components/card-form.css](public/css/components/card-form/card-actions.css)):
 - `.action-group` — `display: contents` — semantischer Wrapper, kein Layout-Bruch zum Flex-Parent (nur nötig, wenn Bündel als Einheit angesprochen werden; bei direkten Geschwister-Buttons reicht der nackte `.action-sep`)
 - `.action-sep` — 1 px Trennstrich (`var(--color-border)`), full-height via `align-self: stretch`; der umschliessende Container muss `display: flex` sein
 
@@ -2264,7 +2264,9 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 ### components/ (geteilt)
 | File | Inhalt |
 |------|--------|
-| [components/card-form.css](public/css/components/card-form.css) | `.card`, `.card-header*`, `.card-actions*`, `.btn-card-close`, `.card-form-*` Grid, Form-Wertspalten, `cardFadeIn`. |
+| [components/card-form/card-shell.css](public/css/components/card-form/card-shell.css) | `.card`, `.card-header*`, `.card-title*`, `.card-eyebrow`, `.card-subline*`, `cardFadeIn`. |
+| [components/card-form/form-elements.css](public/css/components/card-form/form-elements.css) | Form-Felder (`input`/`select`/`textarea`), `.card-form-*` Grid + Wertspalten-Bausteine (`.form-stack`/`-inline`/`-check`/`-radio-group`), `.card-empty*`. |
+| [components/card-form/card-actions.css](public/css/components/card-form/card-actions.css) | `.card-actions*`, `.action-group`/`.action-sep`, `.btn-card-close`. |
 | [components/combobox.css](public/css/components/combobox.css) | `.combobox-*` — Searchable-Select-Komponente (Trigger, Dropdown, Optionen, Gruppen-Header, Compact-Variante, Footer-Button). |
 | [components/buttons-badges.css](public/css/components/buttons-badges.css) | `<button>` Hierarchie, `.badge-*`, `.avatar-*`, `.btn-group`, `.btn-compact`. |
 | [components/icon-btn.css](public/css/components/icon-btn.css) | `.icon-btn` (outlined) + `.icon-btn--ghost` — SSoT für alle Icon-only Buttons (Graph/Map/Mindmap-Toolbars, Header-Cluster, Plot-Board, Action-Groups). Feature-Marker setzen nur Deltas darauf. |
@@ -2454,7 +2456,7 @@ Position: absolute innerhalb `.card`, `background: var(--color-surface) / 0.7` m
 
 ## Empty-State mit CTA
 
-**Status:** Aktiv. Klassen leben in [card-form.css](public/css/components/card-form.css). Verwenden, wann immer eine Karte „Keine Daten — hier der Button um welche zu erzeugen" rendert. Ersetzt den nackten `.card-status`-Leertext. Konsumenten: Figuren-Werkstatt (Inline-Input-Variante) **und** alle Komplettanalyse-Katalogkarten (Figuren, Orte, Szenen, Ereignisse, Weltfakten, Kontinuität, Songs) mit „Buch analysieren"-CTA.
+**Status:** Aktiv. Klassen leben in [card-form/form-elements.css](public/css/components/card-form/form-elements.css). Verwenden, wann immer eine Karte „Keine Daten — hier der Button um welche zu erzeugen" rendert. Ersetzt den nackten `.card-status`-Leertext. Konsumenten: Figuren-Werkstatt (Inline-Input-Variante) **und** alle Komplettanalyse-Katalogkarten (Figuren, Orte, Szenen, Ereignisse, Weltfakten, Kontinuität, Songs) mit „Buch analysieren"-CTA.
 
 **Markup (Standard-CTA mit Icon — Komplettanalyse-Katalogkarten):**
 ```html

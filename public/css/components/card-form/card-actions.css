@@ -1,0 +1,94 @@
+@layer components {
+/* === Card-Actions (Button-Gruppe im card-header) === */
+.card-actions {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: auto;
+}
+
+.card-actions button {
+  white-space: nowrap;
+}
+
+/* Icon-only Buttons in der Action-Leiste behalten ihre quadratische Größe —
+   nie auf Button-Breite strecken (übersteuert den Mobile-`flex: 1 1 auto`). */
+.card-actions .icon-btn {
+  flex: 0 0 auto;
+}
+
+/* Gruppen-Modifier: semantische Bündel mit Trennstrich.
+   .action-group ist display:contents — kein Layout-Bruch zum Flex-Parent. */
+.action-group { display: contents; }
+
+.action-sep {
+  display: inline-block;
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-border);
+  margin: var(--space-xs) 2px;
+}
+
+@media (max-width: 700px) {
+  /* Engere Gaps: auf Touch werden die Icon-Buttons auf ≥40px Tap-Target
+     gestreckt — mit kleinerem Gap packen sie pro Reihe dichter beieinander. */
+  /* Alle Action-Bars rechtsbündig — die Icons packen wie auf Desktop rechts
+     zusammen (statt links gruppiert + ⋯-Overflow einzeln nach rechts gerissen).
+     Rechtsbündig hält zugleich das an die ⋯-Overflow-Kante gekoppelte
+     `.context-menu--dropdown` (right: 0) vom linken Rand fern. */
+  .card-actions { width: 100%; gap: var(--space-xs); justify-content: flex-end; }
+  .card-actions button { flex: 1 1 auto; min-width: 0; }
+  /* Gruppierte Editor-Toolbar (Prüfen/Bearbeiten/Fokus/Chat/Ideen/Teilen):
+     viele Buttons → natürliche Breite + kompakteres Padding/Schrift, damit sie
+     pro Reihe dichter packen (≈2 statt 3 Reihen vor dem Seiteninhalt). Andere
+     Karten (oft nur 1 CTA) behalten den Full-Width-Stretch. */
+  .card-actions--grouped button {
+    flex: 0 1 auto;
+    padding: var(--size-default-padding-y) 10px;
+    font-size: var(--font-size-sm);
+  }
+  .card-actions--grouped .action-sep { display: none; }
+  /* Icon-only Buttons (z.B. Tagebuch Vor/Zurueck) sind via `.icon-btn`
+     natuerlich niedriger als die Text-Buttons der Gruppe. Auf Touch auf die
+     Zeilenhoehe der benachbarten Buttons strecken, damit die Pfeile exakt so
+     gross wie die Buttons sind; Icon bleibt zentriert. */
+  .card-actions .icon-btn {
+    align-self: stretch;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Text-Buttons (Speichern/Abbrechen/Export) bekommen eine Mindestbreite,
+     damit sie tappbar bleiben. Icon-only Buttons sind davon ausgenommen — sie
+     behalten ihre kompakte Quadrat-Größe (Touch-Tap-Target ≥40px kommt aus
+     icon-btn.css @media pointer:coarse), sonst reissen 80px-Slots die Action-
+     Icons unnötig weit auseinander. */
+  .card-actions button:not(.icon-btn) { min-width: 80px; }
+}
+
+/* === Close-Button in Card-Header === */
+.btn-card-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  padding: var(--space-2xs) 6px;
+  cursor: pointer;
+  border-radius: 0;
+  margin-left: var(--space-xs);
+  flex-shrink: 0;
+}
+.btn-card-close:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+}

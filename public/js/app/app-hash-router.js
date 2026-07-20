@@ -556,6 +556,9 @@ export const appHashRouterMethods = {
       () => this.$store.catalogUi.selectedOrtId,
       () => this.$store.catalogUi.selectedSongId,
       () => this.$store.catalogUi.selectedSzeneId,
+      // Beat-Permalink: Edit öffnen setzt plotBeatId → #…/plot/<beatId> (replace,
+      // gleiche Kategorie), Schliessen/Esc/Verwerfen nullt ihn → zurück auf #…/plot.
+      () => this.$store.nav.plotBeatId,
       () => this.$store.nav.searchScope,
     ];
     for (const getter of storeWatched) {

@@ -6,6 +6,7 @@ import { fetchJson, tzOpts } from '../../utils.js';
 import { startPoll, runningJobStatus } from '../../cards/job-helpers.js';
 import { toggleWrapFullscreen } from '../../fullscreen.js';
 import { normTitle } from './constants.js';
+import { EVT } from '../../events.js';
 
 export const aiMethods = {
   // ── KI: Brainstorm ──────────────────────────────────────────────────────
@@ -390,7 +391,7 @@ export const aiMethods = {
     if (!beat || !(beat.occ_top || []).length) return;
     if (this.beatOccPopoverBeatId === beat.id) { this.closeBeatOccPopover(); return; }
     // Hover-Tooltip des Anker-Badges wegblenden — er hinge sonst über dem Popover.
-    window.dispatchEvent(new CustomEvent('tooltip:hide'));
+    window.dispatchEvent(new CustomEvent(EVT.TOOLTIP_HIDE));
     this._occTriggerRect = ev.currentTarget.getBoundingClientRect();
     // Schätzung vor dem Render, danach mit der echten Popover-Grösse nachjustieren
     // (sonst schiebt sich das Menü beim Hochklappen mit fester Höhe über den Button).

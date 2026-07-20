@@ -1,0 +1,410 @@
+@layer components {
+/* === Form elements === */
+label {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  display: block;
+  margin-bottom: var(--space-6);
+}
+
+input[type=text],
+input[type=email],
+input[type=password],
+input[type=url],
+input[type=search],
+input[type=tel],
+input[type=number],
+input[type=date],
+input[type=month],
+input[type=datetime-local],
+select,
+.card-form-input {
+  width: 100%;
+  padding: var(--size-default-padding-y) 10px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-family: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+/* iOS: font-size >= 16px verhindert automatisches Zoom-in beim Fokus */
+@media (max-width: 768px) {
+  input[type=text],
+  input[type=email],
+  input[type=password],
+  input[type=url],
+  input[type=search],
+  input[type=tel],
+  input[type=number],
+  input[type=date],
+  input[type=month],
+  input[type=datetime-local],
+  textarea,
+  select {
+    font-size: var(--font-size-reading);
+  }
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.card-form-input:focus,
+.card-form-textarea:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+/* Disabled: gedämpft + not-allowed, einheitlich über alle Form-Felder. */
+input:disabled,
+select:disabled,
+textarea:disabled,
+.card-form-input:disabled,
+.card-form-textarea:disabled {
+  opacity: var(--opacity-hint);
+  cursor: not-allowed;
+}
+
+/* === Form-Patterns (in Karten wiederverwendbar) ===
+   Grid-Klassen .card-form-grid / -row / -label und Wertspalten-Bausteine
+   .form-stack / -inline / -check etc. Komplettes Markup-Muster siehe
+   DESIGN.md "Form-Patterns". */
+
+.card-form-grid {
+  padding: var(--space-xs) 0 8px;
+}
+.card-form-row {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  align-items: start;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-14);
+}
+.card-form-row--top {
+  align-items: flex-start;
+}
+/* Klappbare Voll-Breite-Sections im Form-Grid (Wörterbuch, Geräte-Tokens):
+   brechen aus dem 170px/1fr-Raster aus. Sonst wird der .collapsible-toggle in
+   die schmale Label-Spalte gequetscht (Uppercase-Titel bricht um) und der Body
+   sitzt versetzt rechts daneben. Block + Top-Divider = eigenständige Section,
+   Toggle linksbündig als Header, Body fliesst darunter. */
+.card-form-row--dict,
+.card-form-row--devices {
+  display: block;
+  border-top: var(--border-thin) solid var(--color-border);
+  padding-top: var(--space-10);
+}
+.card-form-label {
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  padding-top: var(--space-6);
+  color: var(--color-text);
+}
+.card-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.card-form-field-note {
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+.card-form-section-divider {
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  line-height: 1.4;
+  margin: 22px 0 14px;
+  padding-top: var(--space-14);
+  border-top: var(--border-thin) solid var(--color-border);
+}
+/* Inline-Zahlenfeld mit Einheit (z.B. Tagesziel Minuten/Tag im Profil). */
+.card-form-goal-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.card-form-goal-input {
+  box-sizing: border-box;
+  width: 5rem;
+  padding: var(--size-compact-padding);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  font-size: var(--size-compact-font-size);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: right;
+}
+.card-form-goal-input:focus { outline: none; border-color: var(--color-border-focus); }
+.card-form-goal-unit { font-size: var(--font-size-sm); color: var(--color-muted); }
+@media (max-width: 600px) {
+  /* iOS: >= 16px verhindert Zoom-in beim Fokus des Zahlenfelds. */
+  .card-form-goal-input { font-size: var(--font-size-reading); }
+}
+.card-form-saved {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-mini);
+  color: var(--color-success);
+  font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  transition: opacity 250ms ease;
+}
+/* Inline neben Button (z.B. figur-werkstatt, pdf-export) — vertikal mittig
+   trotz `.row { align-items: flex-end }`. Margin-top entfernen, sonst sitzt
+   Toast in Button-Reihe zu tief. */
+.row > .card-form-saved,
+.card-actions > .card-form-saved,
+.card-actions > .card-form-error {
+  align-self: center;
+  margin: 0;
+}
+.card-form-saved::before {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  margin-right: 0.25em;
+  background-color: currentColor;
+  -webkit-mask: var(--icon-check) center / contain no-repeat;
+          mask: var(--icon-check) center / contain no-repeat;
+}
+.card-form-error {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-mini);
+  color: var(--color-err-text);
+}
+
+/* Empty-State mit CTA — Karte hat keine Daten und bietet einen Knopf, um
+   welche zu erstellen. Verwendet von Figuren-Werkstatt; weitere Karten
+   folgen, sobald sie das Pattern brauchen. Dokumentiert in DESIGN.md. */
+.card-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl) var(--space-lg);
+  text-align: center;
+}
+.card-empty-text {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+}
+.card-empty-hint {
+  margin: 0;
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  max-width: 32em;
+  line-height: var(--lh-base);
+}
+/* CTA-Button im Empty-State: inline-flex, damit Lucide-Icon + Label bündig
+   zentriert sitzen. Basis bleibt .primary. */
+.card-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+@media (max-width: 600px) {
+  .card-empty { padding: var(--space-xl) var(--space-md); }
+}
+.card-form-textarea {
+  width: 100%;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  padding: var(--space-6) 8px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+/* Mobile: 16px verhindert iOS-Zoom beim Fokus. Eigener Selektor noetig, weil die
+   Klassen-font-size oben die globale textarea-Regel ueberspezifiziert. */
+@media (max-width: 768px) {
+  .card-form-textarea { font-size: var(--font-size-reading); }
+}
+
+/* Validation-State: aria-invalid="true" reicht — kein paralleler Klassen-State.
+   Screen-Reader liest aria-invalid; Selektor leitet Optik daraus ab. */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"],
+.card-form-textarea[aria-invalid="true"] {
+  border-color: var(--color-err-border);
+  outline-color: var(--color-err-border);
+}
+.card-form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  text-align: right;
+  margin: 0;
+}
+.card-form-row > .card-form-hint {
+  grid-column: 2;
+  text-align: left;
+}
+
+.form-lead {
+  margin: var(--space-xs) 0 14px;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.form-inline {
+  display: flex;
+  gap: var(--space-20);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.form-inline-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+/* Radio-Gruppe (selbst-rendernd via Alpine.data('radioGroup')). Wertspalten-
+   Baustein: horizontale, umbrechende Reihe aus Radio-Optionen. */
+.form-radio-group {
+  display: flex;
+  gap: var(--space-20);
+  flex-wrap: wrap;
+}
+.form-radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.form-radio-option input[type="radio"] {
+  accent-color: var(--color-primary);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* Variante „card" (Standard aller Radio-Gruppen): umrandete Radio-Karten mit
+   Akzent-Tint bei Auswahl. --card-accent kommt aus dem umgebenden Karten-Scope. */
+.form-radio-group--card {
+  gap: var(--space-lg);
+}
+.form-radio-group--card .form-radio-option {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  transition: border-color 120ms, background 120ms;
+}
+.form-radio-group--card .form-radio-option:has(input:checked) {
+  border-color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 8%, var(--color-bg));
+}
+.form-radio-group--card .form-radio-option.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.form-radio-group--card .form-radio-option input[type="radio"] {
+  accent-color: var(--card-accent);
+}
+
+.form-num {
+  font-size: var(--font-size-sm);
+  padding: var(--pad-badge);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  width: 90px;
+}
+
+.form-check {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: var(--space-10);
+  align-items: start;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.form-check input[type="checkbox"] {
+  margin-top: var(--space-3);
+  accent-color: var(--color-primary);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+.form-check-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  display: block;
+}
+.form-check-desc {
+  font-size: var(--font-size-mini);
+  color: var(--color-muted);
+  display: block;
+  margin-top: var(--space-2xs);
+}
+
+.form-section {
+  margin-top: var(--space-14);
+  padding-top: var(--space-14);
+  border-top: var(--border-thin) solid var(--color-border);
+}
+.form-stats {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+}
+.form-size-hint {
+  margin-left: var(--space-6);
+  font-weight: 400;
+  opacity: var(--opacity-strong);
+}
+
+/* Mobile: das 170px/1fr-Raster quetscht Label + Feld auf Handybreite zusammen
+   und die Gaps wirken zu eng. Auf eine Spalte umbrechen und Zeilen-/Feld-Abstand
+   auf die naechsthoehere Token-Stufe anheben. */
+@media (max-width: 600px) {
+  .card-form-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
+  .card-form-label { padding-top: 0; }
+  .card-form-field { gap: var(--space-sm); }
+  .card-form-row > .card-form-hint { grid-column: 1; }
+  .form-inline { gap: var(--space-10) 16px; }
+  .form-inline-field {
+    flex: 1 1 calc(50% - 16px);
+    min-width: 0;
+  }
+  .form-num {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .form-radio-group { gap: var(--space-md); }
+  .form-radio-group--card { flex-direction: column; }
+  .form-radio-group--card .form-radio-option { width: 100%; }
+}
+
+}

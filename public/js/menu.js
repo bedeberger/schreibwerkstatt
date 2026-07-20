@@ -37,6 +37,8 @@
 // - Den Active-Zustand des Triggers kann der Konsument via `:class="{ 'is-active': open }"`
 //   binden — `open` liegt im selben x-data-Scope.
 
+import { EVT } from './events.js';
+
 export function menuData() {
   return {
     open: false,
@@ -49,7 +51,7 @@ export function menuData() {
     openMenu() {
       this.open = true;
       // Hover-Tooltip des Triggers wegblenden — er hinge sonst über dem Menü.
-      window.dispatchEvent(new CustomEvent('tooltip:hide'));
+      window.dispatchEvent(new CustomEvent(EVT.TOOLTIP_HIDE));
       // Ersten Eintrag fokussieren (Tastatur-Bedienung). Der native Button-
       // Outline ist das Fokus-Signal (kein eigener Ring, siehe Fokus-Regel).
       this.$nextTick(() => {

@@ -3,6 +3,7 @@
 
 import { fetchJson } from '../../utils.js';
 import { ACT_PALETTE } from './constants.js';
+import { EVT } from '../../events.js';
 
 export const threadsMethods = {
   async addThread() {
@@ -89,7 +90,7 @@ export const threadsMethods = {
   openThreadMenu(ev, laneId) {
     if (this.threadActionsOpenId === laneId) { this.closeThreadMenu(); return; }
     // Hover-Tooltip des Triggers wegblenden — er hinge sonst über dem Menü.
-    window.dispatchEvent(new CustomEvent('tooltip:hide'));
+    window.dispatchEvent(new CustomEvent(EVT.TOOLTIP_HIDE));
     this._threadTriggerRect = ev.currentTarget.getBoundingClientRect();
     // Schätzung vor dem Render; danach mit der echten Popover-Grösse nachjustieren,
     // damit das Menü beim Hochklappen nicht mit einer festen Höhe über den Button

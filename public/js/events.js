@@ -92,6 +92,9 @@ export const EVT = {
   EXPORT_EPUB_PRESET: 'export:epub:preset',     // detail: { preset }
   EXPORT_DOCX_PRESET: 'export:docx:preset',     // detail: { preset }
 
+  // ── Tooltip-Layer ────────────────────────────────────────────────────────
+  TOOLTIP_HIDE: 'tooltip:hide',                 // kein detail (programmatisches Ausblenden)
+
   // ── App-global ───────────────────────────────────────────────────────────
   SESSION_EXPIRED: 'session-expired',           // kein detail
   APP_UPDATE_AVAILABLE: 'app:update-available', // kein detail
