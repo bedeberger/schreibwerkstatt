@@ -24,9 +24,9 @@ Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama
 - `GET /config` liefert den resolvten Provider read-only (`apiProvider`) für die Frontend-Statuszeile.
 - Self-Service nein. Cost-Verteilung gehört zum Admin-Kontrakt.
 
-### Mutex bleibt providerspezifisch
+### Concurrency-Locks bleiben providerspezifisch
 
-Ollama/Llama-Locks serialisieren *pro Provider*, nicht pro User. VRAM verträgt keine Parallelität.
+Locks serialisieren *pro Provider*, nicht pro User. Ollama läuft über einen strikten Mutex (`withOllamaLock`) — VRAM verträgt keine Parallelität. OpenAI-kompatibel läuft über eine **Semaphore** (`withOpenAICompatLock`, `makeSemaphore` in [lib/ai/shared.js](lib/ai/shared.js)) mit dynamisch gelesener Obergrenze `ai.openai-compat.max_parallel` (Default 1 = seriell wie Ollama, Admin-Setting, greift ohne Neustart). Höher setzen, wenn der lokale Server mehrere Slots verträgt (z.B. LocalAI); überzählige Calls warten in der Queue.
 
 ### Cache-Key-Erweiterung
 
@@ -69,7 +69,7 @@ Alle KI-Konfig liegt in der `app_settings`-Tabelle. Admin-PUT via `/admin/settin
 | `ollama` | NDJSON | Nein | Nein |
 | `openai-compat` | OpenAI-SSE | Nein | Nein |
 
-Ollama + OpenAI-kompatibel laufen über globalen **Mutex** (`withOllamaLock`/`withOpenAICompatLock`) — VRAM-Schutz, parallele Calls würden Modelle abschmieren lassen. Jobs laufen weiter parallel; nur die KI-Calls serialisieren am Server.
+Ollama läuft über einen globalen **Mutex** (`withOllamaLock`) — VRAM-Schutz, parallele Calls würden das Modell abschmieren lassen. OpenAI-kompatibel läuft über eine **Semaphore** (`withOpenAICompatLock`) mit konfigurierbarer Obergrenze `ai.openai-compat.max_parallel` (Default 1). Jobs laufen weiter parallel; die KI-Calls am Server sind auf die Semaphore-Grenze gedrosselt (bzw. bei Ollama seriell).
 
 ### Reasoning/„Thinking" (nur lokale Provider)
 

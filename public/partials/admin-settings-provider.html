@@ -160,6 +160,10 @@
           <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.repeatPenalty')"></small>
         </label>
         <div x-data="settingField({ k: 'ai.openai-compat.think', type: 'toggle', help: 'admin.settings.help.thinkOpenaiCompat' })"></div>
+        <label>ai.openai-compat.max_parallel
+          <input type="text" x-data="numInput({ integer: true, min: 1, max: 16 })" x-modelable="value" x-model="adminSettingsForm['ai.openai-compat.max_parallel']">
+          <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.maxParallelOpenaiCompat')"></small>
+        </label>
       </div>
 
       <template x-if="adminSettingsBudget(adminSettingsProviderSubtab)">

@@ -112,7 +112,9 @@ export {
 export {
   buildLektoratPrompt,
   buildBatchLektoratPrompt,
+  buildObjektivLektoratPrompt,
   SCHEMA_LEKTORAT,
+  SCHEMA_LEKTORAT_OBJEKTIV,
 } from './prompts/lektorat.js';
 
 export {
