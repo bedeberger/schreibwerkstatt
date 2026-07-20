@@ -41,7 +41,13 @@ function _buildLektoratPromptBody(text, textLabel, {
   buchtyp = null,
   previousExcerpt = null,
   langCode = 'de',
+  mode = 'full',
 } = {}) {
+  // Stil-Modus (Claude-Split): objektive/mechanische Typen werden in einem
+  // separaten Objektiv-Pass geprüft (buildObjektivLektoratPrompt) und hier
+  // ausgeschlossen, damit sie nicht doppelt auftauchen. Nur im Cloud-Pfad
+  // relevant – lokale Provider fahren weiterhin den kombinierten Single-Call.
+  const stilOnly = mode === 'stil' && !_isLocal;
   const metaParts = [];
   if (chapterName) metaParts.push(`Kapitel: «${chapterName}»`);
   if (pageName)    metaParts.push(`Seite: «${pageName}»`);
@@ -103,7 +109,9 @@ function _buildLektoratPromptBody(text, textLabel, {
   // Textverständnis, an dem kleine Modelle häufig scheitern oder in Wiederholungsloops geraten.
   const typEnum = _isLocal
     ? 'rechtschreibung|grammatik|stil|wiederholung|schwaches_verb|fuellwort'
-    : 'rechtschreibung|grammatik|stil|satzbau|wiederholung|schwaches_verb|fuellwort|filterwort|klischee|pleonasmus|ki_geruch|show_vs_tell|passiv|perspektivbruch|tempuswechsel|dialogformat|namenskonsistenz|figurenmerkmal|anrede|schauplatzmerkmal';
+    : (stilOnly
+      ? 'stil|satzbau|wiederholung|schwaches_verb|fuellwort|filterwort|klischee|pleonasmus|ki_geruch|show_vs_tell|passiv|perspektivbruch|tempuswechsel|schauplatzmerkmal'
+      : 'rechtschreibung|grammatik|stil|satzbau|wiederholung|schwaches_verb|fuellwort|filterwort|klischee|pleonasmus|ki_geruch|show_vs_tell|passiv|perspektivbruch|tempuswechsel|dialogformat|namenskonsistenz|figurenmerkmal|anrede|schauplatzmerkmal');
 
   // Lokal + Cloud: Typ-Priorität und Anti-Doppelung pro Textspanne. Verhindert,
   // dass derselbe Satz mehrfach gemeldet wird (z.B. fuellwort + schwaches_verb +
@@ -207,7 +215,9 @@ Beispiel eines VERWORFENEN Eintrags (Korrektur-Purität verletzt):
 { "typ": "show_vs_tell", "original": "Dort versteckte er sich vor der Konfrontation, vor der eigentlich normalsten Auseinandersetzung zwischen Ehepartnern.", "korrektur": "Satz kürzen auf: «Dort versteckte er sich vor der Konfrontation.» – der erklärende Nachsatz nimmt dem Leser die Deutung vorweg.", "erklaerung": "..." } → «korrektur» enthält Meta-Präfix, Guillemets und Begründungs-Anhang → KORRIGIEREN zu: { "korrektur": "Dort versteckte er sich vor der Konfrontation.", "erklaerung": "Der erklärende Nachsatz nimmt dem Leser die Deutung vorweg – Satz kürzen." }
 `;
 
-  const figurenkonsistenzBlock = (!_isLocal && figuren.length > 0)
+  // Figurenkonsistenz (namens-/figuren-/anrede) ist objektiv → im Stil-Modus dem
+  // separaten Objektiv-Pass überlassen. Schauplatzkonsistenz bleibt im Stil-Pass.
+  const figurenkonsistenzBlock = (!_isLocal && !stilOnly && figuren.length > 0)
     ? _buildFigurenkonsistenzBlock()
     : '';
   const schauplatzkonsistenzBlock = (!_isLocal && orte.length > 0)
@@ -221,7 +231,7 @@ ${_buildFilterwortBlock()}
 ${_buildKlischeeBlock()}
 ${_buildPleonasmusBlock()}
 ${_buildShowVsTellBlock()}
-${_buildDialogformatBlock(langCode)}
+${stilOnly ? '' : _buildDialogformatBlock(langCode)}
 ${_buildPassivBlock()}
 ${_buildPerspektivbruchBlock()}
 ${_buildTempuswechselBlock()}
@@ -273,7 +283,9 @@ Szenen-Regeln:
 
   const aufgabeSatz = _isLocal
     ? 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, Zeichensetzungs-/Interpunktionsfehler (insbesondere Kommasetzung), stilistische Auffälligkeiten und auffällige Wortwiederholungen. Prüfe Grammatik und Zeichensetzung Satz für Satz und gründlich.'
-    : 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, Zeichensetzungs-/Interpunktionsfehler (insbesondere Kommasetzung), Tempus- und Perspektivbrüche, holprigen Satzbau, stilistische Auffälligkeiten und auffällige Wortwiederholungen – ebenso auf schwache Verben, Füll- und Filterwörter, Klischees, KI-Geruch, Show-statt-Tell, vermeidbares Passiv, Dialogformat-Typografie und Konsistenz von Figuren und Schauplätzen (Zuständigkeit und Details der einzelnen Typen siehe Regelblöcke unten). Prüfe Grammatik, Zeichensetzung und Erzähltempus Satz für Satz und gründlich – das sind objektive Fehler, die nicht übersehen werden dürfen. Bewerte ausserdem die Szenen der Seite.';
+    : (stilOnly
+      ? 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf STILISTISCHE Schwächen: holprigen Satzbau, Wortwiederholungen, schwache Verben, Füll- und Filterwörter, Klischees, KI-Geruch, Show-statt-Tell, vermeidbares Passiv, Pleonasmen sowie Tempus- und Perspektivbrüche und Schauplatz-Konsistenz (Zuständigkeit und Details siehe Regelblöcke unten). WICHTIG: Objektive/mechanische Fehler – Rechtschreibung, Grammatik, Zeichensetzung/Interpunktion, Dialogformat-Typografie sowie Namens-/Figuren-Konsistenz und Anreden – werden in einem SEPARATEN Pass geprüft und dürfen hier NICHT gemeldet werden. Bewerte ausserdem die Szenen der Seite.'
+      : 'Analysiere den Text vollständig von Anfang bis Ende – nicht nur lokale Abschnitte oder die letzten Sätze – auf Rechtschreibfehler, Grammatikfehler, Zeichensetzungs-/Interpunktionsfehler (insbesondere Kommasetzung), Tempus- und Perspektivbrüche, holprigen Satzbau, stilistische Auffälligkeiten und auffällige Wortwiederholungen – ebenso auf schwache Verben, Füll- und Filterwörter, Klischees, KI-Geruch, Show-statt-Tell, vermeidbares Passiv, Dialogformat-Typografie und Konsistenz von Figuren und Schauplätzen (Zuständigkeit und Details der einzelnen Typen siehe Regelblöcke unten). Prüfe Grammatik, Zeichensetzung und Erzähltempus Satz für Satz und gründlich – das sind objektive Fehler, die nicht übersehen werden dürfen. Bewerte ausserdem die Szenen der Seite.');
 
   // XML-Wrapper für die strukturell trennbaren Sektionen — hilft Claude beim
   // Parsen von Aufgabe, Schema, Beispielen und Originaltext als distinkte
@@ -291,8 +303,8 @@ ${metaBlock}${povBlock}${wichtigBlock}${korrekturPuritaetBlock}${severityBlock}$
 ${schemaBlock}
 </output_format>
 ${beispielSection}${szenenRegelnBlock}
-${_buildRechtschreibungBlock(langCode)}
-${_buildGrammatikBlock(langCode)}
+${stilOnly ? '' : _buildRechtschreibungBlock(langCode)}
+${stilOnly ? '' : _buildGrammatikBlock(langCode)}
 ${_buildStilBlock()}
 ${_buildWiederholungBlock(stopwords)}
 ${_buildSchwacheVerbenBlock()}
@@ -311,6 +323,14 @@ export function buildLektoratPrompt(text, opts = {}) {
 // Batch-Variante ohne korrekturen_html (spart Output-Tokens, für Server-Side-Jobs)
 export function buildBatchLektoratPrompt(text, opts = {}) {
   return _buildLektoratPromptBody(text, 'Text:', opts);
+}
+
+// Stil-Pass des Claude-Splits: kombinierter Prompt OHNE die objektiven Typen
+// (die laufen im buildObjektivLektoratPrompt-Pass). Liefert weiterhin szenen/
+// stilanalyse/fazit. Fällt bei lokalen Providern (_isLocal) automatisch auf den
+// vollen Kombi-Prompt zurück – der lokale Pfad splittet nicht.
+export function buildStilLektoratPrompt(text, opts = {}) {
+  return _buildLektoratPromptBody(text, 'Text:', { ...opts, mode: 'stil' });
 }
 
 // ── Objektiv-Pass ──────────────────────────────────────────────────────────────

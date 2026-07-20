@@ -32,6 +32,64 @@ const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const { resolvePageBookId } = require('../../lib/content-ownership');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
+const { consensusFindings, mergePasses } = require('../../lib/lektorat-consolidate');
+
+// Claude-Split (Objektiv-Pass + Stil-Pass): Anzahl Objektiv-Läufe für den Konsens
+// und die Konsens-Schwelle. Admin-tunebar (analog ai.lektorat_batch_concurrency).
+// Lokale Provider splitten nicht → immer 1 Lauf, kombinierter Prompt.
+function objektivRuns() {
+  const n = parseInt(appSettings.get('ai.lektorat_objective_runs'), 10);
+  return Number.isFinite(n) && n > 0 ? n : 3;
+}
+function consensusThreshold() {
+  const n = parseInt(appSettings.get('ai.lektorat_consensus_threshold'), 10);
+  return Number.isFinite(n) && n > 0 ? n : 2;
+}
+
+// Kern-KI-Schritt des Lektorats. Cloud (Claude): Objektiv-Pass K× parallel
+// (Konsens ≥ Schwelle → maximale Präzision, filtert lauf-instabile Einzelgänger)
+// PLUS Stil-Pass 1× (kombinierter Prompt ohne objektive Typen, liefert
+// szenen/stilanalyse/fazit) — alles parallel, danach Span-Overlap-Merge zu einer
+// dublettenfreien fehler-Liste. Der identische Objektiv-Prompt macht die Läufe
+// 2..K bei Claude fast gratis (voller Prompt-Cache-Hit). Lokale Provider: genau
+// EIN kombinierter Call, unverändert. Rückgabe hat stets die Form
+// { fehler, szenen, stilanalyse, fazit } — Cache/History/Frontend bleiben gleich.
+async function _lektoratAnalyze({ jobId, tok, text, local, prompts, system, promptOpts, single, fromPct, toPct }) {
+  const {
+    buildLektoratPrompt, buildBatchLektoratPrompt,
+    buildObjektivLektoratPrompt, buildStilLektoratPrompt,
+    SCHEMA_LEKTORAT, SCHEMA_LEKTORAT_OBJEKTIV,
+  } = prompts;
+  const K = local ? 1 : objektivRuns();
+
+  if (K <= 1) {
+    const prompt = single ? buildLektoratPrompt(text, promptOpts) : buildBatchLektoratPrompt(text, promptOpts);
+    const result = await aiCall(jobId, tok, prompt, system, fromPct, toPct, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT);
+    if (!Array.isArray(result?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
+    return result;
+  }
+
+  if (!tok.inflight) tok.inflight = new Map();   // parallele Live-Token-Summierung
+  const objektivOpts = {
+    figuren: promptOpts.figuren, figurenBeziehungen: promptOpts.figurenBeziehungen,
+    orte: promptOpts.orte, pageName: promptOpts.pageName, chapterName: promptOpts.chapterName,
+    langCode: promptOpts.langCode,
+  };
+  const objektivPrompt = buildObjektivLektoratPrompt(text, objektivOpts);
+  const stilPrompt = buildStilLektoratPrompt(text, promptOpts);
+
+  const [objRuns, stilResult] = await Promise.all([
+    Promise.all(Array.from({ length: K }, () =>
+      aiCall(jobId, tok, objektivPrompt, system, null, null, 4000, 0.2, null, undefined, SCHEMA_LEKTORAT_OBJEKTIV))),
+    aiCall(jobId, tok, stilPrompt, system, null, null, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT),
+  ]);
+
+  if (!Array.isArray(stilResult?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
+  const objFehlerRuns = objRuns.map(r => (Array.isArray(r?.fehler) ? r.fehler : []));
+  const objConsensus = consensusFindings(objFehlerRuns, text, { threshold: consensusThreshold() });
+  const fehler = mergePasses([objConsensus, stilResult.fehler], text);
+  return { fehler, szenen: stilResult.szenen, stilanalyse: stilResult.stilanalyse, fazit: stilResult.fazit };
+}
 
 // Lokale Provider (ollama/llama) bekommen einen deutlich abgespeckten Lektorat-Prompt:
 // kein Vorseiten-Kontext (BookStack-Roundtrip gespart), keine Figuren-Beziehungen,
@@ -189,7 +247,7 @@ const lektoratRouter = express.Router();
 async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts();
-  const { buildLektoratPrompt, SCHEMA_LEKTORAT, PROMPTS_VERSION } = prompts;
+  const { PROMPTS_VERSION } = prompts;
   const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: lektoratStopwords, ERKLAERUNG_RULE: lektoratErklaerungRule, KORREKTUR_REGELN: lektoratKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = bookId ? getBookLocale(bookId, userEmail) : 'de-CH';
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
@@ -265,8 +323,10 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
         result.fehler = finalizeFehler(result.fehler, locale);
       }
     } else {
-      result = await aiCall(jobId, tok,
-        buildLektoratPrompt(text, {
+      result = await _lektoratAnalyze({
+        jobId, tok, text, local, prompts, system: SYSTEM_LEKTORAT, single: true,
+        fromPct: 10, toPct: 97,
+        promptOpts: {
           stopwords: lektoratStopwords,
           erklaerungRule: lektoratErklaerungRule,
           korrekturRegeln: lektoratKorrekturRegeln,
@@ -275,12 +335,9 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
           ...narrativeLabels(bookSettings),
           previousExcerpt,
           langCode,
-        }),
-        SYSTEM_LEKTORAT,
-        10, 97, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT,
-      );
+        },
+      });
 
-      if (!Array.isArray(result?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
       result.fehler = finalizeFehler(result.fehler, locale);
 
       if (ctxSig) saveLektoratCache(bookId, userEmail, pageId, ctxSig, result, effectiveProvider);
@@ -332,7 +389,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
 async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts();
-  const { buildBatchLektoratPrompt, SCHEMA_LEKTORAT, PROMPTS_VERSION } = prompts;
+  const { PROMPTS_VERSION } = prompts;
   const effectiveProvider = resolveProvider({ userEmail });
   const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
   const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: batchStopwords, ERKLAERUNG_RULE: batchErklaerungRule, KORREKTUR_REGELN: batchKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
@@ -351,7 +408,12 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
 
     // Cloud-Provider verträgt parallele Calls; lokale Provider (Ollama/llama.cpp) sind
     // bereits via Mutex in lib/ai.js serialisiert – Pool=1 verhindert pile-up im aiCall.
-    const concurrency = local ? 1 : (parseInt(appSettings.get('ai.lektorat_batch_concurrency'), 10) || 4);
+    // Split-Modus (Cloud): jede Seite fächert in K Objektiv-Läufe + 1 Stil-Lauf auf.
+    // Damit die Gesamt-Concurrency (Seiten-Pool × Calls/Seite) im konfigurierten
+    // Rahmen bleibt, den Seiten-Pool entsprechend teilen (Rate-Limit-Schutz).
+    const rawConcurrency = local ? 1 : (parseInt(appSettings.get('ai.lektorat_batch_concurrency'), 10) || 4);
+    const callsPerPage = local ? 1 : (objektivRuns() > 1 ? objektivRuns() + 1 : 1);
+    const concurrency = Math.max(1, Math.floor(rawConcurrency / callsPerPage));
     const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
     const model = _modelName(effectiveProvider);
     let done = 0, totalErrors = 0;
@@ -416,8 +478,10 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
           // Bei Pool>1 sind feinere Pct-Ranges pro Item nicht sinnvoll
           // (mehrere Calls schreiben gleichzeitig den Job-Progress); progress wird
           // unten aus done/total nach jedem fertigen Item gesetzt.
-          result = await aiCall(jobId, tok,
-            buildBatchLektoratPrompt(text, {
+          result = await _lektoratAnalyze({
+            jobId, tok, text, local, prompts, system: SYSTEM_LEKTORAT, single: false,
+            fromPct: null, toPct: null,
+            promptOpts: {
               stopwords: batchStopwords,
               erklaerungRule: batchErklaerungRule,
               korrekturRegeln: batchKorrekturRegeln,
@@ -430,12 +494,9 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
               erzaehlzeit: bookSettings?.erzaehlzeit || null,
               previousExcerpt,
               langCode,
-            }),
-            SYSTEM_LEKTORAT,
-            null, null, 2000, 0.2, null, undefined, SCHEMA_LEKTORAT,
-          );
+            },
+          });
 
-          if (!Array.isArray(result?.fehler)) throw new Error('fehler-Array fehlt');
           result.fehler = finalizeFehler(result.fehler, locale);
           saveLektoratCache(bookId, userEmail, p.id, ctxSig, result, effectiveProvider);
         }
