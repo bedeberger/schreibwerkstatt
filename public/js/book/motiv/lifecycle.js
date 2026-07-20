@@ -27,6 +27,8 @@ export const lifecycleMethods = {
       this.embedIndexStale = !!data.embedIndex?.stale;
       this._savedPositions = data.layout || {};
       this._memos = {};
+      // Persistierte KI-Brainstorm-Läufe (Historie) mitladen.
+      this.loadBrainstormRuns();
       // Figuren fürs Figuren-Layer + Verknüpfungs-Combobox bereitstellen.
       if (!this.$store.catalog.figuren?.length) window.__app.loadFiguren(bookId);
       this.$nextTick(() => this.renderMotivGraph());
@@ -54,6 +56,11 @@ export const lifecycleMethods = {
     this.editName = '';
     this.editBeschreibung = '';
     this.editTriggers = '';
+    this.editFigures = [];
+    this.editDraftFigures = [];
+    this.editBeats = [];
+    this.editChapters = [];
+    this.editPages = [];
     this.allBeats = [];
     this.allActs = [];
     this._beatsLoaded = false;
@@ -61,6 +68,9 @@ export const lifecycleMethods = {
     this._draftFigurenLoaded = false;
     this.errorMessage = '';
     this.embedIndexStale = false;
+    this.suggestions = [];
+    this.brainstormRuns = [];
+    this.selectedBrainstormRunId = null;
     this._savedPositions = null;
     this._pendingMotifId = null;
     this._memos = {};

@@ -339,6 +339,55 @@ function saveLayout(bookId, userEmail, positions) {
   _stmtUpsertLayout.run(parseInt(bookId), userEmail, JSON.stringify(positions || {}));
 }
 
+// ── KI-Brainstorm-Lauf-Historie ─────────────────────────────────────────────
+// Persistierte Motiv-Brainstorm-Läufe pro (Buch, User). Insert beim Job-Complete
+// in routes/jobs/motif-brainstorm.js; List/Get/Delete via /motifs/brainstorm-runs
+// Routes. Die Liste kommt ohne result_json (Spaltensparsamkeit bei vielen
+// Einträgen) — vorschlag_count ist denormalisiert fürs Listen-Rendering; das
+// Detail liefert die vollen Vorschläge. Buchweit, kein Sub-Scope (der Brainstorm
+// schlägt neue Motive/Themen vor, hängt an keinem einzelnen Motiv).
+
+const _stmtInsertBrainstormRun = db.prepare(`
+  INSERT INTO motif_brainstorm_runs (book_id, user_email, created_at, vorschlag_count, result_json, model)
+  VALUES (?, ?, ${NOW_ISO_SQL}, ?, ?, ?)
+`);
+const _stmtListBrainstormRuns = db.prepare(`
+  SELECT id, book_id, created_at, vorschlag_count, model
+    FROM motif_brainstorm_runs
+   WHERE book_id = ? AND user_email = ?
+   ORDER BY created_at DESC, id DESC
+`);
+const _stmtGetBrainstormRun = db.prepare(`
+  SELECT id, book_id, user_email, created_at, vorschlag_count, result_json, model
+    FROM motif_brainstorm_runs
+   WHERE id = ?
+`);
+const _stmtDeleteBrainstormRun = db.prepare('DELETE FROM motif_brainstorm_runs WHERE id = ? AND user_email = ?');
+
+function insertBrainstormRun({ bookId, userEmail, vorschlagCount = 0, result, model = null }) {
+  const info = _stmtInsertBrainstormRun.run(
+    parseInt(bookId), userEmail, parseInt(vorschlagCount) || 0, JSON.stringify(result), model,
+  );
+  return info.lastInsertRowid;
+}
+function listBrainstormRuns(bookId, userEmail) {
+  return _stmtListBrainstormRuns.all(parseInt(bookId), userEmail);
+}
+function getBrainstormRun(id) {
+  const r = _stmtGetBrainstormRun.get(parseInt(id));
+  if (!r) return null;
+  let result = null;
+  try { result = JSON.parse(r.result_json); } catch { result = null; }
+  return {
+    id: r.id, book_id: r.book_id, user_email: r.user_email,
+    created_at: r.created_at, vorschlag_count: r.vorschlag_count,
+    result, model: r.model,
+  };
+}
+function deleteBrainstormRun(id, userEmail) {
+  return _stmtDeleteBrainstormRun.run(parseInt(id), userEmail).changes;
+}
+
 // ── Graph-Payload ───────────────────────────────────────────────────────────
 // Ein Aufruf liefert alles fürs Konstellations-Rendering: Themen, Motive (jeweils
 // mit Soll-Links + Ist-Count), Beziehungen, plus das persistierte Knoten-Layout.
@@ -373,6 +422,8 @@ module.exports = {
   resolveFigureIds, validBeatIds, validDraftFigureIds, validChapterIds, validPageIds,
   // Ist-Index
   replaceOccurrences, listOccurrences,
+  // KI-Brainstorm-Lauf-Historie
+  insertBrainstormRun, listBrainstormRuns, getBrainstormRun, deleteBrainstormRun,
   // Graph-Layout (View-Präferenz)
   getLayout, saveLayout,
   // Aggregat

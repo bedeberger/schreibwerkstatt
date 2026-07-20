@@ -69,6 +69,36 @@ export const boardMethods = {
     return (this.beatDraft.draft_figure_ids || []).map(id => ({ id, label: this.draftFigurenById?.get(id)?.name || id }));
   },
 
+  // Motiv-Picker-Optionen (entityPicker entity 'custom'): der Motiv-Katalog als
+  // { value, label, group }, gruppiert nach Thema (Gruppen in Themen-Position-
+  // Reihenfolge, „Ohne Thema" ans Ende, innerhalb nach Motiv-Name). Optionen eines
+  // Themas müssen zusammenhängend liegen (combobox groupt zusammenhängende Läufe) —
+  // darum Sort nach _ord → group → label. Read-Quellen motifsCatalog/themesCatalog
+  // werden inline berührt, damit die reaktiven Deps im Getter erhalten bleiben.
+  beatMotifOptions() {
+    const order = new Map();
+    (this.themesCatalog || []).forEach((t, i) => order.set(t.id, i));
+    const themeName = new Map((this.themesCatalog || []).map(t => [t.id, t.name]));
+    const noGroup = window.__app?.t('plot.beat.motifNoTheme') || '—';
+    const rows = (this.motifsCatalog || []).map(m => {
+      const hasTheme = m.theme_id != null && themeName.has(m.theme_id);
+      return {
+        value: m.id,
+        label: m.name,
+        group: hasTheme ? themeName.get(m.theme_id) : noGroup,
+        _ord: hasTheme ? order.get(m.theme_id) : Number.MAX_SAFE_INTEGER,
+      };
+    });
+    rows.sort((a, b) => (a._ord - b._ord) || a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
+    return rows;
+  },
+
+  // Aktuell gewählte Motive des Edit-Drafts als entfernbare Chips.
+  beatMotifChips() {
+    const byId = new Map((this.motifsCatalog || []).map(m => [m.id, m]));
+    return (this.beatDraft.motif_ids || []).map(id => ({ id, label: byId.get(id)?.name || id }));
+  },
+
   // ── Stränge (Swimlanes, Derived) ───────────────────────────────────────────
   // Zeilen des Grids: Stränge in Position-Reihenfolge + die „ohne Strang"-Lane
   // (id null) immer am Ende — sie ist Drop-Ziel zum Entkoppeln und fängt alle

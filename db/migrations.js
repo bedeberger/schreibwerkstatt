@@ -9366,6 +9366,34 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 245 abgeschlossen (Motiv-Werkstatt: motif_draft_figures).');
   }
 
+  if (version < 246) {
+    // Motiv-Werkstatt: Historie der KI-Brainstorm-Laeufe, pro (Buch, User)
+    // skopiert — analog plot_consistency_runs. Der Motiv-Brainstorm ist buchweit
+    // (schlaegt neue Motive/Themen vor, haengt an keinem einzelnen Motiv), darum
+    // kein Sub-Scope. book_id CASCADE — die Historie stirbt mit dem Buch.
+    // result_json = { vorschlaege[] }; vorschlag_count denormalisiert fuers Listen-
+    // Rendering (Liste kommt ohne result_json).
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS motif_brainstorm_runs (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id         INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email      TEXT    NOT NULL,
+        created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        vorschlag_count INTEGER NOT NULL DEFAULT 0,
+        result_json     TEXT    NOT NULL,
+        model           TEXT
+      )
+    `).run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_mbr_book_user_date ON motif_brainstorm_runs(book_id, user_email, created_at DESC)').run();
+
+    const fkErrors246 = db.pragma('foreign_key_check');
+    if (fkErrors246.length) {
+      throw new Error(`Migration 246: foreign_key_check meldet ${fkErrors246.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 246').run();
+    logger.info('DB-Migration auf Version 246 abgeschlossen (Motiv-Werkstatt: motif_brainstorm_runs).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

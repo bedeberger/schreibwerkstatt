@@ -37,6 +37,14 @@ export function registerMotivCard() {
     editName: '',
     editBeschreibung: '',
     editTriggers: '',
+    // Edit-Puffer der Soll-Verknüpfungen (Figuren/Beats/Kapitel/Seiten) — wie die
+    // Kern-Felder explizit via Save/Cancel-Icon persistiert, kein Auto-Save mehr.
+    // Bei Auswahl aus dem Motiv gefüllt (_loadLinkBuffer), Chips lesen die Puffer.
+    editFigures: [],
+    editDraftFigures: [],
+    editBeats: [],
+    editChapters: [],
+    editPages: [],
     // Graph-Layer
     layerFigures: false,
     layerBeats: false,
@@ -75,6 +83,10 @@ export function registerMotivCard() {
     brainstorming: false,
     motivBrainstormJobId: null,
     suggestions: [],
+    // Brainstorm-Lauf-Historie (persistiert pro Buch); ein Eintrag lädt seine
+    // Vorschläge zurück ins Panel (selectedBrainstormRunId markiert den offenen Lauf).
+    brainstormRuns: [],
+    selectedBrainstormRunId: null,
     // interne (nicht-reaktive) Felder
     // Cross-Feature-Sprung (Plot-Beat-Motiv-Badge → motiv:select): geparkte Motiv-ID,
     // falls das Board beim Event noch nicht geladen war; loadBoard wendet sie an.

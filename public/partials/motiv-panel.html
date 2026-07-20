@@ -109,7 +109,9 @@
         </div>
       </div>
 
-      <!-- Soll: Verknüpfungen (klappbar, Zustand pro Motiv in localStorage) -->
+      <!-- Soll: Verknüpfungen (klappbar, Zustand pro Motiv in localStorage).
+           Explizites Speichern via Save/Cancel-Icon (kein Auto-Save) — Chips
+           bearbeiten die editXxx-Puffer, sichtbar nur bei ungespeicherten Änderungen. -->
       <div x-data="collapsible(true)" x-modelable="open" x-model="linksExpanded">
       <button type="button" class="collapsible-toggle motiv-panel-heading" x-bind="trigger">
         <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
@@ -120,11 +122,11 @@
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.figures')"></span>
         <div class="motiv-chip-row">
-          <template x-for="f in selectedMotif().figures" :key="'k'+f.figId">
+          <template x-for="f in editFigures" :key="'k'+f.figId">
             <span class="motiv-chip"><span x-text="f.name"></span>
               <button type="button" @click="toggleLink('figures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
-          <template x-for="f in (selectedMotif().draftFigures || [])" :key="'d'+f.id">
+          <template x-for="f in editDraftFigures" :key="'d'+f.id">
             <span class="motiv-chip motiv-chip--werkstatt"><span x-text="f.name"></span>
               <button type="button" @click="toggleLink('draftFigures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
@@ -141,7 +143,7 @@
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.beats')"></span>
         <div class="motiv-chip-row">
-          <template x-for="b in selectedMotif().beats" :key="b.id">
+          <template x-for="b in editBeats" :key="b.id">
             <span class="motiv-chip"><span x-text="b.titel"></span>
               <button type="button" @click="toggleLink('beats', b)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
@@ -153,7 +155,7 @@
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.chapters')"></span>
         <div class="motiv-chip-row">
-          <template x-for="c in selectedMotif().chapters" :key="c.id">
+          <template x-for="c in editChapters" :key="c.id">
             <span class="motiv-chip"><span x-text="c.name"></span>
               <button type="button" @click="toggleLink('chapters', c)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
@@ -165,7 +167,7 @@
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.pages')"></span>
         <div class="motiv-chip-row">
-          <template x-for="p in selectedMotif().pages" :key="p.id">
+          <template x-for="p in editPages" :key="p.id">
             <span class="motiv-chip"><span x-text="p.name"></span>
               <button type="button" @click="toggleLink('pages', p)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>

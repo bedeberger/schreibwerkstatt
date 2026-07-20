@@ -128,6 +128,23 @@
         </span>
       </template>
     </div>
+    <!-- Motive (Motiv-Werkstatt): schreibt in dieselbe motif_beats-Brücke. Nur sichtbar,
+         wenn der Motiv-Katalog des Buchs Einträge hat. -->
+    <label class="plot-edit-label" x-show="motifsCatalog.length" x-text="$app.t('plot.beat.motifs')"></label>
+    <div x-show="motifsCatalog.length"
+         x-data="entityPicker({ entity: 'custom', multiple: true, placeholder: $app.t('plot.beat.motifPick'), items: () => beatMotifOptions() })"
+         x-modelable="value" x-model="beatDraft.motif_ids"></div>
+    <div class="plot-fig-chips" x-show="beatMotifChips().length">
+      <template x-for="chip in beatMotifChips()" :key="'m' + chip.id">
+        <span class="tag tag--motif plot-fig-chip">
+          <span x-text="chip.label"></span>
+          <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                  @click="toggleBeatDraftMotif(chip.id)">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+          </button>
+        </span>
+      </template>
+    </div>
     <div class="plot-beat-edit-actions">
       <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditBeat(beat)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>

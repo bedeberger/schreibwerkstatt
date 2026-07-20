@@ -323,6 +323,8 @@
   /* Werkstatt-Chip (draft_figures) vom Katalog absetzen: gestrichelter Rahmen
      = „in Entwicklung, evtl. noch nicht im Manuskript", eigener Werkstatt-Akzent. */
   .plot-fig-chip.tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
+  /* Motiv-Chip im Beat-Edit: gleicher Left-Accent wie das read-only Motiv-Badge. */
+  .plot-fig-chip.tag--motif { border-left: 3px solid var(--card-accent-motiv); }
   /* Werkstatt-Badge im Beat-Meta (Ansichtsmodus). */
   .plot-beat-meta .tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
   /* Motiv-Badge im Beat-Meta: read-only Soll-Verknüpfung aus der Motiv-Werkstatt.

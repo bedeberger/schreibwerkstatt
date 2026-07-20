@@ -5,7 +5,7 @@
      braucht. Lebt unsichtbar als display-contents-Anker am Anfang des Notebook-Partials. -->
 <div x-data="editorNotebookCard" class="display-contents"></div>
 
-<div class="card" id="editor-card"
+<div class="card card--page" id="editor-card"
      x-show="showEditorCard" x-cloak
      :class="{ 'editor-card--fullscreen': pageEditorFullscreen && editMode }"
      @keydown.escape.window="!focusActive && pageEditorFullscreen && togglePageEditorFullscreen()">

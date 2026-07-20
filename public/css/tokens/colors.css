@@ -226,6 +226,8 @@
   --card-accent-plot: var(--card-accent-plot-base);
   --card-accent-motiv-base: #7c3aed;
   --card-accent-motiv: var(--card-accent-motiv-base);
+  --card-accent-page-base: #6e7276;
+  --card-accent-page: var(--card-accent-page-base);
 
   /* Event-Subtyp-Akzente (Phase 2): Mapping in card-accents.css.
      Light-Theme: kräftige Hues für Badge-Background. */
@@ -454,6 +456,7 @@
   --card-accent-share: oklch(from var(--card-accent-share-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-plot: oklch(from var(--card-accent-plot-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-motiv: oklch(from var(--card-accent-motiv-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
+  --card-accent-page: oklch(from var(--card-accent-page-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
 
   /* Event-Subtyp-Akzente (Dark) — abgeleitet wie die Karten-Akzente oben. */
   --card-accent-event-geburt: oklch(from var(--card-accent-event-geburt-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);

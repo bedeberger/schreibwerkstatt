@@ -21,7 +21,7 @@ export const lifecycleMethods = {
   async loadBoard() {
     const app = window.__app;
     const bookId = Alpine.store('nav').selectedBookId;
-    if (!bookId) { this.acts = []; this.threads = []; this.beats = []; this.draftFiguren = []; return; }
+    if (!bookId) { this.acts = []; this.threads = []; this.beats = []; this.draftFiguren = []; this.motifsCatalog = []; this.themesCatalog = []; return; }
     this.loading = true;
     this._memos = {};
     try {
@@ -45,6 +45,22 @@ export const lifecycleMethods = {
     } catch (e) {
       this.draftFiguren = [];
     }
+    // Motiv-Katalog + Themen fürs Beat-Motiv-Picker (best-effort, eigenständig vom
+    // Board). `theme_id` bleibt am Motiv, damit das Picker nach Thema gruppieren
+    // kann; `themesCatalog` (id + name, bereits in Position-Reihenfolge) liefert
+    // Gruppen-Label + -Ordnung. Die Badge-Farbe liefert der Server pro Beat.
+    try {
+      const data = await fetchJson(`/motifs?book_id=${bookId}`);
+      this.motifsCatalog = Array.isArray(data?.motifs)
+        ? data.motifs.map(m => ({ id: m.id, name: m.name, theme_id: m.theme_id ?? null }))
+        : [];
+      this.themesCatalog = Array.isArray(data?.themes)
+        ? data.themes.map(t => ({ id: t.id, name: t.name }))
+        : [];
+    } catch (e) {
+      this.motifsCatalog = [];
+      this.themesCatalog = [];
+    }
     // Konsistenz- + Brainstorm-Historie laden (best-effort, eigenständig vom Board).
     this.loadConsistencyRuns();
     this.loadBrainstormRuns();
@@ -62,6 +78,8 @@ export const lifecycleMethods = {
     this.threads = [];
     this.beats = [];
     this.draftFiguren = [];
+    this.motifsCatalog = [];
+    this.themesCatalog = [];
     this._memos = {};
     this.editingBeatId = null;
     this.addingActId = null;

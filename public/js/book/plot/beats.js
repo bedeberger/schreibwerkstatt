@@ -130,6 +130,7 @@ export const beatsMethods = {
       intensitaet: beat.intensitaet || null,
       figure_ids: [...(beat.fig_ids || [])],
       draft_figure_ids: [...(beat.draft_fig_ids || [])],
+      motif_ids: (beat.motifs || []).map(m => m.id),
     };
   },
   cancelEditBeat() { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; },
@@ -173,6 +174,14 @@ export const beatsMethods = {
     this.beatDraft.draft_figure_ids = [...set];
   },
 
+  // Motiv (motifs.id, INTEGER) im Beat an-/abwählen — schreibt in dieselbe
+  // motif_beats-Brücke wie die Motiv-Werkstatt (Beat-Achse, Full-Replace beim Save).
+  toggleBeatDraftMotif(motifId) {
+    const set = new Set(this.beatDraft.motif_ids);
+    if (set.has(motifId)) set.delete(motifId); else set.add(motifId);
+    this.beatDraft.motif_ids = [...set];
+  },
+
   async saveEditBeat(beat) {
     const app = window.__app;
     const titel = (this.beatDraft.titel || '').trim();
@@ -190,6 +199,7 @@ export const beatsMethods = {
           intensitaet: this.beatDraft.intensitaet || null,
           figure_ids: this.beatDraft.figure_ids,
           draft_figure_ids: this.beatDraft.draft_figure_ids,
+          motif_ids: this.beatDraft.motif_ids,
         }),
       });
       this._replaceBeat(updated);

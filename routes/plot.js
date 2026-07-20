@@ -314,8 +314,9 @@ router.post('/beats', jsonBody, (req, res) => {
   if (!_actFitsThread(act, threadId)) return res.status(400).json({ error_code: 'ACT_THREAD_MISMATCH' });
   const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
   const draftFigureIds = plotDb.resolveDraftFigureIds(bookId, userEmail, req.body?.draft_figure_ids);
+  const motifIds = plotDb.resolveMotifIds(bookId, userEmail, req.body?.motif_ids);
 
-  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, verworfen, chapterId, intensitaet, threadId, figureIds, draftFigureIds });
+  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, verworfen, chapterId, intensitaet, threadId, figureIds, draftFigureIds, motifIds });
   logger.info(`[plot] beat create id=${beat.id} act=${actId} book=${bookId}`);
   res.json(beat);
 });
@@ -377,11 +378,14 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
   const draftFigureIds = Array.isArray(req.body?.draft_figure_ids)
     ? plotDb.resolveDraftFigureIds(beat.book_id, userEmail, req.body.draft_figure_ids)
     : undefined;
+  const motifIds = Array.isArray(req.body?.motif_ids)
+    ? plotDb.resolveMotifIds(beat.book_id, userEmail, req.body.motif_ids)
+    : undefined;
 
-  if (!Object.keys(fields).length && typeof figureIds === 'undefined' && typeof draftFigureIds === 'undefined') {
+  if (!Object.keys(fields).length && typeof figureIds === 'undefined' && typeof draftFigureIds === 'undefined' && typeof motifIds === 'undefined') {
     return res.status(400).json({ error_code: 'NO_FIELDS' });
   }
-  res.json(plotDb.updateBeat(id, fields, figureIds, draftFigureIds));
+  res.json(plotDb.updateBeat(id, fields, figureIds, draftFigureIds, motifIds));
 });
 
 router.delete('/beats/:id', (req, res) => {

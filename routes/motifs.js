@@ -197,6 +197,38 @@ router.delete('/relations/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── KI-Brainstorm-Lauf-Historie ─────────────────────────────────────────────
+// Persistierte Läufe pro (Buch, User). Kein POST — der Insert passiert job-seitig
+// beim Complete. Zweisegmentig (/brainstorm-runs[/:id]) → kollidiert nicht mit den
+// einsegmentigen /:id-Motiv-Routen; trotzdem vor ihnen registriert (Konvention).
+
+router.get('/brainstorm-runs', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  const bookId = toIntId(req.query.book_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId, 'viewer')) return;
+  res.json(motifsDb.listBrainstormRuns(bookId, userEmail));
+});
+
+router.get('/brainstorm-runs/:id', (req, res) => {
+  const run = _loadOwned(req, res, motifsDb.getBrainstormRun, 'RUN_NOT_FOUND');
+  if (!run) return;
+  res.json(run);
+});
+
+router.delete('/brainstorm-runs/:id', (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const id = toIntId(req.params.id);
+  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const run = motifsDb.getBrainstormRun(id);
+  if (!run || run.user_email !== userEmail) return res.status(404).json({ error_code: 'RUN_NOT_FOUND' });
+  if (!_guard(req, res, run.book_id)) return;
+  motifsDb.deleteBrainstormRun(id, userEmail);
+  res.json({ ok: true });
+});
+
 // ── Motive ───────────────────────────────────────────────────────────────
 
 router.post('/', jsonBody, (req, res) => {

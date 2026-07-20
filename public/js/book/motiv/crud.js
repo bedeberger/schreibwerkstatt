@@ -115,8 +115,8 @@ export const crudMethods = {
   _bufferTriggerTerms() {
     return (this.editTriggers || '').split(',').map(s => s.trim()).filter(Boolean);
   },
-  // Ungespeicherte Änderungen an Name/Thema/Beschreibung/Trigger?
-  motifDirty() {
+  // Ungespeicherte Änderungen an den Kern-Feldern (Name/Thema/Beschreibung/Trigger)?
+  _coreDirty() {
     const m = this.selectedMotif();
     if (!m) return false;
     const tid = this.editThemeId ? Number(this.editThemeId) : null;
@@ -125,27 +125,50 @@ export const crudMethods = {
       || (this.editBeschreibung || '') !== (m.beschreibung || '')
       || this._bufferTriggerTerms().join(', ') !== (m.trigger_terms || []).join(', ');
   },
-  // Puffer auf den gespeicherten Motivstand zurücksetzen.
-  cancelMotifEdit() {
-    this._loadMotifBuffer(this.selectedMotif());
+  // Ungespeicherte Änderungen am Motiv gesamt (Kern-Felder ODER Soll-Verknüpfungen)?
+  // Steuert Sichtbarkeit des einen Save/Cancel-Icons in der Titelzeile — es erscheint
+  // also auch, sobald eine Combobox-Auswahl eine Verknüpfung in den Puffer legt.
+  motifDirty() {
+    return this._coreDirty() || this.linksDirty();
   },
-  // Alle geänderten Kern-Felder in einem PATCH speichern.
+  // Alle Puffer (Kern-Felder + Verknüpfungen) auf den gespeicherten Motivstand zurücksetzen.
+  cancelMotifEdit() {
+    const m = this.selectedMotif();
+    this._loadMotifBuffer(m);
+    this._loadLinkBuffer(m);
+  },
+  // Motiv speichern: geänderte Kern-Felder als PATCH und/oder geänderte Soll-Links
+  // als Full-Replace-PUT — ein Save-Button für beides, danach ein loadBoard.
   async saveMotifEdit() {
     const m = this.selectedMotif();
     if (!m || !this.motifDirty()) return;
+    const coreDirty = this._coreDirty();
+    const linksDirty = this.linksDirty();
     const name = (this.editName || '').trim();
-    if (!name) { this.errorMessage = window.__app.t('motiv.error.nameRequired'); return; }
-    const patch = {
-      name,
-      theme_id: this.editThemeId ? Number(this.editThemeId) : null,
-      beschreibung: this.editBeschreibung || '',
-      trigger_terms: this._bufferTriggerTerms(),
-    };
+    if (coreDirty && !name) { this.errorMessage = window.__app.t('motiv.error.nameRequired'); return; }
     this.busy = true;
     try {
-      await _json(`/motifs/${m.id}`, 'PATCH', patch);
+      if (coreDirty) {
+        await _json(`/motifs/${m.id}`, 'PATCH', {
+          name,
+          theme_id: this.editThemeId ? Number(this.editThemeId) : null,
+          beschreibung: this.editBeschreibung || '',
+          trigger_terms: this._bufferTriggerTerms(),
+        });
+      }
+      if (linksDirty) {
+        await _json(`/motifs/${m.id}/links`, 'PUT', {
+          figures: this.editFigures.map(f => f.figId),
+          draftFigures: this.editDraftFigures.map(f => f.id),
+          beats: this.editBeats.map(b => b.id),
+          chapters: this.editChapters.map(c => c.id),
+          pages: this.editPages.map(p => p.id),
+        });
+      }
       await this.loadBoard();
-      this._loadMotifBuffer(this.selectedMotif());
+      const sel = this.selectedMotif();
+      this._loadMotifBuffer(sel);
+      this._loadLinkBuffer(sel);
       this.errorMessage = '';
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
@@ -189,17 +212,21 @@ export const crudMethods = {
       });
   },
 
-  // ── Soll-Verknüpfungen (Full-Replace aller fünf Brücken) ─────────────────
-  async _saveLinks(motif) {
-    const body = {
-      figures: (motif.figures || []).map(f => f.figId),
-      draftFigures: (motif.draftFigures || []).map(f => f.id),
-      beats: (motif.beats || []).map(b => b.id),
-      chapters: (motif.chapters || []).map(c => c.id),
-      pages: (motif.pages || []).map(p => p.id),
-    };
-    try { await _json(`/motifs/${motif.id}/links`, 'PUT', body); await this.loadBoard(); }
-    catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+  // ── Soll-Verknüpfungen (explizit gespeichert via Save/Cancel, kein Auto-Save) ─
+  // Die Chips bearbeiten lokale Puffer (editFigures/…); erst saveMotifEdit() schickt
+  // den Full-Replace aller fünf Brücken (ein Motiv-Save deckt Kern-Felder + Links).
+  // kind (figures|draftFigures|beats|chapters|pages) → Puffer-Property.
+  _linkBufKey(kind) {
+    return { figures: 'editFigures', draftFigures: 'editDraftFigures', beats: 'editBeats', chapters: 'editChapters', pages: 'editPages' }[kind];
+  },
+  // Verknüpfungs-Puffer aus dem Motiv füllen (bei Auswahl/Cancel/nach Save). Kopien,
+  // damit Chip-Mutationen den Board-State nicht anfassen, bevor gespeichert wird.
+  _loadLinkBuffer(m) {
+    this.editFigures = m ? (m.figures || []).map(x => ({ ...x })) : [];
+    this.editDraftFigures = m ? (m.draftFigures || []).map(x => ({ ...x })) : [];
+    this.editBeats = m ? (m.beats || []).map(x => ({ ...x })) : [];
+    this.editChapters = m ? (m.chapters || []).map(x => ({ ...x })) : [];
+    this.editPages = m ? (m.pages || []).map(x => ({ ...x })) : [];
   },
   // Figuren-Combobox mischt zwei Quellen; der Auswahl-Wert trägt ein Präfix
   // (fig:<fig_id> = Komplettanalyse, draft:<id> = Plotwerkstatt) → richtige Brücke.
@@ -209,21 +236,18 @@ export const crudMethods = {
     if (s.startsWith('draft:')) this.addLink('draftFigures', s.slice(6));
     else this.addLink('figures', s.startsWith('fig:') ? s.slice(4) : s);
   },
-  // Verknüpfung hinzufügen/entfernen. kind: figures|draftFigures|beats|chapters|pages.
+  // Verknüpfung im Puffer hinzufügen/entfernen (kein Persist — erst saveMotifEdit).
   toggleLink(kind, item) {
-    const motif = this.selectedMotif();
-    if (!motif) return;
+    if (!this.selectedMotif()) return;
     const idKey = kind === 'figures' ? 'figId' : 'id';
-    const arr = motif[kind] || (motif[kind] = []);
+    const arr = this[this._linkBufKey(kind)];
     const ix = arr.findIndex(x => x[idKey] === item[idKey]);
     if (ix >= 0) arr.splice(ix, 1);
     else arr.push(item);
-    this._saveLinks(motif);
   },
-  // Verknüpfung per Auswahl-Wert (Combobox) hinzufügen — Item aus der Quelle auflösen.
+  // Verknüpfung per Auswahl-Wert (Combobox) in den Puffer legen — Item aus der Quelle auflösen.
   addLink(kind, idVal) {
-    const motif = this.selectedMotif();
-    if (!motif || idVal == null || idVal === '') return;
+    if (!this.selectedMotif() || idVal == null || idVal === '') return;
     let item = null;
     if (kind === 'figures') {
       // Katalog-Figuren tragen die TEXT-fig_id im `.id`-Feld (siehe /figures: id = f.fig_id),
@@ -245,16 +269,28 @@ export const crudMethods = {
     }
     if (!item) return;
     const idKey = kind === 'figures' ? 'figId' : 'id';
-    if ((motif[kind] || []).some(x => x[idKey] === item[idKey])) return; // schon verknüpft
-    (motif[kind] || (motif[kind] = [])).push(item);
-    this._saveLinks(motif);
+    const arr = this[this._linkBufKey(kind)];
+    if (arr.some(x => x[idKey] === item[idKey])) return; // schon verknüpft
+    arr.push(item);
   },
 
   hasLink(kind, idVal) {
-    const motif = this.selectedMotif();
-    if (!motif) return false;
+    if (!this.selectedMotif()) return false;
     const idKey = kind === 'figures' ? 'figId' : 'id';
-    return (motif[kind] || []).some(x => x[idKey] === idVal);
+    return this[this._linkBufKey(kind)].some(x => x[idKey] === idVal);
+  },
+
+  // Ungespeicherte Änderungen an den Soll-Verknüpfungen? (ID-Mengen-Vergleich Puffer ↔ Motiv.)
+  // Fliesst in motifDirty() ein — mitgespeichert vom einen Motiv-Save/Cancel.
+  linksDirty() {
+    const m = this.selectedMotif();
+    if (!m) return false;
+    const key = (arr, k) => (arr || []).map(x => String(x[k])).sort().join(',');
+    return key(this.editFigures, 'figId') !== key(m.figures, 'figId')
+      || key(this.editDraftFigures, 'id') !== key(m.draftFigures, 'id')
+      || key(this.editBeats, 'id') !== key(m.beats, 'id')
+      || key(this.editChapters, 'id') !== key(m.chapters, 'id')
+      || key(this.editPages, 'id') !== key(m.pages, 'id');
   },
 
   // ── Auswahl + Fundstellen ────────────────────────────────────────────────
@@ -284,6 +320,7 @@ export const crudMethods = {
     this.selectedMotifId = id;
     this.occurrences = [];
     this._loadMotifBuffer(this.motifById(id));
+    this._loadLinkBuffer(this.motifById(id));
     if (!id) return;
     this.occExpanded = this._readSectionExpanded('occ', id);
     this.linksExpanded = this._readSectionExpanded('links', id);
@@ -314,12 +351,12 @@ export const crudMethods = {
     } catch (e) { /* localStorage optional */ }
   },
 
-  // Anzahl Soll-Verknüpfungen über alle fünf Brücken (Badge in der Sektion).
+  // Anzahl Soll-Verknüpfungen über alle fünf Brücken (Badge in der Sektion) —
+  // aus dem Puffer, damit der Zähler den ungespeicherten Bearbeitungsstand zeigt.
   linkCount() {
-    const m = this.selectedMotif();
-    if (!m) return 0;
-    return (m.figures || []).length + (m.draftFigures || []).length
-      + (m.beats || []).length + (m.chapters || []).length + (m.pages || []).length;
+    if (!this.selectedMotif()) return 0;
+    return this.editFigures.length + this.editDraftFigures.length
+      + this.editBeats.length + this.editChapters.length + this.editPages.length;
   },
 
   gotoOccurrence(occ) {

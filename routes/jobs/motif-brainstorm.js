@@ -11,7 +11,7 @@ const {
   aiCall, getPrompts, getBookPrompts,
   loadOrderedBookContents, loadPageContents,
   groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
-  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, tps,
+  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, tps, _modelName,
 } = require('./shared');
 const motifsDb = require('../../db/motifs');
 const { toIntId } = require('../../lib/validate');
@@ -100,7 +100,21 @@ async function runMotifBrainstormJob(jobId, bookId, userEmail) {
       }
     }
 
-    completeJob(jobId, { vorschlaege, tokensIn: tok.in, tokensOut: tok.out },
+    // Lauf historisieren (best-effort — ein DB-Fehler darf das Ergebnis nicht
+    // verschlucken). Nur echte Vorschläge persistieren; leere Läufe sind nicht
+    // zum Wiederöffnen wert. runId geht in den Job-Payload → das Frontend markiert
+    // den frischen Lauf sofort als ausgewählt, ohne Round-Trip.
+    let runId = null;
+    if (vorschlaege.length) {
+      try {
+        runId = motifsDb.insertBrainstormRun({
+          bookId, userEmail, vorschlagCount: vorschlaege.length,
+          result: { vorschlaege }, model: _modelName(),
+        });
+      } catch (e) { logger.warn(`Motiv-Brainstorm-Run-Insert fehlgeschlagen book=${bookId}: ${e.message}`); }
+    }
+
+    completeJob(jobId, { vorschlaege, runId, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${vorschlaege.length} Vorschläge`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Motiv-Brainstorm Fehler book=${bookId}: ${e.message}`, { stack: e.cause?.stack || e.stack });

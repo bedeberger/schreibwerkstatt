@@ -20,6 +20,13 @@ export function registerPlotCard() {
     // Werkstatt-Figuren (draft_figures) des Buchs, fürs Beat-Picker + Badges.
     // Lokal in der Karte geladen (nicht im catalog-store — wie die Plot-Daten).
     draftFiguren: [],
+    // Motiv-Katalog (Motiv-Werkstatt) fürs Beat-Motiv-Picker: id + name + theme_id
+    // (für Gruppierung nach Thema). Die Badge-Farbe liefert der Server pro Beat
+    // (beat.motifs[].farbe). Best-effort in loadBoard geladen — Board bleibt
+    // Primärdaten, Motive nur Beilage. themesCatalog (id + name, Position-Reihenfolge)
+    // liefert die Gruppen-Header + -Ordnung fürs Picker.
+    motifsCatalog: [],
+    themesCatalog: [],
     loading: false,
     busy: false,
     errorMessage: '',
@@ -51,7 +58,7 @@ export function registerPlotCard() {
 
     // Beat-Edit / -Add
     editingBeatId: null,
-    beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', intensitaet: null, figure_ids: [], draft_figure_ids: [] },
+    beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', intensitaet: null, figure_ids: [], draft_figure_ids: [], motif_ids: [] },
     addingActId: null,
     // Grid-Add-Beat: Zell-Schlüssel `${actId}:${threadId|null}` (statt addingActId).
     addingCell: null,

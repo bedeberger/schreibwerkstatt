@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 245, 129 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 246, 130 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -80,6 +80,7 @@ erDiagram
   books ||--o{ themes                : has
   books ||--o{ motifs                : has
   books ||--o{ motif_graph_layout    : has
+  books ||--o{ motif_brainstorm_runs : has
   themes ||--o{ motifs               : clusters
   motifs ||--o{ motif_relations      : "motif ↔ motif"
   motifs ||--o{ motif_figures        : "soll figure"
@@ -1012,9 +1013,19 @@ erDiagram
     TEXT    positions_json  "node_id → {x,y} (View-Präferenz)"
     TEXT    updated_at
   }
+  motif_brainstorm_runs {
+    INTEGER id              PK
+    INTEGER book_id         FK "CASCADE"
+    TEXT    user_email
+    TEXT    created_at
+    INTEGER vorschlag_count "denormalisiert fürs Listen-Rendering"
+    TEXT    result_json     "{ vorschlaege[] }"
+    TEXT    model
+  }
 
   books    ||--o{ themes            : has
   books    ||--o{ motif_graph_layout : has
+  books    ||--o{ motif_brainstorm_runs : has
   books    ||--o{ motifs            : has
   themes   ||--o{ motifs            : "clusters (SET NULL)"
   motifs   ||--o{ motif_relations   : "from"
@@ -1034,7 +1045,7 @@ erDiagram
   figure_scenes ||--o{ motif_occurrences : "ist"
 ```
 
-**Motiv-Werkstatt (Themen & Motive).** Planendes **und** überwachendes Pendant zur rückwärtsgewandten Textarbeit, visualisiert als kraftgerichtete Konstellation (vis-network). `themes` sind abstrakte Cluster, `motifs` die zentrale Nabe (jedes optional einem Thema zugeordnet, `theme_id` SET NULL). `motif_relations` sind die gerichteten Motiv-↔-Motiv-Kanten mit Freitext-`typ` (verstärkt/kontrastiert/spiegelt) — analog `figure_relations`. Fünf **Soll**-Brücken verknüpfen ein Motiv mit `figures`/`draft_figures`/`plot_beats`/`chapters`/`pages` (wo es laut Plan tragen soll; alle CASCADE beidseitig) — Figuren kommen sowohl aus dem Komplettanalyse-Katalog (`motif_figures`→`figures`) als auch aus den Plotwerkstatt-Drafts (`motif_draft_figures`→`draft_figures`). `motif_occurrences` ist der abgeleitete **Ist**-Index: wo die KI-Motiverkennung (Job `motif-scan`, hybrid aus Embedding-Cosinus + wörtlichem FTS über `trigger_terms`) das Motiv real im Text findet (`kind` page/scene, sentinel-frei via CHECK, Full-Replace pro Motiv je Scan). Der Soll-Ist-Abgleich (Bridges vs. Occurrences) treibt Knotengrösse (Ist-Dichte) und Geist-Knoten (geplant, aber fehlt) im Graphen. `motif_graph_layout` persistiert die von Hand gezogene Knoten-Anordnung als JSON-Blob (`node_id → {x,y}`, ein Row je Buch+User) — reine View-Präferenz, kein Row-pro-Knoten (node_id ist ein Render-Token, kein FK-Ziel). Pro Buch + User skopiert. Rein planend/überwachend, nie generativ in den Text.
+**Motiv-Werkstatt (Themen & Motive).** Planendes **und** überwachendes Pendant zur rückwärtsgewandten Textarbeit, visualisiert als kraftgerichtete Konstellation (vis-network). `themes` sind abstrakte Cluster, `motifs` die zentrale Nabe (jedes optional einem Thema zugeordnet, `theme_id` SET NULL). `motif_relations` sind die gerichteten Motiv-↔-Motiv-Kanten mit Freitext-`typ` (verstärkt/kontrastiert/spiegelt) — analog `figure_relations`. Fünf **Soll**-Brücken verknüpfen ein Motiv mit `figures`/`draft_figures`/`plot_beats`/`chapters`/`pages` (wo es laut Plan tragen soll; alle CASCADE beidseitig) — Figuren kommen sowohl aus dem Komplettanalyse-Katalog (`motif_figures`→`figures`) als auch aus den Plotwerkstatt-Drafts (`motif_draft_figures`→`draft_figures`). `motif_occurrences` ist der abgeleitete **Ist**-Index: wo die KI-Motiverkennung (Job `motif-scan`, hybrid aus Embedding-Cosinus + wörtlichem FTS über `trigger_terms`) das Motiv real im Text findet (`kind` page/scene, sentinel-frei via CHECK, Full-Replace pro Motiv je Scan). Der Soll-Ist-Abgleich (Bridges vs. Occurrences) treibt Knotengrösse (Ist-Dichte) und Geist-Knoten (geplant, aber fehlt) im Graphen. `motif_graph_layout` persistiert die von Hand gezogene Knoten-Anordnung als JSON-Blob (`node_id → {x,y}`, ein Row je Buch+User) — reine View-Präferenz, kein Row-pro-Knoten (node_id ist ein Render-Token, kein FK-Ziel). `motif_brainstorm_runs` historisiert die KI-Brainstorm-Läufe (Job `motif-brainstorm`) pro Buch+User (`result_json` = `{ vorschlaege[] }`, `vorschlag_count` denormalisiert fürs Listen-Rendering) — der Autor öffnet einen Lauf später wieder und übernimmt/verwirft die Vorschläge, analog `plot_consistency_runs`/`werkstatt_runs`. Pro Buch + User skopiert. Rein planend/überwachend, nie generativ in den Text.
 
 ---
 

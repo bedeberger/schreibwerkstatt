@@ -260,6 +260,12 @@ const _stmtMotifsForBeat = db.prepare(`
    WHERE mb.beat_id = ?
    ORDER BY m.position, m.id
 `);
+// Schreibpfad Beat → Motiv (dieselbe motif_beats-Brücke, andere Achse): Full-Replace
+// pro Beat. Berührt nur Zeilen WHERE beat_id = ? — kollidiert nicht mit dem
+// Motiv-seitigen Full-Replace (setMotifBeats, WHERE motif_id = ?). So kuratiert
+// der Plot dieselbe Verknüpfung von der Beat-Seite, ohne die Motiv-Werkstatt zu stören.
+const _stmtDeleteMotifsForBeat = db.prepare('DELETE FROM motif_beats WHERE beat_id = ?');
+const _stmtInsertBeatMotif = db.prepare('INSERT OR IGNORE INTO motif_beats (motif_id, beat_id) VALUES (?, ?)');
 
 // TEXT-fig_id (Frontend-Identität) → INTEGER figures.id (FK-Target), gefiltert
 // aufs Subset, das wirklich zu (Buch, User) gehört. Unbekannte/Fremd-fig_ids
@@ -284,6 +290,18 @@ function resolveDraftFigureIds(bookId, userEmail, draftIds) {
   const placeholders = wanted.map(() => '?').join(',');
   return db.prepare(
     `SELECT id FROM draft_figures WHERE book_id = ? AND user_email = ? AND id IN (${placeholders})`
+  ).all(parseInt(bookId), userEmail, ...wanted).map(r => r.id);
+}
+
+// Motiv-IDs (INTEGER motifs.id) aufs (Buch, User)-Subset filtern — kein Cross-Buch-
+// Leak in die motif_beats-Brücke. Motive gehören zur Motiv-Werkstatt (pro Buch + User).
+function resolveMotifIds(bookId, userEmail, motifIds) {
+  if (!Array.isArray(motifIds) || !motifIds.length) return [];
+  const wanted = motifIds.map(x => parseInt(x)).filter(n => Number.isInteger(n) && n > 0);
+  if (!wanted.length) return [];
+  const placeholders = wanted.map(() => '?').join(',');
+  return db.prepare(
+    `SELECT id FROM motifs WHERE book_id = ? AND user_email = ? AND id IN (${placeholders})`
   ).all(parseInt(bookId), userEmail, ...wanted).map(r => r.id);
 }
 
@@ -327,6 +345,15 @@ function _setBeatDraftFigures(beatId, draftFigureIds) {
   }
 }
 
+// motifIds = INTEGER motifs.id (bereits via resolveMotifIds aufgelöst). Full-Replace
+// pro Beat: alle Motiv-Links dieses Beats löschen, die gewählten neu setzen.
+function _setBeatMotifs(beatId, motifIds) {
+  _stmtDeleteMotifsForBeat.run(parseInt(beatId));
+  for (const mid of (motifIds || [])) {
+    if (Number.isInteger(mid) || /^\d+$/.test(String(mid))) _stmtInsertBeatMotif.run(parseInt(mid), parseInt(beatId));
+  }
+}
+
 function _beatRow(beatId, figMap = null, draftFigMap = null, motifMap = null) {
   const r = _stmtGetBeat.get(parseInt(beatId));
   if (!r) return null;
@@ -346,7 +373,7 @@ function listBeats(bookId, userEmail) {
     .map(r => ({ ...r, fig_ids: figMap[r.id] || [], draft_fig_ids: draftFigMap[r.id] || [], motifs: motifMap[r.id] || [] }));
 }
 
-const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', verworfen = 0, chapterId = null, intensitaet = null, threadId = null, figureIds = [], draftFigureIds = [], sortOrder = null }) => {
+const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', verworfen = 0, chapterId = null, intensitaet = null, threadId = null, figureIds = [], draftFigureIds = [], motifIds = [], sortOrder = null }) => {
   const tid = threadId != null ? parseInt(threadId) : null;
   const pos = sortOrder != null ? parseInt(sortOrder) : (_stmtMaxBeatOrder.get(parseInt(actId), tid).m + 1);
   const info = _stmtInsertBeat.run(
@@ -356,13 +383,14 @@ const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibu
   );
   _setBeatFigures(info.lastInsertRowid, figureIds);
   _setBeatDraftFigures(info.lastInsertRowid, draftFigureIds);
+  _setBeatMotifs(info.lastInsertRowid, motifIds);
   return _beatRow(info.lastInsertRowid);
 });
 
 // Partielles Update: nur übergebene Felder ändern. `fields` enthält bereits
 // validierte Werte; `figureIds`/`draftFigureIds` (falls Array) ersetzen die
 // jeweiligen Figuren-Links komplett.
-const updateBeat = db.transaction((id, fields, figureIds, draftFigureIds) => {
+const updateBeat = db.transaction((id, fields, figureIds, draftFigureIds, motifIds) => {
   const sets = [];
   const vals = [];
   for (const [col, val] of Object.entries(fields)) {
@@ -376,6 +404,7 @@ const updateBeat = db.transaction((id, fields, figureIds, draftFigureIds) => {
   }
   if (Array.isArray(figureIds)) _setBeatFigures(id, figureIds);
   if (Array.isArray(draftFigureIds)) _setBeatDraftFigures(id, draftFigureIds);
+  if (Array.isArray(motifIds)) _setBeatMotifs(id, motifIds);
   return _beatRow(id);
 });
 
@@ -728,7 +757,7 @@ module.exports = {
   listThreads, getThread, createThread, updateThread, deleteThread, reorderThreads, _validThreadId,
   listBeats, getBeat, getBeatMeta, createBeat, updateBeat, deleteBeat, reorderBeats, pageBeatCounts, chapterBeatCounts,
   figurePlotUsage,
-  resolveFigureIds, resolveDraftFigureIds,
+  resolveFigureIds, resolveDraftFigureIds, resolveMotifIds,
   insertPlotConsistencyRun, listPlotConsistencyRuns, getPlotConsistencyRun, deletePlotConsistencyRun,
   insertPlotBrainstormRun, listPlotBrainstormRuns, getPlotBrainstormRun, deletePlotBrainstormRun,
 };

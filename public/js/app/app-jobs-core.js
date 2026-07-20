@@ -3,6 +3,36 @@ import { startPoll as _startPollFn, runningJobStatus as _runningJobStatusFn } fr
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { EVT } from '../events.js';
 
+// Job-Typ → EXCLUSIVE_CARDS-Key: Klick auf die Job-Pill im Footer springt zur
+// Karte, die den Output des Jobs anzeigt. Nur Typen mit sinnvollem Karten-Ziel.
+// Page-scopte (check) und id-tragende Typen (chapter-review, werkstatt-*,
+// batch-check) laufen über Sonderfälle in navigateToJob. Bewusst NICHT gelistet
+// (kein UI-Ziel): book-import, synonym, blog-*/hubspot-* (Sync).
+const JOB_NAV_CARD = {
+  'review':            'bookReview',
+  'komplett-analyse':  'figures',
+  'faktencheck':       'weltfakten',
+  'erzaehlprofil':     'erzaehlprofil',
+  'kontinuitaet':      'kontinuitaet',
+  'redundancy':        'redundanz',
+  'embed-index':       'redundanz',
+  'stilprofil':        'stil',
+  'motif-brainstorm':  'motiv',
+  'motif-scan':        'motiv',
+  'geocode-resolve':   'orte',
+  'plot-brainstorm':   'plot',
+  'plot-consistency':  'plot',
+  'book-chat':         'bookChat',
+  'research-chat':     'recherche',
+  'research-link':     'recherche',
+  'rueckblick':        'tagebuchRueckblick',
+  'finetune-export':   'finetuneExport',
+  'pdf-export':        'pdfExport',
+  'epub-export':       'epubExport',
+  'docx-export':       'docxExport',
+  'folder-import':     'folderImport',
+};
+
 // Auto-Open für Reconnect-Pfade: nur wenn keine Hauptkarte/Editor offen ist.
 // Verhindert, dass ein spät resolvender Reconnect den vom User geöffneten
 // Editor oder eine andere Karte zerstört. Loading-State + Polling laufen
@@ -415,20 +445,27 @@ export const appJobsCoreMethods = {
         this._applyingHash = false;
       }
     }
-    const map = {
-      'review':           'toggleBookReviewCard',
-      'komplett-analyse': 'toggleFiguresCard',
-      'kontinuitaet':     'toggleKontinuitaetCard',
-      'batch-check':      'toggleTreeCard',
-      'book-chat':        'toggleBookChatCard',
-      'finetune-export':  'toggleFinetuneExportCard',
-    };
+    // Seiten-Lektorat: springt zur betroffenen Seite (dedupId = page_id).
     if (job.type === 'check') {
       const pageId = job.dedupId ?? job.bookId;
       const page = this.$store.nav.pages.find(p => String(p.id) === String(pageId));
       if (page) await this.selectPage(page);
       return;
     }
+    // Kapitel-Bewertung: braucht die Kapitel-ID (dedupId) als Root-State,
+    // Hash-Router + Sidebar lesen kapitelReviewChapterId als SSoT.
+    if (job.type === 'chapter-review') {
+      if (job.dedupId != null) this.kapitelReviewChapterId = String(job.dedupId);
+      if (!this.showKapitelReviewCard) await this.toggleKapitelReviewCard();
+      else this._scrollToCardByKey?.('kapitelReview');
+      return;
+    }
+    // Batch-Lektorat: Sidebar/Tree-Ansicht (keine EXCLUSIVE_CARDS-Karte).
+    if (job.type === 'batch-check') {
+      if (this.toggleTreeCard) await this.toggleTreeCard();
+      return;
+    }
+    // Figuren-Werkstatt: Draft (+ optional Knoten) selektieren.
     if (job.type === 'werkstatt-brainstorm' || job.type === 'werkstatt-consistency') {
       const dedup = String(job.dedupId ?? '');
       const [draftPart, knotenPart] = dedup.split('|');
@@ -440,8 +477,17 @@ export const appJobsCoreMethods = {
       }));
       return;
     }
-    const method = map[job.type];
-    if (method && this[method]) await this[method]();
+    // Generisch: zur Karte springen, die den Job-Output anzeigt. Nur öffnen
+    // (bereits offen → nur hinscrollen), nicht toggeln — ein Sprung darf die
+    // Zielkarte nie zuklappen. cardKey referenziert EXCLUSIVE_CARDS (SSoT für
+    // flag + toggle). Typen ohne UI-Ziel (book-import, synonym, blog-*/
+    // hubspot-*) fehlen bewusst — dort gibt es nichts anzuspringen.
+    const cardKey = JOB_NAV_CARD[job.type];
+    if (!cardKey) return;
+    const entry = EXCLUSIVE_CARDS.find(c => c.key === cardKey);
+    if (!entry) return;
+    if (this[entry.flag]) this._scrollToCardByKey?.(cardKey);
+    else if (this[entry.toggle]) await this[entry.toggle]();
   },
 
   // Prüft ob ein gespeicherter Job noch läuft und reconnected ggf.
