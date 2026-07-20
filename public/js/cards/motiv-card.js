@@ -13,6 +13,8 @@ export function registerMotivCard() {
     motifs: [],
     relations: [],
     allBeats: [],
+    // Werkstatt-Figuren (draft_figures) fürs Figuren-Verknüpfungs-Combobox (Gruppe „Plotwerkstatt")
+    allDraftFiguren: [],
     // UI-Status
     loading: false,
     busy: false,
@@ -21,7 +23,12 @@ export function registerMotivCard() {
     selectedMotifId: null,
     occurrences: [],
     occLoading: false,
+    // Edit-Puffer der Kern-Felder (Name/Thema/Beschreibung/Trigger) — explizit
+    // gespeichert via Save/Cancel-Leiste, kein Feld-Autosave.
     editThemeId: '',
+    editName: '',
+    editBeschreibung: '',
+    editTriggers: '',
     // Graph-Layer
     layerFigures: false,
     layerBeats: false,
@@ -30,6 +37,8 @@ export function registerMotivCard() {
     graphMenuOpen: false,
     graphMenuNodeId: null,
     graphMenuPos: { top: 0, left: 0 },
+    // Offener Thema-Farbwähler (Themen-Liste im Panel), null = keiner
+    themeColorPickerId: null,
     // Eingabe-Drafts
     newThemeName: '',
     newMotifName: '',
@@ -45,12 +54,15 @@ export function registerMotivCard() {
     scanning: false,
     scanProgress: 0,
     motivScanJobId: null,
+    // Embedding-Index-Refresh (für semantische Erkennung)
+    indexing: false,
     // Brainstorm-Job (KI-Vorschläge)
     brainstorming: false,
     motivBrainstormJobId: null,
     suggestions: [],
     // interne (nicht-reaktive) Felder
     _beatsLoaded: false,
+    _draftFigurenLoaded: false,
     _memos: {},
     _motivNetwork: null,
     _motivNodes: null,
@@ -58,14 +70,20 @@ export function registerMotivCard() {
     _motivHash: '',
     _scanPollTimer: null,
     _brainstormPollTimer: null,
+    _embedPollTimer: null,
+    _layoutSaveTimer: null,
+    // Persistiertes Knoten-Layout (node_id → {x,y}); aus loadBoard, beim Ziehen gespeichert.
+    _savedPositions: null,
     _graphMenuCloseHandler: null,
+    // SortableJS-Instanz der Themen-Liste (Reihenfolge per Drag)
+    _themeSortable: null,
     _lifecycle: null,
 
     init() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'motiv',
         showFlag: 'showMotivCard',
-        timerKeys: ['_scanPollTimer', '_brainstormPollTimer'],
+        timerKeys: ['_scanPollTimer', '_brainstormPollTimer', '_embedPollTimer', '_layoutSaveTimer'],
         onShow: () => this.loadBoard(),
         onBookChanged: () => {
           this.resetMotiv();
@@ -77,7 +95,10 @@ export function registerMotivCard() {
     },
 
     destroy() {
+      // Ausstehende Layout-Speicherung noch flushen, solange das Netzwerk lebt.
+      if (this._layoutSaveTimer) { clearTimeout(this._layoutSaveTimer); this._layoutSaveTimer = null; this._saveLayout(); }
       this._detachGraphMenuListeners();
+      this._destroyThemeSortable();
       this._destroyGraph();
       this._lifecycle?.destroy();
     },

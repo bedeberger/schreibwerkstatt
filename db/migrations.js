@@ -9320,6 +9320,52 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 243 abgeschlossen (Motiv-Werkstatt: themes + motifs + motif_relations + 4 Bridges + motif_occurrences).');
   }
 
+  if (version < 244) {
+    // Motiv-Werkstatt: manuelle Knoten-Positionen der Konstellation persistieren.
+    // Reine View-Präferenz (pro Buch + User): ein von Hand gezogenes Layout soll
+    // über Reload/Datenänderung hinweg erhalten bleiben. Kein Row-pro-Knoten —
+    // node_id ist ein Render-Token wie "m12"/"t3" (kein FK-fähiges Entitäts-Ziel),
+    // darum ein JSON-Blob node_id → {x,y} je (book_id, user_email). Keine losen
+    // *_id-Spalten; book_id ist der einzige Ref und via FK gebunden (CASCADE).
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_graph_layout (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id        INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email     TEXT    NOT NULL,
+        positions_json TEXT    NOT NULL DEFAULT '{}',
+        updated_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (book_id, user_email)
+      )`);
+    // UNIQUE(book_id, user_email) indiziert book_id bereits (Präfix) → kein Extra-Index.
+
+    const fkErrors244 = db.pragma('foreign_key_check');
+    if (fkErrors244.length) {
+      throw new Error(`Migration 244: foreign_key_check meldet ${fkErrors244.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 244').run();
+    logger.info('DB-Migration auf Version 244 abgeschlossen (Motiv-Werkstatt: motif_graph_layout).');
+  }
+
+  if (version < 245) {
+    // Motiv-Werkstatt: fünfte Soll-Brücke Motiv ↔ Werkstatt-Figur (draft_figures).
+    // Neben den Komplettanalyse-Figuren (motif_figures → figures) sollen auch die
+    // in der Plot-/Figuren-Werkstatt gebrainstormten Figuren als Soll-Ziel eines
+    // Motivs verknüpfbar sein. Eigene M:M-Brücke (draft_figures ist eine eigene
+    // Tabelle, kein figures-Eintrag), beidseitig CASCADE wie die vier bestehenden.
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_draft_figures (
+        motif_id        INTEGER NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
+        draft_figure_id INTEGER NOT NULL REFERENCES draft_figures(id) ON DELETE CASCADE,
+        PRIMARY KEY (motif_id, draft_figure_id)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_draft_figures_draft ON motif_draft_figures(draft_figure_id)');
+
+    const fkErrors245 = db.pragma('foreign_key_check');
+    if (fkErrors245.length) {
+      throw new Error(`Migration 245: foreign_key_check meldet ${fkErrors245.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 245').run();
+    logger.info('DB-Migration auf Version 245 abgeschlossen (Motiv-Werkstatt: motif_draft_figures).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

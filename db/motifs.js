@@ -182,6 +182,7 @@ function _makeBridge(table, col) {
   return set;
 }
 const setMotifFigures = _makeBridge('motif_figures', 'figure_id');
+const setMotifDraftFigures = _makeBridge('motif_draft_figures', 'draft_figure_id');
 const setMotifBeats = _makeBridge('motif_beats', 'beat_id');
 const setMotifChapters = _makeBridge('motif_chapters', 'chapter_id');
 const setMotifPages = _makeBridge('motif_pages', 'page_id');
@@ -195,6 +196,13 @@ const _stmtBridgeFigures = db.prepare(`
     FROM motif_figures mf
     JOIN motifs m ON m.id = mf.motif_id
     JOIN figures f ON f.id = mf.figure_id
+   WHERE m.book_id = ? AND m.user_email = ?
+`);
+const _stmtBridgeDraftFigures = db.prepare(`
+  SELECT mdf.motif_id, mdf.draft_figure_id, d.name
+    FROM motif_draft_figures mdf
+    JOIN motifs m ON m.id = mdf.motif_id
+    JOIN draft_figures d ON d.id = mdf.draft_figure_id
    WHERE m.book_id = ? AND m.user_email = ?
 `);
 const _stmtBridgeBeats = db.prepare(`
@@ -300,6 +308,9 @@ function _filterIds(sql, bookId, ids, extra = []) {
 function validBeatIds(bookId, userEmail, beatIds) {
   return _filterIds('SELECT 1 FROM plot_beats WHERE book_id = ? AND id = ? AND user_email = ?', bookId, beatIds, [userEmail]);
 }
+function validDraftFigureIds(bookId, userEmail, draftFigureIds) {
+  return _filterIds('SELECT 1 FROM draft_figures WHERE book_id = ? AND id = ? AND user_email = ?', bookId, draftFigureIds, [userEmail]);
+}
 function validChapterIds(bookId, chapterIds) {
   return _filterIds('SELECT 1 FROM chapters WHERE book_id = ? AND chapter_id = ?', bookId, chapterIds);
 }
@@ -307,9 +318,30 @@ function validPageIds(bookId, pageIds) {
   return _filterIds('SELECT 1 FROM pages WHERE book_id = ? AND page_id = ?', bookId, pageIds);
 }
 
+// ── Graph-Layout (manuelle Knoten-Positionen, View-Präferenz pro Buch + User) ──
+// Ein JSON-Blob node_id → {x,y}. node_id ist ein Render-Token ("m12"/"t3"/…), kein
+// FK-fähiges Ziel; die gezogene Anordnung ist reine Ansicht (kein Snapshot von Daten).
+
+const _stmtGetLayout = db.prepare('SELECT positions_json FROM motif_graph_layout WHERE book_id = ? AND user_email = ?');
+const _stmtUpsertLayout = db.prepare(`
+  INSERT INTO motif_graph_layout (book_id, user_email, positions_json, updated_at)
+  VALUES (?, ?, ?, ${NOW_ISO_SQL})
+  ON CONFLICT (book_id, user_email) DO UPDATE SET positions_json = excluded.positions_json, updated_at = ${NOW_ISO_SQL}
+`);
+
+function getLayout(bookId, userEmail) {
+  const row = _stmtGetLayout.get(parseInt(bookId), userEmail);
+  if (!row?.positions_json) return {};
+  try { const v = JSON.parse(row.positions_json); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; }
+  catch { return {}; }
+}
+function saveLayout(bookId, userEmail, positions) {
+  _stmtUpsertLayout.run(parseInt(bookId), userEmail, JSON.stringify(positions || {}));
+}
+
 // ── Graph-Payload ───────────────────────────────────────────────────────────
 // Ein Aufruf liefert alles fürs Konstellations-Rendering: Themen, Motive (jeweils
-// mit Soll-Links + Ist-Count), Beziehungen.
+// mit Soll-Links + Ist-Count), Beziehungen, plus das persistierte Knoten-Layout.
 function getGraph(bookId, userEmail) {
   const bid = parseInt(bookId);
   const themes = listThemes(bid, userEmail);
@@ -317,15 +349,16 @@ function getGraph(bookId, userEmail) {
   const relations = listRelations(bid, userEmail);
 
   const byMotif = new Map(motifs.map(m => [m.id, {
-    ...m, figures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0,
+    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0,
   }]));
   for (const r of _stmtBridgeFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.figures.push({ figId: r.fig_id, name: r.name });
+  for (const r of _stmtBridgeDraftFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.draftFigures.push({ id: r.draft_figure_id, name: r.name });
   for (const r of _stmtBridgeBeats.all(bid, userEmail)) byMotif.get(r.motif_id)?.beats.push({ id: r.beat_id, titel: r.titel });
   for (const r of _stmtBridgeChapters.all(bid, userEmail)) byMotif.get(r.motif_id)?.chapters.push({ id: r.chapter_id, name: r.chapter_name });
   for (const r of _stmtBridgePages.all(bid, userEmail)) byMotif.get(r.motif_id)?.pages.push({ id: r.page_id, name: r.page_name });
   for (const r of _stmtOccCounts.all(bid, userEmail)) { const m = byMotif.get(r.motif_id); if (m) m.occurrenceCount = r.n; }
 
-  return { themes, motifs: [...byMotif.values()], relations };
+  return { themes, motifs: [...byMotif.values()], relations, layout: getLayout(bid, userEmail) };
 }
 
 module.exports = {
@@ -336,10 +369,12 @@ module.exports = {
   // Beziehungen
   listRelations, createRelation, deleteRelation, getRelationOwner,
   // Soll-Brücken
-  setMotifFigures, setMotifBeats, setMotifChapters, setMotifPages,
-  resolveFigureIds, validBeatIds, validChapterIds, validPageIds,
+  setMotifFigures, setMotifDraftFigures, setMotifBeats, setMotifChapters, setMotifPages,
+  resolveFigureIds, validBeatIds, validDraftFigureIds, validChapterIds, validPageIds,
   // Ist-Index
   replaceOccurrences, listOccurrences,
+  // Graph-Layout (View-Präferenz)
+  getLayout, saveLayout,
   // Aggregat
   getGraph,
 };

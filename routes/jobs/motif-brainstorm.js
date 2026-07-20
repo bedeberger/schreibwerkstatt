@@ -10,7 +10,8 @@ const {
   createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
   aiCall, getPrompts, getBookPrompts,
   loadOrderedBookContents, loadPageContents,
-  SINGLE_PASS_LIMIT, tps,
+  groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
+  SINGLE_PASS_LIMIT, PER_CHUNK_LIMIT, tps,
 } = require('./shared');
 const motifsDb = require('../../db/motifs');
 const { toIntId } = require('../../lib/validate');
@@ -18,6 +19,18 @@ const { setContext } = require('../../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../../lib/acl');
 
 const VALID_TYP = new Set(['thema', 'motiv']);
+
+// Ein KI-Vorschlag → Katalog-Eintrag normalisieren (Feld-Trim + Typ-Whitelist).
+function _normalizeSuggestion(v) {
+  return {
+    typ: VALID_TYP.has(v.typ) ? v.typ : 'motiv',
+    name: v.name.trim().slice(0, 200),
+    beschreibung: typeof v.beschreibung === 'string' ? v.beschreibung.trim().slice(0, 2000) : '',
+    trigger_terms: Array.isArray(v.trigger_terms)
+      ? v.trigger_terms.filter(s => typeof s === 'string' && s.trim()).map(s => s.trim().slice(0, 80)).slice(0, 12)
+      : [],
+  };
+}
 
 async function runMotifBrainstormJob(jobId, bookId, userEmail) {
   const logger = makeJobLogger(jobId);
@@ -28,43 +41,64 @@ async function runMotifBrainstormJob(jobId, bookId, userEmail) {
     updateJob(jobId, { statusText: 'job.phase.motivBrainstormCollect', progress: 8 });
     const { chMap, pages } = await loadOrderedBookContents(bookId, null);
     const pageContents = await loadPageContents(pages, chMap, 1, null, null, signal());
-    let text = pageContents.map(p => p.text).filter(Boolean).join('\n\n').trim();
-    if (!text) throw i18nError('job.error.motivNoText');
-    if (text.length > SINGLE_PASS_LIMIT) text = text.slice(0, SINGLE_PASS_LIMIT);
+    if (!pageContents.some(p => p.text)) throw i18nError('job.error.motivNoText');
 
     const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
+    // Bereits katalogisierte Namen + fortlaufend die schon vorgeschlagenen — sowohl
+    // für die Dedup als auch als „NICHT wiederholen"-Kontext an die KI (chunk-übergreifend).
     const existingThemes = motifsDb.listThemes(bookId, userEmail).map(t => t.name);
     const existingMotifs = motifsDb.listMotifs(bookId, userEmail).map(m => m.name);
     const seen = new Set([...existingThemes, ...existingMotifs].map(n => n.toLowerCase()));
 
-    logger.info(`Motiv-Brainstorm Start: book=${bookId} text=${text.length} Zeichen, Katalog=${seen.size}`);
-    updateJob(jobId, { statusText: 'job.phase.motivBrainstorm', progress: 15 });
-
+    const systemPrompt = buildMotivSystemPrompt();
     const tok = { in: 0, out: 0, ms: 0 };
-    const result = await aiCall(jobId, tok,
-      buildMotivBrainstormPrompt(text, existingThemes, existingMotifs, BUCH_KONTEXT),
-      buildMotivSystemPrompt(),
-      15, 95, 3000, 0.3, 2000, undefined, SCHEMA_MOTIV_BRAINSTORM,
-    );
+    const vorschlaege = [];
 
-    if (!Array.isArray(result?.vorschlaege)) throw i18nError('job.error.motivVorschlaegeMissing');
-    const vorschlaege = result.vorschlaege
-      .filter(v => v && typeof v.name === 'string' && v.name.trim())
-      .map(v => ({
-        typ: VALID_TYP.has(v.typ) ? v.typ : 'motiv',
-        name: v.name.trim().slice(0, 200),
-        beschreibung: typeof v.beschreibung === 'string' ? v.beschreibung.trim().slice(0, 2000) : '',
-        trigger_terms: Array.isArray(v.trigger_terms)
-          ? v.trigger_terms.filter(s => typeof s === 'string' && s.trim()).map(s => s.trim().slice(0, 80)).slice(0, 12)
-          : [],
-      }))
-      // Dubletten zum Katalog raus (case-insensitive), In-Batch-Dubletten auch.
-      .filter(v => {
+    // Ein Brainstorm-Durchlauf über einen Textausschnitt. Filtert Dubletten
+    // (Katalog + bereits vorgeschlagen) und speist neue Namen in `seen` zurück,
+    // damit spätere Chunks sie nicht erneut vorschlagen.
+    async function brainstormPass(text, progFrom, progTo) {
+      const result = await aiCall(jobId, tok,
+        buildMotivBrainstormPrompt(text, [...existingThemes], [...existingMotifs], BUCH_KONTEXT),
+        systemPrompt, progFrom, progTo, 3000, 0.3, 2000, undefined, SCHEMA_MOTIV_BRAINSTORM,
+      );
+      if (!Array.isArray(result?.vorschlaege)) throw i18nError('job.error.motivVorschlaegeMissing');
+      for (const raw of result.vorschlaege) {
+        if (!raw || typeof raw.name !== 'string' || !raw.name.trim()) continue;
+        const v = _normalizeSuggestion(raw);
         const key = v.name.toLowerCase();
-        if (seen.has(key)) return false;
+        if (seen.has(key)) continue;
         seen.add(key);
-        return true;
-      });
+        (v.typ === 'thema' ? existingThemes : existingMotifs).push(v.name);
+        vorschlaege.push(v);
+      }
+    }
+
+    // Kurze Bücher: ein Durchlauf. Lange: Kapitel-Chunks (wie die Komplettanalyse),
+    // damit auch Motive in späteren Kapiteln erkannt werden statt beim Head-Slice zu entgehen.
+    const totalChars = pageContents.reduce((s, p) => s + (p.text ? p.text.length : 0), 0);
+    const { groupOrder, groups } = groupByChapter(pageContents);
+
+    if (totalChars <= SINGLE_PASS_LIMIT) {
+      logger.info(`Motiv-Brainstorm Single-Pass: book=${bookId} text=${totalChars} Zeichen, Katalog=${seen.size}`);
+      updateJob(jobId, { statusText: 'job.phase.motivBrainstorm', progress: 15 });
+      await brainstormPass(buildSinglePassBookText(groups, groupOrder), 15, 95);
+    } else {
+      const { chunkOrder, chunks } = splitGroupsIntoChunks(groups, groupOrder, PER_CHUNK_LIMIT);
+      logger.info(`Motiv-Brainstorm Multi-Pass: book=${bookId} text=${totalChars} Zeichen, ${chunkOrder.length} Chunks, Katalog=${seen.size}`);
+      for (let i = 0; i < chunkOrder.length; i++) {
+        if (signal()?.aborted) break;
+        const group = chunks.get(chunkOrder[i]);
+        const from = 15 + Math.floor((i / chunkOrder.length) * 80);
+        const to = 15 + Math.floor(((i + 1) / chunkOrder.length) * 80);
+        updateJob(jobId, {
+          statusText: 'job.phase.motivBrainstormChunk',
+          statusParams: { done: i + 1, total: chunkOrder.length },
+          progress: from,
+        });
+        await brainstormPass(buildSinglePassBookText(new Map([[chunkOrder[i], group]]), [chunkOrder[i]]), from, to);
+      }
+    }
 
     completeJob(jobId, { vorschlaege, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${vorschlaege.length} Vorschläge`);

@@ -71,6 +71,36 @@ router.get('/', (req, res) => {
   res.json(motifsDb.getGraph(bookId, userEmail));
 });
 
+// Manuelle Knoten-Positionen der Konstellation speichern (reine View-Präferenz).
+// node_id → {x,y}; Keys/Zahlen defensiv validiert + gedeckelt (Frontend liefert
+// vis-network getPositions()). Vor /:id registriert (literales Segment, kein Konflikt).
+const MAX_LAYOUT_NODES = 5000;
+function _validPositions(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  let n = 0;
+  for (const [k, v] of Object.entries(raw)) {
+    if (n >= MAX_LAYOUT_NODES) break;
+    if (!k || typeof k !== 'string' || k.length > 64) continue;
+    if (!v || typeof v !== 'object') continue;
+    const x = Number(v.x), y = Number(v.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    out[k] = { x: Math.round(x), y: Math.round(y) };
+    n++;
+  }
+  return out;
+}
+
+router.put('/layout', jsonBody, (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const bookId = toIntId(req.body?.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
+  if (!_guard(req, res, bookId)) return;
+  motifsDb.saveLayout(bookId, userEmail, _validPositions(req.body?.positions));
+  res.json({ ok: true });
+});
+
 // ── Themen ─────────────────────────────────────────────────────────────────
 
 router.post('/themes', jsonBody, (req, res) => {
@@ -188,7 +218,8 @@ router.put('/order', jsonBody, (req, res) => {
   res.json({ ok: true });
 });
 
-// Soll-Verknüpfungen setzen (Full-Replace aller vier Brücken). figures als fig_id.
+// Soll-Verknüpfungen setzen (Full-Replace aller fünf Brücken). figures als fig_id,
+// draftFigures als INTEGER draft_figures.id (Werkstatt-Figuren).
 router.put('/:id/links', jsonBody, (req, res) => {
   const motif = _loadOwned(req, res, motifsDb.getMotif, 'MOTIF_NOT_FOUND');
   if (!motif) return;
@@ -196,6 +227,9 @@ router.put('/:id/links', jsonBody, (req, res) => {
   const userEmail = motif.user_email;
   if (req.body?.figures !== undefined) {
     motifsDb.setMotifFigures(motif.id, motifsDb.resolveFigureIds(b, req.body.figures));
+  }
+  if (req.body?.draftFigures !== undefined) {
+    motifsDb.setMotifDraftFigures(motif.id, motifsDb.validDraftFigureIds(b, userEmail, req.body.draftFigures));
   }
   if (req.body?.beats !== undefined) {
     motifsDb.setMotifBeats(motif.id, motifsDb.validBeatIds(b, userEmail, req.body.beats));

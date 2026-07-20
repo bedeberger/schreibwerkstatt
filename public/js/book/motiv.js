@@ -7,6 +7,7 @@ import { crudMethods } from './motiv/crud.js';
 import { graphMethods } from './motiv/graph.js';
 import { scanMethods } from './motiv/scan.js';
 import { brainstormMethods } from './motiv/brainstorm.js';
+import { dndMethods } from './motiv/dnd.js';
 
 export const motivMethods = {
   ...lifecycleMethods,
@@ -14,4 +15,5 @@ export const motivMethods = {
   ...graphMethods,
   ...scanMethods,
   ...brainstormMethods,
+  ...dndMethods,
 };

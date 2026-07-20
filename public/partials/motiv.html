@@ -33,6 +33,10 @@
                 :data-tip="$app.t('motiv.graph.fit')" :aria-label="$app.t('motiv.graph.fit')">
           <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scan"/></svg>
         </button>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="resetLayout()"
+                :data-tip="$app.t('motiv.graph.resetLayout')" :aria-label="$app.t('motiv.graph.resetLayout')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#undo"/></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -58,6 +62,9 @@
                   x-text="(s.trigger_terms || []).join(', ')"></span>
           </div>
           <div class="motiv-sugg-actions">
+            <div class="motiv-sugg-theme" x-show="s.typ === 'motiv' && themes.length"
+                 x-data="combobox($app.t('motiv.motif.themeOptional'), $app.t('motiv.noTheme'))"
+                 x-modelable="value" x-model="s.themeIdDraft" x-effect="options = themeOptions()"></div>
             <button type="button" class="btn-compact" @click="adoptSuggestion(s)" x-text="$app.t('motiv.brainstorm.adopt')"></button>
             <button type="button" class="icon-btn icon-btn--ghost" @click="dismissSuggestion(s)"
                     :data-tip="$app.t('motiv.brainstorm.dismiss')" :aria-label="$app.t('motiv.brainstorm.dismiss')">
@@ -88,6 +95,20 @@
       <button type="button" class="motiv-layer-btn" :class="{ 'is-active': layerBeats }" @click="toggleLayer('beats')" x-text="$app.t('motiv.layer.beats')"></button>
       <button type="button" class="motiv-layer-btn" :class="{ 'is-active': layerChapters }" @click="toggleLayer('chapters')" x-text="$app.t('motiv.layer.chapters')"></button>
     </div>
+  </div>
+
+  <!-- Scan-Status: warnt, wenn die semantische Erkennung aus ist (nur wörtliche
+       Trigger), sonst bietet sie Embeddings-Refresh für frische Fundstellen. -->
+  <div class="motiv-hint" x-show="!semanticActive()" x-cloak>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+    <span x-text="$app.t('motiv.hint.semanticOff')"></span>
+  </div>
+  <div class="motiv-hint motiv-hint--action" x-show="semanticActive()" x-cloak>
+    <span class="motiv-hint-text" x-text="$app.t('motiv.hint.semanticOn')"></span>
+    <button type="button" class="btn-compact" @click="refreshEmbedIndex()" :disabled="indexing">
+      <span x-show="indexing" class="spinner"></span>
+      <span x-text="$app.t('motiv.index.refresh')"></span>
+    </button>
   </div>
 
   <div class="motiv-layout">

@@ -11,16 +11,42 @@
       <p class="muted-msg" x-show="!motifs.length" x-text="$app.t('motiv.empty.hint')"></p>
       <div class="motiv-theme-list" x-show="themes.length">
         <h4 class="motiv-panel-heading" x-text="$app.t('motiv.theme.listTitle')"></h4>
-        <template x-for="t in themes" :key="t.id">
-          <div class="motiv-theme-row">
-            <input type="text" class="motiv-inline-input" :value="t.name" data-spellcheck="spelling"
-                   @change="renameTheme(t, $event.target.value)">
-            <button type="button" class="icon-btn icon-btn--ghost" @click="deleteTheme(t)"
-                    :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
-            </button>
-          </div>
-        </template>
+        <!-- Nur x-for-Anker + Zeilen im Sortable-Container (Drop-Index sauber, h4 aussen). -->
+        <div class="motiv-theme-rows" x-init="_initThemeSortable($el)">
+          <template x-for="t in themes" :key="t.id">
+            <div class="motiv-theme-row" :data-theme-id="t.id">
+              <span class="motiv-drag-grip" aria-hidden="true" :data-tip="$app.t('motiv.theme.dragHint')">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#grip-vertical"/></svg>
+              </span>
+              <!-- Thema-Farbe: Swatch öffnet ein Palette-Popover (theme-aware --palette-*). -->
+              <div class="motiv-color-swatch-wrap">
+                <button type="button" class="motiv-color-swatch"
+                        :style="{ '--col-accent': t.farbe ? ('var(--palette-' + t.farbe + ')') : 'var(--card-accent)' }"
+                        @click.stop="toggleThemeColorPicker(t.id)"
+                        :data-tip="$app.t('motiv.theme.color')" :aria-label="$app.t('motiv.theme.color')"></button>
+                <div class="motiv-color-popover" x-show="themeColorPickerId === t.id" x-cloak
+                     @click.outside="themeColorPickerId === t.id && (themeColorPickerId = null)">
+                  <button type="button" class="motiv-color-opt motiv-color-opt--none"
+                          :class="{ 'motiv-color-opt--on': !t.farbe }"
+                          @click="setThemeColor(t, null)"
+                          :data-tip="$app.t('motiv.theme.colorAuto')" :aria-label="$app.t('motiv.theme.colorAuto')"></button>
+                  <template x-for="key in themeColorKeys()" :key="key">
+                    <button type="button" class="motiv-color-opt"
+                            :style="{ '--col-accent': 'var(--palette-' + key + ')' }"
+                            :class="{ 'motiv-color-opt--on': t.farbe === key }"
+                            @click="setThemeColor(t, key)" :aria-label="key"></button>
+                  </template>
+                </div>
+              </div>
+              <input type="text" class="motiv-inline-input" :value="t.name" data-spellcheck="spelling"
+                     @change="renameTheme(t, $event.target.value)">
+              <button type="button" class="icon-btn icon-btn--ghost" @click="deleteTheme(t)"
+                      :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+              </button>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
   </template>
@@ -29,8 +55,19 @@
   <template x-if="selectedMotif()">
     <div class="motiv-editor">
       <div class="motiv-editor-head">
-        <input type="text" class="motiv-name-input" :value="selectedMotif().name" data-spellcheck="spelling"
-               @change="saveMotifName(selectedMotif(), $event.target.value)">
+        <input type="text" class="motiv-name-input" x-model="editName" data-spellcheck="spelling"
+               @keydown.enter="saveMotifEdit()">
+        <button type="button" class="icon-btn icon-btn--ghost icon-btn--success" x-show="motifDirty()"
+                @click="saveMotifEdit()" :disabled="busy || !editName.trim()"
+                :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+        </button>
+        <button type="button" class="icon-btn icon-btn--ghost" x-show="motifDirty()"
+                @click="cancelMotifEdit()" :disabled="busy"
+                :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        </button>
+        <span class="action-sep" aria-hidden="true" x-show="motifDirty()"></span>
         <button type="button" class="icon-btn icon-btn--ghost" @click="deleteMotif(selectedMotif())"
                 :data-tip="$app.t('motiv.motif.delete')" :aria-label="$app.t('motiv.motif.delete')">
           <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
@@ -39,19 +76,17 @@
 
       <label class="motiv-field-label" x-text="$app.t('motiv.motif.theme')"></label>
       <div x-data="combobox($app.t('motiv.motif.themeOptional'), $app.t('motiv.noTheme'))"
-           x-modelable="value" x-model="editThemeId" x-effect="options = themeOptions()"
-           @combobox-change="saveMotifTheme(selectedMotif(), editThemeId)"></div>
+           x-modelable="value" x-model="editThemeId" x-effect="options = themeOptions()"></div>
 
       <label class="motiv-field-label" x-text="$app.t('motiv.motif.beschreibung')"></label>
       <textarea class="motiv-textarea" rows="3" data-spellcheck="spelling"
                 :placeholder="$app.t('motiv.motif.beschreibungHint')"
-                @change="saveMotifBeschreibung(selectedMotif(), $event.target.value)"
-                x-text="selectedMotif().beschreibung"></textarea>
+                x-model="editBeschreibung"></textarea>
 
       <label class="motiv-field-label" x-text="$app.t('motiv.motif.triggers')"></label>
-      <input type="text" class="motiv-inline-input" :value="(selectedMotif().trigger_terms || []).join(', ')"
+      <input type="text" class="motiv-inline-input" x-model="editTriggers"
              :placeholder="$app.t('motiv.motif.triggersHint')"
-             @change="saveMotifTriggers(selectedMotif(), $event.target.value)">
+             @keydown.enter="saveMotifEdit()">
 
       <!-- Ist: Fundstellen -->
       <h4 class="motiv-panel-heading">
@@ -74,14 +109,23 @@
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.figures')"></span>
         <div class="motiv-chip-row">
-          <template x-for="f in selectedMotif().figures" :key="f.figId">
+          <template x-for="f in selectedMotif().figures" :key="'k'+f.figId">
             <span class="motiv-chip"><span x-text="f.name"></span>
               <button type="button" @click="toggleLink('figures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
+          <template x-for="f in (selectedMotif().draftFigures || [])" :key="'d'+f.id">
+            <span class="motiv-chip motiv-chip--werkstatt"><span x-text="f.name"></span>
+              <button type="button" @click="toggleLink('draftFigures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+          </template>
         </div>
+        <!-- Eine Combobox, zwei Quellen gruppiert: Komplettanalyse (figures) + Plotwerkstatt (draft_figures).
+             Wert trägt ein Präfix (fig:/draft:), addFigureLink löst die richtige Brücke auf. -->
         <div x-data="combobox($app.t('motiv.link.addFigure'), '')" x-modelable="value" x-model="linkFigTmp"
-             x-effect="options = ($store.catalog.figuren||[]).map(f=>({value:f.fig_id,label:f.name}))"
-             @combobox-change="if(linkFigTmp){ addLink('figures', linkFigTmp); linkFigTmp='' }"></div>
+             x-effect="options = [
+               ...($store.catalog.figuren||[]).map(f=>({value:'fig:'+f.fig_id, label:f.name, group:$app.t('motiv.link.figureGroup.katalog')})),
+               ...(allDraftFiguren||[]).map(d=>({value:'draft:'+d.id, label:d.name, group:$app.t('motiv.link.figureGroup.werkstatt')}))
+             ]"
+             @combobox-change="if(linkFigTmp){ addFigureLink(linkFigTmp); linkFigTmp='' }"></div>
       </div>
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.beats')"></span>

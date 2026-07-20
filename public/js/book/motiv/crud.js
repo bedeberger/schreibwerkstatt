@@ -3,6 +3,8 @@
 // aktualisieren (loadBoard) statt Teil-Patches — die Boards sind klein.
 
 import { fetchJson } from '../../utils.js';
+import { THEME_COLOR_KEYS } from './graph.js';
+import { highlightOccurrenceOnPage } from './highlight.js';
 
 function _json(url, method, body) {
   return fetchJson(url, {
@@ -36,6 +38,21 @@ export const crudMethods = {
   async deleteTheme(theme) {
     if (!window.confirm(window.__app.t('motiv.theme.confirmDelete', { name: theme.name }))) return;
     try { await _json(`/motifs/themes/${theme.id}`, 'DELETE'); await this.loadBoard(); }
+    catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+  },
+  // Palette-Schlüssel für den Farbwähler (theme-aware --palette-*-Tokens).
+  themeColorKeys() { return THEME_COLOR_KEYS; },
+  toggleThemeColorPicker(themeId) {
+    this.themeColorPickerId = this.themeColorPickerId === themeId ? null : themeId;
+  },
+  // Thema-Farbe setzen (key aus der Palette oder null = Auto nach Index). Optimistisch
+  // lokal spiegeln, damit Graph + Swatch ohne Reload umfärben; loadBoard bestätigt.
+  async setThemeColor(theme, key) {
+    this.themeColorPickerId = null;
+    const farbe = THEME_COLOR_KEYS.includes(key) ? key : null;
+    if (farbe === (theme.farbe || null)) return;
+    theme.farbe = farbe;
+    try { await _json(`/motifs/themes/${theme.id}`, 'PATCH', { farbe }); await this.loadBoard(); }
     catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
   },
 
@@ -82,29 +99,51 @@ export const crudMethods = {
     finally { this.busy = false; }
   },
 
-  // Feld-Patch eines Motivs (name/beschreibung/theme_id/trigger_terms).
-  async saveMotifField(motif, patch) {
-    try { await _json(`/motifs/${motif.id}`, 'PATCH', patch); await this.loadBoard(); }
-    catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+  // Edit-Puffer der Kern-Felder aus dem Motiv füllen (bei Auswahl/Cancel/Reload).
+  _loadMotifBuffer(m) {
+    this.editName = m ? (m.name || '') : '';
+    this.editThemeId = m && m.theme_id ? String(m.theme_id) : '';
+    this.editBeschreibung = m ? (m.beschreibung || '') : '';
+    this.editTriggers = m ? (m.trigger_terms || []).join(', ') : '';
   },
-  saveMotifName(motif, name) {
-    const clean = (name || '').trim();
-    if (!clean || clean === motif.name) return;
-    return this.saveMotifField(motif, { name: clean });
+  // Trigger-Puffer (Komma-Text) auf die kanonische Term-Liste normalisieren.
+  _bufferTriggerTerms() {
+    return (this.editTriggers || '').split(',').map(s => s.trim()).filter(Boolean);
   },
-  saveMotifBeschreibung(motif, val) {
-    if ((val || '') === (motif.beschreibung || '')) return;
-    return this.saveMotifField(motif, { beschreibung: val || '' });
+  // Ungespeicherte Änderungen an Name/Thema/Beschreibung/Trigger?
+  motifDirty() {
+    const m = this.selectedMotif();
+    if (!m) return false;
+    const tid = this.editThemeId ? Number(this.editThemeId) : null;
+    return (this.editName || '').trim() !== (m.name || '')
+      || tid !== (m.theme_id || null)
+      || (this.editBeschreibung || '') !== (m.beschreibung || '')
+      || this._bufferTriggerTerms().join(', ') !== (m.trigger_terms || []).join(', ');
   },
-  saveMotifTheme(motif, themeId) {
-    const tid = themeId ? Number(themeId) : null;
-    if (tid === (motif.theme_id || null)) return;
-    return this.saveMotifField(motif, { theme_id: tid });
+  // Puffer auf den gespeicherten Motivstand zurücksetzen.
+  cancelMotifEdit() {
+    this._loadMotifBuffer(this.selectedMotif());
   },
-  // Trigger-Begriffe aus Komma-separiertem Text.
-  saveMotifTriggers(motif, text) {
-    const terms = (text || '').split(',').map(s => s.trim()).filter(Boolean);
-    return this.saveMotifField(motif, { trigger_terms: terms });
+  // Alle geänderten Kern-Felder in einem PATCH speichern.
+  async saveMotifEdit() {
+    const m = this.selectedMotif();
+    if (!m || !this.motifDirty()) return;
+    const name = (this.editName || '').trim();
+    if (!name) { this.errorMessage = window.__app.t('motiv.error.nameRequired'); return; }
+    const patch = {
+      name,
+      theme_id: this.editThemeId ? Number(this.editThemeId) : null,
+      beschreibung: this.editBeschreibung || '',
+      trigger_terms: this._bufferTriggerTerms(),
+    };
+    this.busy = true;
+    try {
+      await _json(`/motifs/${m.id}`, 'PATCH', patch);
+      await this.loadBoard();
+      this._loadMotifBuffer(this.selectedMotif());
+      this.errorMessage = '';
+    } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+    finally { this.busy = false; }
   },
   async deleteMotif(motif) {
     if (!window.confirm(window.__app.t('motiv.motif.confirmDelete', { name: motif.name }))) return;
@@ -145,10 +184,11 @@ export const crudMethods = {
       });
   },
 
-  // ── Soll-Verknüpfungen (Full-Replace aller vier Brücken) ─────────────────
+  // ── Soll-Verknüpfungen (Full-Replace aller fünf Brücken) ─────────────────
   async _saveLinks(motif) {
     const body = {
       figures: (motif.figures || []).map(f => f.figId),
+      draftFigures: (motif.draftFigures || []).map(f => f.id),
       beats: (motif.beats || []).map(b => b.id),
       chapters: (motif.chapters || []).map(c => c.id),
       pages: (motif.pages || []).map(p => p.id),
@@ -156,7 +196,15 @@ export const crudMethods = {
     try { await _json(`/motifs/${motif.id}/links`, 'PUT', body); await this.loadBoard(); }
     catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
   },
-  // Verknüpfung hinzufügen/entfernen. kind: figures|beats|chapters|pages.
+  // Figuren-Combobox mischt zwei Quellen; der Auswahl-Wert trägt ein Präfix
+  // (fig:<fig_id> = Komplettanalyse, draft:<id> = Plotwerkstatt) → richtige Brücke.
+  addFigureLink(val) {
+    if (val == null || val === '') return;
+    const s = String(val);
+    if (s.startsWith('draft:')) this.addLink('draftFigures', s.slice(6));
+    else this.addLink('figures', s.startsWith('fig:') ? s.slice(4) : s);
+  },
+  // Verknüpfung hinzufügen/entfernen. kind: figures|draftFigures|beats|chapters|pages.
   toggleLink(kind, item) {
     const motif = this.selectedMotif();
     if (!motif) return;
@@ -175,6 +223,9 @@ export const crudMethods = {
     if (kind === 'figures') {
       const f = (this.$store.catalog.figuren || []).find(x => x.fig_id === idVal);
       if (f) item = { figId: f.fig_id, name: f.name };
+    } else if (kind === 'draftFigures') {
+      const d = (this.allDraftFiguren || []).find(x => String(x.id) === String(idVal));
+      if (d) item = { id: Number(d.id), name: d.name };
     } else if (kind === 'beats') {
       const b = this.allBeats.find(x => String(x.id) === String(idVal));
       if (b) item = { id: b.id, titel: b.titel };
@@ -209,14 +260,23 @@ export const crudMethods = {
       this.allBeats = (data.beats || []).map(b => ({ id: b.id, titel: b.titel }));
     } catch (e) { this.allBeats = []; }
   },
+  // Werkstatt-Figuren (draft_figures) fürs Figuren-Combobox (Gruppe „Plotwerkstatt").
+  async _ensureDraftFiguren() {
+    if (this._draftFigurenLoaded) return;
+    this._draftFigurenLoaded = true;
+    try {
+      const data = await fetchJson(`/draft-figures/${this._bookId()}`);
+      this.allDraftFiguren = (Array.isArray(data) ? data : []).map(d => ({ id: d.id, name: d.name }));
+    } catch (e) { this.allDraftFiguren = []; }
+  },
 
   async selectMotif(id) {
     this.selectedMotifId = id;
     this.occurrences = [];
-    const m = this.motifById(id);
-    this.editThemeId = m && m.theme_id ? String(m.theme_id) : '';
+    this._loadMotifBuffer(this.motifById(id));
     if (!id) return;
     this._ensureBeats();
+    this._ensureDraftFiguren();
     this.occLoading = true;
     try {
       const data = await fetchJson(`/motifs/${id}/occurrences`);
@@ -227,6 +287,10 @@ export const crudMethods = {
   },
 
   gotoOccurrence(occ) {
-    if (occ.page_id) window.__app.gotoPageById(occ.page_id);
+    if (!occ.page_id) return;
+    window.__app.gotoPageById(occ.page_id);
+    // Passage im Seitentext hervorheben (reines Lesen; findet sie nichts, bleibt
+    // der Sprung auf die Seite bestehen).
+    if (occ.snippet) highlightOccurrenceOnPage(occ.snippet);
   },
 };

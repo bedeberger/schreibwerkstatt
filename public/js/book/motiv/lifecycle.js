@@ -24,6 +24,7 @@ export const lifecycleMethods = {
       this.themes = data.themes || [];
       this.motifs = data.motifs || [];
       this.relations = data.relations || [];
+      this._savedPositions = data.layout || {};
       this._memos = {};
       // Figuren fürs Figuren-Layer + Verknüpfungs-Combobox bereitstellen.
       if (!this.$store.catalog.figuren?.length) window.__app.loadFiguren(bookId);
@@ -42,9 +43,16 @@ export const lifecycleMethods = {
     this.relations = [];
     this.selectedMotifId = null;
     this.occurrences = [];
+    this.editThemeId = '';
+    this.editName = '';
+    this.editBeschreibung = '';
+    this.editTriggers = '';
     this.allBeats = [];
     this._beatsLoaded = false;
+    this.allDraftFiguren = [];
+    this._draftFigurenLoaded = false;
     this.errorMessage = '';
+    this._savedPositions = null;
     this._memos = {};
   },
 

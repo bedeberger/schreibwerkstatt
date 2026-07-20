@@ -103,7 +103,73 @@
   padding-left: var(--space-xs);
 }
 .motiv-theme-list { display: flex; flex-direction: column; gap: var(--space-2xs); }
+.motiv-theme-rows { display: flex; flex-direction: column; gap: var(--space-2xs); }
 .motiv-theme-row { display: flex; align-items: center; gap: var(--space-2xs); }
+.motiv-theme-row .motiv-inline-input { flex: 1; min-width: 0; width: auto; }
+.motiv-theme-row--ghost { opacity: 0.5; }
+/* Drag-Griff: einzige Greiffläche, damit Input/Buttons klickbar bleiben. */
+.motiv-drag-grip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  cursor: grab;
+}
+.motiv-drag-grip .icon { width: 14px; height: 14px; }
+.motiv-drag-grip:active { cursor: grabbing; }
+
+/* ── Thema-Farbe (Swatch + Palette-Popover), Muster wie die Plot-Werkstatt ── */
+.motiv-color-swatch-wrap { position: relative; flex: 0 0 auto; display: flex; }
+.motiv-color-swatch {
+  width: 14px; height: 14px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--col-accent);
+  cursor: pointer;
+}
+.motiv-color-swatch:hover { background: var(--col-accent); border-color: var(--color-text); }
+.motiv-color-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2xs));
+  left: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  width: 132px;
+  padding: var(--space-xs);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+.motiv-color-opt {
+  width: 18px; height: 18px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--col-accent);
+  cursor: pointer;
+}
+/* button:hover (gleiche @layer) würde den Swatch-Hintergrund überschreiben — re-asserten. */
+.motiv-color-opt:hover { background: var(--col-accent); transform: scale(1.1); }
+.motiv-color-opt--on { outline: 2px solid var(--color-text); outline-offset: 1px; }
+.motiv-color-opt--none, .motiv-color-opt--none:hover {
+  background: var(--color-card-bg);
+  position: relative;
+  overflow: hidden;
+  transform: none;
+}
+.motiv-color-opt--none::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top right, transparent 44%, var(--color-err-border) 44%, var(--color-err-border) 56%, transparent 56%);
+}
+
+/* Themen-Combobox in der KI-Vorschlagskarte (Motiv-Vorschlag → Thema zuordnen). */
+.motiv-sugg-theme { min-width: 9rem; }
 
 /* ── Motiv-Editor ─────────────────────────────────────────────────────── */
 .motiv-editor { display: flex; flex-direction: column; gap: var(--space-2xs); }
@@ -179,6 +245,11 @@
   font-size: var(--font-size-xs);
   color: var(--color-text);
 }
+/* Werkstatt-Figur (draft_figures) vs. Katalog-Figur optisch unterscheidbar. */
+.motiv-chip--werkstatt {
+  border-color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 12%, var(--color-tag-bg));
+}
 .motiv-chip button {
   border: none;
   background: none;
@@ -190,6 +261,11 @@
 }
 .motiv-chip button:hover { color: var(--color-err-text); }
 .motiv-relation-add { display: flex; align-items: center; gap: var(--space-2xs); flex-wrap: wrap; }
+/* Ziel-Combobox + Typ-Feld auf stabile Flex-Basen: min-width:0 lässt den
+   gewählten Motivnamen im Trigger ellipsieren, statt die Combobox zu dehnen —
+   sonst verschiebt die Auswahl das benachbarte Freitextfeld. */
+.motiv-relation-add > .combobox-wrap,
+.motiv-relation-add > .motiv-inline-input { flex: 1 1 40%; min-width: 0; width: auto; }
 
 /* ── Mobile: gestapelt ────────────────────────────────────────────────── */
 @media (max-width: 960px) {
@@ -197,4 +273,27 @@
   .motiv-graph-container { height: clamp(300px, 60vh, 480px); }
   .motiv-panel { max-height: none; }
   .motiv-layer-toggles { margin-left: 0; }
+}
+
+/* ── Scan-Status-Hinweis (semantische Erkennung an/aus + Embeddings-Refresh) ── */
+.motiv-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  margin-bottom: var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+}
+.motiv-hint .icon { flex-shrink: 0; }
+.motiv-hint--action { justify-content: space-between; }
+.motiv-hint-text { min-width: 0; }
+
+/* Fundstelle im Seitentext (::highlight — global, gesetzt von book/motiv/highlight.js).
+   Semi-transparenter Akzent, funktioniert in Light + Dark ohne DOM-Mutation. */
+::highlight(motiv-hit) {
+  background-color: rgba(124, 58, 237, 0.32);
+  color: inherit;
 }

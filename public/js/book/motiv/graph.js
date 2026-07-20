@@ -5,24 +5,33 @@
 // keinen State mit dem Figuren-Graph.
 
 import { loadVis } from '../../lazy-libs.js';
+import { fetchJson } from '../../utils.js';
 
-// Themen-Palette (deterministisch nach Index; Motive erben die Farbe ihres Themas).
+// Themen-Palette: primär die vom Autor gewählte Farbe (themes.farbe = Palette-
+// Schlüssel, theme-aware --palette-*-Tokens wie in der Plot-Werkstatt); ohne Wahl
+// deterministisch nach Index. Motive erben die Farbe ihres Themas.
+export const THEME_COLOR_KEYS = ['blue', 'green', 'amber', 'orange', 'red', 'wine', 'pink', 'purple', 'brown', 'gray'];
 const THEME_PALETTE = ['#4a52a0', '#0f766e', '#b45309', '#9333ea', '#be123c', '#15803d', '#0369a1', '#a16207'];
 const NEUTRAL = '#8a8f98';
 const LAYER = { figure: '#0891b2', beat: '#7c3a48', chapter: '#65758b' };
 
-function _themeColor(themeId, themes) {
+// paletteVars: Palette-Schlüssel → konkreter Farbwert (vis-network zeichnet auf
+// Canvas, CSS-Custom-Props werden dort NICHT aufgelöst → zur Render-Zeit gelesen).
+function _themeColor(themeId, themes, paletteVars) {
   const ix = themes.findIndex(t => t.id === themeId);
-  return ix >= 0 ? THEME_PALETTE[ix % THEME_PALETTE.length] : NEUTRAL;
+  if (ix < 0) return NEUTRAL;
+  const chosen = themes[ix].farbe;
+  if (chosen && paletteVars && paletteVars[chosen]) return paletteVars[chosen];
+  return THEME_PALETTE[ix % THEME_PALETTE.length];
 }
 
 export const graphMethods = {
   _graphSignature() {
     const m = this.motifs.map(x =>
-      `${x.id}:${x.theme_id || 0}:${x.occurrenceCount || 0}:${(x.figures || []).length}:${(x.beats || []).length}:${(x.chapters || []).length}`
+      `${x.id}:${x.theme_id || 0}:${x.occurrenceCount || 0}:${(x.figures || []).length}:${(x.draftFigures || []).length}:${(x.beats || []).length}:${(x.chapters || []).length}`
     ).join('|');
     const r = this.relations.map(x => `${x.from_motif_id}-${x.to_motif_id}:${x.typ}`).join('|');
-    const t = this.themes.map(x => x.id).join(',');
+    const t = this.themes.map(x => `${x.id}:${x.farbe || ''}`).join(',');
     const layers = `${this.layerFigures}${this.layerBeats}${this.layerChapters}`;
     return [m, r, t, layers, this.$store.shell?.uiLocale].join('##');
   },
@@ -60,6 +69,11 @@ export const graphMethods = {
     const textColor = cs.color || '#333';
     const bgColor = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' ? cs.backgroundColor : '#fff';
     const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--color-muted').trim() || textColor;
+    // Gewählte Theme-Farben (Palette-Schlüssel → konkreter Wert) einmal aus den
+    // --palette-*-Tokens auflösen (theme-aware; Canvas löst CSS-Vars nicht auf).
+    const rootCS = getComputedStyle(document.documentElement);
+    const paletteVars = {};
+    for (const k of THEME_COLOR_KEYS) paletteVars[k] = rootCS.getPropertyValue(`--palette-${k}`).trim();
 
     const nodes = [];
     const edges = [];
@@ -67,9 +81,13 @@ export const graphMethods = {
     // Themen-Anker. shape:'circle' rendert das Label INNERHALB der farbigen
     // Blase (wächst mit dem Text) — dafür ist die weisse Schrift gedacht.
     for (const t of this.themes) {
+      const tc = _themeColor(t.id, this.themes, paletteVars);
       nodes.push({
         id: `t${t.id}`, label: t.name, shape: 'circle', margin: 10, widthConstraint: { maximum: 140 },
-        color: { background: _themeColor(t.id, this.themes), border: _themeColor(t.id, this.themes) },
+        // highlight/hover explizit auf die Thema-Farbe: sonst kippt vis-network die
+        // Blase bei Selektion/Hover auf seine hellblaue Default-Farbe → weisse
+        // Schrift wird unlesbar. Selektion signalisiert stattdessen borderWidthSelected.
+        color: { background: tc, border: tc, highlight: { background: tc, border: tc }, hover: { background: tc, border: tc } },
         font: { color: '#fff', size: 14 },
       });
     }
@@ -77,14 +95,22 @@ export const graphMethods = {
     // Motiv-Naben (Grösse = Ist-Dichte; Geist = geplant aber 0 Fundstellen).
     const figCatalog = this.$store.catalog.figuren || [];
     for (const m of this.motifs) {
-      const col = _themeColor(m.theme_id, this.themes);
+      const col = _themeColor(m.theme_id, this.themes, paletteVars);
       const ghost = this.isGhost(m);
       const size = 10 + Math.min(28, (m.occurrenceCount || 0) * 3);
+      // highlight/hover explizit auf die Motiv-Farbe (wie bei den Thema-Knoten):
+      // sonst kippt vis-network den Punkt bei Selektion/Hover auf seine hellblaue
+      // Default-Farbe (Klick selektiert via _highlightNode) und die Thema-Farbe geht
+      // verloren — Geist-Knoten würden dabei sogar solide gefüllt. Selektion
+      // signalisiert stattdessen borderWidthSelected.
+      const mBg = ghost ? 'rgba(0,0,0,0)' : col;
       nodes.push({
         id: `m${m.id}`, label: m.name, shape: 'dot', size,
-        color: ghost
-          ? { background: 'rgba(0,0,0,0)', border: col }
-          : { background: col, border: col },
+        color: {
+          background: mBg, border: col,
+          highlight: { background: mBg, border: col },
+          hover: { background: mBg, border: col },
+        },
         borderWidth: ghost ? 2 : 1,
         shapeProperties: ghost ? { borderDashes: [4, 4] } : { borderDashes: false },
         font: { color: textColor, size: 13 },
@@ -100,6 +126,14 @@ export const graphMethods = {
           if (!nodes.some(n => n.id === nid)) {
             const cat = figCatalog.find(x => x.fig_id === f.figId);
             nodes.push({ id: nid, label: (cat?.name || f.name || '?'), shape: 'diamond', size: 9, color: LAYER.figure, font: { color: mutedColor, size: 11 } });
+          }
+          edges.push({ from: `m${m.id}`, to: nid, dashes: [2, 3], color: { color: LAYER.figure, opacity: 0.6 }, width: 1 });
+        }
+        // Werkstatt-Figuren (draft_figures) — gleiche Ebene, eigener Knoten-Namespace.
+        for (const f of (m.draftFigures || [])) {
+          const nid = `df${f.id}`;
+          if (!nodes.some(n => n.id === nid)) {
+            nodes.push({ id: nid, label: (f.name || '?'), shape: 'diamond', size: 9, color: LAYER.figure, font: { color: mutedColor, size: 11 } });
           }
           edges.push({ from: `m${m.id}`, to: nid, dashes: [2, 3], color: { color: LAYER.figure, opacity: 0.6 }, width: 1 });
         }
@@ -130,10 +164,21 @@ export const graphMethods = {
       });
     }
 
+    // Persistierte Anordnung anwenden: Knoten mit gespeicherter Position starten dort
+    // und werden während der Stabilisierung fixiert (Physik ordnet nur die neuen/noch
+    // unplatzierten Knoten drumherum). Sind alle Knoten platziert → Physik gar nicht
+    // erst starten. Nach Stabilisierung werden die Pins gelöst (Ziehen bleibt frei).
+    const saved = this._savedPositions || {};
+    for (const n of nodes) {
+      const p = saved[n.id];
+      if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) { n.x = p.x; n.y = p.y; n.fixed = true; }
+    }
+    const allPlaced = nodes.length > 0 && nodes.every(n => n.fixed);
+
     this._motivNodes = new window.vis.DataSet(nodes);
     this._motivEdges = new window.vis.DataSet(edges);
     this._motivNetwork = new window.vis.Network(container, { nodes: this._motivNodes, edges: this._motivEdges }, {
-      physics: { enabled: true, barnesHut: { gravitationalConstant: -6000, springLength: 130, springConstant: 0.04, damping: 0.5 }, stabilization: { iterations: 180 } },
+      physics: { enabled: !allPlaced, barnesHut: { gravitationalConstant: -6000, springLength: 130, springConstant: 0.04, damping: 0.5 }, stabilization: { iterations: 180 } },
       interaction: { hover: true, dragNodes: true, tooltipDelay: 120 },
       nodes: { borderWidthSelected: 3 },
       edges: { selectionWidth: 1 },
@@ -151,11 +196,43 @@ export const graphMethods = {
       const nid = this._motivNetwork?.getNodeAt(params.pointer.DOM);
       this.openGraphMenu(params.event, nid);
     });
-    // Nach der Stabilisierung Physik einfrieren (ruhiges Bild, weiter zieh-/zoombar).
-    this._motivNetwork.once('stabilizationIterationsDone', () => {
-      this._motivNetwork?.setOptions({ physics: { enabled: false } });
-      if (this.selectedMotifId) this._highlightNode(this.selectedMotifId);
+    // Nach dem Ziehen eines Knotens die Anordnung persistieren (debounced).
+    this._motivNetwork.on('dragEnd', (params) => {
+      if (params.nodes?.length) this._scheduleLayoutSave();
     });
+
+    // Nach der Stabilisierung Physik einfrieren (ruhiges Bild, weiter zieh-/zoombar)
+    // und die Start-Pins der gespeicherten Knoten lösen. Sind alle Knoten bereits
+    // platziert, lief keine Stabilisierung → direkt nachziehen.
+    const afterStable = () => {
+      this._motivNetwork?.setOptions({ physics: { enabled: false } });
+      const release = nodes.filter(n => n.fixed).map(n => ({ id: n.id, fixed: false }));
+      if (release.length) this._motivNodes?.update(release);
+      if (this.selectedMotifId) this._highlightNode(this.selectedMotifId);
+    };
+    if (allPlaced) afterStable();
+    else this._motivNetwork.once('stabilizationIterationsDone', afterStable);
+  },
+
+  // Knoten-Positionen debounced speichern (mehrere Drags koaleszieren).
+  _scheduleLayoutSave() {
+    clearTimeout(this._layoutSaveTimer);
+    this._layoutSaveTimer = setTimeout(() => this._saveLayout(), 500);
+  },
+
+  async _saveLayout() {
+    if (!this._motivNetwork) return;
+    const bookId = this.$store.nav.selectedBookId;
+    if (!bookId) return;
+    const positions = this._motivNetwork.getPositions();
+    this._savedPositions = positions; // lokal spiegeln, damit Re-Render die Anordnung hält
+    try {
+      await fetchJson('/motifs/layout', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: bookId, positions }),
+      });
+    } catch (e) { /* Layout ist reine Ansicht — Fehler nicht hart melden */ }
   },
 
   _highlightNode(motifId) {
@@ -178,6 +255,26 @@ export const graphMethods = {
 
   fitGraph() {
     this._motivNetwork?.fit({ animation: { duration: 400 } });
+  },
+
+  // Gespeicherte Anordnung verwerfen → Physik-Layout frisch berechnen. Persistiert
+  // das leere Layout sofort (kein ausstehender Drag-Save überschreibt es wieder).
+  async resetLayout() {
+    clearTimeout(this._layoutSaveTimer);
+    this._layoutSaveTimer = null;
+    this._savedPositions = {};
+    const bookId = this.$store.nav.selectedBookId;
+    if (bookId) {
+      try {
+        await fetchJson('/motifs/layout', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book_id: bookId, positions: {} }),
+        });
+      } catch (e) { /* Layout ist reine Ansicht — Fehler nicht hart melden */ }
+    }
+    this._motivHash = ''; // Signatur-Guard umgehen → Neu-Layout erzwingen
+    this.renderMotivGraph();
   },
 
   // ── Graph-Kontextmenü (Rechtsklick auf Knoten / leere Fläche) ────────────

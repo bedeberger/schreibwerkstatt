@@ -48,15 +48,17 @@ export const brainstormMethods = {
   },
 
   // Vorschlag übernehmen → Theme bzw. Motiv anlegen, dann aus der Liste nehmen.
+  // Motiv-Vorschläge dürfen beim Übernehmen einem Thema zugeordnet werden
+  // (s.themeIdDraft aus der Combobox in der Vorschlagskarte).
   async adoptSuggestion(s) {
     const bookId = this.$store.nav.selectedBookId;
     try {
       if (s.typ === 'thema') {
         await _json('/motifs/themes', 'POST', { book_id: bookId, name: s.name, beschreibung: s.beschreibung });
       } else {
-        await _json('/motifs', 'POST', {
-          book_id: bookId, name: s.name, beschreibung: s.beschreibung, trigger_terms: s.trigger_terms || [],
-        });
+        const body = { book_id: bookId, name: s.name, beschreibung: s.beschreibung, trigger_terms: s.trigger_terms || [] };
+        if (s.themeIdDraft) body.theme_id = Number(s.themeIdDraft);
+        await _json('/motifs', 'POST', body);
       }
       this.dismissSuggestion(s);
       await this.loadBoard();
