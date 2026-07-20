@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "0f5d9fd9f0179422";
+self.__SHELL_BUILD = "b8a567875df07d52";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-backup.css",
   "/css/admin/admin-home.css",
@@ -38,6 +38,7 @@ self.__SHELL_MANIFEST = [
   "/css/book/export-shared.css",
   "/css/book/export.css",
   "/css/book/header-actions.css",
+  "/css/book/motiv.css",
   "/css/book/pdf-export.css",
   "/css/book/plot/board.css",
   "/css/book/plot/swimlane.css",
@@ -206,6 +207,11 @@ self.__SHELL_MANIFEST = [
   "/js/book/kapitel-review.js",
   "/js/book/kontinuitaet.js",
   "/js/book/lektorat-time.js",
+  "/js/book/motiv.js",
+  "/js/book/motiv/crud.js",
+  "/js/book/motiv/graph.js",
+  "/js/book/motiv/lifecycle.js",
+  "/js/book/motiv/scan.js",
   "/js/book/orte-map.js",
   "/js/book/orte.js",
   "/js/book/page-view.js",
@@ -302,6 +308,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/kapitel-review-card.js",
   "/js/cards/kontinuitaet-card.js",
   "/js/cards/lektorat-findings-card.js",
+  "/js/cards/motiv-card.js",
   "/js/cards/my-stats-card.js",
   "/js/cards/my-stats-category.js",
   "/js/cards/my-stats-compute.js",
@@ -600,6 +607,7 @@ self.__SHELL_MANIFEST = [
   "/partials/kapitelreview.html",
   "/partials/komplett-status.html",
   "/partials/kontinuitaet.html",
+  "/partials/motiv.html",
   "/partials/my-stats-book-goals.html",
   "/partials/my-stats-insights.html",
   "/partials/my-stats-rhythm.html",

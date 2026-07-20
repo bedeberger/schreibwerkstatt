@@ -22,6 +22,7 @@ import { registerOrteCard } from '../cards/orte-card.js';
 import { registerSongsCard } from '../cards/songs-card.js';
 import { registerSzenenCard } from '../cards/szenen-card.js';
 import { registerPlotCard } from '../cards/plot-card.js';
+import { registerMotivCard } from '../cards/motiv-card.js';
 import { registerWorldFactsCard } from '../cards/world-facts-card.js';
 import { registerFigurenCard } from '../cards/figuren-card.js';
 import { registerFigurWerkstattCard } from '../cards/figur-werkstatt-card.js';
@@ -175,6 +176,7 @@ export function registerAllCards() {
   registerSongsCard();
   registerSzenenCard();
   registerPlotCard();
+  registerMotivCard();
   registerWorldFactsCard();
   registerFigurenCard();
   registerFigurWerkstattCard();

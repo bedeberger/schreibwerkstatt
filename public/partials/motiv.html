@@ -1,0 +1,205 @@
+<!-- Motiv-Werkstatt (Themen & Motive als Konstellation) -->
+<!--
+  Alpine.data-Sub-Komponente — siehe public/js/cards/motiv-card.js.
+  Themen = Cluster, Motive = Naben (Grösse = Ist-Dichte aus motif_occurrences),
+  Motiv↔Motiv-Beziehungen = Kanten, Soll-Layer (Figuren/Beats/Kapitel) zuschaltbar.
+  KI-Motiverkennung (Job motif-scan) füllt den Ist-Index; nie generativ im Text.
+-->
+<div class="card card--motiv" x-data="motivCard" x-show="$app.showMotivCard" x-cloak>
+  <div class="card-header card-header--subline">
+    <div class="card-header-titlebar">
+      <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
+      <span class="card-title" x-text="$app.t('motiv.title')"></span>
+      <div class="card-subline" x-show="motifs.length > 0">
+        <span class="card-timestamp"
+              x-text="$app.t('motiv.stats', { motifs: motivStats().motifs, themes: motivStats().themes, withOcc: motivStats().withOcc, ghosts: motivStats().ghosts })"></span>
+      </div>
+    </div>
+    <div class="card-header-aside">
+      <div class="card-actions card-actions--grouped">
+        <button type="button" class="icon-btn icon-btn--ghost"
+                @click="runScan()" :disabled="scanning || !motifs.length"
+                :data-tip="$app.t('motiv.scan.run')" :aria-label="$app.t('motiv.scan.run')">
+          <span x-show="scanning" class="spinner"></span>
+          <svg x-show="!scanning" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scan"/></svg>
+        </button>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="fitGraph()"
+                :data-tip="$app.t('motiv.graph.fit')" :aria-label="$app.t('motiv.graph.fit')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#maximize-2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scan-Fortschritt -->
+  <div class="motiv-progress" x-show="scanning" x-cloak>
+    <div class="progress-bar" :style="{ '--progress': scanProgress + '%' }"></div>
+  </div>
+
+  <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>
+
+  <!-- Anlege-Leiste -->
+  <div class="motiv-toolbar">
+    <div class="motiv-toolbar-group">
+      <input type="text" class="motiv-add-input" x-model="newThemeName" data-spellcheck="spelling"
+             :placeholder="$app.t('motiv.theme.namePlaceholder')" @keydown.enter="addTheme()">
+      <button type="button" class="btn-compact" @click="addTheme()" :disabled="busy || !newThemeName.trim()" x-text="$app.t('motiv.theme.add')"></button>
+    </div>
+    <div class="motiv-toolbar-group">
+      <input type="text" class="motiv-add-input" x-model="newMotifName" data-spellcheck="spelling"
+             :placeholder="$app.t('motiv.motif.namePlaceholder')" @keydown.enter="addMotif()">
+      <div class="motiv-theme-select" x-data="combobox($app.t('motiv.motif.themeOptional'), $app.t('motiv.noTheme'))"
+           x-modelable="value" x-model="newMotifThemeId" x-effect="options = themeOptions()"></div>
+      <button type="button" class="btn-compact" @click="addMotif()" :disabled="busy || !newMotifName.trim()" x-text="$app.t('motiv.motif.add')"></button>
+    </div>
+    <div class="motiv-toolbar-group motiv-layer-toggles">
+      <button type="button" class="motiv-layer-btn" :class="{ 'is-active': layerFigures }" @click="toggleLayer('figures')" x-text="$app.t('motiv.layer.figures')"></button>
+      <button type="button" class="motiv-layer-btn" :class="{ 'is-active': layerBeats }" @click="toggleLayer('beats')" x-text="$app.t('motiv.layer.beats')"></button>
+      <button type="button" class="motiv-layer-btn" :class="{ 'is-active': layerChapters }" @click="toggleLayer('chapters')" x-text="$app.t('motiv.layer.chapters')"></button>
+    </div>
+  </div>
+
+  <div class="motiv-layout">
+    <!-- Konstellations-Graph -->
+    <div id="motiv-graph" class="motiv-graph-container" role="img" :aria-label="$app.t('motiv.graph.ariaLabel')"></div>
+
+    <!-- Seitenpanel -->
+    <aside class="motiv-panel">
+      <!-- Ohne Auswahl: Themen-Liste + Hinweis -->
+      <template x-if="!selectedMotif()">
+        <div>
+          <p class="muted-msg" x-show="motifs.length" x-text="$app.t('motiv.panel.pickHint')"></p>
+          <p class="muted-msg" x-show="!motifs.length" x-text="$app.t('motiv.empty.hint')"></p>
+          <div class="motiv-theme-list" x-show="themes.length">
+            <h4 class="motiv-panel-heading" x-text="$app.t('motiv.theme.listTitle')"></h4>
+            <template x-for="t in themes" :key="t.id">
+              <div class="motiv-theme-row">
+                <input type="text" class="motiv-inline-input" :value="t.name" data-spellcheck="spelling"
+                       @change="renameTheme(t, $event.target.value)">
+                <button type="button" class="icon-btn icon-btn--ghost" @click="deleteTheme(t)"
+                        :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- Mit Auswahl: Motiv-Editor -->
+      <template x-if="selectedMotif()">
+        <div class="motiv-editor">
+          <div class="motiv-editor-head">
+            <input type="text" class="motiv-name-input" :value="selectedMotif().name" data-spellcheck="spelling"
+                   @change="saveMotifName(selectedMotif(), $event.target.value)">
+            <button type="button" class="icon-btn icon-btn--ghost" @click="deleteMotif(selectedMotif())"
+                    :data-tip="$app.t('motiv.motif.delete')" :aria-label="$app.t('motiv.motif.delete')">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+            </button>
+          </div>
+
+          <label class="motiv-field-label" x-text="$app.t('motiv.motif.theme')"></label>
+          <div x-data="combobox($app.t('motiv.motif.themeOptional'), $app.t('motiv.noTheme'))"
+               x-modelable="value" x-model="editThemeId" x-effect="options = themeOptions()"
+               @combobox-change="saveMotifTheme(selectedMotif(), editThemeId)"></div>
+
+          <label class="motiv-field-label" x-text="$app.t('motiv.motif.beschreibung')"></label>
+          <textarea class="motiv-textarea" rows="3" data-spellcheck="spelling"
+                    :placeholder="$app.t('motiv.motif.beschreibungHint')"
+                    @change="saveMotifBeschreibung(selectedMotif(), $event.target.value)"
+                    x-text="selectedMotif().beschreibung"></textarea>
+
+          <label class="motiv-field-label" x-text="$app.t('motiv.motif.triggers')"></label>
+          <input type="text" class="motiv-inline-input" :value="(selectedMotif().trigger_terms || []).join(', ')"
+                 :placeholder="$app.t('motiv.motif.triggersHint')"
+                 @change="saveMotifTriggers(selectedMotif(), $event.target.value)">
+
+          <!-- Ist: Fundstellen -->
+          <h4 class="motiv-panel-heading">
+            <span x-text="$app.t('motiv.occ.title')"></span>
+            <span class="badge" x-text="selectedMotif().occurrenceCount || 0"></span>
+          </h4>
+          <p class="muted-msg" x-show="!occLoading && !occurrences.length" x-text="$app.t('motiv.occ.empty')"></p>
+          <div class="motiv-occ-list">
+            <template x-for="o in occurrences" :key="o.id">
+              <button type="button" class="motiv-occ-row internal-link" @click="gotoOccurrence(o)">
+                <span class="motiv-occ-loc" x-text="o.page_name ? ((o.chapter_name ? o.chapter_name + ': ' : '') + o.page_name) : (o.scene_titel || '')"></span>
+                <span class="motiv-occ-snip" x-text="o.snippet" x-show="o.snippet"></span>
+                <span class="badge-source" x-text="$app.t('motiv.occ.source.' + o.source)"></span>
+              </button>
+            </template>
+          </div>
+
+          <!-- Soll: Verknüpfungen -->
+          <h4 class="motiv-panel-heading" x-text="$app.t('motiv.links.title')"></h4>
+          <div class="motiv-link-group">
+            <span class="motiv-field-label" x-text="$app.t('motiv.link.figures')"></span>
+            <div class="motiv-chip-row">
+              <template x-for="f in selectedMotif().figures" :key="f.figId">
+                <span class="motiv-chip"><span x-text="f.name"></span>
+                  <button type="button" @click="toggleLink('figures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+              </template>
+            </div>
+            <div x-data="combobox($app.t('motiv.link.addFigure'), '')" x-modelable="value" x-model="linkFigTmp"
+                 x-effect="options = ($store.catalog.figuren||[]).map(f=>({value:f.fig_id,label:f.name}))"
+                 @combobox-change="if(linkFigTmp){ addLink('figures', linkFigTmp); linkFigTmp='' }"></div>
+          </div>
+          <div class="motiv-link-group">
+            <span class="motiv-field-label" x-text="$app.t('motiv.link.beats')"></span>
+            <div class="motiv-chip-row">
+              <template x-for="b in selectedMotif().beats" :key="b.id">
+                <span class="motiv-chip"><span x-text="b.titel"></span>
+                  <button type="button" @click="toggleLink('beats', b)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+              </template>
+            </div>
+            <div x-data="combobox($app.t('motiv.link.addBeat'), '')" x-modelable="value" x-model="linkBeatTmp"
+                 x-effect="options = (allBeats||[]).map(b=>({value:String(b.id),label:b.titel||'?'}))"
+                 @combobox-change="if(linkBeatTmp){ addLink('beats', linkBeatTmp); linkBeatTmp='' }"></div>
+          </div>
+          <div class="motiv-link-group">
+            <span class="motiv-field-label" x-text="$app.t('motiv.link.chapters')"></span>
+            <div class="motiv-chip-row">
+              <template x-for="c in selectedMotif().chapters" :key="c.id">
+                <span class="motiv-chip"><span x-text="c.name"></span>
+                  <button type="button" @click="toggleLink('chapters', c)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+              </template>
+            </div>
+            <div x-data="combobox($app.t('motiv.link.addChapter'), '')" x-modelable="value" x-model="linkChapTmp"
+                 x-effect="options = ($store.nav.tree||[]).filter(t=>t.type==='chapter' && !String(t.id).startsWith('solo-')).map(c=>({value:String(c.id),label:c.name}))"
+                 @combobox-change="if(linkChapTmp){ addLink('chapters', linkChapTmp); linkChapTmp='' }"></div>
+          </div>
+          <div class="motiv-link-group">
+            <span class="motiv-field-label" x-text="$app.t('motiv.link.pages')"></span>
+            <div class="motiv-chip-row">
+              <template x-for="p in selectedMotif().pages" :key="p.id">
+                <span class="motiv-chip"><span x-text="p.name"></span>
+                  <button type="button" @click="toggleLink('pages', p)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+              </template>
+            </div>
+            <div x-data="combobox($app.t('motiv.link.addPage'), '')" x-modelable="value" x-model="linkPageTmp"
+                 x-effect="options = ($store.nav.pages||[]).map(p=>({value:String(p.id),label:p.name}))"
+                 @combobox-change="if(linkPageTmp){ addLink('pages', linkPageTmp); linkPageTmp='' }"></div>
+          </div>
+
+          <!-- Motiv ↔ Motiv -->
+          <h4 class="motiv-panel-heading" x-text="$app.t('motiv.relations.title')"></h4>
+          <div class="motiv-chip-row">
+            <template x-for="r in relationsForSelected()" :key="r.id">
+              <span class="motiv-chip">
+                <span x-text="(r.outgoing ? '→ ' : '← ') + r.otherName + ' (' + r.typ + ')'"></span>
+                <button type="button" @click="deleteRelation(r)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+            </template>
+          </div>
+          <div class="motiv-relation-add">
+            <div x-data="combobox($app.t('motiv.relations.target'), '')" x-modelable="value" x-model="newRelationTargetId"
+                 x-effect="options = motifs.filter(m=>m.id!==selectedMotifId).map(m=>({value:String(m.id),label:m.name}))"></div>
+            <input type="text" class="motiv-inline-input" x-model="newRelationTyp" data-spellcheck="spelling"
+                   :placeholder="$app.t('motiv.relations.typPlaceholder')" @keydown.enter="addRelation()">
+            <button type="button" class="btn-compact" @click="addRelation()"
+                    :disabled="!newRelationTargetId || !newRelationTyp.trim()" x-text="$app.t('motiv.relations.add')"></button>
+          </div>
+        </div>
+      </template>
+    </aside>
+  </div>
+</div>

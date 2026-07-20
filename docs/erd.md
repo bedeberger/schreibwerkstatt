@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 242, 119 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 243, 127 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -77,6 +77,15 @@ erDiagram
   books ||--o{ plot_brainstorm_runs  : has
   plot_acts ||--o| plot_brainstorm_runs : "for act"
   plot_threads ||--o| plot_brainstorm_runs : "for thread"
+  books ||--o{ themes                : has
+  books ||--o{ motifs                : has
+  themes ||--o{ motifs               : clusters
+  motifs ||--o{ motif_relations      : "motif ↔ motif"
+  motifs ||--o{ motif_figures        : "soll figure"
+  motifs ||--o{ motif_beats          : "soll beat"
+  motifs ||--o{ motif_chapters       : "soll chapter"
+  motifs ||--o{ motif_pages          : "soll page"
+  motifs ||--o{ motif_occurrences    : "detected (ist)"
   plot_beats ||--o{ plot_beat_figures : has
   figures ||--o{ plot_beat_figures   : "appears in beat"
   plot_beats ||--o{ plot_beat_draft_figures : has
@@ -925,6 +934,90 @@ erDiagram
 ```
 
 **Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). Optionale zweite Ordnungsachse sind die Handlungsstränge (`plot_threads`, Swimlanes, geordnet via `position`) — das Board wird ein Raster Akte × Stränge, ein Beat sitzt in der Zelle (`act_id`, `thread_id`). `thread_id` (SET NULL) ist die Strang-Zuordnung (NULL = „ohne Strang"-Lane; null Stränge = flaches Board); ein Strang ist optional an eine Katalog-Figur (`figure_id`) ODER Werkstatt-Figur (`draft_figure_id`) gebunden (beide SET NULL — Hauptfigur-Strang). `status` ist binär (`geplant` = Idee ↔ `im_buch` = eingearbeitet); `verworfen` (0/1) ist eine eigene, orthogonale Achse (ausgemustert, bleibt bei Status-Wechsel erhalten); `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text. `plot_consistency_runs` historisiert jede Konsistenz-Prüfung als kompletten Result-JSON (`konflikte` + `fazit`, `konflikt_count` denormalisiert fürs Listen-Rendering) — `ON DELETE CASCADE` auf `book_id`, pro (Buch, User) skopiert; das Frontend zeigt einen klappbaren Prüfungs-Verlauf, Klick lädt einen Lauf wie ein Live-Resultat ins Consistency-Panel. `plot_brainstorm_runs` historisiert analog jeden Brainstorm-Lauf (`result_json` = `vorschlaege`, `vorschlag_count` denormalisiert), zusätzlich pro `act_id`/`thread_id` (beide **SET NULL** — ein gelöschter Akt/Strang entkoppelt den Lauf nur, der Name kommt zur Lesezeit per JOIN, kein Snapshot); Klick lädt die Vorschläge zurück ins Inline-Panel des Akts/der Zelle.
+
+### 4a · Motiv-Werkstatt (Themen & Motive als Konstellation)
+
+```mermaid
+erDiagram
+  themes {
+    INTEGER id           PK
+    INTEGER book_id      FK "CASCADE"
+    TEXT    user_email
+    TEXT    name
+    TEXT    beschreibung
+    TEXT    farbe         "optionaler Akzent (Cluster-Farbe)"
+    INTEGER position
+    TEXT    created_at
+    TEXT    updated_at
+  }
+  motifs {
+    INTEGER id            PK
+    INTEGER book_id       FK "CASCADE"
+    TEXT    user_email
+    INTEGER theme_id      FK "SET NULL — Thema löschen lässt Motiv stehen"
+    TEXT    name
+    TEXT    beschreibung   "semantische Query-Basis der Erkennung"
+    TEXT    trigger_terms  "JSON-Array wörtlicher Trigger (FTS-Teil)"
+    TEXT    farbe
+    INTEGER position
+    TEXT    created_at
+    TEXT    updated_at
+  }
+  motif_relations {
+    INTEGER id            PK
+    INTEGER from_motif_id FK "CASCADE"
+    INTEGER to_motif_id   FK "CASCADE"
+    TEXT    typ            "Freitext: verstärkt|kontrastiert|spiegelt"
+    TEXT    created_at
+  }
+  motif_figures {
+    INTEGER motif_id  FK "PK, CASCADE"
+    INTEGER figure_id FK "PK, CASCADE"
+  }
+  motif_beats {
+    INTEGER motif_id FK "PK, CASCADE"
+    INTEGER beat_id  FK "PK, CASCADE"
+  }
+  motif_chapters {
+    INTEGER motif_id   FK "PK, CASCADE"
+    INTEGER chapter_id FK "PK, CASCADE"
+  }
+  motif_pages {
+    INTEGER motif_id FK "PK, CASCADE"
+    INTEGER page_id  FK "PK, CASCADE"
+  }
+  motif_occurrences {
+    INTEGER id         PK
+    INTEGER motif_id   FK "CASCADE"
+    INTEGER book_id    FK "CASCADE"
+    TEXT    kind        "page|scene (CHECK)"
+    INTEGER page_id    FK "CASCADE, nullable — bei kind=page"
+    INTEGER scene_id   FK "CASCADE, nullable — bei kind=scene"
+    REAL    score
+    TEXT    snippet
+    TEXT    source      "semantic|trigger (CHECK)"
+    TEXT    created_at
+  }
+
+  books    ||--o{ themes            : has
+  books    ||--o{ motifs            : has
+  themes   ||--o{ motifs            : "clusters (SET NULL)"
+  motifs   ||--o{ motif_relations   : "from"
+  motifs   ||--o{ motif_relations   : "to"
+  motifs   ||--o{ motif_figures     : refs
+  motifs   ||--o{ motif_beats       : refs
+  motifs   ||--o{ motif_chapters    : refs
+  motifs   ||--o{ motif_pages       : refs
+  motifs   ||--o{ motif_occurrences : "detected (ist)"
+  figures  ||--o{ motif_figures     : "soll"
+  plot_beats ||--o{ motif_beats     : "soll"
+  chapters ||--o{ motif_chapters    : "soll"
+  pages    ||--o{ motif_pages       : "soll"
+  pages    ||--o{ motif_occurrences : "ist"
+  figure_scenes ||--o{ motif_occurrences : "ist"
+```
+
+**Motiv-Werkstatt (Themen & Motive).** Planendes **und** überwachendes Pendant zur rückwärtsgewandten Textarbeit, visualisiert als kraftgerichtete Konstellation (vis-network). `themes` sind abstrakte Cluster, `motifs` die zentrale Nabe (jedes optional einem Thema zugeordnet, `theme_id` SET NULL). `motif_relations` sind die gerichteten Motiv-↔-Motiv-Kanten mit Freitext-`typ` (verstärkt/kontrastiert/spiegelt) — analog `figure_relations`. Vier **Soll**-Brücken verknüpfen ein Motiv mit `figures`/`plot_beats`/`chapters`/`pages` (wo es laut Plan tragen soll; alle CASCADE beidseitig). `motif_occurrences` ist der abgeleitete **Ist**-Index: wo die KI-Motiverkennung (Job `motif-scan`, hybrid aus Embedding-Cosinus + wörtlichem FTS über `trigger_terms`) das Motiv real im Text findet (`kind` page/scene, sentinel-frei via CHECK, Full-Replace pro Motiv je Scan). Der Soll-Ist-Abgleich (Bridges vs. Occurrences) treibt Knotengrösse (Ist-Dichte) und Geist-Knoten (geplant, aber fehlt) im Graphen. Pro Buch + User skopiert. Rein planend/überwachend, nie generativ in den Text.
 
 ---
 

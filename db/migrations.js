@@ -9201,6 +9201,125 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 242 abgeschlossen (book_settings.weltfakten_real_pruefen + continuity_issues.quelle).');
   }
 
+  if (version < 243) {
+    // Motiv-Werkstatt: planendes + überwachendes Pendant zur Themen-/Motivarbeit.
+    // Der User katalogisiert Themen (Cluster) und Motive (die konkrete Nabe) und
+    // verknüpft ein Motiv mit Figuren, Plot-Beats, Kapiteln und Seiten (Soll).
+    // Eine KI-Motiverkennung (Job motif-scan) findet die tatsächlichen Fundstellen
+    // im Text (Ist) → motif_occurrences. KI assistiert ausschliesslich planend/
+    // überwachend, schreibt nie in den Text. Pro Buch + User skopiert.
+
+    // Thema: abstrakter Cluster (Schuld & Vergebung, Preis der Freiheit).
+    db.exec(`CREATE TABLE IF NOT EXISTS themes (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email   TEXT    NOT NULL,
+        name         TEXT    NOT NULL,
+        beschreibung TEXT,
+        farbe        TEXT,
+        position     INTEGER NOT NULL DEFAULT 0,
+        created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_themes_book ON themes(book_id, user_email)');
+
+    // Motiv: die zentrale Nabe. theme_id SET NULL — ein Thema löschen lässt seine
+    // Motive stehen (sie fallen in „ohne Thema"). trigger_terms hält als JSON-Array
+    // wörtliche Trigger-Begriffe (Motiv „Wasser" → Regen, Fluss, ertrinken) für den
+    // FTS-Teil der Erkennung; NULL/[] = rein semantisch.
+    db.exec(`CREATE TABLE IF NOT EXISTS motifs (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id       INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email    TEXT    NOT NULL,
+        theme_id      INTEGER REFERENCES themes(id) ON DELETE SET NULL,
+        name          TEXT    NOT NULL,
+        beschreibung  TEXT,
+        trigger_terms TEXT,
+        farbe         TEXT,
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motifs_book ON motifs(book_id, user_email)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motifs_theme ON motifs(theme_id)');
+
+    // Motiv ↔ Motiv: gerichtete Beziehung mit Freitext-Typ (verstärkt/kontrastiert/
+    // spiegelt) — die Kanten der Motiv-Konstellation. UNIQUE verhindert Duplikate.
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_relations (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_motif_id INTEGER NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
+        to_motif_id   INTEGER NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
+        typ           TEXT    NOT NULL,
+        created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (from_motif_id, to_motif_id, typ)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_relations_from ON motif_relations(from_motif_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_relations_to ON motif_relations(to_motif_id)');
+
+    // Soll-Verknüpfungen: wo ein Motiv laut Plan auftauchen soll. Vier M:M-Bridges
+    // auf Figur / Beat / Kapitel / Seite, alle CASCADE auf beiden Seiten (reiner Link).
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_figures (
+        motif_id  INTEGER NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
+        figure_id INTEGER NOT NULL REFERENCES figures(id) ON DELETE CASCADE,
+        PRIMARY KEY (motif_id, figure_id)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_figures_figure ON motif_figures(figure_id)');
+
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_beats (
+        motif_id INTEGER NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
+        beat_id  INTEGER NOT NULL REFERENCES plot_beats(id) ON DELETE CASCADE,
+        PRIMARY KEY (motif_id, beat_id)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_beats_beat ON motif_beats(beat_id)');
+
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_chapters (
+        motif_id   INTEGER NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
+        chapter_id INTEGER NOT NULL REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        PRIMARY KEY (motif_id, chapter_id)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_chapters_chapter ON motif_chapters(chapter_id)');
+
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_pages (
+        motif_id INTEGER NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
+        page_id  INTEGER NOT NULL REFERENCES pages(page_id) ON DELETE CASCADE,
+        PRIMARY KEY (motif_id, page_id)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_pages_page ON motif_pages(page_id)');
+
+    // Ist (abgeleiteter Fund-Index): wo die Motiverkennung ein Motiv real im Text
+    // gefunden hat. Voller Full-Replace pro Motiv bei jedem Scan (kein content_hash —
+    // die Erkennung nutzt den bereits vorhandenen Embedding-/FTS-Index, ist billig).
+    // kind + genau eine gesetzte Ref via CHECK (sentinel-frei). source: semantic
+    // (Embedding-Cosinus) oder trigger (wörtlicher FTS-Treffer).
+    db.exec(`CREATE TABLE IF NOT EXISTS motif_occurrences (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        motif_id   INTEGER NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
+        book_id    INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        kind       TEXT    NOT NULL CHECK(kind IN ('page','scene')),
+        page_id    INTEGER REFERENCES pages(page_id) ON DELETE CASCADE,
+        scene_id   INTEGER REFERENCES figure_scenes(id) ON DELETE CASCADE,
+        score      REAL,
+        snippet    TEXT,
+        source     TEXT    NOT NULL CHECK(source IN ('semantic','trigger')),
+        created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        CHECK (
+          (kind = 'page'  AND page_id IS NOT NULL AND scene_id IS NULL) OR
+          (kind = 'scene' AND scene_id IS NOT NULL AND page_id IS NULL)
+        )
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_occurrences_motif ON motif_occurrences(motif_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_occurrences_book ON motif_occurrences(book_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_occurrences_page ON motif_occurrences(page_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_motif_occurrences_scene ON motif_occurrences(scene_id)');
+
+    const fkErrors243 = db.pragma('foreign_key_check');
+    if (fkErrors243.length) {
+      throw new Error(`Migration 243: foreign_key_check meldet ${fkErrors243.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 243').run();
+    logger.info('DB-Migration auf Version 243 abgeschlossen (Motiv-Werkstatt: themes + motifs + motif_relations + 4 Bridges + motif_occurrences).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

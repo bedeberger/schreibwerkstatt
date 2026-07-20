@@ -42,6 +42,7 @@
   .card--organizer        { --card-accent: var(--card-accent-organize); }
   .card--werkstatt        { --card-accent: var(--card-accent-werkstatt); }
   .card--plot             { --card-accent: var(--card-accent-plot); }
+  .card--motiv            { --card-accent: var(--card-accent-motiv); }
   .card--admin-usage      { --card-accent: var(--color-accent); }
   .card--admin-users      { --card-accent: var(--color-accent); }
   .card--admin-settings   { --card-accent: var(--color-accent); }

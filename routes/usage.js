@@ -30,6 +30,7 @@ const ALLOWED_KEYS = new Set([
   'songs',
   'ereignisse',
   'plot',
+  'motiv',
   'weltfakten',
   'recherche',
   'bookchat',

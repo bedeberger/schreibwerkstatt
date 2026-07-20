@@ -259,6 +259,7 @@ const cardsState = () => ({
   showGlobalZeitstrahl: false,
   showEreignisseCard: false,
   showPlotCard: false,
+  showMotivCard: false,
   showSzenenCard: false,
   showOrteCard: false,
   showSongsCard: false,

@@ -1,0 +1,81 @@
+// Motiv-Werkstatt — Lifecycle + abgeleitete Werte. Lädt den Graph-Payload
+// (Themen + Motive mit Soll-Links & Ist-Count + Beziehungen) und hält die
+// abgeleiteten Aggregate memoized. Rein rückwärtsgewandt/planend.
+
+import { fetchJson } from '../../utils.js';
+
+export const lifecycleMethods = {
+  // Ein Memo-Helper pro Modul (Array-Deps, shallow ===). Reset über this._memos = {}.
+  _memo(key, deps, fn) {
+    const prev = this._memos[key];
+    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) return prev.val;
+    const val = fn();
+    this._memos[key] = { deps, val };
+    return val;
+  },
+
+  async loadBoard() {
+    const bookId = this.$store.nav.selectedBookId;
+    if (!bookId) return;
+    this.loading = true;
+    this.errorMessage = '';
+    try {
+      const data = await fetchJson(`/motifs?book_id=${bookId}`);
+      this.themes = data.themes || [];
+      this.motifs = data.motifs || [];
+      this.relations = data.relations || [];
+      this._memos = {};
+      // Figuren fürs Figuren-Layer + Verknüpfungs-Combobox bereitstellen.
+      if (!this.$store.catalog.figuren?.length) window.__app.loadFiguren(bookId);
+      this.$nextTick(() => this.renderMotivGraph());
+    } catch (e) {
+      this.errorMessage = window.__app.t('motiv.error.load');
+    } finally {
+      this.loading = false;
+    }
+  },
+
+  resetMotiv() {
+    this._destroyGraph();
+    this.themes = [];
+    this.motifs = [];
+    this.relations = [];
+    this.selectedMotifId = null;
+    this.occurrences = [];
+    this.allBeats = [];
+    this._beatsLoaded = false;
+    this.errorMessage = '';
+    this._memos = {};
+  },
+
+  // ── Abgeleitete Werte ─────────────────────────────────────────────────────
+
+  motifById(id) {
+    return this.motifs.find(m => m.id === id) || null;
+  },
+
+  selectedMotif() {
+    return this.selectedMotifId ? this.motifById(this.selectedMotifId) : null;
+  },
+
+  // Ein Motiv gilt als „geplant, aber fehlt" (Geist), wenn es Soll-Verknüpfungen
+  // hat, aber die KI-Erkennung 0 Fundstellen fand.
+  isGhost(m) {
+    const linked = (m.figures?.length || 0) + (m.beats?.length || 0) + (m.chapters?.length || 0) + (m.pages?.length || 0);
+    return linked > 0 && (m.occurrenceCount || 0) === 0;
+  },
+
+  motivStats() {
+    return this._memo('stats', [this.motifs, this.themes], () => {
+      const withOcc = this.motifs.filter(m => (m.occurrenceCount || 0) > 0).length;
+      const ghosts = this.motifs.filter(m => this.isGhost(m)).length;
+      return { motifs: this.motifs.length, themes: this.themes.length, withOcc, ghosts };
+    });
+  },
+
+  // Themen-Optionen fürs Combobox (leere Option = „ohne Thema").
+  themeOptions() {
+    return this._memo('themeOptions', [this.themes], () =>
+      this.themes.map(t => ({ value: String(t.id), label: t.name })));
+  },
+};

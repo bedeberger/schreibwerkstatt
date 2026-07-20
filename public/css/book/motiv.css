@@ -1,0 +1,177 @@
+/* Motiv-Werkstatt (Themen & Motive als Konstellation).
+   Akzent: var(--card-accent) (Mapping in card-accents.css → --card-accent-motiv).
+   Layout: Graph links, Seitenpanel rechts; unter 960px gestapelt. */
+
+/* ── Anlege-/Layer-Leiste ─────────────────────────────────────────────── */
+.motiv-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-sm) 0;
+}
+.motiv-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.motiv-layer-toggles { margin-left: auto; }
+.motiv-add-input {
+  min-width: 8rem;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+.motiv-add-input:focus { border-color: var(--card-accent); outline: none; }
+.motiv-theme-select { min-width: 10rem; }
+
+.motiv-layer-btn {
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.motiv-layer-btn:hover { color: var(--color-text); }
+.motiv-layer-btn.is-active {
+  background: var(--card-accent);
+  border-color: var(--card-accent);
+  color: #fff;
+}
+
+.motiv-progress { padding: var(--space-2xs) 0 var(--space-xs); }
+
+/* ── Zwei-Spalten-Layout ──────────────────────────────────────────────── */
+.motiv-layout {
+  display: grid;
+  grid-template-columns: 1fr 20rem;
+  gap: var(--space-md);
+  align-items: stretch;
+}
+.motiv-graph-container {
+  min-height: 60vh;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+.motiv-panel {
+  min-width: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: var(--space-2xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* ── Themen-Liste (leere Auswahl) ─────────────────────────────────────── */
+.motiv-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin: var(--space-sm) 0 var(--space-2xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  border-left: 3px solid var(--card-accent);
+  padding-left: var(--space-xs);
+}
+.motiv-theme-list { display: flex; flex-direction: column; gap: var(--space-2xs); }
+.motiv-theme-row { display: flex; align-items: center; gap: var(--space-2xs); }
+
+/* ── Motiv-Editor ─────────────────────────────────────────────────────── */
+.motiv-editor { display: flex; flex-direction: column; gap: var(--space-2xs); }
+.motiv-editor-head { display: flex; align-items: center; gap: var(--space-2xs); }
+.motiv-name-input {
+  flex: 1;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.motiv-name-input:hover { border-color: var(--color-border); }
+.motiv-name-input:focus { border-color: var(--card-accent); background: var(--color-bg); outline: none; }
+.motiv-field-label {
+  margin-top: var(--space-2xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+.motiv-inline-input,
+.motiv-textarea {
+  width: 100%;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+.motiv-inline-input:focus,
+.motiv-textarea:focus { border-color: var(--card-accent); outline: none; }
+.motiv-textarea { resize: vertical; }
+
+/* ── Fundstellen (Ist) ────────────────────────────────────────────────── */
+.motiv-occ-list { display: flex; flex-direction: column; gap: var(--space-2xs); }
+.motiv-occ-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card-bg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+.motiv-occ-row:hover { border-color: var(--card-accent); }
+.motiv-occ-loc { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text); }
+.motiv-occ-snip {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Soll-Verknüpfungen + Beziehungen ─────────────────────────────────── */
+.motiv-link-group { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--space-2xs); }
+.motiv-chip-row { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
+.motiv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: 2px var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-tag-bg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text);
+}
+.motiv-chip button {
+  border: none;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  padding: 0;
+}
+.motiv-chip button:hover { color: var(--color-err-text); }
+.motiv-relation-add { display: flex; align-items: center; gap: var(--space-2xs); flex-wrap: wrap; }
+
+/* ── Mobile: gestapelt ────────────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .motiv-layout { grid-template-columns: 1fr; }
+  .motiv-graph-container { min-height: 50vh; }
+  .motiv-panel { max-height: none; }
+  .motiv-layer-toggles { margin-left: 0; }
+}

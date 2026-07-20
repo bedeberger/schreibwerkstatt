@@ -2367,6 +2367,7 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [book/plot/board.css](public/css/book/plot/board.css) | Plot-Werkstatt (Beat-Board / Kanban): Board-Layout, Spalten, Beat-Karten, Beat-Edit, Add-Beat/Akt, Vollbild + Mobile. |
 | [book/plot/widgets.css](public/css/book/plot/widgets.css) | Plot-Werkstatt-Widgets: KI-Brainstorm, Consistency-Panel, Coverage, Status-Verteilungsbalken, Akt-Farbpalette, Beat-Intensität, Spannungsbogen. Ergänzt plot/board.css. |
 | [book/plot/swimlane.css](public/css/book/plot/swimlane.css) | Plot-Werkstatt: Swimlane-Grid (Akte × Stränge) + Strang-Leiste. Ergänzt plot/board.css + plot/widgets.css. |
+| [book/motiv.css](public/css/book/motiv.css) | Motiv-Werkstatt (Themen & Motive als Konstellation): Anlege-/Layer-Leiste, Zwei-Spalten-Layout (Graph + Seitenpanel), Motiv-Editor, Fundstellen-Liste, Soll-Verknüpfungs-Chips, Beziehungs-Editor. Akzent via `var(--card-accent)` (`.card--motiv`). Layer-Toggle-Buttons (`.motiv-layer-btn`) + entfernbare Chips (`.motiv-chip`) sind feature-skopiert. |
 | [book/export.css](public/css/book/export.css) | Buch-Export (Standard-Format-Tiles + .swbook-Migration). |
 | [book/export-shared.css](public/css/book/export-shared.css) | Geteilte Grammatik der drei Export-Karten (PDF/Word/EPUB): Scope-Picker, einzeilige Profil-Leiste + Anlege-Zeile, Tabs/Tab-Panels, Chips, Progress, Mobile. |
 | [book/pdf-export.css](public/css/book/pdf-export.css) | PDF-Export-Spezifika (Inputs, Num-Grids, Schrift-Akkordeon, Farbpicker, Cover-Vorschau). Aufbau aus export-shared.css. |

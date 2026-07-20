@@ -67,6 +67,7 @@ export const appHashRouterMethods = {
     else if (this.showSzenenCard) parts.push('szenen');
     else if (this.showEreignisseCard) parts.push('ereignisse');
     else if (this.showPlotCard) parts.push('plot');
+    else if (this.showMotivCard) parts.push('motiv');
     else if (this.showWorldFactsCard) parts.push('fakten');
     else if (this.showRechercheCard) parts.push('recherche');
     else if (this.showKontinuitaetCard) parts.push('kontinuitaet');
@@ -412,6 +413,10 @@ export const appHashRouterMethods = {
           else { this._closeOtherMainCards('plot'); this._scrollToCardByKey('plot'); }
           if (arg) window.dispatchEvent(new CustomEvent(EVT.PLOT_FOCUS_BEAT, { detail: { beatId: arg } }));
           break;
+        case 'motiv':
+          if (!this.showMotivCard) await this.toggleMotivCard();
+          else { this._closeOtherMainCards('motiv'); this._scrollToCardByKey('motiv'); }
+          break;
         case 'fakten':
           if (!this.showWorldFactsCard) await this.toggleWorldFactsCard();
           else { this._closeOtherMainCards('weltfakten'); this._scrollToCardByKey('weltfakten'); }
@@ -515,7 +520,7 @@ export const appHashRouterMethods = {
     this._teardownHashRouting();
     const watchers = [
       'currentPage', 'showEditorCard',
-      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showWorldFactsCard',
+      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showMotivCard', 'showWorldFactsCard',
       'showRechercheCard',
       'showKontinuitaetCard', 'showErzaehlprofilCard', 'showTagebuchRueckblickCard', 'showBookReviewCard', 'showBookChatCard',
       'showKapitelReviewCard', 'kapitelReviewChapterId',
