@@ -32,7 +32,7 @@ const { requireBookAccess, sendACLError } = require('../../lib/acl');
 const { resolvePageBookId } = require('../../lib/content-ownership');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
-const { lektoratAnalyze, objektivRuns } = require('./lektorat-split');
+const { lektoratAnalyze, objektivRuns, splitEnabled } = require('./lektorat-split');
 
 // Lokale Provider (ollama/llama) bekommen einen deutlich abgespeckten Lektorat-Prompt:
 // kein Vorseiten-Kontext (BookStack-Roundtrip gespart), keine Figuren-Beziehungen,
@@ -355,7 +355,8 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
     // Damit die Gesamt-Concurrency (Seiten-Pool × Calls/Seite) im konfigurierten
     // Rahmen bleibt, den Seiten-Pool entsprechend teilen (Rate-Limit-Schutz).
     const rawConcurrency = local ? 1 : (parseInt(appSettings.get('ai.lektorat_batch_concurrency'), 10) || 4);
-    const callsPerPage = local ? 1 : (objektivRuns() > 1 ? objektivRuns() + 1 : 1);
+    const split = !local && splitEnabled();
+    const callsPerPage = split ? objektivRuns() + 1 : 1;
     const concurrency = Math.max(1, Math.floor(rawConcurrency / callsPerPage));
     const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
     const model = _modelName(effectiveProvider);

@@ -1,16 +1,24 @@
 'use strict';
-// Claude-Split des Seiten-Lektorats: Objektiv-Pass (K× parallel, Konsens) +
-// Stil-Pass (1×), konsolidiert zu einer dublettenfreien fehler-Liste. Ausgelagert
-// aus lektorat.js, damit der Job-Router schlank bleibt. Lokale Provider splitten
-// nicht (K=1 → alter kombinierter Single-Call).
+// Claude-Split des Seiten-Lektorats: fokussierter Objektiv-Pass (K× parallel,
+// Konsens) + fokussierter Stil-Pass (1×), konsolidiert zu einer dublettenfreien
+// fehler-Liste. Ausgelagert aus lektorat.js, damit der Job-Router schlank bleibt.
+// Zwei unabhängige Admin-Regler: ob überhaupt gesplittet wird (ai.lektorat_split)
+// und – wenn ja – wie viele Objektiv-Läufe der Konsens fährt (ai.lektorat_objective_runs).
+// Lokale Provider splitten nie (ein kombinierter Single-Call).
 
 const { aiCall, i18nError } = require('./shared');
 const appSettings = require('../../lib/app-settings');
 const { consensusFindings, mergePasses } = require('../../lib/lektorat-consolidate');
 
+// Ob der Split gefahren wird (fokussierte Einzel-Pässe statt einem grossen Kombi-Call).
+// Unabhängig von der Lauf-Anzahl. Lokale Provider ignorieren das (immer 1 Kombi-Call).
+function splitEnabled() {
+  return appSettings.get('ai.lektorat_split') === true;
+}
+
 // Anzahl paralleler Objektiv-Läufe für den Konsens + Konsens-Schwelle.
 // Admin-tunebar (ai.lektorat_objective_runs / ai.lektorat_consensus_threshold);
-// Defaults kommen aus lib/app-settings.js (3 bzw. 2).
+// Defaults kommen aus lib/app-settings.js (3 bzw. 2). Greift nur bei aktivem Split.
 function objektivRuns() {
   const n = parseInt(appSettings.get('ai.lektorat_objective_runs'), 10);
   return Number.isFinite(n) && n > 0 ? n : 3;
@@ -20,22 +28,24 @@ function consensusThreshold() {
   return Number.isFinite(n) && n > 0 ? n : 2;
 }
 
-// Kern-KI-Schritt des Lektorats. Cloud (Claude): Objektiv-Pass K× (Konsens ≥
-// Schwelle → maximale Präzision, filtert lauf-instabile Einzelgänger) PLUS
-// Stil-Pass 1× (kombinierter Prompt ohne objektive Typen, liefert szenen/
-// stilanalyse/fazit), danach Span-Overlap-Merge zu einer dublettenfreien
-// fehler-Liste. Objektiv-Läufe werden gestaffelt, damit der Prompt-Cache greift.
-// Lokale Provider: genau EIN kombinierter Call, unverändert. Rückgabe hat stets
-// die Form { fehler, szenen, stilanalyse, fazit } — Cache/History/Frontend gleich.
+// Kern-KI-Schritt des Lektorats. Split AN (Cloud/Claude): fokussierter Objektiv-Pass
+// K× (Konsens ≥ Schwelle → maximale Präzision, filtert lauf-instabile Einzelgänger;
+// K=1 = ein fokussierter Objektiv-Call ohne Konsens) PLUS fokussierter Stil-Pass 1×
+// (kombinierter Prompt ohne objektive Typen, liefert szenen/stilanalyse/fazit),
+// danach Span-Overlap-Merge zu einer dublettenfreien fehler-Liste. Objektiv-Läufe
+// werden gestaffelt, damit der Prompt-Cache greift. Split AUS oder lokaler Provider:
+// genau EIN kombinierter Call (Rechtschreibung + Stil + Szenen zusammen). Rückgabe
+// hat stets die Form { fehler, szenen, stilanalyse, fazit } — Cache/History/Frontend gleich.
 async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promptOpts, single, fromPct, toPct }) {
   const {
     buildLektoratPrompt, buildBatchLektoratPrompt,
     buildObjektivLektoratPrompt, buildStilLektoratPrompt,
     SCHEMA_LEKTORAT, SCHEMA_LEKTORAT_OBJEKTIV,
   } = prompts;
-  const K = local ? 1 : objektivRuns();
+  const split = local ? false : splitEnabled();
+  const K = split ? Math.max(1, objektivRuns()) : 1;
 
-  if (K <= 1) {
+  if (!split) {
     const prompt = single ? buildLektoratPrompt(text, promptOpts) : buildBatchLektoratPrompt(text, promptOpts);
     const result = await aiCall(jobId, tok, prompt, system, fromPct, toPct, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT);
     if (!Array.isArray(result?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
@@ -75,4 +85,4 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   return { fehler, szenen: stilResult.szenen, stilanalyse: stilResult.stilanalyse, fazit: stilResult.fazit };
 }
 
-module.exports = { lektoratAnalyze, objektivRuns };
+module.exports = { lektoratAnalyze, objektivRuns, splitEnabled };

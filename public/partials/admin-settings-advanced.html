@@ -8,6 +8,7 @@
         <div x-data="settingField({ k: 'app.name', ph: 'Schreibwerkstatt', help: 'admin.settings.help.appName' })"></div>
         <div x-data="settingField({ k: 'ai.chat_temperature', type: 'num', num: { step: 0.01, decimals: 2, min: 0, max: 2 } })"></div>
         <div x-data="settingField({ k: 'ai.lektorat_batch_concurrency', type: 'num', num: { step: 1, min: 1, max: 8 } })"></div>
+        <div x-data="settingField({ k: 'ai.lektorat_split', type: 'toggle', label: 'admin.settings.label.lektoratSplit', help: 'admin.settings.help.lektoratSplit' })"></div>
         <div x-data="settingField({ k: 'ai.lektorat_objective_runs', type: 'num', num: { integer: true, min: 1, max: 6 }, label: 'admin.settings.label.lektoratObjectiveRuns', help: 'admin.settings.help.lektoratObjectiveRuns' })"></div>
         <div x-data="settingField({ k: 'ai.lektorat_consensus_threshold', type: 'num', num: { integer: true, min: 1, max: 6 }, label: 'admin.settings.label.lektoratConsensusThreshold', help: 'admin.settings.help.lektoratConsensusThreshold' })"></div>
         <div x-data="settingField({ k: 'ai.komplett.extract_max_tokens', type: 'num', num: { integer: true, min: 1024, max: 200000 }, help: 'admin.settings.help.komplettExtractMaxTokens' })"></div>
