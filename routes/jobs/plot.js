@@ -298,6 +298,26 @@ function _threadContext(bookId, userEmail) {
   }));
 }
 
+// Textbeleg-Verankerung als Consistency-Kontext: der persistierte Ist-Index
+// (plot_beat_occurrences, aus dem beat-anchor-Job) als plain object beat_id →
+// { count, top[] }. NUR wenn der Index befüllt ist (occTotal > 0) — ein leerer
+// Index bedeutet „nie verankert", nicht „nichts im Buch"; dann liefern wir
+// anchorMap=null und die Consistency prüft wie bisher gegen den Szenen-Index.
+// Best-effort: ein Fehler hier darf den Check nicht failen (Belege sind Beilage).
+function _anchorContext(bookId, userEmail) {
+  try {
+    const map = plotDb.beatOccurrenceMap(bookId, userEmail);
+    let occTotal = 0;
+    const obj = {};
+    for (const [beatId, e] of map) { obj[beatId] = e; occTotal += e.count; }
+    if (occTotal === 0) return { anchorMap: null, anchorInfo: {} };
+    return { anchorMap: obj, anchorInfo: { stale: plotDb.beatAnchorStale(bookId, userEmail) } };
+  } catch (e) {
+    require('../../logger').warn(`[plot-consistency] Textbeleg-Kontext übersprungen: ${e.message}`);
+    return { anchorMap: null, anchorInfo: {} };
+  }
+}
+
 // ── Brainstorm-Job ────────────────────────────────────────────────────────────
 
 async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
@@ -395,7 +415,13 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     // die Prüfung Beats gegen das gesammelte Material abgleichen kann.
     const recherche = _rechercheContext(bookId, userEmail).slice(0, limits.recherche);
 
-    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length} recherche=${recherche.length}`);
+    // Textbeleg-Verankerung (Ist-Index gegen das echte Manuskript, aus dem
+    // beat-anchor-Job persistiert). Nur mitgeben, wenn der Index BEFÜLLT ist —
+    // sonst hiesse „KEIN Textbeleg" bloss „nie gescannt" statt „nicht im Buch"
+    // (falsche Drift-Flut). Kein Embedding-Aufwand: reine Wiederverwendung.
+    const { anchorMap, anchorInfo } = _anchorContext(bookId, userEmail);
+
+    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length} recherche=${recherche.length} textbelege=${anchorMap ? Object.keys(anchorMap).length : 'aus'}`);
     updateJob(jobId, { statusText: 'job.plot.consistency.aiReply', progress: 10 });
 
     // maxTokens grosszuegig: ein schonungsloser Check ueber alle Beats/Szenen/
@@ -403,7 +429,7 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     // 3000 schnitt die JSON-Antwort regelmaessig mitten im Array ab → Truncation.
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet, recherche),
+      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet, recherche, anchorMap, anchorInfo),
       buildPlotSystemPrompt(),
       10, 95, 6000, 0.3, 12000, undefined, SCHEMA_PLOT_CONSISTENCY,
     );

@@ -25,7 +25,27 @@ const STATUS_LABEL = {
 // Beat der Strang annotiert. Vererbung (live): ein Beat ohne eigenes Kapitel erbt
 // das Strang-Kapitel (als „(vom Strang)" markiert); die Strang-Hauptfigur gilt
 // implizit als beteiligt (Regel-Hinweis im Prompt, hier nicht pro Beat wiederholt).
-function _boardOutline(acts, beats, threadInfo = null) {
+// Textbeleg-Marker eines Beats (nur Consistency, wenn ein befüllter Verankerungs-
+// Index vorliegt): ob/wo der Beat semantisch im ECHTEN Manuskript auftaucht.
+// „im Buch" ohne Beleg = Drift-Signal; „geplant" mit Beleg = evtl. schon
+// geschrieben. Ähnlichkeit, kein Beweis — die KI urteilt am Ausschnitt.
+function _beatAnchorMarker(beat, anchorMap) {
+  if (!anchorMap || beat.verworfen) return '';
+  const a = anchorMap[beat.id];
+  const has = a && a.count > 0;
+  const wo = (n) => (a.top || []).slice(0, n)
+    .map(t => t.page_name || (t.scene_titel ? `Szene „${t.scene_titel}"` : null))
+    .filter(Boolean).join(', ');
+  if (beat.status === 'im_buch') {
+    if (!has) return ' ⟨KEIN Textbeleg im Manuskript gefunden⟩';
+    const snip = a.top[0] && a.top[0].snippet ? `: „${_trunc(a.top[0].snippet, 120)}"` : '';
+    return ` ⟨Textbeleg ${wo(2)}${snip}⟩`;
+  }
+  // status 'geplant'
+  return has ? ` ⟨bereits Textstellen vorhanden: ${wo(2)}⟩` : '';
+}
+
+function _boardOutline(acts, beats, threadInfo = null, anchorMap = null) {
   return (acts || []).map(act => {
     const own = (beats || [])
       .filter(b => b.act_id === act.id)
@@ -36,7 +56,7 @@ function _boardOutline(acts, beats, threadInfo = null) {
           ? ` → Kapitel: ${b.chapter_name}`
           : (info && info.kapitel ? ` → Kapitel: ${info.kapitel} (vom Strang)` : '');
         const str = info ? ` {Strang: ${info.name}}` : '';
-        return `  - ${b.titel} [${st}]${kap}${str}`;
+        return `  - ${b.titel} [${st}]${kap}${str}${_beatAnchorMarker(b, anchorMap)}`;
       });
     // Hybrid-Akte: ein Akt kann GETEILT sein (alle Stränge) oder einem Strang
     // EIGEN gehören (thread_id). Eigene Akte ausweisen, damit die KI versteht,
@@ -290,7 +310,7 @@ export const SCHEMA_PLOT_BRAINSTORM = _obj({
 // Prüft den geplanten Plot gegen die Buchrealität: extrahierte Szenen + Kapitel +
 // Figuren. Findet Brüche, Lücken und „geplant vs. schon geschrieben"-Drift.
 
-export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = [], orte = [], zeitstrahl = [], kontinuitaet = [], recherche = []) {
+export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = [], orte = [], zeitstrahl = [], kontinuitaet = [], recherche = [], anchorMap = null, anchorInfo = {}) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nKAPITEL DES BUCHS (chronologisch):\n${kapLines}\n` : '';
@@ -318,6 +338,16 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   const hybridNote = _hasOwnActs(acts)
     ? '\nHYBRID-AKTE: Manche Stränge haben eine EIGENE Aktstruktur (im Board als „eigener Akt von Strang …" gekennzeichnet), andere teilen sich die geteilten Akte. Ein Strang mit eigenen Akten plant absichtlich unabhängig — beanstande NICHT, dass er die geteilten Akte „überspringt". Prüfe seinen dramaturgischen Bogen INNERHALB seiner eigenen Akte.\n'
     : '';
+  // Textbeleg-Segment (semantische Verankerung gegen das echte Manuskript): nur
+  // wenn ein befüllter Index vorliegt (sonst hiesse „KEIN Textbeleg" bloss „nie
+  // gescannt", nicht „nicht im Buch" → falsche Drift-Flut).
+  const anchorSeg = anchorMap ? `
+TEXTBELEGE (semantische Suche über das ECHTE Manuskript): Hinter Beats stehen ⟨…⟩-Marker, die zeigen, ob und wo ein Beat tatsächlich im Buchtext auftaucht. Sie sind dein wichtigster Realitätsanker — genauer als der Szenen-Index:
+- "im Buch" + „KEIN Textbeleg" → starkes Drift-Signal: der Plan behauptet etwas, das die Textsuche NICHT findet. Priorisiere das und nenne den Beat samt Seite, falls bekannt.
+- "im Buch" + Textbeleg → im Text belegt; beanstande ihn NICHT als „fehlt", ausser der Beleg-Ausschnitt passt inhaltlich erkennbar nicht zum Beat.
+- "geplant" + „bereits Textstellen vorhanden" → evtl. schon geschrieben: schlage vor, den Status auf „im Buch" zu ziehen.
+Der Marker ist Ähnlichkeit, kein Beweis — urteile am Beleg-Ausschnitt, nicht blind. Nenne die belegende Seite im "problem"/"vorschlag", damit die Autorin sie anspringen kann.${anchorInfo.stale ? ' HINWEIS: Der Beleg-Index ist evtl. veraltet (Beats seit dem letzten Verankerungs-Lauf geändert) — behandle fehlende Belege bei offensichtlich frisch bearbeiteten Beats mit Vorsicht.' : ''}
+` : '';
   // Zeitstrahl-spezifischer Prüfpunkt nur, wenn ein Figuren-Zeitstrahl vorliegt.
   const zeitChecks = zeitLines
     ? `
@@ -339,8 +369,8 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   return `Du prüfst die GEPLANTE Handlung (Beat-Board) der Autorin auf Stimmigkeit — in sich und gegen die tatsächliche Buchrealität (Kapitel + analysierte Szenen). Sei schonungslos, aber konstruktiv.
 
 GEPLANTES BEAT-BOARD:
-${_boardOutline(acts, beats, _threadInfoMap(threads))}
-${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${orteSeg}${zeitSeg}${kontiSeg}${rechSeg}${strSeg}${hybridNote}
+${_boardOutline(acts, beats, _threadInfoMap(threads), anchorMap)}
+${anchorSeg}${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${orteSeg}${zeitSeg}${kontiSeg}${rechSeg}${strSeg}${hybridNote}
 Status-Legende der Beats: geplant (Idee, noch nicht eingearbeitet) · im Buch (laut Plan schon geschrieben). Zusätzlich kann ein Beat als "verworfen" markiert sein (ausgemustert, soll nicht mehr ins Buch).
 
 Prüfe auf:
