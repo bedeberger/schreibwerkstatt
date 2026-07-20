@@ -285,7 +285,9 @@ export const crudMethods = {
     this.occurrences = [];
     this._loadMotifBuffer(this.motifById(id));
     if (!id) return;
-    this.occExpanded = this._readOccExpanded(id);
+    this.occExpanded = this._readSectionExpanded('occ', id);
+    this.linksExpanded = this._readSectionExpanded('links', id);
+    this.relationsExpanded = this._readSectionExpanded('relations', id);
     this._ensureBeats();
     this._ensureDraftFiguren();
     this.occLoading = true;
@@ -297,18 +299,27 @@ export const crudMethods = {
     this._highlightNode(id);
   },
 
-  // Auf-/Zuklapp-Zustand der Fundstellen-Sektion pro Motiv (localStorage; Default
-  // offen → nur der zugeklappte Zustand wird gespeichert, offen räumt den Key).
-  _occExpandedKey(id) { return `sw:motiv:occ-expanded:${id}`; },
-  _readOccExpanded(id) {
-    try { return localStorage.getItem(this._occExpandedKey(id)) !== '0'; }
+  // Auf-/Zuklapp-Zustand einer Panel-Sektion (occ/links/relations) pro Motiv
+  // (localStorage; Default offen → nur der zugeklappte Zustand wird gespeichert,
+  // offen räumt den Key).
+  _sectionExpandedKey(section, id) { return `sw:motiv:${section}-expanded:${id}`; },
+  _readSectionExpanded(section, id) {
+    try { return localStorage.getItem(this._sectionExpandedKey(section, id)) !== '0'; }
     catch (e) { return true; }
   },
-  _persistOccExpanded(id, open) {
+  _persistSectionExpanded(section, id, open) {
     try {
-      if (open) localStorage.removeItem(this._occExpandedKey(id));
-      else localStorage.setItem(this._occExpandedKey(id), '0');
+      if (open) localStorage.removeItem(this._sectionExpandedKey(section, id));
+      else localStorage.setItem(this._sectionExpandedKey(section, id), '0');
     } catch (e) { /* localStorage optional */ }
+  },
+
+  // Anzahl Soll-Verknüpfungen über alle fünf Brücken (Badge in der Sektion).
+  linkCount() {
+    const m = this.selectedMotif();
+    if (!m) return 0;
+    return (m.figures || []).length + (m.draftFigures || []).length
+      + (m.beats || []).length + (m.chapters || []).length + (m.pages || []).length;
   },
 
   gotoOccurrence(occ) {

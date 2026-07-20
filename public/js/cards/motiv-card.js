@@ -25,9 +25,12 @@ export function registerMotivCard() {
     selectedMotifId: null,
     occurrences: [],
     occLoading: false,
-    // Fundstellen-Sektion auf-/zugeklappt (pro Motiv in localStorage persistiert,
-    // gesetzt bei jeder Auswahl in selectMotif; Default offen).
+    // Panel-Sektionen auf-/zugeklappt (pro Motiv in localStorage persistiert,
+    // gesetzt bei jeder Auswahl in selectMotif; Default offen): Fundstellen (Ist),
+    // Soll-Verknüpfungen und Motiv↔Motiv-Beziehungen.
     occExpanded: true,
+    linksExpanded: true,
+    relationsExpanded: true,
     // Edit-Puffer der Kern-Felder (Name/Thema/Beschreibung/Trigger) — explizit
     // gespeichert via Save/Cancel-Leiste, kein Feld-Autosave.
     editThemeId: '',
@@ -105,9 +108,15 @@ export function registerMotivCard() {
         onCardRefresh: () => this.loadBoard(),
       });
 
-      // Auf-/Zuklappen der Fundstellen-Sektion pro Motiv persistieren.
+      // Auf-/Zuklappen der Panel-Sektionen pro Motiv persistieren.
       this.$watch('occExpanded', (v) => {
-        if (this.selectedMotifId) this._persistOccExpanded(this.selectedMotifId, v);
+        if (this.selectedMotifId) this._persistSectionExpanded('occ', this.selectedMotifId, v);
+      });
+      this.$watch('linksExpanded', (v) => {
+        if (this.selectedMotifId) this._persistSectionExpanded('links', this.selectedMotifId, v);
+      });
+      this.$watch('relationsExpanded', (v) => {
+        if (this.selectedMotifId) this._persistSectionExpanded('relations', this.selectedMotifId, v);
       });
 
       // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit) und den

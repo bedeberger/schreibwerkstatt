@@ -109,8 +109,14 @@
         </div>
       </div>
 
-      <!-- Soll: Verknüpfungen -->
-      <h4 class="motiv-panel-heading" x-text="$app.t('motiv.links.title')"></h4>
+      <!-- Soll: Verknüpfungen (klappbar, Zustand pro Motiv in localStorage) -->
+      <div x-data="collapsible(true)" x-modelable="open" x-model="linksExpanded">
+      <button type="button" class="collapsible-toggle motiv-panel-heading" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+        <span x-text="$app.t('motiv.links.title')"></span>
+        <span class="badge" x-text="linkCount()"></span>
+      </button>
+      <div x-bind="panel" x-cloak>
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.figures')"></span>
         <div class="motiv-chip-row">
@@ -168,9 +174,17 @@
              x-effect="options = ($store.nav.pages||[]).map(p=>({value:String(p.id),label:p.name,group:p.chapterName||''}))"
              @combobox-change="if(linkPageTmp){ addLink('pages', linkPageTmp); linkPageTmp='' }"></div>
       </div>
+      </div>
+      </div>
 
-      <!-- Motiv ↔ Motiv -->
-      <h4 class="motiv-panel-heading" x-text="$app.t('motiv.relations.title')"></h4>
+      <!-- Motiv ↔ Motiv (klappbar, Zustand pro Motiv in localStorage) -->
+      <div x-data="collapsible(true)" x-modelable="open" x-model="relationsExpanded">
+      <button type="button" class="collapsible-toggle motiv-panel-heading" x-bind="trigger">
+        <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+        <span x-text="$app.t('motiv.relations.title')"></span>
+        <span class="badge" x-text="relationsForSelected().length"></span>
+      </button>
+      <div x-bind="panel" x-cloak>
       <div class="motiv-chip-row">
         <template x-for="r in relationsForSelected()" :key="r.id">
           <span class="motiv-chip">
@@ -185,6 +199,8 @@
                :placeholder="$app.t('motiv.relations.typPlaceholder')" @keydown.enter="addRelation()">
         <button type="button" class="btn-compact" @click="addRelation()"
                 :disabled="!newRelationTargetId || !newRelationTyp.trim()" x-text="$app.t('motiv.relations.add')"></button>
+      </div>
+      </div>
       </div>
     </div>
   </template>
