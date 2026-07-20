@@ -76,6 +76,9 @@ export function registerMotivCard() {
     motivBrainstormJobId: null,
     suggestions: [],
     // interne (nicht-reaktive) Felder
+    // Cross-Feature-Sprung (Plot-Beat-Motiv-Badge → motiv:select): geparkte Motiv-ID,
+    // falls das Board beim Event noch nicht geladen war; loadBoard wendet sie an.
+    _pendingMotifId: null,
     _beatsLoaded: false,
     _draftFigurenLoaded: false,
     _memos: {},
@@ -95,6 +98,16 @@ export function registerMotivCard() {
     _lifecycle: null,
 
     init() {
+      // Cross-Card-Sprung: `motiv:select` (z.B. aus einem Plot-Beat-Motiv-Badge)
+      // wählt das Motiv aus. Motive evtl. noch nicht geladen → ID parken,
+      // loadBoard() wendet sie nach dem Fetch an.
+      const onSelectMotif = (e) => {
+        const id = parseInt(e.detail?.motifId);
+        if (!id) return;
+        if (!this.motifs.length) { this._pendingMotifId = id; return; }
+        if (this.motifById(id) && this.selectedMotifId !== id) this.selectMotif(id);
+      };
+
       this._lifecycle = setupCardLifecycle(this, {
         name: 'motiv',
         showFlag: 'showMotivCard',
@@ -106,6 +119,7 @@ export function registerMotivCard() {
         },
         onViewReset: () => this.resetMotiv(),
         onCardRefresh: () => this.loadBoard(),
+        extraListeners: [{ type: 'motiv:select', handler: onSelectMotif }],
       });
 
       // Auf-/Zuklappen der Panel-Sektionen pro Motiv persistieren.

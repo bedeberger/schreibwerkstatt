@@ -235,6 +235,32 @@ const _stmtDraftFigsForBeat = db.prepare(`
 const _stmtDeleteDraftFigsForBeat = db.prepare('DELETE FROM plot_beat_draft_figures WHERE beat_id = ?');
 const _stmtInsertDraftFig = db.prepare('INSERT OR IGNORE INTO plot_beat_draft_figures (beat_id, draft_figure_id) VALUES (?, ?)');
 
+// Motiv-Soll-Verknüpfungen pro Beat — read-only Anzeige im Plot. `motif_beats` ist
+// eine der M:M-Soll-Brücken der Motiv-Werkstatt; kuratiert wird sie dort, der Plot
+// zeigt sie nur als Badge (Klick → Motiv-Werkstatt). Effektive Farbe = eigene
+// Motiv-Farbe, sonst die des zugeordneten Themas (wie im Konstellations-Graph);
+// beides ist ein Palette-Schlüssel, die Whitelist gegen CSS-Injection liegt im
+// Frontend (motifAccent). Scoping über den Beat (Buch + User); die verknüpften
+// Motive tragen denselben Scope (Motiv-Werkstatt ist pro Buch + User isoliert).
+const _stmtListMotifsForBook = db.prepare(`
+  SELECT mb.beat_id, m.id AS motif_id, m.name, COALESCE(m.farbe, t.farbe) AS farbe
+    FROM motif_beats mb
+    JOIN plot_beats b ON b.id = mb.beat_id
+    JOIN motifs     m ON m.id = mb.motif_id
+    LEFT JOIN themes t ON t.id = m.theme_id
+   WHERE b.book_id = ? AND b.user_email = ?
+   ORDER BY m.position, m.id
+`);
+// Motive EINES Beats (Pendant zu _stmtFigsForBeat — Einzel-Beat-Pfad ohne Buch-Map).
+const _stmtMotifsForBeat = db.prepare(`
+  SELECT m.id AS motif_id, m.name, COALESCE(m.farbe, t.farbe) AS farbe
+    FROM motif_beats mb
+    JOIN motifs m ON m.id = mb.motif_id
+    LEFT JOIN themes t ON t.id = m.theme_id
+   WHERE mb.beat_id = ?
+   ORDER BY m.position, m.id
+`);
+
 // TEXT-fig_id (Frontend-Identität) → INTEGER figures.id (FK-Target), gefiltert
 // aufs Subset, das wirklich zu (Buch, User) gehört. Unbekannte/Fremd-fig_ids
 // fallen still raus (kein Cross-Buch-Leak in die M:M-Tabelle).
@@ -277,6 +303,14 @@ function _draftFigMapForBook(bookId, userEmail) {
   return map;
 }
 
+function _motifMapForBook(bookId, userEmail) {
+  const map = {};
+  for (const r of _stmtListMotifsForBook.all(parseInt(bookId), userEmail)) {
+    (map[r.beat_id] = map[r.beat_id] || []).push({ id: r.motif_id, name: r.name, farbe: r.farbe });
+  }
+  return map;
+}
+
 // figureIds = INTEGER figures.id (bereits via resolveFigureIds aufgelöst).
 function _setBeatFigures(beatId, figureIds) {
   _stmtDeleteFigsForBeat.run(parseInt(beatId));
@@ -293,21 +327,23 @@ function _setBeatDraftFigures(beatId, draftFigureIds) {
   }
 }
 
-function _beatRow(beatId, figMap = null, draftFigMap = null) {
+function _beatRow(beatId, figMap = null, draftFigMap = null, motifMap = null) {
   const r = _stmtGetBeat.get(parseInt(beatId));
   if (!r) return null;
   // Ohne vorgebaute Buch-Map (Einzel-Beat-Pfad) gezielt nur die Links DIESES
   // Beats laden — kein buchweiter Scan pro Mutation/Lesung.
   const figs = figMap ? (figMap[r.id] || []) : _stmtFigsForBeat.all(r.id).map(x => x.fig_id);
   const draftFigs = draftFigMap ? (draftFigMap[r.id] || []) : _stmtDraftFigsForBeat.all(r.id).map(x => x.draft_id);
-  return { ...r, fig_ids: figs, draft_fig_ids: draftFigs };
+  const motifs = motifMap ? (motifMap[r.id] || []) : _stmtMotifsForBeat.all(r.id).map(x => ({ id: x.motif_id, name: x.name, farbe: x.farbe }));
+  return { ...r, fig_ids: figs, draft_fig_ids: draftFigs, motifs };
 }
 
 function listBeats(bookId, userEmail) {
   const figMap = _figMapForBook(bookId, userEmail);
   const draftFigMap = _draftFigMapForBook(bookId, userEmail);
+  const motifMap = _motifMapForBook(bookId, userEmail);
   return _stmtListBeats.all(parseInt(bookId), userEmail)
-    .map(r => ({ ...r, fig_ids: figMap[r.id] || [], draft_fig_ids: draftFigMap[r.id] || [] }));
+    .map(r => ({ ...r, fig_ids: figMap[r.id] || [], draft_fig_ids: draftFigMap[r.id] || [], motifs: motifMap[r.id] || [] }));
 }
 
 const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', verworfen = 0, chapterId = null, intensitaet = null, threadId = null, figureIds = [], draftFigureIds = [], sortOrder = null }) => {

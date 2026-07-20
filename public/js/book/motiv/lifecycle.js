@@ -30,6 +30,12 @@ export const lifecycleMethods = {
       // Figuren fürs Figuren-Layer + Verknüpfungs-Combobox bereitstellen.
       if (!this.$store.catalog.figuren?.length) window.__app.loadFiguren(bookId);
       this.$nextTick(() => this.renderMotivGraph());
+      // Geparkter Cross-Card-Sprung (motiv:select vor dem Board-Load) → jetzt auswählen.
+      if (this._pendingMotifId) {
+        const pid = this._pendingMotifId;
+        this._pendingMotifId = null;
+        if (this.motifById(pid)) this.selectMotif(pid);
+      }
     } catch (e) {
       this.errorMessage = window.__app.t('motiv.error.load');
     } finally {
@@ -56,6 +62,7 @@ export const lifecycleMethods = {
     this.errorMessage = '';
     this.embedIndexStale = false;
     this._savedPositions = null;
+    this._pendingMotifId = null;
     this._memos = {};
   },
 

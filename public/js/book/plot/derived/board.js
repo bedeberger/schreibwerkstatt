@@ -209,4 +209,12 @@ export const boardMethods = {
     const key = act && act.farbe;
     return (key && ACT_PALETTE.includes(key)) ? `var(--palette-${key})` : 'var(--card-accent)';
   },
+
+  // CSS-Akzent eines Motiv-Badges auf der Beat-Karte: bekannter Palette-Key
+  // (eigene Motiv- oder geerbte Themen-Farbe) → --palette-<key>, sonst der
+  // Motiv-Werkstatt-Akzent. Whitelist verhindert CSS-Injection.
+  motifAccent(m) {
+    const key = m && m.farbe;
+    return (key && ACT_PALETTE.includes(key)) ? `var(--palette-${key})` : 'var(--card-accent-motiv)';
+  },
 };

@@ -78,6 +78,7 @@ export const EVT = {
 
   // ── Cross-Card Selektion / Filter ────────────────────────────────────────
   FIGUR_WERKSTATT_SELECT: 'figur-werkstatt:select',       // detail: { figureId }
+  MOTIV_SELECT: 'motiv:select',                           // detail: { motifId }
   PLOT_FOCUS_BEAT: 'plot:focus-beat',                     // detail: { beatId }
   PLOT_FILTER_DRAFT_FIGURE: 'plot:filter-draft-figure',   // detail: { figureId }
   RUECKBLICK_SELECT: 'rueckblick:select',                 // detail: { date }

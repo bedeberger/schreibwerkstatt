@@ -37,7 +37,7 @@
       </span>
     </div>
     <p class="plot-beat-desc" x-show="beat.beschreibung" x-text="beat.beschreibung"></p>
-    <div class="plot-beat-meta" x-show="beat.chapter_name || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length)">
+    <div class="plot-beat-meta" x-show="beat.chapter_name || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length) || (beat.motifs && beat.motifs.length)">
       <span class="kapitel-badge kapitel-badge--primary internal-link" x-show="beat.chapter_name"
             @click.stop="beat.chapter_name && $app.openKapitelByName(beat.chapter_name)"
             x-text="beat.chapter_name"></span>
@@ -49,6 +49,14 @@
         <span class="tag tag--werkstatt internal-link" @click.stop="$app.openWerkstattDraftById(dfId)"
               :data-tip="$app.t('plot.beat.werkstattFiguren')"
               x-text="draftFigurenById.get(dfId)?.name || dfId"></span>
+      </template>
+      <!-- Motiv-Badges (read-only): Soll-Verknüpfung aus der Motiv-Werkstatt (motif_beats).
+           Kuratiert wird sie dort; Klick springt in die Motiv-Werkstatt zum Motiv. -->
+      <template x-for="mo in (beat.motifs || [])" :key="'m' + mo.id">
+        <span class="tag tag--motif internal-link" :style="{ '--motif-accent': motifAccent(mo) }"
+              @click.stop="$app.openMotifById(mo.id)"
+              :data-tip="$app.t('plot.beat.motif')"
+              x-text="mo.name"></span>
       </template>
     </div>
   </div>

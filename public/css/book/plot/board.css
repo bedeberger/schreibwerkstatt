@@ -325,6 +325,13 @@
   .plot-fig-chip.tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
   /* Werkstatt-Badge im Beat-Meta (Ansichtsmodus). */
   .plot-beat-meta .tag--werkstatt { border: 1px dashed var(--card-accent-werkstatt); }
+  /* Motiv-Badge im Beat-Meta: read-only Soll-Verknüpfung aus der Motiv-Werkstatt.
+     Farb-Akzent (eigene/Themen-Palette, sonst Motiv-Werkstatt-Akzent) via
+     --motif-accent (im Markup gesetzt); Punkt-Marker setzt es visuell vom
+     Katalog-/Werkstatt-Tag ab, ohne eine neue Badge-Form einzuführen. */
+  .plot-beat-meta .tag--motif {
+    border-left: 3px solid var(--motif-accent, var(--card-accent-motiv));
+  }
   .plot-beat-edit-actions {
     display: flex;
     align-items: center;

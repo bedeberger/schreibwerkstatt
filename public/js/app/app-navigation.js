@@ -114,6 +114,24 @@ export const appNavigationMethods = {
     }
   },
 
+  // Cross-Feature: aus dem Plot-Board (Beat-Motiv-Badge) in die Motiv-Werkstatt
+  // springen und dort das Motiv auswählen. Die Motiv-Karte hört `motiv:select`
+  // und parkt die ID, falls das Board noch nicht geladen ist.
+  async openMotifById(motifId) {
+    this._beginNavigation();
+    try {
+      const mid = _coerceId(motifId);
+      if (!this.showMotivCard) {
+        await this.toggleMotivCard();
+      }
+      window.dispatchEvent(new CustomEvent(EVT.MOTIV_SELECT, {
+        detail: { motifId: mid },
+      }));
+    } finally {
+      this._endNavigation();
+    }
+  },
+
   // Cross-Feature: aus der Figuren-Werkstatt ins Plot-Board springen, gefiltert auf
   // die Beats dieser Werkstatt-Figur. Die Plot-Karte hört `plot:filter-draft-figure`
   // und parkt das Ziel, falls das Board noch nicht geladen ist.

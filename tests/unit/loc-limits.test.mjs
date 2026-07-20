@@ -85,7 +85,6 @@ const CATEGORIES = [
     cap: 600,
     allow: {
       'public/css/components/card-form.css': 700,
-      'public/css/page/page-view.css': 732,
       'public/css/editor/book/book-editor.css': 674,
     },
   },
