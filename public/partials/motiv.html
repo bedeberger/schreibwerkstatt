@@ -109,7 +109,7 @@
     <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
     <span x-text="$app.t('motiv.hint.semanticOff')"></span>
   </div>
-  <div class="motiv-hint motiv-hint--action" x-show="semanticActive() && !indexRefreshed" x-cloak>
+  <div class="motiv-hint motiv-hint--action" x-show="semanticActive() && embedIndexStale" x-cloak>
     <span class="motiv-hint-text" x-text="$app.t('motiv.hint.semanticOn')"></span>
     <button type="button" class="btn-compact" @click="refreshEmbedIndex()" :disabled="indexing">
       <span x-show="indexing" class="spinner"></span>

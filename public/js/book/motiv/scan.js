@@ -27,7 +27,7 @@ export const scanMethods = {
       startPoll(this, {
         timerProp: '_embedPollTimer',
         jobId,
-        onDone: async () => { this.indexing = false; this.indexRefreshed = true; if (this.motifs.length) await this.runScan(); },
+        onDone: async () => { this.indexing = false; this.embedIndexStale = false; if (this.motifs.length) await this.runScan(); },
         onNotFound: () => { this.indexing = false; },
         onError: () => { this.indexing = false; this.errorMessage = window.__app.t('motiv.error.index'); },
       });

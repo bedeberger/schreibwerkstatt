@@ -6,6 +6,8 @@
 
 const express = require('express');
 const motifsDb = require('../db/motifs');
+const embed = require('../lib/embed');
+const semanticChunks = require('../db/semantic-chunks');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError } = require('../lib/acl');
@@ -60,6 +62,18 @@ function _terms(v) {
   return clean.length ? clean : null;
 }
 
+// Frische des Embedding-Index fürs Buch (für den „Index aktualisieren"-Hinweis
+// im Panel). Server-gestützt statt Session-Flag: `stale` ist true, wenn kein
+// Index existiert oder Quell-Entitäten seit dem letzten Lauf geändert wurden
+// (billige updated_at-Heuristik in semanticChunks.indexStatus, ohne Re-Hashing).
+// Embedding-Backend aus → kein Hinweis (Panel warnt separat via semanticActive()).
+function _embedIndexInfo(bookId) {
+  if (!embed.isEnabled()) return { enabled: false, stale: false };
+  const { model } = embed.getConfig();
+  const st = semanticChunks.indexStatus(bookId, model);
+  return { enabled: true, indexed: st.indexed, staleCount: st.staleCount, stale: !st.indexed || st.staleCount > 0 };
+}
+
 // ── Graph-Payload (Themen + Motive mit Soll-Links & Ist-Count + Beziehungen) ──
 
 router.get('/', (req, res) => {
@@ -68,7 +82,9 @@ router.get('/', (req, res) => {
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
   if (!_guard(req, res, bookId, 'viewer')) return;
-  res.json(motifsDb.getGraph(bookId, userEmail));
+  const graph = motifsDb.getGraph(bookId, userEmail);
+  graph.embedIndex = _embedIndexInfo(bookId);
+  res.json(graph);
 });
 
 // Manuelle Knoten-Positionen der Konstellation speichern (reine View-Präferenz).

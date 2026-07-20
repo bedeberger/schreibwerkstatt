@@ -64,8 +64,10 @@ export function registerMotivCard() {
     motivFullscreen: false,
     // Embedding-Index-Refresh (für semantische Erkennung)
     indexing: false,
-    // Index in dieser Sitzung schon aktualisiert? Blendet den Refresh-Hinweis aus.
-    indexRefreshed: false,
+    // Ist der Embedding-Index des Buches veraltet? Server-gestützt aus loadBoard
+    // (embedIndex.stale) — steuert den „Index aktualisieren"-Hinweis. Kein Session-
+    // Flag: verschwindet, sobald der Index tatsächlich frisch ist (auch via Nacht-Cron).
+    embedIndexStale: false,
     // Brainstorm-Job (KI-Vorschläge)
     brainstorming: false,
     motivBrainstormJobId: null,

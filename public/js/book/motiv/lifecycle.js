@@ -24,6 +24,7 @@ export const lifecycleMethods = {
       this.themes = data.themes || [];
       this.motifs = data.motifs || [];
       this.relations = data.relations || [];
+      this.embedIndexStale = !!data.embedIndex?.stale;
       this._savedPositions = data.layout || {};
       this._memos = {};
       // Figuren fürs Figuren-Layer + Verknüpfungs-Combobox bereitstellen.
@@ -53,7 +54,7 @@ export const lifecycleMethods = {
     this.allDraftFiguren = [];
     this._draftFigurenLoaded = false;
     this.errorMessage = '';
-    this.indexRefreshed = false;
+    this.embedIndexStale = false;
     this._savedPositions = null;
     this._memos = {};
   },
