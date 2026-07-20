@@ -437,14 +437,31 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     if (!Array.isArray(result?.konflikte)) throw i18nError('job.error.plot.konflikteMissing');
     if (typeof result.fazit !== 'string') throw i18nError('job.error.plot.fazitMissing');
 
+    // Klickbare Fundstelle je Befund: deterministisch aus dem Verankerungs-Index
+    // (nicht aus dem KI-Text), gematcht über den Beat-Titel (gleiche normTitle-
+    // Basis wie Frontend + Prompt). Die stärkste Fundstelle des benannten Beats
+    // (occ_top[0], vorsortiert nach Score) mit einer page_id → { page_id, page_name }.
+    // So springt die Autorin aus dem Befund direkt an die belegende Textstelle.
+    const _norm = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const belegByTitle = {};
+    if (anchorMap) {
+      for (const b of beats) {
+        const top = (anchorMap[b.id]?.top || []).find(t => t.page_id);
+        if (top) belegByTitle[_norm(b.titel)] = { page_id: top.page_id, page_name: top.page_name || null };
+      }
+    }
     const konflikte = result.konflikte
       .filter(k => k && typeof k.problem === 'string')
-      .map(k => ({
-        beat: typeof k.beat === 'string' ? k.beat.trim() : '—',
-        schwere: SEVERITY.includes(k.schwere) ? k.schwere : 'mittel',
-        problem: k.problem.trim(),
-        vorschlag: typeof k.vorschlag === 'string' ? k.vorschlag.trim() : '',
-      }));
+      .map(k => {
+        const beat = typeof k.beat === 'string' ? k.beat.trim() : '—';
+        return {
+          beat,
+          schwere: SEVERITY.includes(k.schwere) ? k.schwere : 'mittel',
+          problem: k.problem.trim(),
+          vorschlag: typeof k.vorschlag === 'string' ? k.vorschlag.trim() : '',
+          fundstelle: belegByTitle[_norm(beat)] || null,
+        };
+      });
     const fazit = result.fazit.trim();
 
     // Lauf historisieren, damit der User die Prüfung später nochmal ansehen kann.
