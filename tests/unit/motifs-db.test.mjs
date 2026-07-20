@@ -175,3 +175,35 @@ test('deleteMotif kaskadiert Beziehungen/Brücken/Occurrences', () => {
   assert.equal(motifs.listRelations(BOOK, USER).filter(r => r.from_motif_id === a.id).length, 0);
   assert.equal(motifs.listOccurrences(a.id).length, 0);
 });
+
+test('Brainstorm-Lauf-Historie: insert/list/get/delete + User-Scope', () => {
+  const result = { vorschlaege: [
+    { typ: 'motiv', name: 'Spiegel', beschreibung: 'Selbstbild', trigger_terms: ['Spiegel'] },
+    { typ: 'thema', name: 'Identität', beschreibung: '', trigger_terms: [] },
+  ] };
+  const id = motifs.insertBrainstormRun({ bookId: BOOK, userEmail: USER, vorschlagCount: 2, result, model: 'test-model' });
+  assert.ok(id > 0);
+
+  // Liste kommt ohne result_json (Spaltensparsamkeit), aber mit denormalisiertem Count.
+  const list = motifs.listBrainstormRuns(BOOK, USER);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].vorschlag_count, 2);
+  assert.equal(list[0].model, 'test-model');
+  assert.equal(list[0].result_json, undefined);
+  assert.equal(list[0].result, undefined);
+
+  // Detail liefert die geparsten Vorschläge.
+  const detail = motifs.getBrainstormRun(id);
+  assert.equal(detail.result.vorschlaege.length, 2);
+  assert.equal(detail.result.vorschlaege[0].name, 'Spiegel');
+  assert.equal(detail.user_email, USER);
+
+  // Fremd-User darf nicht löschen (user_email-Guard im DELETE).
+  assert.equal(motifs.deleteBrainstormRun(id, 'fremd@x.test'), 0);
+  assert.equal(motifs.listBrainstormRuns(BOOK, USER).length, 1);
+
+  // Eigener Delete greift.
+  assert.equal(motifs.deleteBrainstormRun(id, USER), 1);
+  assert.equal(motifs.listBrainstormRuns(BOOK, USER).length, 0);
+  assert.equal(motifs.getBrainstormRun(id), null);
+});

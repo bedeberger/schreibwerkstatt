@@ -54,4 +54,12 @@ test('motif-brainstorm: normalisiert + filtert Katalog-/Batch-Dubletten', async 
   assert.equal(v.find(x => x.name === 'Spiegel').typ, 'motiv'); // unbekannter typ normalisiert
   assert.equal(v.find(x => x.name === 'Schuld & Vergebung').typ, 'thema');
   assert.deepEqual(v.find(x => x.name === 'Regen').trigger_terms, ['Regen', 'Fluss']);
+
+  // Lauf wird historisiert: runId im Payload + Eintrag in motif_brainstorm_runs.
+  assert.ok(job.result.runId > 0, 'runId im Job-Payload');
+  const runs = motifsDb.listBrainstormRuns(BOOK, USER);
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].vorschlag_count, 3);
+  const detail = motifsDb.getBrainstormRun(job.result.runId);
+  assert.deepEqual(detail.result.vorschlaege.map(x => x.name), ['Schuld & Vergebung', 'Regen', 'Spiegel']);
 });
