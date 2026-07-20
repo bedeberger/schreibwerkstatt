@@ -21,7 +21,7 @@ function splitEnabled() {
 // Defaults kommen aus lib/app-settings.js (3 bzw. 2). Greift nur bei aktivem Split.
 function objektivRuns() {
   const n = parseInt(appSettings.get('ai.lektorat_objective_runs'), 10);
-  return Number.isFinite(n) && n > 0 ? n : 3;
+  return Number.isFinite(n) && n > 0 ? n : 1;
 }
 function consensusThreshold() {
   const n = parseInt(appSettings.get('ai.lektorat_consensus_threshold'), 10);
