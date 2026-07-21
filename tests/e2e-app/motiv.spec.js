@@ -110,9 +110,12 @@ test('Motiv-Werkstatt: erste Combobox-Auswahl landet sofort im Link-Puffer (dirt
   });
 
   // Kapitel-Verknüpfung über die ECHTE Combobox wählen (3. Link-Gruppe) —
-  // genau EIN Klick muss reichen.
+  // genau EIN Klick muss reichen. Trigger vorher ZENTRIEREN: die Combobox
+  // schliesst bei Window-Scroll, und der Autofokus aufs Suchfeld scrollt nach,
+  // wenn das Dropdown unter dem Viewport-Rand aufginge.
   const chapGroup = page.locator('.motiv-link-group').nth(2);
-  await chapGroup.locator('.combobox-trigger').scrollIntoViewIfNeeded();
+  await chapGroup.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(150);
   await chapGroup.locator('.combobox-trigger').click();
   const opt = chapGroup.locator('.combobox-option').first();
   await expect(opt).toBeVisible();
@@ -159,4 +162,49 @@ test('Motiv-Werkstatt: Re-Select desselben Motivs behält ungespeicherte Edits',
   expect(result.dirty).toBe(true);
 
   guard.assertClean('Motiv-Werkstatt Re-Select');
+});
+
+// Regression: Wechsel auf ein ANDERES Motiv committet ausstehende Änderungen
+// (wie das Beat-Edit-Panel der Plot-Werkstatt: Wechsel = Save, kein stilles
+// Verwerfen).
+test('Motiv-Werkstatt: Motivwechsel speichert ungespeicherte Edits', async ({ page }) => {
+  const guard = attachConsoleGuard(page);
+  await bootApp(page);
+  await selectSeededBook(page);
+
+  await page.evaluate(() => window.__app.toggleMotivCard());
+  await page.waitForFunction(() => {
+    const el = document.querySelector('.card--motiv');
+    if (!el) return false;
+    const c = window.Alpine.$data(el);
+    return c && !c.loading;
+  }, null, { timeout: 15000 });
+
+  const result = await page.evaluate(async () => {
+    const card = window.Alpine.$data(document.querySelector('.card--motiv'));
+    card.newMotifName = 'Wechsel-Quelle';
+    await card.addMotif();
+    const firstId = card.selectedMotifId;
+    card.newMotifName = 'Wechsel-Ziel';
+    await card.addMotif();
+    const secondId = card.selectedMotifId;
+
+    // Erstes Motiv wählen, umbenennen, dann ohne Save aufs zweite wechseln.
+    await card.selectMotif(firstId);
+    card.editName = 'Wechsel-Quelle umbenannt';
+    await card.selectMotif(secondId);
+
+    return {
+      selectedId: card.selectedMotifId,
+      secondId,
+      firstName: card.motifById(firstId)?.name,
+      err: card.errorMessage,
+    };
+  });
+
+  expect(result.selectedId).toBe(result.secondId);
+  expect(result.firstName, 'Rename beim Wechsel committet').toBe('Wechsel-Quelle umbenannt');
+  expect(result.err).toBe('');
+
+  guard.assertClean('Motiv-Werkstatt Commit-on-Switch');
 });

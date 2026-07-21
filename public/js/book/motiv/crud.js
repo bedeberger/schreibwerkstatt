@@ -327,11 +327,26 @@ export const crudMethods = {
     } catch (e) { this.allDraftFiguren = []; }
   },
 
+  // Ausstehende Puffer-Änderungen des aktuell gewählten Motivs committen (wie das
+  // Beat-Edit-Panel der Plot-Werkstatt: Wechsel/Schliessen = Save, kein stilles
+  // Verwerfen). Leerer Name verwirft nur die Umbenennung statt den Save zu blocken.
+  async _commitPendingMotifEdit() {
+    const m = this.selectedMotif();
+    if (!m || !this.motifDirty()) return;
+    if (!(this.editName || '').trim()) this.editName = m.name;
+    await this.saveMotifEdit();
+  },
+
   async selectMotif(id) {
     // Re-Klick auf das bereits gewählte Motiv (z.B. sein Graph-Knoten): Edit-Puffer
     // NICHT neu laden — sonst verwirft der Klick ungespeicherte Änderungen (Name/
     // Thema/Verknüpfungen) kommentarlos und der Graph behält den alten Stand.
     const sameId = !!id && id === this.selectedMotifId;
+    if (!sameId) {
+      await this._commitPendingMotifEdit();
+      // Save fehlgeschlagen (errorMessage steht) → Auswahl behalten, nichts verwerfen.
+      if (this.motifDirty()) return;
+    }
     this.selectedMotifId = id;
     if (!sameId) {
       this.occurrences = [];
