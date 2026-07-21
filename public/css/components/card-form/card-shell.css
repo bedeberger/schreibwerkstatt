@@ -206,13 +206,25 @@
     align-items: flex-start;
     flex-wrap: nowrap;
   }
+  /* Floor fuer die Titelspalte: ohne ihn quetscht eine breite Badge-Leiste
+     in der Aside den Titel via overflow-wrap:anywhere auf 1 Zeichen/Zeile. */
+  .card-header:has(.card-header-titlebar) > .card-header-titlebar { min-width: 55%; }
   .card-header:has(.card-header-titlebar) > .card-actions,
   .card-header:has(.card-header-titlebar) > .card-header-aside {
     width: auto;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
     flex-wrap: wrap;
     justify-content: flex-end;
     margin-left: var(--space-md);
+  }
+  /* .tok-stats ist base flex/nowrap/shrink:0 (page-list.css) — in der Header-
+     Aside muss die Badge-Zeile umbrechen koennen, sonst diktiert sie die
+     Min-Breite der Aside und sprengt den 55%-Floor der Titelspalte. */
+  .card-header:has(.card-header-titlebar) > .card-header-aside .tok-stats {
+    flex-wrap: wrap;
+    flex-shrink: 1;
+    justify-content: flex-end;
   }
 }
 

@@ -18,14 +18,23 @@ export const crudMethods = {
   _bookId() { return this.$store.nav.selectedBookId; },
 
   // ── Themen ─────────────────────────────────────────────────────────────
+  // Namensfeld eines Themas in der Panel-Liste fokussieren (nach Anlegen) — greift
+  // nur, wenn die Themen-Liste sichtbar ist (kein Motiv selektiert); sonst No-Op.
+  _focusThemeInput(themeId) {
+    this.$nextTick(() => {
+      const el = this.$root?.querySelector(`.motiv-theme-row[data-theme-id="${themeId}"] .motiv-inline-input`);
+      if (el) { el.focus(); el.select(); }
+    });
+  },
   async addTheme() {
     const name = (this.newThemeName || '').trim();
     if (!name) return;
     this.busy = true;
     try {
-      await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name });
+      const theme = await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name });
       this.newThemeName = '';
       await this.loadBoard();
+      this._focusThemeInput(theme.id);
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },
@@ -73,6 +82,7 @@ export const crudMethods = {
       this.newMotifName = '';
       await this.loadBoard();
       this.selectMotif(m.id);
+      this.$nextTick(() => this.$root?.querySelector('.motiv-name-input')?.focus());
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },
@@ -92,14 +102,15 @@ export const crudMethods = {
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },
-  // Thema direkt anlegen (aus dem Graph-Kontextmenü) — mit Default-Namen; umbenannt
-  // wird inline in der Themen-Liste des Panels.
+  // Thema direkt anlegen (aus dem Graph-Kontextmenü) — mit Default-Namen; danach
+  // inline in der Themen-Liste des Panels fokussiert zum sofortigen Umbenennen.
   async createThemeQuick() {
     this.closeGraphMenu();
     this.busy = true;
     try {
-      await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name: window.__app.t('motiv.theme.newName') });
+      const theme = await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name: window.__app.t('motiv.theme.newName') });
       await this.loadBoard();
+      this._focusThemeInput(theme.id);
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },
