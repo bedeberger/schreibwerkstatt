@@ -225,7 +225,17 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
     lastUpdateMs = now;
 
     const updates = {};
-    if (fromPct != null && toPct != null) {
+    if (tok.progressRange) {
+      // Mehrere Teil-Calls (Lektorat-Split: K Objektiv-Läufe + 1 Stil-Lauf) teilen
+      // sich EINEN Fortschrittsbereich. Jeder Call meldet seine eigene Streaming-
+      // Fraktion; der Balken zeigt den Mittelwert über alle erwarteten Calls
+      // (progressRange.total) – additiv statt konkurrierend, damit parallele Streams
+      // den Balken nicht hin- und herspringen lassen (analog tok.inflight).
+      tok.progressParts.set(callId, Math.min(1, chars / dynExpectedChars));
+      const { from, to, total } = tok.progressRange;
+      const sum = [...tok.progressParts.values()].reduce((s, v) => s + v, 0);
+      updates.progress = Math.round(from + (to - from) * Math.min(1, sum / total));
+    } else if (fromPct != null && toPct != null) {
       updates.progress = Math.round(fromPct + (toPct - fromPct) * Math.min(1, chars / dynExpectedChars));
     }
     if (tok.inflight) {
@@ -266,12 +276,20 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
   tok.cacheCreate1h = (tok.cacheCreate1h || 0) + cacheCreation1hIn;
   if (genDurationMs != null) tok.ms += genDurationMs;
   const liveTps = tok.ms > 0 ? tok.out / (tok.ms / 1000) : null;
-  updateJob(jobId, {
+  const finalUpdates = {
     tokensIn: tok.in, tokensOut: tok.out,
     cacheReadIn: tok.cacheRead, cacheCreationIn: tok.cacheCreate,
     cacheCreation1hIn: tok.cacheCreate1h,
     tokensPerSec: liveTps,
-  });
+  };
+  if (tok.progressRange) {
+    // Dieser Teil-Call ist fertig → volle Fraktion, Balken um sein Segment vorrücken.
+    tok.progressParts.set(callId, 1);
+    const { from, to, total } = tok.progressRange;
+    const sum = [...tok.progressParts.values()].reduce((s, v) => s + v, 0);
+    finalUpdates.progress = Math.round(from + (to - from) * Math.min(1, sum / total));
+  }
+  updateJob(jobId, finalUpdates);
   if (truncated) throw i18nError('job.error.aiTruncated', { max: maxTokensOverride, tokIn: tokensIn, tokOut: tokensOut, total: tokensIn + tokensOut });
   return parseJSON(text);
 }

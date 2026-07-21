@@ -53,6 +53,13 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   }
 
   if (!tok.inflight) tok.inflight = new Map();   // parallele Live-Token-Summierung
+  // Fortschritt über alle Teil-Calls (K Objektiv-Läufe + 1 Stil-Lauf) verteilen,
+  // sofern ein Bereich vorgegeben ist (Einzel-Lektorat). Im Batch (fromPct/toPct = null)
+  // steuert der Job den Balken per Seiten-Zähler – dann keinen Range setzen.
+  if (fromPct != null && toPct != null) {
+    tok.progressRange = { from: fromPct, to: toPct, total: K + 1 };
+    tok.progressParts = new Map();
+  }
   const objektivOpts = {
     figuren: promptOpts.figuren, figurenBeziehungen: promptOpts.figurenBeziehungen,
     orte: promptOpts.orte, pageName: promptOpts.pageName, chapterName: promptOpts.chapterName,
