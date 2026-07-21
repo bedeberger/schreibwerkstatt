@@ -118,6 +118,36 @@ test('Korrektur ueber eine Heading-Grenze </h2><p> wird uebersprungen', () => {
   assert.equal(countTag(out, 'p'), 1);
 });
 
+test('Korrektur ueber einen <br> wird uebersprungen (Zeilenumbruch bleibt erhalten)', () => {
+  // `original` ueberspannt einen <br> (Vers/Strophe/Adresse). Die Text-View macht
+  // aus dem <br> einen Space, sodass der Match greift — beim Ersetzen ginge der
+  // sichtbare Umbruch aber ersatzlos verloren. Darum: No-Op, HTML 1:1 erhalten.
+  const html = '<p>Rosen sind rot,<br>Veilchen sind blau.</p>';
+  const out = applyCorrections(html, [{ original: 'rot, Veilchen', korrektur: 'rot und Veilchen', typ: 'grammatik' }]);
+  assert.equal(out, html);
+  assert.equal(countTag(out, 'br'), 1);
+});
+
+test('Korrektur neben (nicht ueber) einem <br> wird normal angewandt', () => {
+  // Der Match liegt komplett in EINER Zeile, der <br> bleibt ausserhalb der Range
+  // → normale Ersetzung, Umbruch unberuehrt.
+  const html = '<p>Rosen sind rot,<br>Veilchen sind blau.</p>';
+  const out = applyCorrections(html, [{ original: 'Veilchen sind blau', korrektur: 'Veilchen sind lila', typ: 'stil' }]);
+  assert.equal(countTag(out, 'br'), 1);
+  assert.ok(out.includes('Veilchen sind lila'));
+  assert.ok(out.includes('Rosen sind rot,'));
+});
+
+test('korrektur mit rohem \\n fuegt keinen Zeilenumbruch hinzu', () => {
+  // Ein KI-Artefakt-Newline in `korrektur` darf nicht verbatim ins HTML wandern
+  // (in <pre>/.poem wuerde es als sichtbarer Umbruch gerendert). Es wird zu Space.
+  const html = '<p>Der Satz ist gut.</p>';
+  const out = applyCorrections(html, [{ original: 'Der Satz ist gut.', korrektur: 'Der Satz\nist sehr gut.', typ: 'stil' }]);
+  assert.ok(!out.includes('\n'));
+  assert.ok(out.includes('Der Satz ist sehr gut.'));
+  assert.equal(countTag(out, 'br'), 0);
+});
+
 test('SAFETY_HTML_RATIO faengt katastrophale Schrumpfung ab, blockt normale Korrektur nicht', () => {
   // Replikat des Guards aus _loadApplyAndSave: finalHtml < page.html * RATIO -> Fehler.
   const guard = (before, after) => after.length < before.length * SAFETY_HTML_RATIO;

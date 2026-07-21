@@ -150,6 +150,17 @@ function _crossesBlockBoundary(slice) {
   return false;
 }
 
+// True, wenn der Slice einen sichtbaren Zeilenumbruch <br> umschliesst. In der
+// Text-View wird <br> — wie jedes Tag — zu einem Space (markSpace), sodass ein
+// toleranter Match ihn ueberspannen kann. Beim Ersetzen ginge der <br> dann
+// verloren: er ist ein Void-Tag, den `_splitOrphanTags` nicht als Waise erhaelt,
+// und `korrektur` ist Fliesstext ohne Umbruch-Position. Ergebnis waere ein
+// stillschweigend geloeschter Zeilenumbruch (Vers, Adresse, Strophe). Wie bei
+// einer Block-Grenze bleibt der Text darum unveraendert statt korrumpiert.
+function _crossesLineBreak(slice) {
+  return /<br\b[^>]*>/i.test(slice);
+}
+
 // True, wenn der Slice ein VOLLSTAENDIG umschlossenes <a>…</a> enthaelt (Open
 // UND Close im Bereich). Das href traegt Information, die die Plaintext-View der
 // KI nie gesehen hat — beim Ersetzen fiele der Link ersatzlos weg (nur der
@@ -201,26 +212,35 @@ function _splitOrphanTags(slice) {
  * dabei darf weder das öffnende noch das schliessende Tag verloren gehen).
  *
  * Kreuzt der Match dagegen eine BLOCK-Grenze (`</p><p>`, `</li><li>`, Heading,
- * Tabelle …) ODER umschliesst er einen vollständigen Hyperlink (`<a>…</a>`),
- * wird NICHT ersetzt: eine Block-Grenzen-Ersetzung würde Absätze zerstören, eine
- * Link-Ersetzung würde das nur der KI-Plaintext-View unbekannte `href` ersatzlos
- * verwerfen. In beiden Fällen bleibt der Text unverändert statt korrumpiert.
+ * Tabelle …), umschliesst er einen Zeilenumbruch (`<br>`) ODER einen vollständigen
+ * Hyperlink (`<a>…</a>`), wird NICHT ersetzt: eine Block-Grenzen-Ersetzung würde
+ * Absätze zerstören, ein umspannter `<br>` würde als sichtbarer Zeilenumbruch
+ * ersatzlos verschwinden, eine Link-Ersetzung würde das nur der KI-Plaintext-View
+ * unbekannte `href` verwerfen. In allen Fällen bleibt der Text unverändert statt
+ * korrumpiert.
+ *
+ * `replacement` selbst wird von rohen Zeilenumbrüchen (`\n`/`\r`) befreit, damit
+ * kein Umbruch hinzukommt, den `original` nicht hatte.
  *
  * Gibt das neue HTML zurück, oder das Original wenn nichts gefunden bzw. der
- * Match eine Block-Grenze kreuzt oder einen Link umschliesst.
+ * Match eine Block-Grenze, einen `<br>` oder einen Link kreuzt.
  */
 export function replaceInHtml(html, needle, replacement) {
   if (!html || !needle) return html;
   const m = findInHtml(html, needle);
   if (!m) return html;
   const removed = html.slice(m.htmlStart, m.htmlEnd);
-  let inserted = replacement;
+  // Keinen Zeilenumbruch hinzufuegen: `korrektur` ist reiner Ersatz-Fliesstext.
+  // Ein rohes \n darin (KI-Artefakt) wanderte sonst verbatim ins HTML und wuerde
+  // in umbruch-erhaltenden Bloecken (<pre>, .poem) als sichtbarer Umbruch gerendert.
+  let inserted = String(replacement).replace(/[\r\n]+/g, ' ');
   if (removed.includes('<')) {
     if (_crossesBlockBoundary(removed)) return html;
+    if (_crossesLineBreak(removed)) return html;
     if (_containsBalancedAnchor(removed)) return html;
     const { orphanOpens, orphanCloses } = _splitOrphanTags(removed);
     if (orphanOpens.length || orphanCloses.length) {
-      inserted = orphanOpens.join('') + replacement + orphanCloses.join('');
+      inserted = orphanOpens.join('') + inserted + orphanCloses.join('');
     }
   }
   return html.slice(0, m.htmlStart) + inserted + html.slice(m.htmlEnd);
