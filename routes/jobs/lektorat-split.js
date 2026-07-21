@@ -6,7 +6,7 @@
 // und – wenn ja – wie viele Objektiv-Läufe der Konsens fährt (ai.lektorat_objective_runs).
 // Lokale Provider splitten nie (ein kombinierter Single-Call).
 
-const { aiCall, i18nError } = require('./shared');
+const { aiCall, i18nError, updateJob } = require('./shared');
 const appSettings = require('../../lib/app-settings');
 const { consensusFindings, mergePasses } = require('../../lib/lektorat-consolidate');
 
@@ -18,7 +18,7 @@ function splitEnabled() {
 
 // Anzahl paralleler Objektiv-Läufe für den Konsens + Konsens-Schwelle.
 // Admin-tunebar (ai.lektorat_objective_runs / ai.lektorat_consensus_threshold);
-// Defaults kommen aus lib/app-settings.js (3 bzw. 2). Greift nur bei aktivem Split.
+// Defaults kommen aus lib/app-settings.js (1 bzw. 2). Greift nur bei aktivem Split.
 function objektivRuns() {
   const n = parseInt(appSettings.get('ai.lektorat_objective_runs'), 10);
   return Number.isFinite(n) && n > 0 ? n : 1;
@@ -55,11 +55,25 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   if (!tok.inflight) tok.inflight = new Map();   // parallele Live-Token-Summierung
   // Fortschritt über alle Teil-Calls (K Objektiv-Läufe + 1 Stil-Lauf) verteilen,
   // sofern ein Bereich vorgegeben ist (Einzel-Lektorat). Im Batch (fromPct/toPct = null)
-  // steuert der Job den Balken per Seiten-Zähler – dann keinen Range setzen.
-  if (fromPct != null && toPct != null) {
-    tok.progressRange = { from: fromPct, to: toPct, total: K + 1 };
+  // steuert der Job den Balken per Seiten-Zähler – dann weder Range noch Teil-Call-
+  // Zähler setzen (der würde sonst die Seiten-Statuszeile überschreiben).
+  const total = K + 1;
+  const trackPasses = fromPct != null && toPct != null;
+  if (trackPasses) {
+    tok.progressRange = { from: fromPct, to: toPct, total };
     tok.progressParts = new Map();
   }
+  // Status-Zeile: nach jedem fertigen Teil-Call hochzählen (parallele Calls beenden
+  // out-of-order → reine „X von Y fertig"-Zählung, kein Pass-Name). Gibt r durch,
+  // damit die Ergebnisse der aiCalls unverändert weiterverwendet werden.
+  let doneCalls = 0;
+  const tick = (r) => {
+    if (trackPasses) {
+      doneCalls++;
+      updateJob(jobId, { statusText: 'job.phase.lektoratPasses', statusParams: { done: doneCalls, total } });
+    }
+    return r;
+  };
   const objektivOpts = {
     figuren: promptOpts.figuren, figurenBeziehungen: promptOpts.figurenBeziehungen,
     orte: promptOpts.orte, pageName: promptOpts.pageName, chapterName: promptOpts.chapterName,
@@ -67,11 +81,11 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   };
   const objektivPrompt = buildObjektivLektoratPrompt(text, objektivOpts);
   const stilPrompt = buildStilLektoratPrompt(text, promptOpts);
-  const objCall = () => aiCall(jobId, tok, objektivPrompt, system, null, null, 4000, 0.2, null, undefined, SCHEMA_LEKTORAT_OBJEKTIV);
+  const objCall = () => aiCall(jobId, tok, objektivPrompt, system, null, null, 4000, 0.2, null, undefined, SCHEMA_LEKTORAT_OBJEKTIV).then(tick);
 
   // Stil-Pass parallel starten – eigener User-Prompt, profitiert nicht vom
   // Objektiv-Cache (teilt nur den kleinen System-Block).
-  const stilPromise = aiCall(jobId, tok, stilPrompt, system, null, null, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT);
+  const stilPromise = aiCall(jobId, tok, stilPrompt, system, null, null, 5000, 0.2, null, undefined, SCHEMA_LEKTORAT).then(tick);
 
   // Objektiv-Läufe STAFFELN statt sofort alle parallel: den ersten Lauf voll
   // abschliessen, damit er den Prompt-Cache primet (voller Input = System +

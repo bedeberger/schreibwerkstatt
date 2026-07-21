@@ -3636,6 +3636,7 @@
   "job.phase.verifyContradictions": "KI verifiziert Widersprüche am Originaltext…",
   "job.phase.loadingPageContent": "Lade Seiteninhalt…",
   "job.phase.aiAnalyzing": "KI analysiert…",
+  "job.phase.lektoratPasses": "KI analysiert… ({done}/{total})",
   "job.phase.pageProgress": "{current}/{total}: {name}…",
   "job.phase.searchingSynonyms": "KI sucht Synonyme…",
   "job.phase.distillingStyle": "KI destilliert das Stilprofil…",

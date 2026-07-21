@@ -3636,6 +3636,7 @@
   "job.phase.verifyContradictions": "AI verifying contradictions against the source text…",
   "job.phase.loadingPageContent": "Loading page content…",
   "job.phase.aiAnalyzing": "AI analysing…",
+  "job.phase.lektoratPasses": "AI analysing… ({done}/{total})",
   "job.phase.pageProgress": "{current}/{total}: {name}…",
   "job.phase.searchingSynonyms": "AI searching synonyms…",
   "job.phase.distillingStyle": "AI distilling the style profile…",
