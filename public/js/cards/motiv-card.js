@@ -61,11 +61,6 @@ export function registerMotivCard() {
     newMotifThemeId: '',
     newRelationTargetId: '',
     newRelationTyp: '',
-    // Verknüpfungs-Combobox-Tempwerte (werden nach Auswahl geleert)
-    linkFigTmp: '',
-    linkBeatTmp: '',
-    linkChapTmp: '',
-    linkPageTmp: '',
     // Scan-Job
     scanning: false,
     scanProgress: 0,

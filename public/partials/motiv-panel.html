@@ -132,13 +132,15 @@
           </template>
         </div>
         <!-- Eine Combobox, zwei Quellen gruppiert: Komplettanalyse (figures) + Plotwerkstatt (draft_figures).
-             Wert trägt ein Präfix (fig:/draft:), addFigureLink löst die richtige Brücke auf. -->
-        <div x-data="combobox($app.t('motiv.link.addFigure'), '')" x-modelable="value" x-model="linkFigTmp"
+             Wert trägt ein Präfix (fig:/draft:), addFigureLink löst die richtige Brücke auf.
+             Picker-Muster: transient + $event.detail — x-modelable-Sync ist asynchron
+             (Effect-Flush), ein Temp-x-model wäre im combobox-change-Handler noch stale. -->
+        <div x-data="combobox({ placeholder: $app.t('motiv.link.addFigure'), transient: true })"
              x-effect="options = [
                ...($store.catalog.figuren||[]).map(f=>({value:'fig:'+f.id, label:f.name, group:$app.t('motiv.link.figureGroup.katalog')})),
                ...(allDraftFiguren||[]).map(d=>({value:'draft:'+d.id, label:d.name, group:$app.t('motiv.link.figureGroup.werkstatt')}))
              ]"
-             @combobox-change="if(linkFigTmp){ addFigureLink(linkFigTmp); linkFigTmp='' }"></div>
+             @combobox-change="addFigureLink($event.detail)"></div>
       </div>
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.beats')"></span>
@@ -148,9 +150,9 @@
               <button type="button" @click="toggleLink('beats', b)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
         </div>
-        <div x-data="combobox($app.t('motiv.link.addBeat'), '')" x-modelable="value" x-model="linkBeatTmp"
+        <div x-data="combobox({ placeholder: $app.t('motiv.link.addBeat'), transient: true })"
              x-effect="options = (allActs||[]).flatMap(a=>(allBeats||[]).filter(b=>String(b.actId)===String(a.id)).map(b=>({value:String(b.id),label:b.titel||'?',group:a.name})))"
-             @combobox-change="if(linkBeatTmp){ addLink('beats', linkBeatTmp); linkBeatTmp='' }"></div>
+             @combobox-change="addLink('beats', $event.detail)"></div>
       </div>
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.chapters')"></span>
@@ -160,9 +162,9 @@
               <button type="button" @click="toggleLink('chapters', c)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
         </div>
-        <div x-data="combobox($app.t('motiv.link.addChapter'), '')" x-modelable="value" x-model="linkChapTmp"
+        <div x-data="combobox({ placeholder: $app.t('motiv.link.addChapter'), transient: true })"
              x-effect="options = ($store.nav.tree||[]).filter(t=>t.type==='chapter' && !String(t.id).startsWith('solo-')).map(c=>({value:String(c.id),label:c.name}))"
-             @combobox-change="if(linkChapTmp){ addLink('chapters', linkChapTmp); linkChapTmp='' }"></div>
+             @combobox-change="addLink('chapters', $event.detail)"></div>
       </div>
       <div class="motiv-link-group">
         <span class="motiv-field-label" x-text="$app.t('motiv.link.pages')"></span>
@@ -172,9 +174,9 @@
               <button type="button" @click="toggleLink('pages', p)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
         </div>
-        <div x-data="combobox($app.t('motiv.link.addPage'), '')" x-modelable="value" x-model="linkPageTmp"
+        <div x-data="combobox({ placeholder: $app.t('motiv.link.addPage'), transient: true })"
              x-effect="options = ($store.nav.pages||[]).map(p=>({value:String(p.id),label:p.name,group:p.chapterName||''}))"
-             @combobox-change="if(linkPageTmp){ addLink('pages', linkPageTmp); linkPageTmp='' }"></div>
+             @combobox-change="addLink('pages', $event.detail)"></div>
       </div>
       </div>
       </div>

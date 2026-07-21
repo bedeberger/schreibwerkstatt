@@ -118,12 +118,12 @@
     <label class="plot-edit-label" x-show="$store.catalog.figuren.length || draftFiguren.length"
            x-text="$app.t('plot.beat.figuren')"></label>
     <div x-show="$store.catalog.figuren.length || draftFiguren.length"
-         x-data="combobox($app.t('plot.beat.figurenPick'), '')" x-modelable="value" x-model="beatFigTmp"
+         x-data="combobox({ placeholder: $app.t('plot.beat.figurenPick'), transient: true })"
          x-effect="options = [
            ...($store.catalog.figuren||[]).map(f=>({value:'fig:'+f.id, label:(f.kurzname||f.name), group:$app.t('plot.beat.figureGroup.katalog')})),
            ...(draftFiguren||[]).map(d=>({value:'draft:'+d.id, label:d.name, group:$app.t('plot.beat.figureGroup.werkstatt')}))
          ]"
-         @combobox-change="if(beatFigTmp){ addBeatFigureLink(beatFigTmp); beatFigTmp='' }"></div>
+         @combobox-change="addBeatFigureLink($event.detail)"></div>
     <div class="plot-fig-chips" x-show="beatFigureChips().length || beatWerkstattChips().length">
       <template x-for="chip in beatFigureChips()" :key="chip.id">
         <span class="tag plot-fig-chip">

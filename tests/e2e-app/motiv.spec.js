@@ -85,3 +85,78 @@ test('Motiv-Werkstatt: anlegen, verknüpfen, Graph — ohne Konsolenfehler', asy
   await page.waitForTimeout(300);
   guard.assertClean('Motiv-Werkstatt Interaktion');
 });
+
+// Regression: Verknüpfungs-Comboboxen sind transiente Picker mit $event.detail.
+// Ein Temp-x-model wäre im combobox-change-Handler noch stale (x-modelable synct
+// asynchron via Effect-Flush) — die erste Auswahl landete dann nirgends, die
+// zweite fügte die vorherige hinzu.
+test('Motiv-Werkstatt: erste Combobox-Auswahl landet sofort im Link-Puffer (dirty)', async ({ page }) => {
+  const guard = attachConsoleGuard(page);
+  await bootApp(page);
+  await selectSeededBook(page);
+
+  await page.evaluate(() => window.__app.toggleMotivCard());
+  await page.waitForFunction(() => {
+    const el = document.querySelector('.card--motiv');
+    if (!el) return false;
+    const c = window.Alpine.$data(el);
+    return c && !c.loading;
+  }, null, { timeout: 15000 });
+
+  await page.evaluate(async () => {
+    const card = window.Alpine.$data(document.querySelector('.card--motiv'));
+    card.newMotifName = 'Combobox-Regression';
+    await card.addMotif(); // selektiert das neue Motiv
+  });
+
+  // Kapitel-Verknüpfung über die ECHTE Combobox wählen (3. Link-Gruppe) —
+  // genau EIN Klick muss reichen.
+  const chapGroup = page.locator('.motiv-link-group').nth(2);
+  await chapGroup.locator('.combobox-trigger').scrollIntoViewIfNeeded();
+  await chapGroup.locator('.combobox-trigger').click();
+  const opt = chapGroup.locator('.combobox-option').first();
+  await expect(opt).toBeVisible();
+  await opt.click();
+
+  await page.waitForFunction(() => {
+    const c = window.Alpine.$data(document.querySelector('.card--motiv'));
+    return c.editChapters.length === 1 && c.motifDirty();
+  }, null, { timeout: 5000 });
+
+  // Save/Cancel-Icons erscheinen (motifDirty).
+  await expect(page.locator('.motiv-editor-head .icon-btn--success')).toBeVisible();
+
+  guard.assertClean('Motiv-Werkstatt Combobox-Link');
+});
+
+// Regression: Re-Klick auf den bereits gewählten Graph-Knoten (selectMotif mit
+// derselben ID) darf ungespeicherte Edit-Puffer nicht verwerfen.
+test('Motiv-Werkstatt: Re-Select desselben Motivs behält ungespeicherte Edits', async ({ page }) => {
+  const guard = attachConsoleGuard(page);
+  await bootApp(page);
+  await selectSeededBook(page);
+
+  await page.evaluate(() => window.__app.toggleMotivCard());
+  await page.waitForFunction(() => {
+    const el = document.querySelector('.card--motiv');
+    if (!el) return false;
+    const c = window.Alpine.$data(el);
+    return c && !c.loading;
+  }, null, { timeout: 15000 });
+
+  const result = await page.evaluate(async () => {
+    const card = window.Alpine.$data(document.querySelector('.card--motiv'));
+    card.newMotifName = 'Reselect-Regression';
+    await card.addMotif();
+    const id = card.selectedMotifId;
+    card.editName = 'Umbenannt aber ungespeichert';
+    // Graph-Knoten-Klick auf das gewählte Motiv → selectMotif(gleiche ID).
+    await card.selectMotif(id);
+    return { editName: card.editName, dirty: card.motifDirty() };
+  });
+
+  expect(result.editName).toBe('Umbenannt aber ungespeichert');
+  expect(result.dirty).toBe(true);
+
+  guard.assertClean('Motiv-Werkstatt Re-Select');
+});

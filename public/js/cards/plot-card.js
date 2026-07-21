@@ -59,9 +59,6 @@ export function registerPlotCard() {
     // Beat-Edit / -Add
     editingBeatId: null,
     beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', intensitaet: null, figure_ids: [], draft_figure_ids: [], motif_ids: [] },
-    // Temp-Wert der kombinierten Figuren-Combobox (Katalog + Werkstatt als
-    // opt-Gruppen); combobox-change decodiert das Präfix und leert das Feld.
-    beatFigTmp: '',
     addingActId: null,
     // Grid-Add-Beat: Zell-Schlüssel `${actId}:${threadId|null}` (statt addingActId).
     addingCell: null,

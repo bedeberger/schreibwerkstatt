@@ -328,10 +328,16 @@ export const crudMethods = {
   },
 
   async selectMotif(id) {
+    // Re-Klick auf das bereits gewählte Motiv (z.B. sein Graph-Knoten): Edit-Puffer
+    // NICHT neu laden — sonst verwirft der Klick ungespeicherte Änderungen (Name/
+    // Thema/Verknüpfungen) kommentarlos und der Graph behält den alten Stand.
+    const sameId = !!id && id === this.selectedMotifId;
     this.selectedMotifId = id;
-    this.occurrences = [];
-    this._loadMotifBuffer(this.motifById(id));
-    this._loadLinkBuffer(this.motifById(id));
+    if (!sameId) {
+      this.occurrences = [];
+      this._loadMotifBuffer(this.motifById(id));
+      this._loadLinkBuffer(this.motifById(id));
+    }
     if (!id) return;
     this.occExpanded = this._readSectionExpanded('occ', id);
     this.linksExpanded = this._readSectionExpanded('links', id);

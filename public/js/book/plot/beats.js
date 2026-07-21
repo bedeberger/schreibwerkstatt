@@ -132,7 +132,6 @@ export const beatsMethods = {
       draft_figure_ids: [...(beat.draft_fig_ids || [])],
       motif_ids: (beat.motifs || []).map(m => m.id),
     };
-    this.beatFigTmp = '';
   },
   cancelEditBeat() { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; },
 
