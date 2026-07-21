@@ -703,3 +703,62 @@ test('normalizeQuotesInRange: Dot-Run nur innerhalb Range', () => {
   // Inner Dot-Run normalisiert; ausserhalb (`Foo..`) bleibt
   assert.equal(p.textContent, '«Oh…» z.B. Foo..');
 });
+
+// --- Innen-Abstand & Idempotenz (Fix: macOS-Autokorrektur-Spaces + FR-Wachstum) ---
+
+const NBSP = ' ';
+
+test('de-CH: von aussen (macOS) eingefügte Spaces in Guillemets werden gestrippt', () => {
+  const root = makeRoot('<p>« Hallo », sagte er.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  const n = normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '«Hallo», sagte er.');
+  assert.ok(n > 0, 'Änderung muss gezählt werden (markiert dirty)');
+});
+
+test('de-CH: NBSP-Innenabstände werden ebenfalls gestrippt', () => {
+  const root = makeRoot(`<p>«${NBSP}Hallo${NBSP}»</p>`);
+  const style = resolveQuoteStyle('de', 'CH');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, '«Hallo»');
+});
+
+test('de-CH: bereits sauber → count 0 (kein unnötiges Dirty/Re-Save)', () => {
+  const root = makeRoot('<p>«Hallo», sagte er.</p>');
+  const style = resolveQuoteStyle('de', 'CH');
+  assert.equal(normalizeQuotes(root, style), 0);
+});
+
+test('fr: exakt ein NBSP je Guillemet, idempotent über mehrere Läufe', () => {
+  const root = makeRoot('<p>"Bonjour", dit-il.</p>');
+  const style = resolveQuoteStyle('fr');
+  normalizeQuotes(root, style);
+  const once = root.querySelector('p').textContent;
+  assert.equal(once, `«${NBSP}Bonjour${NBSP}», dit-il.`);
+  // Wiederholte Läufe dürfen keine weiteren Spaces einschieben.
+  normalizeQuotes(root, style);
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, once);
+});
+
+test('fr: mehrfach-Spaces kollabieren auf den Style-NBSP', () => {
+  const root = makeRoot('<p>«   Bonjour   »</p>');
+  const style = resolveQuoteStyle('fr');
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, `«${NBSP}Bonjour${NBSP}»`);
+});
+
+test('fr: fragmentierte Text-Nodes (Guillemet | NBSP | Wort) bleiben idempotent', () => {
+  // Simuliert contenteditable-Fragmentierung: normalize() muss vorher mergen.
+  const root = makeRoot('<p></p>');
+  const p = root.querySelector('p');
+  p.appendChild(document.createTextNode('«'));
+  p.appendChild(document.createTextNode(NBSP + 'Bonjour' + NBSP));
+  p.appendChild(document.createTextNode('»'));
+  const style = resolveQuoteStyle('fr');
+  normalizeQuotes(root, style);
+  const once = root.querySelector('p').textContent;
+  normalizeQuotes(root, style);
+  assert.equal(root.querySelector('p').textContent, once);
+  assert.equal(once, `«${NBSP}Bonjour${NBSP}»`);
+});

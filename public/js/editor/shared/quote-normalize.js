@@ -9,18 +9,12 @@
 // sonst würde er fälschlich als schliessendes Single-Quote (de-CH `›`) gesetzt.
 // Skip: <pre>, <code>, <script>, <style>.
 //
-// Klassifikation rein kontextbasiert — kein Open/Close-State. Jeder Quote
-// wird anhand der Nachbarschaftszeichen (prev/next) eigenständig entschieden;
-// ein einzelner ungerader Quote vergiftet nicht alle folgenden.
-//
-// Zwei Scopes: `normalizeQuotes(rootEl, style)` für Page-weit (Slash-Item
-// Notebook + Focus-Topbar), `normalizeQuotesInRange(range, style)` für eine
-// Selection-Range (Bubble-Toolbar Notebook).
-//
-// Zusätzlich: ASCII-Dot-Runs (`..`, `...`, `....`) innerhalb einer offenen
-// Quote-Klammer → `…` (U+2026). Nur in Quote-Scope, damit Abkürzungen
-// (`z.B.`, `usw.`) ausserhalb von Dialogen unverändert bleiben. Detection
-// via `quoteStack.length > 0` an der Dot-Position.
+// Klassifikation rein kontextbasiert — kein Open/Close-State. Jeder Quote wird
+// anhand der Nachbarschaftszeichen (prev/next) eigenständig entschieden.
+// Zwei Scopes: `normalizeQuotes(rootEl, style)` page-weit (Slash-Item Notebook +
+// Focus-Topbar), `normalizeQuotesInRange(range, style)` für eine Selection-Range
+// (Bubble-Toolbar Notebook). ASCII-Dot-Runs innerhalb offener Quote-Klammer →
+// `…`; nur in Quote-Scope (`quoteStack.length > 0`), damit `z.B.`/`usw.` bleiben.
 
 const STYLES = {
   // Schweiz / Liechtenstein: Guillemets aussen, Single-Guillemets innen
@@ -262,19 +256,41 @@ function _peekNext(textNodes, nodeIdx) {
   return '';
 }
 
-// Wendet ein Replacement an und dedupliziert Leerzeichen an Style-Grenzen
-// (FR-Style hat NBSP innerhalb der Guillemets: `« …` / `… »`). Wenn `out`
-// mit Space endet und `repl` mit Space beginnt → ein Space droppen. Wenn
-// `repl` mit Space endet und Source-Next ein Space ist → Source-Skip 1.
-function _applyRepl(out, srcNext, repl) {
-  if (SPACES.has(repl[0]) && out.length && SPACES.has(out[out.length - 1])) {
-    out = out.slice(0, -1);
+// Emittiert eine Quote-Glyphe mit style-korrektem Innen-Abstand und macht das
+// Ergebnis idempotent — unabhängig davon, wie viele Spaces (regulär/NBSP) bereits
+// dastehen. `repl` trägt die Style-Vorgabe inklusive optionalem Innen-Space
+// (de-CH: `«`/`»` ohne, fr: `« `/` »` mit NBSP). Der Space wird in
+// lead/core/trail zerlegt: open → core+trail plus `dropFollowing` (verwirft die
+// direkt folgenden Source-Spaces, auch über Node-Grenzen, statt sie anzudocken →
+// keine wachsenden Abstände bei Re-Läufen, egal ob macOS-Autokorrektur oder KI
+// sie eingeschleust hat); close → Trailing-Spaces in `out` strippen, dann
+// lead+core; apostrophe → nur core. Reiner Glyphen-Style (kein Innen-Space)
+// räumt Fremd-Spaces so gleich mit weg.
+function _splitRepl(repl) {
+  let a = 0, b = repl.length;
+  while (a < b && SPACES.has(repl[a])) a++;
+  while (b > a && SPACES.has(repl[b - 1])) b--;
+  return { lead: repl.slice(0, a), core: repl.slice(a, b) || repl, trail: repl.slice(b) };
+}
+
+// `minStrip` begrenzt den close-Strip rückwärts — die Range-Variante schützt so
+// den Out-of-Range-Head (Spaces vor `startOff`). `core` = signifikante Glyphe.
+function _emitQuote(out, role, repl, minStrip = 0) {
+  const { lead, core, trail } = _splitRepl(repl);
+  if (role === 'open') return { out: out + core + trail, dropFollowing: true, core };
+  if (role === 'close') {
+    let e = out.length;
+    while (e > minStrip && SPACES.has(out[e - 1])) e--;
+    return { out: out.slice(0, e) + lead + core, dropFollowing: false, core };
   }
-  const skip = SPACES.has(repl[repl.length - 1]) && SPACES.has(srcNext) ? 1 : 0;
-  return { out: out + repl, skip };
+  return { out: out + core, dropFollowing: false, core };
 }
 
 function _normalizeBlock(blockEl, style) {
+  // Benachbarte Text-Nodes zusammenführen (Browser-Normalzustand: ein Node pro
+  // Inline-Run; Editing/`&#160;`-Parse fragmentiert ihn). Sonst läge das Guillemet
+  // im einen, sein NBSP im nächsten Node → einseitiger Strip, FR wüchse pro Lauf.
+  blockEl.normalize?.();
   const textNodes = [];
   // Inner Blocks (z.B. <p> in <blockquote>, <li> in <ul>) werden NICHT
   // mitgesammelt — sie laufen als eigene _normalizeBlock-Aufrufe, damit ihr
@@ -285,6 +301,9 @@ function _normalizeBlock(blockEl, style) {
   let count = 0;
   let prevChar = '';
   let prevNonWs = '';
+  // Nach öffnendem Quote: direkt folgende Source-Spaces gehören zum (schon
+  // emittierten) Innen-Abstand → verworfen, auch über Node-Grenzen.
+  let dropFollowing = false;
   // Quote-Stack pro Block (Reset an Block-Grenze). `length` = Nesting-Depth
   // beim aktuellen Char. Inhalt ist irrelevant — wir brauchen nur die Tiefe.
   const quoteStack = [];
@@ -295,14 +314,20 @@ function _normalizeBlock(blockEl, style) {
       // Weiche Zeilengrenze: frischer Kontext wie an einer Block-Grenze.
       prevChar = '';
       prevNonWs = '';
+      dropFollowing = false;
       quoteStack.length = 0;
       continue;
     }
     const s = node.nodeValue;
     if (!s) continue;
     let out = '';
+    let units = 0; // normalisierte Einheiten in diesem Node (Quotes + Ellipsen)
     for (let i = 0; i < s.length; i++) {
       const c = s[i];
+      if (dropFollowing) {
+        if (SPACES.has(c)) continue; // Innen-Space nach öffnendem Quote schlucken
+        dropFollowing = false;
+      }
       const isDouble = _isDoubleQuote(c);
       const isSingle = !isDouble && _isSingleQuote(c);
       if (!isDouble && !isSingle) {
@@ -313,7 +338,7 @@ function _normalizeBlock(blockEl, style) {
           i += runLen - 1;
           prevChar = '…';
           prevNonWs = '…';
-          count++;
+          units++;
           continue;
         }
         out += c;
@@ -328,32 +353,18 @@ function _normalizeBlock(blockEl, style) {
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
         : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter, singleOpen);
       const repl = _depthRepl(cls.role, quoteStack.length, style, cls.repl, isDouble);
-      // Idempotenz: nur sinnvoll, wenn `repl` mit Space (NBSP / reg) startet
-      // (FR-Style). Dann darf der bereits in `out` vorhandene Space als erstes
-      // Zeichen von `repl` zählen — wir konsumieren nur `repl.slice(1)` aus
-      // Source. Für Non-Space-Prefix-Styles (de-CH/de-DE/en/it) bleibt
-      // matchOffset 0, sonst entstünde ein Empty-Emit-Infinite-Loop bei
-      // adjazenten Glyphen wie `„«` → `«` + matchOffset=1 → emitted=''.
-      const matchOffset = (SPACES.has(repl[0]) && out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
-      const emitted = s.startsWith(repl.slice(matchOffset), i) ? repl.slice(matchOffset) : null;
-      if (emitted !== null) {
-        out += emitted;
-        i += emitted.length - 1;
-      } else {
-        const srcNext = i + 1 < s.length ? s[i + 1] : '';
-        const applied = _applyRepl(out, srcNext, repl);
-        out = applied.out;
-        i += applied.skip;
-        count++;
-      }
-      prevChar = repl[repl.length - 1] || c;
-      for (let k = repl.length - 1; k >= 0; k--) {
-        if (!SPACES.has(repl[k])) { prevNonWs = repl[k]; break; }
-      }
+      const em = _emitQuote(out, cls.role, repl);
+      out = em.out;
+      dropFollowing = em.dropFollowing;
+      units++;
+      prevChar = out[out.length - 1] || c;
+      prevNonWs = em.core;
       if (cls.role === 'open') quoteStack.push(isDouble ? 'd' : 's');
       else if (cls.role === 'close' && quoteStack.length) quoteStack.pop();
     }
-    if (out !== s) node.nodeValue = out;
+    // Geänderter Node zählt ≥1 (auch wenn nur ein Fremd-Space über die Grenze
+    // geschluckt wurde → `units` hier 0), unveränderter 0 → no-op bleibt count 0.
+    if (out !== s) { node.nodeValue = out; count += Math.max(1, units); }
   }
   return count;
 }
@@ -428,12 +439,6 @@ export function normalizeQuotesInRange(range, style) {
   const quoteStack = [];
   let lastBlock = null;
 
-  const _updateNonWs = (str) => {
-    for (let k = str.length - 1; k >= 0; k--) {
-      if (!SPACES.has(str[k])) { prevNonWs = str[k]; return; }
-    }
-  };
-
   for (let nodeIdx = 0; nodeIdx < all.length; nodeIdx++) {
     const node = all[nodeIdx];
     if (_isBr(node)) {
@@ -482,8 +487,17 @@ export function normalizeQuotesInRange(range, style) {
       prevChar = r.prevChar;
       prevNonWs = r.prevNonWs;
     }
+    // close-Strip nur bis hierher (schützt den Out-of-Range-Head); `dropFollowing`
+    // gilt nur in der Range — ein Space direkt hinter der Selection bleibt.
+    const outRangeStart = out.length;
+    let dropFollowing = false;
+    let units = 0;
     for (let i = startOff; i < endOff; i++) {
       const c = s[i];
+      if (dropFollowing) {
+        if (SPACES.has(c)) continue;
+        dropFollowing = false;
+      }
       const isDouble = _isDoubleQuote(c);
       const isSingle = !isDouble && _isSingleQuote(c);
       if (!isDouble && !isSingle) {
@@ -494,7 +508,7 @@ export function normalizeQuotesInRange(range, style) {
           i += runLen - 1;
           prevChar = '…';
           prevNonWs = '…';
-          count++;
+          units++;
           continue;
         }
         out += c;
@@ -509,24 +523,12 @@ export function normalizeQuotesInRange(range, style) {
         ? _classifyDouble(c, prevChar, prevNonWs, next, style)
         : _classifySingle(c, prevChar, prevNonWs, next, style, wordAfter, singleOpen);
       const repl = _depthRepl(cls.role, quoteStack.length, style, cls.repl, isDouble);
-      const matchOffset = (SPACES.has(repl[0]) && out.length && out[out.length - 1] === repl[0]) ? 1 : 0;
-      const consumeLen = repl.length - matchOffset;
-      // Idempotenz nur innerhalb der Range prüfen — Match darf nicht
-      // ausserhalb der User-Selection greifen.
-      if ((i + consumeLen) <= endOff && s.startsWith(repl.slice(matchOffset), i)) {
-        out += repl.slice(matchOffset);
-        i += consumeLen - 1;
-      } else {
-        // Skip nur innerhalb der Range — sonst würde ein post-Range-Space
-        // gefressen, der ausserhalb der User-Selection liegt.
-        const srcNext = (i + 1) < endOff ? s[i + 1] : '';
-        const applied = _applyRepl(out, srcNext, repl);
-        out = applied.out;
-        i += applied.skip;
-        count++;
-      }
-      prevChar = repl[repl.length - 1] || c;
-      _updateNonWs(repl);
+      const em = _emitQuote(out, cls.role, repl, outRangeStart);
+      out = em.out;
+      dropFollowing = em.dropFollowing;
+      units++;
+      prevChar = out[out.length - 1] || c;
+      prevNonWs = em.core;
       if (cls.role === 'open') quoteStack.push(isDouble ? 'd' : 's');
       else if (cls.role === 'close' && quoteStack.length) quoteStack.pop();
     }
@@ -537,7 +539,10 @@ export function normalizeQuotesInRange(range, style) {
       prevChar = r.prevChar;
       prevNonWs = r.prevNonWs;
     }
-    if (out !== s) node.nodeValue = out;
+    if (out !== s) {
+      node.nodeValue = out;
+      count += Math.max(1, units);
+    }
   }
   return count;
 }
