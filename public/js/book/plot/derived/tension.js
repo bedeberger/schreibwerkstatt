@@ -70,7 +70,7 @@ export const tensionMethods = {
       for (const b of withInt) {
         (b.fig_ids || []).forEach(id => catIds.add(id));
         (b.draft_fig_ids || []).forEach(id => draftIds.add(String(id)));
-        const t = b.thread_id != null ? this.threadsById.get(b.thread_id) : null;
+        const t = b.thread_id != null ? this._threadById(b.thread_id) : null;
         if (t) {
           if (t.fig_id) catIds.add(t.fig_id);
           if (t.draft_figure_id != null) draftIds.add(String(t.draft_figure_id));

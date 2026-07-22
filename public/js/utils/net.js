@@ -18,6 +18,20 @@ export async function fetchJson(url, opts) {
 }
 
 /**
+ * `fetchJson` mit JSON-Body-Boilerplate: setzt Methode + Content-Type-Header
+ * und serialisiert `body` (weggelassen, wenn falsy — z.B. DELETE ohne Payload).
+ * Ersetzt das an vielen Stellen ausgeschriebene
+ * `{ method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(...) }`.
+ */
+export function sendJson(url, method, body) {
+  return fetchJson(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+/**
  * Löscht eine Alpine-Status-Property nach `delay`, wenn sie dann noch den
  * gesetzten Wert trägt. Verhindert, dass spätere Status-Updates durch einen
  * verzögerten Reset überschrieben werden – eigenes setTimeout-Idiom, das sich

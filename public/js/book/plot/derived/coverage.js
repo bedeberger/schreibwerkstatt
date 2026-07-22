@@ -157,14 +157,14 @@ export const coverageMethods = {
   // über die Strang-Hauptfigur (Live-Vererbung, gleiches Modell wie die Badges)?
   _beatInvolvesCatalog(b, figId) {
     if ((b.fig_ids || []).includes(figId)) return true;
-    const t = b.thread_id != null ? this.threadsById.get(b.thread_id) : null;
+    const t = b.thread_id != null ? this._threadById(b.thread_id) : null;
     return !!(t && String(t.fig_id) === String(figId));
   },
 
   // Pendant für Werkstatt-Figuren (draft_fig_ids explizit ODER Strang-Bindung).
   _beatInvolvesDraft(b, draftId) {
     if ((b.draft_fig_ids || []).map(String).includes(String(draftId))) return true;
-    const t = b.thread_id != null ? this.threadsById.get(b.thread_id) : null;
+    const t = b.thread_id != null ? this._threadById(b.thread_id) : null;
     return !!(t && String(t.draft_figure_id) === String(draftId));
   },
 

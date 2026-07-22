@@ -3,16 +3,8 @@
 // der Autor übernimmt sie einzeln (→ Theme/Motiv anlegen) oder verwirft sie. Ein
 // Lauf lässt sich später aus der Historie wieder öffnen. Nie im Text.
 
-import { fetchJson, tzOpts } from '../../utils.js';
+import { fetchJson, sendJson, tzOpts, localeTag } from '../../utils.js';
 import { startPoll } from '../../cards/job-helpers.js';
-
-function _json(url, method, body) {
-  return fetchJson(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-}
 
 export const brainstormMethods = {
   // force=true verwirft den Delta-Cache und brainstormt das ganze Buch neu
@@ -69,11 +61,11 @@ export const brainstormMethods = {
     const bookId = this.$store.nav.selectedBookId;
     try {
       if (s.typ === 'thema') {
-        await _json('/motifs/themes', 'POST', { book_id: bookId, name: s.name, beschreibung: s.beschreibung });
+        await sendJson('/motifs/themes', 'POST', { book_id: bookId, name: s.name, beschreibung: s.beschreibung });
       } else {
         const body = { book_id: bookId, name: s.name, beschreibung: s.beschreibung, trigger_terms: s.trigger_terms || [] };
         if (s.themeIdDraft) body.theme_id = Number(s.themeIdDraft);
-        await _json('/motifs', 'POST', body);
+        await sendJson('/motifs', 'POST', body);
       }
       this.dismissSuggestion(s);
       await this.loadBoard();
@@ -131,8 +123,7 @@ export const brainstormMethods = {
     if (!iso) return '';
     try {
       const d = new Date(iso);
-      const locale = this.$store.shell?.uiLocale === 'en' ? 'en-GB' : 'de-CH';
-      return d.toLocaleString(locale, tzOpts());
+      return d.toLocaleString(localeTag(this.$store.shell?.uiLocale), tzOpts());
     } catch { return iso; }
   },
 };

@@ -42,14 +42,8 @@ export function registerPlotCard() {
       return this._draftFigMap;
     },
 
-    // O(1)-Lookup-Map id→Strang (gleiches Referenz-Wechsel-Muster).
-    get threadsById() {
-      if (this._threadMapRef !== this.threads) {
-        this._threadMapRef = this.threads;
-        this._threadMap = new Map((this.threads || []).map(t => [t.id, t]));
-      }
-      return this._threadMap;
-    },
+    // Strang-Lookup läuft über die Methode _threadById (board.js, SSoT) — kein
+    // Card-Getter, weil ihn nur die reinen Methods-Module konsumieren.
 
     // Filter (Kapitel / Figur / Werkstatt-Figur) — wie szenen/ereignisse; filtert
     // die Beats pro Akt-Spalte rein fürs Rendering (beatsForAct bleibt ungefiltert
@@ -163,7 +157,9 @@ export function registerPlotCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'plot',
         showFlag: 'showPlotCard',
-        timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer', '_anchorPollTimer'],
+        // Timer-Cleanup läuft ausschliesslich über _clearJobs (SSoT): book:changed/
+        // view:reset via resetPlot, destroy() ruft es unten selbst. Kein timerKeys
+        // hier (sonst zwei Quellen für dieselben drei Poll-Timer).
         // Sortable vor dem ersten Board-Render laden — _reattachSortables (via
         // loadBoard / $watch) bindet die Beat-Zellen, sobald window.Sortable da ist.
         onShow: async () => { await loadSortable(); await this.loadBoard(); },
@@ -218,6 +214,7 @@ export function registerPlotCard() {
     },
 
     destroy() {
+      this._clearJobs();
       this._destroySortables();
       this._detachOccPopoverListeners?.();
       this._lifecycle?.destroy();

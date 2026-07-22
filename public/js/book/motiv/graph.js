@@ -5,7 +5,7 @@
 // keinen State mit dem Figuren-Graph.
 
 import { loadVis } from '../../lazy-libs.js';
-import { fetchJson } from '../../utils.js';
+import { sendJson } from '../../utils.js';
 import { toggleWrapFullscreen } from '../../fullscreen.js';
 
 // Themen-Palette: primär die vom Autor gewählte Farbe (themes.farbe = Palette-
@@ -20,6 +20,20 @@ const LAYER = { figure: '#0891b2', beat: '#7c3a48', chapter: '#65758b' };
 // Auto-Farbe (Palette-Schlüssel) für ein Thema am gegebenen Listen-Index.
 export function defaultThemeColorKey(ix) {
   return THEME_COLOR_KEYS[((ix % THEME_COLOR_KEYS.length) + THEME_COLOR_KEYS.length) % THEME_COLOR_KEYS.length];
+}
+
+// Knoten-ID-Namespace: jeder Graph-Knoten trägt ein Typ-Präfix vor der DB-ID
+// (t=Thema, m=Motiv, f=Figur, df=Werkstatt-Figur, b=Beat, c=Kapitel). Encode/Decode
+// als SSoT, damit die Konvention nicht über Render/Click/Hover/Kontextmenü verstreut
+// re-implementiert wird — ein neuer Layer-Typ wird nur hier eingetragen.
+const NODE_PREFIX = { theme: 't', motif: 'm', figure: 'f', draftFigure: 'df', beat: 'b', chapter: 'c' };
+export function nodeId(kind, id) { return `${NODE_PREFIX[kind]}${id}`; }
+// Rohe Knoten-ID → { kind, id } oder null. `df` vor den Einzelbuchstaben matchen.
+export function parseNode(id) {
+  const m = /^(df|[tmfbc])(\d+)$/.exec(id || '');
+  if (!m) return null;
+  const kind = Object.keys(NODE_PREFIX).find(k => NODE_PREFIX[k] === m[1]);
+  return { kind, id: Number(m[2]) };
 }
 
 // paletteVars: Palette-Schlüssel → konkreter Farbwert (vis-network zeichnet auf
@@ -89,7 +103,7 @@ export const graphMethods = {
     for (const t of this.themes) {
       const tc = _themeColor(t.id, this.themes, paletteVars);
       nodes.push({
-        id: `t${t.id}`, label: t.name, shape: 'circle', margin: 10, widthConstraint: { maximum: 140 },
+        id: nodeId('theme', t.id), label: t.name, shape: 'circle', margin: 10, widthConstraint: { maximum: 140 },
         // highlight/hover explizit auf die Thema-Farbe: sonst kippt vis-network die
         // Blase bei Selektion/Hover auf seine hellblaue Default-Farbe → weisse
         // Schrift wird unlesbar. Selektion signalisiert stattdessen borderWidthSelected.
@@ -114,6 +128,9 @@ export const graphMethods = {
       return MOTIF_SIZE_MIN + t * (MOTIF_SIZE_MAX - MOTIF_SIZE_MIN);
     };
     const figCatalog = this.$store.catalog.figuren || [];
+    // Layer-Knoten (Figur/Beat/Kapitel) können von mehreren Motiven geteilt werden →
+    // ID-Set gegen Doppel-Push (statt O(n²)-`nodes.some` je Layer-Eintrag).
+    const layerSeen = new Set();
     for (const m of this.motifs) {
       const col = _themeColor(m.theme_id, this.themes, paletteVars);
       const ghost = this.isGhost(m);
@@ -124,8 +141,9 @@ export const graphMethods = {
       // verloren — Geist-Knoten würden dabei sogar solide gefüllt. Selektion
       // signalisiert stattdessen borderWidthSelected.
       const mBg = ghost ? 'rgba(0,0,0,0)' : col;
+      const mid = nodeId('motif', m.id);
       nodes.push({
-        id: `m${m.id}`, label: m.name, shape: 'dot', size,
+        id: mid, label: m.name, shape: 'dot', size,
         color: {
           background: mBg, border: col,
           highlight: { background: mBg, border: col },
@@ -136,40 +154,42 @@ export const graphMethods = {
         font: { color: textColor, size: 13 },
       });
       if (m.theme_id) {
-        edges.push({ from: `t${m.theme_id}`, to: `m${m.id}`, dashes: true, color: { color: col, opacity: 0.5 }, width: 1 });
+        edges.push({ from: nodeId('theme', m.theme_id), to: mid, dashes: true, color: { color: col, opacity: 0.5 }, width: 1 });
       }
 
       // Soll-Layer (optional zuschaltbar).
       if (this.layerFigures) {
         for (const f of (m.figures || [])) {
-          const nid = `f${f.figId}`;
-          if (!nodes.some(n => n.id === nid)) {
+          const nid = nodeId('figure', f.figId);
+          if (!layerSeen.has(nid)) {
+            layerSeen.add(nid);
             const cat = figCatalog.find(x => String(x.id) === String(f.figId));
             nodes.push({ id: nid, label: (cat?.name || f.name || '?'), shape: 'diamond', size: 9, color: LAYER.figure, font: { color: mutedColor, size: 11 } });
           }
-          edges.push({ from: `m${m.id}`, to: nid, dashes: [2, 3], color: { color: LAYER.figure, opacity: 0.6 }, width: 1 });
+          edges.push({ from: mid, to: nid, dashes: [2, 3], color: { color: LAYER.figure, opacity: 0.6 }, width: 1 });
         }
         // Werkstatt-Figuren (draft_figures) — gleiche Ebene, eigener Knoten-Namespace.
         for (const f of (m.draftFigures || [])) {
-          const nid = `df${f.id}`;
-          if (!nodes.some(n => n.id === nid)) {
+          const nid = nodeId('draftFigure', f.id);
+          if (!layerSeen.has(nid)) {
+            layerSeen.add(nid);
             nodes.push({ id: nid, label: (f.name || '?'), shape: 'diamond', size: 9, color: LAYER.figure, font: { color: mutedColor, size: 11 } });
           }
-          edges.push({ from: `m${m.id}`, to: nid, dashes: [2, 3], color: { color: LAYER.figure, opacity: 0.6 }, width: 1 });
+          edges.push({ from: mid, to: nid, dashes: [2, 3], color: { color: LAYER.figure, opacity: 0.6 }, width: 1 });
         }
       }
       if (this.layerBeats) {
         for (const b of (m.beats || [])) {
-          const nid = `b${b.id}`;
-          if (!nodes.some(n => n.id === nid)) nodes.push({ id: nid, label: b.titel || '?', shape: 'square', size: 9, color: LAYER.beat, font: { color: mutedColor, size: 11 } });
-          edges.push({ from: `m${m.id}`, to: nid, dashes: [2, 3], color: { color: LAYER.beat, opacity: 0.6 }, width: 1 });
+          const nid = nodeId('beat', b.id);
+          if (!layerSeen.has(nid)) { layerSeen.add(nid); nodes.push({ id: nid, label: b.titel || '?', shape: 'square', size: 9, color: LAYER.beat, font: { color: mutedColor, size: 11 } }); }
+          edges.push({ from: mid, to: nid, dashes: [2, 3], color: { color: LAYER.beat, opacity: 0.6 }, width: 1 });
         }
       }
       if (this.layerChapters) {
         for (const c of (m.chapters || [])) {
-          const nid = `c${c.id}`;
-          if (!nodes.some(n => n.id === nid)) nodes.push({ id: nid, label: c.name || '?', shape: 'triangle', size: 9, color: LAYER.chapter, font: { color: mutedColor, size: 11 } });
-          edges.push({ from: `m${m.id}`, to: nid, dashes: [2, 3], color: { color: LAYER.chapter, opacity: 0.6 }, width: 1 });
+          const nid = nodeId('chapter', c.id);
+          if (!layerSeen.has(nid)) { layerSeen.add(nid); nodes.push({ id: nid, label: c.name || '?', shape: 'triangle', size: 9, color: LAYER.chapter, font: { color: mutedColor, size: 11 } }); }
+          edges.push({ from: mid, to: nid, dashes: [2, 3], color: { color: LAYER.chapter, opacity: 0.6 }, width: 1 });
         }
       }
     }
@@ -177,7 +197,7 @@ export const graphMethods = {
     // Motiv ↔ Motiv (Beziehungstyp als Kantenlabel).
     for (const r of this.relations) {
       edges.push({
-        from: `m${r.from_motif_id}`, to: `m${r.to_motif_id}`, label: r.typ,
+        from: nodeId('motif', r.from_motif_id), to: nodeId('motif', r.to_motif_id), label: r.typ,
         arrows: 'to', color: { color: '#b45309' }, width: 2,
         font: { size: 11, color: mutedColor, strokeWidth: 3, strokeColor: bgColor },
         smooth: { type: 'curvedCW', roundness: 0.2 },
@@ -205,17 +225,17 @@ export const graphMethods = {
     });
 
     this._motivNetwork.on('click', (params) => {
-      const nid = params.nodes?.[0];
+      const ref = parseNode(params.nodes?.[0]);
       this.closeGraphMenu();
       this._closeMotifOccPopover();
-      if (nid && /^m\d+$/.test(nid)) this.selectMotif(Number(nid.slice(1)));
-      else if (nid && /^t\d+$/.test(nid)) this.selectTheme(Number(nid.slice(1)));
+      if (ref?.kind === 'motif') this.selectMotif(ref.id);
+      else if (ref?.kind === 'theme') this.selectTheme(ref.id);
     });
     // Hover über einen Motiv-Knoten öffnet das Fundstellen-Peek-Popover (occTop);
     // blur schliesst verzögert (Grace-Timer), damit der Cursor aufs Popover wandern
     // kann. Ziehen/Zoomen schliesst sofort (Position würde sonst wegdriften).
     this._motivNetwork.on('hoverNode', (params) => {
-      if (params.node && /^m\d+$/.test(params.node)) this._openMotifOccPopover(params.node);
+      if (parseNode(params.node)?.kind === 'motif') this._openMotifOccPopover(params.node);
     });
     this._motivNetwork.on('blurNode', () => this._scheduleCloseOccPopover());
     this._motivNetwork.on('dragStart', () => this._closeMotifOccPopover());
@@ -258,17 +278,13 @@ export const graphMethods = {
     const positions = this._motivNetwork.getPositions();
     this._savedPositions = positions; // lokal spiegeln, damit Re-Render die Anordnung hält
     try {
-      await fetchJson('/motifs/layout', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: bookId, positions }),
-      });
+      await sendJson('/motifs/layout', 'PUT', { book_id: bookId, positions });
     } catch (e) { /* Layout ist reine Ansicht — Fehler nicht hart melden */ }
   },
 
   _highlightNode(motifId) {
     if (!this._motivNetwork) return;
-    try { this._motivNetwork.selectNodes([`m${motifId}`]); } catch (_) { /* Knoten evtl. (noch) nicht da */ }
+    try { this._motivNetwork.selectNodes([nodeId('motif', motifId)]); } catch (_) { /* Knoten evtl. (noch) nicht da */ }
   },
 
   _destroyGraph() {
@@ -285,14 +301,14 @@ export const graphMethods = {
   // Knotenzentrum (canvasToDOM); Zeilen springen an die belegende Textstelle.
   // Bleibt offen, solange der Cursor über Knoten ODER Popover ist: blur startet
   // einen Grace-Timer, den mouseenter aufs Popover (keepOccPopover) abbricht.
-  _openMotifOccPopover(nodeId) {
+  _openMotifOccPopover(nid) {
     clearTimeout(this._occHoverCloseTimer);
-    const id = Number(nodeId.slice(1));
-    const m = this.motifById(id);
+    const id = parseNode(nid)?.id;
+    const m = id != null ? this.motifById(id) : null;
     if (!m || !(m.occTop || []).length) { this._closeMotifOccPopover(); return; }
     const container = document.getElementById('motiv-graph');
     if (!container || !this._motivNetwork) return;
-    const pos = this._motivNetwork.getPositions([nodeId])[nodeId];
+    const pos = this._motivNetwork.getPositions([nid])[nid];
     if (!pos) return;
     const dom = this._motivNetwork.canvasToDOM(pos);
     const rect = container.getBoundingClientRect();
@@ -370,11 +386,7 @@ export const graphMethods = {
     const bookId = this.$store.nav.selectedBookId;
     if (bookId) {
       try {
-        await fetchJson('/motifs/layout', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ book_id: bookId, positions: {} }),
-        });
+        await sendJson('/motifs/layout', 'PUT', { book_id: bookId, positions: {} });
       } catch (e) { /* Layout ist reine Ansicht — Fehler nicht hart melden */ }
     }
     this._motivHash = ''; // Signatur-Guard umgehen → Neu-Layout erzwingen
@@ -423,20 +435,18 @@ export const graphMethods = {
     this._graphMenuCloseHandler = null;
   },
 
-  // Knoten-Typ für den offenen Menü-Kontext: 'theme' | 'motif' | 'canvas'.
+  // Knoten-Typ für den offenen Menü-Kontext: 'theme' | 'motif' | 'canvas' | 'other'.
   graphMenuKind() {
-    const id = this.graphMenuNodeId;
-    if (!id) return 'canvas';
-    if (/^t\d+$/.test(id)) return 'theme';
-    if (/^m\d+$/.test(id)) return 'motif';
-    return 'other';
+    if (!this.graphMenuNodeId) return 'canvas';
+    const kind = parseNode(this.graphMenuNodeId)?.kind;
+    return (kind === 'theme' || kind === 'motif') ? kind : 'other';
   },
   graphMenuTheme() {
-    const id = this.graphMenuNodeId;
-    return (id && /^t\d+$/.test(id)) ? (this.themes.find(t => t.id === Number(id.slice(1))) || null) : null;
+    const ref = parseNode(this.graphMenuNodeId);
+    return ref?.kind === 'theme' ? (this.themes.find(t => t.id === ref.id) || null) : null;
   },
   graphMenuMotif() {
-    const id = this.graphMenuNodeId;
-    return (id && /^m\d+$/.test(id)) ? this.motifById(Number(id.slice(1))) : null;
+    const ref = parseNode(this.graphMenuNodeId);
+    return ref?.kind === 'motif' ? this.motifById(ref.id) : null;
   },
 };

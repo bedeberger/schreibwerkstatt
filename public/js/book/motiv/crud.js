@@ -2,17 +2,9 @@
 // plus Auswahl + Fundstellen-Laden. Nach jeder Mutation lokalen State + Graph
 // aktualisieren (loadBoard) statt Teil-Patches — die Boards sind klein.
 
-import { fetchJson } from '../../utils.js';
+import { fetchJson, sendJson } from '../../utils.js';
 import { THEME_COLOR_KEYS, defaultThemeColorKey } from './graph.js';
 import { highlightOccurrenceOnPage } from './highlight.js';
-
-function _json(url, method, body) {
-  return fetchJson(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-}
 
 export const crudMethods = {
   _bookId() { return this.$store.nav.selectedBookId; },
@@ -31,7 +23,7 @@ export const crudMethods = {
     if (!name) return;
     this.busy = true;
     try {
-      const theme = await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name });
+      const theme = await sendJson('/motifs/themes', 'POST', { book_id: this._bookId(), name });
       this.newThemeName = '';
       await this.loadBoard();
       await this.selectTheme(theme.id);
@@ -42,7 +34,7 @@ export const crudMethods = {
   async deleteTheme(theme) {
     if (!window.confirm(window.__app.t('motiv.theme.confirmDelete', { name: theme.name }))) return;
     try {
-      await _json(`/motifs/themes/${theme.id}`, 'DELETE');
+      await sendJson(`/motifs/themes/${theme.id}`, 'DELETE');
       if (this.selectedThemeId === theme.id) { this.selectedThemeId = null; this._loadThemeBuffer(null); }
       await this.loadBoard();
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
@@ -68,7 +60,7 @@ export const crudMethods = {
     if (!name) { this.errorMessage = window.__app.t('motiv.error.nameRequired'); return; }
     this.busy = true;
     try {
-      await _json(`/motifs/themes/${t.id}`, 'PATCH', { name, beschreibung: this.editThemeBeschreibung || '' });
+      await sendJson(`/motifs/themes/${t.id}`, 'PATCH', { name, beschreibung: this.editThemeBeschreibung || '' });
       await this.loadBoard();
       this._loadThemeBuffer(this.selectedTheme());
       this.errorMessage = '';
@@ -83,25 +75,31 @@ export const crudMethods = {
     if (!(this.editThemeName || '').trim()) this.editThemeName = t.name;
     await this.saveThemeEdit();
   },
-  // Thema auswählen → Editor im Panel. Gegenseitig exklusiv zur Motiv-Auswahl:
-  // ausstehende Motiv-/Themen-Edits erst committen (fehlgeschlagener Save behält die
-  // Auswahl). Re-Select derselben ID lädt den Puffer nicht neu (Edits überleben).
+  // Vor jedem Auswahl-Wechsel BEIDE Panel-Editoren (Motiv + Thema) committen. Gibt
+  // false zurück, wenn ein Save fehlschlug (Puffer bleibt dirty) → der Aufrufer bricht
+  // ab und behält die aktuelle Auswahl, statt Änderungen still zu verwerfen. Motiv-
+  // und Themen-Editor sind im Panel exklusiv (nur einer ist je dirty); beide zu
+  // committen ist billig und macht die Reihenfolge egal. SSoT für selectMotif/
+  // selectTheme/deselectTheme.
+  async _commitPendingEdits() {
+    await this._commitPendingMotifEdit();
+    if (this.motifDirty()) return false;
+    await this._commitPendingThemeEdit();
+    if (this.themeDirty()) return false;
+    return true;
+  },
+  // Thema auswählen → Editor im Panel. Gegenseitig exklusiv zur Motiv-Auswahl.
+  // Re-Select derselben ID lädt den Puffer nicht neu (Edits überleben).
   async selectTheme(id) {
     const sameId = !!id && id === this.selectedThemeId;
-    if (!sameId) {
-      await this._commitPendingMotifEdit();
-      if (this.motifDirty()) return;
-      await this._commitPendingThemeEdit();
-      if (this.themeDirty()) return;
-    }
+    if (!sameId && !(await this._commitPendingEdits())) return;
     this.selectedMotifId = null;
     this.selectedThemeId = id;
     if (!sameId) this._loadThemeBuffer(this.themeById(id));
   },
   // Themen-Editor schliessen → zurück zur Themen-Liste (committet ausstehende Edits).
   async deselectTheme() {
-    await this._commitPendingThemeEdit();
-    if (this.themeDirty()) return;
+    if (!(await this._commitPendingEdits())) return;
     this.selectedThemeId = null;
   },
   // Palette-Schlüssel für den Farbwähler (theme-aware --palette-*-Tokens).
@@ -121,7 +119,7 @@ export const crudMethods = {
     const farbe = THEME_COLOR_KEYS.includes(key) ? key : null;
     if (farbe === (theme.farbe || null)) return;
     theme.farbe = farbe;
-    try { await _json(`/motifs/themes/${theme.id}`, 'PATCH', { farbe }); await this.loadBoard(); }
+    try { await sendJson(`/motifs/themes/${theme.id}`, 'PATCH', { farbe }); await this.loadBoard(); }
     catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
   },
 
@@ -133,7 +131,7 @@ export const crudMethods = {
     try {
       const body = { book_id: this._bookId(), name };
       if (this.newMotifThemeId) body.theme_id = Number(this.newMotifThemeId);
-      const m = await _json('/motifs', 'POST', body);
+      const m = await sendJson('/motifs', 'POST', body);
       this.newMotifName = '';
       await this.loadBoard();
       await this.selectMotif(m.id);
@@ -150,7 +148,7 @@ export const crudMethods = {
     try {
       const body = { book_id: this._bookId(), name: window.__app.t('motiv.motif.newName') };
       if (themeId) body.theme_id = Number(themeId);
-      const m = await _json('/motifs', 'POST', body);
+      const m = await sendJson('/motifs', 'POST', body);
       await this.loadBoard();
       await this.selectMotif(m.id);
       this.$nextTick(() => { const el = this.$root?.querySelector('.motiv-name-input'); if (el) { el.focus(); el.select(); } });
@@ -163,7 +161,7 @@ export const crudMethods = {
     this.closeGraphMenu();
     this.busy = true;
     try {
-      const theme = await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name: window.__app.t('motiv.theme.newName') });
+      const theme = await sendJson('/motifs/themes', 'POST', { book_id: this._bookId(), name: window.__app.t('motiv.theme.newName') });
       await this.loadBoard();
       await this.selectTheme(theme.id);
       this._focusThemeNameInput();
@@ -216,7 +214,7 @@ export const crudMethods = {
     this.busy = true;
     try {
       if (coreDirty) {
-        await _json(`/motifs/${m.id}`, 'PATCH', {
+        await sendJson(`/motifs/${m.id}`, 'PATCH', {
           name,
           theme_id: this.editThemeId ? Number(this.editThemeId) : null,
           beschreibung: this.editBeschreibung || '',
@@ -224,7 +222,7 @@ export const crudMethods = {
         });
       }
       if (linksDirty) {
-        await _json(`/motifs/${m.id}/links`, 'PUT', {
+        await sendJson(`/motifs/${m.id}/links`, 'PUT', {
           figures: this.editFigures.map(f => f.figId),
           draftFigures: this.editDraftFigures.map(f => f.id),
           beats: this.editBeats.map(b => b.id),
@@ -243,7 +241,7 @@ export const crudMethods = {
   async deleteMotif(motif) {
     if (!window.confirm(window.__app.t('motiv.motif.confirmDelete', { name: motif.name }))) return;
     try {
-      await _json(`/motifs/${motif.id}`, 'DELETE');
+      await sendJson(`/motifs/${motif.id}`, 'DELETE');
       if (this.selectedMotifId === motif.id) { this.selectedMotifId = null; this.occurrences = []; }
       await this.loadBoard();
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
@@ -256,14 +254,14 @@ export const crudMethods = {
     const typ = (this.newRelationTyp || '').trim();
     if (!from || !to || from === to || !typ) return;
     try {
-      await _json('/motifs/relations', 'POST', { from_motif_id: from, to_motif_id: to, typ });
+      await sendJson('/motifs/relations', 'POST', { from_motif_id: from, to_motif_id: to, typ });
       this.newRelationTargetId = '';
       this.newRelationTyp = '';
       await this.loadBoard();
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
   },
   async deleteRelation(rel) {
-    try { await _json(`/motifs/relations/${rel.id}`, 'DELETE'); await this.loadBoard(); }
+    try { await sendJson(`/motifs/relations/${rel.id}`, 'DELETE'); await this.loadBoard(); }
     catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
   },
   // Beziehungen, die das gewählte Motiv berühren (mit Richtungs-/Partner-Label).
@@ -286,6 +284,9 @@ export const crudMethods = {
   _linkBufKey(kind) {
     return { figures: 'editFigures', draftFigures: 'editDraftFigures', beats: 'editBeats', chapters: 'editChapters', pages: 'editPages' }[kind];
   },
+  // Identitäts-Property im Puffer-Item: Katalog-Figuren tragen die TEXT-fig_id als
+  // `figId`, alle übrigen Brücken die INTEGER-`id`.
+  _linkIdKey(kind) { return kind === 'figures' ? 'figId' : 'id'; },
   // Verknüpfungs-Puffer aus dem Motiv füllen (bei Auswahl/Cancel/nach Save). Kopien,
   // damit Chip-Mutationen den Board-State nicht anfassen, bevor gespeichert wird.
   _loadLinkBuffer(m) {
@@ -306,7 +307,7 @@ export const crudMethods = {
   // Verknüpfung im Puffer hinzufügen/entfernen (kein Persist — erst saveMotifEdit).
   toggleLink(kind, item) {
     if (!this.selectedMotif()) return;
-    const idKey = kind === 'figures' ? 'figId' : 'id';
+    const idKey = this._linkIdKey(kind);
     const arr = this[this._linkBufKey(kind)];
     const ix = arr.findIndex(x => x[idKey] === item[idKey]);
     if (ix >= 0) arr.splice(ix, 1);
@@ -335,7 +336,7 @@ export const crudMethods = {
       if (p) item = { id: Number(idVal), name: p.name };
     }
     if (!item) return;
-    const idKey = kind === 'figures' ? 'figId' : 'id';
+    const idKey = this._linkIdKey(kind);
     const arr = this[this._linkBufKey(kind)];
     if (arr.some(x => x[idKey] === item[idKey])) return; // schon verknüpft
     arr.push(item);
@@ -343,7 +344,7 @@ export const crudMethods = {
 
   hasLink(kind, idVal) {
     if (!this.selectedMotif()) return false;
-    const idKey = kind === 'figures' ? 'figId' : 'id';
+    const idKey = this._linkIdKey(kind);
     return this[this._linkBufKey(kind)].some(x => x[idKey] === idVal);
   },
 
@@ -397,15 +398,10 @@ export const crudMethods = {
     // Re-Klick auf das bereits gewählte Motiv (z.B. sein Graph-Knoten): Edit-Puffer
     // NICHT neu laden — sonst verwirft der Klick ungespeicherte Änderungen (Name/
     // Thema/Verknüpfungen) kommentarlos und der Graph behält den alten Stand.
+    // Save fehlgeschlagen → Auswahl behalten, nichts verwerfen. Motiv-Auswahl ist
+    // gegenseitig exklusiv zur Themen-Auswahl (ein Editor im Panel).
     const sameId = !!id && id === this.selectedMotifId;
-    if (!sameId) {
-      await this._commitPendingMotifEdit();
-      // Save fehlgeschlagen (errorMessage steht) → Auswahl behalten, nichts verwerfen.
-      if (this.motifDirty()) return;
-      // Motiv-Auswahl ist gegenseitig exklusiv zur Themen-Auswahl (ein Editor im Panel).
-      await this._commitPendingThemeEdit();
-      if (this.themeDirty()) return;
-    }
+    if (!sameId && !(await this._commitPendingEdits())) return;
     this.selectedThemeId = null;
     this.selectedMotifId = id;
     if (!sameId) {

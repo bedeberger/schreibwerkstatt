@@ -189,10 +189,25 @@ export const boardMethods = {
   // Strangs (nie auf dem Beat gespeichert — rein Anzeige + KI-Kontext). Eigene
   // Beat-Werte haben Vorrang: die Strang-Figur wird nur als geerbter Zusatz
   // gezeigt, das Strang-Kapitel nur, wenn der Beat kein eigenes Kapitel hat.
+  // O(1)-Lookup id→Strang (Referenz-Wechsel-Cache wie $app.figurenById). Als
+  // Methode statt Card-Getter, damit alle reinen Methods-Module sie teilen können —
+  // Object-Spread überträgt keine Getter (ein Getter müsste auf der Card leben und
+  // wäre den Sub-Modulen + Unit-Tests unsichtbar). SSoT für den Strang-Lookup.
+  _threadById(id) {
+    if (this._threadMapRef !== this.threads) {
+      this._threadMapRef = this.threads;
+      this._threadMap = new Map((this.threads || []).map(t => [t.id, t]));
+    }
+    return this._threadMap.get(id) || null;
+  },
+
   _threadOf(beat) {
     const tid = beat && beat.thread_id;
     if (tid == null) return null;
-    return (this.threads || []).find(t => t.id === tid) || null;
+    // O(1) über _threadById — nicht linear scannen. effectiveChapterNameForBeat
+    // (SSoT) läuft pro Beat im Filter + über alle Beats in plotCoverage; ein
+    // .find() hier machte das O(beats × threads).
+    return this._threadById(tid);
   },
 
   // Vom Strang geerbte Figur als { kind:'catalog'|'werkstatt', id, label } —

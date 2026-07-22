@@ -37,6 +37,16 @@ function _plotContextError(source, cause) {
   return err;
 }
 
+// Sync-Kontext-Loader in ein einheitliches try/catch wickeln: ein echter Lade-/
+// DB-Fehler wird source-annotiert zum i18n-Job-Fehler (statt mit halbem Board-Bild
+// weiterzulaufen). Ein leeres Ergebnis (keine Orte/Szenen/…) ist kein Fehler und
+// kommt regulär durch. `_anchorContext` (loggt + liefert null) und `_kapitelContext`
+// (async) bleiben bewusst mit eigenem Handling.
+function _loadCtx(source, fn) {
+  try { return fn(); }
+  catch (e) { throw _plotContextError(source, e); }
+}
+
 // Figuren-Ensemble als Grundierung für beide Jobs — der volle reiche Kontext aus
 // getFiguren: Rollen-Meta, Tags, Beschreibung, Beziehungen (Soziogramm) und
 // Lebensereignisse (Figuren-Zeitstrahl). getFiguren liefert Beziehungspartner als
@@ -69,53 +79,45 @@ function _figurenContext(bookId, userEmail) {
 // Direkt-SQL erlaubt. Ein Buch ohne Orte liefert regulär []; ein echter DB-Fehler
 // failt den Job source-annotiert (statt stillschweigend ohne Orte weiterzulaufen).
 function _orteContext(bookId, userEmail) {
-  try {
-    return db.prepare(`
-      SELECT name, typ, beschreibung, stimmung
-        FROM locations
-       WHERE book_id = ? AND user_email = ?
-       ORDER BY sort_order, id
-    `).all(parseInt(bookId), userEmail).map(o => ({
-      name: o.name,
-      typ: o.typ || null,
-      beschreibung: o.beschreibung || null,
-      stimmung: o.stimmung || null,
-    }));
-  } catch (e) {
-    throw _plotContextError('orte', e);
-  }
+  return _loadCtx('orte', () => db.prepare(`
+    SELECT name, typ, beschreibung, stimmung
+      FROM locations
+     WHERE book_id = ? AND user_email = ?
+     ORDER BY sort_order, id
+  `).all(parseInt(bookId), userEmail).map(o => ({
+    name: o.name,
+    typ: o.typ || null,
+    beschreibung: o.beschreibung || null,
+    stimmung: o.stimmung || null,
+  })));
 }
 
 // Buchweiter Figuren-Zeitstrahl (figure_events, chronologisch nach sort_order)
 // mit aufgelöster Figur + Kapitel. figure_events/figures sind keine pages/
 // chapters/books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige zur Lesezeit).
 function _zeitstrahlContext(bookId, userEmail) {
-  try {
-    return db.prepare(`
-      SELECT fe.datum, fe.ereignis, fe.typ, f.name AS figur, c.chapter_name AS kapitel
-        FROM figure_events fe
-        JOIN figures f ON f.id = fe.figure_id
-        LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
-       WHERE f.book_id = ? AND f.user_email = ?
-       ORDER BY fe.sort_order, fe.id
-       LIMIT 300
-    `).all(parseInt(bookId), userEmail).map(e => ({
-      datum: e.datum || null,
-      ereignis: e.ereignis,
-      typ: e.typ || null,
-      figur: e.figur || null,
-      kapitel: e.kapitel || null,
-    }));
-  } catch (e) {
-    throw _plotContextError('zeitstrahl', e);
-  }
+  return _loadCtx('zeitstrahl', () => db.prepare(`
+    SELECT fe.datum, fe.ereignis, fe.typ, f.name AS figur, c.chapter_name AS kapitel
+      FROM figure_events fe
+      JOIN figures f ON f.id = fe.figure_id
+      LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
+     WHERE f.book_id = ? AND f.user_email = ?
+     ORDER BY fe.sort_order, fe.id
+     LIMIT 300
+  `).all(parseInt(bookId), userEmail).map(e => ({
+    datum: e.datum || null,
+    ereignis: e.ereignis,
+    typ: e.typ || null,
+    figur: e.figur || null,
+    kapitel: e.kapitel || null,
+  })));
 }
 
 // Offene Kontinuitäts-Befunde aus dem letzten Continuity-Check (nur Consistency).
 // Erdet den Plot-Check auf bereits bekannte Brüche, statt sie neu zu erfinden.
 // Kein Check vorhanden → regulär []; echter DB-Fehler failt den Job.
 function _kontinuitaetContext(bookId, userEmail) {
-  try {
+  return _loadCtx('kontinuitaet', () => {
     const check = getLatestContinuityCheck(bookId, userEmail);
     if (!check || !Array.isArray(check.issues)) return [];
     return check.issues
@@ -128,9 +130,7 @@ function _kontinuitaetContext(bookId, userEmail) {
         kapitel: Array.isArray(i.kapitel) ? i.kapitel : [],
         empfehlung: i.empfehlung || null,
       }));
-  } catch (e) {
-    throw _plotContextError('kontinuitaet', e);
-  }
+  });
 }
 
 // Verknüpfte Recherche-Fundstücke: alle (nicht archivierten) Recherche-Items, die
@@ -141,7 +141,7 @@ function _kontinuitaetContext(bookId, userEmail) {
 // ohne eigenen Notiztext). Kein Link/keine Recherche → regulär []; echter DB-Fehler
 // failt den Job (statt der KI stillschweigend das gesammelte Material zu unterschlagen).
 function _rechercheContext(bookId, userEmail) {
-  try {
+  return _loadCtx('recherche', () => {
     const rows = db.prepare(`
       SELECT ri.id, ri.title, ri.body, ri.source, ri.doc_text,
              ril.target_kind, ril.beat_id, ril.thread_id,
@@ -177,9 +177,7 @@ function _rechercheContext(bookId, userEmail) {
       }
     }
     return [...byItem.values()];
-  } catch (e) {
-    throw _plotContextError('recherche', e);
-  }
+  });
 }
 
 // Adaptives Kontext-Budget: kleine (lokale) Modelle bekommen knappere Listen,
@@ -219,12 +217,8 @@ function _trimFiguren(figuren, limits) {
 // Namen zu kennen. Echter DB-Fehler → Job failen (nicht stillschweigend ohne
 // Werkstatt-Figuren weiterlaufen).
 function _werkstattFigurenContext(bookId, userEmail) {
-  try {
-    return draftFiguresDb.listDraftFigures(bookId, userEmail)
-      .map(d => ({ name: d.name, archetype: d.archetype || null, psychologie: extractPsychologie(d.mindmap) }));
-  } catch (e) {
-    throw _plotContextError('werkstattFiguren', e);
-  }
+  return _loadCtx('werkstattFiguren', () => draftFiguresDb.listDraftFigures(bookId, userEmail)
+    .map(d => ({ name: d.name, archetype: d.archetype || null, psychologie: extractPsychologie(d.mindmap) })));
 }
 
 // Kapitelnamen in echter Buchorganizer-Reihenfolge (über die Content-Store-
@@ -244,7 +238,7 @@ async function _kapitelContext(bookId) {
 // beteiligten Figuren. figure_scenes/scene_figures sind keine pages/chapters/
 // books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige-Wert zur Lesezeit).
 function _szenenContext(bookId, userEmail) {
-  try {
+  return _loadCtx('szenen', () => {
     const scenes = db.prepare(`
       SELECT fs.id, fs.titel, c.chapter_name AS kapitel
         FROM figure_scenes fs
@@ -264,9 +258,7 @@ function _szenenContext(bookId, userEmail) {
     const byScene = {};
     for (const r of figRows) (byScene[r.scene_id] = byScene[r.scene_id] || []).push(r.name);
     return scenes.map(s => ({ titel: s.titel, kapitel: s.kapitel, figuren: byScene[s.id] || [] }));
-  } catch (e) {
-    throw _plotContextError('szenen', e);
-  }
+  });
 }
 
 // Handlungsstränge (Swimlanes) mit aufgelöster Hauptfigur. Katalog-Bindung über
@@ -277,17 +269,18 @@ function _szenenContext(bookId, userEmail) {
 // Vorschläge. Der figures-/draft-Lookup ist Anreicherung, schlägt aber auf
 // denselben echten Fehler ebenfalls durch (keine stille Teil-Auflösung).
 function _threadContext(bookId, userEmail) {
-  let threads, figByFigId = {}, draftById = {};
-  try {
-    threads = plotDb.listThreads(bookId, userEmail);
-    if (!threads.length) return [];
-    for (const r of db.prepare('SELECT fig_id, name FROM figures WHERE book_id = ? AND user_email = ?').all(parseInt(bookId), userEmail)) {
-      figByFigId[r.fig_id] = r.name;
+  const { threads, figByFigId, draftById } = _loadCtx('threads', () => {
+    const threads = plotDb.listThreads(bookId, userEmail);
+    const figByFigId = {}, draftById = {};
+    if (threads.length) {
+      for (const r of db.prepare('SELECT fig_id, name FROM figures WHERE book_id = ? AND user_email = ?').all(parseInt(bookId), userEmail)) {
+        figByFigId[r.fig_id] = r.name;
+      }
+      for (const d of draftFiguresDb.listDraftFigures(bookId, userEmail)) draftById[d.id] = d.name;
     }
-    for (const d of draftFiguresDb.listDraftFigures(bookId, userEmail)) draftById[d.id] = d.name;
-  } catch (e) {
-    throw _plotContextError('threads', e);
-  }
+    return { threads, figByFigId, draftById };
+  });
+  if (!threads.length) return [];
   return threads.map(t => ({
     id: t.id,
     name: t.name,
@@ -318,6 +311,26 @@ function _anchorContext(bookId, userEmail) {
   }
 }
 
+// Gemeinsamer Kontext-Block beider Jobs (Brainstorm + Consistency): Buch-Kontext,
+// Kontext-Budget und die grundierenden Listen (Figuren, Werkstatt-Figuren, Kapitel,
+// Orte, Zeitstrahl, Stränge), bereits auf `limits` gekappt. Recherche bleibt
+// job-spezifisch (Brainstorm filtert auf die Zielzelle, Consistency nimmt alles);
+// Consistency lädt zusätzlich Szenen/Kontinuität/Textbelege separat.
+async function _commonPlotContext(bookId, userEmail) {
+  const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
+  const limits = _ctxLimits(userEmail);
+  return {
+    BUCH_KONTEXT,
+    limits,
+    figuren: _trimFiguren(_figurenContext(bookId, userEmail), limits),
+    werkstattFiguren: _werkstattFigurenContext(bookId, userEmail),
+    kapitel: (await _kapitelContext(bookId)).slice(0, limits.kapitel),
+    orte: _orteContext(bookId, userEmail).slice(0, limits.orte),
+    zeitstrahl: limits.zeitstrahl ? _zeitstrahlContext(bookId, userEmail).slice(0, limits.zeitstrahl) : [],
+    threads: _threadContext(bookId, userEmail),
+  };
+}
+
 // ── Brainstorm-Job ────────────────────────────────────────────────────────────
 
 async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
@@ -330,14 +343,8 @@ async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
     if (!act) throw i18nError('job.error.plot.actMissing');
     const beats = plotDb.listBeats(bookId, userEmail);
 
-    const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
-    const limits = _ctxLimits(userEmail);
-    const figuren = _trimFiguren(_figurenContext(bookId, userEmail), limits);
-    const werkstattFiguren = _werkstattFigurenContext(bookId, userEmail);
-    const kapitel = (await _kapitelContext(bookId)).slice(0, limits.kapitel);
-    const orte = _orteContext(bookId, userEmail).slice(0, limits.orte);
-    const zeitstrahl = limits.zeitstrahl ? _zeitstrahlContext(bookId, userEmail).slice(0, limits.zeitstrahl) : [];
-    const threads = _threadContext(bookId, userEmail);
+    const { BUCH_KONTEXT, limits, figuren, werkstattFiguren, kapitel, orte, zeitstrahl, threads } =
+      await _commonPlotContext(bookId, userEmail);
     const threadInfo = threadId != null ? (threads.find(t => t.id === threadId) || null) : null;
     // Recherche nur für die Zielzelle: Material, das an einen Beat dieses Akts ODER
     // an den Ziel-Strang geknüpft ist — so erden neue Beats auf bereits gesammelte
@@ -401,16 +408,10 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     const beats = plotDb.listBeats(bookId, userEmail);
     if (!beats.length) throw i18nError('job.error.plot.boardEmpty');
 
-    const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
-    const limits = _ctxLimits(userEmail);
-    const figuren = _trimFiguren(_figurenContext(bookId, userEmail), limits);
-    const werkstattFiguren = _werkstattFigurenContext(bookId, userEmail);
-    const kapitel = (await _kapitelContext(bookId)).slice(0, limits.kapitel);
+    const { BUCH_KONTEXT, limits, figuren, werkstattFiguren, kapitel, orte, zeitstrahl, threads } =
+      await _commonPlotContext(bookId, userEmail);
     const szenen = _szenenContext(bookId, userEmail).slice(0, limits.szenen);
-    const orte = _orteContext(bookId, userEmail).slice(0, limits.orte);
-    const zeitstrahl = limits.zeitstrahl ? _zeitstrahlContext(bookId, userEmail).slice(0, limits.zeitstrahl) : [];
     const kontinuitaet = _kontinuitaetContext(bookId, userEmail).slice(0, limits.kontinuitaet);
-    const threads = _threadContext(bookId, userEmail);
     // Buchweiter Check: alles an Beats/Stränge geknüpfte Recherche-Material, damit
     // die Prüfung Beats gegen das gesammelte Material abgleichen kann.
     const recherche = _rechercheContext(bookId, userEmail).slice(0, limits.recherche);

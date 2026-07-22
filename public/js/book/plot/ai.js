@@ -320,7 +320,7 @@ export const aiMethods = {
     if (!iso) return '';
     try {
       const d = new Date(iso);
-      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-GB' : 'de-CH';
+      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
       return d.toLocaleString(locale, tzOpts());
     } catch { return iso; }
   },

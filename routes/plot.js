@@ -52,6 +52,21 @@ function _loadOwned(req, res, getFn, notFoundCode) {
   return row;
 }
 
+// Book-skopierte Collection-Handler (kein :id): Login + book_id + ACL-Guard in
+// einem Schritt. Gibt { userEmail, bookId } zurück oder null (die passende
+// Fehler-Response wurde dann bereits gesendet). Pendant zu _loadOwned für die
+// :id-Handler — SSoT für die sonst in jedem GET-Collection-Handler wiederholte
+// Login-/book_id-/Guard-Kette. Der Guard läuft VOR handler-spezifischen
+// Zusatz-Validierungen (z.B. draft_id) — kein Leak an nicht-autorisierte Aufrufer.
+function _requireBook(req, res) {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) { res.status(401).json({ error_code: 'LOGIN_REQ' }); return null; }
+  const bookId = toIntId(req.query.book_id);
+  if (!bookId) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
+  if (!_guard(req, res, bookId)) return null;
+  return { userEmail, bookId };
+}
+
 // chapter_id muss zum Buch gehören, sonst NULL (kein Fremd-Verweis).
 function _validChapterId(bookId, chapterId) {
   if (!chapterId) return null;
@@ -84,11 +99,9 @@ function _resolveThreadDraftFigure(bookId, userEmail, rawDraftId) {
 
 // ── Board laden ──────────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  const bookId = toIntId(req.query.book_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!_guard(req, res, bookId)) return;
+  const ctx = _requireBook(req, res);
+  if (!ctx) return;
+  const { userEmail, bookId } = ctx;
   // Ist-Index der Beat-Verankerung an jeden Beat hängen (count + Top-Fundstellen)
   // → Drift-Badge + Fundstellen-Popover im Frontend (Soll `status` vs. Ist). Kein
   // Extra-Call. navigableOnly: nur anspringbare Fundstellen (Szene ohne Seite fällt
@@ -111,12 +124,9 @@ router.get('/', (req, res) => {
 // Plot-Verknüpfungs-Indikator im Notebook-Editor (wie /ideen/counts,
 // /research/page-counts). Pro Buch + User skopiert.
 router.get('/page-beat-counts', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  const bookId = toIntId(req.query.book_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!_guard(req, res, bookId)) return;
-  res.json(plotDb.pageBeatCounts(bookId, userEmail));
+  const ctx = _requireBook(req, res);
+  if (!ctx) return;
+  res.json(plotDb.pageBeatCounts(ctx.bookId, ctx.userEmail));
 });
 
 // Plot-Beteiligung einer Werkstatt-Figur: Anzahl Beats (gesamt + aktiv) + die
@@ -125,13 +135,11 @@ router.get('/page-beat-counts', (req, res) => {
 // Pflicht; die Katalog-Quellfigur (source_figure_id) wird serverseitig aus dem
 // Owner-geprüften Draft gezogen, nicht vom Client geliefert (kein Cross-Figur-Leak).
 router.get('/figure-usage', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  const bookId = toIntId(req.query.book_id);
+  const ctx = _requireBook(req, res);
+  if (!ctx) return;
+  const { userEmail, bookId } = ctx;
   const draftId = toIntId(req.query.draft_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!draftId)   return res.status(400).json({ error_code: 'DRAFT_ID_REQ' });
-  if (!_guard(req, res, bookId)) return;
+  if (!draftId) return res.status(400).json({ error_code: 'DRAFT_ID_REQ' });
   const draft = getDraftFigure(draftId);
   if (!draft || draft.user_email !== userEmail || draft.book_id !== bookId) {
     return res.json({ beatCount: 0, activeBeatCount: 0, threads: [] });
@@ -149,12 +157,9 @@ router.get('/figure-usage', (req, res) => {
 // Map chapter_id → Anzahl nicht-verworfener Beats im Kapitel. Speist den
 // Plot-Verknüpfungs-Indikator in der Kapitelansicht.
 router.get('/chapter-beat-counts', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  const bookId = toIntId(req.query.book_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!_guard(req, res, bookId)) return;
-  res.json(plotDb.chapterBeatCounts(bookId, userEmail));
+  const ctx = _requireBook(req, res);
+  if (!ctx) return;
+  res.json(plotDb.chapterBeatCounts(ctx.bookId, ctx.userEmail));
 });
 
 // ── Akte ─────────────────────────────────────────────────────────────────────
@@ -425,12 +430,9 @@ router.put('/beats/order', jsonBody, (req, res) => {
 // Prüfungen später nochmal ansehen kann. Insert geschieht beim Job-Complete in
 // routes/jobs/plot.js. Hier nur Lesen + Löschen.
 router.get('/consistency-runs', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  const bookId = toIntId(req.query.book_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!_guard(req, res, bookId)) return;
-  res.json(plotDb.listPlotConsistencyRuns(bookId, userEmail));
+  const ctx = _requireBook(req, res);
+  if (!ctx) return;
+  res.json(plotDb.listPlotConsistencyRuns(ctx.bookId, ctx.userEmail));
 });
 
 router.get('/consistency-runs/:id', (req, res) => {
@@ -451,12 +453,9 @@ router.delete('/consistency-runs/:id', (req, res) => {
 // Insert geschieht beim Job-Complete in routes/jobs/plot.js. Hier nur Lesen +
 // Löschen. Liste mit act_name/thread_name (JOIN, nullbar bei gelöschtem Akt/Strang).
 router.get('/brainstorm-runs', (req, res) => {
-  const userEmail = userEmailOrNull(req);
-  const bookId = toIntId(req.query.book_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!_guard(req, res, bookId)) return;
-  res.json(plotDb.listPlotBrainstormRuns(bookId, userEmail));
+  const ctx = _requireBook(req, res);
+  if (!ctx) return;
+  res.json(plotDb.listPlotBrainstormRuns(ctx.bookId, ctx.userEmail));
 });
 
 router.get('/brainstorm-runs/:id', (req, res) => {

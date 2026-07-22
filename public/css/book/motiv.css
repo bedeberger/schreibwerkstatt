@@ -77,7 +77,7 @@
   align-items: start;
 }
 .motiv-graph-container {
-  height: clamp(320px, 46vh, 560px);
+  height: clamp(360px, 52vh, 640px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);

@@ -4,7 +4,7 @@
 // wir nehmen den Move via revertSortable zurück und mutieren dann das Modell
 // (this.themes + position), x-for rendert daraus neu → PUT /motifs/themes/order.
 
-import { fetchJson } from '../../utils.js';
+import { sendJson } from '../../utils.js';
 import { loadSortable } from '../../lazy-libs.js';
 import { patchSortableOnce, revertSortable, markDragIgnore, unmarkDragIgnore, BASE_SORTABLE_OPTS } from '../../sortable-dnd.js';
 
@@ -56,11 +56,7 @@ export const dndMethods = {
     this.themes = reordered;
     this._memos = {};
     try {
-      await fetchJson('/motifs/themes/order', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: this.$store.nav.selectedBookId, order: ids }),
-      });
+      await sendJson('/motifs/themes/order', 'PUT', { book_id: this.$store.nav.selectedBookId, order: ids });
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
   },
 };
