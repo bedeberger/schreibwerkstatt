@@ -81,7 +81,7 @@ export const crudMethods = {
       const m = await _json('/motifs', 'POST', body);
       this.newMotifName = '';
       await this.loadBoard();
-      this.selectMotif(m.id);
+      await this.selectMotif(m.id);
       this.$nextTick(() => this.$root?.querySelector('.motiv-name-input')?.focus());
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
@@ -97,8 +97,8 @@ export const crudMethods = {
       if (themeId) body.theme_id = Number(themeId);
       const m = await _json('/motifs', 'POST', body);
       await this.loadBoard();
-      this.selectMotif(m.id);
-      this.$nextTick(() => this.$root?.querySelector('.motiv-name-input')?.focus());
+      await this.selectMotif(m.id);
+      this.$nextTick(() => { const el = this.$root?.querySelector('.motiv-name-input'); if (el) { el.focus(); el.select(); } });
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },

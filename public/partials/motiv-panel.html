@@ -93,7 +93,7 @@
         <button type="button" class="collapsible-toggle motiv-panel-heading" x-bind="trigger">
           <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
           <span x-text="$app.t('motiv.occ.title')"></span>
-          <span class="badge" x-text="selectedMotif().occurrenceCount || 0"></span>
+          <span class="badge" x-text="selectedMotif()?.occurrenceCount || 0"></span>
         </button>
         <div x-bind="panel" x-cloak>
           <p class="muted-msg" x-show="!occLoading && !occurrences.length" x-text="$app.t('motiv.occ.empty')"></p>
@@ -102,7 +102,12 @@
               <button type="button" class="motiv-occ-row internal-link" @click="gotoOccurrence(o)">
                 <span class="motiv-occ-loc" x-text="o.page_name ? ((o.chapter_name ? o.chapter_name + ': ' : '') + o.page_name) : (o.scene_titel || '')"></span>
                 <span class="motiv-occ-snip" x-text="o.snippet" x-show="o.snippet"></span>
-                <span class="badge-source" x-text="$app.t('motiv.occ.source.' + o.source)"></span>
+                <span class="motiv-occ-meta">
+                  <span class="badge motiv-occ-conf" x-show="o.score != null"
+                        x-text="Math.round(o.score * 100) + '%'"
+                        :data-tip="$app.t('motiv.occ.confidence')"></span>
+                  <span class="badge-source" x-text="$app.t('motiv.occ.source.' + o.source)"></span>
+                </span>
               </button>
             </template>
           </div>

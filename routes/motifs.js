@@ -7,6 +7,7 @@
 const express = require('express');
 const motifsDb = require('../db/motifs');
 const embed = require('../lib/embed');
+const appSettings = require('../lib/app-settings');
 const semanticChunks = require('../db/semantic-chunks');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
@@ -74,6 +75,12 @@ function _embedIndexInfo(bookId) {
   return { enabled: true, indexed: st.indexed, staleCount: st.staleCount, stale: !st.indexed || st.staleCount > 0 };
 }
 
+// Cosinus-Floor für die Ist-Fundstellen (App-Setting; 0 = alle zeigen). Blendet
+// unwahrscheinliche semantische Treffer aus Liste + Ist-Dichte; wörtliche bleiben.
+function _motifFloor() {
+  return Number(appSettings.get('motif.scan.min_score')) || 0;
+}
+
 // ── Graph-Payload (Themen + Motive mit Soll-Links & Ist-Count + Beziehungen) ──
 
 router.get('/', (req, res) => {
@@ -82,7 +89,7 @@ router.get('/', (req, res) => {
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
   if (!_guard(req, res, bookId, 'viewer')) return;
-  const graph = motifsDb.getGraph(bookId, userEmail);
+  const graph = motifsDb.getGraph(bookId, userEmail, _motifFloor());
   graph.embedIndex = _embedIndexInfo(bookId);
   res.json(graph);
 });
@@ -295,7 +302,7 @@ router.put('/:id/links', jsonBody, (req, res) => {
 router.get('/:id/occurrences', (req, res) => {
   const motif = _loadOwned(req, res, motifsDb.getMotif, 'MOTIF_NOT_FOUND');
   if (!motif) return;
-  res.json({ occurrences: motifsDb.listOccurrences(motif.id) });
+  res.json({ occurrences: motifsDb.listOccurrences(motif.id, _motifFloor()) });
 });
 
 router.patch('/:id', jsonBody, (req, res) => {

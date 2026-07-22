@@ -1,0 +1,34 @@
+<!-- Fundstellen-Peek-Popover am Graph-Knoten (Fragment-Include aus motiv.html) —
+     ein einzelnes, nach <body> teleportiertes .context-menu (JS-positioniert in
+     _openMotifOccPopover). Der Graph sitzt in einem Canvas-Container, in dem ein
+     verankertes Popover geclippt würde. Hover über einen Motiv-Knoten öffnet es;
+     bleibt offen, solange der Cursor über Knoten ODER Popover ist (mouseenter hält,
+     mouseleave schliesst). Content-Popover (reiche Zeilen), kein Aktions-Menü.
+     Läuft im Scope der motivCard (Include vor Alpine-Init). -->
+<template x-teleport="body">
+  <div class="context-menu motiv-occ-popover" x-ref="motivOccPopover" role="menu"
+       x-show="occHoverMotifId !== null && !!occHoverMotif()" x-cloak
+       :style="`top:${occHoverPos.top}px;left:${occHoverPos.left}px`"
+       @mouseenter="keepOccPopover()" @mouseleave="_closeMotifOccPopover()"
+       @keydown.escape.window="_closeMotifOccPopover()">
+    <template x-if="occHoverMotif()">
+      <div>
+        <div class="context-menu-header" x-text="$app.t('motiv.peek.title', { name: occHoverMotif().name, n: occHoverMotif().occurrenceCount || 0 })"></div>
+        <template x-for="(occ, i) in (occHoverMotif().occTop || [])" :key="i">
+          <button type="button" role="menuitem" class="motiv-occ-item"
+                  :disabled="!occ.page_id"
+                  @click.stop="jumpFromPeek(occ)"
+                  :aria-label="$app.t('motiv.peek.jump')">
+            <span class="motiv-occ-item-head">
+              <span class="motiv-occ-item-name" x-text="occ.page_name ? ((occ.chapter_name ? occ.chapter_name + ': ' : '') + occ.page_name) : (occ.scene_titel ? '„' + occ.scene_titel + '“' : $app.t('motiv.peek.unknownPlace'))"></span>
+              <span class="badge-source" x-text="$app.t('motiv.occ.source.' + occ.source)"></span>
+            </span>
+            <span class="motiv-occ-item-snippet" x-show="occ.snippet" x-text="occ.snippet"></span>
+          </button>
+        </template>
+        <div class="motiv-occ-more" x-show="(occHoverMotif().occurrenceCount || 0) > (occHoverMotif().occTop || []).length"
+             x-text="$app.t('motiv.peek.more', { n: (occHoverMotif().occurrenceCount || 0) - (occHoverMotif().occTop || []).length })"></div>
+      </div>
+    </template>
+  </div>
+</template>

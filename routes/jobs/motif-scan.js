@@ -54,7 +54,12 @@ async function _scanMotif(bookId, motif, useSemantic, signalFn) {
     if (query) {
       const hits = await semanticQuery(bookId, query, { kinds: SCAN_KINDS, topK: TOP_K, signal: signalFn() });
       for (const h of hits) {
-        found.set(_occKey(h.kind, h.entity_id), _toOcc(h.kind, h.entity_id, h.score, _plainSnippet(h.text), 'semantic'));
+        // Als Konfidenz zählt der rohe Cosinus (0–1, absolut interpretierbar für
+        // %-Anzeige + Score-Floor). Reine FTS-Fusions-Kandidaten (kein Cosinus)
+        // sind semantisch nicht belegt → hier überspringen; die wörtliche Erkennung
+        // deckt Trigger-Begriffe separat und bewusst ab.
+        if (h.semScore == null) continue;
+        found.set(_occKey(h.kind, h.entity_id), _toOcc(h.kind, h.entity_id, h.semScore, _plainSnippet(h.text), 'semantic'));
       }
     }
   }

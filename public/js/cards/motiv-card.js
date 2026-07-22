@@ -53,6 +53,9 @@ export function registerMotivCard() {
     graphMenuOpen: false,
     graphMenuNodeId: null,
     graphMenuPos: { top: 0, left: 0 },
+    // Fundstellen-Peek-Popover am Graph-Knoten (Hover): gehovertes Motiv + Position.
+    occHoverMotifId: null,
+    occHoverPos: { top: 0, left: 0 },
     // Offener Thema-Farbwähler (Themen-Liste im Panel), null = keiner
     themeColorPickerId: null,
     // Eingabe-Drafts
@@ -97,6 +100,8 @@ export function registerMotivCard() {
     _brainstormPollTimer: null,
     _embedPollTimer: null,
     _layoutSaveTimer: null,
+    _occHoverCloseTimer: null,
+    _occTrigRect: null,
     // Persistiertes Knoten-Layout (node_id → {x,y}); aus loadBoard, beim Ziehen gespeichert.
     _savedPositions: null,
     _graphMenuCloseHandler: null,
@@ -118,7 +123,7 @@ export function registerMotivCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'motiv',
         showFlag: 'showMotivCard',
-        timerKeys: ['_scanPollTimer', '_brainstormPollTimer', '_embedPollTimer', '_layoutSaveTimer'],
+        timerKeys: ['_scanPollTimer', '_brainstormPollTimer', '_embedPollTimer', '_layoutSaveTimer', '_occHoverCloseTimer'],
         onShow: () => this.loadBoard(),
         onBookChanged: () => {
           this.resetMotiv();
@@ -147,7 +152,15 @@ export function registerMotivCard() {
         signal: this._lifecycle.signal,
         onChange: (active) => {
           this.motivFullscreen = active;
-          this.$nextTick(() => this._motivNetwork?.redraw());
+          // Container-Grösse ändert sich → Canvas erst nach dem Fullscreen-Reflow
+          // neu vermessen (redraw) und die Ansicht einpassen (fit). Ohne fit bleibt
+          // der Graph beim alten Viewport hängen und liegt ausserhalb der neuen
+          // Fläche; rAF stellt sicher, dass das :fullscreen-Layout schon steht.
+          requestAnimationFrame(() => {
+            if (!this._motivNetwork) return;
+            this._motivNetwork.redraw();
+            this._motivNetwork.fit({ animation: { duration: 300 } });
+          });
         },
       });
     },

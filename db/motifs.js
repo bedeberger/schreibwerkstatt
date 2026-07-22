@@ -252,12 +252,22 @@ const replaceOccurrences = db.transaction((motifId, bookId, rows) => {
   }
 });
 
-// Fundstellen-Zahl pro Motiv fürs Graph-Rendering (Ist-Dichte).
+// Fundstellen-Zahl pro Motiv fürs Graph-Rendering (Ist-Dichte). Optionaler Score-
+// Floor blendet schwache semantische Treffer aus (Ist-Dichte + Geist-Erkennung
+// respektieren die Schwelle live); wörtliche Trigger-Treffer (score=null) zählen immer.
 const _stmtOccCounts = db.prepare(`
   SELECT o.motif_id, COUNT(*) AS n
     FROM motif_occurrences o
     JOIN motifs m ON m.id = o.motif_id
    WHERE m.book_id = ? AND m.user_email = ?
+   GROUP BY o.motif_id
+`);
+const _stmtOccCountsFloor = db.prepare(`
+  SELECT o.motif_id, COUNT(*) AS n
+    FROM motif_occurrences o
+    JOIN motifs m ON m.id = o.motif_id
+   WHERE m.book_id = ? AND m.user_email = ?
+     AND (o.score IS NULL OR o.score >= ?)
    GROUP BY o.motif_id
 `);
 // Fundstellen-Detail eines Motivs (Seiten- + Szenen-Kontext via JOIN, kein Snapshot).
@@ -272,9 +282,34 @@ const _stmtOccDetail = db.prepare(`
    ORDER BY o.score DESC, o.id
 `);
 
-function listOccurrences(motifId) {
-  return _stmtOccDetail.all(parseInt(motifId));
+// minScore: Cosinus-Floor (0 = aus) — blendet schwache semantische Treffer aus.
+// Wörtliche Trigger-Treffer (score=null) sind nie vom Floor betroffen (Exakt-Match).
+function listOccurrences(motifId, minScore = 0) {
+  const rows = _stmtOccDetail.all(parseInt(motifId));
+  const floor = Number(minScore) || 0;
+  if (floor <= 0) return rows;
+  return rows.filter(r => r.score == null || r.score >= floor);
 }
+
+// Top-N Fundstellen pro Motiv fürs Graph-Knoten-Popover (Peek ohne Panel): eine
+// Query übers ganze Buch, per ROW_NUMBER auf N pro Motiv gedeckelt (nach Score).
+const OCC_TOP_N = 5;
+const _stmtOccTop = db.prepare(`
+  SELECT motif_id, id, kind, page_id, scene_id, score, snippet, source,
+         page_name, chapter_name, scene_titel
+    FROM (
+      SELECT o.motif_id, o.id, o.kind, o.page_id, o.scene_id, o.score, o.snippet, o.source,
+             p.page_name, c.chapter_name, s.titel AS scene_titel,
+             ROW_NUMBER() OVER (PARTITION BY o.motif_id ORDER BY o.score DESC, o.id) AS rn
+        FROM motif_occurrences o
+        JOIN motifs m ON m.id = o.motif_id
+        LEFT JOIN pages p    ON p.page_id = o.page_id
+        LEFT JOIN chapters c ON c.chapter_id = p.chapter_id
+        LEFT JOIN figure_scenes s ON s.id = o.scene_id
+       WHERE m.book_id = ? AND m.user_email = ?
+    )
+   WHERE rn <= ${OCC_TOP_N}
+`);
 
 // ── Scoping-Validatoren (Soll-Link-Targets aufs Buch beschränken) ──────────
 // Verhindert Cross-Book-Leaks (FK allein liesse ein Motiv aus Buch A auf eine
@@ -424,21 +459,33 @@ function deleteBrainstormCache(bookId, userEmail) {
 // ── Graph-Payload ───────────────────────────────────────────────────────────
 // Ein Aufruf liefert alles fürs Konstellations-Rendering: Themen, Motive (jeweils
 // mit Soll-Links + Ist-Count), Beziehungen, plus das persistierte Knoten-Layout.
-function getGraph(bookId, userEmail) {
+// minScore: Cosinus-Floor (0 = aus) — schwache semantische Treffer fallen aus Ist-
+// Dichte (Knotengrösse), Geist-Erkennung und Peek-Popover. Wörtliche Trigger-Treffer
+// (score=null) bleiben immer. Gefiltert am Lese-Chokepoint → wirkt ohne Scan-Neulauf.
+function getGraph(bookId, userEmail, minScore = 0) {
   const bid = parseInt(bookId);
+  const floor = Number(minScore) || 0;
   const themes = listThemes(bid, userEmail);
   const motifs = listMotifs(bid, userEmail);
   const relations = listRelations(bid, userEmail);
 
   const byMotif = new Map(motifs.map(m => [m.id, {
-    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0,
+    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0, occTop: [],
   }]));
   for (const r of _stmtBridgeFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.figures.push({ figId: r.fig_id, name: r.name });
   for (const r of _stmtBridgeDraftFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.draftFigures.push({ id: r.draft_figure_id, name: r.name });
   for (const r of _stmtBridgeBeats.all(bid, userEmail)) byMotif.get(r.motif_id)?.beats.push({ id: r.beat_id, titel: r.titel });
   for (const r of _stmtBridgeChapters.all(bid, userEmail)) byMotif.get(r.motif_id)?.chapters.push({ id: r.chapter_id, name: r.chapter_name });
   for (const r of _stmtBridgePages.all(bid, userEmail)) byMotif.get(r.motif_id)?.pages.push({ id: r.page_id, name: r.page_name });
-  for (const r of _stmtOccCounts.all(bid, userEmail)) { const m = byMotif.get(r.motif_id); if (m) m.occurrenceCount = r.n; }
+  const counts = floor > 0 ? _stmtOccCountsFloor.all(bid, userEmail, floor) : _stmtOccCounts.all(bid, userEmail);
+  for (const r of counts) { const m = byMotif.get(r.motif_id); if (m) m.occurrenceCount = r.n; }
+  // occTop ist bereits nach Score absteigend gedeckelt: fällt ein Top-Treffer unter
+  // den Floor, liegen alle nachfolgenden ebenfalls darunter → JS-Filter genügt.
+  for (const r of _stmtOccTop.all(bid, userEmail)) {
+    const { motif_id, ...occ } = r;
+    if (floor > 0 && occ.score != null && occ.score < floor) continue;
+    byMotif.get(motif_id)?.occTop.push(occ);
+  }
 
   return { themes, motifs: [...byMotif.values()], relations, layout: getLayout(bid, userEmail) };
 }

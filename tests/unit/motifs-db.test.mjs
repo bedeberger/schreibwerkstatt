@@ -161,6 +161,33 @@ test('Ist-Index: replaceOccurrences (Full-Replace) + Count + Detail + CHECK', ()
   }, /CHECK|constraint/i);
 });
 
+test('Ist-Index: Score-Floor filtert schwache semantische Treffer, wörtliche bleiben', () => {
+  const chId = seedChapter(BOOK, 'Kap Floor');
+  const p1 = seedPage(BOOK, chId, 'Floor-A');
+  const p2 = seedPage(BOOK, chId, 'Floor-B');
+  const p3 = seedPage(BOOK, chId, 'Floor-C');
+  const m = motifs.createMotif(BOOK, USER, { name: 'Floor-Motiv' });
+
+  motifs.replaceOccurrences(m.id, BOOK, [
+    { kind: 'page', pageId: p1, score: 0.8, snippet: 'stark', source: 'semantic' },
+    { kind: 'page', pageId: p2, score: 0.3, snippet: 'schwach', source: 'semantic' },
+    { kind: 'page', pageId: p3, score: null, snippet: 'wörtlich', source: 'trigger' },
+  ]);
+
+  // Ohne Floor: alle drei.
+  assert.equal(motifs.listOccurrences(m.id, 0).length, 3);
+  assert.equal(motifs.getGraph(BOOK, USER, 0).motifs.find(x => x.id === m.id).occurrenceCount, 3);
+
+  // Floor 0.5: schwacher semantischer Treffer (0.3) fällt raus, wörtlicher (null) bleibt.
+  const filtered = motifs.listOccurrences(m.id, 0.5);
+  assert.equal(filtered.length, 2);
+  assert.ok(!filtered.some(o => o.score === 0.3));
+  assert.ok(filtered.some(o => o.score == null)); // Exakt-Match nie vom Floor betroffen
+
+  // Ist-Dichte im Graph respektiert den Floor identisch (Knotengrösse + Geist-Erkennung).
+  assert.equal(motifs.getGraph(BOOK, USER, 0.5).motifs.find(x => x.id === m.id).occurrenceCount, 2);
+});
+
 test('deleteMotif kaskadiert Beziehungen/Brücken/Occurrences', () => {
   const a = motifs.createMotif(BOOK, USER, { name: 'Casc-A' });
   const b = motifs.createMotif(BOOK, USER, { name: 'Casc-B' });
