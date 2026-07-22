@@ -219,7 +219,7 @@ export const graphMethods = {
     this._motivEdges = new window.vis.DataSet(edges);
     this._motivNetwork = new window.vis.Network(container, { nodes: this._motivNodes, edges: this._motivEdges }, {
       physics: { enabled: !allPlaced, barnesHut: { gravitationalConstant: -6000, springLength: 130, springConstant: 0.04, damping: 0.5 }, stabilization: { iterations: 180 } },
-      interaction: { hover: true, dragNodes: true, tooltipDelay: 120 },
+      interaction: { dragNodes: true },
       nodes: { borderWidthSelected: 3 },
       edges: { selectionWidth: 1 },
     });
@@ -227,19 +227,9 @@ export const graphMethods = {
     this._motivNetwork.on('click', (params) => {
       const ref = parseNode(params.nodes?.[0]);
       this.closeGraphMenu();
-      this._closeMotifOccPopover();
       if (ref?.kind === 'motif') this.selectMotif(ref.id);
       else if (ref?.kind === 'theme') this.selectTheme(ref.id);
     });
-    // Hover über einen Motiv-Knoten öffnet das Fundstellen-Peek-Popover (occTop);
-    // blur schliesst verzögert (Grace-Timer), damit der Cursor aufs Popover wandern
-    // kann. Ziehen/Zoomen schliesst sofort (Position würde sonst wegdriften).
-    this._motivNetwork.on('hoverNode', (params) => {
-      if (parseNode(params.node)?.kind === 'motif') this._openMotifOccPopover(params.node);
-    });
-    this._motivNetwork.on('blurNode', () => this._scheduleCloseOccPopover());
-    this._motivNetwork.on('dragStart', () => this._closeMotifOccPopover());
-    this._motivNetwork.on('zoom', () => this._closeMotifOccPopover());
     // Rechtsklick auf einen Knoten (oder die leere Fläche) öffnet das Kontextmenü —
     // Thema-Knoten → Motiv anlegen, Motiv-Knoten → bearbeiten/anlegen/löschen.
     this._motivNetwork.on('oncontext', (params) => {
@@ -288,71 +278,9 @@ export const graphMethods = {
   },
 
   _destroyGraph() {
-    this._closeMotifOccPopover();
     if (this._motivNetwork) { this._motivNetwork.destroy(); this._motivNetwork = null; }
     this._motivNodes = null;
     this._motivEdges = null;
-  },
-
-  // ── Fundstellen-Peek am Graph-Knoten (Hover) ──────────────────────────────
-  // Hover über einen Motiv-Knoten zeigt seine Top-N Fundstellen (occTop aus dem
-  // Graph-Payload) — Peek in den Text, ohne das volle Seitenpanel zu öffnen (das
-  // bleibt Klick vorbehalten). Nach <body> teleportiert, JS-positioniert am
-  // Knotenzentrum (canvasToDOM); Zeilen springen an die belegende Textstelle.
-  // Bleibt offen, solange der Cursor über Knoten ODER Popover ist: blur startet
-  // einen Grace-Timer, den mouseenter aufs Popover (keepOccPopover) abbricht.
-  _openMotifOccPopover(nid) {
-    clearTimeout(this._occHoverCloseTimer);
-    const id = parseNode(nid)?.id;
-    const m = id != null ? this.motifById(id) : null;
-    if (!m || !(m.occTop || []).length) { this._closeMotifOccPopover(); return; }
-    const container = document.getElementById('motiv-graph');
-    if (!container || !this._motivNetwork) return;
-    const pos = this._motivNetwork.getPositions([nid])[nid];
-    if (!pos) return;
-    const dom = this._motivNetwork.canvasToDOM(pos);
-    const rect = container.getBoundingClientRect();
-    // Pseudo-Trigger-Rect am Knotenzentrum → gleiche Positionslogik wie Plot
-    // (rechts neben den Knoten, nach oben klappen wenn unten kein Platz ist).
-    const cx = rect.left + dom.x, cy = rect.top + dom.y;
-    this._occTrigRect = { right: cx + 10, left: cx - 10, top: cy - 10, bottom: cy + 10 };
-    this.occHoverPos = this._computeOccPopoverPos(this._occTrigRect, 260, 200);
-    this.occHoverMotifId = id;
-    this.$nextTick(() => {
-      const el = this.$refs.motivOccPopover;
-      if (!el || !this._occTrigRect) return;
-      this.occHoverPos = this._computeOccPopoverPos(this._occTrigRect, el.offsetWidth, el.offsetHeight);
-    });
-  },
-
-  _computeOccPopoverPos(r, pw, ph) {
-    const left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.right));
-    const top = (r.bottom + ph + 8 > window.innerHeight)
-      ? Math.max(8, r.top - ph - 4)
-      : r.bottom + 4;
-    return { top, left };
-  },
-
-  _scheduleCloseOccPopover() {
-    clearTimeout(this._occHoverCloseTimer);
-    this._occHoverCloseTimer = setTimeout(() => this._closeMotifOccPopover(), 180);
-  },
-  keepOccPopover() { clearTimeout(this._occHoverCloseTimer); },
-  _closeMotifOccPopover() {
-    clearTimeout(this._occHoverCloseTimer);
-    this.occHoverMotifId = null;
-  },
-
-  // Das gerade gehoverte Motiv (fürs teleportierte Popover ausserhalb des Graphs).
-  occHoverMotif() {
-    return this.occHoverMotifId != null ? this.motifById(this.occHoverMotifId) : null;
-  },
-
-  // Aus dem Peek-Popover an eine Fundstelle springen (Seite + Passage-Highlight,
-  // gleiche Mechanik wie die Panel-Liste); Popover vorher schliessen.
-  jumpFromPeek(occ) {
-    this._closeMotifOccPopover();
-    this.gotoOccurrence(occ);
   },
 
   toggleLayer(kind) {
@@ -397,7 +325,6 @@ export const graphMethods = {
   // Cursor-verankert: an der Klickposition öffnen, nur an den Viewport-Rand
   // clampen (kein Flip nötig, siehe Harte Regel „Flip-up-Popover").
   openGraphMenu(ev, nodeId) {
-    this._closeMotifOccPopover();
     this.graphMenuNodeId = nodeId || null;
     this.graphMenuPos = this._computeGraphMenuPos(ev.clientX, ev.clientY, 220, 180);
     this.graphMenuOpen = true;

@@ -60,9 +60,6 @@ export function registerMotivCard() {
     graphMenuOpen: false,
     graphMenuNodeId: null,
     graphMenuPos: { top: 0, left: 0 },
-    // Fundstellen-Peek-Popover am Graph-Knoten (Hover): gehovertes Motiv + Position.
-    occHoverMotifId: null,
-    occHoverPos: { top: 0, left: 0 },
     // Offener Thema-Farbwähler (Themen-Liste im Panel), null = keiner
     themeColorPickerId: null,
     // Eingabe-Drafts
@@ -107,8 +104,6 @@ export function registerMotivCard() {
     _brainstormPollTimer: null,
     _embedPollTimer: null,
     _layoutSaveTimer: null,
-    _occHoverCloseTimer: null,
-    _occTrigRect: null,
     // Persistiertes Knoten-Layout (node_id → {x,y}); aus loadBoard, beim Ziehen gespeichert.
     _savedPositions: null,
     _graphMenuCloseHandler: null,
@@ -130,7 +125,7 @@ export function registerMotivCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'motiv',
         showFlag: 'showMotivCard',
-        timerKeys: ['_scanPollTimer', '_brainstormPollTimer', '_embedPollTimer', '_layoutSaveTimer', '_occHoverCloseTimer'],
+        timerKeys: ['_scanPollTimer', '_brainstormPollTimer', '_embedPollTimer', '_layoutSaveTimer'],
         onShow: () => this.loadBoard(),
         onBookChanged: () => {
           this.resetMotiv();

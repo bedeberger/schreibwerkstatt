@@ -291,26 +291,6 @@ function listOccurrences(motifId, minScore = 0) {
   return rows.filter(r => r.score == null || r.score >= floor);
 }
 
-// Top-N Fundstellen pro Motiv fürs Graph-Knoten-Popover (Peek ohne Panel): eine
-// Query übers ganze Buch, per ROW_NUMBER auf N pro Motiv gedeckelt (nach Score).
-const OCC_TOP_N = 5;
-const _stmtOccTop = db.prepare(`
-  SELECT motif_id, id, kind, page_id, scene_id, score, snippet, source,
-         page_name, chapter_name, scene_titel
-    FROM (
-      SELECT o.motif_id, o.id, o.kind, o.page_id, o.scene_id, o.score, o.snippet, o.source,
-             p.page_name, c.chapter_name, s.titel AS scene_titel,
-             ROW_NUMBER() OVER (PARTITION BY o.motif_id ORDER BY o.score DESC, o.id) AS rn
-        FROM motif_occurrences o
-        JOIN motifs m ON m.id = o.motif_id
-        LEFT JOIN pages p    ON p.page_id = o.page_id
-        LEFT JOIN chapters c ON c.chapter_id = p.chapter_id
-        LEFT JOIN figure_scenes s ON s.id = o.scene_id
-       WHERE m.book_id = ? AND m.user_email = ?
-    )
-   WHERE rn <= ${OCC_TOP_N}
-`);
-
 // ── Scoping-Validatoren (Soll-Link-Targets aufs Buch beschränken) ──────────
 // Verhindert Cross-Book-Leaks (FK allein liesse ein Motiv aus Buch A auf eine
 // Seite aus Buch B zeigen). Figuren nach aussen als TEXT-fig_id → INTEGER id.
@@ -470,7 +450,7 @@ function getGraph(bookId, userEmail, minScore = 0) {
   const relations = listRelations(bid, userEmail);
 
   const byMotif = new Map(motifs.map(m => [m.id, {
-    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0, occTop: [],
+    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0,
   }]));
   for (const r of _stmtBridgeFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.figures.push({ figId: r.fig_id, name: r.name });
   for (const r of _stmtBridgeDraftFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.draftFigures.push({ id: r.draft_figure_id, name: r.name });
@@ -479,13 +459,6 @@ function getGraph(bookId, userEmail, minScore = 0) {
   for (const r of _stmtBridgePages.all(bid, userEmail)) byMotif.get(r.motif_id)?.pages.push({ id: r.page_id, name: r.page_name });
   const counts = floor > 0 ? _stmtOccCountsFloor.all(bid, userEmail, floor) : _stmtOccCounts.all(bid, userEmail);
   for (const r of counts) { const m = byMotif.get(r.motif_id); if (m) m.occurrenceCount = r.n; }
-  // occTop ist bereits nach Score absteigend gedeckelt: fällt ein Top-Treffer unter
-  // den Floor, liegen alle nachfolgenden ebenfalls darunter → JS-Filter genügt.
-  for (const r of _stmtOccTop.all(bid, userEmail)) {
-    const { motif_id, ...occ } = r;
-    if (floor > 0 && occ.score != null && occ.score < floor) continue;
-    byMotif.get(motif_id)?.occTop.push(occ);
-  }
 
   return { themes, motifs: [...byMotif.values()], relations, layout: getLayout(bid, userEmail) };
 }
