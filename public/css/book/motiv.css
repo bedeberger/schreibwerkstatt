@@ -115,8 +115,24 @@
 .motiv-theme-list { display: flex; flex-direction: column; gap: var(--space-2xs); }
 .motiv-theme-rows { display: flex; flex-direction: column; gap: var(--space-2xs); }
 .motiv-theme-row { display: flex; align-items: center; gap: var(--space-2xs); }
-.motiv-theme-row .motiv-inline-input { flex: 1; min-width: 0; width: auto; }
 .motiv-theme-row--ghost { opacity: 0.5; }
+/* Thema-Name: klickbares Label (öffnet den Themen-Editor im Panel). */
+.motiv-theme-name {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3xs) var(--space-2xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.motiv-theme-name:hover { border-color: var(--color-border); background: var(--color-bg); }
 /* Drag-Griff: einzige Greiffläche, damit Input/Buttons klickbar bleiben. */
 .motiv-drag-grip {
   display: inline-flex;

@@ -209,6 +209,7 @@ export const graphMethods = {
       this.closeGraphMenu();
       this._closeMotifOccPopover();
       if (nid && /^m\d+$/.test(nid)) this.selectMotif(Number(nid.slice(1)));
+      else if (nid && /^t\d+$/.test(nid)) this.selectTheme(Number(nid.slice(1)));
     });
     // Hover über einen Motiv-Knoten öffnet das Fundstellen-Peek-Popover (occTop);
     // blur schliesst verzögert (Grace-Timer), damit der Cursor aufs Popover wandern

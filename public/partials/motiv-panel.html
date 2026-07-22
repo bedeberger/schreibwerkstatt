@@ -5,7 +5,7 @@
      Aus motiv.html ausgelagert (HTML-Partial-LOC-Limit). -->
 <aside class="motiv-panel">
   <!-- Ohne Auswahl: Themen-Liste + Hinweis -->
-  <template x-if="!selectedMotif()">
+  <template x-if="!selectedMotif() && !selectedTheme()">
     <div>
       <p class="muted-msg" x-show="motifs.length" x-text="$app.t('motiv.panel.pickHint')"></p>
       <p class="muted-msg" x-show="!motifs.length" x-text="$app.t('motiv.empty.hint')"></p>
@@ -38,8 +38,8 @@
                   </template>
                 </div>
               </div>
-              <input type="text" class="motiv-inline-input" :value="t.name" data-spellcheck="spelling"
-                     @change="renameTheme(t, $event.target.value)">
+              <button type="button" class="motiv-theme-name internal-link" @click="selectTheme(t.id)"
+                      x-text="t.name" :data-tip="$app.t('motiv.theme.editTip')"></button>
               <button type="button" class="icon-btn icon-btn--ghost" @click="deleteTheme(t)"
                       :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
@@ -48,6 +48,61 @@
           </template>
         </div>
       </div>
+    </div>
+  </template>
+
+  <!-- Thema gewählt: Themen-Editor (Name/Beschreibung/Farbe), explizites Save/Cancel -->
+  <template x-if="!selectedMotif() && selectedTheme()">
+    <div class="motiv-editor">
+      <div class="motiv-editor-head">
+        <button type="button" class="icon-btn icon-btn--ghost" @click="deselectTheme()" :disabled="busy"
+                :data-tip="$app.t('motiv.theme.backToList')" :aria-label="$app.t('motiv.theme.backToList')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-left"/></svg>
+        </button>
+        <input type="text" class="motiv-name-input motiv-theme-name-input" x-model="editThemeName" data-spellcheck="spelling"
+               @keydown.enter="saveThemeEdit()">
+        <button type="button" class="icon-btn icon-btn--ghost icon-btn--success" x-show="themeDirty()"
+                @click="saveThemeEdit()" :disabled="busy || !editThemeName.trim()"
+                :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+        </button>
+        <button type="button" class="icon-btn icon-btn--ghost" x-show="themeDirty()"
+                @click="cancelThemeEdit()" :disabled="busy"
+                :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        </button>
+        <span class="action-sep" aria-hidden="true" x-show="themeDirty()"></span>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="deleteTheme(selectedTheme())"
+                :data-tip="$app.t('motiv.graph.menu.deleteTheme')" :aria-label="$app.t('motiv.graph.menu.deleteTheme')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+        </button>
+      </div>
+
+      <label class="motiv-field-label" x-text="$app.t('motiv.theme.color')"></label>
+      <div class="motiv-color-swatch-wrap">
+        <button type="button" class="motiv-color-swatch"
+                :style="{ '--col-accent': 'var(--palette-' + themeSwatchKey(selectedTheme()) + ')' }"
+                @click.stop="toggleThemeColorPicker(selectedTheme().id)"
+                :data-tip="$app.t('motiv.theme.color')" :aria-label="$app.t('motiv.theme.color')"></button>
+        <div class="motiv-color-popover" x-show="themeColorPickerId === selectedThemeId" x-cloak
+             @click.outside="themeColorPickerId === selectedThemeId && (themeColorPickerId = null)">
+          <button type="button" class="motiv-color-opt motiv-color-opt--none"
+                  :class="{ 'motiv-color-opt--on': !selectedTheme().farbe }"
+                  @click="setThemeColor(selectedTheme(), null)"
+                  :data-tip="$app.t('motiv.theme.colorAuto')" :aria-label="$app.t('motiv.theme.colorAuto')"></button>
+          <template x-for="key in themeColorKeys()" :key="key">
+            <button type="button" class="motiv-color-opt"
+                    :style="{ '--col-accent': 'var(--palette-' + key + ')' }"
+                    :class="{ 'motiv-color-opt--on': selectedTheme().farbe === key }"
+                    @click="setThemeColor(selectedTheme(), key)" :aria-label="key"></button>
+          </template>
+        </div>
+      </div>
+
+      <label class="motiv-field-label" x-text="$app.t('motiv.theme.beschreibung')"></label>
+      <textarea class="motiv-textarea" rows="4" data-spellcheck="spelling"
+                :placeholder="$app.t('motiv.theme.beschreibungHint')"
+                x-model="editThemeBeschreibung"></textarea>
     </div>
   </template>
 

@@ -23,6 +23,9 @@ export function registerMotivCard() {
     errorMessage: '',
     // Auswahl + Fundstellen
     selectedMotifId: null,
+    // Themen-Auswahl (parallel zur Motiv-Auswahl, gegenseitig exklusiv): Klick auf
+    // ein Thema (Liste oder Graph-Knoten) öffnet den Themen-Editor im Panel.
+    selectedThemeId: null,
     occurrences: [],
     occLoading: false,
     // Panel-Sektionen auf-/zugeklappt (pro Motiv in localStorage persistiert,
@@ -37,6 +40,10 @@ export function registerMotivCard() {
     editName: '',
     editBeschreibung: '',
     editTriggers: '',
+    // Edit-Puffer des Themen-Editors (Name/Beschreibung) — explizit gespeichert
+    // via Save/Cancel, kein Feld-Autosave (App-Standard, wie der Motiv-Editor).
+    editThemeName: '',
+    editThemeBeschreibung: '',
     // Edit-Puffer der Soll-Verknüpfungen (Figuren/Beats/Kapitel/Seiten) — wie die
     // Kern-Felder explizit via Save/Cancel-Icon persistiert, kein Auto-Save mehr.
     // Bei Auswahl aus dem Motiv gefüllt (_loadLinkBuffer), Chips lesen die Puffer.

@@ -18,11 +18,11 @@ export const crudMethods = {
   _bookId() { return this.$store.nav.selectedBookId; },
 
   // ── Themen ─────────────────────────────────────────────────────────────
-  // Namensfeld eines Themas in der Panel-Liste fokussieren (nach Anlegen) — greift
-  // nur, wenn die Themen-Liste sichtbar ist (kein Motiv selektiert); sonst No-Op.
-  _focusThemeInput(themeId) {
+  // Namensfeld des Themen-Editors fokussieren (nach Anlegen) — der Editor ist erst
+  // nach dem Reflow (selectTheme → x-if) im DOM; sonst No-Op.
+  _focusThemeNameInput() {
     this.$nextTick(() => {
-      const el = this.$root?.querySelector(`.motiv-theme-row[data-theme-id="${themeId}"] .motiv-inline-input`);
+      const el = this.$root?.querySelector('.motiv-theme-name-input');
       if (el) { el.focus(); el.select(); }
     });
   },
@@ -34,20 +34,75 @@ export const crudMethods = {
       const theme = await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name });
       this.newThemeName = '';
       await this.loadBoard();
-      this._focusThemeInput(theme.id);
+      await this.selectTheme(theme.id);
+      this._focusThemeNameInput();
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },
-  async renameTheme(theme, name) {
-    const clean = (name || '').trim();
-    if (!clean || clean === theme.name) return;
-    try { await _json(`/motifs/themes/${theme.id}`, 'PATCH', { name: clean }); await this.loadBoard(); }
-    catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
-  },
   async deleteTheme(theme) {
     if (!window.confirm(window.__app.t('motiv.theme.confirmDelete', { name: theme.name }))) return;
-    try { await _json(`/motifs/themes/${theme.id}`, 'DELETE'); await this.loadBoard(); }
-    catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+    try {
+      await _json(`/motifs/themes/${theme.id}`, 'DELETE');
+      if (this.selectedThemeId === theme.id) { this.selectedThemeId = null; this._loadThemeBuffer(null); }
+      await this.loadBoard();
+    } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+  },
+
+  // Themen-Editor: Kern-Felder (Name/Beschreibung) mit explizitem Save/Cancel wie der
+  // Motiv-Editor. Farbe bleibt Sofort-Aktion (setThemeColor), unabhängig vom Puffer.
+  _loadThemeBuffer(t) {
+    this.editThemeName = t ? (t.name || '') : '';
+    this.editThemeBeschreibung = t ? (t.beschreibung || '') : '';
+  },
+  themeDirty() {
+    const t = this.selectedTheme();
+    if (!t) return false;
+    return (this.editThemeName || '').trim() !== (t.name || '')
+      || (this.editThemeBeschreibung || '') !== (t.beschreibung || '');
+  },
+  cancelThemeEdit() { this._loadThemeBuffer(this.selectedTheme()); },
+  async saveThemeEdit() {
+    const t = this.selectedTheme();
+    if (!t || !this.themeDirty()) return;
+    const name = (this.editThemeName || '').trim();
+    if (!name) { this.errorMessage = window.__app.t('motiv.error.nameRequired'); return; }
+    this.busy = true;
+    try {
+      await _json(`/motifs/themes/${t.id}`, 'PATCH', { name, beschreibung: this.editThemeBeschreibung || '' });
+      await this.loadBoard();
+      this._loadThemeBuffer(this.selectedTheme());
+      this.errorMessage = '';
+    } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
+    finally { this.busy = false; }
+  },
+  // Ausstehende Puffer-Änderungen des gewählten Themas committen (Wechsel/Schliessen =
+  // Save, kein stilles Verwerfen). Leerer Name verwirft nur die Umbenennung.
+  async _commitPendingThemeEdit() {
+    const t = this.selectedTheme();
+    if (!t || !this.themeDirty()) return;
+    if (!(this.editThemeName || '').trim()) this.editThemeName = t.name;
+    await this.saveThemeEdit();
+  },
+  // Thema auswählen → Editor im Panel. Gegenseitig exklusiv zur Motiv-Auswahl:
+  // ausstehende Motiv-/Themen-Edits erst committen (fehlgeschlagener Save behält die
+  // Auswahl). Re-Select derselben ID lädt den Puffer nicht neu (Edits überleben).
+  async selectTheme(id) {
+    const sameId = !!id && id === this.selectedThemeId;
+    if (!sameId) {
+      await this._commitPendingMotifEdit();
+      if (this.motifDirty()) return;
+      await this._commitPendingThemeEdit();
+      if (this.themeDirty()) return;
+    }
+    this.selectedMotifId = null;
+    this.selectedThemeId = id;
+    if (!sameId) this._loadThemeBuffer(this.themeById(id));
+  },
+  // Themen-Editor schliessen → zurück zur Themen-Liste (committet ausstehende Edits).
+  async deselectTheme() {
+    await this._commitPendingThemeEdit();
+    if (this.themeDirty()) return;
+    this.selectedThemeId = null;
   },
   // Palette-Schlüssel für den Farbwähler (theme-aware --palette-*-Tokens).
   themeColorKeys() { return THEME_COLOR_KEYS; },
@@ -102,15 +157,16 @@ export const crudMethods = {
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },
-  // Thema direkt anlegen (aus dem Graph-Kontextmenü) — mit Default-Namen; danach
-  // inline in der Themen-Liste des Panels fokussiert zum sofortigen Umbenennen.
+  // Thema direkt anlegen (aus dem Graph-Kontextmenü) — mit Default-Namen; danach im
+  // Panel-Editor selektiert + Namensfeld fokussiert zum sofortigen Umbenennen.
   async createThemeQuick() {
     this.closeGraphMenu();
     this.busy = true;
     try {
       const theme = await _json('/motifs/themes', 'POST', { book_id: this._bookId(), name: window.__app.t('motiv.theme.newName') });
       await this.loadBoard();
-      this._focusThemeInput(theme.id);
+      await this.selectTheme(theme.id);
+      this._focusThemeNameInput();
     } catch (e) { this.errorMessage = window.__app.t('motiv.error.save'); }
     finally { this.busy = false; }
   },
@@ -346,7 +402,11 @@ export const crudMethods = {
       await this._commitPendingMotifEdit();
       // Save fehlgeschlagen (errorMessage steht) → Auswahl behalten, nichts verwerfen.
       if (this.motifDirty()) return;
+      // Motiv-Auswahl ist gegenseitig exklusiv zur Themen-Auswahl (ein Editor im Panel).
+      await this._commitPendingThemeEdit();
+      if (this.themeDirty()) return;
     }
+    this.selectedThemeId = null;
     this.selectedMotifId = id;
     if (!sameId) {
       this.occurrences = [];

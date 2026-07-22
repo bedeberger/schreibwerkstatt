@@ -11,6 +11,11 @@
       <div>
         <div class="context-menu-header" x-text="graphMenuTheme().name"></div>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
+                @click.stop="selectTheme(graphMenuTheme().id); closeGraphMenu()">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+          <span x-text="$app.t('motiv.graph.menu.editTheme')"></span>
+        </button>
+        <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                 @click.stop="createMotifAt(graphMenuTheme().id)">
           <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
           <span x-text="$app.t('motiv.graph.menu.addMotif')"></span>

@@ -51,7 +51,10 @@ export const lifecycleMethods = {
     this.motifs = [];
     this.relations = [];
     this.selectedMotifId = null;
+    this.selectedThemeId = null;
     this.occurrences = [];
+    this.editThemeName = '';
+    this.editThemeBeschreibung = '';
     this.editThemeId = '';
     this.editName = '';
     this.editBeschreibung = '';
@@ -84,6 +87,14 @@ export const lifecycleMethods = {
 
   selectedMotif() {
     return this.selectedMotifId ? this.motifById(this.selectedMotifId) : null;
+  },
+
+  themeById(id) {
+    return this.themes.find(t => t.id === id) || null;
+  },
+
+  selectedTheme() {
+    return this.selectedThemeId ? this.themeById(this.selectedThemeId) : null;
   },
 
   // Ein Motiv gilt als „geplant, aber fehlt" (Geist), wenn es Soll-Verknüpfungen
