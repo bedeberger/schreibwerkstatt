@@ -115,9 +115,12 @@
 .page-content-view hr.blankpage { border-top: 3px double var(--color-accent); margin: 1.6em 0; }
 .page-content-view--editing hr { cursor: pointer; }
 .page-content-view--editing hr.hr-selected { border-top-color: var(--color-accent); border-top-width: 2px; outline: 2px solid var(--color-accent); outline-offset: 4px; }
-/* hr ist void ohne Caret-Slot: bei Selektion landet der Caret quer zwischen
-   Linie und Folgeabsatz. Caret ausblenden, solange eine hr selektiert ist. */
-.page-content-view--editing:has(hr.hr-selected) { caret-color: transparent; }
+/* hr ist void ohne Caret-Slot: der Caret landet quer zwischen Linie und
+   Folgeabsatz. Caret ausblenden, solange eine hr per Klick markiert ist
+   (hr-selected) oder eine Text-Selektion über eine hr hinweggeht
+   (hr-in-selection, gesetzt in editor-toolbar-card.js). */
+.page-content-view--editing:has(hr.hr-selected),
+.page-content-view--editing.hr-in-selection { caret-color: transparent; }
 .page-content-view pre { background: var(--color-bg); padding: var(--space-10) 12px; border-radius: var(--radius-md); overflow-x: auto; font-size: var(--font-size-sm); }
 .page-content-view code { background: var(--color-bg); padding: var(--space-1) 4px; border-radius: var(--radius-sm); font-size: var(--font-em-90); }
 .page-content-view pre code { background: none; padding: 0; }

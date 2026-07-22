@@ -80,6 +80,27 @@ export function registerEditorToolbarCard() {
         });
         if (editEl && e.target.tagName === 'HR') e.target.classList.toggle('hr-selected');
       }, { signal });
+
+      // Void-<hr> hat keinen Caret-Slot: geht eine Text-Selektion über eine <hr>
+      // hinweg, rendert der Browser den Caret schräg zwischen Linie und
+      // Folgeabsatz. Solange die Selektion eine <hr> berührt, denselben
+      // caret-color-Guard wie beim Klick setzen (siehe page-view.css). Klasse am
+      // Edit-Container; kollabierte Selektion wird nicht behandelt (dort greift
+      // die hr-selected-Klick-Logik).
+      document.addEventListener('selectionchange', () => {
+        document.querySelectorAll('.page-content-view--editing.hr-in-selection')
+          .forEach((el) => el.classList.remove('hr-in-selection'));
+        const sel = document.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+        const range = sel.getRangeAt(0);
+        const anchor = range.commonAncestorContainer;
+        const editEl = (anchor.nodeType === 1 ? anchor : anchor.parentElement)
+          ?.closest?.('.page-content-view--editing');
+        if (!editEl) return;
+        const touchesHr = Array.from(editEl.querySelectorAll('hr'))
+          .some((hr) => range.intersectsNode(hr));
+        if (touchesHr) editEl.classList.add('hr-in-selection');
+      }, { signal });
     },
 
     destroy() {
