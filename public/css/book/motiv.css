@@ -130,7 +130,8 @@
   border-radius: var(--radius-sm);
   background: none;
   color: var(--color-text);
-  font: inherit;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
   text-align: left;
   cursor: pointer;
   overflow: hidden;
