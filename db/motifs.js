@@ -255,15 +255,18 @@ const replaceOccurrences = db.transaction((motifId, bookId, rows) => {
 // Fundstellen-Zahl pro Motiv fürs Graph-Rendering (Ist-Dichte). Optionaler Score-
 // Floor blendet schwache semantische Treffer aus (Ist-Dichte + Geist-Erkennung
 // respektieren die Schwelle live); wörtliche Trigger-Treffer (score=null) zählen immer.
+// avg_score = mittlere Übereinstimmung der Fundstellen (Cosinus 0..1); wörtliche
+// Trigger-Treffer (score=null) sind exakte Matches → als 1.0 (100%) gewertet.
+// Beides fliesst in die Graph-Knotengrösse (Dichte × Übereinstimmung).
 const _stmtOccCounts = db.prepare(`
-  SELECT o.motif_id, COUNT(*) AS n
+  SELECT o.motif_id, COUNT(*) AS n, AVG(COALESCE(o.score, 1.0)) AS avg_score
     FROM motif_occurrences o
     JOIN motifs m ON m.id = o.motif_id
    WHERE m.book_id = ? AND m.user_email = ?
    GROUP BY o.motif_id
 `);
 const _stmtOccCountsFloor = db.prepare(`
-  SELECT o.motif_id, COUNT(*) AS n
+  SELECT o.motif_id, COUNT(*) AS n, AVG(COALESCE(o.score, 1.0)) AS avg_score
     FROM motif_occurrences o
     JOIN motifs m ON m.id = o.motif_id
    WHERE m.book_id = ? AND m.user_email = ?
@@ -450,7 +453,7 @@ function getGraph(bookId, userEmail, minScore = 0) {
   const relations = listRelations(bid, userEmail);
 
   const byMotif = new Map(motifs.map(m => [m.id, {
-    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0,
+    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0, occAvgScore: 0,
   }]));
   for (const r of _stmtBridgeFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.figures.push({ figId: r.fig_id, name: r.name });
   for (const r of _stmtBridgeDraftFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.draftFigures.push({ id: r.draft_figure_id, name: r.name });
@@ -458,7 +461,7 @@ function getGraph(bookId, userEmail, minScore = 0) {
   for (const r of _stmtBridgeChapters.all(bid, userEmail)) byMotif.get(r.motif_id)?.chapters.push({ id: r.chapter_id, name: r.chapter_name });
   for (const r of _stmtBridgePages.all(bid, userEmail)) byMotif.get(r.motif_id)?.pages.push({ id: r.page_id, name: r.page_name });
   const counts = floor > 0 ? _stmtOccCountsFloor.all(bid, userEmail, floor) : _stmtOccCounts.all(bid, userEmail);
-  for (const r of counts) { const m = byMotif.get(r.motif_id); if (m) m.occurrenceCount = r.n; }
+  for (const r of counts) { const m = byMotif.get(r.motif_id); if (m) { m.occurrenceCount = r.n; m.occAvgScore = r.avg_score || 0; } }
 
   return { themes, motifs: [...byMotif.values()], relations, layout: getLayout(bid, userEmail) };
 }

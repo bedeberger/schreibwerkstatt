@@ -198,7 +198,10 @@ export function comboboxData(cfg = {}) {
           e.preventDefault();
           if (this.highlighted >= 0 && this.filtered[this.highlighted]) this.select(this.filtered[this.highlighted].value);
         } else if (e.key === 'Escape') {
-          e.preventDefault(); this.close();
+          // Dropdown offen → Escape schliesst NUR das Dropdown. stopPropagation, damit
+          // ein umschliessender Editor (Motiv-/Beat-Panel mit panel-weitem Escape=Abbrechen)
+          // den Tastendruck nicht zusätzlich als „Bearbeitung verwerfen" auffasst.
+          e.preventDefault(); e.stopPropagation(); this.close();
         }
       },
       _scrollHl() {

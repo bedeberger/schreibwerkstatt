@@ -48,7 +48,7 @@ function _themeColor(themeId, themes, paletteVars) {
 export const graphMethods = {
   _graphSignature() {
     const m = this.motifs.map(x =>
-      `${x.id}:${x.name || ''}:${x.theme_id || 0}:${x.occurrenceCount || 0}:${(x.figures || []).length}:${(x.draftFigures || []).length}:${(x.beats || []).length}:${(x.chapters || []).length}`
+      `${x.id}:${x.name || ''}:${x.theme_id || 0}:${x.occurrenceCount || 0}:${(x.occAvgScore || 0).toFixed(3)}:${(x.figures || []).length}:${(x.draftFigures || []).length}:${(x.beats || []).length}:${(x.chapters || []).length}`
     ).join('|');
     const r = this.relations.map(x => `${x.from_motif_id}-${x.to_motif_id}:${x.typ}`).join('|');
     const t = this.themes.map(x => `${x.id}:${x.name || ''}:${x.farbe || ''}`).join(',');
@@ -112,20 +112,29 @@ export const graphMethods = {
       });
     }
 
-    // Motiv-Naben (Grösse = Ist-Dichte; Geist = geplant aber 0 Fundstellen).
-    // Grösse dynamisch gegen die reale Fundstellen-Spanne des Datensatzes
-    // normalisiert (nicht feste Absolut-Skala): kleinstes reales Motiv = MIN,
-    // grösstes = MAX, √-interpoliert (Fläche ∝ Fundstellen, dämpft Ausreisser).
-    // Geist-Knoten (0 Treffer, aber geplant) bleiben fix klein.
+    // Motiv-Naben (Grösse = Ist-Präsenz; Geist = geplant aber 0 Fundstellen).
+    // Zwei Dimensionen fliessen ein, nicht bloss die Fundstellen-Zahl:
+    //   1. Ist-Dichte  — Anzahl Fundstellen, √-gedämpft und gegen die reale Spanne
+    //      des Datensatzes auf [0,1] normalisiert (Ausreisser dämpfen).
+    //   2. Übereinstimmung — mittlere Konfidenz der Fundstellen (occAvgScore, 0..1;
+    //      wörtliche Trigger-Treffer = 100%). Absolut interpretiert, nicht gegen die
+    //      Spanne normalisiert — 95%-Motiv soll gross sein, egal wie die anderen liegen.
+    // Blend: gewichtete Summe (Dichte dominiert, Qualität moduliert) → √-Fläche.
+    // Ein oft-aber-schwach gefundenes Motiv bleibt so kleiner als ein etwas seltener,
+    // aber sehr treffsicher belegtes. Geist-Knoten (0 Treffer) bleiben fix klein.
     const MOTIF_SIZE_MIN = 14, MOTIF_SIZE_MAX = 46, MOTIF_SIZE_GHOST = 10;
+    const COUNT_WEIGHT = 0.6, QUALITY_WEIGHT = 0.4;
     const _occCounts = this.motifs.filter(m => !this.isGhost(m)).map(m => m.occurrenceCount || 0);
     const _occMin = _occCounts.length ? Math.min(..._occCounts) : 0;
     const _occMax = _occCounts.length ? Math.max(..._occCounts) : 0;
     const _motifSize = (m) => {
       if (this.isGhost(m)) return MOTIF_SIZE_GHOST;
-      if (_occMax === _occMin) return (MOTIF_SIZE_MIN + MOTIF_SIZE_MAX) / 2;
-      const t = (Math.sqrt(m.occurrenceCount || 0) - Math.sqrt(_occMin)) / (Math.sqrt(_occMax) - Math.sqrt(_occMin));
-      return MOTIF_SIZE_MIN + t * (MOTIF_SIZE_MAX - MOTIF_SIZE_MIN);
+      const density = _occMax === _occMin
+        ? 0.5
+        : (Math.sqrt(m.occurrenceCount || 0) - Math.sqrt(_occMin)) / (Math.sqrt(_occMax) - Math.sqrt(_occMin));
+      const quality = Math.max(0, Math.min(1, m.occAvgScore || 0));
+      const blend = COUNT_WEIGHT * density + QUALITY_WEIGHT * quality;
+      return MOTIF_SIZE_MIN + blend * (MOTIF_SIZE_MAX - MOTIF_SIZE_MIN);
     };
     const figCatalog = this.$store.catalog.figuren || [];
     // Layer-Knoten (Figur/Beat/Kapitel) können von mehreren Motiven geteilt werden →

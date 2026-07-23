@@ -9,6 +9,36 @@ import { highlightOccurrenceOnPage } from './highlight.js';
 export const crudMethods = {
   _bookId() { return this.$store.nav.selectedBookId; },
 
+  // Panel-weite Tastaturkürzel (am Karten-Root, damit sie auch bei Fokus im Graph/
+  // Chip greifen): Cmd/Ctrl+S speichert das gewählte Motiv bzw. Thema, Escape verwirft
+  // ungespeicherte Änderungen — oder schliesst den Editor, wenn nichts dirty ist.
+  // Combobox/EntityPicker konsumieren Escape selbst, solange ihr Dropdown offen ist
+  // (stopPropagation dort), und offene Popover/Menüs regeln ihr Escape ebenfalls selbst.
+  onPanelKeydown(event) {
+    const mod = event.metaKey || event.ctrlKey;
+    if (mod && !event.shiftKey && !event.altKey && (event.key === 's' || event.key === 'S')) {
+      event.preventDefault();
+      if (this.selectedMotif()) this.saveMotifEdit();
+      else if (this.selectedTheme()) this.saveThemeEdit();
+      return;
+    }
+    if (event.key === 'Escape') {
+      if (this.graphMenuOpen || this.themeColorPickerId != null) return;
+      if (this.selectedMotif()) { event.preventDefault(); this.escMotifEdit(); }
+      else if (this.selectedTheme()) { event.preventDefault(); this.escThemeEdit(); }
+    }
+  },
+  // Escape im Motiv-Editor: ungespeicherte Änderungen verwerfen, sonst Editor schliessen.
+  async escMotifEdit() {
+    if (this.motifDirty()) { this.cancelMotifEdit(); return; }
+    await this.selectMotif(null);
+  },
+  // Escape im Themen-Editor: analog (verwerfen → sonst zurück zur Themen-Liste).
+  async escThemeEdit() {
+    if (this.themeDirty()) { this.cancelThemeEdit(); return; }
+    await this.deselectTheme();
+  },
+
   // ── Themen ─────────────────────────────────────────────────────────────
   // Namensfeld des Themen-Editors fokussieren (nach Anlegen) — der Editor ist erst
   // nach dem Reflow (selectTheme → x-if) im DOM; sonst No-Op.

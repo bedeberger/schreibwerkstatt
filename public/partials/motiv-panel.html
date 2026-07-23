@@ -1,8 +1,7 @@
-<!-- Motiv-Werkstatt: Seitenpanel (nested via <div id="partial-motiv-panel">).
-     motivCard-Scope. Ohne Auswahl: Themen-Liste + Hinweis. Mit Auswahl:
-     Motiv-Editor (Name/Thema/Beschreibung/Trigger) + Fundstellen (Ist) +
-     Soll-Verknüpfungen (Figuren/Beats/Kapitel/Seiten) + Motiv↔Motiv-Beziehungen.
-     Aus motiv.html ausgelagert (HTML-Partial-LOC-Limit). -->
+<!-- Motiv-Werkstatt: Seitenpanel (nested via <div id="partial-motiv-panel">, motivCard-Scope).
+     Ohne Auswahl: Themen-Liste. Mit Auswahl: Editor (Name/Thema/Beschreibung/Trigger) +
+     Fundstellen (Ist) + Soll-Verknüpfungen + Motiv↔Motiv-Beziehungen. Cmd/Ctrl+S / Escape
+     panel-weit via onPanelKeydown am Karten-Root (motiv.html). -->
 <aside class="motiv-panel">
   <!-- Ohne Auswahl: Themen-Liste + Hinweis -->
   <template x-if="!selectedMotif() && !selectedTheme()">
@@ -55,27 +54,30 @@
   <template x-if="!selectedMotif() && selectedTheme()">
     <div class="motiv-editor">
       <div class="motiv-editor-head">
-        <button type="button" class="icon-btn icon-btn--ghost" @click="deselectTheme()" :disabled="busy"
-                :data-tip="$app.t('motiv.theme.backToList')" :aria-label="$app.t('motiv.theme.backToList')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-left"/></svg>
-        </button>
-        <input type="text" class="motiv-name-input motiv-theme-name-input" x-model="editThemeName" data-spellcheck="spelling"
-               @keydown.enter="saveThemeEdit()">
-        <button type="button" class="icon-btn icon-btn--ghost icon-btn--success" x-show="themeDirty()"
-                @click="saveThemeEdit()" :disabled="busy || !editThemeName.trim()"
-                :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
-        </button>
-        <button type="button" class="icon-btn icon-btn--ghost" x-show="themeDirty()"
-                @click="cancelThemeEdit()" :disabled="busy"
-                :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
-        </button>
-        <span class="action-sep" aria-hidden="true" x-show="themeDirty()"></span>
-        <button type="button" class="icon-btn icon-btn--ghost" @click="deleteTheme(selectedTheme())"
-                :data-tip="$app.t('motiv.graph.menu.deleteTheme')" :aria-label="$app.t('motiv.graph.menu.deleteTheme')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
-        </button>
+        <div class="motiv-editor-titlerow">
+          <button type="button" class="icon-btn icon-btn--ghost" @click="deselectTheme()" :disabled="busy"
+                  :data-tip="$app.t('motiv.theme.backToList')" :aria-label="$app.t('motiv.theme.backToList')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-left"/></svg>
+          </button>
+          <input type="text" class="motiv-name-input motiv-theme-name-input" x-model="editThemeName" data-spellcheck="spelling"
+                 @keydown.enter="saveThemeEdit()">
+          <button type="button" class="icon-btn icon-btn--ghost" @click="deleteTheme(selectedTheme())"
+                  :data-tip="$app.t('motiv.graph.menu.deleteTheme')" :aria-label="$app.t('motiv.graph.menu.deleteTheme')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+          </button>
+        </div>
+        <div class="motiv-editor-actions" x-show="themeDirty()" x-cloak>
+          <button type="button" class="icon-btn icon-btn--ghost icon-btn--success"
+                  @click="saveThemeEdit()" :disabled="busy || !editThemeName.trim()"
+                  :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+          </button>
+          <button type="button" class="icon-btn icon-btn--ghost"
+                  @click="cancelThemeEdit()" :disabled="busy"
+                  :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+          </button>
+        </div>
       </div>
 
       <label class="motiv-field-label" x-text="$app.t('motiv.theme.color')"></label>
@@ -110,23 +112,26 @@
   <template x-if="selectedMotif()">
     <div class="motiv-editor">
       <div class="motiv-editor-head">
-        <input type="text" class="motiv-name-input" x-model="editName" data-spellcheck="spelling"
-               @keydown.enter="saveMotifEdit()">
-        <button type="button" class="icon-btn icon-btn--ghost icon-btn--success" x-show="motifDirty()"
-                @click="saveMotifEdit()" :disabled="busy || !editName.trim()"
-                :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
-        </button>
-        <button type="button" class="icon-btn icon-btn--ghost" x-show="motifDirty()"
-                @click="cancelMotifEdit()" :disabled="busy"
-                :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
-        </button>
-        <span class="action-sep" aria-hidden="true" x-show="motifDirty()"></span>
-        <button type="button" class="icon-btn icon-btn--ghost" @click="deleteMotif(selectedMotif())"
-                :data-tip="$app.t('motiv.motif.delete')" :aria-label="$app.t('motiv.motif.delete')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
-        </button>
+        <div class="motiv-editor-titlerow">
+          <input type="text" class="motiv-name-input" x-model="editName" data-spellcheck="spelling"
+                 @keydown.enter="saveMotifEdit()">
+          <button type="button" class="icon-btn icon-btn--ghost" @click="deleteMotif(selectedMotif())"
+                  :data-tip="$app.t('motiv.motif.delete')" :aria-label="$app.t('motiv.motif.delete')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+          </button>
+        </div>
+        <div class="motiv-editor-actions" x-show="motifDirty()" x-cloak>
+          <button type="button" class="icon-btn icon-btn--ghost icon-btn--success"
+                  @click="saveMotifEdit()" :disabled="busy || !editName.trim()"
+                  :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+          </button>
+          <button type="button" class="icon-btn icon-btn--ghost"
+                  @click="cancelMotifEdit()" :disabled="busy"
+                  :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+          </button>
+        </div>
       </div>
 
       <label class="motiv-field-label" x-text="$app.t('motiv.motif.theme')"></label>
@@ -183,18 +188,15 @@
         <span class="motiv-field-label" x-text="$app.t('motiv.link.figures')"></span>
         <div class="motiv-chip-row">
           <template x-for="f in editFigures" :key="'k'+f.figId">
-            <span class="motiv-chip"><span x-text="f.name"></span>
-              <button type="button" @click="toggleLink('figures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+            <span class="motiv-chip"><span x-text="f.name"></span><button type="button" @click="toggleLink('figures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
           <template x-for="f in editDraftFigures" :key="'d'+f.id">
-            <span class="motiv-chip motiv-chip--werkstatt"><span x-text="f.name"></span>
-              <button type="button" @click="toggleLink('draftFigures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+            <span class="motiv-chip motiv-chip--werkstatt"><span x-text="f.name"></span><button type="button" @click="toggleLink('draftFigures', f)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
         </div>
-        <!-- Eine Combobox, zwei Quellen gruppiert: Komplettanalyse (figures) + Plotwerkstatt (draft_figures).
-             Wert trägt ein Präfix (fig:/draft:), addFigureLink löst die richtige Brücke auf.
-             Picker-Muster: transient + $event.detail — x-modelable-Sync ist asynchron
-             (Effect-Flush), ein Temp-x-model wäre im combobox-change-Handler noch stale. -->
+        <!-- Eine Combobox, zwei Quellen gruppiert (Komplettanalyse figures + Plotwerkstatt draft_figures);
+             Präfix fig:/draft: → addFigureLink wählt die Brücke. Picker-Muster transient + $event.detail,
+             weil x-modelable-Sync asynchron ist (Temp-x-model wäre im combobox-change-Handler noch stale). -->
         <div x-data="combobox({ placeholder: $app.t('motiv.link.addFigure'), transient: true })"
              x-effect="options = [
                ...($store.catalog.figuren||[]).map(f=>({value:'fig:'+f.id, label:f.name, group:$app.t('motiv.link.figureGroup.katalog')})),
@@ -206,8 +208,7 @@
         <span class="motiv-field-label" x-text="$app.t('motiv.link.beats')"></span>
         <div class="motiv-chip-row">
           <template x-for="b in editBeats" :key="b.id">
-            <span class="motiv-chip"><span x-text="b.titel"></span>
-              <button type="button" @click="toggleLink('beats', b)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+            <span class="motiv-chip"><span x-text="b.titel"></span><button type="button" @click="toggleLink('beats', b)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
         </div>
         <div x-data="combobox({ placeholder: $app.t('motiv.link.addBeat'), transient: true })"
@@ -218,8 +219,7 @@
         <span class="motiv-field-label" x-text="$app.t('motiv.link.chapters')"></span>
         <div class="motiv-chip-row">
           <template x-for="c in editChapters" :key="c.id">
-            <span class="motiv-chip"><span x-text="c.name"></span>
-              <button type="button" @click="toggleLink('chapters', c)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+            <span class="motiv-chip"><span x-text="c.name"></span><button type="button" @click="toggleLink('chapters', c)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
         </div>
         <div x-data="combobox({ placeholder: $app.t('motiv.link.addChapter'), transient: true })"
@@ -230,8 +230,7 @@
         <span class="motiv-field-label" x-text="$app.t('motiv.link.pages')"></span>
         <div class="motiv-chip-row">
           <template x-for="p in editPages" :key="p.id">
-            <span class="motiv-chip"><span x-text="p.name"></span>
-              <button type="button" @click="toggleLink('pages', p)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
+            <span class="motiv-chip"><span x-text="p.name"></span><button type="button" @click="toggleLink('pages', p)" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button></span>
           </template>
         </div>
         <div x-data="combobox({ placeholder: $app.t('motiv.link.addPage'), transient: true })"

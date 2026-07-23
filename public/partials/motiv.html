@@ -5,7 +5,8 @@
   Motiv↔Motiv-Beziehungen = Kanten, Soll-Layer (Figuren/Beats/Kapitel) zuschaltbar.
   KI-Motiverkennung (Job motif-scan) füllt den Ist-Index; nie generativ im Text.
 -->
-<div class="card card--motiv" x-data="motivCard" x-show="$app.showMotivCard" x-cloak>
+<div class="card card--motiv" x-data="motivCard" x-show="$app.showMotivCard" x-cloak
+     @keydown="onPanelKeydown($event)">
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
