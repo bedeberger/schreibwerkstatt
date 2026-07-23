@@ -86,6 +86,11 @@
   min-width: 0;
   max-height: 70vh;
   overflow-y: auto;
+  /* Reserviert den Scrollbar-Platz dauerhaft → beim Auf-/Zuklappen einer Sektion
+     (z.B. Fundstellen), das den Inhalt über 70vh wachsen lässt, erscheint/
+     verschwindet die Scrollbar sonst und die nutzbare Breite springt: das Panel
+     „wackelt". Mit stable bleibt die Breite konstant. */
+  scrollbar-gutter: stable;
   padding-right: var(--space-2xs);
   display: flex;
   flex-direction: column;
