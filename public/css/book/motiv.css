@@ -296,11 +296,12 @@
 }
 .motiv-chip button:hover { color: var(--color-err-text); }
 .motiv-relation-add { display: flex; align-items: center; gap: var(--space-2xs); flex-wrap: wrap; }
-/* Ziel-Combobox + Typ-Feld auf stabile Flex-Basen: min-width:0 lässt den
-   gewählten Motivnamen im Trigger ellipsieren, statt die Combobox zu dehnen —
-   sonst verschiebt die Auswahl das benachbarte Freitextfeld. */
-.motiv-relation-add > .combobox-wrap,
-.motiv-relation-add > .motiv-inline-input { flex: 1 1 40%; min-width: 0; width: auto; }
+/* Ziel-Combobox auf eigener, voller Zeile — ein langer Motivname bläht sie nicht
+   in die benachbarte Spalte, sondern ellipsiert (min-width:0). Typ-Freitextfeld +
+   „Hinzufügen" teilen die zweite Zeile, sodass die Auswahl das Textfeld nie
+   verkleinert; das Feld behält so seine volle Breite zum Tippen. */
+.motiv-relation-add > .combobox-wrap { flex: 1 1 100%; min-width: 0; }
+.motiv-relation-add > .motiv-inline-input { flex: 1 1 auto; min-width: 0; width: auto; }
 
 /* ── Vollbild: ganze Karte nimmt den Viewport, Graph füllt den Resthöhenraum
      unter Header/Toolbar (Panel behält seine Spalte). ───────────────────── */
