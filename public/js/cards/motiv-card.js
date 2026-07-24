@@ -52,6 +52,8 @@ export function registerMotivCard() {
     editBeats: [],
     editChapters: [],
     editPages: [],
+    // Ansicht: Konstellation (Graph) oder Kapitel-Verlaufsband (Heatmap Motiv × Kapitel)
+    motivView: 'graph',
     // Graph-Layer
     layerFigures: false,
     layerBeats: false,

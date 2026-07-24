@@ -190,17 +190,71 @@ ${parts.join('\n\n')}
 `;
 }
 
-export function buildBookReviewSinglePassPrompt(bookName, pageCount, bookText, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '', komplettContext = null } = {}) {
+/**
+ * Baut den Block „Themen & Motive aus der Motiv-Werkstatt" für die BUCHbewertung.
+ * Nur buchweit gedacht (nicht für die Kapitelbewertung).
+ *
+ * Wichtiger Unterschied zu _buildKomplettContextBlock: diese Daten sind teils
+ * AUTOR-ABSICHT (das geplante Soll), keine aus dem Text extrahierte Wahrheit.
+ * Der Block ist entsprechend gerahmt — das Modell soll die Umsetzung und
+ * thematische Kohärenz beurteilen (v.a. auf der Achse "thema"), aber eine
+ * bewusste Abweichung vom Plan NICHT als Fehler werten. Pro Motiv steht das
+ * Soll (verankerte Figuren/Kapitel/Beats/Seiten) neben dem Ist (Fundstellen der
+ * Motiverkennung). Erscheint nur, wenn mindestens ein Motiv existiert.
+ *
+ * @param {{themen:Array, motive:Array}} ctx
+ * @returns {string} Block oder '' (wenn keine Motive)
+ */
+function _buildMotivContextBlock(ctx) {
+  if (!ctx || !ctx.motive?.length) return '';
+  const parts = [];
+
+  if (ctx.themen?.length) {
+    const lines = ctx.themen.map(t => `- ${t.name}${t.beschreibung ? ` – ${t.beschreibung}` : ''}`);
+    parts.push(`Themen (abstrakte Klammern):\n${lines.join('\n')}`);
+  }
+
+  const motifLines = ctx.motive.map(m => {
+    const thema = m.thema ? ` [Thema: ${m.thema}]` : '';
+    const desc = m.beschreibung ? ` – ${m.beschreibung}` : '';
+    const soll = [];
+    if (m.sollFiguren?.length) soll.push(`Figuren: ${m.sollFiguren.join(', ')}`);
+    if (m.sollKapitel?.length) soll.push(`Kapitel: ${m.sollKapitel.join(', ')}`);
+    if (m.sollBeats)  soll.push(`${m.sollBeats} Beat(s)`);
+    if (m.sollSeiten) soll.push(`${m.sollSeiten} Seite(n)`);
+    const sollStr = soll.length ? `geplant verankert an ${soll.join('; ')}` : 'keine konkrete Verankerung geplant';
+    return `- «${m.name}»${thema}${desc}\n    Soll: ${sollStr} · Ist: ${m.istFunde} Fundstelle(n) im Text`;
+  });
+  parts.push(`Motive (Soll = Plan des Autors, Ist = automatisch im Text gefunden):\n${motifLines.join('\n')}`);
+
+  return `
+=== THEMEN & MOTIVE AUS DER MOTIV-WERKSTATT (Absicht des Autors, KEINE Textwahrheit) ===
+Das Folgende ist die vom Autor GEPLANTE thematische Ebene, nicht aus dem Text
+extrahiert. Nutze es, um auf der Achse "thema" (roter Faden) die inhaltliche
+Kohärenz und die Umsetzung der Motive zu beurteilen: Wird ein zentrales Motiv
+tatsächlich getragen (hohes Ist), oder ist es nur geplant und im Text kaum
+präsent (Soll vorhanden, Ist niedrig/0)? Ein solcher Soll/Ist-Bruch ist ein
+möglicher Hinweis auf ein unterentwickeltes Motiv. ABER: Weiche der Autor
+bewusst von seinem Plan ab, ist das kein Fehler — bewerte die Wirkung des
+tatsächlichen Textes, nicht die Treue zum Plan. Wo diese Daten schweigen, NICHT raten.
+
+${parts.join('\n\n')}
+=== ENDE THEMEN & MOTIVE ===
+`;
+}
+
+export function buildBookReviewSinglePassPrompt(bookName, pageCount, bookText, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '', komplettContext = null, motivContext = null } = {}) {
   const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
   const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
   const kontextBlock = _buildKomplettContextBlock(komplettContext);
+  const motivBlock = _buildMotivContextBlock(motivContext);
   return `<aufgabe>
 Bewerte das folgende Buch «${bookName}» kritisch und umfassend.
 </aufgabe>
 ${ACHSEN_BLOCK_BOOK}
 ${NOTENSKALA_BLOCK}
 ${EMPFEHLUNGEN_FORMAT_BLOCK}
-${schwerpunktBlock}${povBlock}${kontextBlock}
+${schwerpunktBlock}${povBlock}${kontextBlock}${motivBlock}
 <output_format>
 Antworte mit diesem JSON-Schema:
 {
@@ -312,10 +366,11 @@ ${chText}
 </kapitelinhalt>`;
 }
 
-export function buildBookReviewMultiPassPrompt(bookName, chapterAnalyses, totalPageCount, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '', komplettContext = null } = {}) {
+export function buildBookReviewMultiPassPrompt(bookName, chapterAnalyses, totalPageCount, { erzaehlperspektive = null, erzaehlzeit = null, buchtyp = null, reviewSchwerpunkt = '', komplettContext = null, motivContext = null } = {}) {
   const povBlock = _buildErzaehlformBlock(erzaehlperspektive, erzaehlzeit, buchtyp, 'review');
   const schwerpunktBlock = _buildReviewSchwerpunktBlock(reviewSchwerpunkt);
   const kontextBlock = _buildKomplettContextBlock(komplettContext);
+  const motivBlock = _buildMotivContextBlock(motivContext);
   const synthIn = chapterAnalyses.map((ca, i) => {
     const lines = [
       `## Kapitel ${i + 1}: ${ca.name} (${ca.pageCount} Seiten)`,
@@ -344,7 +399,7 @@ ${EMPFEHLUNGEN_FORMAT_BLOCK}
 HINWEIS: Für "beispielzitate" stehen im Multi-Pass keine Volltexte zur Verfügung.
 Wenn aus den Kapitelanalysen keine wörtlichen Zitate ableitbar sind, das Feld
 "beispielzitate" auf [] setzen statt zu raten.
-${schwerpunktBlock}${povBlock}${kontextBlock}
+${schwerpunktBlock}${povBlock}${kontextBlock}${motivBlock}
 <kapitelanalysen kapitel="${chapterAnalyses.length}" seiten="${totalPageCount}">
 ${synthIn}
 </kapitelanalysen>

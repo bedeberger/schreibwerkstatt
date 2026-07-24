@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "1f1cee9d692ace7d";
+self.__SHELL_BUILD = "41b50ab827b12dbe";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-backup.css",
   "/css/admin/admin-home.css",
@@ -41,6 +41,7 @@ self.__SHELL_MANIFEST = [
   "/css/book/motiv.css",
   "/css/book/pdf-export.css",
   "/css/book/plot/board.css",
+  "/css/book/plot/relations.css",
   "/css/book/plot/swimlane.css",
   "/css/book/plot/widgets.css",
   "/css/card-accents.css",
@@ -181,7 +182,9 @@ self.__SHELL_MANIFEST = [
   "/js/book-overview/format.js",
   "/js/book-overview/kapitel.js",
   "/js/book-overview/load.js",
+  "/js/book-overview/motiv.js",
   "/js/book-overview/orte.js",
+  "/js/book-overview/plot.js",
   "/js/book-overview/projection.js",
   "/js/book-overview/recent.js",
   "/js/book-overview/review.js",
@@ -212,6 +215,7 @@ self.__SHELL_MANIFEST = [
   "/js/book/kontinuitaet.js",
   "/js/book/lektorat-time.js",
   "/js/book/motiv.js",
+  "/js/book/motiv/band.js",
   "/js/book/motiv/brainstorm.js",
   "/js/book/motiv/crud.js",
   "/js/book/motiv/dnd.js",
@@ -566,7 +570,9 @@ self.__SHELL_MANIFEST = [
   "/partials/bookoverview-coverage.html",
   "/partials/bookoverview-diary.html",
   "/partials/bookoverview-figpresence.html",
+  "/partials/bookoverview-motiv.html",
   "/partials/bookoverview-ortpresence.html",
+  "/partials/bookoverview-plot.html",
   "/partials/bookoverview-recent.html",
   "/partials/bookoverview-review.html",
   "/partials/bookoverview-rueckblick-heatmap.html",

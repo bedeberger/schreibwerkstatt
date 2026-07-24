@@ -34,6 +34,7 @@ function _buildLektoratPromptBody(text, textLabel, {
   figuren = [],
   figurenBeziehungen = [],
   orte = [],
+  motive = [],
   pageName = null,
   chapterName = null,
   erzaehlperspektive = null,
@@ -98,6 +99,20 @@ function _buildLektoratPromptBody(text, textLabel, {
           return '- ' + parts.join(' | ');
         }).join('\n')}\n`)
     : '';
+
+  // Geplante Motive (Soll aus der Motiv-Werkstatt) als PASSIVER Kontext. Zweck:
+  // motivtragende Formulierungen nicht gegen ein Motiv wegkorrigieren – kein
+  // Drift-Urteil, keine eigenen Findings. Lokal weggelassen (kleine Modelle
+  // ziehen daraus keinen Nutzen, nur Token-Kosten). Für den Objektiv-Pass irrelevant.
+  const motivBlock = (_isLocal || motive.length === 0)
+    ? ''
+    : `\nGeplante Motive/Themen für diese Stelle (Soll laut Motiv-Werkstatt – reiner HINTERGRUNDKONTEXT, NICHT bewerten und NICHT als «fehler» melden):\n${motive.map(m => {
+        const parts = [m.name];
+        if (m.theme_name) parts.push(`Thema: ${m.theme_name}`);
+        if (m.beschreibung) parts.push(m.beschreibung);
+        if (m.trigger_terms?.length) parts.push(`Schlüsselbegriffe: ${m.trigger_terms.join(', ')}`);
+        return '- ' + parts.join(' | ');
+      }).join('\n')}\nHinweis: Formulierungen, wiederkehrende Bilder, Symbole oder Schlüsselbegriffe, die bewusst eines dieser Motive tragen, NICHT als Wiederholung, Klischee, Füllwort oder Stilschwäche anstreichen – motivische Wiederholung ist gewollt. Bewerte weiterhin echte handwerkliche Schwächen; nur den bewussten Motiv-Bezug nicht wegkorrigieren.\n`;
 
   // Vorseiten-Absatz dient Tempus-/Perspektiv-Übergang – lokal nicht geprüft.
   const previousBlock = (_isLocal || !previousExcerpt)
@@ -309,7 +324,7 @@ ${_buildStilBlock()}
 ${_buildWiederholungBlock(stopwords)}
 ${_buildSchwacheVerbenBlock()}
 ${_buildFuellwortBlock()}
-${spezialBlocks}${figurenBlock}${beziehungenBlock}${orteBlock}${previousBlock}
+${spezialBlocks}${figurenBlock}${beziehungenBlock}${orteBlock}${motivBlock}${previousBlock}
 ${selbstkontrollBlock}
 <originaltext label="${textLabel.replace(/:\s*$/, '')}">
 ${text}

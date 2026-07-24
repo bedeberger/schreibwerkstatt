@@ -5,7 +5,7 @@
 // keinen State mit dem Figuren-Graph.
 
 import { loadVis } from '../../lazy-libs.js';
-import { sendJson } from '../../utils.js';
+import { sendJson, escHtml } from '../../utils.js';
 import { toggleWrapFullscreen } from '../../fullscreen.js';
 
 // Themen-Palette: primär die vom Autor gewählte Farbe (themes.farbe = Palette-
@@ -203,13 +203,28 @@ export const graphMethods = {
       }
     }
 
-    // Motiv ↔ Motiv (Beziehungstyp als Kantenlabel).
+    // Motiv ↔ Motiv (Beziehungstyp als Kantenlabel). Kanten laufen den direktesten
+    // (geraden) Weg und folgen beim Ziehen sofort der neuen Knotenposition —
+    // `smooth: false` statt der Default-`dynamic`-Kurve, die mit einem verzögerten
+    // Stützknoten ausbeult. Nur wenn zwischen demselben Motiv-Paar mehrere Kanten
+    // liegen (z. B. Hin- + Rückbeziehung), biegen wir sie leicht auf getrennte
+    // Seiten, damit sie sich nicht überdecken.
+    const pairCount = {};
     for (const r of this.relations) {
+      const key = [r.from_motif_id, r.to_motif_id].sort((a, b) => a - b).join('-');
+      pairCount[key] = (pairCount[key] || 0) + 1;
+    }
+    for (const r of this.relations) {
+      const key = [r.from_motif_id, r.to_motif_id].sort((a, b) => a - b).join('-');
+      const parallel = pairCount[key] > 1;
+      // Bei Parallelkanten die Ausweich-Seite deterministisch aus der Knoten-
+      // Reihenfolge ableiten, damit Hin- und Rückkante gegenläufig ausweichen.
+      const cw = r.from_motif_id < r.to_motif_id;
       edges.push({
         from: nodeId('motif', r.from_motif_id), to: nodeId('motif', r.to_motif_id), label: r.typ,
         arrows: 'to', color: { color: '#b45309' }, width: 2,
         font: { size: 11, color: mutedColor, strokeWidth: 3, strokeColor: bgColor },
-        smooth: { type: 'curvedCW', roundness: 0.2 },
+        smooth: parallel ? { type: cw ? 'curvedCW' : 'curvedCCW', roundness: 0.2 } : false,
       });
     }
 
@@ -228,9 +243,12 @@ export const graphMethods = {
     this._motivEdges = new window.vis.DataSet(edges);
     this._motivNetwork = new window.vis.Network(container, { nodes: this._motivNodes, edges: this._motivEdges }, {
       physics: { enabled: !allPlaced, barnesHut: { gravitationalConstant: -6000, springLength: 130, springConstant: 0.04, damping: 0.5 }, stabilization: { iterations: 180 } },
-      interaction: { dragNodes: true },
+      interaction: { dragNodes: true, hover: true, tooltipDelay: 100 },
       nodes: { borderWidthSelected: 3 },
-      edges: { selectionWidth: 1 },
+      // Kanten den direktesten (geraden) Weg nehmen lassen — die Default-`dynamic`-
+      // Glättung hängt einen verzögerten Stützknoten an, der beim Ziehen ausbeult.
+      // Motiv↔Motiv-Parallelkanten überschreiben das per-Kante mit einer leichten Kurve.
+      edges: { selectionWidth: 1, smooth: false },
     });
 
     this._motivNetwork.on('click', (params) => {
@@ -250,6 +268,8 @@ export const graphMethods = {
     this._motivNetwork.on('dragEnd', (params) => {
       if (params.nodes?.length) this._scheduleLayoutSave();
     });
+    // Hover-Tooltip (Detail-Karte am Knoten, wie im Figuren-Graph).
+    this._attachMotivTooltip(container);
 
     // Nach der Stabilisierung Physik einfrieren (ruhiges Bild, weiter zieh-/zoombar)
     // und die Start-Pins der gespeicherten Knoten lösen. Sind alle Knoten bereits
@@ -286,7 +306,76 @@ export const graphMethods = {
     try { this._motivNetwork.selectNodes([nodeId('motif', motifId)]); } catch (_) { /* Knoten evtl. (noch) nicht da */ }
   },
 
+  // Detail-Tooltip beim Hovern über einen Knoten (Motiv bzw. Thema), analog zum
+  // Figuren-Graph. HTML ausschliesslich aus escHtml()-Atomen — XSS-Escape-Invariante.
+  _attachMotivTooltip(container) {
+    const tip = document.getElementById('motiv-tooltip');
+    if (!tip) return;
+    const t = (k, p) => window.__app.t(k, p);
+
+    const showTipAt = (html, clientX, clientY) => {
+      tip.innerHTML = html;
+      tip.style.left = '0px';
+      tip.style.top = '0px';
+      tip.classList.add('visible');
+      const rect = container.getBoundingClientRect();
+      const cx = clientX - rect.left;
+      const cy = clientY - rect.top;
+      let left = cx + 14;
+      let top = cy + 14;
+      if (left + tip.offsetWidth > container.offsetWidth) left = Math.max(0, cx - tip.offsetWidth - 14);
+      if (top + tip.offsetHeight > container.offsetHeight) top = Math.max(0, cy - tip.offsetHeight - 14);
+      tip.style.left = Math.max(0, left) + 'px';
+      tip.style.top = Math.max(0, top) + 'px';
+    };
+    const hideTip = () => tip.classList.remove('visible');
+
+    const motifTipHtml = (m) => {
+      const theme = m.theme_id ? this.themeById(m.theme_id) : null;
+      const themeLabel = theme ? theme.name : t('motiv.noTheme');
+      const ghost = this.isGhost(m);
+      const occ = m.occurrenceCount || 0;
+      const links = (m.figures?.length || 0) + (m.draftFigures?.length || 0)
+        + (m.beats?.length || 0) + (m.chapters?.length || 0) + (m.pages?.length || 0);
+      const stats = [];
+      if (ghost) {
+        stats.push(`<span class="motiv-tip-ghost">${escHtml(t('motiv.tip.ghost'))}</span>`);
+      } else if (occ > 0) {
+        let line = escHtml(t('motiv.tip.occurrences', { n: occ }));
+        if (m.occAvgScore) line += ' · ' + escHtml(t('motiv.tip.confidence', { pct: Math.round(m.occAvgScore * 100) }));
+        stats.push(line);
+      } else {
+        stats.push(escHtml(t('motiv.tip.noOccurrences')));
+      }
+      if (links > 0) stats.push(escHtml(t('motiv.tip.links', { n: links })));
+      return `<strong>${escHtml(m.name)}</strong>`
+        + `<em>${escHtml(themeLabel)}</em>`
+        + (m.beschreibung ? `<p>${escHtml(m.beschreibung)}</p>` : '')
+        + `<div class="motiv-tip-stats">${stats.join('<br>')}</div>`;
+    };
+
+    const themeTipHtml = (th) => {
+      const count = this.motifs.filter(m => m.theme_id === th.id).length;
+      return `<strong>${escHtml(th.name)}</strong>`
+        + `<em>${escHtml(t('motiv.tip.themeMotifs', { n: count }))}</em>`
+        + (th.beschreibung ? `<p>${escHtml(th.beschreibung)}</p>` : '');
+    };
+
+    this._motivNetwork.on('hoverNode', ({ node, event }) => {
+      const ref = parseNode(node);
+      if (!ref) return;
+      let html = '';
+      if (ref.kind === 'motif') { const m = this.motifById(ref.id); if (m) html = motifTipHtml(m); }
+      else if (ref.kind === 'theme') { const th = this.themeById(ref.id); if (th) html = themeTipHtml(th); }
+      if (!html) return;
+      showTipAt(html, event.clientX, event.clientY);
+    });
+    this._motivNetwork.on('blurNode', hideTip);
+    this._motivNetwork.on('dragStart', hideTip);
+  },
+
   _destroyGraph() {
+    document.getElementById('motiv-tooltip')?.classList.remove('visible');
     if (this._motivNetwork) { this._motivNetwork.destroy(); this._motivNetwork = null; }
     this._motivNodes = null;
     this._motivEdges = null;

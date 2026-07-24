@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const express = require('express');
 const {
   db, getBookLocale, getBookSettings, getChapterFigures, getChapterFigureRelations, getChapterLocations,
+  getPageMotifs,
   loadLektoratCache, saveLektoratCache,
 } = require('../../db/schema');
 const {
@@ -212,6 +213,9 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
     const figuren           = getChapterFigures(bookId, pd.chapter_id, userEmail);
     const figurenBeziehungen = (!local && bookId) ? getChapterFigureRelations(bookId, pd.chapter_id, userEmail) : [];
     const orte              = bookId ? getChapterLocations(bookId, pd.chapter_id, userEmail) : [];
+    // Geplante Soll-Motive dieser Seite/dieses Kapitels als passiver Stil-Pass-Kontext
+    // (nur Cloud – der Motiv-Block wird für _isLocal ohnehin gedroppt).
+    const motive            = (!local && bookId) ? getPageMotifs(bookId, pd.chapter_id, pageId, userEmail) : [];
 
     // Kapitelname: zuerst aus lokaler chapters-Tabelle (kein BookStack-Call nötig),
     // Fallback: null wenn Kapitel fehlt oder Buch noch nicht synchronisiert wurde.
@@ -246,7 +250,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
     const ctxSig = bookId ? buildLektoratCtxSig({
       upd: pd.updated_at || '',
       text_sha: crypto.createHash('sha1').update(text).digest('hex').slice(0, 16),
-      fig: figuren, ort: orte, bez: figurenBeziehungen,
+      fig: figuren, ort: orte, bez: figurenBeziehungen, mot: motive,
       nar: narrativeLabels(bookSettings),
       sw: lektoratStopwords, er: lektoratErklaerungRule, kr: lektoratKorrekturRegeln,
       stp: bookSettings?.stilprofil || '',
@@ -273,7 +277,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
           stopwords: lektoratStopwords,
           erklaerungRule: lektoratErklaerungRule,
           korrekturRegeln: lektoratKorrekturRegeln,
-          figuren, figurenBeziehungen, orte,
+          figuren, figurenBeziehungen, orte, motive,
           pageName: pd.name, chapterName,
           ...narrativeLabels(bookSettings),
           previousExcerpt,
@@ -376,6 +380,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
         const batchFiguren     = getChapterFigures(bookId, pd.chapter_id, userEmail);
         const batchBeziehungen = local ? [] : getChapterFigureRelations(bookId, pd.chapter_id, userEmail);
         const batchOrte        = getChapterLocations(bookId, pd.chapter_id, userEmail);
+        const batchMotive      = local ? [] : getPageMotifs(bookId, pd.chapter_id, p.id, userEmail);
 
         // Lokale Provider: Vorseiten-Kontext wird im Prompt nicht verwendet – kompletter
         // Block überspringen, spart einen BookStack-Fetch pro Seite.
@@ -401,7 +406,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
         const ctxSig = buildLektoratCtxSig({
           upd: pd.updated_at || '',
           text_sha: crypto.createHash('sha1').update(text).digest('hex').slice(0, 16),
-          fig: batchFiguren, ort: batchOrte, bez: batchBeziehungen,
+          fig: batchFiguren, ort: batchOrte, bez: batchBeziehungen, mot: batchMotive,
           ep: bookSettings?.erzaehlperspektive || null,
           ez: bookSettings?.erzaehlzeit || null,
           sw: batchStopwords, er: batchErklaerungRule, kr: batchKorrekturRegeln,
@@ -432,6 +437,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
               figuren: batchFiguren,
               figurenBeziehungen: batchBeziehungen,
               orte: batchOrte,
+              motive: batchMotive,
               pageName: p.name,
               chapterName,
               erzaehlperspektive: bookSettings?.erzaehlperspektive || null,

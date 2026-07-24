@@ -29,13 +29,14 @@ export const lifecycleMethods = {
       this.acts = Array.isArray(data.acts) ? data.acts : [];
       this.threads = Array.isArray(data.threads) ? data.threads : [];
       this.beats = Array.isArray(data.beats) ? data.beats : [];
+      this.relations = Array.isArray(data.relations) ? data.relations : [];
       // Ist-Index-Staleness (Beats seit letztem Anchor-Lauf geändert) → Header
       // bietet „Verankerung aktualisieren" an.
       this.beatAnchorStale = !!(data.beatAnchor && data.beatAnchor.stale);
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.load');
-      this.acts = []; this.threads = []; this.beats = [];
+      this.acts = []; this.threads = []; this.beats = []; this.relations = [];
     } finally {
       this.loading = false;
     }
@@ -80,6 +81,9 @@ export const lifecycleMethods = {
     this.acts = [];
     this.threads = [];
     this.beats = [];
+    this.relations = [];
+    this.relDraftTyp = '';
+    this.relDraftTarget = '';
     this.draftFiguren = [];
     this.motifsCatalog = [];
     this.themesCatalog = [];

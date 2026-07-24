@@ -37,6 +37,8 @@ import { recentMethods } from './book-overview/recent.js';
 import { formatMethods } from './book-overview/format.js';
 import { diaryMethods } from './book-overview/diary.js';
 import { projectionMethods } from './book-overview/projection.js';
+import { plotMethods } from './book-overview/plot.js';
+import { motivMethods } from './book-overview/motiv.js';
 
 export const bookOverviewMethods = {
   ...loadMethods,
@@ -52,4 +54,6 @@ export const bookOverviewMethods = {
   ...kapitelMethods,
   ...recentMethods,
   ...formatMethods,
+  ...plotMethods,
+  ...motivMethods,
 };

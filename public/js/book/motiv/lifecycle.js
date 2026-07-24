@@ -52,6 +52,7 @@ export const lifecycleMethods = {
     this.relations = [];
     this.selectedMotifId = null;
     this.selectedThemeId = null;
+    this.motivView = 'graph';
     this.occurrences = [];
     this.editThemeName = '';
     this.editThemeBeschreibung = '';

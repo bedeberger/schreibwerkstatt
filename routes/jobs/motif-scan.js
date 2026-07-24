@@ -30,7 +30,31 @@ const motifScanRouter = express.Router();
 // Fund-Kinds im Text (Seiten + Szenen — genau die, die motif_occurrences via CHECK
 // erlaubt; Figuren-Chunks des Embedding-Index sind für Motive nicht sinnvoll).
 const SCAN_KINDS = ['page', 'scene'];
-const TOP_K = 40;
+
+// Fundstellen-Cap pro Motiv, buchgrössen-abhängig. Ein fixes TOP_K sättigt bei
+// grossen (dichten) Büchern die Ist-Dichte: ein omnipräsentes Motiv erreicht die
+// Grenze schnell, und die Knotengrösse unterscheidet „40 Stellen" nicht mehr von
+// „200 Stellen". Darum skaliert das Cap mit der Zahl indizierter Seiten/Szenen
+// (TOP_K_FRACTION), unten wie oben geklammert. Kleine Bücher behalten TOP_K_BASE.
+const TOP_K_BASE = 40;
+const TOP_K_MAX = 500;
+const TOP_K_FRACTION = 0.5;
+function _computeTopK(entityCount) {
+  return Math.max(TOP_K_BASE, Math.min(TOP_K_MAX, Math.ceil((entityCount || 0) * TOP_K_FRACTION)));
+}
+
+// FTS-Query eines wörtlichen Trigger-Begriffs. Einzelwörter ab TRIGGER_PREFIX_MIN
+// Zeichen werden als Präfix gesucht (`Wasser` → `Wasser*`), damit deutsche Flexion
+// (Wassers, Wasserns, Wasserfall) mitgefunden wird — der grösste Recall-Verlust bei
+// exaktem Token-Match. Kurze Begriffe (See, Weg) bleiben exakt (Präfix überdehnt
+// sonst: See* → Seele, sehen). Ein vom Autor selbst gesetztes `*` bleibt respektiert;
+// Mehrwort-Begriffe gehen unverändert durch (buildMatchQuery UND-verknüpft sie).
+const TRIGGER_PREFIX_MIN = 5;
+function _triggerQuery(term) {
+  const t = String(term || '').trim();
+  if (!t || /\s/.test(t) || t.endsWith('*')) return t;
+  return t.length >= TRIGGER_PREFIX_MIN ? `${t}*` : t;
+}
 
 const _TAG = /<\/?[^>]+>/g;
 const _ENT = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
@@ -46,13 +70,13 @@ function _toOcc(kind, entityId, score, snippet, source) {
 
 // Fundstellen eines Motivs sammeln. Dedup pro (kind, entity) — semantischer Treffer
 // gewinnt gegen wörtlichen (höhere Vertrauensstufe); ein Ort zählt einmal (Ist-Dichte).
-async function _scanMotif(bookId, motif, useSemantic, signalFn) {
+async function _scanMotif(bookId, motif, useSemantic, signalFn, topK) {
   const found = new Map();
 
   if (useSemantic) {
     const query = [motif.name, motif.beschreibung].map(s => String(s || '').trim()).filter(Boolean).join('. ');
     if (query) {
-      const hits = await semanticQuery(bookId, query, { kinds: SCAN_KINDS, topK: TOP_K, signal: signalFn() });
+      const hits = await semanticQuery(bookId, query, { kinds: SCAN_KINDS, topK, signal: signalFn() });
       for (const h of hits) {
         // Als Konfidenz zählt der rohe Cosinus (0–1, absolut interpretierbar für
         // %-Anzeige + Score-Floor). Reine FTS-Fusions-Kandidaten (kein Cosinus)
@@ -65,8 +89,10 @@ async function _scanMotif(bookId, motif, useSemantic, signalFn) {
   }
 
   for (const term of motif.trigger_terms || []) {
+    const q = _triggerQuery(term);
+    if (!q) continue;
     let r;
-    try { r = searchIndex.query(term, { bookId, kinds: SCAN_KINDS, limit: TOP_K }); }
+    try { r = searchIndex.query(q, { bookId, kinds: SCAN_KINDS, limit: topK }); }
     catch (e) { logger.warn(`[motiv-scan] FTS "${term}" fehlgeschlagen: ${e.message}`); continue; }
     for (const h of (r.hits || [])) {
       const key = _occKey(h.kind, h.entity_id);
@@ -88,13 +114,16 @@ async function runMotifScanJob(jobId, bookId, userEmail) {
 
     const useSemantic = embed.isEnabled();
     const motifs = motifsDb.listMotifs(bookId, userEmail);
+    // Fundstellen-Cap einmal pro Lauf aus der Buchgrösse ableiten (Seiten + Szenen
+    // im FTS-Index), damit dichte Motive in grossen Büchern nicht bei 40 plateauen.
+    const topK = _computeTopK(searchIndex.countEntities(bookId, SCAN_KINDS));
     updateJob(jobId, { statusText: 'job.phase.motivScan', statusParams: { done: 0, total: motifs.length }, progress: 5 });
 
     let totalOcc = 0;
     for (let i = 0; i < motifs.length; i++) {
       throwIfAborted();
       const motif = motifs[i];
-      const rows = await _scanMotif(bookId, motif, useSemantic, signal);
+      const rows = await _scanMotif(bookId, motif, useSemantic, signal, topK);
       motifsDb.replaceOccurrences(motif.id, bookId, rows);
       totalOcc += rows.length;
       updateJob(jobId, {
@@ -103,7 +132,7 @@ async function runMotifScanJob(jobId, bookId, userEmail) {
       });
     }
 
-    log.info(`Motiv-Scan ${bookId}: ${motifs.length} Motive, ${totalOcc} Fundstellen (semantisch=${useSemantic}).`);
+    log.info(`Motiv-Scan ${bookId}: ${motifs.length} Motive, ${totalOcc} Fundstellen (semantisch=${useSemantic}, topK=${topK}).`);
     completeJob(jobId, { motifs: motifs.length, occurrences: totalOcc, semantic: useSemantic }, null,
       `${motifs.length} Motive, ${totalOcc} Fundstellen`);
   } catch (e) {
@@ -143,4 +172,4 @@ motifScanRouter.post('/motif-scan', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { motifScanRouter, runMotifScanJob, scanAllBooks };
+module.exports = { motifScanRouter, runMotifScanJob, scanAllBooks, _triggerQuery, _computeTopK };

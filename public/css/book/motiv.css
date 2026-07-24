@@ -75,7 +75,33 @@
   grid-template-columns: 1fr 20rem;
   gap: var(--space-md);
   align-items: start;
+  /* Bezugsrahmen für den absolut positionierten Hover-Tooltip (#motiv-tooltip
+     sitzt an der Grid-Origin, deckungsgleich mit dem Graph-Container). */
+  position: relative;
 }
+
+/* Hover-Detail-Tooltip über dem Konstellations-Graph (positioniert in graph.js),
+   Muster wie .figur-tooltip im Figuren-Graph. */
+.motiv-tooltip {
+  display: none;
+  position: absolute;
+  z-index: var(--z-popover);
+  pointer-events: none;
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-sm) 10px;
+  font-size: var(--font-size-sm);
+  max-width: 240px;
+  line-height: 1.4;
+}
+.motiv-tooltip.visible { display: block; }
+.motiv-tooltip strong { display: block; margin-bottom: var(--space-2xs); }
+.motiv-tooltip em { color: var(--color-muted); font-style: normal; font-size: var(--font-size-xs); }
+.motiv-tooltip p { margin: var(--space-xs) 0 0; color: var(--color-text); white-space: pre-wrap; }
+.motiv-tip-stats { margin-top: var(--space-xs); color: var(--color-muted); font-size: var(--font-size-xs); }
+.motiv-tip-ghost { color: var(--card-accent, var(--color-muted)); }
 .motiv-graph-container {
   height: clamp(360px, 62vh, 760px);
   border: 1px solid var(--color-border);
@@ -259,7 +285,10 @@
   cursor: pointer;
   transition: border-color var(--transition-fast);
 }
-.motiv-occ-row:hover { border-color: var(--card-accent); }
+/* `.internal-link` trägt die Zeile nur für die Tastatur-Delegation (role=button,
+   Enter/Space); der globale `.internal-link:hover`-Underline ist hier unerwünscht. */
+.motiv-occ-row:hover { border-color: var(--card-accent); text-decoration: none; }
+.motiv-occ-row:focus-visible { text-decoration: none; }
 .motiv-occ-loc { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text); }
 .motiv-occ-snip {
   font-size: var(--font-size-xs);
@@ -372,6 +401,25 @@
 .motiv-hint .icon { flex-shrink: 0; }
 .motiv-hint--action { justify-content: space-between; }
 .motiv-hint-text { min-width: 0; }
+
+/* ── Kapitel-Verlaufsband (zweite Ansicht: Motiv × Kapitel als Heatmap) ──
+   Nutzt das geteilte .heatmap-*-Pattern (analysis/heatmap.css); hier nur der
+   Wrapper-Abstand + der Thema-Farbtupfer vor dem Motiv-Namen in der Rowhead. */
+.motiv-band-wrap {
+  margin-top: var(--space-sm);
+}
+.motiv-band-wrap .heatmap-rowhead-main {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  cursor: pointer;
+}
+.motiv-band-swatch {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+}
 
 /* Fundstelle im Seitentext (::highlight — global, gesetzt von book/motiv/highlight.js).
    Semi-transparenter Akzent, funktioniert in Light + Dark ohne DOM-Mutation. */

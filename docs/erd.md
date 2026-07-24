@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 248, 132 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 249, 133 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -93,6 +93,7 @@ erDiagram
   figures ||--o{ plot_beat_figures   : "appears in beat"
   plot_beats ||--o{ plot_beat_draft_figures : has
   draft_figures ||--o{ plot_beat_draft_figures : "appears in beat"
+  plot_beats ||--o{ plot_beat_relations : "causal/setup edge"
   draft_figures ||--o{ motif_draft_figures : "soll"
   books }o--o| book_categories       : "category_id"
   books ||--o| blog_connections      : "wp-link"
@@ -922,6 +923,16 @@ erDiagram
     TEXT    source     "semantic|trigger"
     TEXT    created_at
   }
+  plot_beat_relations {
+    INTEGER id           PK
+    INTEGER book_id      FK "CASCADE"
+    TEXT    user_email
+    INTEGER from_beat_id FK "CASCADE"
+    INTEGER to_beat_id   FK "CASCADE"
+    TEXT    typ          "Freitext (kuratiert): bereitet-vor|zahlt-ein|fuehrt-zu|motiviert|blockiert|spiegelt"
+    TEXT    created_at
+    TEXT    updated_at
+  }
 
   continuity_checks ||--o{ continuity_issues          : has
   continuity_issues ||--o{ continuity_issue_figures   : refs
@@ -950,9 +961,12 @@ erDiagram
   plot_beats        ||--o{ plot_beat_occurrences      : "detected (ist)"
   pages             ||--o{ plot_beat_occurrences      : ist
   figure_scenes     ||--o{ plot_beat_occurrences      : ist
+  books             ||--o{ plot_beat_relations        : has
+  plot_beats        ||--o{ plot_beat_relations        : "from (causal/setup)"
+  plot_beats        ||--o{ plot_beat_relations        : "to (causal/setup)"
 ```
 
-**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). Optionale zweite Ordnungsachse sind die Handlungsstränge (`plot_threads`, Swimlanes, geordnet via `position`) — das Board wird ein Raster Akte × Stränge, ein Beat sitzt in der Zelle (`act_id`, `thread_id`). `thread_id` (SET NULL) ist die Strang-Zuordnung (NULL = „ohne Strang"-Lane; null Stränge = flaches Board); ein Strang ist optional an eine Katalog-Figur (`figure_id`) ODER Werkstatt-Figur (`draft_figure_id`) gebunden (beide SET NULL — Hauptfigur-Strang). `status` ist binär (`geplant` = Idee ↔ `im_buch` = eingearbeitet); `verworfen` (0/1) ist eine eigene, orthogonale Achse (ausgemustert, bleibt bei Status-Wechsel erhalten); `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text. `plot_consistency_runs` historisiert jede Konsistenz-Prüfung als kompletten Result-JSON (`konflikte` + `fazit`, `konflikt_count` denormalisiert fürs Listen-Rendering) — `ON DELETE CASCADE` auf `book_id`, pro (Buch, User) skopiert; das Frontend zeigt einen klappbaren Prüfungs-Verlauf, Klick lädt einen Lauf wie ein Live-Resultat ins Consistency-Panel. `plot_brainstorm_runs` historisiert analog jeden Brainstorm-Lauf (`result_json` = `vorschlaege`, `vorschlag_count` denormalisiert), zusätzlich pro `act_id`/`thread_id` (beide **SET NULL** — ein gelöschter Akt/Strang entkoppelt den Lauf nur, der Name kommt zur Lesezeit per JOIN, kein Snapshot); Klick lädt die Vorschläge zurück ins Inline-Panel des Akts/der Zelle. `plot_beat_occurrences` ist der abgeleitete **Ist**-Index der Beat-Verankerung (Pendant zu `motif_occurrences`): wo ein geplanter Beat semantisch/wörtlich im Buchtext auftaucht (Job `beat-anchor`, hybrid aus Embedding-Cosinus über `titel`+`beschreibung` + optionalem FTS auf die Titel-Begriffe; `kind` page/scene sentinel-frei via CHECK, Full-Replace pro Beat je Lauf, CASCADE an Beat + Buch). Der Soll-Ist-Abgleich (`status` vs. Fundstellen-Dichte) treibt das Drift-Badge auf der Beat-Karte (`im_buch` ohne Fund = Drift, `geplant` mit Fund = evtl. schon geschrieben).
+**Plot-Werkstatt (Beat-Board).** Planendes Pendant zur rückwärtsgewandten Szenen-/Ereignis-Analyse: `plot_acts` sind die Spalten (Akte/Phasen, geordnet via `position`), `plot_beats` die Karten darin (Handlungspunkte, geordnet via `sort_order`). Optionale zweite Ordnungsachse sind die Handlungsstränge (`plot_threads`, Swimlanes, geordnet via `position`) — das Board wird ein Raster Akte × Stränge, ein Beat sitzt in der Zelle (`act_id`, `thread_id`). `thread_id` (SET NULL) ist die Strang-Zuordnung (NULL = „ohne Strang"-Lane; null Stränge = flaches Board); ein Strang ist optional an eine Katalog-Figur (`figure_id`) ODER Werkstatt-Figur (`draft_figure_id`) gebunden (beide SET NULL — Hauptfigur-Strang). `status` ist binär (`geplant` = Idee ↔ `im_buch` = eingearbeitet); `verworfen` (0/1) ist eine eigene, orthogonale Achse (ausgemustert, bleibt bei Status-Wechsel erhalten); `chapter_id` (SET NULL) verknüpft einen Beat mit dem Zielkapitel; `plot_beat_figures` ist die M:M-Brücke zu beteiligten Katalog-Figuren (`figures`), `plot_beat_draft_figures` die parallele M:M-Brücke zu Werkstatt-Figuren (`draft_figures`, vorwärts-entwickelt, evtl. noch nicht im Manuskript) — beide CASCADE auf Beat- und Figur-Seite. Pro Buch + User skopiert. KI assistiert ausschliesslich planend/überwachend (Brainstorm + Consistency gegen Buchrealität, beide kennen Katalog- **und** Werkstatt-Figuren), nie generativ in den Text. `plot_consistency_runs` historisiert jede Konsistenz-Prüfung als kompletten Result-JSON (`konflikte` + `fazit`, `konflikt_count` denormalisiert fürs Listen-Rendering) — `ON DELETE CASCADE` auf `book_id`, pro (Buch, User) skopiert; das Frontend zeigt einen klappbaren Prüfungs-Verlauf, Klick lädt einen Lauf wie ein Live-Resultat ins Consistency-Panel. `plot_brainstorm_runs` historisiert analog jeden Brainstorm-Lauf (`result_json` = `vorschlaege`, `vorschlag_count` denormalisiert), zusätzlich pro `act_id`/`thread_id` (beide **SET NULL** — ein gelöschter Akt/Strang entkoppelt den Lauf nur, der Name kommt zur Lesezeit per JOIN, kein Snapshot); Klick lädt die Vorschläge zurück ins Inline-Panel des Akts/der Zelle. `plot_beat_occurrences` ist der abgeleitete **Ist**-Index der Beat-Verankerung (Pendant zu `motif_occurrences`): wo ein geplanter Beat semantisch/wörtlich im Buchtext auftaucht (Job `beat-anchor`, hybrid aus Embedding-Cosinus über `titel`+`beschreibung` + optionalem FTS auf die Titel-Begriffe; `kind` page/scene sentinel-frei via CHECK, Full-Replace pro Beat je Lauf, CASCADE an Beat + Buch). Der Soll-Ist-Abgleich (`status` vs. Fundstellen-Dichte) treibt das Drift-Badge auf der Beat-Karte (`im_buch` ohne Fund = Drift, `geplant` mit Fund = evtl. schon geschrieben → Promotion-Vorschlag). `plot_beat_relations` modelliert gerichtete Beat-zu-Beat-Kanten (`from_beat_id --typ--> to_beat_id`, `typ` Freitext mit kuratierten Vorschlägen: Kausalität `fuehrt-zu`/`motiviert`/`blockiert`/`spiegelt` + Setup/Payoff `bereitet-vor`/`zahlt-ein`) — beide Beats CASCADE, pro Buch + User skopiert, UNIQUE gegen Duplikat-Kanten. Der Consistency-Check liest sie als Kontext, um hängende Setups/Payoffs, Wirkung-vor-Ursache und `im_buch`-Beats, die auf noch geplante Beats bauen, zu erkennen.
 
 ### 4a · Motiv-Werkstatt (Themen & Motive als Konstellation)
 

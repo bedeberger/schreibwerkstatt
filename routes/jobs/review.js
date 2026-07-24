@@ -16,7 +16,7 @@ const {
   jsonBody,
 } = require('./shared');
 const { narrativeLabels } = require('./narrative-labels');
-const { loadReviewKomplettContext } = require('./review-context');
+const { loadReviewKomplettContext, loadReviewMotivContext } = require('./review-context');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
@@ -61,7 +61,10 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   // Komplett-Daten sind optional: ohne vorhergehende Komplettanalyse bleiben
   // die Buckets leer und der Prompt injiziert keinen Strukturdaten-Block.
   const komplettContext = loadReviewKomplettContext(bookId, userEmail);
-  const reviewOptions = { ...narrative, reviewSchwerpunkt, komplettContext };
+  // Motiv-Werkstatt-Daten (Themen & Motive, Soll/Ist) — nur Buchbewertung, als
+  // Autor-Absicht gerahmt (nicht Textwahrheit). Ohne Motiv-Werkstatt leer.
+  const motivContext = loadReviewMotivContext(bookId, userEmail);
+  const reviewOptions = { ...narrative, reviewSchwerpunkt, komplettContext, motivContext };
 
   const bookIdInt = parseInt(bookId);
   const email = userEmail || '';
@@ -73,7 +76,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   const narrativeSig = _sigHash(narrative);
   // Stilprofil fliesst in SYSTEM_BUCHBEWERTUNG (Referenz-Framing) → muss den
   // Cache invalidieren, wenn der Autor das Profil ändert.
-  const optionsSig = _sigHash({ schwerpunkt: reviewSchwerpunkt, komplettContext, narrative, stilprofil: bookSettings?.stilprofil || '' });
+  const optionsSig = _sigHash({ schwerpunkt: reviewSchwerpunkt, komplettContext, motivContext, narrative, stilprofil: bookSettings?.stilprofil || '' });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)

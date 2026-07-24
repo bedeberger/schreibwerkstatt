@@ -72,6 +72,17 @@
               x-text="mo.name"></span>
       </template>
     </div>
+    <!-- Beat-zu-Beat-Beziehungen (ausgehend): Kausal-/Setup-Payoff-Kanten, read-only.
+         Klick springt zum Ziel-Beat (scrollToBeat). Kuratiert wird im Bearbeiten-Modus. -->
+    <div class="plot-beat-rels" x-show="beatRelationsOut(beat).length">
+      <template x-for="rel in beatRelationsOut(beat)" :key="rel.id">
+        <span class="plot-beat-rel internal-link" @click.stop="scrollToBeat(rel.to_beat_id)"
+              :data-tip="relTypeLabel(rel.typ) + ': ' + rel.to_titel">
+          <span class="plot-beat-rel-typ" x-text="relTypeLabel(rel.typ)"></span>
+          <span class="plot-beat-rel-target" x-text="rel.to_titel"></span>
+        </span>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -160,6 +171,34 @@
           </button>
         </span>
       </template>
+    </div>
+    <!-- Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff): Typ + Ziel-Beat wählen,
+         sofort persistiert (eigene Achse neben dem Draft-Save). Nur sinnvoll ab 2 Beats. -->
+    <label class="plot-edit-label" x-show="beats.length > 1" x-text="$app.t('plot.relation.label')"></label>
+    <div class="plot-rel-editor" x-show="beats.length > 1">
+      <div class="plot-rel-add">
+        <div class="plot-rel-typ"
+             x-data="combobox({ placeholder: $app.t('plot.relation.typPick') })"
+             x-modelable="value" x-model="relDraftTyp"
+             x-effect="options = relationTypes().map(tp => ({ value: tp, label: relTypeLabel(tp) }))"></div>
+        <div class="plot-rel-target"
+             x-data="combobox({ placeholder: $app.t('plot.relation.targetPick') })"
+             x-modelable="value" x-model="relDraftTarget"
+             x-effect="options = relTargetOptions(beat)"></div>
+        <button type="button" class="btn-compact" :disabled="busy || !relDraftTyp || !relDraftTarget"
+                @click="addBeatRelation(beat)" x-text="$app.t('plot.relation.add')"></button>
+      </div>
+      <div class="plot-fig-chips" x-show="beatRelationsOut(beat).length">
+        <template x-for="rel in beatRelationsOut(beat)" :key="rel.id">
+          <span class="tag plot-fig-chip plot-rel-chip">
+            <span x-text="relTypeLabel(rel.typ) + ' → ' + rel.to_titel"></span>
+            <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                    @click="deleteBeatRelationById(rel.id)">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+            </button>
+          </span>
+        </template>
+      </div>
     </div>
     <div class="plot-beat-edit-actions">
       <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditBeat(beat)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">

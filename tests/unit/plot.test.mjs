@@ -707,7 +707,7 @@ test('plot prompts: Consistency rendert verknüpfte Recherche + Recherche-Abglei
 test('plot prompts: Schemas haben die erwartete Form', () => {
   assert.deepEqual(prompts.SCHEMA_PLOT_BRAINSTORM.properties.vorschlaege.items.required.sort(), ['begruendung', 'label']);
   const k = prompts.SCHEMA_PLOT_CONSISTENCY.properties.konflikte.items;
-  assert.deepEqual(k.required.sort(), ['beat', 'problem', 'schwere', 'vorschlag']);
+  assert.deepEqual(k.required.sort(), ['beat', 'beat_id', 'problem', 'schwere', 'vorschlag']);
   assert.deepEqual(prompts.PLOT_SEVERITY_ENUM, ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig']);
 });
 

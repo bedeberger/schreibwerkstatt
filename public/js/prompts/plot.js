@@ -53,7 +53,10 @@ function _boardOutline(acts, beats, threadInfo = null, anchorMap = null) {
           ? ` → Kapitel: ${b.chapter_name}`
           : (info && info.kapitel ? ` → Kapitel: ${info.kapitel} (vom Strang)` : '');
         const str = info ? ` {Strang: ${info.name}}` : '';
-        return `  - ${b.titel} [${st}]${kap}${str}${_beatAnchorMarker(b, anchorMap)}`;
+        // Stabile Beat-ID als [#id]-Marker voranstellen: der Consistency-Check gibt
+        // sie in `beat_id` zurück, sodass ein Befund seinen Beat auch nach einer
+        // Umbenennung noch trifft (Titel-Match wäre sonst der einzige Anker).
+        return `  - [#${b.id}] ${b.titel} [${st}]${kap}${str}${_beatAnchorMarker(b, anchorMap)}`;
       });
     // Hybrid-Akte: ein Akt kann GETEILT sein (alle Stränge) oder einem Strang
     // EIGEN gehören (thread_id). Eigene Akte ausweisen, damit die KI versteht,
@@ -215,6 +218,27 @@ function _kapitelLines(kapitel) {
     .join('\n');
 }
 
+// Kuratierte Phrasen für die gerichteten Beat-Beziehungen (from --typ--> to).
+// Freitext-Typen fallen auf „<typ> →" zurück (analog figure_relations).
+const REL_PHRASE = {
+  'bereitet-vor': 'bereitet vor →',
+  'zahlt-ein': 'zahlt ein auf →',
+  'fuehrt-zu': 'führt zu →',
+  'motiviert': 'motiviert →',
+  'blockiert': 'blockiert →',
+  'spiegelt': 'spiegelt →',
+};
+
+// Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff): „«From» <Phrase> «To»".
+// Erdet den Consistency-Check auf die vom Autor explizit gezogenen Kanten, statt
+// Kausalität nur aus der Prosa raten zu müssen.
+function _relationsLines(relations) {
+  return (relations || []).slice(0, 120)
+    .filter(r => r && r.from_titel && r.to_titel)
+    .map(r => `- «${r.from_titel}» ${REL_PHRASE[r.typ] || `${r.typ} →`} «${r.to_titel}»`)
+    .join('\n');
+}
+
 // Szenen als „Buchrealität": Titel — Kapitel — beteiligte Figuren.
 function _szenenLines(szenen) {
   return (szenen || []).slice(0, 150)
@@ -307,7 +331,7 @@ export const SCHEMA_PLOT_BRAINSTORM = _obj({
 // Prüft den geplanten Plot gegen die Buchrealität: extrahierte Szenen + Kapitel +
 // Figuren. Findet Brüche, Lücken und „geplant vs. schon geschrieben"-Drift.
 
-export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = [], orte = [], zeitstrahl = [], kontinuitaet = [], recherche = [], anchorMap = null, anchorInfo = {}) {
+export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [], figuren = [], buchKontext = '', werkstattFiguren = [], threads = [], orte = [], zeitstrahl = [], kontinuitaet = [], recherche = [], anchorMap = null, anchorInfo = {}, relations = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const kapLines = _kapitelLines(kapitel);
   const kapSeg = kapLines ? `\nKAPITEL DES BUCHS (chronologisch):\n${kapLines}\n` : '';
@@ -335,6 +359,10 @@ export function buildPlotConsistencyPrompt(acts, beats, kapitel = [], szenen = [
   const hybridNote = _hasOwnActs(acts)
     ? '\nHYBRID-AKTE: Manche Stränge haben eine EIGENE Aktstruktur (im Board als „eigener Akt von Strang …" gekennzeichnet), andere teilen sich die geteilten Akte. Ein Strang mit eigenen Akten plant absichtlich unabhängig — beanstande NICHT, dass er die geteilten Akte „überspringt". Prüfe seinen dramaturgischen Bogen INNERHALB seiner eigenen Akte.\n'
     : '';
+  const relLines = _relationsLines(relations);
+  const relSeg = relLines
+    ? `\nBEAT-BEZIEHUNGEN (vom Autor explizit gezogene Kanten zwischen Beats — Kausalität + Setup/Payoff; die Board-Reihenfolge ergibt sich aus Akt → Beat):\n${relLines}\n`
+    : '';
   // Textbeleg-Segment (semantische Verankerung gegen das echte Manuskript): nur
   // wenn ein befüllter Index vorliegt (sonst hiesse „KEIN Textbeleg" bloss „nie
   // gescannt", nicht „nicht im Buch" → falsche Drift-Flut).
@@ -361,12 +389,19 @@ Der Marker ist Ähnlichkeit, kein Beweis — urteile am Beleg-Ausschnitt, nicht 
     ? `
 - Recherche-Abgleich: Widerspricht ein Beat dem verknüpften Recherche-Material (Fakten/Quellen)? Oder wurde zu einem Beat/Strang Recherche gesammelt, die der geplante Beat noch gar nicht aufgreift (ungenutztes Material)?`
     : '';
+  // Prüfpunkte für die expliziten Beat-Beziehungen nur, wenn welche gezogen wurden.
+  const relChecks = relLines
+    ? `
+- Setup/Payoff: Wird ein „bereitet vor"-Setup nirgends eingelöst (Ziel-Beat verworfen, fehlt, oder steht in der Board-Reihenfolge VOR dem Setup)? Zahlt ein „zahlt ein auf"-Payoff auf einen Setup ein, der fehlt/verworfen ist oder erst später kommt (Tschechows Gewehr, das nicht abgefeuert wird — oder ein Schuss ohne Gewehr)?
+- Kausalität: Steht bei „führt zu"/„motiviert" die Wirkung in der Board-Reihenfolge VOR ihrer Ursache? Widerspricht eine „blockiert"-Kante der geplanten Abfolge?
+- Status-Abhängigkeit: Baut ein Beat mit Status „im Buch" (als Wirkung/Payoff einer Kante) auf einem Beat auf, der noch „geplant" ist (das Geschriebene setzt etwas voraus, das laut Plan noch gar nicht geschrieben wurde)?`
+    : '';
 
   return `Du prüfst die GEPLANTE Handlung (Beat-Board) der Autorin auf Stimmigkeit — in sich und gegen die tatsächliche Buchrealität (Kapitel + analysierte Szenen). Sei schonungslos, aber konstruktiv.
 
 GEPLANTES BEAT-BOARD:
 ${_boardOutline(acts, beats, _threadInfoMap(threads), anchorMap)}
-${anchorSeg}${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${orteSeg}${zeitSeg}${kontiSeg}${rechSeg}${strSeg}${hybridNote}
+${anchorSeg}${ctxSeg}${kapSeg}${szSeg}${figSeg}${wfSeg}${orteSeg}${zeitSeg}${kontiSeg}${rechSeg}${strSeg}${hybridNote}${relSeg}
 Status-Legende der Beats: geplant (Idee, noch nicht eingearbeitet) · im Buch (laut Plan schon geschrieben). Zusätzlich kann ein Beat als "verworfen" markiert sein (ausgemustert, soll nicht mehr ins Buch).
 
 Prüfe auf:
@@ -375,7 +410,7 @@ Prüfe auf:
 - Chronologie-Brüche: die Reihenfolge der Beats (Akte → Beats) passt nicht zur Reihenfolge der verknüpften Kapitel
 - Logische Brüche / Widersprüche innerhalb der Handlung (Kausalität, Motivation, Figurenlogik)
 - Lücken: Kapitel mit Szenen, für die es keinen Beat gibt — oder dramaturgische Leerstellen (fehlender Wendepunkt, fehlende Auflösung eines Konflikts)
-- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${zeitChecks}${strChecks}${rechChecks}
+- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${zeitChecks}${strChecks}${rechChecks}${relChecks}
 
 Schwere-Skala:
 - "kritisch": logischer Bruch oder Plan-Realität-Widerspruch, der die Handlung zerstört
@@ -384,14 +419,14 @@ Schwere-Skala:
 - "schwach": leichte Reibung, Hinweis genügt
 - "niedrig": kosmetisch / Status-Pflege
 
-Nenne im Feld "beat" den Titel des betroffenen Beats — oder "—" für übergreifende Befunde (Lücken, fehlende Wendepunkte). Wenn alles stimmig ist, gib ein leeres "konflikte"-Array zurück und schreibe ein bestätigendes Fazit.
+Nenne im Feld "beat" den Titel des betroffenen Beats — oder "—" für übergreifende Befunde (Lücken, fehlende Wendepunkte). Gib zusätzlich im Feld "beat_id" die Zahl aus dem [#…]-Marker des betroffenen Beats an (z.B. [#42] → 42); für übergreifende Befunde ("—") setze "beat_id" auf null. Wenn alles stimmig ist, gib ein leeres "konflikte"-Array zurück und schreibe ein bestätigendes Fazit.
 
 Priorisiere nach Schwere und melde die wichtigsten Befunde (höchstens ~25) — keine redundanten oder rein kosmetischen Dopplungen. Halte "problem" und "vorschlag" knapp (je 1–2 Sätze).
 
 Antworte mit diesem JSON-Schema:
 {
   "konflikte": [
-    { "beat": "Titel des Beats oder —", "schwere": "kritisch|stark|mittel|schwach|niedrig", "problem": "kurze Beschreibung", "vorschlag": "konkreter Lösungsvorschlag" }
+    { "beat": "Titel des Beats oder —", "beat_id": 42, "schwere": "kritisch|stark|mittel|schwach|niedrig", "problem": "kurze Beschreibung", "vorschlag": "konkreter Lösungsvorschlag" }
   ],
   "fazit": "1–3 Sätze Gesamteinschätzung"
 }`;
@@ -402,6 +437,9 @@ export const SCHEMA_PLOT_CONSISTENCY = _obj({
     type: 'array',
     items: _obj({
       beat: _str,
+      // Stabile Beat-ID (aus dem [#…]-Board-Marker) — überlebt Umbenennungen. null
+      // bei übergreifenden Befunden ("—", kein einzelner Beat).
+      beat_id: { type: ['integer', 'null'] },
       schwere: { type: 'string', enum: SEVERITY_ENUM },
       problem: _str,
       vorschlag: _str,

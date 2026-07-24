@@ -39,7 +39,12 @@ export const loadMethods = {
       return fallback;
     };
     try {
-      const [stats, coverage, heat, reviews, recent, figuren, szenen, orte, songs, lektoratTime, settings] = await Promise.all([
+      // Plot-Board + Motiv-Konstellation sind optionale Planungswerkzeuge (pro
+      // Buch + User, editor-skopiert für Plot). Ihr Fehlen ist normal (nie geplant)
+      // bzw. erwartbar (Reader ohne Editor-Recht → 403 auf /plot) — darum stiller
+      // Catch statt `guard`, damit ein 403/leerer Payload NICHT den Fehler-Banner
+      // auslöst. Das Tile bleibt bei fehlenden Daten via x-if einfach aus.
+      const [stats, coverage, heat, reviews, recent, figuren, szenen, orte, songs, lektoratTime, settings, plot, motifs] = await Promise.all([
         fetchJsonRetry(`/history/book-stats/${bookId}`).catch(guard('stats', [])),
         fetchJsonRetry(`/history/coverage/${bookId}`).catch(guard('coverage', null)),
         fetchJsonRetry(`/history/fehler-heatmap/${bookId}?mode=open`).catch(guard('heat', null)),
@@ -51,6 +56,8 @@ export const loadMethods = {
         fetchJsonRetry(`/songs/${bookId}`).catch(guard('songs', null)),
         fetchJsonRetry(`/history/lektorat-time/${bookId}`).catch(guard('lektorat', null)),
         fetchJsonRetry(`/booksettings/${bookId}`).catch(guard('settings', null)),
+        fetchJsonRetry(`/plot?book_id=${bookId}`).catch(() => null),
+        fetchJsonRetry(`/motifs?book_id=${bookId}`).catch(() => null),
       ]);
       if (this.overviewBookId !== bookId) return;
       this.overviewStats = Array.isArray(stats) ? stats : [];
@@ -70,6 +77,8 @@ export const loadMethods = {
       this.overviewGoalTargetChars = settings?.goal_target_chars != null ? Number(settings.goal_target_chars) : null;
       this.overviewGoalDeadline = settings?.goal_deadline || null;
       this.overviewBuchtyp = settings?.buchtyp || null;
+      this.overviewPlot = plot && Array.isArray(plot.beats) ? plot : null;
+      this.overviewMotifs = motifs && Array.isArray(motifs.motifs) ? motifs : null;
       this._memos = {};
       // Rückblick-Heatmap-Coverage nur für Tagebücher laden — der Buchtyp steht
       // erst nach `settings` fest, daher sequenziell (non-Tagebuch fetcht nie).
@@ -209,6 +218,8 @@ export const loadMethods = {
     this.overviewGoalDeadline = null;
     this.overviewBuchtyp = null;
     this.overviewRueckblickCoverage = null;
+    this.overviewPlot = null;
+    this.overviewMotifs = null;
     this.overviewLoadErrors = [];
     this.overviewBookId = null;
     this._memos = {};

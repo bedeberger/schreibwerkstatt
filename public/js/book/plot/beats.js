@@ -274,6 +274,8 @@ export const beatsMethods = {
     try {
       await fetchJson(`/plot/beats/${beat.id}`, { method: 'DELETE' });
       this.beats = this.beats.filter(b => b.id !== beat.id);
+      // Server kaskadiert die Kanten dieses Beats — lokal nachziehen (ein- + ausgehend).
+      this.relations = this.relations.filter(r => r.from_beat_id !== beat.id && r.to_beat_id !== beat.id);
       this._memos = {};
       if (this.editingBeatId === beat.id) { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; }
       this.errorMessage = '';
@@ -287,6 +289,48 @@ export const beatsMethods = {
   _replaceBeat(row) {
     this.beats = this.beats.map(b => (b.id === row.id ? row : b));
     this._memos = {};
+  },
+
+  // ── Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff) ────────────────────
+  // Kante vom aktuell bearbeiteten Beat (`from`) auf den im Picker gewählten
+  // Ziel-Beat (`to`) mit dem gewählten Typ. Server validiert Selbst-Kante +
+  // Fremd-Verweise; UNIQUE macht Doppel-Kanten idempotent. Sofort persistiert
+  // (wie toggleBeatVerworfen — eigene Achse neben dem Beat-Draft-Save).
+  async addBeatRelation(fromBeat) {
+    const app = window.__app;
+    if (!fromBeat) return;
+    const toId = this.relDraftTarget ? parseInt(this.relDraftTarget) : null;
+    const typ = this.relDraftTyp || '';
+    if (!toId || !typ) { this.errorMessage = app.t('plot.relation.incomplete'); return; }
+    this.busy = true;
+    try {
+      const rel = await fetchJson('/plot/beat-relations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, from_beat_id: fromBeat.id, to_beat_id: toId, typ }),
+      });
+      // Idempotent: bei bestehender Kante liefert der Server die vorhandene zurück —
+      // nur einreihen, wenn sie noch nicht in der Liste ist.
+      if (rel && !this.relations.some(r => r.id === rel.id)) this.relations = [...this.relations, rel];
+      this._memos = {};
+      this.relDraftTarget = '';
+      this.relDraftTyp = '';
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.relation.error');
+    } finally { this.busy = false; }
+  },
+
+  async deleteBeatRelationById(relId) {
+    const app = window.__app;
+    if (!relId) return;
+    try {
+      await fetchJson(`/plot/beat-relations/${relId}`, { method: 'DELETE' });
+      this.relations = this.relations.filter(r => r.id !== relId);
+      this._memos = {};
+    } catch (e) {
+      this.errorMessage = app.t('plot.relation.error');
+    }
   },
 
   // ── Drop-Mechanik (von SortableJS via dnd.js#onBeatSortEnd aufgerufen) ──────

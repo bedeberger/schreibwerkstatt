@@ -421,8 +421,12 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     // sonst hiesse „KEIN Textbeleg" bloss „nie gescannt" statt „nicht im Buch"
     // (falsche Drift-Flut). Kein Embedding-Aufwand: reine Wiederverwendung.
     const { anchorMap, anchorInfo } = _anchorContext(bookId, userEmail);
+    // Explizite Beat-zu-Beat-Kanten (Kausalität + Setup/Payoff) als Prompt-Kontext,
+    // damit die KI Setup/Payoff und Kausalketten strukturell prüfen kann statt sie
+    // nur aus der Prosa zu raten. Best-effort — leere Liste ist kein Fehler.
+    const relations = _loadCtx('relations', () => plotDb.listBeatRelations(bookId, userEmail));
 
-    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length} recherche=${recherche.length} textbelege=${anchorMap ? Object.keys(anchorMap).length : 'aus'}`);
+    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length} recherche=${recherche.length} relationen=${relations.length} textbelege=${anchorMap ? Object.keys(anchorMap).length : 'aus'}`);
     updateJob(jobId, { statusText: 'job.plot.consistency.aiReply', progress: 10 });
 
     // maxTokens grosszuegig: ein schonungsloser Check ueber alle Beats/Szenen/
@@ -430,7 +434,7 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     // 3000 schnitt die JSON-Antwort regelmaessig mitten im Array ab → Truncation.
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet, recherche, anchorMap, anchorInfo),
+      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet, recherche, anchorMap, anchorInfo, relations),
       buildPlotSystemPrompt(),
       10, 95, 6000, 0.3, 12000, undefined, SCHEMA_PLOT_CONSISTENCY,
     );
@@ -444,23 +448,35 @@ async function runPlotConsistencyJob(jobId, bookId, userEmail) {
     // (occ_top[0], vorsortiert nach Score) mit einer page_id → { page_id, page_name }.
     // So springt die Autorin aus dem Befund direkt an die belegende Textstelle.
     const _norm = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const belegByTitle = {};
+    // Stabile Beat-ID als primärer Anker (überlebt Umbenennungen), Titel als
+    // Fallback für Modelle, die den [#…]-Marker nicht zurückgeben, und für Alt-Läufe.
+    const validBeatIds = new Set(beats.map(b => b.id));
+    const idByTitle = new Map(beats.map(b => [_norm(b.titel), b.id]));
+    const belegById = {};
     if (anchorMap) {
       for (const b of beats) {
         const top = (anchorMap[b.id]?.top || []).find(t => t.page_id);
-        if (top) belegByTitle[_norm(b.titel)] = { page_id: top.page_id, page_name: top.page_name || null };
+        if (top) belegById[b.id] = { page_id: top.page_id, page_name: top.page_name || null };
       }
     }
     const konflikte = result.konflikte
       .filter(k => k && typeof k.problem === 'string')
       .map(k => {
         const beat = typeof k.beat === 'string' ? k.beat.trim() : '—';
+        // beat_id bevorzugen (aufs Board-Subset validiert), sonst Titel → id auflösen.
+        const rawId = k.beat_id != null ? parseInt(k.beat_id) : null;
+        let beatId = Number.isInteger(rawId) && validBeatIds.has(rawId) ? rawId : null;
+        if (beatId == null && beat !== '—') {
+          const byTitle = idByTitle.get(_norm(beat));
+          if (byTitle != null) beatId = byTitle;
+        }
         return {
           beat,
+          beat_id: beatId,
           schwere: SEVERITY.includes(k.schwere) ? k.schwere : 'mittel',
           problem: k.problem.trim(),
           vorschlag: typeof k.vorschlag === 'string' ? k.vorschlag.trim() : '',
-          fundstelle: belegByTitle[_norm(beat)] || null,
+          fundstelle: (beatId != null ? belegById[beatId] : null) || null,
         };
       });
     const fazit = result.fazit.trim();

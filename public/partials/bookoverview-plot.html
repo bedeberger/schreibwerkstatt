@@ -1,0 +1,56 @@
+<!-- Plot-Board-Snapshot: aktive Beats (Zahl) + Akte/Stränge-Meta + Status-
+     Verteilung (geplant/im_buch/verworfen) + Drift-Warnung (als „im Buch"
+     markiert, aber im Text nicht auffindbar). Datenquelle: /plot?book_id,
+     Aggregat overviewPlotStats(). Klick → Plot-Werkstatt. Reader ohne
+     Editor-Recht sehen das Tile nicht (overviewPlot=null via 403, siehe load.js). -->
+<template x-if="overviewHasPlot()">
+  <div class="overview-tile internal-link"
+       @click="$app.togglePlotCard()"
+       :aria-label="$app.t('overview.plot') + ': ' + _fmtNum(overviewPlotStats().beats) + ' ' + $app.t('overview.unit.beats')">
+    <div class="overview-tile-label" x-text="$app.t('overview.plot')"></div>
+    <div class="overview-fig-row">
+      <span class="overview-fig-count" x-text="_fmtNum(overviewPlotStats().beats)"></span>
+      <span class="overview-fig-count-unit" x-text="$app.t('overview.unit.beats')"></span>
+    </div>
+    <div class="overview-plot-meta">
+      <span x-text="overviewPlotStats().acts + ' ' + $app.t('overview.unit.acts')"></span>
+      <span x-show="overviewPlotStats().threads > 0"
+            x-text="'· ' + overviewPlotStats().threads + ' ' + $app.t('overview.unit.threads')"></span>
+    </div>
+
+    <div class="overview-stacked-bar"
+         x-show="overviewPlotStats().beats > 0 || overviewPlotStats().by.verworfen > 0"
+         :data-tip="$app.t('overview.plotStatusBreakdown', {
+           geplant: overviewPlotStats().by.geplant,
+           imBuch: overviewPlotStats().by.im_buch,
+           verworfen: overviewPlotStats().by.verworfen
+         })">
+      <div class="overview-stacked-seg overview-stacked-seg--geplant"
+           :style="{ flex: overviewPlotStats().by.geplant }"
+           x-show="overviewPlotStats().by.geplant > 0"></div>
+      <div class="overview-stacked-seg overview-stacked-seg--imbuch"
+           :style="{ flex: overviewPlotStats().by.im_buch }"
+           x-show="overviewPlotStats().by.im_buch > 0"></div>
+      <div class="overview-stacked-seg overview-stacked-seg--verworfen"
+           :style="{ flex: overviewPlotStats().by.verworfen }"
+           x-show="overviewPlotStats().by.verworfen > 0"></div>
+    </div>
+    <div class="overview-stacked-legend" x-show="overviewPlotStats().beats > 0 || overviewPlotStats().by.verworfen > 0">
+      <span class="overview-stacked-key overview-stacked-key--geplant"
+            x-show="overviewPlotStats().by.geplant > 0"
+            x-text="overviewPlotStats().by.geplant + ' ' + $app.t('plot.status.geplant')"></span>
+      <span class="overview-stacked-key overview-stacked-key--imbuch"
+            x-show="overviewPlotStats().by.im_buch > 0"
+            x-text="overviewPlotStats().by.im_buch + ' ' + $app.t('plot.status.im_buch')"></span>
+      <span class="overview-stacked-key overview-stacked-key--verworfen"
+            x-show="overviewPlotStats().by.verworfen > 0"
+            x-text="overviewPlotStats().by.verworfen + ' ' + $app.t('plot.status.verworfen')"></span>
+    </div>
+
+    <div class="overview-plot-drift" x-show="overviewPlotStats().drift > 0"
+         :data-tip="$app.t('overview.plotDriftTip')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+      <span x-text="$app.t('overview.plotDrift', { n: overviewPlotStats().drift })"></span>
+    </div>
+  </div>
+</template>

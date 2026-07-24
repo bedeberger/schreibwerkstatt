@@ -63,6 +63,16 @@
   <!-- Anlege-Leiste -->
   <div class="motiv-toolbar">
     <div class="motiv-toolbar-group">
+      <div class="tabs" role="tablist" :aria-label="$app.t('motiv.view.label')">
+        <button type="button" class="tabs-btn" role="tab"
+                :class="{ 'tabs-btn--active': motivView === 'graph' }" :aria-selected="motivView === 'graph'"
+                @click="setMotivView('graph')" x-text="$app.t('motiv.view.graph')"></button>
+        <button type="button" class="tabs-btn" role="tab"
+                :class="{ 'tabs-btn--active': motivView === 'band' }" :aria-selected="motivView === 'band'"
+                @click="setMotivView('band')" x-text="$app.t('motiv.view.band')"></button>
+      </div>
+    </div>
+    <div class="motiv-toolbar-group">
       <input type="text" class="motiv-add-input" x-model="newThemeName" data-spellcheck="spelling"
              :placeholder="$app.t('motiv.theme.namePlaceholder')" @keydown.enter="addTheme()">
       <button type="button" class="btn-compact" @click="addTheme()" :disabled="busy || !newThemeName.trim()" x-text="$app.t('motiv.theme.add')"></button>
@@ -74,7 +84,7 @@
            x-modelable="value" x-model="newMotifThemeId" x-effect="options = themeOptions()"></div>
       <button type="button" class="btn-compact" @click="addMotif()" :disabled="busy || !newMotifName.trim()" x-text="$app.t('motiv.motif.add')"></button>
     </div>
-    <div class="motiv-toolbar-group motiv-layer-toggles">
+    <div class="motiv-toolbar-group motiv-layer-toggles" x-show="motivView === 'graph'">
       <button type="button" class="motiv-layer-btn" :class="{ 'is-active': layerFigures }" @click="toggleLayer('figures')" x-text="$app.t('motiv.layer.figures')"></button>
       <button type="button" class="motiv-layer-btn" :class="{ 'is-active': layerBeats }" @click="toggleLayer('beats')" x-text="$app.t('motiv.layer.beats')"></button>
       <button type="button" class="motiv-layer-btn" :class="{ 'is-active': layerChapters }" @click="toggleLayer('chapters')" x-text="$app.t('motiv.layer.chapters')"></button>
@@ -95,12 +105,63 @@
     </button>
   </div>
 
-  <div class="motiv-layout">
+  <div class="motiv-layout" x-show="motivView === 'graph'">
     <!-- Konstellations-Graph -->
     <div id="motiv-graph" class="motiv-graph-container" role="img" :aria-label="$app.t('motiv.graph.ariaLabel')"></div>
+    <!-- Hover-Detail-Tooltip (absolut über dem Graph, positioniert in graph.js) -->
+    <div id="motiv-tooltip" class="motiv-tooltip"></div>
 
     <!-- Seitenpanel (nested Partial — HTML-Partial-LOC-Limit) -->
     <div id="partial-motiv-panel"></div>
+  </div>
+
+  <!-- Kapitel-Verlaufsband: Motiv × Kapitel als Heatmap (Ist-Dichte über den
+       Buchbogen). Zeigt, wo ein Motiv trägt und wo es verschwindet — die
+       Konstellation zeigt nur OB, nicht WO. Reines Lesen, nie generativ. -->
+  <div class="motiv-band-wrap" x-show="motivView === 'band'" x-cloak>
+    <div class="muted-msg muted-msg--spaced"
+         x-show="bandMotifs().length === 0 || bandChapters().length === 0"
+         x-text="$app.t('motiv.band.empty')"></div>
+    <template x-if="bandMotifs().length > 0 && bandChapters().length > 0">
+      <div class="heatmap-wrap">
+        <div class="heatmap-legend" x-text="$app.t('motiv.band.legend')"></div>
+        <div class="heatmap-scroll">
+          <table class="heatmap-table">
+            <thead>
+              <tr>
+                <th class="heatmap-rowhead" x-text="$app.t('motiv.band.motif')"></th>
+                <th class="heatmap-numcol" x-text="$app.t('motiv.band.total')"></th>
+                <template x-for="ch in bandChapters()" :key="ch.id">
+                  <th :data-tip="ch.name"><span x-text="ch.name"></span></th>
+                </template>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="m in bandMotifs()" :key="m.id">
+                <tr>
+                  <th class="heatmap-rowhead" scope="row">
+                    <span class="heatmap-rowhead-main internal-link" @click="bandSelectMotif(m.id)">
+                      <span class="motiv-band-swatch" :style="{ background: bandMotifColor(m) }" aria-hidden="true"></span>
+                      <span x-text="m.name"></span>
+                    </span>
+                    <span class="heatmap-rowhead-sub" x-show="m.theme_id"
+                          x-text="(themeById(m.theme_id) || {}).name || ''"></span>
+                  </th>
+                  <td class="heatmap-numcol" x-text="bandRowTotal(m.id)"></td>
+                  <template x-for="ch in bandChapters()" :key="ch.id">
+                    <td class="heatmap-cell"
+                        :class="bandCellClass(bandCount(m.id, ch.id))"
+                        :style="bandCellVars(bandCount(m.id, ch.id))"
+                        :data-tip="ch.name + ' · ' + $app.t('motiv.band.hits', { n: bandCount(m.id, ch.id) })"
+                        x-text="bandCount(m.id, ch.id) || ''"></td>
+                  </template>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
   </div>
 
   <!-- KI-Brainstorm-Lauf-Historie: persistierte Läufe pro Buch, unter Graph +

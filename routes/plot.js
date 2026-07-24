@@ -112,11 +112,17 @@ router.get('/', (req, res) => {
     const occ = occMap.get(b.id);
     return { ...b, occ_count: occ ? occ.count : 0, occ_top: occ ? occ.top : [] };
   });
+  // Geplante Beats werden nur verankert, wenn die Promotion-Erkennung an ist — dann
+  // zählen sie auch für die Stale-Heuristik (sonst würde ein geänderter geplanter
+  // Beat fälschlich zum „Verankerung aktualisieren"-Angebot führen).
+  const promoteOn = (Number(appSettings.get('plot.anchor.promote_min_score')) || 0) > 0;
+  const staleStatuses = promoteOn ? ['im_buch', 'geplant'] : ['im_buch'];
   res.json({
     acts: plotDb.listActs(bookId, userEmail),
     threads: plotDb.listThreads(bookId, userEmail),
     beats,
-    beatAnchor: { stale: plotDb.beatAnchorStale(bookId, userEmail) },
+    relations: plotDb.listBeatRelations(bookId, userEmail),
+    beatAnchor: { stale: plotDb.beatAnchorStale(bookId, userEmail, staleStatuses) },
   });
 });
 
@@ -422,6 +428,38 @@ router.put('/beats/order', jsonBody, (req, res) => {
   if (!order)  return res.status(400).json({ error_code: 'ORDER_REQ' });
   if (!_guard(req, res, bookId)) return;
   plotDb.reorderBeats(bookId, userEmail, order);
+  res.json({ ok: true });
+});
+
+// ── Beat-Beziehungen (Kausalität + Setup/Payoff) ────────────────────────────
+// Gerichtete Kante from_beat --typ--> to_beat. Beide Beats werden serverseitig aufs
+// (Buch, User)-Subset validiert; Selbst-Kanten + Fremd-Verweise sind unmöglich.
+const _REL_ERR = { SELF_RELATION: 'SELF_RELATION', BEAT_MISMATCH: 'BEAT_MISMATCH', BEAT_REQUIRED: 'BEAT_REQUIRED', TYP_REQUIRED: 'TYP_REQUIRED' };
+router.post('/beat-relations', jsonBody, (req, res) => {
+  const userEmail = userEmailOrNull(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const bookId = toIntId(req.body?.book_id);
+  if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
+  if (!_guard(req, res, bookId)) return;
+  try {
+    const rel = plotDb.createBeatRelation(bookId, userEmail, {
+      fromBeatId: toIntId(req.body?.from_beat_id),
+      toBeatId: toIntId(req.body?.to_beat_id),
+      typ: req.body?.typ,
+    });
+    if (!rel) return res.status(400).json({ error_code: 'REL_FAILED' });
+    logger.info(`[plot] beat-relation create id=${rel.id} from=${rel.from_beat_id} to=${rel.to_beat_id} book=${bookId}`);
+    res.json(rel);
+  } catch (e) {
+    return res.status(400).json({ error_code: _REL_ERR[e.code] || 'REL_FAILED' });
+  }
+});
+
+router.delete('/beat-relations/:id', (req, res) => {
+  const rel = _loadOwned(req, res, plotDb.getBeatRelation, 'REL_NOT_FOUND');
+  if (!rel) return;
+  plotDb.deleteBeatRelation(rel.id, rel.user_email);
+  logger.info(`[plot] beat-relation delete id=${rel.id} book=${rel.book_id}`);
   res.json({ ok: true });
 });
 

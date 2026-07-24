@@ -250,12 +250,17 @@ export const aiMethods = {
     setTimeout(() => el.classList.remove('plot-beat--flash'), 1600);
   },
 
-  // Aus einem Konsistenz-Befund zum benannten Beat springen (Titel-Match, gleiche
-  // Vertragsbasis wie der Befund). Übergreifende Befunde ("—") haben kein Ziel.
+  // Aus einem Konsistenz-Befund zum betroffenen Beat springen: stabile beat_id
+  // bevorzugen (überlebt Umbenennungen), sonst Titel-Match (Alt-Läufe / kein
+  // [#…]-Echo). Übergreifende Befunde ("—") haben kein Ziel.
   gotoKonfliktBeat(k) {
-    if (!k || !k.beat || k.beat === '—') return;
-    const key = normTitle(k.beat);
-    const beat = (this.beats || []).find(b => normTitle(b.titel) === key);
+    if (!k) return;
+    let beat = null;
+    if (k.beat_id != null) beat = (this.beats || []).find(b => b.id === k.beat_id);
+    if (!beat && k.beat && k.beat !== '—') {
+      const key = normTitle(k.beat);
+      beat = (this.beats || []).find(b => normTitle(b.titel) === key);
+    }
     if (beat) this.scrollToBeat(beat.id);
   },
 
@@ -443,6 +448,31 @@ export const aiMethods = {
   gotoOccurrence(occ) {
     this.closeBeatOccPopover();
     if (occ && occ.page_id) window.__app.gotoPageById(occ.page_id);
+  },
+
+  // Promotion aus dem Fundstellen-Popover: einen GEPLANTEN Beat, der offenbar
+  // schon im Text steht (starker Textbeleg), auf „im Buch" setzen. Der Autor hat
+  // die Fundstellen im Popover davor gesehen und bestätigt so bewusst.
+  async promoteBeat(beat) {
+    const app = window.__app;
+    if (!beat || beat.status === 'im_buch') return;
+    this.busy = true;
+    try {
+      const updated = await fetchJson(`/plot/beats/${beat.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'im_buch' }),
+      });
+      // Die PATCH-Antwort trägt kein occ_count/occ_top (nur GET /plot hängt sie an);
+      // die Fundstellen bleiben in der DB. Vorhandene Werte übernehmen, damit das
+      // Badge sofort von 'promote' auf 'confirmed' wechselt statt fälschlich 'drift'.
+      this._replaceBeat({ ...updated, occ_count: beat.occ_count, occ_top: beat.occ_top });
+      this.closeBeatOccPopover();
+      app.refreshPlotBeatCounts?.();
+      this.errorMessage = '';
+    } catch (e) {
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
   },
 
   // Ganze Plot-Karte ins Native-Vollbild — mehr horizontaler Platz fürs Akt-Board.

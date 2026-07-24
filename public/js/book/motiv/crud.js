@@ -478,8 +478,11 @@ export const crudMethods = {
   },
 
   gotoOccurrence(occ) {
-    if (!occ.page_id) return;
-    window.__app.gotoPageById(occ.page_id);
+    // Seiten-Fund trägt page_id direkt; Szenen-Fund (page_id null) fällt auf die
+    // Seite zurück, an der die Szene verankert ist (figure_scenes.page_id).
+    const pageId = occ.page_id || occ.scene_page_id;
+    if (!pageId) return;
+    window.__app.gotoPageById(pageId);
     // Passage im Seitentext hervorheben (reines Lesen; findet sie nichts, bleibt
     // der Sprung auf die Seite bestehen).
     if (occ.snippet) highlightOccurrenceOnPage(occ.snippet);

@@ -2,7 +2,7 @@
 // Stränge/Swimlanes, Hybrid-Akte, Grid-Render-Plan, Live-Vererbung, Akt-Farben.
 // Reine Compute aus Board-State (memoized), keine Server-Mutationen.
 
-import { STATUSES, DIST_SEGMENTS, ACT_PALETTE, classifyBeatAnchor } from '../constants.js';
+import { STATUSES, DIST_SEGMENTS, ACT_PALETTE, BEAT_REL_TYPES, classifyBeatAnchor } from '../constants.js';
 
 export const boardMethods = {
   // ── Derived (memoized) ──────────────────────────────────────────────────────
@@ -268,6 +268,36 @@ export const boardMethods = {
   // hängt occ_count + occ_top an jeden Beat (routes/plot.js). 'none' → kein Badge.
   beatAnchorState(beat) {
     return classifyBeatAnchor(beat && beat.status, beat && beat.occ_count, beat && beat.verworfen);
+  },
+
+  // ── Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff) ────────────────────
+  // Kuratierte Typ-Auswahl fürs Beziehungs-Picker (stabile Schlüssel, Reihenfolge).
+  relationTypes() { return BEAT_REL_TYPES; },
+
+  // i18n-Label eines Beziehungstyps (Freitext-Fallback für Alt-Typen ohne Key).
+  relTypeLabel(typ) {
+    const app = window.__app;
+    const key = 'plot.relation.type.' + typ;
+    const label = app.t(key);
+    return label === key ? typ : label;
+  },
+
+  // Ausgehende Kanten eines Beats (from_beat_id === beat.id), lesefertig mit
+  // Ziel-Titel (aus dem Payload-JOIN) — read-only Badges + Edit-Chips.
+  beatRelationsOut(beat) {
+    if (!beat) return [];
+    return this._memo(`relOut:${beat.id}`, [this.relations, beat.id], () =>
+      (this.relations || []).filter(r => r.from_beat_id === beat.id));
+  },
+
+  // Ziel-Beat-Optionen fürs Beziehungs-Picker: alle anderen Beats (nicht der Beat
+  // selbst) als { value: id, label: titel }. Verworfene werden mit Marker gezeigt.
+  relTargetOptions(beat) {
+    if (!beat) return [];
+    return this._memo(`relTargets:${beat.id}`, [this.beats, beat.id], () =>
+      (this.beats || [])
+        .filter(b => b.id !== beat.id)
+        .map(b => ({ value: b.id, label: b.titel + (b.verworfen ? ' (verworfen)' : '') })));
   },
 
   // Tooltip des Anchor-Badges: Zustands-Satz + die Top-Fundstellen (Seitenname).

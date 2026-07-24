@@ -273,10 +273,37 @@ const _stmtOccCountsFloor = db.prepare(`
      AND (o.score IS NULL OR o.score >= ?)
    GROUP BY o.motif_id
 `);
+// Ist-Fundstellen pro (Motiv, Kapitel) fürs Präsenz-Raster der Buch-Übersicht
+// (Kapitel × Motiv, analog zum kapitel-Breakdown von /locations). page-Treffer
+// mappen über pages.chapter_id, scene-Treffer über figure_scenes.page_id →
+// pages.chapter_id. Fundstellen ohne auflösbares Kapitel (chapter_id NULL) fallen
+// im getGraph raus. Score-Floor wie bei den Gesamt-Counts (wörtliche Trigger immer).
+const _stmtOccChapters = db.prepare(`
+  SELECT o.motif_id, COALESCE(pp.chapter_id, sp.chapter_id) AS chapter_id, COUNT(*) AS n
+    FROM motif_occurrences o
+    JOIN motifs m ON m.id = o.motif_id
+    LEFT JOIN pages pp ON pp.page_id = o.page_id
+    LEFT JOIN figure_scenes s ON s.id = o.scene_id
+    LEFT JOIN pages sp ON sp.page_id = s.page_id
+   WHERE m.book_id = ? AND m.user_email = ?
+   GROUP BY o.motif_id, COALESCE(pp.chapter_id, sp.chapter_id)
+`);
+const _stmtOccChaptersFloor = db.prepare(`
+  SELECT o.motif_id, COALESCE(pp.chapter_id, sp.chapter_id) AS chapter_id, COUNT(*) AS n
+    FROM motif_occurrences o
+    JOIN motifs m ON m.id = o.motif_id
+    LEFT JOIN pages pp ON pp.page_id = o.page_id
+    LEFT JOIN figure_scenes s ON s.id = o.scene_id
+    LEFT JOIN pages sp ON sp.page_id = s.page_id
+   WHERE m.book_id = ? AND m.user_email = ?
+     AND (o.score IS NULL OR o.score >= ?)
+   GROUP BY o.motif_id, COALESCE(pp.chapter_id, sp.chapter_id)
+`);
 // Fundstellen-Detail eines Motivs (Seiten- + Szenen-Kontext via JOIN, kein Snapshot).
 const _stmtOccDetail = db.prepare(`
   SELECT o.id, o.kind, o.page_id, o.scene_id, o.score, o.snippet, o.source,
-         p.page_name, p.chapter_id, c.chapter_name, s.titel AS scene_titel
+         p.page_name, p.chapter_id, c.chapter_name,
+         s.titel AS scene_titel, s.page_id AS scene_page_id
     FROM motif_occurrences o
     LEFT JOIN pages p    ON p.page_id = o.page_id
     LEFT JOIN chapters c ON c.chapter_id = p.chapter_id
@@ -292,6 +319,37 @@ function listOccurrences(motifId, minScore = 0) {
   const floor = Number(minScore) || 0;
   if (floor <= 0) return rows;
   return rows.filter(r => r.score == null || r.score >= floor);
+}
+
+// ── Soll-Motive einer Seite (passiver Lektorat-Kontext) ─────────────────────
+// Motive, deren Soll-Brücke auf DIESE Seite (motif_pages) oder auf DEREN Kapitel
+// (motif_chapters) zeigt. Reiner Hintergrundkontext für den Stil-Pass des
+// Lektorats: motivtragende Formulierungen (wiederkehrende Bilder, Trigger-Terme)
+// sollen NICHT als Wiederholung/Klischee/Stilfehler wegkorrigiert werden. Kein
+// Ist-Index, kein Drift-Urteil — nur das geplante Soll. Pro Buch + User skopiert.
+const _stmtPageMotifs = db.prepare(`
+  SELECT DISTINCT m.id, m.name, m.beschreibung, m.trigger_terms, m.position, t.name AS theme_name
+    FROM motifs m
+    LEFT JOIN themes t ON t.id = m.theme_id
+   WHERE m.book_id = ? AND m.user_email = ?
+     AND (
+       m.id IN (SELECT motif_id FROM motif_pages    WHERE page_id = ?)
+       OR m.id IN (SELECT motif_id FROM motif_chapters WHERE chapter_id = ?)
+     )
+   ORDER BY m.position, m.id
+`);
+function getPageMotifs(bookId, chapterId, pageId, userEmail) {
+  if (!bookId || !pageId || !userEmail) return [];
+  const rows = _stmtPageMotifs.all(
+    parseInt(bookId), userEmail, parseInt(pageId),
+    chapterId ? parseInt(chapterId) : null,
+  );
+  return rows.map(r => ({
+    name: r.name,
+    beschreibung: r.beschreibung,
+    theme_name: r.theme_name,
+    trigger_terms: _parseTerms(r.trigger_terms),
+  }));
 }
 
 // ── Scoping-Validatoren (Soll-Link-Targets aufs Buch beschränken) ──────────
@@ -453,7 +511,7 @@ function getGraph(bookId, userEmail, minScore = 0) {
   const relations = listRelations(bid, userEmail);
 
   const byMotif = new Map(motifs.map(m => [m.id, {
-    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0, occAvgScore: 0,
+    ...m, figures: [], draftFigures: [], beats: [], chapters: [], pages: [], occurrenceCount: 0, occAvgScore: 0, occChapters: [],
   }]));
   for (const r of _stmtBridgeFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.figures.push({ figId: r.fig_id, name: r.name });
   for (const r of _stmtBridgeDraftFigures.all(bid, userEmail)) byMotif.get(r.motif_id)?.draftFigures.push({ id: r.draft_figure_id, name: r.name });
@@ -462,6 +520,13 @@ function getGraph(bookId, userEmail, minScore = 0) {
   for (const r of _stmtBridgePages.all(bid, userEmail)) byMotif.get(r.motif_id)?.pages.push({ id: r.page_id, name: r.page_name });
   const counts = floor > 0 ? _stmtOccCountsFloor.all(bid, userEmail, floor) : _stmtOccCounts.all(bid, userEmail);
   for (const r of counts) { const m = byMotif.get(r.motif_id); if (m) { m.occurrenceCount = r.n; m.occAvgScore = r.avg_score || 0; } }
+  // Kapitel-Aufschlüsselung der Ist-Fundstellen (Präsenz-Raster der Buch-Übersicht).
+  // Treffer ohne auflösbares Kapitel (chapter_id NULL) übergehen.
+  const occCh = floor > 0 ? _stmtOccChaptersFloor.all(bid, userEmail, floor) : _stmtOccChapters.all(bid, userEmail);
+  for (const r of occCh) {
+    if (r.chapter_id == null) continue;
+    byMotif.get(r.motif_id)?.occChapters.push({ chapterId: r.chapter_id, n: r.n });
+  }
 
   return { themes, motifs: [...byMotif.values()], relations, layout: getLayout(bid, userEmail) };
 }
@@ -476,6 +541,8 @@ module.exports = {
   // Soll-Brücken
   setMotifFigures, setMotifDraftFigures, setMotifBeats, setMotifChapters, setMotifPages,
   resolveFigureIds, validBeatIds, validDraftFigureIds, validChapterIds, validPageIds,
+  // Soll-Motive einer Seite (passiver Lektorat-Kontext)
+  getPageMotifs,
   // Ist-Index
   replaceOccurrences, listOccurrences,
   // KI-Brainstorm-Lauf-Historie

@@ -25,6 +25,14 @@
         </template>
         <div class="plot-occ-more" x-show="(beatOccPopoverBeat().occ_count || 0) > (beatOccPopoverBeat().occ_top || []).length"
              x-text="$app.t('plot.anchor.popover.more', { n: (beatOccPopoverBeat().occ_count || 0) - (beatOccPopoverBeat().occ_top || []).length })"></div>
+        <!-- Promotion: geplanter Beat mit starkem Textbeleg → Vorschlag, ihn auf
+             „im Buch" zu setzen (der Autor prüft die Fundstellen darüber selbst). -->
+        <div class="plot-occ-promote" x-show="beatAnchorState(beatOccPopoverBeat()) === 'promote'">
+          <p class="plot-occ-promote-hint" x-text="$app.t('plot.anchor.promote.hint')"></p>
+          <button type="button" class="btn-compact plot-occ-promote-btn" :disabled="busy"
+                  @click.stop="promoteBeat(beatOccPopoverBeat())"
+                  x-text="$app.t('plot.anchor.promote.action')"></button>
+        </div>
       </div>
     </template>
   </div>

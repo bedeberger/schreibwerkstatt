@@ -20,8 +20,10 @@ const ANCHOR = {
   14: { count: 3, top: [{ page_name: 'S. 5' }] }, // verworfen → darf NICHT als Beleg erscheinen
 };
 
+// Board-Zeile eines Beats. Format: „  - [#<id>] <Titel> [<status>]…" (der
+// [#id]-Marker speist das stabile Beat-ID-Matching des Consistency-Checks).
 function line(prompt, titel) {
-  return prompt.split('\n').find(l => l.includes(`- ${titel} [`)) || '';
+  return prompt.split('\n').find(l => l.includes(`] ${titel} [`)) || '';
 }
 
 test('im_buch + Textbeleg → Beleg mit Seite + Ausschnitt', () => {

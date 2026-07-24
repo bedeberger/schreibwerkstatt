@@ -9463,6 +9463,38 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 248 abgeschlossen (Motiv-Werkstatt: motif_brainstorm_cache).');
   }
 
+  if (version < 249) {
+    // Plot-Werkstatt: gerichtete Beat-zu-Beat-Beziehungen (Kausalitaet + Setup/
+    // Payoff). Kante from_beat --typ--> to_beat; `typ` ist Freitext (kuratierte
+    // Vorschlaege im Frontend, analog figure_relations.typ). So werden Kausalketten
+    // und Tschechows-Gewehr-Paare explizit modellierbar — der Consistency-Check
+    // liest sie als Kontext (haengender Setup ohne Payoff, Wirkung vor Ursache,
+    // im_buch-Beat, der auf einen noch geplanten Beat baut). book_id CASCADE (stirbt
+    // mit dem Buch); from/to CASCADE (Kante stirbt mit einem der Beats). UNIQUE
+    // verhindert Duplikat-Kanten gleichen Typs. Pro Buch + User skopiert (user_email).
+    db.exec(`CREATE TABLE IF NOT EXISTS plot_beat_relations (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id      INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        user_email   TEXT    NOT NULL,
+        from_beat_id INTEGER NOT NULL REFERENCES plot_beats(id) ON DELETE CASCADE,
+        to_beat_id   INTEGER NOT NULL REFERENCES plot_beats(id) ON DELETE CASCADE,
+        typ          TEXT    NOT NULL,
+        created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (from_beat_id, to_beat_id, typ)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_rel_book ON plot_beat_relations(book_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_rel_from ON plot_beat_relations(from_beat_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_rel_to ON plot_beat_relations(to_beat_id)');
+
+    const fkErrors249 = db.pragma('foreign_key_check');
+    if (fkErrors249.length) {
+      throw new Error(`Migration 249: foreign_key_check meldet ${fkErrors249.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 249').run();
+    logger.info('DB-Migration auf Version 249 abgeschlossen (Plot-Werkstatt: plot_beat_relations).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

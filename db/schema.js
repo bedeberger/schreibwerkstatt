@@ -14,6 +14,7 @@ const books = require('./books');
 const tokenUsage = require('./token-usage');
 const { recordJobLedger } = require('./cost-ledger');
 const draftFigures = require('./draft-figures');
+const motifs = require('./motifs');
 const { parseDatum } = require('../lib/datum-parse');
 const { normEventSubtyp } = require('./event-subtyp');
 const { matchLocations } = require('../lib/entity-match');
@@ -1567,6 +1568,8 @@ module.exports = {
   backfillAppearancesFromScenesEvents: figures.backfillAppearancesFromScenesEvents,
   // locations
   getChapterLocations,
+  // motifs (Soll-Kontext fürs Lektorat)
+  getPageMotifs:            motifs.getPageMotifs,
   // pages
   reconcilePageIds:   pages.reconcilePageIds,
   pruneStaleBookData: pages.pruneStaleBookData,

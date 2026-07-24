@@ -17,6 +17,13 @@ export function registerPlotCard() {
     // = flaches Board (heutiges Verhalten). Pro Buch + User, lokal in der Karte.
     threads: [],
     beats: [],
+    // Gerichtete Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff). Flache Liste
+    // aus dem /plot-Payload ({ id, from_beat_id, to_beat_id, typ, from_titel,
+    // to_titel }); die Beat-Karte gruppiert sie pro Beat (ausgehende Kanten).
+    relations: [],
+    // Temp-State fürs Anlegen einer Beziehung im Beat-Edit (Typ + Ziel-Beat).
+    relDraftTyp: '',
+    relDraftTarget: '',
     // Werkstatt-Figuren (draft_figures) des Buchs, fürs Beat-Picker + Badges.
     // Lokal in der Karte geladen (nicht im catalog-store — wie die Plot-Daten).
     draftFiguren: [],

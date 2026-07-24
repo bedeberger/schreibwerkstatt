@@ -165,6 +165,39 @@
 .overview-stacked-key--mittel::before  { background: var(--color-warn-text); }
 .overview-stacked-key--schwach::before { background: var(--color-err-text); }
 
+/* ── Plot-Board-Snapshot: Status-Verteilung + Meta + Drift-Warnung ─────────── */
+/* Status-Segmente der geteilten `.overview-stacked-bar`: geplant (Akzent),
+   im_buch (grün = eingearbeitet), verworfen (gedämpft). */
+.overview-stacked-seg--geplant   { background: var(--color-accent); }
+.overview-stacked-seg--imbuch    { background: var(--color-success); }
+.overview-stacked-seg--verworfen { background: var(--color-muted); }
+.overview-stacked-key--geplant::before   { background: var(--color-accent); }
+.overview-stacked-key--imbuch::before    { background: var(--color-success); }
+.overview-stacked-key--verworfen::before { background: var(--color-muted); }
+
+.overview-plot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Drift = als „im Buch" markiert, aber im Text nicht auffindbar. Warn-Ton wie
+   der Fehler-Hinweis über dem Grid (amber), dezente Zeile am Tile-Fuss. */
+.overview-plot-drift {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-warn-text);
+}
+.overview-plot-drift .icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
 @media (max-width: 700px) {
   .overview-fig-count { font-size: 20px; }
 }

@@ -833,25 +833,87 @@ function beatOccurrenceMap(bookId, userEmail, opts = {}) {
   return map;
 }
 
-// Stale-Heuristik fürs „Verankerung aktualisieren"-Angebot: gibt es `im_buch`-Beats,
-// die nach dem jüngsten Occurrence-Lauf geändert wurden (oder nie verankert)? Nur
-// `im_buch` zählt — geplante/verworfene Beats werden nicht verankert, dürfen also
-// kein Neulauf-Angebot auslösen. Billige updated_at-Heuristik analog zur Motiv-
-// Werkstatt (semanticChunks.indexStatus).
-const _stmtBeatAnchorStale = db.prepare(`
-  SELECT
-    (SELECT COUNT(*) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0 AND status = 'im_buch') AS beats,
-    (SELECT MAX(updated_at) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0 AND status = 'im_buch') AS beat_max,
-    (SELECT MAX(o.created_at) FROM plot_beat_occurrences o
-       JOIN plot_beats b ON b.id = o.beat_id
-      WHERE b.book_id = ? AND b.user_email = ?) AS occ_max
-`);
-function beatAnchorStale(bookId, userEmail) {
+// Stale-Heuristik fürs „Verankerung aktualisieren"-Angebot: gibt es zu verankernde
+// Beats, die nach dem jüngsten Occurrence-Lauf geändert wurden (oder nie verankert)?
+// `statuses` = die Status, die verankert werden (siehe beat-anchor.js): immer
+// `im_buch`; zusätzlich `geplant`, wenn die Promotion-Erkennung aktiv ist
+// (plot.anchor.promote_min_score > 0 — der Aufrufer entscheidet, damit die reine
+// DB-Schicht die App-Setting nicht lesen muss). Verworfene Beats zählen nie. Billige
+// updated_at-Heuristik analog zur Motiv-Werkstatt (semanticChunks.indexStatus).
+const _STALE_ALLOWED_STATUS = new Set(['im_buch', 'geplant']);
+function beatAnchorStale(bookId, userEmail, statuses = ['im_buch']) {
   const bid = parseInt(bookId);
-  const r = _stmtBeatAnchorStale.get(bid, userEmail, bid, userEmail, bid, userEmail);
+  const allowed = statuses.filter(s => _STALE_ALLOWED_STATUS.has(s));
+  if (!allowed.length) return false;
+  const ph = allowed.map(() => '?').join(',');
+  const r = db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0 AND status IN (${ph})) AS beats,
+      (SELECT MAX(updated_at) FROM plot_beats WHERE book_id = ? AND user_email = ? AND verworfen = 0 AND status IN (${ph})) AS beat_max,
+      (SELECT MAX(o.created_at) FROM plot_beat_occurrences o
+         JOIN plot_beats b ON b.id = o.beat_id
+        WHERE b.book_id = ? AND b.user_email = ?) AS occ_max
+  `).get(bid, userEmail, ...allowed, bid, userEmail, ...allowed, bid, userEmail);
   if (!r || !r.beats) return false;          // nichts zu verankern → nicht stale
   if (!r.occ_max) return true;               // noch nie gelaufen
   return !!(r.beat_max && r.beat_max > r.occ_max); // Beat seit letztem Lauf geändert
+}
+
+// ── Beat-zu-Beat-Beziehungen (Kausalitaet + Setup/Payoff) ────────────────────
+// Gerichtete Kante from_beat --typ--> to_beat. `typ` ist Freitext (kuratierte
+// Vorschlaege im Frontend, analog figure_relations). Pro Buch + User skopiert.
+// Read-Aggregat liefert die Beat-Titel via JOIN (kein Snapshot).
+const _REL_SELECT = `
+  SELECT r.id, r.book_id, r.user_email, r.from_beat_id, r.to_beat_id, r.typ,
+         fb.titel AS from_titel, tb.titel AS to_titel,
+         r.created_at, r.updated_at
+    FROM plot_beat_relations r
+    JOIN plot_beats fb ON fb.id = r.from_beat_id
+    JOIN plot_beats tb ON tb.id = r.to_beat_id
+`;
+const _stmtListBeatRelations = db.prepare(`${_REL_SELECT} WHERE r.book_id = ? AND r.user_email = ? ORDER BY r.from_beat_id, r.id`);
+const _stmtGetBeatRelation = db.prepare(`${_REL_SELECT} WHERE r.id = ?`);
+const _stmtInsertBeatRelation = db.prepare(`
+  INSERT OR IGNORE INTO plot_beat_relations (book_id, user_email, from_beat_id, to_beat_id, typ, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+`);
+const _stmtFindBeatRelation = db.prepare('SELECT id FROM plot_beat_relations WHERE from_beat_id = ? AND to_beat_id = ? AND typ = ?');
+const _stmtDeleteBeatRelation = db.prepare('DELETE FROM plot_beat_relations WHERE id = ? AND user_email = ?');
+
+function listBeatRelations(bookId, userEmail) {
+  return _stmtListBeatRelations.all(parseInt(bookId), userEmail);
+}
+
+function getBeatRelation(id) {
+  return _stmtGetBeatRelation.get(parseInt(id)) || null;
+}
+
+// Prueft, ob ein Beat wirklich zu (Buch, User) gehoert (Fremd-Verweis-Schutz).
+function _beatBelongs(bookId, userEmail, beatId) {
+  const b = _stmtGetBeat.get(parseInt(beatId));
+  return !!(b && b.book_id === parseInt(bookId) && b.user_email === userEmail);
+}
+
+// Kante anlegen. Beide Beats muessen zu (Buch, User) gehoeren; keine Selbst-Kante.
+// Bei bestehender identischer Kante (UNIQUE) wird die vorhandene zurueckgegeben
+// (idempotent). Wirft mit .code fuer die Route.
+function createBeatRelation(bookId, userEmail, { fromBeatId, toBeatId, typ }) {
+  const fid = parseInt(fromBeatId);
+  const tid = parseInt(toBeatId);
+  if (!Number.isInteger(fid) || !Number.isInteger(tid)) { const e = new Error('BEAT_REQUIRED'); e.code = 'BEAT_REQUIRED'; throw e; }
+  if (fid === tid) { const e = new Error('SELF_RELATION'); e.code = 'SELF_RELATION'; throw e; }
+  if (!_beatBelongs(bookId, userEmail, fid) || !_beatBelongs(bookId, userEmail, tid)) {
+    const e = new Error('BEAT_MISMATCH'); e.code = 'BEAT_MISMATCH'; throw e;
+  }
+  const cleanTyp = String(typ || '').trim().slice(0, 40);
+  if (!cleanTyp) { const e = new Error('TYP_REQUIRED'); e.code = 'TYP_REQUIRED'; throw e; }
+  const info = _stmtInsertBeatRelation.run(parseInt(bookId), userEmail, fid, tid, cleanTyp);
+  const id = info.changes ? info.lastInsertRowid : _stmtFindBeatRelation.get(fid, tid, cleanTyp)?.id;
+  return id ? getBeatRelation(id) : null;
+}
+
+function deleteBeatRelation(id, userEmail) {
+  return _stmtDeleteBeatRelation.run(parseInt(id), userEmail).changes;
 }
 
 module.exports = {
@@ -859,6 +921,7 @@ module.exports = {
   threadHasOwnActs, forkThreadActs, unforkThreadActs,
   listThreads, getThread, createThread, updateThread, deleteThread, reorderThreads, _validThreadId,
   listBeats, getBeat, getBeatMeta, createBeat, updateBeat, deleteBeat, reorderBeats, pageBeatCounts, chapterBeatCounts,
+  listBeatRelations, getBeatRelation, createBeatRelation, deleteBeatRelation,
   figurePlotUsage,
   resolveFigureIds, resolveDraftFigureIds, resolveMotifIds,
   insertPlotConsistencyRun, listPlotConsistencyRuns, getPlotConsistencyRun, deletePlotConsistencyRun,

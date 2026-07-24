@@ -16,6 +16,7 @@ const {
   createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
 } = require('./shared');
 const plotDb = require('../../db/plot');
+const appSettings = require('../../lib/app-settings');
 const embed = require('../../lib/embed');
 const { semanticQuery } = require('../../lib/semantic-retrieval');
 const searchIndex = require('../../lib/search');
@@ -46,7 +47,13 @@ function _toOcc(kind, entityId, score, snippet, source) {
 // Fundstellen eines Beats sammeln. Query = titel + beschreibung. Semantisch (mit
 // interner FTS-Fusion) wenn das Embedding-Backend läuft, sonst reine FTS über den
 // Titel. Dedup pro (kind, entity) — ein Ort zählt einmal.
-async function _anchorBeat(bookId, beat, useSemantic, signalFn) {
+//
+// minScore: Score-Untergrenze fürs Speichern. 0 für „im Buch"-Beats (alle Treffer
+// zählen — es geht um Drift-Erkennung). Für „geplant"-Beats die hohe Promotion-
+// Schwelle, damit nur starke Treffer als „offenbar schon geschrieben" durchkommen
+// (sonst Vorschlags-Flut). Bei minScore > 0 wird der reine FTS-Fallback übersprungen:
+// ein wörtlicher Titel-Treffer ist ohne Semantik ein zu schwaches Promotion-Signal.
+async function _anchorBeat(bookId, beat, useSemantic, signalFn, minScore = 0) {
   const found = new Map();
   const query = [beat.titel, beat.beschreibung].map(s => String(s || '').trim()).filter(Boolean).join('. ');
   if (!query) return [];
@@ -54,9 +61,11 @@ async function _anchorBeat(bookId, beat, useSemantic, signalFn) {
   if (useSemantic) {
     const hits = await semanticQuery(bookId, query, { kinds: SCAN_KINDS, topK: TOP_K, signal: signalFn() });
     for (const h of hits) {
+      if (minScore > 0 && h.score != null && h.score < minScore) continue;
       found.set(_occKey(h.kind, h.entity_id), _toOcc(h.kind, h.entity_id, h.score, _plainSnippet(h.text), 'semantic'));
     }
   } else {
+    if (minScore > 0) return []; // Promotion nur mit Semantik — FTS-Titel-Treffer zu schwach.
     // Ohne Embedding-Backend: wörtliche FTS über den Beat-Titel (kürzer, präziser
     // als die ganze Beschreibung als Textblob).
     let r;
@@ -79,15 +88,22 @@ async function runBeatAnchorJob(jobId, bookId, userEmail) {
     };
 
     const useSemantic = embed.isEnabled();
-    // Nur eingearbeitete Beats werden im Text verankert: geprüft wird, ob ein als
-    // „im Buch" markierter Beat tatsächlich im Manuskript auffindbar ist (Soll-Ist-
-    // Drift). Für „geplant"/verworfene Beats gibt es kein Soll „im Text", also nichts
-    // zu prüfen. Deren evtl. vorhandenen Alt-Fundstellen werden geleert, damit kein
-    // Stale-Index zurückbleibt, wenn ein Beat aus „im Buch" zurückgestuft/verworfen wird.
+    // Promotion-Schwelle für GEPLANTE Beats (hoch, sonst Vorschlags-Flut). 0 = aus.
+    const promoteFloor = Number(appSettings.get('plot.anchor.promote_min_score')) || 0;
+    // Verankert werden nicht-verworfene Beats beider Status:
+    //   - „im Buch": alle Treffer (Soll-Ist-Drift — ist das laut Plan Geschriebene
+    //     wirklich im Text?).
+    //   - „geplant": nur Treffer ≥ promoteFloor (Promotion-Erkennung — offenbar schon
+    //     geschrieben? → Vorschlag „auf im Buch setzen"). Bei promoteFloor = 0 werden
+    //     geplante Beats nicht gescannt (Feature aus).
+    // Verworfene Beats haben kein Soll „im Text"; ihre evtl. vorhandenen Alt-Fundstellen
+    // werden geleert (kein Stale-Index nach Rückstufung/Verwerfen).
     const allBeats = plotDb.listBeatsForAnchor(bookId, userEmail);
-    const beats = allBeats.filter(b => b.status === 'im_buch' && !b.verworfen);
+    const beats = allBeats.filter(b => !b.verworfen
+      && (b.status === 'im_buch' || (b.status === 'geplant' && promoteFloor > 0)));
+    const anchoredIds = new Set(beats.map(b => b.id));
     for (const b of allBeats) {
-      if (b.status !== 'im_buch' || b.verworfen) plotDb.replaceBeatOccurrences(b.id, bookId, []);
+      if (!anchoredIds.has(b.id)) plotDb.replaceBeatOccurrences(b.id, bookId, []);
     }
     updateJob(jobId, { statusText: 'job.phase.beatAnchor', statusParams: { done: 0, total: beats.length }, progress: 5 });
 
@@ -95,7 +111,8 @@ async function runBeatAnchorJob(jobId, bookId, userEmail) {
     for (let i = 0; i < beats.length; i++) {
       throwIfAborted();
       const beat = beats[i];
-      const rows = await _anchorBeat(bookId, beat, useSemantic, signal);
+      const minScore = beat.status === 'im_buch' ? 0 : promoteFloor;
+      const rows = await _anchorBeat(bookId, beat, useSemantic, signal, minScore);
       plotDb.replaceBeatOccurrences(beat.id, bookId, rows);
       totalOcc += rows.length;
       updateJob(jobId, {

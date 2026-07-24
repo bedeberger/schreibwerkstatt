@@ -27,29 +27,43 @@ export const coverageMethods = {
   },
 
   // ── Konsistenz-Befunde ↔ Beats (aktiver Lauf) ──────────────────────────────
-  // Index normalisierter Beat-Titel → Befunde des gerade angezeigten Laufs.
-  // Übergreifende Befunde ("—") haben kein Beat-Ziel und fallen raus. Memoisiert
-  // auf das Result-Objekt — es wird bei jedem Lauf/Öffnen neu zugewiesen, sodass
-  // der Referenz-Vergleich greift.
+  // Index der Befunde des gerade angezeigten Laufs, zwei Achsen:
+  //   byId    — Befunde mit stabiler beat_id (überleben Umbenennungen)
+  //   byTitle — Befunde ohne beat_id (Alt-Läufe / Modelle ohne [#…]-Echo) per Titel
+  // Übergreifende Befunde ("—", kein Beat-Ziel) fallen raus. Memoisiert auf das
+  // Result-Objekt — es wird bei jedem Lauf/Öffnen neu zugewiesen, sodass der
+  // Referenz-Vergleich greift.
   _konfliktIndex() {
     return this._memo('konfliktIdx', [this.consistencyResult], () => {
-      const map = new Map();
+      const byId = new Map();
+      const byTitle = new Map();
       const ks = this.consistencyResult?.konflikte || [];
       ks.forEach((k, idx) => {
+        const entry = { ...k, idx };
+        if (k.beat_id != null) {
+          if (!byId.has(k.beat_id)) byId.set(k.beat_id, []);
+          byId.get(k.beat_id).push(entry);
+          return;
+        }
         const key = normTitle(k.beat);
         if (!key || key === '—') return;
-        if (!map.has(key)) map.set(key, []);
-        map.get(key).push({ ...k, idx });
+        if (!byTitle.has(key)) byTitle.set(key, []);
+        byTitle.get(key).push(entry);
       });
-      return map;
+      return { byId, byTitle };
     });
   },
 
-  // Befunde, die genau diesen Beat (per Titel) betreffen — leer, wenn kein Lauf
-  // angezeigt wird oder der Beat sauber ist.
+  // Befunde, die genau diesen Beat betreffen — per stabiler ID plus (für Befunde
+  // ohne beat_id) per Titel. Leer, wenn kein Lauf angezeigt wird oder der Beat
+  // sauber ist.
   beatKonflikte(beat) {
-    if (!this.consistencyResult) return [];
-    return this._konfliktIndex().get(normTitle(beat?.titel)) || [];
+    if (!this.consistencyResult || !beat) return [];
+    const idx = this._konfliktIndex();
+    return [
+      ...(idx.byId.get(beat.id) || []),
+      ...(idx.byTitle.get(normTitle(beat.titel)) || []),
+    ];
   },
 
   // Höchste Schwere unter den Befunden eines Beats (steuert die Badge-Farbe).
