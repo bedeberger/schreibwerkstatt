@@ -186,6 +186,9 @@
      bewusst neben, nicht in der Familie der Analyse-Karten. */
   --card-accent-mybooks-base: #8a6a3c;
   --card-accent-mybooks: var(--card-accent-mybooks-base);
+  /* Autorenprofil: user-skopiert wie mystats/mybooks, eigener Ton (Aubergine). */
+  --card-accent-autorenprofil-base: #7a4a80;
+  --card-accent-autorenprofil: var(--card-accent-autorenprofil-base);
   --card-accent-review-base: #5a4a8e;
   --card-accent-review: var(--card-accent-review-base);
   --card-accent-kapitel-base: #5e7a3a;
@@ -436,6 +439,7 @@
   --card-accent-bookstats: oklch(from var(--card-accent-bookstats-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-mystats: oklch(from var(--card-accent-mystats-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-mybooks: oklch(from var(--card-accent-mybooks-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
+  --card-accent-autorenprofil: oklch(from var(--card-accent-autorenprofil-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-review: oklch(from var(--card-accent-review-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-kapitel: oklch(from var(--card-accent-kapitel-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-chat: oklch(from var(--card-accent-chat-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);

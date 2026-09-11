@@ -1,5 +1,7 @@
 import { fetchJson, clearStatusAfter, formatLastRun } from '../utils.js';
 import { EVT } from '../events.js';
+import { KOMPLETT_STEPS, KOMPLETT_CORE_STEPS, KOMPLETT_STEP_KEYS,
+         normalizeKomplettScope, isFullKomplettScope } from '../komplett-scope.js';
 
 // Komplett-Analyse-Pipeline-UI: Start, Polling, Phasen-Indikator,
 // Last-Run-Anzeige, Kapitel-Cache-Reset.
@@ -16,9 +18,64 @@ export const appKomplettMethods = {
     await this.appAlert({ message: this.t('app.cacheCleared', { n: deleted }) });
   },
 
+  // Einstiegspunkt aller Auslöser (Header-Knopf, Leer-Zustand der Katalog-Karten,
+  // Command-Palette): das Modal fragt den Umfang und ersetzt damit die frühere
+  // Ja/Nein-Bestätigung — es beantwortet dieselbe Frage genauer.
   async alleAktualisieren() {
     if (!this.$store.nav.selectedBookId || this.$store.jobs.alleAktualisierenLoading) return;
-    if (!await this.appConfirm({ message: this.t('komplett.confirm') })) return;
+    this.showKomplettStatus = false;
+    this.komplettScopeForce = false;
+    this.komplettScopeLoading = true;
+    // Partial lazy nachladen, BEVOR das Flag gesetzt wird — der Dialog gehoert
+    // nicht in den Cold-Boot-Satz (die meisten Sitzungen oeffnen ihn nie).
+    await this._ensurePartial('komplett-scope');
+    this.komplettScopeOpen = true;
+    const bookId = this.$store.nav.selectedBookId;
+    try {
+      // Vorbelegung ist der zuletzt GESTARTETE Umfang (serverseitig, pro Buch + User).
+      const { scope } = await fetchJson(`/jobs/komplett-scope/${bookId}`);
+      // Buchwechsel während des Fetches: die Antwort gehört dann zum alten Buch.
+      if (this.$store.nav.selectedBookId !== bookId) return;
+      this.komplettScope = normalizeKomplettScope(scope);
+    } catch (e) {
+      console.error('[komplettScope]', e);
+      // Ohne Vorbelegung der vollständige Lauf — er lässt nichts aus.
+      this.komplettScope = normalizeKomplettScope(null);
+    } finally {
+      this.komplettScopeLoading = false;
+    }
+  },
+
+  // Schritte, die dem User angeboten werden. Die Cloud-Klasse ist dieselbe Bedingung,
+  // unter der `/config` die Karten ausblendet und der Job die Phase überspringt —
+  // ein Schalter für etwas, das ohnehin nicht läuft, wäre eine Falschaussage.
+  komplettScopeSteps(group) {
+    const cloud = this.$store.config.effectiveProviderClass === 'cloud';
+    return KOMPLETT_STEPS.filter(s => s.group === group && (cloud || !s.cloudOnly));
+  },
+
+  komplettCoreSteps() { return KOMPLETT_CORE_STEPS; },
+
+  // Wie viele Schritte laufen — Beschriftung des Start-Knopfs. Zählt nur, was
+  // überhaupt angeboten wird (ein lokaler Provider hat keine Urteils-Phasen).
+  komplettScopeCount() {
+    const offered = [...this.komplettScopeSteps('katalog'), ...this.komplettScopeSteps('pruefung')];
+    return { on: offered.filter(s => this.komplettScope[s.key]).length, total: offered.length };
+  },
+
+  komplettScopeIsFull() { return isFullKomplettScope(this.komplettScope); },
+
+  // Voreinstellungen. «Nur Katalog» ist der häufige Fall nach einer Kapitel-Änderung:
+  // Entitäten auffrischen, die teuren Urteils-Phasen später oder gar nicht.
+  setKomplettScopePreset(preset) {
+    const next = {};
+    for (const s of KOMPLETT_STEPS) next[s.key] = preset === 'all' ? true : s.group === 'katalog';
+    this.komplettScope = next;
+  },
+
+  async startKomplettRun() {
+    this.komplettScopeOpen = false;
+    if (!this.$store.nav.selectedBookId || this.$store.jobs.alleAktualisierenLoading) return;
     this.$store.jobs.alleAktualisierenLoading = true;
     this.$store.jobs.alleAktualisierenProgress = 0;
     this.$store.jobs.alleAktualisierenTokIn = 0;
@@ -38,10 +95,10 @@ export const appKomplettMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           book_id: parseInt(bookId), book_name: bookName,
-          // Teil-Lauf: read-only Endphasen abwählbar (Zeit + Kosten). Server-Default
-          // ist „alles an", die Flags werden nur gesetzt, wenn der User sie anklickt.
-          skip_continuity: !!this.komplettSkipContinuity,
-          skip_narrative_profile: !!this.komplettSkipNarrativeProfile,
+          // Lauf-Umfang: der Server normalisiert nach, wir schicken nur die bekannten
+          // Schlüssel. Er wird zugleich als Vorbelegung des nächsten Laufs gespeichert.
+          scope: Object.fromEntries(KOMPLETT_STEP_KEYS.map(k => [k, this.komplettScope[k] !== false])),
+          force: !!this.komplettScopeForce,
         }),
       });
       // Sofort-Refresh des Footer-Polls, sonst sieht die Job-Queue-Bar den Job
@@ -49,7 +106,7 @@ export const appKomplettMethods = {
       window.dispatchEvent(new CustomEvent(EVT.JOB_ENQUEUED, { detail: { type: 'komplett-analyse', jobId } }));
       this._startKomplettPoll(jobId, bookId);
     } catch (e) {
-      console.error('[alleAktualisieren]', e);
+      console.error('[startKomplettRun]', e);
       this.$store.jobs.alleAktualisierenStatus = `${this.t('common.errorColon')}${e.message}`;
       this.$store.jobs.alleAktualisierenLoading = false;
     }
@@ -133,18 +190,28 @@ export const appKomplettMethods = {
     //   continuity=97       = Ende aiCall Phase 8 (82→97, breite Range für langen Call)
     // Im Single-Pass wird Phase 3b übersprungen (Server setzt passMode='single'),
     // damit sie auch im UI nicht als „erledigt" erscheint.
+    // `scope`: der Schritt, an dem die Phase haengt. Ist er abgewaehlt, faellt die
+    // Zeile WEG statt als erledigt abgehakt zu werden — die Bar rueckt ueber den
+    // Bereich hinweg vor, und ein Haken waere dann eine Falschaussage ueber eine
+    // Phase, die gar nicht lief.
     const phases = [
       { key: 'phase.loadPages',          threshold: 12  },
       { key: 'phase.extract',            threshold: 30  },
       { key: 'phase.figurenConsolidate', threshold: 43  },
-      { key: 'phase.orteConsolidate',    threshold: 55  },
-      { key: 'phase.songsConsolidate',   threshold: 56  },
-      { key: 'phase.chapterRelations',   threshold: 58, onlyMulti: true },
-      { key: 'phase.szenenEvents',       threshold: 78  },
-      { key: 'phase.timeline',           threshold: 82  },
-      { key: 'phase.continuity',         threshold: 97  },
+      { key: 'phase.orteConsolidate',    threshold: 55, scope: 'orte' },
+      { key: 'phase.songsConsolidate',   threshold: 56, scope: 'songs' },
+      { key: 'phase.chapterRelations',   threshold: 58, onlyMulti: true, scope: 'beziehungen' },
+      { key: 'phase.szenenEvents',       threshold: 78, scope: ['szenen', 'ereignisse'] },
+      { key: 'phase.timeline',           threshold: 82, scope: 'ereignisse' },
+      { key: 'phase.continuity',         threshold: 97, scope: 'kontinuitaet' },
     ];
-    const visible = phases.filter(ph => !(ph.onlyMulti && this.$store.jobs.alleAktualisierenPassMode === 'single'));
+    const inScope = (ph) => {
+      if (!ph.scope) return true;
+      const keys = Array.isArray(ph.scope) ? ph.scope : [ph.scope];
+      return keys.some(k => this.komplettScope[k] !== false);
+    };
+    const visible = phases.filter(ph =>
+      !(ph.onlyMulti && this.$store.jobs.alleAktualisierenPassMode === 'single') && inScope(ph));
     return visible.map((ph, i) => {
       const done = p >= ph.threshold;
       const prevThreshold = i === 0 ? 0 : visible[i - 1].threshold;

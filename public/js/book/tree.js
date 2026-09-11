@@ -6,6 +6,8 @@
 //                         Token-Estimate-Backfill. Exportiert auch `insertChapterItem`.
 //   tree/build.js       — Tree-Aufbau aus der bookTree-Antwort (nav.pages/nav.tree +
 //                         Sortier-Indexe) + Nachladen der Sidebar-Plaketten.
+//   tree/catchup.js     — leiser Nachzug des Baums (SW-Revalidierung, Collab-Feed,
+//                         Drift-Probe) — die zweite Haelfte von Stale-While-Revalidate.
 //   tree/permissions.js — ACL-Rolle + Entity-Flag pro Buch, canEdit/canReview/isViewer, Buchtyp.
 //   tree/open-state.js  — Persistenter Collapse-State + Chapter-Header-Aktivierung.
 //   tree/stats.js       — Seiten-Status/Tooltips, Page-Stats-Sync, Kapitel-Aggregation.
@@ -13,6 +15,7 @@
 
 import { treeLoadMethods } from './tree/load.js';
 import { treeBuildMethods } from './tree/build.js';
+import { treeCatchUpMethods } from './tree/catchup.js';
 import { treePermissionsMethods } from './tree/permissions.js';
 import { treeOpenStateMethods } from './tree/open-state.js';
 import { treeStatsMethods } from './tree/stats.js';
@@ -22,6 +25,7 @@ import { treeUiMethods } from './tree/ui.js';
 export const treeMethods = {
   ...treeLoadMethods,
   ...treeBuildMethods,
+  ...treeCatchUpMethods,
   ...treePermissionsMethods,
   ...treeOpenStateMethods,
   ...treeStatsMethods,

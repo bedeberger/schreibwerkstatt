@@ -1,0 +1,242 @@
+<!--
+  Kapitel-Dashboard — Kennzahlen-Kopf der Kapitel-Bewertung.
+  Rechnet ausschliesslich aus vorhandenen Quellen (Baum + tokEsts, Fehler-
+  Heatmap, Lektoratszeit, Catalog-Store, Bewertungs-Historie); kein KI-Call.
+  Compute + Ladepfad: public/js/cards/kapitel-dashboard.js.
+  Laeuft im Alpine-Scope der Karte (`kapitelReviewCard`).
+-->
+<template x-if="kdReady()">
+  <div class="overview-grid kapitel-dashboard">
+
+    <!-- Umfang: Zeichen gross + Sub-Stats; Fuss zeigt die laengste Seite -->
+    <div class="overview-tile overview-tile--hero"
+         :aria-label="$app.t('kapitelReview.dash.umfang') + ': ' + _fmtNum(kdUmfang().chars) + ' ' + $app.t('bookstats.unit.z')">
+      <div class="overview-tile-head">
+        <span class="overview-tile-label" x-text="$app.t('kapitelReview.dash.umfang')"></span>
+        <span class="overview-tile-median" x-show="kdPosition()"
+              x-text="kdPosition() ? $app.t('kapitelReview.dash.position', { index: kdPosition().index, total: kdPosition().total }) : ''"></span>
+      </div>
+      <div class="overview-hero-row">
+        <div class="overview-hero-num">
+          <span class="overview-hero-value" x-text="_fmtNum(kdUmfang().chars)"></span>
+          <span class="overview-hero-unit" x-text="$app.t('bookstats.unit.z')"></span>
+        </div>
+        <div class="overview-substats">
+          <div class="overview-substat" :data-tip="$app.t('bookstats.metric.normseiten')">
+            <span class="overview-substat-value" x-text="_fmtNormseiten(kdUmfang().chars)"></span>
+            <span class="overview-substat-unit" x-text="$app.t('bookstats.unit.ns')"></span>
+          </div>
+          <div class="overview-substat">
+            <span class="overview-substat-value" x-text="_fmtNum(kdUmfang().words)"></span>
+            <span class="overview-substat-unit" x-text="$app.t('bookstats.unit.w')"></span>
+          </div>
+          <div class="overview-substat">
+            <span class="overview-substat-value" x-text="_fmtNum(kdUmfang().pages)"></span>
+            <span class="overview-substat-unit" x-text="$app.t('bookstats.unit.s')"></span>
+          </div>
+          <div class="overview-substat" x-show="kdUmfang().sharePct !== null"
+               :data-tip="$app.t('kapitelReview.dash.shareTip')">
+            <span class="overview-substat-value" x-text="_fmtNum(kdUmfang().sharePct) + '%'"></span>
+            <span class="overview-substat-unit" x-text="$app.t('kapitelReview.dash.share')"></span>
+          </div>
+          <div class="overview-substat" x-show="kdUmfang().minutes > 0"
+               :data-tip="$app.t('kapitelReview.dash.readTimeTip')">
+            <span class="overview-substat-value" x-text="_fmtNum(kdUmfang().minutes)"></span>
+            <span class="overview-substat-unit" x-text="$app.t('kapitelReview.dash.unitMin')"></span>
+          </div>
+        </div>
+      </div>
+      <div class="kapitel-dash-foot" x-show="kdUmfang().pages > 1 && kdUmfang().longest">
+        <span class="kapitel-dash-foot-label" x-text="$app.t('kapitelReview.dash.longest')"></span>
+        <span class="kapitel-dash-foot-link internal-link"
+              @click="$app.selectPage(kdUmfang().longest.page)"
+              x-text="kdUmfang().longest.name"></span>
+        <span class="kapitel-dash-foot-value" x-text="$app.charBadge(kdUmfang().longest.chars)"></span>
+        <span class="kapitel-dash-foot-label" x-text="$app.t('kapitelReview.dash.avgPage')"></span>
+        <span class="kapitel-dash-foot-value" x-text="$app.charBadge(kdUmfang().avgChars)"></span>
+      </div>
+    </div>
+
+    <!-- Letzte Bewertung dieses Kapitels; ohne Lauf ein Handlungsaufruf -->
+    <template x-if="kdLastReview()">
+      <div class="overview-tile">
+        <div class="overview-tile-label" x-text="$app.t('kapitelReview.dash.review')"></div>
+        <div class="kapitel-dash-stars"
+             :data-tip="noteTip(kdLastReview().entry.review_json?.gesamtnote)"
+             x-html="renderStars(kdLastReview().entry.review_json?.gesamtnote)"></div>
+        <div class="overview-review-meta">
+          <span class="overview-review-date" x-text="$app.formatDate(kdLastReview().entry.reviewed_at)"></span>
+          <span class="overview-review-trend" x-show="kdLastReview().delta !== null"
+                :class="kdLastReview().delta > 0 ? 'overview-trend-pct--up' : 'overview-trend-pct--down'"
+                :data-tip="$app.t('kapitelReview.trendTip')"
+                x-text="kdLastReview().delta === null ? '' : (kdLastReview().delta > 0 ? '▲ +' : '▼ −') + _fmtNum(Math.abs(kdLastReview().delta))"></span>
+        </div>
+      </div>
+    </template>
+    <template x-if="!kdLastReview()">
+      <div class="overview-tile overview-tile--cta internal-link"
+           @click="runKapitelReview()"
+           :aria-label="$app.t('kapitelReview.start')">
+        <div class="overview-tile-label" x-text="$app.t('kapitelReview.dash.review')"></div>
+        <div class="overview-cta-body">
+          <span class="overview-cta-text" x-text="$app.t('kapitelReview.dash.reviewNone')"></span>
+          <span class="overview-cta-action" x-text="$app.t('kapitelReview.start')"></span>
+        </div>
+      </div>
+    </template>
+
+    <!-- Lektorat: Abdeckung als Ring, Befunddichte gegen den Buchwert -->
+    <template x-if="kdLektorat()">
+      <div class="overview-tile internal-link"
+           @click="$app.toggleFehlerHeatmapCard()"
+           :data-tip="$app.t('overview.openHeatmap')"
+           :aria-label="$app.t('kapitelReview.dash.lektorat')">
+        <div class="overview-tile-label" x-text="$app.t('kapitelReview.dash.lektorat')"></div>
+        <div class="overview-donut-row">
+          <svg class="overview-donut" :class="{ 'overview-donut--empty': kdLektorat().pct === 0 }"
+               viewBox="0 0 72 72" aria-hidden="true">
+            <circle cx="36" cy="36" r="30" fill="none" stroke="var(--color-border)" stroke-width="6"></circle>
+            <circle cx="36" cy="36" r="30" fill="none" stroke="var(--color-accent)" stroke-width="6"
+                    stroke-linecap="round"
+                    :stroke-dasharray="(kdLektorat().pct / 100 * 188.5).toFixed(1) + ' 188.5'"
+                    transform="rotate(-90 36 36)"></circle>
+            <text x="36" y="40" text-anchor="middle" class="overview-donut-text"
+                  x-text="kdLektorat().pct + '%'"></text>
+          </svg>
+          <div class="overview-donut-meta">
+            <div class="overview-donut-meta-checked"
+                 x-text="$app.t('overview.coverageMeta', { checked: kdLektorat().pagesChecked, total: kdLektorat().pagesTotal })"></div>
+            <div class="kapitel-dash-kv" x-show="kdLektorat().pagesChecked > 0">
+              <span class="kapitel-dash-kv-value" x-text="_fmtNum(kdLektorat().findings)"></span>
+              <span class="kapitel-dash-kv-label" x-text="$app.t('kapitelReview.dash.findings')"></span>
+            </div>
+            <div class="kapitel-dash-kv" x-show="kdLektorat().per1k !== null"
+                 :data-tip="$app.t('kapitelReview.dash.densityTip')">
+              <span class="kapitel-dash-kv-value"
+                    :class="kdBookPer1k() === null || kdLektorat().per1k === kdBookPer1k() ? ''
+                            : (kdLektorat().per1k < kdBookPer1k() ? 'kapitel-dash-better' : 'kapitel-dash-worse')"
+                    x-text="_fmtNum(kdLektorat().per1k) + ' ' + $app.t('overview.unit.per1k')"></span>
+              <span class="kapitel-dash-kv-label" x-show="kdBookPer1k() !== null"
+                    x-text="$app.t('kapitelReview.dash.densityBook', { v: _fmtNum(kdBookPer1k()) })"></span>
+            </div>
+            <div class="kapitel-dash-kv" x-show="kdLektoratSeconds() > 0">
+              <span class="kapitel-dash-kv-value" x-text="kdLektoratTimeLabel()"></span>
+              <span class="kapitel-dash-kv-label" x-text="$app.t('kapitelReview.dash.lektoratTime')"></span>
+            </div>
+            <div class="muted-msg" x-show="kdLektorat().pagesChecked === 0"
+                 x-text="$app.t('kapitelReview.dash.noCheck')"></div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Haeufigste Befundtypen im Kapitel -->
+    <template x-if="kdTopTypen().length > 0">
+      <div class="overview-tile internal-link"
+           @click="$app.toggleFehlerHeatmapCard()"
+           :data-tip="$app.t('overview.openHeatmap')"
+           :aria-label="$app.t('kapitelReview.dash.topTypen')">
+        <div class="overview-tile-label" x-text="$app.t('kapitelReview.dash.topTypen')"></div>
+        <ul class="overview-error-bars">
+          <template x-for="e in kdTopTypen()" :key="e.typ">
+            <li class="overview-error-bar-item">
+              <div class="overview-error-bar-head">
+                <span class="overview-error-typ" x-text="tileFehlerLabel(e.typ)"></span>
+                <span class="overview-error-count" x-text="_fmtNum(e.count)"></span>
+              </div>
+              <div class="overview-error-bar-track">
+                <div class="overview-error-bar-fill" :style="{ width: e.pct + '%' }"></div>
+              </div>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </template>
+
+    <!-- Figuren im Kapitel: Rangliste nach Auftritten (figure_appearances) -->
+    <template x-if="kdFiguren().rows.length > 0">
+      <div class="overview-tile overview-tile--medium">
+        <div class="overview-tile-head">
+          <span class="overview-tile-label" x-text="$app.t('kapitelReview.dash.figuren')"></span>
+          <span class="overview-tile-median" x-show="kdFiguren().total > kdFiguren().rows.length"
+                x-text="$app.t('kapitelReview.dash.more', { n: kdFiguren().total - kdFiguren().rows.length })"></span>
+        </div>
+        <ul class="kapitel-dash-rank">
+          <template x-for="f in kdFiguren().rows" :key="f.id">
+            <li class="kapitel-dash-rank-row internal-link"
+                @click="$app.openFigurById(f.id)"
+                :data-tip="f.fullName + (f.extra > 0 ? ' · ' + $app.t('kapitelReview.dash.scenes', { n: f.extra }) : '')">
+              <span class="kapitel-dash-rank-avatar" x-text="tileInitials(f.fullName)"></span>
+              <span class="kapitel-dash-rank-name" x-text="f.name"></span>
+              <span class="kapitel-dash-rank-bar">
+                <span class="kapitel-dash-rank-fill" :style="{ width: f.pct + '%' }"></span>
+              </span>
+              <span class="kapitel-dash-rank-count" x-text="_fmtNum(f.count)"></span>
+            </li>
+          </template>
+        </ul>
+        <div class="card-hint" x-text="$app.t('kapitelReview.dash.figurenHint')"></div>
+      </div>
+    </template>
+
+    <!-- Schauplaetze im Kapitel -->
+    <template x-if="kdOrte().rows.length > 0">
+      <div class="overview-tile">
+        <div class="overview-tile-head">
+          <span class="overview-tile-label" x-text="$app.t('kapitelReview.dash.orte')"></span>
+          <span class="overview-tile-median" x-show="kdOrte().total > kdOrte().rows.length"
+                x-text="$app.t('kapitelReview.dash.more', { n: kdOrte().total - kdOrte().rows.length })"></span>
+        </div>
+        <div class="overview-fig-chips">
+          <template x-for="o in kdOrte().rows" :key="o.id">
+            <span class="overview-ort-chip internal-link"
+                  :data-typ="o.typ"
+                  :data-tip="o.fullName + ' · ' + o.count"
+                  @click="$app.openOrtById(o.id)">
+              <span class="overview-ort-dot" :data-typ="o.typ" aria-hidden="true"></span>
+              <span class="overview-fig-name" x-text="o.name"></span>
+            </span>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Szenen im Kapitel: Anzahl + Wertungen + Kurzliste -->
+    <template x-if="kdSzenen().total > 0">
+      <div class="overview-tile">
+        <div class="overview-tile-label" x-text="$app.t('kapitelReview.dash.szenen')"></div>
+        <div class="overview-fig-row">
+          <span class="overview-fig-count" x-text="_fmtNum(kdSzenen().total)"></span>
+          <span class="overview-fig-count-unit" x-text="$app.t('overview.unit.total')"></span>
+        </div>
+        <!-- Wertungsverteilung der Szenen dieses Kapitels — gleiche Balken-
+             Atome wie das Szenen-Tile der Buch-Uebersicht. -->
+        <div class="overview-stacked-bar"
+             :data-tip="$app.t('overview.szenenBreakdown', {
+               stark: kdSzenen().wertung.stark,
+               mittel: kdSzenen().wertung.mittel,
+               schwach: kdSzenen().wertung.schwach
+             })">
+          <div class="overview-stacked-seg overview-stacked-seg--stark"
+               :style="{ flex: kdSzenen().wertung.stark }" x-show="kdSzenen().wertung.stark > 0"></div>
+          <div class="overview-stacked-seg overview-stacked-seg--mittel"
+               :style="{ flex: kdSzenen().wertung.mittel }" x-show="kdSzenen().wertung.mittel > 0"></div>
+          <div class="overview-stacked-seg overview-stacked-seg--schwach"
+               :style="{ flex: kdSzenen().wertung.schwach }" x-show="kdSzenen().wertung.schwach > 0"></div>
+          <div class="overview-stacked-seg overview-stacked-seg--ohne"
+               :style="{ flex: kdSzenen().wertung.ohne }" x-show="kdSzenen().wertung.ohne > 0"></div>
+        </div>
+        <ul class="kapitel-dash-scenes">
+          <template x-for="s in kdSzenen().list" :key="s.id">
+            <li class="kapitel-dash-scene internal-link"
+                @click="$app.openSzeneById(s.id)" :data-tip="s.titel">
+              <span class="kapitel-dash-scene-dot" :data-wertung="s.wertung || 'ohne'" aria-hidden="true"></span>
+              <span class="kapitel-dash-scene-titel" x-text="s.titel"></span>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </template>
+
+  </div>
+</template>

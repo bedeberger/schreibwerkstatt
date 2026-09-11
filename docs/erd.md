@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 282, 159 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 284, 161 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -54,6 +54,7 @@ erDiagram
   books ||--o{ user_page_usage       : has
   books ||--o{ book_access           : has
   books ||--o{ book_shelf            : "shelved by"
+  books ||--o{ komplett_scope        : "run scope"
   books ||--o{ book_share_invites    : has
   books ||--o{ page_locks            : locks
   books ||--o{ writing_time          : has
@@ -172,6 +173,8 @@ erDiagram
 
   app_users ||--o{ book_access       : grants
   app_users ||--o{ book_shelf        : "pins/archives"
+  app_users ||--o{ komplett_scope    : "chooses run scope"
+  app_users ||--|| author_profile    : "own style profile"
   app_users ||--o{ page_locks        : holds
   app_users ||--o{ page_presence     : pings
   app_users ||--o{ book_presence     : pings
@@ -1716,6 +1719,23 @@ erDiagram
     TEXT    pinned_at      "NULL = nicht angeheftet"
     TEXT    archived_at    "NULL = nicht archiviert"
     TEXT    last_opened_at "NULL = nie offen gehabt; groesster Stempel = Startbuch"
+    TEXT    updated_at
+  }
+  komplett_scope {
+    INTEGER book_id    PK,FK "books(book_id) CASCADE"
+    TEXT    user_email PK,FK "app_users(email) CASCADE"
+    TEXT    scope_json "zuletzt gestarteter Lauf-Umfang; gegen lib/komplett-scope.js normalisiert"
+    TEXT    updated_at
+  }
+  author_profile {
+    TEXT    user_email  PK,FK "app_users(email) CASCADE — 1:1 zum Konto, NICHT zum Buch"
+    TEXT    profil_text "gedeuteter Autorenstil ueber die eigenen Buecher; editierbar"
+    TEXT    konstanten  "JSON [{aspekt, beleg}] — was ueber alle Buecher haelt"
+    TEXT    entwicklung "JSON [{aspekt, richtung, beleg}] — was sich verschiebt"
+    TEXT    basis_json  "welche Buecher gingen ein (Nachweis des Stands)"
+    TEXT    basis_sig   "Signatur der Basis; abweichend ⇒ Text ist veraltet"
+    INTEGER edited      "0|1 — vom Autor angefasst; ein neuer Lauf fragt dann nach"
+    TEXT    created_at
     TEXT    updated_at
   }
   book_share_invites {

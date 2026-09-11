@@ -155,21 +155,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Teil-Lauf-Schalter (Kontinuität/Erzählprofil abwählen). Wie die Aktionen darunter
-   bewusst de-prominent: der vollständige Lauf bleibt der Default. */
-.komplett-status-phases {
-  margin-top: var(--space-sm);
-  padding-top: var(--space-sm);
-  border-top: 0.5px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xs);
-}
-.komplett-status-phases-title {
-  font-size: var(--font-size-mini);
-  color: var(--color-muted);
-}
-
 /* Aktionen am Panel-Fuss (z.B. Delta-Cache leeren) — bewusst de-prominent,
    nur über das ⋯-Menü erreichbar statt als nackter Header-Button. */
 .komplett-status-actions {

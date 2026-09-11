@@ -5,6 +5,7 @@
 // beim Buchwechsel auf den Initialstand zurück.
 import { fetchJsonRetry as fetchJsonRetryBase } from '../utils.js';
 import { komplettHiddenFor } from '../cards/feature-registry.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 const fetchJsonRetry = (url, opts) => fetchJsonRetryBase(url, opts, 'bookOverview');
 
@@ -40,6 +41,16 @@ export function initialOverviewState() {
 }
 
 export const loadMethods = {
+  // `_memo(key, deps, fn)` — geteilter Helper (cards/card-memo.js). Cache-Hit
+  // nur, wenn ALLE Source-Refs (deps) identisch zur letzten Compute sind.
+  // Wichtig für Tiles, die zusätzlich zu `overviewXxx` auch
+  // `Alpine.store('nav').tree`/`app.figuren` lesen — sonst wird ein Compute mit
+  // leerem `tree` (während loadPages noch läuft) als `null` gecached und das
+  // Tile bleibt aus, obwohl `tree` danach befüllt wird (Haupt-Source-Ref
+  // unverändert). Memos, die lokalisierte Strings backen, führen zusätzlich
+  // `_uiLocale()` in den Deps.
+  ...memoMethods,
+
   async loadBookOverview(bookId, opts = {}) {
     if (!bookId) return;
     // Dedupe: laufender Load fürs gleiche Buch wird ignoriert. Buchwechsel
@@ -310,23 +321,5 @@ export const loadMethods = {
       const roots = chs.filter(c => c.parent_id == null);
       return { roots, rootOf, rootOfName, byId, byName };
     });
-  },
-
-  // Cache hit nur wenn ALLE Source-Refs (deps) identisch zur letzten Compute.
-  // Wichtig für Tiles, die zusätzlich zu `overviewXxx` auch `Alpine.store('nav').tree`/
-  // `app.figuren` lesen — sonst wird ein Compute mit leerem `tree` (während
-  // loadPages noch läuft) als `null` cached und Tile bleibt aus, obwohl
-  // tree danach befüllt wird (Haupt-Source-Ref unverändert). Memos, die
-  // lokalisierte Strings backen, führen zusätzlich `_uiLocale()` in den Deps.
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length
-        && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
   },
 };

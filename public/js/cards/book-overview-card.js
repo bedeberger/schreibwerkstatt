@@ -16,6 +16,10 @@ export function registerBookOverviewCard() {
     _lifecycle: null,
     // Re-Entry-Guard für die Microtask-Koaleszierung unten (kein fachlicher State).
     _pendingBookId: null,
+    // Memo-Speicher von cards/card-memo.js#_memo. Siehe Begruendung in
+    // tagebuch-rueckblick-card.js: ohne Deklaration landet der Topf beim
+    // Scope-Merge an der Root und wird zwischen Karten geteilt.
+    _memos: {},
 
     init() {
       // Buchwechsel via Combobox feuert beide Events (`view:reset` sync aus

@@ -129,6 +129,13 @@ export const EVT = {
   // ── Tooltip-Layer ────────────────────────────────────────────────────────
   TOOLTIP_HIDE: 'tooltip:hide',                 // kein detail (programmatisches Ausblenden)
 
+  // ── Inhalts-Frische (Service Worker) ─────────────────────────────────────
+  // Der SW hat bei der Hintergrund-Revalidierung einer SWR-Antwort einen
+  // ANDEREN Inhalt gesehen als den Cache-Stand, den er ausgeliefert hat.
+  // `kind` ist die vom Client verstandene Bedeutung des Pfads, nicht der Pfad
+  // selbst (public/js/app/boot/content-updated.js).
+  CONTENT_UPDATED: 'content:updated',           // detail: { kind: 'books'|'tree', bookId? }
+
   // ── App-global ───────────────────────────────────────────────────────────
   SESSION_EXPIRED: 'session-expired',           // kein detail
   APP_UPDATE_AVAILABLE: 'app:update-available', // kein detail

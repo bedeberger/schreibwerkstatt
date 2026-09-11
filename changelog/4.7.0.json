@@ -1,0 +1,46 @@
+{
+  "version": "4.7.0",
+  "date": "2026-09-11",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Autorenprofil: Die stilistischen Kennzahlen Ihrer eigenen Bücher stehen jetzt nebeneinander, in Werk-Reihenfolge. Satzbau, Wortschatz und Lesbarkeit sind gemessen, nicht bewertet — und auf Wunsch deutet die KI, was gleich bleibt und was sich verschiebt.",
+      "en": "Author profile: The stylistic figures of your own books now sit side by side, in order of publication. Sentence structure, vocabulary and readability are measured, not judged — and on request the AI interprets what stays and what shifts."
+    },
+    {
+      "kind": "neu",
+      "de": "Komplettanalyse: Vor jedem Lauf fragt ein Fenster, was neu berechnet werden soll. Abgewählte Schritte bleiben unangetastet, sodass ein kurzer Katalog-Abgleich nicht mehr die ganze, teure Analyse nach sich zieht.",
+      "en": "Full analysis: Before each run a dialog asks what should be recalculated. Deselected steps stay untouched, so a quick catalogue update no longer pulls the whole expensive analysis along with it."
+    },
+    {
+      "kind": "neu",
+      "de": "Kapitelbewertung: Ein neuer Überblick zeigt zu jedem Kapitel Umfang, Lesezeit, offene Lektoratsbefunde sowie die Figuren, Schauplätze und Szenen darin. Die Seitenliste steht daneben im eigenen Reiter.",
+      "en": "Chapter review: A new overview shows each chapter's length, reading time, open editing findings plus the characters, settings and scenes it contains. The page list sits next to it in its own tab."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Bucheinstellungen: Das Stilprofil eines Buchs lässt sich per Knopf aus Ihrem Autorenprofil übernehmen. Neu angelegte Bücher starten von sich aus damit.",
+      "en": "Book settings: A book's style profile can now be taken over from your author profile at the press of a button. Newly created books start with it automatically."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Die Kapitel- und Seitenliste holt Änderungen von anderen Geräten jetzt von selbst nach. Was am Mac oder am Handy geschrieben wurde, steht beim Öffnen sofort da statt erst beim zweiten Laden.",
+      "en": "The chapter and page list now picks up changes from other devices on its own. Whatever you wrote on your Mac or phone is there as soon as you open the app, instead of only on the second load."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Chat: Eine laufende Antwort bleibt bei ihrem Gespräch. Sie können währenddessen in ein früheres Gespräch wechseln, ohne zurückgezogen zu werden, und das laufende steht sofort in der Übersicht.",
+      "en": "Chat: A running reply stays with its own conversation. You can switch to an earlier one meanwhile without being pulled back, and the running conversation appears in the list right away."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Motiv-Werkstatt: Die Konstellation hat Bedienknöpfe zum Näherholen und Wegrücken bekommen. Bisher ging das nur über das Mausrad.",
+      "en": "Motif workshop: The constellation now has buttons to zoom in and out. Until now that was only possible with the mouse wheel."
+    },
+    {
+      "kind": "behoben",
+      "de": "Editor: Der Hinweis „Zuletzt bearbeitet auf …\" blieb stehen, nachdem Sie die Seite in diesem Browser selbst gespeichert hatten. Er verschwindet jetzt, sobald Ihre eigene Fassung die neueste ist.",
+      "en": "Editor: The \"Last edited on …\" note stayed put after you had saved the page in this browser yourself. It now disappears as soon as your own version is the most recent one."
+    }
+  ]
+}

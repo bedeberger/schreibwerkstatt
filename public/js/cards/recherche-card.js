@@ -113,6 +113,8 @@ export function registerRechercheCard() {
     researchChatSessionId: null,
     researchChatInput: '',
     researchChatLoading: false,
+    // Session, für die der laufende Job arbeitet (null = kein Lauf).
+    researchChatRunningSessionId: null,
     researchChatProgress: 0,
     researchChatStatus: '',
     _researchChatPollTimer: null,

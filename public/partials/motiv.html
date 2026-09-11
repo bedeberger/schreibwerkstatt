@@ -40,17 +40,18 @@
           <svg x-show="!scanning" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#search"/></svg>
         </button>
         <!-- Ansichts-Steuerung des Graphen: nur in der Konstellation. Im
-             Verlaufsband und in den Befunden gibt es nichts einzupassen oder
-             anzuordnen — ein Knopf, der dort wortlos nichts tut, liest sich als
-             Defekt. Trennstrich und Gruppe tragen dieselbe Bedingung (Muster aus
+             Verlaufsband und in den Befunden gibt es nichts anzuordnen — ein
+             Knopf, der dort wortlos nichts tut, liest sich als Defekt.
+             Trennstrich und Gruppe tragen dieselbe Bedingung (Muster aus
              editor-page-actions.html); `.action-group` ist `display: contents`
-             und bricht den Flex-Fluss der Leiste nicht. -->
+             und bricht den Flex-Fluss der Leiste nicht.
+             Zoom und Einpassen stehen bewusst NICHT hier, sondern am Graphen
+             selbst (`.motiv-graph-controls`): sie verstellen den Ausschnitt, den
+             man dabei ansieht. `resetLayout()` bleibt im Kartenkopf, weil es
+             nicht die Ansicht aendert, sondern die gespeicherte Anordnung
+             verwirft. -->
         <span class="action-sep" aria-hidden="true" x-show="motivView === 'graph'"></span>
         <span class="action-group" x-show="motivView === 'graph'">
-          <button type="button" class="icon-btn icon-btn--ghost" @click="fitGraph()"
-                  :data-tip="$app.t('motiv.graph.fit')" :aria-label="$app.t('motiv.graph.fit')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scan"/></svg>
-          </button>
           <button type="button" class="icon-btn icon-btn--ghost" @click="resetLayout()"
                   :data-tip="$app.t('motiv.graph.resetLayout')" :aria-label="$app.t('motiv.graph.resetLayout')">
             <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#undo"/></svg>
@@ -142,6 +143,25 @@
   <div class="motiv-layout" x-show="motivView === 'graph'">
     <!-- Konstellations-Graph -->
     <div id="motiv-graph" class="motiv-graph-container" role="img" :aria-label="$app.t('motiv.graph.ariaLabel')"></div>
+    <!-- Minimale Steuerelemente am Graphen (wie in der Figuren-Karte): Zoom und
+         Einpassen. Als Auflage in der Ecke der Zeichenflaeche statt als eigene
+         Zeile — `.motiv-layout` ist ein Zwei-Spalten-Grid, ein drittes Kind
+         waere eine dritte Rasterzelle; und im Vollbild bleiben sie so am Bild.
+         Bezugsrahmen ist dieselbe Grid-Origin wie beim Hover-Tooltip. -->
+    <div class="motiv-graph-controls" role="group" :aria-label="$app.t('motiv.graph.controls')">
+      <button type="button" class="icon-btn icon-btn--ghost" @click="zoomGraph(1.3)"
+              :data-tip="$app.t('graph.zoomIn')" :aria-label="$app.t('graph.zoomIn')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+      </button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="zoomGraph(0.77)"
+              :data-tip="$app.t('graph.zoomOut')" :aria-label="$app.t('graph.zoomOut')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#minus"/></svg>
+      </button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="fitGraph()"
+              :data-tip="$app.t('motiv.graph.fit')" :aria-label="$app.t('motiv.graph.fit')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scan"/></svg>
+      </button>
+    </div>
     <!-- Hover-Detail-Tooltip (absolut über dem Graph, positioniert in graph.js) -->
     <div id="motiv-tooltip" class="graph-tooltip"></div>
 

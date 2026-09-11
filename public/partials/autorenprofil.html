@@ -1,0 +1,169 @@
+<!-- Autorenprofil: die stilistischen Kennzahlen der EIGENEN Buecher nebeneinander,
+     in Werk-Reihenfolge. Alpine.data-Sub-Komponente, siehe
+     public/js/cards/autorenprofil-card.js. User-bound, nicht buch-bound.
+
+     KEIN `sortableTable`, und das ist die Ausnahme, nicht die Schlamperei: die
+     Spaltenachse IST die Werk-Reihenfolge. Nach einer Kennzahl umsortiert waere
+     die Entwicklung zerschnitten — dieselbe Begruendung wie beim Figuren-Lebenslauf.
+
+     Die Karte wertet nicht: gezeigt werden Wert, Median und Abstand. Ob eine
+     kuerzere Satzlaenge ein Fortschritt ist, entscheidet der Autor. -->
+<div class="card card--autorenprofil" x-data="autorenprofilCard" x-show="$app.showAutorenprofilCard" x-cloak>
+  <div class="card-header">
+    <span class="card-title" x-text="$app.t('autorenprofil.title')"></span>
+    <button type="button" class="btn-card-close" @click="$app.toggleAutorenprofilCard()"
+            :aria-label="$app.t('common.close')" :data-tip="$app.t('common.close')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=696#x"/></svg>
+    </button>
+  </div>
+
+  <p class="card-hint card-section" x-text="$app.t('autorenprofil.intro')"></p>
+
+  <div x-show="apLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+  <p x-show="apError" x-cloak class="card-form-error" x-text="apError"></p>
+
+  <!-- Basis des Profils: woraus ist es gerechnet, und was fehlt darin.
+       Weggelassene Buecher werden BENANNT statt still uebergangen. -->
+  <div class="card-section" x-show="apData && !apLoading && !apError" x-cloak>
+    <p class="card-status"
+       x-text="$app.t('autorenprofil.basis', { measured: apCounts.measured, total: apCounts.total })"></p>
+
+    <p class="card-hint" x-show="apSkipped.tooShort?.length" x-cloak
+       x-text="$app.t('autorenprofil.skip.tooShort', { books: apBookNames(apSkipped.tooShort) })"></p>
+    <p class="card-hint" x-show="apSkipped.unscanned?.length" x-cloak
+       x-text="$app.t('autorenprofil.skip.unscanned', { books: apBookNames(apSkipped.unscanned) })"></p>
+    <p class="card-hint" x-show="apSkipped.excluded?.length" x-cloak
+       x-text="$app.t('autorenprofil.skip.excluded', { books: apBookNames(apSkipped.excluded) })"></p>
+
+    <p class="card-hint" x-show="apSingleBook" x-cloak x-text="$app.t('autorenprofil.singleBook')"></p>
+    <p class="card-hint" x-show="apData?.comparable && !apData?.trendAvailable" x-cloak
+       x-text="$app.t('autorenprofil.trendNeedsMore')"></p>
+  </div>
+
+  <!-- Deutung (KI-Lauf). Steht ueber der Messung: sie ist die Antwort, die
+       Tabelle darunter der Beleg. Der Lauf liest keinen Buchtext, sondern die
+       Buch-Stilprofile + die gemessenen Zahlen. -->
+  <div class="card-section ap-profile" x-show="apData && !apLoading && !apError && apCounts.measured > 0" x-cloak>
+    <div class="card-section-head">
+      <span class="card-section-title" x-text="$app.t('autorenprofil.profile.title')"></span>
+      <button type="button" class="btn-compact" x-show="!apEditing"
+              :disabled="apGenerating"
+              @click="generateAutorenprofil()"
+              x-text="apGenerating ? $app.t('autorenprofil.generating')
+                                   : (apProfile ? $app.t('autorenprofil.regenerate') : $app.t('autorenprofil.generate'))"></button>
+    </div>
+
+    <p class="card-form-error" x-show="apGenError" x-cloak x-text="apGenError"></p>
+
+    <p class="card-hint" x-show="!apProfile && !apGenerating" x-cloak
+       x-text="$app.t('autorenprofil.profile.none')"></p>
+
+    <!-- „veraltet" blendet den Text NICHT aus: er gilt weiter, spricht aber von
+         einem aelteren Stand der Buecher. -->
+    <p class="card-status" x-show="apProfile && apProfileStale" x-cloak
+       x-text="$app.t('autorenprofil.profile.stale')"></p>
+
+    <template x-if="apProfile && !apEditing">
+      <div>
+        <p class="ap-profile-text" x-text="apProfile.profil_text"></p>
+        <div class="ap-profile-actions">
+          <button type="button" class="btn-compact" @click="startApEdit()"
+                  x-text="$app.t('autorenprofil.edit')"></button>
+          <span class="ap-profile-meta" x-show="apProfile.edited" x-cloak
+                x-text="$app.t('autorenprofil.profile.editedNote')"></span>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="apEditing">
+      <div class="ap-profile-edit">
+        <textarea class="ap-profile-textarea" x-model="apEditText" rows="10"
+                  data-spellcheck="spelling"
+                  :aria-label="$app.t('autorenprofil.profile.title')"></textarea>
+        <div class="ap-profile-actions">
+          <button type="button" class="btn-compact primary" :disabled="apSaving"
+                  @click="saveApText()" x-text="$app.t('common.save')"></button>
+          <button type="button" class="btn-compact" @click="cancelApEdit()"
+                  x-text="$app.t('common.cancel')"></button>
+        </div>
+      </div>
+    </template>
+
+    <!-- Konstanten und Entwicklung: die eigentliche Einordnung, je mit Beleg.
+         Ohne Beleg waere es eine Behauptung. -->
+    <template x-if="apProfile && !apEditing && apProfile.konstanten.length">
+      <div class="ap-findings">
+        <span class="ap-findings-title" x-text="$app.t('autorenprofil.konstanten')"></span>
+        <template x-for="(k, i) in apProfile.konstanten" :key="i">
+          <p class="ap-finding">
+            <span class="ap-finding-aspekt" x-text="k.aspekt"></span>
+            <span class="ap-finding-beleg" x-text="k.beleg"></span>
+          </p>
+        </template>
+      </div>
+    </template>
+
+    <template x-if="apProfile && !apEditing && apProfile.entwicklung.length">
+      <div class="ap-findings">
+        <span class="ap-findings-title" x-text="$app.t('autorenprofil.entwicklung')"></span>
+        <template x-for="(e, i) in apProfile.entwicklung" :key="i">
+          <p class="ap-finding">
+            <span class="ap-finding-aspekt" x-text="e.aspekt"></span>
+            <span class="ap-finding-richtung" x-text="e.richtung"></span>
+            <span class="ap-finding-beleg" x-text="e.beleg"></span>
+          </p>
+        </template>
+      </div>
+    </template>
+  </div>
+
+  <div class="muted-msg muted-msg--spaced" x-show="apIsEmpty" x-cloak
+       x-text="$app.t('autorenprofil.empty')"></div>
+
+  <div class="table-scroll card-section" x-show="apData && !apLoading && apCounts.measured > 0" x-cloak>
+    <table class="ap-table">
+      <thead>
+        <tr>
+          <th class="ap-metric-th" x-text="$app.t('autorenprofil.col.metric')"></th>
+          <template x-for="b in apBooks" :key="b.book_id">
+            <th class="ap-book-th">
+              <span class="ap-book-name" x-text="apBookName(b.book_id)"></span>
+              <span class="ap-book-meta" x-text="$app.t('autorenprofil.tokens', { n: apNum(b.tokens, 0) })"></span>
+            </th>
+          </template>
+          <th class="ap-median-th" x-show="apData?.comparable" x-text="$app.t('autorenprofil.col.median')"></th>
+          <th class="ap-trend-th" x-show="apData?.trendAvailable"
+              :data-tip="$app.t('autorenprofil.col.trendTip')"
+              x-text="$app.t('autorenprofil.col.trend')"></th>
+        </tr>
+      </thead>
+      <template x-for="g in apGroups()" :key="g.group">
+        <tbody>
+          <tr class="ap-group-row">
+            <th :colspan="apBooks.length + 1 + (apData?.comparable ? 1 : 0) + (apData?.trendAvailable ? 1 : 0)"
+                x-text="$app.t('autorenprofil.group.' + g.group)"></th>
+          </tr>
+          <template x-for="m in g.metrics" :key="m.key">
+            <tr>
+              <th scope="row" class="ap-metric-td"
+                  :data-tip="$app.t('autorenprofil.metricTip.' + m.key)"
+                  x-text="$app.t('autorenprofil.metric.' + m.key)"></th>
+              <template x-for="b in apBooks" :key="b.book_id">
+                <td class="ap-value-td">
+                  <span class="ap-value" x-text="apValue(b.metrics[m.key], m)"></span>
+                  <span class="ap-dev" x-show="apData?.comparable" x-text="apDeviation(b, m.key)"></span>
+                </td>
+              </template>
+              <td class="ap-median-td" x-show="apData?.comparable" x-text="apValue(m.median, m)"></td>
+              <td class="ap-trend-td" x-show="apData?.trendAvailable"
+                  :class="apTrendClass(m)" x-text="apTrend(m)"></td>
+            </tr>
+          </template>
+        </tbody>
+      </template>
+    </table>
+  </div>
+
+  <p class="card-hint card-section" x-show="apData && apCounts.measured > 0" x-cloak
+     x-text="$app.t('autorenprofil.footnote')"></p>
+</div>

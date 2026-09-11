@@ -14,6 +14,7 @@ const baseMethods = makeChatMethods({
     sessionId: 'chatSessionId',
     input: 'chatInput',
     loading: 'chatLoading',
+    runningSessionId: 'chatRunningSessionId',
     status: 'chatStatus',
     progress: 'chatProgress',
     pollTimer: '_chatPollTimer',
@@ -53,8 +54,9 @@ const baseMethods = makeChatMethods({
       console.warn('[sendChatMessage] Seiteninhalt konnte nicht geladen werden:', e.message);
     }
   },
-  onPollDone: async function () {
-    if (window.__app.currentPage) await this.loadChatSessions();
+  // Historie frischt die Basis auf; hier bleibt nur die Seitenansicht (die
+  // Vorschlags-Marken im Text hängen an den neuen Nachrichten).
+  onPollDone: function () {
     window.__app.updatePageView();
   },
   onSessionsChanged: function () {

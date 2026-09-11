@@ -393,6 +393,15 @@ export const graphMethods = {
     this._motivNetwork?.fit({ animation: { duration: 400 } });
   },
 
+  // Zoom-Schritt der Steuerelemente am Graphen (faktor > 1 = naeher heran).
+  // vis-network kennt keinen Zoom-Befehl, nur ein absolutes Ziel — der Schritt
+  // rechnet darum gegen die aktuelle Skala.
+  zoomGraph(faktor) {
+    const net = this._motivNetwork;
+    if (!net) return;
+    net.moveTo({ scale: net.getScale() * faktor, animation: { duration: 200, easingFunction: 'easeInOutQuad' } });
+  },
+
   // Ganze Motiv-Karte ins Native-Vollbild — mehr Platz für die Konstellation.
   // Status-Sync via fullscreenchange-Listener in motiv-card.js (motivFullscreen),
   // der den Graph auf die neue Containergrösse neu zeichnet.

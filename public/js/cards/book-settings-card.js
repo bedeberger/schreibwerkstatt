@@ -44,6 +44,7 @@ export function registerBookSettingsCard() {
     stilprofilGenerating: false,
     stilprofilJobId: null,
     stilprofilError: '',
+    stilprofilAdopting: false,
     bookSettingsErzaehlperspektive: '',
     bookSettingsErzaehlzeit: '',
     bookSettingsIsFinished: false,

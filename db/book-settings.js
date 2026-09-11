@@ -77,6 +77,18 @@ const _updateBookStilprofil = db.prepare(`
     stilprofil=excluded.stilprofil,
     updated_at=excluded.updated_at
 `);
+// Vorbelegung aus dem Autorenprofil: schreibt NUR, solange das Buch noch kein
+// eigenes Stilprofil hat. Der WHERE-Zusatz am DO UPDATE ist der ganze
+// Unterschied zu `_updateBookStilprofil` — ohne ihn wuerde eine Vererbung die
+// Handarbeit am Buch ueberschreiben, und genau das darf sie nie.
+const _seedBookStilprofil = db.prepare(`
+  INSERT INTO book_settings (book_id, stilprofil, updated_at)
+  VALUES (?, ?, ?)
+  ON CONFLICT(book_id) DO UPDATE SET
+    stilprofil=excluded.stilprofil,
+    updated_at=excluded.updated_at
+  WHERE book_settings.stilprofil IS NULL OR TRIM(book_settings.stilprofil) = ''
+`);
 // Quellenverzeichnis-Einstellungen als eigener Schreibpfad (Muster
 // entities_enabled/stilprofil) statt als weitere Positionsargumente an
 // saveBookSettings: der Quellen-Tab speichert unabhaengig vom Haupt-Formular,
@@ -248,8 +260,24 @@ function setBookStilprofil(bookId, stilprofil) {
   );
 }
 
+/**
+ * Stilprofil eines Buchs aus dem Autorenprofil vorbelegen.
+ *
+ * Kopie, keine Verknuepfung — dieselbe Entscheidung wie beim geerbten KI-Profil
+ * eines eingeladenen Kontos: ein spaeter geaendertes Autorenprofil zieht das Buch
+ * NICHT mit, sonst wechselte die Stimme eines laufenden Manuskripts ohne Anlass.
+ *
+ * Schreibt nur in eine leere Stelle. Gibt `true` zurueck, wenn vorbelegt wurde.
+ */
+function seedBookStilprofil(bookId, stilprofil) {
+  const text = (stilprofil || '').trim();
+  if (!text) return false;
+  return _seedBookStilprofil.run(parseInt(bookId), text, new Date().toISOString()).changes > 0;
+}
+
 module.exports = {
   getBookSettings,
+  seedBookStilprofil,
   getBookLocale,
   saveBookSettings,
   setBookEntitiesEnabled,

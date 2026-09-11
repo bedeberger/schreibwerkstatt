@@ -36,7 +36,7 @@
       <template x-for="e in overviewTopFehler()" :key="e.typ">
         <li class="overview-error-bar-item">
           <div class="overview-error-bar-head">
-            <span class="overview-error-typ" x-text="overviewFehlerLabel(e.typ)"></span>
+            <span class="overview-error-typ" x-text="tileFehlerLabel(e.typ)"></span>
             <span class="overview-error-count" x-text="_fmtNum(e.count)"></span>
           </div>
           <div class="overview-error-bar-track">

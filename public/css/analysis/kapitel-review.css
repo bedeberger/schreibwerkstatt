@@ -78,6 +78,51 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
+
+/* Laengenbalken der Seite, relativ zur laengsten Seite des Kapitels. Feste
+   Spur-Breite statt flex-Anteil: der Balken soll zwischen zwei Zeilen
+   vergleichbar sein, nicht mit dem Seitennamen mitwandern. */
+.kapitel-page-bar {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 5px;
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+  overflow: hidden;
+}
+.kapitel-page-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--card-accent);
+}
+
+/* Offene Lektorats-Befunde der Seite. Nur sichtbar, wenn die Seite ueberhaupt
+   geprueft wurde — ungeprueft traegt keine Plakette (siehe
+   cards/kapitel-dashboard.js#kdPageFindings). */
+.kapitel-page-findings {
+  flex: 0 0 auto;
+  min-width: 1.5rem;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: var(--font-size-micro);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.kapitel-page-findings--open {
+  color: var(--color-warn-text);
+  background: var(--color-warn-bg);
+}
+.kapitel-page-findings--clean {
+  color: var(--color-success);
+  background: transparent;
+}
+
+@media (max-width: 600px) {
+  /* Auf schmalen Schirmen konkurriert der Balken mit Name + Plaketten. */
+  .kapitel-page-bar { display: none; }
+}
 .kapitel-new-page {
   display: flex;
   gap: var(--space-6);

@@ -30,7 +30,7 @@
               :data-tip="f.name + (f.mentions > 0 ? ' · ' + f.mentions : '')">
           <span class="overview-fig-avatar"
                 :data-idx="i"
-                x-text="overviewInitials(f.kurzname || f.name)"></span>
+                x-text="tileInitials(f.kurzname || f.name)"></span>
           <span class="overview-fig-name" x-text="f.kurzname || f.name"></span>
         </span>
       </template>

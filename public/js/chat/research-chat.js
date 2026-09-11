@@ -123,6 +123,7 @@ export const researchChatMethods = {
       sessionId: 'researchChatSessionId',
       input: 'researchChatInput',
       loading: 'researchChatLoading',
+      runningSessionId: 'researchChatRunningSessionId',
       status: 'researchChatStatus',
       progress: 'researchChatProgress',
       pollTimer: '_researchChatPollTimer',
@@ -139,26 +140,6 @@ export const researchChatMethods = {
     sendUrl: '/jobs/research-chat',
     onPollProgress: function (job) {
       this.researchChatStatus = this._runningJobStatus(job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut, job.progress, job.tokensPerSec, job.statusParams, job.cacheReadIn);
-    },
-    onPollDone: async function () {
-      const sid = this.researchChatSessionId;
-      const sessions = this.researchChatSessions || [];
-      const idx = sessions.findIndex(s => s.id === sid);
-      const nowIso = new Date().toISOString();
-      if (idx >= 0) {
-        const row = { ...sessions[idx], last_message_at: nowIso };
-        const next = sessions.slice();
-        next.splice(idx, 1);
-        next.unshift(row);
-        this.researchChatSessions = next;
-      } else {
-        const firstUserMsg = (this.researchChatMessages || []).find(m => m.role === 'user');
-        const root = window.__app;
-        this.researchChatSessions = [
-          { id: sid, book_id: parseInt(Alpine.store('nav').selectedBookId), book_name: root.selectedBookName, created_at: nowIso, last_message_at: nowIso, preview: firstUserMsg ? firstUserMsg.content : '' },
-          ...sessions,
-        ];
-      }
     },
   }),
 };

@@ -306,6 +306,11 @@ export {
   buildStilprofilPrompt,
   SCHEMA_STILPROFIL,
 } from './prompts/stilprofil.js';
+export {
+  buildAutorenprofilPrompt,
+  SCHEMA_AUTORENPROFIL,
+  AUTORENPROFIL_METRIC_LABELS,
+} from './prompts/autorenprofil.js';
 
 export {
   buildRueckblickPrompt,

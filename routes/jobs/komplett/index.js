@@ -7,6 +7,7 @@ const {
   getContinuityIssueBookId,
   setContinuityIssueResolved,
   getChapterNarrativeProfile,
+  getKomplettScope, saveKomplettScope,
   } = require('../../../db/schema');
 const { getNarrativeReport, getAutorenBefund } = require('../../../db/narrative-report');
 const { getBookSettings } = require('../../../db/schema');
@@ -17,6 +18,8 @@ const { setContext } = require('../../../lib/log-context');
 const { aclParamGuard, requireBookAccess, sendACLError, sessionEmail } = require('../../../lib/acl');
 const { jsonBody, createJob, enqueueJob, findActiveJobId } = require('../shared');
 const { runKomplettAnalyseJob, runKontinuitaetJob, runErzaehlprofilJob, runFaktencheckJob, runKomplettAnalyseAll } = require('./job');
+const { normalizeKomplettScope } = require('../../../lib/komplett-scope');
+const logger = require('../../../logger');
 
 const komplettRouter = express.Router();
 // :book_id-Routes (GET kontinuitaet, DELETE chapter-cache) sind viewer+ resp. editor+.
@@ -34,19 +37,29 @@ komplettRouter.post('/komplett-analyse', jsonBody, (req, res) => {
   const userToken = null;
   const existing = findActiveJobId('komplett-analyse', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
-  // Optionale Teil-Läufe: Kontinuitätsprüfung (P8) und Erzählprofil sind read-only
-  // Endphasen — wer nach einer Kapitel-Änderung nur den Katalog auffrischen will,
-  // spart hier Zeit UND Geld, ohne an der Extraktionsqualität zu drehen. Beide
-  // lassen sich einzeln nachziehen (POST /jobs/kontinuitaet, /jobs/erzaehlprofil).
-  // Default = alles an (unverändertes Verhalten für bestehende Aufrufer).
-  const skipContinuity = req.body?.skip_continuity === true;
-  const skipNarrativeProfile = req.body?.skip_narrative_profile === true;
+  // Lauf-Umfang (Teil-Lauf): welche Schritte dieser Lauf neu berechnet. Katalog +
+  // Normalisierung in lib/komplett-scope.js; fehlt `scope`, läuft alles (unverändertes
+  // Verhalten für bestehende Aufrufer und den Nacht-Cron).
+  //
+  // Der gestartete Umfang wird zugleich zur Vorbelegung des nächsten Laufs: ein Wert,
+  // ein Schreiber. Ein separat gespeicherter „Standard" neben dem zuletzt gestarteten
+  // Umfang wären zwei Zustände, von denen der sichtbare nicht zwingend der wirksame ist.
+  const scope = normalizeKomplettScope(req.body?.scope);
+  saveKomplettScope(book_id, userEmail, scope);
+  // «Neu erstellen statt aktualisieren»: Delta-Cache UND Konsolidierungs-Checkpoint
+  // leeren, damit die Extraktion wirklich neu läuft. Derselbe Schreibpfad wie der
+  // Knopf «Cache leeren» — kein zweiter.
+  if (req.body?.force === true) {
+    const deleted = deleteChapterExtractCache(book_id, userEmail || '');
+    deleteCheckpoint('komplett-consolidation', book_id, userEmail || '');
+    logger.info(`Komplettanalyse: Neu-Erstellung angefordert – ${deleted} Cache-Eintraege geleert.`);
+  }
   const label = book_name ? 'job.label.komplettBook' : 'job.label.komplett';
   const labelParams = book_name ? { name: book_name } : null;
   const jobId = createJob('komplett-analyse', book_id, userEmail, label, labelParams);
   // provider bleibt undefined (Slot 6) — den setzt nur der Nacht-Cron; opts folgt dahinter.
   enqueueJob(jobId, () => runKomplettAnalyseJob(jobId, book_id, book_name || '', userEmail, userToken,
-    undefined, { skipContinuity, skipNarrativeProfile }));
+    undefined, { scope }));
   res.json({ jobId });
 });
 
@@ -155,6 +168,13 @@ komplettRouter.get('/erzaehlprofil/:book_id', (req, res) => {
   const befund = profile.chapters.length ? getNarrativeReport(bookId, userEmail) : null;
   const autorenBefund = getAutorenBefund(bookId, userEmail);
   res.json({ ...profile, befund, autorenBefund });
+});
+
+// Zuletzt gewaehlter Lauf-Umfang — Vorbelegung des Modals vor dem Start. viewer+,
+// weil es eine Lese-Frage ist; geschrieben wird er ausschliesslich beim Starten
+// (POST /komplett-analyse), damit es nur einen Schreibpfad gibt.
+komplettRouter.get('/komplett-scope/:book_id', (req, res) => {
+  res.json({ scope: getKomplettScope(req.bookId, sessionEmail(req)) });
 });
 
 komplettRouter.delete('/chapter-cache/:book_id', (req, res) => {

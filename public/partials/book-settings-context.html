@@ -37,6 +37,10 @@
                     @click="generateStilprofil()"
                     :disabled="stilprofilGenerating"
                     x-text="stilprofilGenerating ? $app.t('book.settings.stilprofil.generating') : $app.t('book.settings.stilprofil.generate')"></button>
+            <button type="button" class="btn-compact"
+                    @click="adoptAuthorProfile()"
+                    :disabled="stilprofilAdopting"
+                    x-text="$app.t('book.settings.stilprofil.fromAuthor')"></button>
             <span class="card-form-hint" x-text="(bookSettingsStilprofil || '').length + ' / 6000'"></span>
           </div>
           <p class="card-form-error" x-show="stilprofilError" x-text="stilprofilError" x-cloak></p>

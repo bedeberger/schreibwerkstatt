@@ -64,6 +64,36 @@ export const settingsMethods = {
   },
 
 
+  // Autorenprofil in dieses Buch uebernehmen. Fuellt NUR das Formularfeld — der
+  // User sieht den Text und speichert selbst. Kein zweiter Schreibpfad auf
+  // book_settings.stilprofil, und kein stilles Ueberschreiben dessen, was im
+  // Feld schon steht: der Klick ist die Entscheidung, das Speichern die zweite.
+  //
+  // Neu angelegte Buecher bekommen den Text bereits bei der Anlage
+  // (lib/content-store/index.js) — dieser Knopf ist der Weg fuer Buecher, die es
+  // damals noch nicht gab.
+  async adoptAuthorProfile() {
+    if (this.stilprofilAdopting) return;
+    this.stilprofilAdopting = true;
+    this.stilprofilError = '';
+    try {
+      const res = await fetch('/me/author-profile');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const text = (data?.profile?.profil_text || '').trim();
+      if (!text) {
+        this.stilprofilError = window.__app.t('book.settings.stilprofil.noAuthorProfile');
+        return;
+      }
+      this.bookSettingsStilprofil = text;
+    } catch (e) {
+      this.stilprofilError = e.message;
+    } finally {
+      this.stilprofilAdopting = false;
+    }
+  },
+
+
   // Kategorie. Pool global; pro Buch eine Kategorie (optional).
   async loadBookCategory() {
     const bookId = Alpine.store('nav').selectedBookId;

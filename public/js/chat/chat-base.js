@@ -21,6 +21,10 @@ export function makeChatMethods(cfg) {
   // ── Interne Helfer (Aufruf via .call(this)) ──────────────────────────────
 
   async function loadSessions() {
+    // `canOpen` deckt hier die Vorbedingungen von `sessionsUrl` ab (offene Seite
+    // bzw. gewähltes Buch): der Refresh läuft auch nach einem Job-Ende, und da
+    // kann der User die Seite längst verlassen haben.
+    if (!cfg.canOpen(this)) return;
     try {
       this[p.sessions] = await fetchJson(cfg.sessionsUrl(this));
       if (cfg.onSessionsChanged) cfg.onSessionsChanged.call(this);
@@ -50,10 +54,21 @@ export function makeChatMethods(cfg) {
       if (active && active.jobId) {
         this[p.loading] = true;
         startPollLocal.call(this, active.jobId);
+      } else if (this[p.loading] && this[p.runningSessionId] !== data.id) {
+        // Es läuft ein Job — aber für ein anderes Gespräch. Ohne diesen
+        // Hinweis steht die gesperrte Eingabe hier unerklärt da: die
+        // Ladeanzeigen hängen an der laufenden Session, nicht an der Karte.
+        setElsewhereStatus.call(this);
       }
     } catch (e) {
       console.error(`[load${L}Session]`, e);
     }
+  }
+
+  // Statuszeile, wenn der laufende Job NICHT zum sichtbaren Gespräch gehört.
+  function setElsewhereStatus() {
+    const root = window.__app;
+    this[p.status] = `<span class="muted-msg">${escHtml(root.t('chat.runningElsewhere'))}</span>`;
   }
 
   async function startNewSession() {
@@ -74,44 +89,69 @@ export function makeChatMethods(cfg) {
     }
   }
 
+  // Ein Lauf gehört der Session, für die er gestartet wurde — nicht der Karte.
+  // `viewing()` entscheidet deshalb bei jeder Anzeige und jedem Reload, ob das
+  // gerade sichtbare Gespräch überhaupt gemeint ist. Ohne diese Unterscheidung
+  // zeigt ein während des Laufs geöffnetes früheres Gespräch Progressbar,
+  // Skelett und Token-Status (liest sich als „dieses Gespräch wird bearbeitet")
+  // und `onDone` zieht den User am Ende ungefragt dorthin zurück, wo er
+  // weggeklickt hat.
   function startPollLocal(jobId) {
     const sessionId = this[p.sessionId];
     const root = window.__app;
+    this[p.runningSessionId] = sessionId;
+    const viewing = () => this[p.sessionId] === sessionId;
+    const finish = () => {
+      this[p.loading] = false;
+      if (p.progress) this[p.progress] = 0;
+      this[p.runningSessionId] = null;
+      this[p.status] = '';
+    };
+    const emitProgress = cfg.onPollProgress
+      ? (job) => cfg.onPollProgress.call(this, job)
+      : (job) => {
+          const tokIn = job.tokensIn || 0;
+          const tokOut = job.tokensOut || 0;
+          if (tokIn + tokOut > 0) {
+            const tpsPart = job.tokensPerSec ? ` · ${Math.round(job.tokensPerSec)} tok/s` : '';
+            // tokIn ist bei Ollama/Llama erst am Streaming-Ende bekannt (aus
+            // usage) — vorher nur tokOut zeigen statt falscher Schätzwerte.
+            const inPart = tokIn > 0 ? `↑${fmtTok(tokIn)} ` : '';
+            this[p.status] = `<span class="muted-msg">${inPart}↓${fmtTok(tokOut)} Tokens${tpsPart}</span>`;
+          } else {
+            this[p.status] = '';
+          }
+        };
     startPoll(this, {
       timerProp: p.pollTimer,
       ...(p.progress ? { progressProp: p.progress } : {}),
       jobId,
       lsKey: cfg.lsKeyFn ? cfg.lsKeyFn(sessionId) : null,
-      onProgress: cfg.onPollProgress
-        ? (job) => cfg.onPollProgress.call(this, job)
-        : (job) => {
-            const tokIn = job.tokensIn || 0;
-            const tokOut = job.tokensOut || 0;
-            if (tokIn + tokOut > 0) {
-              const tpsPart = job.tokensPerSec ? ` · ${Math.round(job.tokensPerSec)} tok/s` : '';
-              // tokIn ist bei Ollama/Llama erst am Streaming-Ende bekannt (aus
-              // usage) — vorher nur tokOut zeigen statt falscher Schätzwerte.
-              const inPart = tokIn > 0 ? `↑${fmtTok(tokIn)} ` : '';
-              this[p.status] = `<span class="muted-msg">${inPart}↓${fmtTok(tokOut)} Tokens${tpsPart}</span>`;
-            } else {
-              this[p.status] = '';
-            }
-          },
+      onProgress: (job) => {
+        // Den Fortschritt traegt in diesem Fall die Zeile in der Historie.
+        if (!viewing()) { setElsewhereStatus.call(this); return; }
+        emitProgress(job);
+      },
       onNotFound: async () => {
-        this[p.loading] = false;
-        if (p.progress) this[p.progress] = 0;
-        this[p.status] = '';
-        await loadSession.call(this, sessionId);
+        finish();
+        if (viewing()) await loadSession.call(this, sessionId);
+        else await loadSessions.call(this);
       },
       onError: async (job) => {
         // Belt-and-suspenders: startPoll clear't Timer eigentlich vor dem
         // Callback. Doppelt clearen schützt vor stuck `loading=true`-States,
         // bei denen weder „Neue Session" noch Senden möglich wäre.
         if (this[p.pollTimer]) { clearInterval(this[p.pollTimer]); this[p.pollTimer] = null; }
-        this[p.loading] = false;
-        if (p.progress) this[p.progress] = 0;
+        finish();
         if (p.pendingRefresh) this[p.pendingRefresh] = false;
         const errLabel = job.error ? root.t(job.error, job.errorParams) : root.t('common.unknownError');
+        if (!viewing()) {
+          // Fehler nicht verschlucken, aber auch nicht dem sichtbaren Gespräch
+          // anhängen — er gehört zu dem Lauf, der woanders lief.
+          this[p.status] = `<span class="error-msg">${escHtml(root.t('chat.errorElsewhere', { msg: errLabel }))}</span>`;
+          await loadSessions.call(this);
+          return;
+        }
         const errHtml = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(errLabel)}</span>`;
         // Server-State neu laden: User-Msg ist serverseitig persistiert
         // (_handleChatPost), Assistant-Msg fehlt. Optimistischer Stub wird durch
@@ -123,14 +163,18 @@ export function makeChatMethods(cfg) {
         this[p.status] = errHtml;
       },
       onDone: async (job) => {
-        this[p.loading] = false;
-        if (p.progress) this[p.progress] = 0;
-        this[p.status] = '';
-        await loadSession.call(this, sessionId);
+        finish();
+        // Nur nachladen, wenn der User noch in diesem Gespräch steht — sonst
+        // wäre das ein Sprung weg von dem, was er gerade liest.
+        if (viewing()) await loadSession.call(this, sessionId);
+        // Die Historie dagegen IMMER: der abgeschlossene Lauf gehört mit
+        // frischem Titel und Zeitstempel an die Spitze der Liste, egal wo der
+        // User gerade steht. Darum hier und nicht in den drei Chat-Configs.
+        await loadSessions.call(this);
         if (cfg.onPollDone) await cfg.onPollDone.call(this);
         // KI-Titel wird nur auf der ersten Runde generiert und kommt im Job-Result
-        // zurück. In die (ggf. optimistisch aufgebaute) Sessions-Liste übernehmen,
-        // damit der History-Eintrag sofort den Titel statt der Vorschau zeigt.
+        // zurück. In die Sessions-Liste übernehmen, damit der History-Eintrag
+        // sofort den Titel statt der Vorschau zeigt.
         const newTitle = job?.result?.sessionTitle;
         if (newTitle && Array.isArray(this[p.sessions])) {
           const row = this[p.sessions].find(s => s.id === sessionId);
@@ -224,6 +268,12 @@ export function makeChatMethods(cfg) {
       if (cfg.lsKeyFn && jobId) localStorage.setItem(cfg.lsKeyFn(this[p.sessionId]), jobId);
       if (jobId) startPollLocal.call(this, jobId);
       else { this[p.loading] = false; this.$nextTick(() => scrollToBottom.call(this)); }
+      // Ab jetzt steht das Gespräch in der Historie: die User-Nachricht ist
+      // serverseitig persistiert (_handleChatPost), und die Liste fuehrt nur
+      // Sessions MIT Nachrichten. Ohne diesen Refresh fehlt der gerade
+      // abgefeuerte Lauf in der Liste, bis er fertig ist — und genau dort
+      // gehört die Lauf-Anzeige hin, während der User anderswo liest.
+      await loadSessions.call(this);
     } catch (e) {
       console.error(`[send${L}Message]`, e);
       // Optimistische Msg behalten + sendError markieren + Input restaurieren,
@@ -238,6 +288,13 @@ export function makeChatMethods(cfg) {
   };
 
   m[`start${L}Poll`]      = function (jobId) { return startPollLocal.call(this, jobId); };
+
+  // Laeuft der Job dieser Karte für genau dieses Gespräch? Alle Ladeanzeigen
+  // (Progressbar, Skelett, Lauf-Punkt in der Historie) fragen danach statt nach
+  // `loading` allein — das ist karten-global und sagt nur, DASS etwas läuft.
+  m[`is${L}SessionRunning`] = function (id) {
+    return !!this[p.loading] && id != null && this[p.runningSessionId] === id;
+  };
   m[`_scroll${L}ToBottom`] = function () { scrollToBottom.call(this); };
   // Server-persistierte Fallback-Nachrichten werden als `__i18n:key__` gespeichert
   // und beim Rendern in die aktuelle Locale aufgelöst (siehe CLAUDE.md, i18n-Regel).
@@ -296,6 +353,7 @@ export function makeChatMethods(cfg) {
     this[p.sessions] = [];
     this[p.messages] = [];
     this[p.sessionId] = null;
+    this[p.runningSessionId] = null;
     this[p.input] = '';
     this[p.loading] = false;
     if (p.progress) this[p.progress] = 0;

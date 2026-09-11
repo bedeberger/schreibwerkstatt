@@ -16,6 +16,7 @@
   .card--bookstats        { --card-accent: var(--card-accent-bookstats); }
   .card--mystats          { --card-accent: var(--card-accent-mystats); }
   .card--mybooks          { --card-accent: var(--card-accent-mybooks); }
+  .card--autorenprofil    { --card-accent: var(--card-accent-autorenprofil); }
   .card--review           { --card-accent: var(--card-accent-review); }
   .card--kapitel          { --card-accent: var(--card-accent-kapitel); }
   .card--chat             { --card-accent: var(--card-accent-chat); }

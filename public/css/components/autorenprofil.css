@@ -1,0 +1,138 @@
+/* Autorenprofil — Kennzahlen der eigenen Buecher nebeneinander.
+   Karte: public/partials/autorenprofil.html, public/js/cards/autorenprofil-card.js.
+   Akzent kommt aus card-accents.css (var(--card-accent)), nicht von hier. */
+
+.ap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.ap-table th {
+  text-align: left;
+  color: var(--color-muted);
+  font-weight: var(--fw-regular);
+  padding: var(--space-2xs) var(--space-md) var(--space-5) 0;
+  border-bottom: 0.5px solid var(--color-border);
+  vertical-align: bottom;
+}
+
+.ap-table td {
+  padding: var(--space-xs) var(--space-md) var(--space-xs) 0;
+  border-bottom: 0.5px solid var(--color-border);
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Die Kennzahl-Spalte bleibt fix, die Buch-Spalten teilen sich den Rest — sonst
+   haengt die Spaltenbreite daran, welches Buch den laengeren Namen hat. */
+.ap-metric-th, .ap-metric-td { width: 11rem; }
+.ap-book-th { width: auto; }
+
+.ap-metric-td {
+  font-weight: var(--fw-regular);
+  color: var(--color-text);
+}
+
+/* Buchkopf: Name ueber Umfang. Beide als Block — Flex gehoert nie auf die Zelle
+   selbst, sonst ist sie kein `table-cell` mehr und die Spalte verrutscht gegen
+   ihren Kopf (gleiche Falle wie in figuren-lebenslauf.css). */
+.ap-book-name {
+  display: block;
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+}
+
+.ap-book-meta {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* Gruppen-Trennzeile (Satzbau / Wortschatz / Lesbarkeit). */
+.ap-group-row th {
+  padding-top: var(--space-md);
+  color: var(--card-accent);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.ap-value { display: block; }
+
+/* Abstand zum Median. Bewusst zurueckhaltend und ohne Ampelfarbe: die Abweichung
+   ist eine Messung, keine Note. */
+.ap-dev {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.ap-median-td { color: var(--color-muted); }
+
+/* Richtung ueber die Werk-Reihenfolge. Die Klassen sagen rauf/runter, nicht
+   gut/schlecht — darum kein Gruen/Rot, sondern nur Gewicht und Akzent. */
+.ap-trend-td { font-variant-numeric: tabular-nums; }
+.ap-trend--up, .ap-trend--down { color: var(--card-accent); font-weight: var(--fw-medium); }
+.ap-trend--flat { color: var(--color-muted); }
+
+@media (max-width: 700px) {
+  .ap-metric-th, .ap-metric-td { width: 8rem; }
+  .ap-table { font-size: var(--font-size-xs); }
+}
+
+/* ── Deutung (KI-Lauf) ──────────────────────────────────────────────────────
+   Steht ueber der Messtabelle: die Aussage zuerst, der Beleg darunter. */
+.ap-profile-text {
+  margin: 0 0 var(--space-sm);
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.ap-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.ap-profile-meta { font-size: var(--font-size-xs); color: var(--color-muted); }
+
+.ap-profile-textarea {
+  width: 100%;
+  margin-bottom: var(--space-sm);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* Konstanten + Entwicklung: je Zeile Aspekt, ggf. Richtung, dann Beleg. Der
+   Beleg steht immer dabei — ohne ihn waere die Zeile eine Behauptung. */
+.ap-findings { margin-bottom: var(--space-md); }
+
+.ap-findings-title {
+  display: block;
+  margin-bottom: var(--space-xs);
+  color: var(--card-accent);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ap-finding {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.ap-finding-aspekt { font-weight: var(--fw-medium); }
+.ap-finding-aspekt::after { content: ' — '; font-weight: var(--fw-regular); color: var(--color-muted); }
+
+.ap-finding-richtung { color: var(--card-accent); }
+.ap-finding-richtung::after { content: ': '; color: var(--color-muted); }
+
+.ap-finding-beleg { color: var(--color-muted); }

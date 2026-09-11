@@ -68,13 +68,20 @@ async function _runZeitstrahlSafe(ctx, opts) {
 }
 
 /** Zeitstrahl + Kontinuität + Attribut-Detektor, inklusive Persistenz.
- *  `skipContinuity` waehlt P8 (und mit ihm den Attribut-Detektor) ab — der Zeitstrahl
- *  ist Kern-Katalog und laeuft weiter. Schreibt selbst in die DB; liefert nichts. */
+ *  Teil-Lauf: `skipContinuity` waehlt P8 (und mit ihm den Attribut-Detektor) ab,
+ *  `skipZeitstrahl` den Zeitstrahl (P6) — die beiden sind im Modal getrennte Schritte
+ *  und laufen hier nur zusammen, weil sie sich bei der Cloud-Klasse die Wartezeit
+ *  teilen. Schreibt selbst in die DB; liefert nichts. */
 async function runKontinuitaetPhase(ctx, {
-  skipContinuity, isCloudModel, kontMultiPass,
+  skipContinuity, skipZeitstrahl, isCloudModel, kontMultiPass,
   figKompakt, orteKompakt, chapterFakten, anachronismus, figNameToId,
 }) {
   const { jobId, bookIdInt, email, log, effectiveProvider, idMaps, fullBookText, warnings } = ctx;
+  // Zeitstrahl abgewählt: bestehende `zeitstrahl_events` bleiben stehen. Der Aufruf
+  // faellt weg statt mit leerer Eingabe zu laufen — P6 konsolidiert aus `figure_events`
+  // und schriebe sonst denselben Stand neu, ohne dass ein Ereignis dazugekommen waere.
+  const zeitstrahl = (opts) => skipZeitstrahl ? Promise.resolve() : _runZeitstrahlSafe(ctx, opts);
+  if (skipZeitstrahl) log.info('Zeitstrahl (P6) auf Wunsch übersprungen – bestehender Zeitstrahl bleibt.');
   let kontResult;
   if (skipContinuity) {
     // Teil-Lauf: P8 abgewählt. Das vorherige Kontinuitäts-Ergebnis bleibt unangetastet
@@ -82,14 +89,14 @@ async function runKontinuitaetPhase(ctx, {
     // vorrücken — sonst hängt sie bei 82, bis completeJob auf 100 springt.
     // Kein eigener statusText: runZeitstrahl (nicht-silent) setzt seinen eigenen.
     log.info('Kontinuitätsprüfung (P8) auf Wunsch übersprungen – bestehendes Ergebnis bleibt.');
-    await _runZeitstrahlSafe(ctx);
+    await zeitstrahl();
     updateJob(jobId, { progress: 97 });
     kontResult = null;
   } else if (isCloudModel) {
     // Parallel: P6 silent, P8 ownt Bar (82..97).
     updateJob(jobId, { progress: 82, statusText: 'job.phase.checkContinuity' });
     const [, p8Out] = await Promise.all([
-      _runZeitstrahlSafe(ctx, { silent: true }),
+      zeitstrahl({ silent: true }),
       _runP8(ctx, { kontMultiPass, figKompakt, orteKompakt, chapterFakten, anachronismus }),
     ]);
     kontResult = p8Out;
@@ -97,7 +104,9 @@ async function runKontinuitaetPhase(ctx, {
     // Kontinuitätsprüfung (P8) ist Cloud-only — für lokale Provider übersprungen:
     // ohne Single-Pass/Verify-Filter/Attribut-Check produziert der Fakten-Multi-Pass
     // zu viele False Positives. Der Zeitstrahl (P6) ist Kern-Katalog und läuft weiter.
-    await _runZeitstrahlSafe(ctx);
+    await zeitstrahl();
+    // Ohne P6 setzt niemand die Bar in diesem Zweig — sonst steht sie bis completeJob.
+    if (skipZeitstrahl) updateJob(jobId, { progress: 82 });
     kontResult = null;
   }
   // Pflichtfeld-Check als Degradierung (P8 read-only → kein throw): ein schema-valides

@@ -171,7 +171,14 @@ function resolveSzenenForSave(szenen, idMaps) {
 
 /** Speichert Szenen und Figuren-Events in die DB. Gibt { szenenCount, eventsCount } zurück. */
 function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId, idMaps, log, jobId, opts = {}) {
-  db.transaction(() => {
+  // Teil-Lauf: die beiden Schritte teilen sich diesen Schreibpfad, sind aber
+  // einzeln abwählbar. `writeSzenen: false` MUSS die Szenen-Transaktion ganz
+  // auslassen — mit leerer Liste würde ihr Reconcile jede bestehende Szene als
+  // verschwunden markieren (stale=1), also genau den Bestand entwerten, den das
+  // Abwählen schützen soll.
+  const writeSzenen = opts.writeSzenen !== false;
+  const writeEvents = opts.writeEvents !== false;
+  if (writeSzenen) db.transaction(() => {
     // Reconcile statt DELETE+INSERT, damit figure_scenes.id (und FK-Refs darauf:
     // research_item_links.scene_id, scene_locations) ueber Re-Analysen stabil bleibt.
     // figure_scenes hat keinen lauf-stabilen Identifier → Match ueber matchScenes (pro
@@ -245,7 +252,7 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
     }
   })();
 
-  const eventsCount = assignments.reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0);
+  const eventsCount = writeEvents ? assignments.reduce((s, a) => s + (a.lebensereignisse?.length || 0), 0) : 0;
   if (eventsCount > 0) {
     saveZeitstrahlEvents(bookIdInt, email, []);
     updateFigurenEvents(bookIdInt, assignments, email, idMaps);
@@ -255,9 +262,11 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
   // dritte Quelle dazugehört. Hier wird der Index absichtlich nicht angefasst.
   // figure_scenes neu indexieren — Full-Replace pro Buch (kind/book
   // droppen, dann Re-Upsert aller aktuellen Rows).
-  searchIndex.removeKindForBook('scene', bookIdInt);
-  const sceneRows = db.prepare('SELECT id FROM figure_scenes WHERE book_id = ?').all(bookIdInt);
-  for (const r of sceneRows) searchIndex.upsertScene(r.id);
+  if (writeSzenen) {
+    searchIndex.removeKindForBook('scene', bookIdInt);
+    const sceneRows = db.prepare('SELECT id FROM figure_scenes WHERE book_id = ?').all(bookIdInt);
+    for (const r of sceneRows) searchIndex.upsertScene(r.id);
+  }
   // Figuren wurden im selben Job-Run via saveFigurenToDb persistiert — die
   // figures-Daten haben sich potentiell geaendert (Beschreibungen, Namen).
   searchIndex.removeKindForBook('figure', bookIdInt);
@@ -266,8 +275,8 @@ function saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId,
   searchIndex.removeKindForBook('location', bookIdInt);
   const locRows = db.prepare('SELECT id FROM locations WHERE book_id = ?').all(bookIdInt);
   for (const l of locRows) searchIndex.upsertLocation(l.id);
-  log.info(`${szenen.length} Szenen, ${eventsCount} Ereignisse gespeichert.`);
-  return { szenenCount: szenen.length, eventsCount };
+  log.info(`${writeSzenen ? szenen.length : 0} Szenen, ${eventsCount} Ereignisse gespeichert.`);
+  return { szenenCount: writeSzenen ? szenen.length : 0, eventsCount };
 }
 
 // Patterns, mit denen die KI eine eigene Entwarnung in beschreibung/empfehlung

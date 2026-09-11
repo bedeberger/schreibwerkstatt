@@ -2,7 +2,8 @@
 // SSE-basierte Konversation über die aktuell offene Seite.
 //
 // Eigener State: chatSessions, chatMessages, chatSessionId, chatInput,
-//   chatLoading, chatProgress, chatStatus, _chatPollTimer, _chatPendingRefresh.
+//   chatLoading, chatRunningSessionId, chatProgress, chatStatus, _chatPollTimer,
+//   _chatPendingRefresh.
 // Root behält: showChatCard (Hash-Router), currentPage, originalHtml,
 //   saveApplying, lektoratFindings, checkDone, _checkDoneBeforeChat,
 //   _loadApplyAndSave, updatePageView, selectedBookId, t.
@@ -18,6 +19,9 @@ export function registerChatCard() {
     chatSessionId: null,
     chatInput: '',
     chatLoading: false,
+    // Session, für die der laufende Job arbeitet (null = kein Lauf).
+    // Die Ladeanzeigen hängen daran, nicht an chatLoading — siehe chat-base.js.
+    chatRunningSessionId: null,
     chatProgress: 0,
     chatStatus: '',
     _chatPollTimer: null,

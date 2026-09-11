@@ -40,4 +40,30 @@ export const rootGetterDescriptors = {
       return value;
     },
   },
+
+  // Der „Zuletzt bearbeitet auf <Gerät>"-Hint, gefiltert gegen den aktuellen
+  // Seitenstand. `pageLastEditor` ist der Schnappschuss der letzten loadPage-
+  // Antwort; jeder Save dieser Seite — egal welcher Pfad (Editor-Save, Autosave,
+  // Konflikt-Auflösung, Lektorat-/Beleg-/Chat-Apply, Todo-Haken, Outbox-Flush) —
+  // rückt `currentPage.updated_at` vor und macht den Schnappschuss damit zur
+  // Vergangenheit: neuester Schreiber ist dann DIESES Gerät, und dafür sieht
+  // `_resolvePageLastEditor` bewusst keinen Hinweis vor.
+  //
+  // Why abgeleitet statt als Reset in den Save-Pfaden: die Aussage des Banners
+  // ist „der neueste Stand dieser Seite kam von Gerät X" — eine Funktion aus
+  // (Schnappschuss, aktueller Stand). Als Regel fällt sie an EINER Stelle,
+  // während acht Schreibpfade das Feld von Hand nullen müssten und der nächste
+  // neue Schreibweg es vergisst. `pageLastEditor` bleibt dadurch die
+  // unverfälschte Server-Antwort; nur die Anzeige urteilt über ihre Aktualität.
+  pageLastEditorHint: {
+    enumerable: true,
+    configurable: true,
+    get() {
+      const le = this.pageLastEditor;
+      if (!le) return null;
+      const cur = this.currentPage?.updated_at;
+      if (cur && le.updated_at && new Date(cur) > new Date(le.updated_at)) return null;
+      return le;
+    },
+  },
 };

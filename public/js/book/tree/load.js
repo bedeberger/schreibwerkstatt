@@ -313,6 +313,13 @@ export const treeLoadMethods = {
       ]);
       this.checkPendingJobs(bookId); // Reconnect nach Tab-Schliessen, kein await
       this.loadTokenEstimates(this._tokenEstGen, signal); // Hintergrund, kein await
+      // War der Read nicht `fresh`, kam der Baum moeglicherweise aus dem
+      // SW-Cache — dann ist jetzt der richtige Moment fuer die Frage, ob er noch
+      // gilt. Genau dieser Fall ist der Kaltstart, und genau dort faellt der
+      // stale Baum auf ("beim Anmelden fehlen Seiten"). Ein `fresh`-Read
+      // beantwortet die Frage bereits selbst. Kein await: die Probe darf den
+      // Boot nicht verzoegern (tree/catchup.js).
+      if (!readsFresh(opts)) this._checkTreeDrift(bookId);
       // Karten, die einen frischen Tree brauchen (Buchorganizer), reagieren
       // explizit auf diesen Event statt auf einen $watch der Tree-Identität —
       // so können dieselben Karten auch In-Place-Mutationen am Tree machen,

@@ -117,6 +117,13 @@ export const appCollabMethods = {
     this.$store.collab._selfPageDeviceCount = Number(data?.self_page_device_count) || 0;
     this.$store.collab._selfBookDeviceCount = Number(data?.self_book_device_count) || 0;
     this._reconcileFullCollabPoll(bookId);
+    // Laeuft der volle Poll nicht, ist NIEMAND fuer die Frage zustaendig, ob
+    // sich der Baum seit dem letzten Laden geaendert hat: das Gate oben misst
+    // GLEICHZEITIG offene Geraete (90s-Fenster), nicht Veraenderung. Wer gestern
+    // am Mac-Client schrieb und heute den Browser oeffnet, faellt genau da
+    // durch. Die Probe haengt an diesem Tick statt an einem eigenen Timer —
+    // 40 s Granularitaet fuer einen indexierten Read (tree/catchup.js).
+    if (!this.$store.collab._collabPollTimer) this._checkTreeDrift(bookId);
   },
 
   // Beim Seitenwechsel sofort neu pingen, damit die page-scoped Erkennung nicht
@@ -243,9 +250,18 @@ export const appCollabMethods = {
 
   _applyCollabChanges(changes) {
     let touchedCurrent = null;
+    let sawUnknownPage = false;
     const others = [];
     for (const ch of changes) {
       if (!ch?.page_id) continue;
+      // Eine Aenderung an einer Seite, die der Baum nicht kennt, ist eine NEU
+      // ANGELEGTE Seite (oder eine, die in dieses Buch verschoben wurde). Der
+      // Feed kennt nur „update" und „delete" — ohne diesen Zweig setzt ein
+      // `update` hier bloss einen Plaketten-Marker auf ein Item, das es in der
+      // Sidebar gar nicht gibt, und die Seite bleibt bis zum naechsten
+      // Voll-Load unsichtbar. Der Baum wird darum nachgezogen (tree/catchup.js);
+      // Toast + Marker laufen unveraendert weiter.
+      if (ch.kind !== 'delete' && this._pageIdOrderMap && !this._pageIdOrderMap.has(ch.page_id)) sawUnknownPage = true;
       if (ch.kind === 'delete') {
         if (this.currentPage?.id && ch.page_id === this.currentPage.id) {
           touchedCurrent = ch;
@@ -267,6 +283,7 @@ export const appCollabMethods = {
     }
     // Map-Mutation: neue Reference triggert Alpine-Reaktivitaet.
     this.$store.collab.recentRemoteEdits = new Map(this.$store.collab.recentRemoteEdits);
+    if (sawUnknownPage) this._scheduleTreeCatchUp('collab-new-page');
 
     if (touchedCurrent) this._onCurrentPageRemoteEdit(touchedCurrent);
     if (others.length === 1) {

@@ -549,6 +549,8 @@ app.use('/changelog', require('./routes/changelog'));
 // gleicher Mount-Praefix. Express probiert Router in Reihenfolge — /me/books
 // gibt es in userSettingsRouter nicht, die Reihenfolge ist also nur Kosmetik.
 app.use('/me/books', require('./routes/mybooks'));
+// Autorenprofil: dieselbe Begruendung fuer einen eigenen Router wie beim Regal.
+app.use('/me/author-profile', require('./routes/author-profile'));
 app.use('/me', userSettingsRouter);
 app.use('/sync', syncRouter);
 app.use('/export', exportRouter);

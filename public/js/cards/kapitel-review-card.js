@@ -10,6 +10,9 @@ import { renderReviewHtml, chapterReviewAxesFor } from '../book/review.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { contentRepo } from '../repo/content.js';
+import { memoMethods } from './card-memo.js';
+import { tileFormatMethods } from './tile-format.js';
+import { kapitelDashboardMethods, initialKapitelDashboardState } from './kapitel-dashboard.js';
 
 function emptySlot() {
   return { loading: false, progress: 0, status: '', out: '', jobId: null, pollTimer: null };
@@ -18,6 +21,16 @@ function emptySlot() {
 export function registerKapitelReviewCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('kapitelReviewCard', () => ({
+    ...memoMethods,
+    ...tileFormatMethods,
+    ...kapitelDashboardMethods,
+    // Dashboard-Kacheln: SSoT des Startzustands ist
+    // initialKapitelDashboardState() — dieselbe Quelle, die
+    // resetKapitelDashboard() beim Buchwechsel zurueckschreibt.
+    ...initialKapitelDashboardState(),
+    // Memo-Speicher des geteilten `_memo`-Helpers (cards/card-memo.js).
+    _memos: {},
+
     // kapitelReviewChapterId lebt am Root (Hash-Router + Sidebar lesen es).
     kapitelReviewHistory: {},
     selectedKapitelReviewId: null,
@@ -35,10 +48,17 @@ export function registerKapitelReviewCard() {
       // neu, damit der Eintrag in der Card auftaucht.
       const onJobFinished = (e) => {
         const d = e.detail;
-        if (d?.type !== 'chapter-review' || d.job?.status !== 'done') return;
-        const root = window.__app;
-        if (!Alpine.store('nav').selectedBookId || String(d.bookId) !== String(Alpine.store('nav').selectedBookId)) return;
-        this.loadKapitelReviewHistory(Alpine.store('nav').selectedBookId);
+        if (d?.job?.status !== 'done') return;
+        const bookId = Alpine.store('nav').selectedBookId;
+        if (!bookId || String(d.bookId) !== String(bookId)) return;
+        if (d.type === 'chapter-review') this.loadKapitelReviewHistory(bookId);
+        // Ein Lektoratslauf (Einzelseite oder Stapel) verschiebt Abdeckung,
+        // Befundzahl und Fehlertypen — die Dashboard-Kacheln zeigen sonst den
+        // Stand von vor dem Lauf. Figuren/Orte/Szenen brauchen keinen Reload:
+        // sie kommen reaktiv aus dem Catalog-Store.
+        if ((d.type === 'check' || d.type === 'batch-check') && window.__app.showKapitelReviewCard) {
+          this.loadKapitelDashboard(bookId, { fresh: true });
+        }
       };
 
       const onJobReconnect = (e) => {
@@ -62,6 +82,7 @@ export function registerKapitelReviewCard() {
 
       const reset = (ctx) => {
         ctx._clearAllPollTimers();
+        ctx.resetKapitelDashboard();
         ctx._kapitelReviewByChapter = {};
         window.__app.kapitelReviewChapterId = '';
         ctx.selectedKapitelReviewId = null;
@@ -75,7 +96,17 @@ export function registerKapitelReviewCard() {
         showNeedsBookId: false,
         onShow: () => this._openKapitelReview(),
         load: (root) => this.loadKapitelReviewHistory(Alpine.store('nav').selectedBookId),
-        onBookChanged: (e, ctx) => reset(ctx),
+        // Buchwechsel: alles verwerfen — und, wenn die Karte dabei offen
+        // bleibt (`_maybeOpenBookOverview` laesst sie stehen), gleich fuer das
+        // neue Buch wieder aufbauen. Ohne das zweite Stueck steht der User vor
+        // einer leeren Karte: der Show-Watcher feuert nicht mehr (Flag war
+        // schon true), und weder Historie noch Dashboard laden von selbst.
+        onBookChanged: async (e, ctx) => {
+          reset(ctx);
+          if (window.__app.showKapitelReviewCard && Alpine.store('nav').selectedBookId) {
+            await ctx._openKapitelReview();
+          }
+        },
         onViewReset:   (e, ctx) => reset(ctx),
         extraListeners: [
           { type: 'job:reconnect',         handler: onJobReconnect },
@@ -198,8 +229,12 @@ export function registerKapitelReviewCard() {
         const eligible = this.kapitelReviewChapterOptions();
         root.kapitelReviewChapterId = eligible.length ? String(eligible[0].id) : '';
       }
-      if (Alpine.store('nav').selectedBookId) {
-        await this.loadKapitelReviewHistory(Alpine.store('nav').selectedBookId);
+      const bookId = Alpine.store('nav').selectedBookId;
+      if (bookId) {
+        await Promise.all([
+          this.loadKapitelReviewHistory(bookId),
+          this.loadKapitelDashboard(bookId),
+        ]);
       }
     },
 

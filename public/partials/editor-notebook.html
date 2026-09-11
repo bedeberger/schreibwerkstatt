@@ -204,17 +204,19 @@
 
   <!-- Push-getriebener „Zuletzt bearbeitet auf <Gerät>"-Hint: das letzte Save
        dieser Seite kam von einem anderen EIGENEN Gerät (z. B. nativer Mac-Focus-
-       Client). Passiv, kein Live-Signal — aktualisiert sich erst beim nächsten
-       Speichern/Reload, nicht beim Tippen. Eigenes aktuelles Gerät + fremde User
-       sind bereits in _resolvePageLastEditor ausgefiltert. Sitzt UNTER dem
+       Client). Passiv, kein Live-Signal — er kommt aus dem letzten Seiten-Load,
+       nicht vom Tippen. Eigenes aktuelles Gerät + fremde User sind bereits in
+       _resolvePageLastEditor ausgefiltert; sobald DIESER Browser die Seite
+       speichert, ist der Schnappschuss überholt und `pageLastEditorHint` lässt
+       den Banner fallen (abgeleitet aus currentPage.updated_at). Sitzt UNTER dem
        Editor-Frame (nicht oben unter der sticky Topbar — dort flackerte er beim
        Überfahren durch Sticky-Overlap-Repaints). -->
-  <template x-if="pageLastEditor">
+  <template x-if="pageLastEditorHint">
     <div class="editor-presence-banner editor-presence-banner--device" x-cloak>
       <span class="editor-presence-banner__text"
             x-text="t('presence.lastEdited', {
-              device: pageLastEditor.device_name,
-              rel: formatRelativeShort(pageLastEditor.updated_at)
+              device: pageLastEditorHint?.device_name,
+              rel: formatRelativeShort(pageLastEditorHint?.updated_at)
             })"></span>
       <button type="button" class="editor-presence-banner__dismiss"
               @click="pageLastEditor = null"

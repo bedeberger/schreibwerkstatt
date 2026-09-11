@@ -89,16 +89,6 @@
         </template>
       </ul>
     </div>
-    <!-- Teil-Lauf: die beiden read-only Endphasen abwählbar. Bewusst de-prominent im
-         ⋯-Menü — Default ist der vollständige Lauf; das hier ist die Abkürzung, wenn nur
-         der Katalog aufgefrischt werden soll. Beide Phasen sind einzeln nachziehbar. -->
-    <div class="komplett-status-phases" x-show="!$store.jobs.alleAktualisierenLoading" x-cloak>
-      <div class="komplett-status-phases-title" x-text="t('komplett.phasesTitle')"></div>
-      <div x-data="toggleSwitch({ label: () => t('komplett.skipContinuity') })"
-           x-modelable="value" x-model="komplettSkipContinuity"></div>
-      <div x-data="toggleSwitch({ label: () => t('komplett.skipNarrativeProfile') })"
-           x-modelable="value" x-model="komplettSkipNarrativeProfile"></div>
-    </div>
     <div class="komplett-status-actions">
       <button type="button"
               class="komplett-status-action-btn"

@@ -1,0 +1,102 @@
+<!--
+  Seitenstatistik des gewaehlten Kapitels — klickbar zur Seite, plus die
+  Sub-Kapitel-Section und die beiden Quick-Add-Formulare.
+  Eigenes Partial, damit kapitelreview.html unter dem LOC-Deckel bleibt; der
+  `<div id="partial-kapitelreview-pages">`-Platzhalter steht in der Karte und
+  laeuft im selben Alpine-Scope (`kapitelReviewCard`).
+-->
+  <!-- Seitenstatistik des gewählten Kapitels – klickbar zur Seite -->
+  <template x-if="kapitelReviewSelectedChapter()">
+    <div class="kapitel-pages-section">
+      <div class="kapitel-pages-heading" x-text="$app.t('kapitelReview.pagesHeading', { n: kapitelReviewSelectedChapter().pages.length })"></div>
+      <div class="kapitel-empty-hint"
+           x-show="kapitelReviewSelectedChapter().pages.length === 0 && kapitelReviewSubchapterTree($app.kapitelReviewChapterId).length === 0"
+           x-text="$app.t('kapitelReview.emptyHint')"></div>
+      <div class="kapitel-pages-list" x-show="kapitelReviewSelectedChapter().pages.length > 0">
+        <template x-for="page in kapitelReviewSelectedChapter().pages" :key="page.id">
+          <!-- @include kapitel-page-row -->
+        </template>
+      </div>
+
+      <!--
+        Sub-Kapitel-Section: ganze Section klappbar (Section-Toggle), pro Sub
+        eigenes Collapse fuer dessen Page-Liste. Chevron toggelt, Name-Klick
+        navigiert in das jeweilige Sub-Kapitel (kapitelReviewChapterId-Switch).
+      -->
+      <template x-if="kapitelReviewSubchapterTree($app.kapitelReviewChapterId).length > 0">
+        <div class="kapitel-subchapters" x-data="collapsible(true)">
+          <button type="button" class="collapsible-toggle kapitel-subchapters-heading" x-bind="trigger">
+            <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+            <span x-text="$app.t('kapitelReview.subchaptersHeading', { n: kapitelReviewSubchapterTree($app.kapitelReviewChapterId).length })"></span>
+          </button>
+          <div class="kapitel-subchapters-body" x-bind="panel" x-cloak>
+            <template x-for="sub in kapitelReviewSubchapterTree($app.kapitelReviewChapterId)" :key="sub.id">
+              <div class="kapitel-subchapter" :style="{ '--sub-depth': sub.depthOffset }">
+                <div class="kapitel-subchapter-header">
+                  <button type="button"
+                          class="kapitel-subchapter-chevron"
+                          @click="toggleSubchapterOpen(sub.id)"
+                          :aria-expanded="isSubchapterOpen(sub.id)"
+                          :aria-label="$app.t(isSubchapterOpen(sub.id) ? 'sidebar.collapseAll' : 'sidebar.expandAll')">
+                    <span class="history-chevron" :class="{ open: isSubchapterOpen(sub.id) }" aria-hidden="true"></span>
+                  </button>
+                  <span class="kapitel-subchapter-name internal-link"
+                        role="button" tabindex="0"
+                        @click="$app.kapitelReviewChapterId = String(sub.id)"
+                        :data-tip="$app.t('kapitelReview.openSubchapterTip', { name: sub.name })"
+                        x-text="sub.name"></span>
+                  <span class="tag" x-text="sub.pages.length === 1 ? $app.t('sidebar.pagesCountOne') : $app.t('sidebar.pagesCount', { n: sub.pages.length })"></span>
+                </div>
+                <div class="kapitel-pages-list" x-show="isSubchapterOpen(sub.id) && sub.pages.length > 0" x-cloak>
+                  <template x-for="page in sub.pages" :key="page.id">
+                    <!-- @include kapitel-page-row -->
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!--
+        Beide "Anlegen"-Forms im Grid: 2 Spalten (Input / Button), Forms via
+        display:contents, damit Buttons über beide Zeilen gleichbreit
+        ausgerichtet werden. Horizontaler Trenner zwischen Seite und Kapitel.
+      -->
+      <div class="kapitel-add-forms">
+        <form class="kapitel-new-page" @submit.prevent="createKapitelPage()">
+          <input type="text"
+                 class="kapitel-new-page-input"
+                 x-model="$app.newPageTitle"
+                 :placeholder="$app.t('kapitelReview.newPagePlaceholder')"
+                 :aria-label="$app.t('kapitelReview.newPagePlaceholder')"
+                 :disabled="$app.newPageCreating"
+                 data-spellcheck="spelling">
+          <button type="submit"
+                  :disabled="$app.newPageCreating || !$app.newPageTitle.trim()">
+            <span x-show="$app.newPageCreating" class="spinner"></span>
+            <span x-text="$app.t('kapitelReview.newPageAdd')"></span>
+          </button>
+        </form>
+        <div class="error-msg" x-show="$app.newPageError" x-text="$app.newPageError"></div>
+
+        <hr class="kapitel-add-divider">
+
+        <form class="kapitel-new-page" @submit.prevent="createSiblingChapter()">
+          <input type="text"
+                 class="kapitel-new-page-input"
+                 x-model="$app.newChapterTitle"
+                 :placeholder="$app.t('kapitelReview.newChapterPlaceholder')"
+                 :aria-label="$app.t('kapitelReview.newChapterPlaceholder')"
+                 :disabled="$app.newChapterCreating"
+                 data-spellcheck="spelling">
+          <button type="submit"
+                  :disabled="$app.newChapterCreating || !$app.newChapterTitle.trim()">
+            <span x-show="$app.newChapterCreating" class="spinner"></span>
+            <span x-text="$app.t('kapitelReview.newChapterAdd')"></span>
+          </button>
+        </form>
+        <div class="error-msg" x-show="$app.newChapterError" x-text="$app.newChapterError"></div>
+      </div>
+    </div>
+  </template>

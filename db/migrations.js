@@ -11430,6 +11430,80 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 282 abgeschlossen (book_shelf.last_opened_at).');
   }
 
+  if (version < 283) {
+    // `komplett_scope` — der zuletzt gewaehlte Lauf-Umfang der Komplettanalyse,
+    // pro Buch UND User. Das Modal vor dem Start liest ihn als Vorbelegung und
+    // schreibt ihn beim Starten zurueck: ein Wert, ein Schreiber, kein zweiter
+    // Zustand, der still vom sichtbaren abweichen kann.
+    //
+    // Pro User und nicht buchweit (also NICHT in `book_settings`, dessen PK nur
+    // die book_id ist): der Katalog der Komplettanalyse ist selbst pro User
+    // skopiert (`figures.user_email`, `locations.user_email`, …) — zwei Leute am
+    // selben Buch pflegen getrennte Kataloge und muessen getrennt entscheiden
+    // koennen, welche Schritte ihr Lauf anfasst. Zusaetzlich haelt es den Umfang
+    // aus `bookSettingsSigPart` heraus, das in die Extraktions-Cache-Signatur
+    // fliesst — eine Umfangs-Aenderung darf den Delta-Cache nicht verwerfen.
+    //
+    // JSON statt einer Spalte pro Schritt: der Katalog ist SSoT im Code
+    // (lib/komplett-scope.js) und wird beim Lesen dagegen normalisiert —
+    // Unbekanntes faellt weg, Fehlendes ist AN. Ein neuer Schritt braucht damit
+    // keine Migration und laeuft bei bestehenden Zeilen korrekt mit, statt still
+    // nie wieder ausgefuehrt zu werden.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS komplett_scope (
+        book_id    INTEGER NOT NULL REFERENCES books(book_id)   ON DELETE CASCADE,
+        user_email TEXT    NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        scope_json TEXT    NOT NULL,
+        updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        PRIMARY KEY (book_id, user_email)
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_komplett_scope_user ON komplett_scope(user_email)');
+
+    const fkErrors283 = db.pragma('foreign_key_check');
+    if (fkErrors283.length) {
+      throw new Error(`Migration 283: foreign_key_check meldet ${fkErrors283.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 283').run();
+    logger.info('DB-Migration auf Version 283 abgeschlossen (komplett_scope).');
+  }
+
+  if (version < 284) {
+    // `author_profile` — das gedeutete Autorenprofil, pro KONTO (nicht pro Buch).
+    // Die Messung dahinter (lib/author-profile.js) ist read-time und bekommt
+    // bewusst keine Tabelle: `book_lexicon` und `page_stats` SIND bereits die
+    // abgeleiteten Indexe, ein dritter waere eine dritte Wahrheit. Persistiert
+    // wird nur, was der KI-Lauf hinzufuegt und was der Autor daran editiert.
+    //
+    // `edited` trennt „vom Modell erzeugt" von „vom Autor angefasst": ein
+    // erneuter Lauf darf einen von Hand geschriebenen Text nicht kommentarlos
+    // ueberschreiben — die Karte fragt dann nach.
+    //
+    // `basis_json` haelt fest, aus welchen Buechern der Text entstand, und
+    // `basis_sig` deren Stand. Ohne beides steht ein Profiltext ohne Datum im
+    // Raum und behauptet eine Aktualitaet, die er nicht hat.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS author_profile (
+        user_email  TEXT    PRIMARY KEY REFERENCES app_users(email) ON DELETE CASCADE,
+        profil_text TEXT,
+        konstanten  TEXT,
+        entwicklung TEXT,
+        basis_json  TEXT,
+        basis_sig   TEXT,
+        edited      INTEGER NOT NULL DEFAULT 0 CHECK (edited IN (0,1)),
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+
+    const fkErrors284 = db.pragma('foreign_key_check');
+    if (fkErrors284.length) {
+      throw new Error(`Migration 284: foreign_key_check meldet ${fkErrors284.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 284').run();
+    logger.info('DB-Migration auf Version 284 abgeschlossen (author_profile).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

@@ -44,6 +44,7 @@ class FakeResponse {
     });
   }
   async json() { return JSON.parse(this.body); }
+  async text() { return String(this.body); }
 }
 
 class FakeRequest {
@@ -81,7 +82,7 @@ function makeCache(initial = {}) {
   };
 }
 
-function loadSw({ cache, fetchImpl }) {
+function loadSw({ cache, fetchImpl, posted }) {
   const caches = {
     async open() { return cache; },
     async keys() { return []; },
@@ -104,7 +105,11 @@ function loadSw({ cache, fetchImpl }) {
   sandbox.self.__SHELL_BUILD = 'testbuild';
   sandbox.self.__SHELL_MANIFEST = ['/js/app.js'];
   sandbox.self.addEventListener = (type, fn) => { listeners[type] = fn; };
-  sandbox.self.clients = { matchAll: async () => [] };
+  // Eine Senke fuer postMessage: die Nachzug-Meldung des SW ist Verhalten, das
+  // nur hier ueberhaupt beobachtbar ist.
+  sandbox.self.clients = {
+    matchAll: async () => (posted ? [{ postMessage: (m) => posted.push(m) }] : []),
+  };
   sandbox.self.location = { origin: 'https://example.test' };
   const ctx = vm.createContext(sandbox);
   vm.runInContext(SW_SRC, ctx);
@@ -269,4 +274,174 @@ test('Ohne no-cache bleibt es bei SWR — die Ansage ist eine Ausnahme, keine Um
   const res = await ctx.handleContent(new FakeRequest(p));
 
   assert.equal(res.body, 'ALT');
+});
+
+// ── Nachzug nach Revalidierung ────────────────────────────────────────────
+// Stale-While-Revalidate liefert den Cache-Stand an die UI und die Netzantwort
+// nur in den Cache. Ohne Meldung erfaehrt die schon gerenderte Sidebar davon nie
+// — deshalb zeigt der erste Reload den Baum vom letzten Besuch und erst der
+// zweite den aktuellen. Genau das ist das gemeldete „ich muss zu oft reloaden".
+
+const TREE = '/content/books/3/tree';
+
+// Der Netz-Fetch laeuft im Hintergrund (der Cache-Hit geht sofort raus); die
+// Meldung faellt eine Mikrotask spaeter. `setTimeout` ist im Sandbox-Harness
+// synchron, also reicht ein Tick der Microtask-Queue.
+const settle = () => new Promise(r => setTimeout(r, 0));
+
+// Die Nachrichten entstehen IM vm-Context und haben darum einen fremden
+// Object-Prototyp — `deepEqual` scheitert daran, obwohl der Inhalt stimmt.
+const assertPosted = (posted, paths) => {
+  assert.deepEqual(posted.map(m => `${m.type} ${m.path}`),
+    paths.map(p => `content-updated ${p}`));
+};
+
+test('Abweichende Revalidierung wird den Tabs gemeldet', async () => {
+  const cache = makeCache({ [TREE]: new FakeResponse('{"chapters":[1]}') });
+  const posted = [];
+  const ctx = loadSw({
+    cache, posted,
+    fetchImpl: async () => new FakeResponse('{"chapters":[1,2]}'),
+  });
+
+  const res = await ctx.handleContent(new FakeRequest(TREE));
+  assert.equal(res.body, '{"chapters":[1]}',
+    'Der Cache-Hit geht weiterhin sofort raus — SWR bleibt SWR.');
+
+  await settle();
+  assertPosted(posted, [TREE],
+    'Die Abweichung muss gemeldet werden, sonst rendert niemand nach.');
+});
+
+test('Unveraenderte Revalidierung meldet nichts', async () => {
+  // Sonst waere jeder Read ein Re-Render — der Regelfall ist „nichts Neues".
+  const cache = makeCache({ [TREE]: new FakeResponse('{"chapters":[1]}') });
+  const posted = [];
+  const ctx = loadSw({
+    cache, posted,
+    fetchImpl: async () => new FakeResponse('{"chapters":[1]}'),
+  });
+
+  await ctx.handleContent(new FakeRequest(TREE));
+  await settle();
+
+  assertPosted(posted, []);
+});
+
+test('Bei gleichem ETag entscheidet der Header — ohne Body-Vergleich', async () => {
+  // Der Regelfall nach der Cache-Control-Ansage der Route: der HTTP-Cache des
+  // Browsers beantwortet die Revalidierung per 304, der Body ist identisch.
+  const cache = makeCache({ [TREE]: new FakeResponse('{"chapters":[1]}', {
+    headers: { ETag: 'W/"abc"' },
+  }) });
+  const posted = [];
+  const ctx = loadSw({
+    cache, posted,
+    fetchImpl: async () => new FakeResponse('{"chapters":[1]}', { headers: { ETag: 'W/"abc"' } }),
+  });
+
+  await ctx.handleContent(new FakeRequest(TREE));
+  await settle();
+
+  assertPosted(posted, []);
+});
+
+test('Abweichender ETag meldet, auch wenn der Body gleich aussaehe', async () => {
+  const cache = makeCache({ [TREE]: new FakeResponse('X', { headers: { ETag: 'W/"abc"' } }) });
+  const posted = [];
+  const ctx = loadSw({
+    cache, posted,
+    fetchImpl: async () => new FakeResponse('X', { headers: { ETag: 'W/"def"' } }),
+  });
+
+  await ctx.handleContent(new FakeRequest(TREE));
+  await settle();
+
+  assertPosted(posted, [TREE]);
+});
+
+test('Ohne gecachten Stand gibt es nichts zu melden', async () => {
+  // Kaltstart: die Netzantwort IST die ausgelieferte Antwort. Eine Meldung
+  // hiesse, den Client zum Nachladen dessen zu bitten, was er gerade bekommt.
+  const cache = makeCache({});
+  const posted = [];
+  const ctx = loadSw({ cache, posted, fetchImpl: async () => new FakeResponse('{"chapters":[]}') });
+
+  await ctx.handleContent(new FakeRequest(TREE));
+  await settle();
+
+  assertPosted(posted, []);
+});
+
+test('Eine Fehlerantwort meldet nichts und ueberschreibt den Cache nicht', async () => {
+  const cache = makeCache({ [TREE]: new FakeResponse('{"chapters":[1]}') });
+  const posted = [];
+  const ctx = loadSw({ cache, posted, fetchImpl: async () => new FakeResponse('{}', { status: 401 }) });
+
+  await ctx.handleContent(new FakeRequest(TREE));
+  await settle();
+
+  assertPosted(posted, []);
+  assert.deepEqual(cache.writes, []);
+});
+
+test('Ein abweichender Seiten-Body wird nicht gemeldet', () => {
+  // Er laeuft weiterhin als SWR, aber der Vergleich unterbleibt: eine Meldung
+  // haette clientseitig keinen Konsumenten (der offene Editor hat seinen
+  // eigenen Stale-Write-Schutz), und der Klon + Textvergleich fiele bei JEDEM
+  // Seiten-Read an.
+  return (async () => {
+    const p = '/content/pages/9';
+    const cache = makeCache({ [p]: new FakeResponse('ALT') });
+    const posted = [];
+    const ctx = loadSw({ cache, posted, fetchImpl: async () => new FakeResponse('NEU') });
+
+    const res = await ctx.handleContent(new FakeRequest(p));
+    assert.equal(res.body, 'ALT', 'SWR bleibt SWR.');
+    await settle();
+    assertPosted(posted, []);
+    assert.deepEqual(cache.writes, [p], 'Der Cache wird trotzdem revalidiert.');
+  })();
+});
+
+// ── __fresh fuellt den Cache ──────────────────────────────────────────────
+// Der Marker heisst „beantworte MICH nicht aus dem Cache". Er darf nicht
+// zusaetzlich heissen „lass die Offline-Kopie stehen": ein Buch, das man nur
+// per Buchwechsel oeffnet, wird ausschliesslich `fresh` gelesen
+// (tree/load.js#FRESH_SOURCES) — sein Baum kaeme im Zug sonst nie aus dem
+// Cache, weil er nie hineingeschrieben wurde. `/config` macht es seit je so.
+
+test('__fresh liefert die Netzantwort UND zieht den Cache-Eintrag nach', async () => {
+  const cache = makeCache({ [TREE]: new FakeResponse('ALT') });
+  const ctx = loadSw({ cache, fetchImpl: async () => new FakeResponse('NEU') });
+
+  const res = await ctx.handleContent(new FakeRequest(TREE + '?__fresh=1'));
+
+  assert.equal(res.body, 'NEU', 'Der Aufrufer bekommt unveraendert den Serverstand.');
+  assert.deepEqual(cache.writes, [TREE],
+    'Abgelegt unter dem Pfad OHNE Marker — sonst trifft ihn kein normaler Read.');
+  assert.equal(cache.store.get('https://example.test' + TREE).body, 'NEU');
+});
+
+test('__fresh behaelt die uebrigen Query-Parameter beim Ablegen', async () => {
+  const p = '/content/pages/7/revisions';
+  const cache = makeCache({});
+  const ctx = loadSw({ cache, fetchImpl: async () => new FakeResponse('{"total":3}') });
+
+  await ctx.handleContent(new FakeRequest(p + '?limit=5&__fresh=1'));
+
+  // Netz-zuerst-Pfad (volatiles Log) — er cacht ohnehin unter der vollen URL.
+  assert.deepEqual(cache.writes, [p + '?limit=5&__fresh=1']);
+});
+
+test('__fresh cacht keine Fehlerantwort', async () => {
+  const cache = makeCache({ [TREE]: new FakeResponse('ALT') });
+  const ctx = loadSw({ cache, fetchImpl: async () => new FakeResponse('{}', { status: 401 }) });
+
+  const res = await ctx.handleContent(new FakeRequest(TREE + '?__fresh=1'));
+
+  assert.equal(res.status, 401);
+  assert.deepEqual(cache.writes, []);
+  assert.equal(cache.store.get('https://example.test' + TREE).body, 'ALT',
+    'Der bestehende Offline-Stand bleibt, statt durch eine 401 ersetzt zu werden.');
 });

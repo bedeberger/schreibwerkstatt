@@ -2,7 +2,8 @@
 // Freie Konversation über das gesamte Buch (Agent mit Tool-Use).
 //
 // Eigener State: bookChatSessions, bookChatMessages, bookChatSessionId,
-//   bookChatInput, bookChatLoading, bookChatProgress, bookChatStatus,
+//   bookChatInput, bookChatLoading, bookChatRunningSessionId,
+//   bookChatProgress, bookChatStatus,
 //   _bookChatPollTimer.
 // Root behält: showBookChatCard (Hash-Router), selectedBookId,
 //   selectedBookName, t.
@@ -18,6 +19,8 @@ export function registerBookChatCard() {
     bookChatSessionId: null,
     bookChatInput: '',
     bookChatLoading: false,
+    // Session, für die der laufende Job arbeitet (null = kein Lauf).
+    bookChatRunningSessionId: null,
     bookChatProgress: 0,
     bookChatStatus: '',
     _bookChatPollTimer: null,

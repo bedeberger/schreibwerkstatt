@@ -301,6 +301,7 @@ const JOB_TYPE_LABELS = {
   'source-detect':         'job.label.sourceDetect',
   'source-embed-index':    'job.label.sourceEmbedIndex',
   'stilprofil':            'job.label.stilprofil',
+  'autorenprofil':         'job.label.autorenprofil',
   'struktur-check':        'job.label.strukturCheck',
   'headline-variants':     'job.label.headlineVariants',
   'interview-transcribe':  'job.label.interviewTranscribe',

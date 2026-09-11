@@ -21,6 +21,7 @@ const locationsWrite = require('./locations-write');
 const worldFacts = require('./world-facts');
 const aiCaches = require('./ai-caches');
 const rueckblick = require('./rueckblick');
+const komplettScope = require('./komplett-scope');
 const bookSettings = require('./book-settings');
 const continuity = require('./continuity');
 const songs = require('./songs');
@@ -104,6 +105,10 @@ module.exports = {
   loadFinetuneAiCache:   aiCaches.loadFinetuneAiCache,
   saveFinetuneAiCache:   aiCaches.saveFinetuneAiCache,
   deleteFinetuneAiCache: aiCaches.deleteFinetuneAiCache,
+  // komplett_scope (Lauf-Umfang der Komplettanalyse, pro Buch + User)
+  getKomplettScope:  komplettScope.getKomplettScope,
+  saveKomplettScope: komplettScope.saveKomplettScope,
+
   // rueckblick (Cache + Historie)
   loadRueckblickCache:   rueckblick.loadRueckblickCache,
   saveRueckblickCache:   rueckblick.saveRueckblickCache,

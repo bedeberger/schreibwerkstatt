@@ -17,6 +17,7 @@ const JOB_NAV_CARD = {
   'redundancy':        'redundanz',
   'embed-index':       'redundanz',
   'stilprofil':        'stil',
+  'autorenprofil':     'autorenprofil',
   'motif-brainstorm':  'motiv',
   'motif-scan':        'motiv',
   'geocode-resolve':   'orte',

@@ -63,6 +63,10 @@
       <span class="avatar-menu-item-label" x-text="t('header.myBooks')"></span>
     </button>
 
+    <button type="button" class="avatar-menu-item" role="menuitem" @click="showAvatarMenu = false; toggleAutorenprofilCard()">
+      <span class="avatar-menu-item-label" x-text="t('autorenprofil.title')"></span>
+    </button>
+
     <button type="button" class="avatar-menu-item" role="menuitem"
             x-show="$store.session.currentUser?.role === 'admin'"
             @click="showAvatarMenu = false; toggleAdminUsersCard()">

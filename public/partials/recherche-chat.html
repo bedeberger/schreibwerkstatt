@@ -13,7 +13,7 @@
     </div>
   </div>
 
-  <div x-show="researchChatProgress > 0" class="progress-bar-wrap">
+  <div x-show="researchChatProgress > 0 && isResearchChatSessionRunning(researchChatSessionId)" class="progress-bar-wrap">
     <div class="progress-bar" :style="{ '--progress': researchChatProgress + '%' }"></div>
   </div>
   <div x-show="researchChatStatus" class="card-status" x-html="researchChatStatus"></div>
@@ -80,7 +80,7 @@
       </div>
     </template>
 
-    <div x-show="researchChatLoading" class="chat-skeleton-wrapper">
+    <div x-show="isResearchChatSessionRunning(researchChatSessionId)" class="chat-skeleton-wrapper">
       <div class="chat-skeleton"></div>
     </div>
   </div>
@@ -107,7 +107,7 @@
         @click="loadResearchChatSession(s.id)"
       >
         <div class="chat-session-preview" x-text="(s.title || s.preview || $app.t('recherche.chat.untitled')).slice(0, 80)"></div>
-        <div class="chat-session-meta" x-text="$app.formatDate(s.last_message_at)"></div>
+        <div class="chat-session-meta"><span x-show="isResearchChatSessionRunning(s.id)" class="spinner chat-session-running" role="status" :aria-label="$app.t('chat.sessionRunning')" :data-tip="$app.t('chat.sessionRunning')"></span><span x-text="$app.formatDate(s.last_message_at)"></span></div>
         <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteResearchChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
       </div>
     </template>

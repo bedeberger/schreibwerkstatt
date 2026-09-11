@@ -1,0 +1,121 @@
+@layer components {
+/* Lauf-Umfang-Dialog der Komplettanalyse (natives <dialog> via Alpine.data('modal')).
+   Markup: public/partials/komplett-scope.html */
+
+.komplett-scope-dialog {
+  /* Pflicht: der globale Reset (* { margin: 0 }) schlaegt die UA-Regel
+     `dialog { margin: auto }` — ohne das klebt der Dialog in der linken oberen Ecke. */
+  margin: auto;
+  width: min(560px, calc(100vw - 2 * var(--space-lg)));
+  max-height: min(82vh, 780px);
+  overflow-y: auto;
+  padding: var(--space-20);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-card-bg);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+}
+.komplett-scope-dialog::backdrop {
+  background: var(--color-overlay);
+}
+
+.komplett-scope-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.komplett-scope-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+.komplett-scope-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xs);
+  border: none;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.komplett-scope-close:hover { color: var(--color-text); }
+
+.komplett-scope-hint { margin-top: var(--space-2xs); }
+
+.komplett-scope-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap-section);
+  margin-top: var(--card-gap-section);
+}
+
+.komplett-scope-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap-tight);
+}
+
+/* Kern-Schritte: Inventar ohne Schalter. Gedaempft, damit sofort lesbar ist,
+   dass hier nichts zu entscheiden ist. */
+.komplett-scope-core {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-sm);
+  list-style: none;
+  padding: 0;
+}
+.komplett-scope-core-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+.komplett-scope-core-item .icon {
+  width: 0.9em;
+  height: 0.9em;
+  color: var(--color-success);
+}
+
+.komplett-scope-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+/* Der Hinweis gehoert unter den Schalter und bringt keinen eigenen Abstand mit —
+   den Rhythmus setzt der Fluss (siehe DESIGN.md „Karten-Innenraum"). */
+.komplett-scope-step .card-hint {
+  margin: 0;
+  padding-left: calc(var(--space-lg) + var(--space-2xs));
+}
+
+.komplett-scope-group--force {
+  padding-top: var(--card-gap-tight);
+  border-top: 0.5px solid var(--color-border);
+}
+
+.komplett-scope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: var(--card-gap-section);
+  padding-top: var(--card-gap-tight);
+  border-top: 0.5px solid var(--color-border);
+}
+.komplett-scope-presets,
+.komplett-scope-confirm {
+  display: flex;
+  gap: var(--space-2xs);
+}
+
+@media (max-width: 600px) {
+  .komplett-scope-dialog { padding: var(--space-lg); }
+  .komplett-scope-actions { flex-direction: column; align-items: stretch; }
+  .komplett-scope-presets,
+  .komplett-scope-confirm { justify-content: flex-end; }
+}
+}

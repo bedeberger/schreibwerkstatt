@@ -10,6 +10,7 @@ import { setupSpellcheckDispatch } from '../cards/editor-spellcheck/dispatch.js'
 import { FILTER_SCOPES } from './app-view.js';
 import { EVT } from '../events.js';
 import { reconcileSessionCaches } from './boot/session-change.js';
+import { installContentUpdatedBridge } from './boot/content-updated.js';
 
 export const appInitMethods = {
   // AbortController `_abortCtrl` (initialisiert via app-state.js) hält alle
@@ -20,6 +21,7 @@ export const appInitMethods = {
     this._abortCtrl?.abort();
     if (this.$store.jobs._jobQueueTimer) clearInterval(this.$store.jobs._jobQueueTimer);
     if (this._statusTimer) clearTimeout(this._statusTimer);
+    if (this._treeCatchUpTimer) { clearTimeout(this._treeCatchUpTimer); this._treeCatchUpTimer = null; }
     if (typeof this._teardownStatsObserver === 'function') this._teardownStatsObserver();
   },
 
@@ -63,6 +65,11 @@ export const appInitMethods = {
     // nur die offene Seite) beim Wiederverbinden + speist den Pending-Zähler.
     this._installOutbox(signal);
     window.addEventListener(EVT.JOB_FINISHED, (e) => this._onJobFinished(e.detail), { signal });
+    // Zweite Haelfte von Stale-While-Revalidate: der SW meldet, wenn seine
+    // Hintergrund-Revalidierung von dem abweicht, was er ausgeliefert hat —
+    // sonst wird der Seitenbaum erst beim ZWEITEN Reload aktuell (book/tree/catchup.js).
+    installContentUpdatedBridge(signal);
+    window.addEventListener(EVT.CONTENT_UPDATED, (e) => this._onContentUpdated(e.detail), { signal });
     this._initSttDictation?.(signal);
     this._initTtsProof?.(signal);
     // Sleep/Wake-Recovery: bei längerer Hide-Phase (>30 s) Daten neu laden,
@@ -134,6 +141,14 @@ export const appInitMethods = {
     const supported  = getSupportedLocales();
     const fallbackLocale = supported.includes(browserLoc) ? browserLoc : 'de';
     try {
+    // Sitzungs-Abgleich PARALLEL zum Shell-Aufbau anstossen, awaited erst unten.
+    // Er wirft CONTENT_CACHE + CONFIG_CACHE weg, wenn eine andere Sitzung laeuft
+    // als die, zu der sie gehoeren; der Shell-Aufbau darunter fasst
+    // ausschliesslich den SHELL_CACHE an (Partials, i18n) und kann dem nicht in
+    // die Quere kommen. In Serie lag die Wartezeit auf die SW-Quittung (bis 1,5 s,
+    // wenn der Worker aus dem Leerlauf hochfaehrt) vor dem ersten `/config` — hier
+    // verschwindet sie hinter Arbeit, die ohnehin anfaellt.
+    const sessionCachesReconciled = reconcileSessionCaches();
     try {
       await configureI18n(fallbackLocale);
       this.$store.shell.uiLocale = fallbackLocale;
@@ -146,13 +161,13 @@ export const appInitMethods = {
       console.error('[init:shell]', e);
     }
 
-    // Sitzungswechsel behandeln, BEVOR der erste gecachte Read laeuft: laeuft
-    // eine andere Sitzung als die, zu der die SW-Caches gehoeren, sind sie hier
-    // weg. Sonst rendert die Sidebar (und `/config`) aus einer beliebig alten
-    // Kopie, weil Stale-While-Revalidate den Cache-Hit sofort ausliefert und
-    // die Netzantwort nur noch den Cache fuellt, nicht die gerenderte Ansicht.
+    // Hier awaiten, und zwar VOR dem ersten gecachten Read: laeuft eine andere
+    // Sitzung als die, zu der die SW-Caches gehoeren, sind sie dann weg. Sonst
+    // rendert die Sidebar (und `/config`) aus einer beliebig alten Kopie, weil
+    // Stale-While-Revalidate den Cache-Hit sofort ausliefert und die Netzantwort
+    // nur noch den Cache fuellt, nicht die gerenderte Ansicht.
     // Faelle + Begruendung: boot/session-change.js.
-    const bootstrapOpts = await reconcileSessionCaches();
+    const bootstrapOpts = await sessionCachesReconciled;
 
     let cfg = null;
     try {

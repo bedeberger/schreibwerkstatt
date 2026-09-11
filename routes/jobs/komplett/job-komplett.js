@@ -42,6 +42,8 @@ const {
   runKontinuitaetPhase, runCoverageAudit, komplettMaxTokens,
 } = require('./phases');
 const { buildAnachronismusData, _komplettAiOverrides, resolveRemapNames } = require('./job-shared');
+const { loadOrteFromDb, countSongsInDb, countSzenenInDb } = require('./scope');
+const { normalizeKomplettScope, isFullKomplettScope, skippedKomplettSteps } = require('../../../lib/komplett-scope');
 const { COST_LABEL, relabel } = require('./cost-labels');
 
 // ── Job: Komplettanalyse ─────────────────────────────────────────────────────
@@ -54,13 +56,15 @@ const { COST_LABEL, relabel } = require('./cost-labels');
 //   P3b (Kapitelübergreifende Beziehungen, nur Multi-Pass, non-critical)
 //   P5 Szenen remappen
 //   P6 Zeitstrahl + P8 Kontinuität: parallel bei Claude (P8 ownt Progress-Bar), sonst sequentiell
-// opts.skipContinuity / opts.skipNarrativeProfile: die beiden read-only Endphasen
-// einzeln abwählbar (Teil-Lauf; siehe POST-Handler). Default = alles an.
+// opts.scope: Lauf-Umfang (Teil-Lauf) — welche Schritte dieser Lauf neu berechnet.
+// Katalog + Normalisierung: lib/komplett-scope.js. Fehlt er, läuft alles (Nacht-Cron).
 // ACHTUNG Positions-Reihenfolge: `provider` (Slot 6) wird vom Nacht-Cron gesetzt —
 // opts MUSS dahinter stehen, sonst landet das Options-Objekt im Provider-Slot.
 async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userToken, provider = undefined, opts = {}) {
-  const skipContinuity = opts.skipContinuity === true;
-  const skipNarrativeProfile = opts.skipNarrativeProfile === true;
+  // Lauf-Umfang: normalisiert, damit ein Aufrufer ohne `scope` (Nacht-Cron, Tests)
+  // unverändert den vollständigen Lauf bekommt.
+  const scope = normalizeKomplettScope(opts.scope);
+  const fullScope = isFullKomplettScope(scope);
   const bookIdInt = parseInt(bookId);
   const email = userEmail || null;
   const log = makeJobLogger(jobId);
@@ -134,6 +138,8 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
   const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
 
   try {
+    const skippedSteps = skippedKomplettSteps(scope);
+    if (skippedSteps.length) log.info(`Teil-Lauf – abgewählte Schritte: ${skippedSteps.join(', ')}.`);
     const cp = loadAndValidateCheckpoint(bookIdInt, email, log, jobId);
 
     // ── Seiten laden ──────────────────────────────────────────────────────────
@@ -317,7 +323,10 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // Server mit `ai.openai-compat.max_parallel > 1` verträgt die zwei Calls genauso, und
     // bei einem lokalen Modell wiegt der gesparte Call ein Vielfaches der Cloud-Ersparnis.
     // Ollama liefert 1 (globaler Mutex) und bleibt damit seriell wie bisher.
-    const isMultiPassParallel = maxParallelCalls(effectiveProvider) > 1 && chapterFiguren.length > 1;
+    // Teil-Lauf: ohne Schritt «Orte» entfällt P3 samt Konsolidierungs-Call — die
+    // Namens→Handle-Karten kommen dann aus dem bestehenden Katalog, damit die Szenen
+    // ihre Ortszuordnung behalten (sonst dropped remapSzenen jede ort_id).
+    const isMultiPassParallel = maxParallelCalls(effectiveProvider) > 1 && chapterFiguren.length > 1 && scope.orte;
     let figuren, figNameToId, figNameToIdLower, figurenKompakt, isSinglePass;
     let orte, ortNameToId, ortNameToIdLower;
     if (isMultiPassParallel) {
@@ -332,16 +341,30 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     } else {
       ({ figuren, figNameToId, figNameToIdLower, figurenKompakt, isSinglePass } =
         await runPhase2(ctx, chapterFiguren, chapterAssignments, chapterSzenen));
-      ({ orte, ortNameToId, ortNameToIdLower } =
-        await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, figNameToId, figNameToIdLower));
+      if (scope.orte) {
+        ({ orte, ortNameToId, ortNameToIdLower } =
+          await runPhase3(ctx, chapterOrte, figurenKompakt, isSinglePass, figNameToId, figNameToIdLower));
+      } else {
+        ({ orte, ortNameToId, ortNameToIdLower } = loadOrteFromDb(bookIdInt, email));
+        log.info(`Orte auf Wunsch übersprungen – ${orte.length} Schauplätze aus dem Katalog übernommen.`);
+        updateJob(jobId, { progress: 55 });
+      }
     }
     pt.mark('P2+P3 Konsolidierung');
 
     // ── Phase 3 Songs: Musikbibliothek konsolidieren ─────────────────────────
-    const { songs } = await runPhase3Songs(ctx, chapterSongs || [], figurenKompakt, isSinglePass, figNameToId, figNameToIdLower);
+    let songsCount;
+    if (scope.songs) {
+      const { songs } = await runPhase3Songs(ctx, chapterSongs || [], figurenKompakt, isSinglePass, figNameToId, figNameToIdLower);
+      songsCount = songs.length;
+    } else {
+      songsCount = countSongsInDb(bookIdInt, email);
+      log.info(`Songs auf Wunsch übersprungen – bestehende Musikbibliothek (${songsCount}) bleibt.`);
+      updateJob(jobId, { progress: 56 });
+    }
 
     // ── Phase 3b: Kapitelübergreifende Beziehungen (non-critical, nur Multi-Pass) ──
-    if (chapterFiguren.length > 1 && figuren.length >= 2) {
+    if (scope.beziehungen && chapterFiguren.length > 1 && figuren.length >= 2) {
       await runNonCritical('Phase 3b kapitelübergreifende Beziehungen',
         () => runPhase3b(ctx, figuren), log,
         { warnings, warnKey: 'job.warn.crossChapterFailed' });
@@ -358,33 +381,51 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
       'SELECT id, loc_id FROM locations WHERE book_id = ? AND user_email = ? ORDER BY sort_order'
     ).all(bookIdInt, email);
     const locIdToDbId = Object.fromEntries(locRows.map(r => [r.loc_id, r.id]));
-    // Remap-Rescue (#8, nur Claude): unauflösbare Figuren-Klarnamen aus Szenen/Events dem Katalog
-    // zuordnen (mutiert figNameToIdLower in place), BEVOR remapSzenen/remapAssignments sie droppen.
-    // Non-fatal (AbortError propagiert); no-op wenn alle Namen bereits auflösbar sind.
-    await resolveRemapNames(ctx, { chapterSzenen, chapterAssignments, figuren, figNameToId, figNameToIdLower });
-    const szenen = remapSzenen(chapterSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNameToIdLower, idMaps.chNameToId, log);
-    const assignments = remapAssignments(chapterAssignments, figNameToId, figNameToIdLower, idMaps.chNameToId, log, jobId);
-    updateJob(jobId, { progress: 76, statusText: 'job.phase.savingScenes' });
-    // Szenen: auflösen + Within-Run-Dedup EINMAL, damit Judge und Speichern auf
-    // derselben Liste arbeiten (die Plan-Indizes zeigen sonst ins Leere). Danach den
-    // Graubereich des Cross-Run-Matchings beurteilen lassen — Titel-Varianten derselben
-    // Szene sind der häufigste stale-Dubletten-Grund.
-    const szenenResolved = resolveSzenenForSave(szenen, idMaps);
-    let szeneHint = null;
-    try {
-      const plan = planSzenenMatch(bookIdInt, email, szenenResolved.szenen, locIdToDbId);
-      if (plan.unsure.length) {
-        szeneHint = await judgeEntityPairs(ctx, 'szene', {
-          incoming: szenenResolved.szenen, existing: plan.existing, unsure: plan.unsure,
-        });
+    // Teil-Lauf: Szenen und Lebensereignisse sind zwei Schritte, die denselben
+    // Schreibpfad teilen. Ist keiner von beiden gewählt, entfällt der ganze Block
+    // inklusive Remap-Rescue und Szenen-Judge (beides KI-Calls) — der bestehende
+    // Bestand bleibt dann unangetastet.
+    const writeSzenen = scope.szenen;
+    const writeEvents = scope.ereignisse;
+    let szenenResult = { szenenCount: countSzenenInDb(bookIdInt, email), eventsCount: 0 };
+    if (writeSzenen || writeEvents) {
+      // Remap-Rescue (#8, nur Claude): unauflösbare Figuren-Klarnamen aus Szenen/Events dem Katalog
+      // zuordnen (mutiert figNameToIdLower in place), BEVOR remapSzenen/remapAssignments sie droppen.
+      // Non-fatal (AbortError propagiert); no-op wenn alle Namen bereits auflösbar sind.
+      await resolveRemapNames(ctx, { chapterSzenen, chapterAssignments, figuren, figNameToId, figNameToIdLower });
+      const szenen = writeSzenen
+        ? remapSzenen(chapterSzenen, figNameToId, figNameToIdLower, ortNameToId, ortNameToIdLower, idMaps.chNameToId, log)
+        : [];
+      const assignments = writeEvents
+        ? remapAssignments(chapterAssignments, figNameToId, figNameToIdLower, idMaps.chNameToId, log, jobId)
+        : [];
+      updateJob(jobId, { progress: 76, statusText: 'job.phase.savingScenes' });
+      // Szenen: auflösen + Within-Run-Dedup EINMAL, damit Judge und Speichern auf
+      // derselben Liste arbeiten (die Plan-Indizes zeigen sonst ins Leere). Danach den
+      // Graubereich des Cross-Run-Matchings beurteilen lassen — Titel-Varianten derselben
+      // Szene sind der häufigste stale-Dubletten-Grund.
+      const szenenResolved = resolveSzenenForSave(szenen, idMaps);
+      let szeneHint = null;
+      try {
+        const plan = planSzenenMatch(bookIdInt, email, szenenResolved.szenen, locIdToDbId);
+        if (plan.unsure.length) {
+          szeneHint = await judgeEntityPairs(ctx, 'szene', {
+            incoming: szenenResolved.szenen, existing: plan.existing, unsure: plan.unsure,
+          });
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        log.warn(`Szenen-Match-Judge übersprungen (${e.message}) – Matching bleibt regelbasiert.`);
       }
-    } catch (e) {
-      if (e.name === 'AbortError') throw e;
-      log.warn(`Szenen-Match-Judge übersprungen (${e.message}) – Matching bleibt regelbasiert.`);
+      szenenResult = saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId, idMaps, log, jobId,
+        { resolved: szenenResolved, matchHint: szeneHint && szeneHint.size ? szeneHint : null,
+          writeSzenen, writeEvents });
+      if (!writeSzenen) szenenResult.szenenCount = countSzenenInDb(bookIdInt, email);
+      backfillLocationChaptersFromScenes(bookIdInt, email);
+    } else {
+      log.info('Szenen und Lebensereignisse auf Wunsch übersprungen – bestehender Bestand bleibt.');
+      updateJob(jobId, { progress: 76 });
     }
-    const szenenResult = saveSzenenAndEvents(bookIdInt, email, szenen, assignments, locIdToDbId, idMaps, log, jobId,
-      { resolved: szenenResolved, matchHint: szeneHint && szeneHint.size ? szeneHint : null });
-    backfillLocationChaptersFromScenes(bookIdInt, email);
     // Kapitel-Auftritte neu aufbauen — Full-Replace, JETZT liegen alle drei Quellen vor:
     // KI-`kapitel` aus Phase 2 (`figuren`) + die eben gespeicherten Szenen/Ereignisse.
     // Phase 2 schreibt den Index bewusst nicht (Begründung an rebuildFigureAppearances).
@@ -411,7 +452,8 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // Zeitstrahl (P6) + Kontinuität (P8) + Attribut-Detektor inkl. Persistenz —
     // die Phase kapselt ihre Fehler selbst (read-only Endphasen, siehe dort).
     await runKontinuitaetPhase(ctx, {
-      skipContinuity, isCloudModel, kontMultiPass,
+      skipContinuity: !scope.kontinuitaet, skipZeitstrahl: !scope.ereignisse,
+      isCloudModel, kontMultiPass,
       figKompakt, orteKompakt, chapterFakten, anachronismus, figNameToId,
     });
 
@@ -419,7 +461,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
 
     // ── Coverage-Self-Audit (F2, non-critical, nur Claude): Extraktions-Recall messbar machen ──
     let coverage = null;
-    if (isCloudModel) {
+    if (isCloudModel && scope.coverage) {
       coverage = await runNonCritical('Coverage-Self-Audit',
         () => runCoverageAudit(ctx, figuren.map(f => f.name), orteKompakt.map(o => o.name)), log);
       if (coverage && coverage.score != null) {
@@ -436,7 +478,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // oben komplett → das bestehende Profil bleibt gültig). Nur Cloud-Klasse (wie
     // Kontinuität ausgeblendet für lokale Modelle); Kill-Switch
     // `ai.komplett.narrative_profile` (Default an; in Integration-Tests aus).
-    if (skipNarrativeProfile) {
+    if (!scope.erzaehlprofil) {
       // Teil-Lauf: read-only Endphase abgewählt, das bestehende Profil bleibt gültig.
       // Nachziehen über POST /jobs/erzaehlprofil (rechnet nur diese Phase neu).
       log.info('Erzählprofil auf Wunsch übersprungen – bestehendes Profil bleibt.');
@@ -455,14 +497,13 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     // erledigt". Nach einem Lauf ohne Kontinuität/Erzählprofil stimmt das nicht — der
     // nächste Voll-Lauf würde am Short-Circuit hängen bleiben und die abgewählten
     // Phasen nie nachholen. Symmetrisch zum `partialFailure`-Gate in Phase 1.
-    const partialRun = skipContinuity || skipNarrativeProfile;
-    if (partialRun) {
-      log.info('Konsolidierungs-Checkpoint übersprungen – Teil-Lauf (abgewählte Phasen sind nicht gelaufen).');
+    if (!fullScope) {
+      log.info('Konsolidierungs-Checkpoint übersprungen – Teil-Lauf (abgewählte Schritte sind nicht gelaufen).');
     } else {
       saveCheckpoint(CONSOLIDATION_CP_TYPE, bookIdInt, email, {
         sig: consolidationSig,
         figCount: figuren.length, orteCount: orte.length,
-        songsCount: songs.length, szenenCount: szenenResult.szenenCount,
+        songsCount, szenenCount: szenenResult.szenenCount,
       });
     }
     log.info(`Phasen-Timing: ${pt.summary()}`);
@@ -475,13 +516,14 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
     completeJob(jobId, {
       figCount:    figuren.length,
       orteCount:   orte.length,
-      songsCount:  songs.length,
+      songsCount,
       szenenCount: szenenResult.szenenCount,
       warnings,
+      ...(fullScope ? {} : { skippedSteps }),
       ...(coverage ? { coverage } : {}),
       ...(costByPhase ? { costByPhase } : {}),
       tokensIn: tok.in, tokensOut: tok.out,
-    }, tps(tok), `fig=${figuren.length} orte=${orte.length} songs=${songs.length} szenen=${szenenResult.szenenCount}${coverage?.score != null ? ` cov=${coverage.score}` : ''}${warnings.length ? ` warn=${warnings.length}` : ''}`);
+    }, tps(tok), `fig=${figuren.length} orte=${orte.length} songs=${songsCount} szenen=${szenenResult.szenenCount}${coverage?.score != null ? ` cov=${coverage.score}` : ''}${warnings.length ? ` warn=${warnings.length}` : ''}`);
   } catch (e) {
     if (e.name !== 'AbortError') {
       const cause = e.cause?.message || e.cause?.code || '';

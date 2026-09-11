@@ -360,6 +360,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Laufender Job in der Historie: die Anzeige gehört der Zeile, die wirklich
+   bearbeitet wird (siehe chat-base.js#is<Label>SessionRunning). */
+.chat-session-running {
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-1);
+}
 .chat-session-meta {
   font-size: var(--font-size-micro);
   color: var(--color-subtle);

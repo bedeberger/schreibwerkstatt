@@ -1433,11 +1433,11 @@ test('Komplettanalyse #2: Coverage-Feedback zieht eine vom Audit gemeldete fehle
   }
 });
 
-// ── Teil-Lauf: read-only Endphasen abwählbar ─────────────────────────────────
-// Kontinuitätsprüfung (P8) und Erzählprofil sitzen am ENDE der seriellen Kette. Wer
-// nach einer Kapitel-Änderung nur den Katalog auffrischt, spart durch das Abwählen
-// Wartezeit und Geld, ohne an der Extraktionsqualität zu drehen.
-test('Komplettanalyse Teil-Lauf: skipContinuity überspringt P8 und friert den Konsolidierungs-Checkpoint NICHT ein', async () => {
+// ── Teil-Lauf: Lauf-Umfang (lib/komplett-scope.js) ──────────────────────────
+// Der Umfang waehlt aus, welche Schritte ein Lauf neu berechnet. Wer nach einer
+// Kapitel-Aenderung nur den Katalog auffrischt, spart Wartezeit und Geld, ohne an
+// der Extraktionsqualitaet zu drehen.
+test('Komplettanalyse Teil-Lauf: Umfang ohne «kontinuitaet» überspringt P8 und friert den Konsolidierungs-Checkpoint NICHT ein', async () => {
   const BOOK_ID = 131;
   const email = 'tester@test.dev';
   seedTinyBook(BOOK_ID);
@@ -1452,7 +1452,7 @@ test('Komplettanalyse Teil-Lauf: skipContinuity überspringt P8 und friert den K
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
     ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude',
-      { skipContinuity: true }));
+      { scope: { kontinuitaet: false } }));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
 
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -1462,16 +1462,65 @@ test('Komplettanalyse Teil-Lauf: skipContinuity überspringt P8 und friert den K
 
   // KEIN Kontinuitäts-Call gelaufen.
   const kontCalls = ctx.mockAi.log.filter(e => e.schemaKeys?.includes('probleme')).length;
-  assert.equal(kontCalls, 0, 'P8 darf bei skipContinuity gar nicht aufrufen');
+  assert.equal(kontCalls, 0, 'P8 darf bei abgewähltem Schritt gar nicht aufrufen');
   // Und kein Check persistiert (das vorherige Ergebnis bleibt, hier: keins).
   const checks = ctx.dbSchema.db.prepare('SELECT COUNT(*) n FROM continuity_checks WHERE book_id = ?').get(BOOK_ID);
-  assert.equal(checks.n, 0, 'skipContinuity darf keinen Kontinuitäts-Check schreiben');
+  assert.equal(checks.n, 0, 'ein abgewählter Schritt darf keinen Kontinuitäts-Check schreiben');
+  assert.deepEqual(job.result.skippedSteps, ['kontinuitaet'], 'der Teil-Lauf weist die abgewählten Schritte aus');
 
   // DIE zentrale Invariante: der Konsolidierungs-Marker behauptet „P2–P8 erledigt".
   // Nach einem Teil-Lauf stimmt das nicht — sonst bliebe der nächste Voll-Lauf am
   // Short-Circuit hängen und würde P8 nie nachholen.
   const marker = ctx.dbSchema.loadCheckpoint('komplett-consolidation', BOOK_ID, email);
   assert.equal(marker, null, 'Teil-Lauf darf keinen Konsolidierungs-Checkpoint schreiben');
+});
+
+// Ein abgewaehlter Katalog-Schritt heisst «nicht neu berechnen», nicht «leeren». Die
+// Reconcile-Schreibpfade markieren nicht mehr gelieferte Eintraege als stale — mit
+// leerer Eingabe wuerden sie genau den Bestand entwerten, den das Abwaehlen schuetzt.
+test('Komplettanalyse Teil-Lauf: abgewählte Katalog-Schritte lassen den Bestand unangetastet', async () => {
+  const BOOK_ID = 133;
+  const email = 'tester@test.dev';
+  seedTinyBook(BOOK_ID);
+
+  // Bestand aus einem frueheren Lauf, den die Extraktion diesmal NICHT mehr liefert.
+  const NOW = "'2026-01-01T00:00:00.000Z'";
+  ctx.dbSchema.db.prepare(`INSERT INTO locations (book_id, user_email, loc_id, name, typ, sort_order, stale, updated_at)
+    VALUES (?, ?, 'ort_alt', 'Alte Hütte', 'gebaeude', 0, 0, ${NOW})`).run(BOOK_ID, email);
+  ctx.dbSchema.db.prepare(`INSERT INTO figure_scenes (book_id, user_email, titel, chapter_id, sort_order, stale)
+    VALUES (?, ?, 'Alte Szene', 1100, 0, 0)`).run(BOOK_ID, email);
+  ctx.dbSchema.db.prepare(`INSERT INTO songs (book_id, user_email, song_uid, titel, sort_order, updated_at)
+    VALUES (?, ?, 'song_alt', 'Altes Lied', 0, ${NOW})`).run(BOOK_ID, email);
+
+  ctx.mockAi.on((e) => e.schemaKeys.includes('figuren') && !e.schemaKeys.includes('assignments') && !e.schemaKeys.includes('orte'), figurenStammResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.includes('orte') && e.schemaKeys.includes('szenen') && !e.schemaKeys.includes('figuren'), ortePassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('fakten'), faktenPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('assignments'), eventsPassResponse());
+  ctx.mockAi.on((e) => e.schemaKeys.length === 1 && e.schemaKeys.includes('beziehungen'), beziehungenResponse());
+
+  const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
+  ctx.shared.enqueueJob(jobId, () =>
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude',
+      { scope: { orte: false, szenen: false, songs: false, ereignisse: false, beziehungen: false, kontinuitaet: false, erzaehlprofil: false, coverage: false } }));
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
+
+  assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
+  // Der Kern lief: die Figuren sind konsolidiert.
+  assert.ok(job.result.figCount >= 2, `Figuren-Katalog läuft immer (fig=${job.result.figCount})`);
+
+  const q = (sql) => ctx.dbSchema.db.prepare(sql).get(BOOK_ID, email);
+  assert.equal(q('SELECT COUNT(*) n FROM locations WHERE book_id = ? AND user_email = ? AND stale = 0').n, 1,
+    'der bestehende Ort darf nicht stale werden');
+  assert.equal(q("SELECT name FROM locations WHERE book_id = ? AND user_email = ?").name, 'Alte Hütte',
+    'und der neue Ort aus der Extraktion darf nicht angelegt werden');
+  assert.equal(q('SELECT COUNT(*) n FROM figure_scenes WHERE book_id = ? AND user_email IS ? AND stale = 0').n, 1,
+    'die bestehende Szene darf nicht stale werden');
+  assert.equal(q('SELECT COUNT(*) n FROM songs WHERE book_id = ? AND user_email IS ?').n, 1,
+    'die bestehende Musikbibliothek bleibt');
+  // Kennzahlen zeigen den BESTAND, nicht 0 — sonst liest sich der Teil-Lauf wie ein Datenverlust.
+  assert.equal(job.result.orteCount, 1, 'orteCount zeigt den bestehenden Katalog');
+  assert.equal(job.result.szenenCount, 1, 'szenenCount zeigt den bestehenden Bestand');
+  assert.equal(job.result.songsCount, 1, 'songsCount zeigt den bestehenden Bestand');
 });
 
 test('Komplettanalyse Voll-Lauf schreibt den Konsolidierungs-Checkpoint (Gegenprobe)', async () => {

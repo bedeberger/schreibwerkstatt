@@ -35,6 +35,11 @@
 //    Zwei Ausnahmen, begründet an CONTENT_LIVE_REGEX/CONTENT_VOLATILE_REGEX: Poll-Endpunkte
 //    (/changes, /presence) werden nie gecacht, wachsende Logs (Revisionsliste) und die Suche
 //    laufen Netz-zuerst mit Cache als Offline-Rückfall.
+//    MIT NACHZUG: weicht die Revalidierung vom ausgelieferten Cache-Stand ab,
+//    meldet der SW das als 'content-updated' an seine Tabs (notifyContentUpdated).
+//    Ohne diese Meldung ist SWR aus Sicht der UI reines „stale" — die Netzantwort
+//    fuellt nur den Cache, nicht die schon gerenderte Sidebar, und der Baum wird
+//    erst beim ZWEITEN Reload aktuell.
 //  - Schreibende Requests (PUT/POST/DELETE): nie behandelt (method-Check am Anfang)
 //  - Auth/KI/Job-Queue/SSE: Network-Only, nie cachen
 
@@ -262,15 +267,22 @@ async function handleNavigate(req) {
   return new Response('Offline – Shell nicht im Cache.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }
 
+// Broadcast an alle kontrollierten Tabs. Eine Stelle, zwei Meldungen
+// ('shell-incoherent', 'content-updated') — beide sagen dem Client, dass das,
+// was er gerade zeigt, nicht mehr das ist, was hier liegt.
+async function postToClients(msg) {
+  try {
+    const clients = await self.clients.matchAll({ includeUncontrolled: false });
+    for (const c of clients) c.postMessage(msg);
+  } catch {}
+}
+
 // Meldet allen kontrollierten Tabs, dass der kohärente Asset-Satz dieser
 // Generation Lücken hat (Einzel-Eviction). Der Client triggert daraufhin den
 // regulären Update-/Reload-Pfad (Banner falls Editor dirty, sonst Reload) und
 // bootet in eine frisch precachte, kohärente Generation.
-async function notifyIncoherent(pathname) {
-  try {
-    const clients = await self.clients.matchAll({ includeUncontrolled: false });
-    for (const c of clients) c.postMessage({ type: 'shell-incoherent', path: pathname });
-  } catch {}
+function notifyIncoherent(pathname) {
+  return postToClients({ type: 'shell-incoherent', path: pathname });
 }
 
 // Kohärenz-kritische Shell-Assets (App-JS/Partials/CSS/i18n/Icons): Cache-Only.
@@ -356,6 +368,50 @@ function _forbidsStale(res) {
   return /\bno-cache\b|\bno-store\b/i.test(cc);
 }
 
+// Hat die Revalidierung etwas anderes geliefert als den ausgelieferten Stand?
+//
+// Zwei Wege, und der erste ist der Regelfall: traegt die gecachte Antwort einen
+// ETag, entscheidet der Header-Vergleich ohne einen einzigen Byte-Read. Genau
+// dafuer setzen die beiden Lese-Endpunkte des Baums ihren ETag
+// (routes/content/books.js) — bei unveraendertem Buch beantwortet ihn schon der
+// HTTP-Cache des Browsers mit 304, ganz ohne Body.
+//
+// Ohne ETag bleibt der Textvergleich gegen den vorab gezogenen Klon. Fehlt der
+// (Klon nicht lesbar, Netzantwort ohne ETag obwohl der Cache-Eintrag einen hat):
+// als Drift werten. Ein Nachzug zu viel kostet einen leisen Re-Render, ein
+// verpasster kostet die Aussage, um derentwillen das Ganze existiert.
+async function _samePayload(cachedEtag, cachedClone, net) {
+  if (cachedEtag) return net.headers.get('ETag') === cachedEtag;
+  if (!cachedClone) return false;
+  try { return (await cachedClone.text()) === (await net.clone().text()); }
+  catch { return false; }
+}
+
+// Fuer WELCHE Pfade lohnt der Vergleich ueberhaupt? Buchliste und Seitenbaum —
+// aus ihnen entsteht die Sidebar, und nur sie haben clientseitig einen
+// Konsumenten. Ein Seiten-Body ist ausgenommen, obwohl er ebenfalls SWR laeuft:
+// ihn zu vergleichen hiesse, bei JEDEM Seiten-Read einen Klon zu ziehen und den
+// vollen Text zu vergleichen, damit am Ende eine Meldung entsteht, die niemand
+// liest (der offene Editor hat seinen eigenen Stale-Write-Schutz).
+//
+// Diese Liste sagt nur „vergleichen ja/nein". Was ein Pfad BEDEUTET, entscheidet
+// weiterhin allein der Client (boot/content-updated.js) — der SW kennt keine Karten.
+const CONTENT_NOTIFY_REGEX = /^\/content\/(?:books|books\/\d+\/tree)$/;
+
+// Meldet den Tabs, dass die Hintergrund-Revalidierung dieses Pfads einen ANDEREN
+// Inhalt ergeben hat als der Cache-Hit, den sie gerade rendern.
+//
+// WARUM DAS NOETIG IST: Stale-While-Revalidate gibt den Cache-Stand an die UI
+// und die Netzantwort nur in den Cache. Die schon gerenderte Sidebar erfaehrt
+// davon nie — deshalb zeigt der erste Reload den Stand des letzten Besuchs und
+// erst der zweite den aktuellen. Der Netz-Request laeuft ohnehin; hier wird nur
+// sein Ergebnis nicht mehr weggeworfen. Der Client entscheidet, was ein Pfad
+// fuer ihn bedeutet (public/js/app/boot/content-updated.js) — der SW kennt
+// keine Karten.
+function notifyContentUpdated(pathname) {
+  return postToClients({ type: 'content-updated', path: pathname });
+}
+
 async function _handleSwr(req, cacheName) {
   // Bypass-Marker: konsistenzkritische Reads (z.B. Konflikt-Check vor
   // Draft-Push) müssen frische Server-Daten sehen, nicht den SWR-Cache.
@@ -363,8 +419,28 @@ async function _handleSwr(req, cacheName) {
   // ein veralteter Draft überschreibt Server-Stand.
   const url = new URL(req.url);
   if (url.searchParams.has('__fresh')) {
-    try { return await fetch(req); }
-    catch {
+    try {
+      const net = await fetch(req);
+      // Den CACHE-EINTRAG trotzdem nachziehen (wie handleConfig es tut). Der
+      // Marker heisst „beantworte MICH nicht aus dem Cache" — nicht „lass die
+      // Offline-Kopie auf dem Stand des allerersten Loads stehen". Ohne das
+      // frieren genau die Buecher ein, die man nur per Buchwechsel oeffnet
+      // (`FRESH_SOURCES`): ihr Baum kaeme im Zug nie aus dem Cache, weil er nie
+      // hineingeschrieben wurde. Der Aufrufer bekommt unveraendert die
+      // Netzantwort — an der Konsistenzzusage des Markers aendert sich nichts.
+      if (net && net.ok && net.type !== 'opaqueredirect') {
+        const cw = await caches.open(cacheName);
+        // Unter dem Pfad OHNE `__fresh` ablegen, sonst entsteht ein zweiter
+        // Eintrag, den kein normaler Read je trifft (und der den 200er-Deckel
+        // mit Dubletten fuellt). Eigene URL-Instanz: `url` wird weiter unten
+        // noch gelesen.
+        const key = new URL(req.url);
+        key.searchParams.delete('__fresh');
+        await cw.put(new Request(key.toString()), net.clone());
+        await _evictContentCache(cw);
+      }
+      return net;
+    } catch {
       return new Response(JSON.stringify({ error: 'offline' }), {
         status: 503,
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
@@ -382,10 +458,21 @@ async function _handleSwr(req, cacheName) {
   // billigste Absicherung gegen den naechsten solchen Endpunkt: er muss nur
   // seinen Header setzen und braucht keinen Eintrag in einer Liste hier.
   if (cached && _forbidsStale(cached)) return _handleNetworkFirst(req, cacheName);
+  // Vergleichskopie ZIEHEN, BEVOR der Cache-Hit rausgeht: `clone()` wirft,
+  // sobald der Client den Body gelesen hat. Traegt die gecachte Antwort einen
+  // ETag, reicht spaeter der Header-Vergleich und der Klon entfaellt — der
+  // Baum eines grossen Buchs sind ein paar hundert KB, die sonst bei jedem
+  // Read doppelt im Speicher liegen.
+  const worthDiffing = !!cached && CONTENT_NOTIFY_REGEX.test(url.pathname);
+  const cachedEtag = worthDiffing ? cached.headers.get('ETag') : null;
+  const cachedClone = (worthDiffing && !cachedEtag) ? cached.clone() : null;
   const netPromise = fetch(req).then(async (res) => {
     if (res && res.ok && res.type !== 'opaqueredirect') {
+      // Der Vergleich muss VOR dem cache.put laufen, sonst ist der alte Stand weg.
+      const drifted = worthDiffing && !(await _samePayload(cachedEtag, cachedClone, res));
       await cache.put(req, res.clone());
       await _evictContentCache(cache);
+      if (drifted) notifyContentUpdated(url.pathname);
     }
     return res;
   }).catch(() => null);

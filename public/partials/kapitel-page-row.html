@@ -10,6 +10,21 @@
     <span class="page-status-dot" :class="'page-status-' + $app.pageStatus(page)"></span>
     <span x-text="page.name"></span>
   </span>
+  <!-- Laengenbalken relativ zur laengsten Seite des Kapitels: zeigt auf einen
+       Blick, welche Seite das Gewicht traegt. -->
+  <span class="kapitel-page-bar" aria-hidden="true">
+    <span class="kapitel-page-bar-fill" :style="{ width: kdPageBar(page.id) + '%' }"></span>
+  </span>
+  <!-- Offene Lektorats-Befunde. `null` = nie geprueft -> KEINE Plakette
+       (ungeprueft ist nicht fehlerfrei). -->
+  <template x-if="kdPageFindings(page.id) !== null">
+    <span class="kapitel-page-findings"
+          :class="kdPageFindings(page.id) > 0 ? 'kapitel-page-findings--open' : 'kapitel-page-findings--clean'"
+          :data-tip="kdPageFindings(page.id) > 0
+            ? $app.t('kapitelReview.dash.pageFindings', { n: kdPageFindings(page.id) })
+            : $app.t('kapitelReview.dash.pageClean')"
+          x-text="kdPageFindings(page.id) > 0 ? kdPageFindings(page.id) : '✓'"></span>
+  </template>
   <span class="kapitel-page-edited" x-show="page.updated_at" x-text="$app.formatDate(page.updated_at)"></span>
   <span class="kapitel-page-stats">
     <template x-if="$app.tokEsts[page.id] && $app.tokEsts[page.id].words > 0">

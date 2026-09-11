@@ -1,0 +1,82 @@
+<!-- Lauf-Umfang der Komplettanalyse: fragt vor jedem Lauf, welche Schritte neu
+     berechnet werden. Ersetzt die frühere Ja/Nein-Bestätigung — es ist dieselbe
+     Frage, nur genauer beantwortbar. Der Kern steht als ausgegraute Zeile mit drin,
+     damit die Liste ein Inventar dessen ist, was der Job überhaupt tut, statt nur
+     einer Liste von Schaltern. Katalog-SSoT: public/js/komplett-scope.js. -->
+<dialog class="komplett-scope-dialog"
+        x-data="modal()" x-modelable="open" x-model="komplettScopeOpen">
+  <div class="komplett-scope-head">
+    <span class="komplett-scope-title" x-text="t('komplett.scope.title')"></span>
+    <button type="button" class="komplett-scope-close" @click="close()"
+            :data-tip="t('common.close')" :aria-label="t('common.close')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+    </button>
+  </div>
+  <p class="card-hint komplett-scope-hint" x-text="t('komplett.scope.hint')"></p>
+
+  <div class="komplett-scope-body">
+    <!-- Kern: keine Schalter. Ein Schritt, den man nicht abwählen kann, braucht
+         keinen Schalter, der so tut, als ginge es. -->
+    <div class="komplett-scope-group">
+      <div class="card-section-title" x-text="t('komplett.scope.groupCore')"></div>
+      <ul class="komplett-scope-core">
+        <template x-for="key in komplettCoreSteps()" :key="key">
+          <li class="komplett-scope-core-item">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+            <span x-text="t('komplett.step.' + key)"></span>
+          </li>
+        </template>
+      </ul>
+      <p class="card-hint" x-text="t('komplett.scope.coreHint')"></p>
+    </div>
+
+    <div class="komplett-scope-group">
+      <div class="card-section-title" x-text="t('komplett.scope.groupKatalog')"></div>
+      <template x-for="step in komplettScopeSteps('katalog')" :key="step.key">
+        <div class="komplett-scope-step">
+          <div x-data="toggleSwitch({ label: () => $app.t('komplett.step.' + step.key) })"
+               x-modelable="value" x-model="komplettScope[step.key]"></div>
+          <p class="card-hint" x-text="t('komplett.stepHint.' + step.key)"></p>
+        </div>
+      </template>
+    </div>
+
+    <div class="komplett-scope-group" x-show="komplettScopeSteps('pruefung').length">
+      <div class="card-section-title" x-text="t('komplett.scope.groupPruefung')"></div>
+      <template x-for="step in komplettScopeSteps('pruefung')" :key="step.key">
+        <div class="komplett-scope-step">
+          <div x-data="toggleSwitch({ label: () => $app.t('komplett.step.' + step.key) })"
+               x-modelable="value" x-model="komplettScope[step.key]"></div>
+          <p class="card-hint" x-text="t('komplett.stepHint.' + step.key)"></p>
+        </div>
+      </template>
+    </div>
+
+    <div class="komplett-scope-group komplett-scope-group--force">
+      <div class="card-section-title" x-text="t('komplett.scope.groupSource')"></div>
+      <div class="komplett-scope-step">
+        <div x-data="toggleSwitch({ label: () => $app.t('komplett.scope.force') })"
+             x-modelable="value" x-model="komplettScopeForce"></div>
+        <p class="card-hint" x-text="t('komplett.scope.forceHint')"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="komplett-scope-actions">
+    <div class="komplett-scope-presets">
+      <button type="button" class="confirm-dialog-btn" @click="setKomplettScopePreset('all')"
+              x-text="t('komplett.scope.presetAll')"></button>
+      <button type="button" class="confirm-dialog-btn" @click="setKomplettScopePreset('katalog')"
+              x-text="t('komplett.scope.presetKatalog')"></button>
+    </div>
+    <div class="komplett-scope-confirm">
+      <button type="button" class="confirm-dialog-btn" @click="close()" x-text="t('common.cancel')"></button>
+      <button type="button" class="confirm-dialog-btn confirm-dialog-btn--primary"
+              @click="startKomplettRun()"
+              :disabled="komplettScopeLoading || komplettScopeCount().on === 0"
+              x-text="komplettScopeIsFull()
+                ? t('komplett.scope.startAll')
+                : t('komplett.scope.startPartial', { on: komplettScopeCount().on, total: komplettScopeCount().total })"></button>
+    </div>
+  </div>
+</dialog>

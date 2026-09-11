@@ -28,6 +28,12 @@ export function registerTagebuchRueckblickCard() {
     rbBeleg: { key: null, label: '', belege: [] },
     _rueckblickPollTimer: null,
     _lifecycle: null,
+    // Memo-Speicher von tagebuch-rueckblick.js#_memo. MUSS hier deklariert
+    // sein: legt ihn erst der Helper per `this._memos = {}` an, schreibt
+    // Alpines Scope-Merge die unbekannte Eigenschaft an die aeusserste
+    // Komponente (die Root) — dann teilen sich fremde Karten einen Topf,
+    // und ein gleichnamiger Schluessel liefert deren Eintrag zurueck.
+    _memos: {},
 
     init() {
       const onJobReconnect = (e) => {

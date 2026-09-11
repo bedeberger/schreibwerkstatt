@@ -1,3 +1,5 @@
+import { normalizeKomplettScope } from '../komplett-scope.js';
+
 // Feature-Flag für den Block-Level-Merge bei Stale-Write-Konflikten (Notebook +
 // Focus-Editor). Off → klassischer Überschreiben/Übernehmen-Banner. Client-Konstante
 // (keine Per-User-Differenzierung nötig); bei Bug einfach auf false → alter Pfad.
@@ -135,6 +137,10 @@ const pageState = () => ({
   // Vom Server (loadPage → last_editor) befüllt, in selectPage/_refetchCurrentPage
   // gegen das aktuelle Gerät gefiltert (nur fremde EIGENE Geräte, nicht live).
   // null = kein Hint (eigener Browser, fehlende Daten oder fremder User).
+  // Reiner SCHNAPPSCHUSS des letzten Seiten-Loads — kein Save-Pfad schreibt hier;
+  // ob er noch gilt, entscheidet der abgeleitete Getter `pageLastEditorHint`
+  // (app-root-getters.js) gegen `currentPage.updated_at`. Die Anzeige liest den
+  // Getter, nicht dieses Feld.
   pageLastEditor: null,
   currentPageEmpty: false,
   // true, wenn der Seiteninhalt nicht geladen werden konnte (Netz-/SW-Cache-
@@ -321,6 +327,7 @@ const cardsState = () => ({
   showUserSettingsCard: false,
   showMyStatsCard: false,
   showMyBooksCard: false,
+  showAutorenprofilCard: false,
   showHelpCard: false,
   showOnboardingCard: false,
   // First-Login-Willkommens-Banner (zeigt einmalig auf „Erste Schritte").
@@ -349,13 +356,18 @@ const cardsState = () => ({
   showSearchCard: false,
   showShareLinksCard: false,
   showKomplettStatus: false,
-  // Teil-Lauf der Komplettanalyse: die beiden read-only Endphasen (Kontinuitätsprüfung
-  // P8, Erzählprofil) einzeln abwählbar. Sie sitzen am Ende der seriellen Kette und
-  // kosten damit Wartezeit UND Geld — wer nach einer Kapitel-Änderung nur den Katalog
-  // auffrischt, braucht sie nicht. Default false = alles läuft (unverändertes
-  // Verhalten); nachziehen geht über die Standalone-Jobs der jeweiligen Karte.
-  komplettSkipContinuity: false,
-  komplettSkipNarrativeProfile: false,
+  // Lauf-Umfang der Komplettanalyse (Modal vor dem Start): welche Schritte der Lauf
+  // neu berechnet. Katalog + Normalisierung in ../komplett-scope.js; der zuletzt
+  // gestartete Umfang liegt serverseitig und ist die Vorbelegung des nächsten Laufs.
+  // `komplettScope` hier vollständig zu seeden, damit das Modal auch dann rendert,
+  // wenn der Fetch der Vorbelegung noch läuft oder scheitert.
+  komplettScopeOpen: false,
+  komplettScopeLoading: false,
+  komplettScope: normalizeKomplettScope(null),
+  // «Von Grund auf neu erstellen»: leert vor dem Lauf Delta-Cache + Konsolidierungs-
+  // Checkpoint. Bewusst NICHT Teil des gespeicherten Umfangs — eine Neu-Erstellung ist
+  // eine Entscheidung für DIESEN Lauf und darf sich nicht stillschweigend wiederholen.
+  komplettScopeForce: false,
   showAvatarMenu: false,
   // Overflow-Menü ("⋯") der Seiten-Action-Leiste (Notebook-Seitenansicht).
   pageActionsMenuOpen: false,
@@ -443,6 +455,10 @@ const lektoratState = () => ({
   _statsObserver: null,
   _statsObserverMutation: null,
   _statsObserverState: null,
+  // Leiser Nachzug des Seitenbaums (book/tree/catchup.js): Entprell-Timer +
+  // Re-Entry-Guard. Refs hier, damit destroy() den Timer abraeumen kann.
+  _treeCatchUpTimer: null,
+  _treeCatchUpInflight: false,
 });
 
 // bookReviewHistory wird von tree.js/loadPages geschrieben und von

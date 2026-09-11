@@ -134,6 +134,11 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
   // (das Profil wird gerade ERST aus dem Text destilliert; VORRANGIGE-ANGABEN
   // sollen die Beschreibung nicht einfärben).
   const SYS_STILPROFIL_CORE       = buildSystem(sp.stilprofil        || 'Du bist ein literarischer Stilanalytiker. Du destillierst aus einer Leseprobe den unverwechselbaren Stil des Autors – rein deskriptiv, ohne zu werten und ohne den Text fortzuschreiben.', rules);
+  // Autorenprofil-Deutung: verdichtet die Buch-Stilprofile + Messwerte zu einer
+  // Aussage ueber den Autor. Wie beim Stilprofil ohne Buch-Kontext-Block — der
+  // Lauf ist werk-, nicht buch-bezogen, und die VORRANGIGEN ANGABEN eines
+  // einzelnen Buchs haetten hier nichts zu suchen.
+  const SYS_AUTORENPROFIL_CORE    = buildSystem(sp.autorenprofil     || 'Du bist ein literarischer Stilanalytiker. Du verdichtest die Stilprofile mehrerer Buecher desselben Autors zu seiner wiedererkennbaren Handschrift – rein deskriptiv, ohne zu werten, ohne Vergleiche mit anderen Autoren und ohne etwas zu behaupten, das die Vorlagen nicht hergeben.', rules);
   // Struktur-Check journalistischer Beitraege: prueft die FORM der Textsorte,
   // nicht die Sprache. Bewusst ohne Buch-Kontext-Block — der Soll-Katalog kommt
   // aus der Textsorte (prompts/textsorten.js), nicht aus den Buch-Angaben.
@@ -186,6 +191,8 @@ function _buildLocalePrompts(localeConfig, globalErklaerungRule, buchKontext = '
     SYSTEM_BUCHBEWERTUNG_BLOCKS: _toCacheBlocks(SYS_BUCHBEWERTUNG_CORE, reviewCtx),
     // Stilprofil-Extraktion: deskriptive Analyse, kein Buch-Kontext-Block.
     SYSTEM_STILPROFIL:           SYS_STILPROFIL_CORE,
+    // Autorenprofil-Deutung: werk-bezogen, ebenfalls ohne Buch-Kontext-Block.
+    SYSTEM_AUTORENPROFIL:        SYS_AUTORENPROFIL_CORE,
     // Struktur-Check: Formpruefung gegen die Textsorte, kein Buch-Kontext-Block.
     SYSTEM_STRUKTUR:             SYS_STRUKTUR_CORE,
     // Titel-Werkstatt: Vorschlaege zur Auswahl, kein Buch-Kontext-Block.
