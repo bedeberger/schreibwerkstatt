@@ -4,6 +4,7 @@
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
 import { rechercheMethods } from '../book/recherche.js';
+import { ideenBacklinkMethods } from '../book/ideen-backlinks.js';
 import { rechercheToSourceMethods } from '../sources/from-research.js';
 import { rechercheScrapeMethods } from '../book/recherche/scrape.js';
 import { researchChatMethods } from '../chat/research-chat.js';
@@ -29,6 +30,11 @@ export function registerRechercheCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('rechercheCard', () => ({
     items: [],
+
+    // Ideen-Plaketten (Gegenrichtung der Ideen-Verknuepfung, read-only).
+    // Map Ziel-ID → Ideen-Anrisse; geladen in loadIdeaBacklinks (non-fatal).
+    ideaBacklinks: {},
+    _ideaBacklinkBookId: null,
     tagPool: [],
     linkTargets: {},
     _linkTargetsBookId: null,
@@ -257,5 +263,6 @@ export function registerRechercheCard() {
     ...rechercheToSourceMethods,
     ...rechercheScrapeMethods,
     ...researchChatMethods,
+    ...ideenBacklinkMethods,
   }));
 }

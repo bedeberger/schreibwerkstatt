@@ -68,8 +68,10 @@ export const hashBuildMethods = {
     else if (this.showEreignisseCard) parts.push('ereignisse');
     else if (this.showPlotCard) parts.push('plot');
     else if (this.showMotivCard) parts.push('motiv');
+    else if (this.showWerkbankCard) parts.push('werkbank');
     else if (this.showWorldFactsCard) parts.push('fakten');
     else if (this.showRechercheCard) parts.push('recherche');
+    else if (this.showIdeenBoardCard) parts.push('ideen');
     else if (this.showSourcesCard) parts.push('quellen');
     else if (this.showKontinuitaetCard) parts.push('kontinuitaet');
     else if (this.showErzaehlprofilCard) parts.push('erzaehlprofil');

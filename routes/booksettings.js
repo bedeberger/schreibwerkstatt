@@ -3,7 +3,7 @@ const express = require('express');
 const {
   getBookSettings, saveBookSettings, setBookEntitiesEnabled,
   setBookCitationSettings, VALID_CITATION_STYLES, VALID_BIBLIOGRAPHY_SCOPES, VALID_CITATION_NOTES,
-  setBookXrefSettings, setBookTextsorte, setBookIsFinished,
+  setBookXrefSettings, setBookTextsorte, setBookIsFinished, setBookResearchSettings,
 } = require('../db/schema');
 const { isValidTextsorte } = require('../db/textsorte');
 const { aclParamGuard, sessionEmail } = require('../lib/acl');
@@ -260,6 +260,31 @@ router.put('/:book_id/textsorte', aclParamGuard('editor'), jsonBody, (req, res) 
   setBookTextsorte(bookId, value);
   logger.info(`[textsorte] book=${bookId} default=${value || '–'}`);
   res.json({ ok: true, textsorte: value });
+});
+
+/** Recherche-Profil des Buchs: Freitext-Steuerung + Domain-Eingrenzung fuer den
+ *  Recherche-Chat. Eigener Endpunkt wie /citation, /xrefs und /textsorte.
+ *
+ *  Teil-PUT: ein nicht uebergebenes Feld behaelt seinen Stand — der Freitext und
+ *  die Domainliste werden in der Oberflaeche zwar zusammen bearbeitet, sind aber
+ *  zwei unabhaengige Aussagen.
+ *
+ *  Die Antwort traegt den NORMALISIERTEN Stand (Domains als Array): die
+ *  Oberflaeche muss zeigen, was wirklich gespeichert wurde — eine eingetippte
+ *  ganze URL wird zum Host, eine unbrauchbare Zeile faellt weg, und das darf der
+ *  User nicht erst beim naechsten Laden merken. */
+router.put('/:book_id/research', aclParamGuard('editor'), jsonBody, (req, res) => {
+  const bookId = req.bookId;
+  const b = req.body || {};
+  const cur = getBookSettings(bookId, sessionEmail(req));
+
+  const saved = setBookResearchSettings(bookId, {
+    research_profile: b.research_profile !== undefined ? b.research_profile : cur.research_profile,
+    research_domains: b.research_domains !== undefined ? b.research_domains : cur.research_domains,
+  });
+
+  logger.info(`[recherche-profil] book=${bookId} profilZeichen=${(saved.research_profile || '').length} domains=${saved.research_domains.length}`);
+  res.json({ ok: true, ...saved });
 });
 
 module.exports = router;

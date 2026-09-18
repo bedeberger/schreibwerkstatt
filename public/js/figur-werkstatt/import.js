@@ -6,6 +6,11 @@
 
 import { fetchJson } from '../utils.js';
 
+// Normalisierung fuer den Namensvergleich: getrimmt, kleingeschrieben. Bewusst
+// stumpf — er entscheidet nur die VORAUSWAHL im Verknuepfen-Dialog, nie die
+// Verknuepfung selbst (die bestaetigt der Autor).
+function _norm(s) { return String(s || '').trim().toLowerCase(); }
+
 export const importMethods = {
   async startImport() {
     const app = window.__app;
@@ -24,6 +29,79 @@ export const importMethods = {
     } finally {
       this.importablesLoading = false;
     }
+  },
+
+  // ── Nachtraeglich mit einer Katalog-Figur verknuepfen ──────────────────────
+  // Der Weg fuer alle, die erst geplant und dann geschrieben haben: die
+  // Komplettanalyse legt die Figur ein zweites Mal an. Ohne den Zeiger bleiben
+  // es zwei Figuren, und jede Bruecke im Haus fuehrt zwei Spalten.
+  async startLinkFigure() {
+    const app = window.__app;
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId || !this.selectedDraftId) return;
+    this.linking = true;
+    this.linkCandidatesLoading = true;
+    this.selectedLinkFigureId = '';
+    this.errorMessage = '';
+    try {
+      const rows = await fetchJson(`/draft-figures/${bookId}/link-candidates`);
+      this.linkCandidates = Array.isArray(rows) ? rows : [];
+      // Vorauswahl bei Namensgleichheit — der haeufigste Fall ist genau der,
+      // und er soll ein Klick sein, keine Suche.
+      const me = _norm(this.editName || this.selectedDraft()?.name);
+      const hit = this.linkCandidates.find(f => _norm(f.name) === me || _norm(f.kurzname) === me);
+      if (hit) this.selectedLinkFigureId = String(hit.id);
+    } catch {
+      this.linkCandidates = [];
+      this.errorMessage = app.t('werkstatt.error.linkLoad') || app.t('common.unknownError');
+    } finally {
+      this.linkCandidatesLoading = false;
+    }
+  },
+
+  cancelLinkFigure() {
+    this.linking = false;
+    this.selectedLinkFigureId = '';
+    this.linkCandidates = [];
+  },
+
+  // figureId === null loest die Verknuepfung wieder (der Draft lebt weiter —
+  // `source_figure_id` ist ein Zeiger, kein Besitz).
+  async runLinkFigure(figureId) {
+    const app = window.__app;
+    const id = this.selectedDraftId;
+    if (!id) return;
+    const fid = figureId === null ? null : parseInt(figureId ?? this.selectedLinkFigureId);
+    if (figureId !== null && !fid) return;
+    this.busy = true;
+    try {
+      const r = await fetch(`/draft-figures/by-id/${id}/link-figure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ figureId: fid }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 409 && body.existingDraftId) {
+        // Die Katalog-Figur haengt schon an einem anderen Draft — dorthin
+        // springen statt eine mehrdeutige Quelle zu erlauben.
+        this.errorMessage = app.t('werkstatt.error.alreadyLinked');
+        this.cancelLinkFigure();
+        this.selectDraft(body.existingDraftId);
+        return;
+      }
+      if (!r.ok) throw new Error(body.error_code || 'link failed');
+      // Draft-Liste lokal nachziehen (der Server liefert die frische Zeile mit
+      // aufgeloestem source_figure_name) und die Cross-Feature-Badges neu holen:
+      // die Plot-/Motiv-Beteiligung haengt an der Quell-Figur.
+      const idx = this.drafts.findIndex(d => d.id === id);
+      if (idx >= 0) this.drafts.splice(idx, 1, body);
+      this.cancelLinkFigure();
+      this.errorMessage = '';
+      this.loadPlotUsage?.();
+      this.loadMotifUsage?.();
+    } catch {
+      this.errorMessage = app.t('werkstatt.error.link') || app.t('common.unknownError');
+    } finally { this.busy = false; }
   },
 
   cancelImport() {

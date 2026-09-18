@@ -8,9 +8,14 @@ const {
   listDraftFigures, getDraftFigureBySource,
   createDraftFigure, updateDraftFigure, deleteDraftFigure,
   listImportableFigures, listWerkstattRuns, deleteWerkstattRun,
-  getFigureWithDetails,
+  getFigureWithDetails, setDraftSourceFigure, listLinkCandidates,
 } = require('../db/schema');
 const { scopedDraft, scopedRun } = require('./draft-figures-acl');
+const occDb = require('../db/draft-figure-occurrences');
+const contentStore = require('../lib/content-store');
+const { extractPsychologie, PSYCHE_KERNE } = require('../lib/draft-mindmap-extract');
+const { computeArcFindings } = require('../lib/figure-arc');
+const appSettings = require('../lib/app-settings');
 const { buildMindmapFromFigure, mapArchetype } = require('../lib/draft-mindmap-builder');
 const { toIntId } = require('../lib/validate');
 const { aclParamGuard, sessionEmail } = require('../lib/acl');
@@ -84,6 +89,17 @@ router.get('/by-id/:id/runs', (req, res) => {
   const draft = scopedDraft(req, res, req.params.id);
   if (!draft) return;
   res.json(listWerkstattRuns(draft.id, draft.user_email));
+});
+
+// Fundstellen EINER Werkstatt-Figur (Ist-Index des Bogens). Optionaler
+// `kern`-Filter fuer den Zell-Klick im Verlaufsband: die Zelle nennt eine Zahl,
+// und ohne ihre Aufloesung bleibt sie eine Behauptung (gleiche Begruendung wie
+// das Zell-Detail der Motiv-Werkstatt). Ohne Filter alle Kerne.
+router.get('/by-id/:id/occurrences', (req, res) => {
+  const draft = scopedDraft(req, res, req.params.id);
+  if (!draft) return;
+  const kern = PSYCHE_KERNE.includes(req.query.kern) ? req.query.kern : null;
+  res.json(occDb.listDraftOccurrences(draft.id, { kern }));
 });
 
 router.get('/runs/:run_id', (req, res) => {
@@ -162,6 +178,77 @@ router.get('/:book_id/importable', (req, res) => {
   res.json(listImportableFigures(req.bookId, sessionEmail(req)));
 });
 
+// Bogen-Ansicht: Ist-Index + Messung fuer ALLE Werkstatt-Figuren eines Buchs.
+// Speist das Kern-x-Kapitel-Verlaufsband der Karte UND die Befund-Sammelstelle;
+// ein zweiter Lesepfad zeigte zwei verschiedene Bestaende (gleiche Regel wie die
+// zwei Ansichten des Recherche-Boards).
+//
+// `scanned=false` heisst UNGEPRUEFT, nicht abwesend: ohne befuellten Ist-Index
+// liefert die Messung keine Befunde, und das Frontend weist den Zustand aus —
+// sonst meldete ein nie gelaufener Anchor jeden Kern als „steht nicht im Buch"
+// (gleiches Muster wie `motif_occurrences` und `anchorMap === null` im Plot-Check).
+//
+// Kapitel-Reihenfolge ueber die Content-Store-Facade (kein Direkt-SQL auf
+// chapters), wortgleich mit routes/motifs.js#_chapterOrder.
+function _chapterOrder(tree) {
+  const out = [];
+  (function walk(chapters) {
+    for (const c of chapters || []) {
+      out.push(c.id);
+      walk(c.subchapters);
+    }
+  })(tree?.chapters);
+  return out;
+}
+
+router.get('/:book_id/arc', async (req, res) => {
+  const bookId = req.bookId;
+  const userEmail = sessionEmail(req);
+  try {
+    const drafts = listDraftFigures(bookId, userEmail);
+    const scanned = occDb.hasDraftOccurrences(bookId, userEmail);
+    const floor = Number(appSettings.get('werkstatt.anchor.min_score')) || 0;
+
+    // Counts + Kapitel-Aufschluesselung einmal buchweit holen und auf die Drafts
+    // verteilen — kein Query pro Figur.
+    const counts = new Map();
+    for (const r of occDb.occCounts(bookId, userEmail, floor)) {
+      if (!counts.has(r.draft_id)) counts.set(r.draft_id, {});
+      counts.get(r.draft_id)[r.kern] = r.n;
+    }
+    const chapters = new Map();
+    for (const r of occDb.occChapters(bookId, userEmail)) {
+      if (r.chapter_id == null) continue;   // Fundstelle ohne aufloesbares Kapitel
+      if (!chapters.has(r.draft_id)) chapters.set(r.draft_id, {});
+      const perKern = chapters.get(r.draft_id);
+      (perKern[r.kern] ||= []).push({ chapterId: r.chapter_id, n: r.n });
+    }
+
+    const payload = drafts.map(d => {
+      const psy = extractPsychologie(d.mindmap);
+      const geplant = {};
+      for (const k of PSYCHE_KERNE) geplant[k] = !!(psy && psy[k] && psy[k].length);
+      return {
+        id: d.id, name: d.name, archetype: d.archetype,
+        geplant,
+        counts: counts.get(d.id) || {},
+        occ: chapters.get(d.id) || {},
+      };
+    });
+
+    const chapterOrder = _chapterOrder(await contentStore.bookTree(bookId, req));
+    const befunde = computeArcFindings({ drafts: payload, chapterOrder, scanned });
+    res.json({
+      drafts: payload, befunde, scanned,
+      stale: occDb.draftAnchorStale(bookId, userEmail),
+      kerne: PSYCHE_KERNE,
+    });
+  } catch (e) {
+    logger.error(`[werkstatt] Bogen-Ansicht fehlgeschlagen book=${bookId}: ${e.message}`, { stack: e.stack });
+    res.status(500).json({ error_code: 'FIGURE_ARC_FAILED' });
+  }
+});
+
 // Werkstatt-Figur aus bestehender figures-Row importieren. Body: { figureId }.
 // Idempotent gegenüber doppelten Klicks: bestehender Draft mit gleicher
 // source_figure_id → 409 mit existingDraftId, damit das Frontend dorthin
@@ -201,6 +288,50 @@ router.post('/:book_id/import', jsonBody, (req, res) => {
   });
   logger.info(`[werkstatt] import draft=${created.id} from figure=${figureId} ("${fig.name}")`);
   res.json(created);
+});
+
+// Nachtraegliche Verknuepfung mit einer Katalog-Figur (`source_figure_id`).
+//
+// Der Weg fuer alle, die erst geplant und dann geschrieben haben: die
+// Komplettanalyse legt die Figur ein zweites Mal an, und ohne diesen Zeiger
+// bleiben es zwei Figuren — mit zwei Bruecken-Spalten an jedem Beat und jedem
+// Motiv. `figureId: null` loest die Verknuepfung wieder.
+//
+// Kein Promotion-Pfad: der Katalog bleibt der abgeleitete Index der
+// Komplettanalyse, hier wird nur ein Zeiger gesetzt.
+router.get('/:book_id/link-candidates', (req, res) => {
+  const cands = listLinkCandidates(req.bookId, sessionEmail(req));
+  res.json(cands);
+});
+
+router.post('/by-id/:id/link-figure', jsonBody, (req, res) => {
+  const draft = scopedDraft(req, res, req.params.id);
+  if (!draft) return;
+  const raw = req.body?.figureId;
+  if (raw == null) {
+    logger.info(`[werkstatt] unlink draft=${draft.id} von figure=${draft.source_figure_id}`);
+    return res.json(setDraftSourceFigure(draft.id, null));
+  }
+  const figureId = toIntId(raw);
+  if (!figureId) return res.status(400).json({ error_code: 'FIGURE_ID_REQ' });
+
+  const fig = getFigureWithDetails(figureId);
+  if (!fig) return res.status(404).json({ error_code: 'FIGURE_NOT_FOUND' });
+  if (fig.book_id !== draft.book_id) return res.status(400).json({ error_code: 'FIGURE_BOOK_MISMATCH' });
+  // Owner-Check wie beim Import: Pre-Migration-Figuren mit user_email IS NULL
+  // bleiben verboten, sonst entstuende ein Zeiger ohne reverse-Owner-Pfad.
+  if (fig.user_email !== draft.user_email) return res.status(403).json({ error_code: 'FORBIDDEN' });
+
+  // Eine Katalog-Figur haengt an hoechstens EINEM Draft — sonst zeigten zwei
+  // Werkstatt-Figuren auf dieselbe Quelle und die Lesezeit-Aufloesung waere
+  // mehrdeutig (dasselbe, was der Import mit 409 ALREADY_IMPORTED abfaengt).
+  const existing = getDraftFigureBySource(draft.book_id, draft.user_email, figureId);
+  if (existing && existing.id !== draft.id) {
+    return res.status(409).json({ error_code: 'ALREADY_IMPORTED', existingDraftId: existing.id });
+  }
+
+  logger.info(`[werkstatt] link draft=${draft.id} → figure=${figureId} ("${fig.name}")`);
+  res.json(setDraftSourceFigure(draft.id, figureId));
 });
 
 router.delete('/:id', (req, res) => {

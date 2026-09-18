@@ -129,9 +129,11 @@ export const beatsMethods = {
       status: beat.status || 'geplant',
       chapter_id: beat.chapter_id || '',
       intensitaet: beat.intensitaet || null,
+      zeit: beat.zeit || '',
       figure_ids: [...(beat.fig_ids || [])],
       draft_figure_ids: [...(beat.draft_fig_ids || [])],
       motif_ids: (beat.motifs || []).map(m => m.id),
+      location_ids: (beat.locations || []).map(l => l.id),
     };
   },
   cancelEditBeat() { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; },
@@ -217,6 +219,13 @@ export const beatsMethods = {
     this.beatDraft.motif_ids = [...set];
   },
 
+  // Schauplatz (locations.loc_id, TEXT) im Beat an-/abwählen.
+  toggleBeatDraftOrt(locId) {
+    const set = new Set(this.beatDraft.location_ids);
+    if (set.has(locId)) set.delete(locId); else set.add(locId);
+    this.beatDraft.location_ids = [...set];
+  },
+
   async saveEditBeat(beat) {
     const app = window.__app;
     const titel = (this.beatDraft.titel || '').trim();
@@ -231,9 +240,14 @@ export const beatsMethods = {
       status: this.beatDraft.status,
       chapter_id: this.beatDraft.chapter_id ? parseInt(this.beatDraft.chapter_id) : null,
       intensitaet: this.beatDraft.intensitaet || null,
+      // Leerer Text heisst „keine Angabe" → null, nicht '': die Zeit-Messung
+      // fragt auf `Number.isFinite(jahr)`, und ein Leerstring waere ein
+      // datierter Beat ohne Datum.
+      zeit: (this.beatDraft.zeit || '').trim() || null,
       figure_ids: [...this.beatDraft.figure_ids],
       draft_figure_ids: [...this.beatDraft.draft_figure_ids],
       motif_ids: [...this.beatDraft.motif_ids],
+      location_ids: [...this.beatDraft.location_ids],
     };
     try {
       const updated = await fetchJson(`/plot/beats/${beat.id}`, {

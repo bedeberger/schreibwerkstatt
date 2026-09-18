@@ -1,6 +1,6 @@
 {
   "name": "schreibwerkstatt",
-  "version": "4.7.0",
+  "version": "4.8.0",
   "description": "Schreibwerkstatt — Schreiben, Lektorat und Buchanalyse mit KI",
   "license": "AGPL-3.0-or-later",
   "main": "server.js",
@@ -21,6 +21,7 @@
     "test:focus": "playwright test tests/e2e/focus-editor.spec.js && playwright test --config=playwright.app.config.js tests/e2e-app/focus-editor-app.spec.js",
     "cache:cleanup": "node scripts/cache-cleanup.js",
     "squash:regen": "node tools/regen-squashed.js",
+    "calibrate:tokens": "node scripts/calibrate-chars-per-token.js",
     "eval:lektorat": "node scripts/eval-lektorat.js"
   },
   "devDependencies": {

@@ -1,0 +1,71 @@
+{
+  "version": "4.8.0",
+  "date": "2026-09-18",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Neue Karte «Werkbank»: eine Tabelle Figuren × Akte zeigt, welche Figur welchen Akt trägt — mit ihren Motiven und ihrem Bogen. Ein zweiter Reiter sammelt alle gemessenen Befunde an einer Stelle.",
+      "en": "New \"Workbench\" card: a characters × acts table shows which character carries which act — with their motifs and their arc. A second tab collects all measured findings in one place."
+    },
+    {
+      "kind": "neu",
+      "de": "Neue Karte «Ideen-Board»: alle Ideen und Pendenzen des Buchs auf einem Brett. Zeilen sind Kapitel und Seiten, Spalten der Bearbeitungsstand — Karten lassen sich per Ziehen weiterschieben.",
+      "en": "New \"Idea board\" card: every idea and open item of the book on one board. Rows are chapters and pages, columns the progress state — drag a card to move it along."
+    },
+    {
+      "kind": "neu",
+      "de": "Jede Idee trägt jetzt einen Bearbeitungsstand — offen, in Arbeit, erledigt oder verworfen. Zusätzlich lässt sie sich mit einem Beat, einem Motiv oder einem Recherche-Fundstück verknüpfen.",
+      "en": "Every idea now carries a progress state — open, in progress, done or discarded. It can also be linked to a beat, a motif or a research finding."
+    },
+    {
+      "kind": "neu",
+      "de": "Figuren-Werkstatt, «Bogen im Buch»: zu jeder Figur steht jetzt, in welchen Kapiteln ihre geplanten Kerne im geschriebenen Text auftauchen. Wo der Bogen im Text nicht eingelöst wird, steht es als Befund daneben.",
+      "en": "Character workshop, \"Arc in the book\": for each character you now see in which chapters their planned themes actually appear in the written text. Where the arc is not delivered, it is listed as a finding."
+    },
+    {
+      "kind": "neu",
+      "de": "Beat-Board: zu jedem Handlungspunkt lassen sich Schauplätze und die erzählte Zeit festhalten. Widersprüche zu Geburtsjahren oder zur Reihenfolge auf dem Board werden direkt am Beat angezeigt.",
+      "en": "Beat board: each beat can now hold its locations and its narrated time. Contradictions with birth years or with the order on the board are shown right at the beat."
+    },
+    {
+      "kind": "neu",
+      "de": "PDF-Export: zwei fertig gestaltete Buchsätze stehen als Vorlage bereit — «Taschenbuch modern» und «Roman klassisch». Die Vorlage legt ein neues Profil an, das aktive Profil bleibt unverändert.",
+      "en": "PDF export: two ready-made book designs are available as templates — \"Modern paperback\" and \"Classic novel\". A template creates a new profile; the active one stays untouched."
+    },
+    {
+      "kind": "neu",
+      "de": "Kapitel-Übersicht, Abschnitt «Entwicklung»: eine Kurve zeigt, wie der Umfang eines Kapitels über die Zeit gewachsen ist — gelesen aus den gespeicherten Seitenfassungen.",
+      "en": "Chapter overview, \"Development\" section: a curve shows how a chapter grew over time — read from the saved page versions."
+    },
+    {
+      "kind": "neu",
+      "de": "Buch-Einstellungen, neuer Abschnitt «Recherche»: ein Fachprofil und eine Liste erlaubter Domains steuern, wie und wo der Recherche-Chat sucht.",
+      "en": "Book settings, new \"Research\" section: a subject profile and a list of allowed domains steer how and where the research chat searches."
+    },
+    {
+      "kind": "neu",
+      "de": "Figuren-Werkstatt: eine Werkstatt-Figur lässt sich mit ihrer Figur aus dem Katalog verknüpfen. Plot-Beats und Motive der Katalogfigur zählen dann auch in der Werkstatt mit.",
+      "en": "Character workshop: a workshop character can be linked to its counterpart in the catalogue. Plot beats and motifs of the catalogue character then count in the workshop too."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Figuren-Werkstatt: im Kopf einer Figur steht jetzt, welche Motive sie trägt und wie viele davon im Text belegt sind. Ein Klick öffnet die Motiv-Werkstatt.",
+      "en": "Character workshop: a character's header now shows which motifs they carry and how many of those appear in the text. One click opens the motif workshop."
+    },
+    {
+      "kind": "behoben",
+      "de": "Im PDF verloren getrennte Wörter mit «Source Serif» und «Source Sans» still ihren Trennstrich. Mit diesen Schriften wird jetzt ohne Silbentrennung gesetzt — mit einem Hinweis nach dem Export.",
+      "en": "In the PDF, hyphenated words silently lost their hyphen with \"Source Serif\" and \"Source Sans\". With these fonts the text is now set without hyphenation, and a note appears after the export."
+    },
+    {
+      "kind": "behoben",
+      "de": "Auswahllisten klappten in einigen Karten versetzt neben dem Feld auf statt direkt darunter.",
+      "en": "In some cards, dropdown lists opened offset next to the field instead of directly below it."
+    },
+    {
+      "kind": "behoben",
+      "de": "Plot-Werkstatt: der Spannungsbogen ruckelte beim Ein- und Ausklappen.",
+      "en": "Plot workshop: the tension curve stuttered when collapsing and expanding."
+    }
+  ]
+}

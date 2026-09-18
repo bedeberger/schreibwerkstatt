@@ -174,10 +174,26 @@ test('_beatFieldSnapshot bildet die PATCH-Form des Beat-Stands', () => {
   const ctx = makeCtx();
   const snap = ctx._beatFieldSnapshot({
     id: 1, titel: 'T', beschreibung: null, status: 'im_buch', chapter_id: 4,
-    intensitaet: 3, fig_ids: ['f1'], draft_fig_ids: [2], motifs: [{ id: 5 }, { id: 6 }],
+    intensitaet: 3, zeit: 'Sommer 1987', fig_ids: ['f1'], draft_fig_ids: [2],
+    motifs: [{ id: 5 }, { id: 6 }], locations: [{ id: 'l1' }],
   });
   assert.deepEqual(snap, {
     titel: 'T', beschreibung: '', status: 'im_buch', chapter_id: 4, intensitaet: 3,
-    figure_ids: ['f1'], draft_figure_ids: [2], motif_ids: [5, 6],
+    zeit: 'Sommer 1987',
+    figure_ids: ['f1'], draft_figure_ids: [2], motif_ids: [5, 6], location_ids: ['l1'],
   });
+});
+
+// Das Snapshot-Objekt IST das Undo-Ziel: fehlt darin ein Feld, das der PATCH
+// schreibt, kann Undo es nicht zuruecknehmen. Darum die Gegenprobe mit leerem
+// Beat — jedes Feld muss auch dann im Snapshot stehen.
+test('_beatFieldSnapshot laesst kein PATCH-Feld aus (auch bei leerem Beat)', () => {
+  const ctx = makeCtx();
+  const snap = ctx._beatFieldSnapshot({ id: 1, titel: 'T' });
+  assert.deepEqual(Object.keys(snap).sort(), [
+    'beschreibung', 'chapter_id', 'draft_figure_ids', 'figure_ids',
+    'intensitaet', 'location_ids', 'motif_ids', 'status', 'titel', 'zeit',
+  ]);
+  assert.deepEqual(snap.location_ids, []);
+  assert.equal(snap.zeit, null);
 });

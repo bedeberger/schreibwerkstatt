@@ -323,6 +323,14 @@ export const hashApplyMethods = {
           if (!this.showMotivCard) await this.toggleMotivCard();
           else { this._closeOtherMainCards('motiv'); this._scrollToCardByKey('motiv'); }
           break;
+        case 'werkbank':
+          if (!this.showWerkbankCard) await this.toggleWerkbankCard();
+          else { this._closeOtherMainCards('werkbank'); this._scrollToCardByKey('werkbank'); }
+          break;
+        case 'ideen':
+          if (!this.showIdeenBoardCard) await this.toggleIdeenBoardCard();
+          else { this._closeOtherMainCards('ideenBoard'); this._scrollToCardByKey('ideenBoard'); }
+          break;
         case 'fakten':
           if (!this.showWorldFactsCard) await this.toggleWorldFactsCard();
           else { this._closeOtherMainCards('weltfakten'); this._scrollToCardByKey('weltfakten'); }

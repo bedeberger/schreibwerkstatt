@@ -227,7 +227,25 @@
 /* Name auf eigener, breiter Zeile; Save/Cancel darunter (erscheinen erst bei
    ungespeicherten Änderungen). So verschiebt sich das Namensfeld beim Tippen
    nicht mehr und lange Motivnamen bekommen die volle Panel-Breite. */
-.motiv-editor-head { display: flex; flex-direction: column; gap: var(--space-2xs); }
+/* Sticky im Scrollport des Panels (.motiv-panel, max-height 70vh): Save/Cancel
+   erscheinen erst bei ungespeicherten Aenderungen, die Verknuepfungs-Chips liegen
+   aber weit unterhalb der Falz. Ohne sticky taucht das Save-Icon beim Entfernen
+   einer Figuren-/Beat-/Kapitel-Verknuepfung ausserhalb des Bildes auf — die
+   Aenderung ist sichtbar, der Knopf dazu nicht.
+   padding-bottom deckt den Flex-Gap zum naechsten Feld ab (sonst scrollt Text
+   durch einen Schlitz unter dem Kopf), die negative margin nimmt genau dieses
+   Padding aus dem Layout wieder heraus. */
+.motiv-editor-head {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  background: var(--color-surface);
+  padding-bottom: var(--space-2xs);
+  margin-bottom: calc(-1 * var(--space-2xs));
+}
 .motiv-editor-titlerow { display: flex; align-items: center; gap: var(--space-2xs); }
 .motiv-editor-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2xs); }
 .motiv-name-input {
@@ -354,7 +372,13 @@
 @media (max-width: 960px) {
   .motiv-layout { grid-template-columns: 1fr; }
   .motiv-graph-container { height: clamp(300px, 60vh, 480px); }
-  .motiv-panel { max-height: none; }
+  /* Gestapelt scrollt die SEITE, nicht das Panel — ein eigener Scrollport waere
+     hier ein zweites Scrollfeld unter dem Daumen. Darum overflow zurueck auf
+     visible: nur so haengt der sticky .motiv-editor-head am Viewport statt an
+     einem Scrollport, der nie scrollt (sonst stehen Save/Cancel weit oben ausser
+     Sicht, waehrend man unten eine Verknuepfung entfernt). Nichts im Panel lebt
+     vom Clipping — Chips und Fundstellen brechen um (flex-wrap / overflow-wrap). */
+  .motiv-panel { max-height: none; overflow: visible; }
   .motiv-layer-toggles { justify-content: flex-start; }
 }
 

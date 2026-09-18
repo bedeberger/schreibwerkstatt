@@ -4,6 +4,7 @@
 import { fetchJson } from '../../utils.js';
 import { ACT_PALETTE } from './constants.js';
 import { EVT } from '../../events.js';
+import { computePopoverPos, refinePopoverPos } from '../../popover-anchor.js';
 
 export const threadsMethods = {
   async addThread() {
@@ -107,22 +108,13 @@ export const threadsMethods = {
     // Schätzung vor dem Render; danach mit der echten Popover-Grösse nachjustieren,
     // damit das Menü beim Hochklappen nicht mit einer festen Höhe über den Button
     // geschoben wird (Pattern wie das Ideen-Meatball-Menü).
-    this.threadMenuPos = this._computeThreadMenuPos(this._threadTriggerRect, 220, 240);
+    this.threadMenuPos = computePopoverPos(this._threadTriggerRect, 220, 240);
     this.threadActionsOpenId = laneId;
     this._attachThreadMenuListeners();
     this.$nextTick(() => {
-      const el = this.$refs.threadMenu;
-      if (!el || !this._threadTriggerRect) return;
-      this.threadMenuPos = this._computeThreadMenuPos(this._threadTriggerRect, el.offsetWidth, el.offsetHeight);
+      const pos = refinePopoverPos(this.$refs.threadMenu, this._threadTriggerRect);
+      if (pos) this.threadMenuPos = pos;
     });
-  },
-
-  _computeThreadMenuPos(r, pw, ph) {
-    const left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.right - pw));
-    const top = (r.bottom + ph + 8 > window.innerHeight)
-      ? Math.max(8, r.top - ph - 4)
-      : r.bottom + 4;
-    return { top, left };
   },
 
   closeThreadMenu() {

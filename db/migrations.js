@@ -11504,6 +11504,219 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 284 abgeschlossen (author_profile).');
   }
 
+  if (version < 285) {
+    // Figuren-Werkstatt: abgeleiteter Ist-Index des FIGURENBOGENS — wo die
+    // psychologischen Kerne einer Werkstatt-Figur (want/need/wound/lie/bogen/
+    // konflikt) real im Buchtext auftauchen. Pendant zu motif_occurrences und
+    // plot_beat_occurrences; Full-Replace pro (Draft, Kern) je Anchor-Lauf.
+    //
+    // `kern` ist der Diskriminator und KEIN Sentinel: die Frage ist nicht „kommt
+    // die Figur vor" (das beantwortet figure_appearances), sondern „wo im Buch
+    // traegt ihre Wunde, wo bricht ihre Luege" — ein Bogen ist eine Verteilung
+    // ueber den Buchbogen, keine Zahl. Darum eine Zeile pro Kern und Fundstelle.
+    //
+    // Rein abgeleitet, nie handgepflegt. draft_id CASCADE (stirbt mit dem Draft),
+    // book_id CASCADE. kind page/scene sentinel-frei via CHECK.
+    db.exec(`CREATE TABLE IF NOT EXISTS draft_figure_occurrences (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        draft_id   INTEGER NOT NULL REFERENCES draft_figures(id) ON DELETE CASCADE,
+        book_id    INTEGER NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+        kern       TEXT    NOT NULL CHECK(kern IN ('want','need','wound','lie','bogen','konflikt')),
+        kind       TEXT    NOT NULL CHECK(kind IN ('page','scene')),
+        page_id    INTEGER REFERENCES pages(page_id) ON DELETE CASCADE,
+        scene_id   INTEGER REFERENCES figure_scenes(id) ON DELETE CASCADE,
+        score      REAL,
+        snippet    TEXT,
+        source     TEXT    NOT NULL CHECK(source IN ('semantic','trigger')),
+        created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        CHECK (
+          (kind = 'page'  AND page_id IS NOT NULL AND scene_id IS NULL) OR
+          (kind = 'scene' AND scene_id IS NOT NULL AND page_id IS NULL)
+        )
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_draft_fig_occ_draft ON draft_figure_occurrences(draft_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_draft_fig_occ_book ON draft_figure_occurrences(book_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_draft_fig_occ_page ON draft_figure_occurrences(page_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_draft_fig_occ_scene ON draft_figure_occurrences(scene_id)');
+
+    const fkErrors285 = db.pragma('foreign_key_check');
+    if (fkErrors285.length) {
+      throw new Error(`Migration 285: foreign_key_check meldet ${fkErrors285.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 285').run();
+    logger.info('DB-Migration auf Version 285 abgeschlossen (Figuren-Werkstatt: draft_figure_occurrences).');
+  }
+
+  if (version < 286) {
+    // Plot-Werkstatt: M:N-Bruecke Beat <-> Schauplatz. Vierte Bruecke neben
+    // plot_beat_figures / plot_beat_draft_figures / motif_beats — derselbe
+    // Schnitt, andere Achse: WO spielt der Handlungspunkt.
+    //
+    // Der Ort ist ein dramaturgisches Werkzeug (die Konfrontation findet dort
+    // statt, wo es anfing), und `locations` samt Karte liegt vollstaendig vor.
+    // Ohne die Bruecke kann weder die Konsistenzpruefung noch der Brainstorm
+    // ueber Schauplaetze urteilen.
+    db.exec(`CREATE TABLE IF NOT EXISTS plot_beat_locations (
+        beat_id     INTEGER NOT NULL REFERENCES plot_beats(id) ON DELETE CASCADE,
+        location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+        PRIMARY KEY (beat_id, location_id)
+      )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_loc_beat ON plot_beat_locations(beat_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_plot_beat_loc_loc ON plot_beat_locations(location_id)');
+
+    const fkErrors286 = db.pragma('foreign_key_check');
+    if (fkErrors286.length) {
+      throw new Error(`Migration 286: foreign_key_check meldet ${fkErrors286.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 286').run();
+    logger.info('DB-Migration auf Version 286 abgeschlossen (Plot-Werkstatt: plot_beat_locations).');
+  }
+
+  if (version < 287) {
+    // Plot-Werkstatt: `zeit` am Beat — WANN in der erzaehlten Welt der Hand-
+    // lungspunkt spielt. Freitext wie `figure_events.datum` (ein Plan traegt
+    // „Sommer 1987" so oft wie ein Datum); die Jahreszahl zieht derselbe
+    // Parser heraus wie ueberall sonst (lib/figure-years.js#yearFromString).
+    //
+    // Schaltet die deterministische Alters-Pruefung frei: Beat spielt 1987,
+    // Figur X ist laut figure_ages dann acht — und der Beat verlangt, dass sie
+    // faehrt. Additiv (ADD COLUMN), kein Recreate noetig.
+    const beatCols = db.pragma('table_info(plot_beats)').map(c => c.name);
+    if (!beatCols.includes('zeit')) {
+      db.exec('ALTER TABLE plot_beats ADD COLUMN zeit TEXT');
+    }
+
+    const fkErrors287 = db.pragma('foreign_key_check');
+    if (fkErrors287.length) {
+      throw new Error(`Migration 287: foreign_key_check meldet ${fkErrors287.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 287').run();
+    logger.info('DB-Migration auf Version 287 abgeschlossen (Plot-Werkstatt: plot_beats.zeit).');
+  }
+
+  if (version < 288) {
+    // Ideen bekommen eine Bearbeitungs-STUFE statt eines Ja/Nein, dazu die
+    // Bruecke `idea_links` zu den drei planenden Katalogen (Recherche, Beat, Motiv).
+    //
+    // Warum `erledigt` VERSCHWINDET statt neben `status` stehen zu bleiben: es
+    // waeren zwei Wahrheiten ueber dieselbe Frage. Ein `erledigt = 1` neben
+    // `status = 'verworfen'` ist eine Lage, die kein Lesepfad sinnvoll aufloest,
+    // und der naechste Schreibpfad setzt garantiert nur eine der beiden. Also
+    // eine Spalte, ein CHECK — `erledigt = 1` wird zu `status = 'erledigt'`,
+    // `erledigt_at` wird zum allgemeineren `status_at` (wann die Stufe zuletzt
+    // wechselte). Stufen-SSoT: lib/ideen-status.js#IDEE_STATUSES.
+    //
+    // Recreate statt ADD/DROP COLUMN, weil der CHECK auf `status` zur Tabelle
+    // gehoert und ein ALTER ihn nicht nachtragen kann.
+    db.pragma('foreign_keys = OFF');
+
+    db.exec('DROP TABLE IF EXISTS ideen_new');
+    db.exec(`
+      CREATE TABLE ideen_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL REFERENCES books(book_id)       ON DELETE CASCADE,
+        page_id     INTEGER          REFERENCES pages(page_id)       ON DELETE CASCADE,
+        chapter_id  INTEGER          REFERENCES chapters(chapter_id) ON DELETE CASCADE,
+        user_email  TEXT    NOT NULL,
+        content     TEXT    NOT NULL,
+        status      TEXT    NOT NULL DEFAULT 'offen'
+                      CHECK(status IN ('offen','in_arbeit','erledigt','verworfen')),
+        status_at   TEXT,
+        created_at  TEXT    NOT NULL,
+        updated_at  TEXT    NOT NULL,
+        CHECK ((page_id IS NOT NULL AND chapter_id IS NULL)
+            OR (page_id IS NULL AND chapter_id IS NOT NULL)),
+        FOREIGN KEY (user_email) REFERENCES app_users(email) ON DELETE CASCADE
+      )
+    `);
+    db.exec(`
+      INSERT INTO ideen_new (id, book_id, page_id, chapter_id, user_email, content,
+                             status, status_at, created_at, updated_at)
+      SELECT id, book_id, page_id, chapter_id, user_email, content,
+             CASE WHEN erledigt = 1 THEN 'erledigt' ELSE 'offen' END,
+             erledigt_at, created_at, updated_at
+        FROM ideen
+    `);
+    db.exec('DROP TABLE ideen');
+    db.exec('ALTER TABLE ideen_new RENAME TO ideen');
+    db.exec('CREATE INDEX idx_ideen_page_user    ON ideen(page_id, user_email)');
+    db.exec('CREATE INDEX idx_ideen_chapter_user ON ideen(chapter_id, user_email)');
+    db.exec('CREATE INDEX idx_ideen_book_user    ON ideen(book_id, user_email)');
+    // Fuehrender Index auf der FK-Spalte: ein Recreate verliert die Indexe, und
+    // ohne diesen laeuft das Loeschen eines Kontos (CASCADE ueber user_email)
+    // in einen Full-Scan (gegated in tests/unit/migration-fk-smoke.test.js).
+    db.exec('CREATE INDEX idx_ideen_user_email   ON ideen(user_email)');
+
+    // Bruecke Idee ↔ Recherche-Fundstueck / Plot-Beat / Motiv.
+    //
+    // EINE Tabelle statt `research_item_links.target_kind` um 'idea' zu
+    // erweitern: die Idee besitzt ihre Verknuepfungen, sonst laege ein Drittel
+    // davon (Recherche) in einer fremden Tabelle und zwei Drittel (Beat, Motiv)
+    // hier — und die Frage „woran haengt diese Pendenz" haette zwei Lesepfade.
+    // Form ist der Zwilling von `research_item_links`: sentinel-frei, genau eine
+    // *_id passend zum `target_kind`, alle anderen NULL.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS idea_links (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        idea_id     INTEGER NOT NULL REFERENCES ideen(id)           ON DELETE CASCADE,
+        target_kind TEXT    NOT NULL CHECK(target_kind IN ('research','beat','motif')),
+        research_id INTEGER          REFERENCES research_items(id)  ON DELETE CASCADE,
+        beat_id     INTEGER          REFERENCES plot_beats(id)      ON DELETE CASCADE,
+        motif_id    INTEGER          REFERENCES motifs(id)          ON DELETE CASCADE,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        CHECK (
+          (target_kind='research' AND research_id IS NOT NULL AND beat_id IS NULL AND motif_id IS NULL) OR
+          (target_kind='beat'     AND beat_id     IS NOT NULL AND research_id IS NULL AND motif_id IS NULL) OR
+          (target_kind='motif'    AND motif_id    IS NOT NULL AND research_id IS NULL AND beat_id IS NULL)
+        )
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_idea_links_idea ON idea_links(idea_id)');
+    // Rueckwaerts-Indexe: die Gegenseiten (Recherche-Karte, Beat-Board, Motiv-
+    // Werkstatt) lesen ausschliesslich ueber die Ziel-Spalte.
+    db.exec('CREATE INDEX IF NOT EXISTS idx_idea_links_research ON idea_links(research_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_idea_links_beat     ON idea_links(beat_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_idea_links_motif    ON idea_links(motif_id)');
+    // Dieselbe Kante nur einmal (partielle UNIQUE-Indexe je Ziel-Art).
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_idea_links_uniq_research ON idea_links(idea_id, research_id) WHERE research_id IS NOT NULL');
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_idea_links_uniq_beat     ON idea_links(idea_id, beat_id)     WHERE beat_id     IS NOT NULL');
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_idea_links_uniq_motif    ON idea_links(idea_id, motif_id)    WHERE motif_id    IS NOT NULL');
+
+    db.pragma('foreign_keys = ON');
+    const fkErrors288 = db.pragma('foreign_key_check');
+    if (fkErrors288.length) {
+      throw new Error(`Migration 288: foreign_key_check meldet ${fkErrors288.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 288').run();
+    logger.info('DB-Migration auf Version 288 abgeschlossen (ideen.status statt erledigt + idea_links).');
+  }
+
+  if (version < 289) {
+    // Recherche-Profil pro Buch: Freitext-Steuerung + Domain-Eingrenzung fuer den
+    // Recherche-Chat. Am BUCH, weil „ich suche medizinische Fachliteratur" eine
+    // Aussage ueber diese Arbeit ist und nicht ueber die Person — dieselbe Achse
+    // wie `buch_kontext` und `stilprofil`, die direkt daneben stehen.
+    //
+    // `research_domains` ist Text (eine Domain pro Zeile), keine eigene Tabelle:
+    // es ist eine geordnete Kurzliste ohne eigene Attribute, die immer am Stueck
+    // gelesen und am Stueck geschrieben wird. Normalisierungs-SSoT ist
+    // lib/research-profile.js — die Spalte haelt nur, was dort herauskommt.
+    const bsCols289 = db.pragma('table_info(book_settings)').map(c => c.name);
+    if (!bsCols289.includes('research_profile')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN research_profile TEXT');
+    }
+    if (!bsCols289.includes('research_domains')) {
+      db.exec('ALTER TABLE book_settings ADD COLUMN research_domains TEXT');
+    }
+
+    const fkErrors289 = db.pragma('foreign_key_check');
+    if (fkErrors289.length) {
+      throw new Error(`Migration 289: foreign_key_check meldet ${fkErrors289.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 289').run();
+    logger.info('DB-Migration auf Version 289 abgeschlossen (book_settings.research_profile/research_domains).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

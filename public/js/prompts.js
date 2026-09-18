@@ -377,6 +377,7 @@ export {
   SCHEMA_RESEARCH_LINK,
   buildResearchChatAgentSystemPrompt,
   RESEARCH_CHAT_TOOLS,
+  buildResearchChatTools,
   RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION,
 } from './prompts/recherche.js';
 

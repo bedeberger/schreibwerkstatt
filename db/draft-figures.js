@@ -18,7 +18,7 @@ const { db } = require('./connection');
 const _SELECT_SQL = `
   SELECT d.id, d.book_id, d.user_email, d.name, d.archetype, d.mindmap_json,
          d.notes, d.source_figure_id, d.created_at, d.updated_at,
-         f.name AS source_figure_name
+         f.name AS source_figure_name, f.fig_id AS source_fig_id
     FROM draft_figures d
     LEFT JOIN figures f ON f.id = d.source_figure_id
 `;
@@ -55,6 +55,10 @@ function _row(r) {
     mindmap,
     notes: r.notes || null,
     source_figure_id: r.source_figure_id || null,
+    // Die TEXT-fig_id der Quell-Figur: das ist die Identitaet, mit der das
+    // Frontend (und die Werkbank) Katalog-Figuren adressiert — die INTEGER-id
+    // daneben ist nur der FK-Traeger.
+    source_fig_id: r.source_fig_id || null,
     source_figure_name: r.source_figure_name || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -88,6 +92,50 @@ function updateDraftFigure(id, { name, archetype = null, mindmap, notes = null }
   const now = new Date().toISOString();
   _stmtUpdate.run(name, archetype, JSON.stringify(mindmap), notes, now, parseInt(id));
   return getDraftFigure(id);
+}
+
+// Nachtraegliche Verknuepfung Draft → Katalog-Figur (`source_figure_id`).
+//
+// Why: die Werkstatt entwickelt eine Figur VORWAERTS, die Komplettanalyse
+// extrahiert sie RUECKWAERTS aus dem geschriebenen Text. Wer erst plant und dann
+// schreibt, hat danach zwangslaeufig zwei Eintraege derselben Figur — und jede
+// Bruecke im Haus fuehrt seither zwei Spalten (plot_beat_figures +
+// plot_beat_draft_figures, motif_figures + motif_draft_figures), jede Combobox
+// zwei Gruppen. Die Verknuepfung loest das ZUR LESEZEIT auf, ohne eine der
+// beiden Zeilen zu toeten.
+//
+// Bewusst KEIN Promotion-Pfad (Draft wird nicht zur Katalog-Figur): der Katalog
+// ist ein abgeleiteter Index der Komplettanalyse und wuerde eine hineingeschriebene
+// Zeile beim naechsten Lauf ueberschreiben. Hier wird nur ein Zeiger gesetzt —
+// dieselbe Haltung wie `entity-merge` beim Zusammenfuehren zweier Katalog-Zeilen:
+// Referenzen umhaengen, nichts erfinden.
+const _stmtSetSource = db.prepare(
+  'UPDATE draft_figures SET source_figure_id = ?, updated_at = ? WHERE id = ?'
+);
+function setDraftSourceFigure(id, figureId) {
+  _stmtSetSource.run(
+    figureId != null ? parseInt(figureId) : null,
+    new Date().toISOString(),
+    parseInt(id),
+  );
+  return getDraftFigure(id);
+}
+
+// Katalog-Figuren, die als Quelle fuer DIESEN Draft in Frage kommen: eigene
+// Figuren des Buchs, die noch an keinem Draft haengen. Der Namensvergleich
+// passiert im Handler (er entscheidet nur die Vorauswahl) — die Liste selbst ist
+// bewusst vollstaendig, damit eine umbenannte Figur trotzdem waehlbar bleibt.
+const _stmtLinkCandidates = db.prepare(`
+  SELECT f.id, f.name, f.kurzname, f.typ, f.beschreibung, f.sort_order
+    FROM figures f
+    LEFT JOIN draft_figures d
+      ON d.source_figure_id = f.id AND d.user_email = ?
+   WHERE f.book_id = ? AND f.user_email IS ? AND d.id IS NULL
+   ORDER BY f.sort_order, f.id
+`);
+function listLinkCandidates(bookId, userEmail) {
+  return _stmtLinkCandidates.all(userEmail, parseInt(bookId), userEmail)
+    .map(({ sort_order, ...rest }) => rest);
 }
 
 function deleteDraftFigure(id) {
@@ -205,6 +253,6 @@ function deleteWerkstattRun(id, userEmail) {
 module.exports = {
   listDraftFigures, getDraftFigure, getDraftFigureBySource,
   createDraftFigure, updateDraftFigure, deleteDraftFigure,
-  listImportableFigures,
+  listImportableFigures, setDraftSourceFigure, listLinkCandidates,
   insertWerkstattRun, listWerkstattRuns, getWerkstattRun, deleteWerkstattRun,
 };

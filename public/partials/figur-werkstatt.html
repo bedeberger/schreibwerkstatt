@@ -89,6 +89,14 @@
                 @click="$app.openPlotForDraftFigure(selectedDraftId)"
                 :data-tip="plotUsageTip()"
                 x-text="plotUsageLabel()"></span>
+          <!-- Cross-Feature: Motiv-Beteiligung → Klick öffnet die Konstellation
+               beim ersten Motiv dieser Figur. Die Gegenrichtung zum Figuren-Layer
+               der Motiv-Werkstatt; ohne sie kennt nur eine Seite die Kante. -->
+          <span x-show="motifUsageVisible()" x-cloak
+                class="badge badge--motiv internal-link"
+                @click="openMotifForFigure()"
+                :data-tip="motifUsageTip()"
+                x-text="motifUsageLabel()"></span>
         </div>
         <div class="card-actions">
           <button type="button" class="icon-btn icon-btn--ghost icon-btn--success"
@@ -118,6 +126,23 @@
                 <span x-text="$app.t('werkstatt.action.consistency')"></span>
               </button>
               <div class="context-menu-sep" role="separator"></div>
+              <!-- Nachtraegliche Verknuepfung mit der Katalog-Figur: wer erst
+                   plant und dann schreibt, hat die Figur danach zweimal (Werkstatt
+                   + Komplettanalyse). Der Zeiger loest das auf, ohne eine der
+                   beiden Zeilen zu toeten. -->
+              <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+                      x-show="!selectedDraft()?.source_figure_id"
+                      :disabled="busy" @click="startLinkFigure(); werkstattMenuOpen = false">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#users"/></svg>
+                <span x-text="$app.t('werkstatt.action.linkFigure')"></span>
+              </button>
+              <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
+                      x-show="selectedDraft()?.source_figure_id"
+                      :disabled="busy" @click="runLinkFigure(null); werkstattMenuOpen = false">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#unlink"/></svg>
+                <span x-text="$app.t('werkstatt.action.unlinkFigure')"></span>
+              </button>
+              <div class="context-menu-sep" role="separator"></div>
               <button type="button" class="context-menu-item context-menu-item--icon context-menu-item--danger" role="menuitem"
                       :disabled="busy" @click="requestDelete(); werkstattMenuOpen = false">
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
@@ -126,6 +151,12 @@
             </div>
           </span>
         </div>
+      </div>
+
+      <!-- Verknuepfen-Panel (Katalog-Figur als Quelle setzen). Eigenes Fragment
+           wie der Import-Picker — HTML-Partial-LOC-Limit. -->
+      <div x-show="linking" x-cloak class="werkstatt-create-inline">
+        <!-- @include werkstatt-link-fields -->
       </div>
 
       <!-- Form: Name + Archetyp + Notizen -->
@@ -244,6 +275,13 @@
           </button>
         </div>
       </section>
+
+      <!-- Bogen im Buch: Kern x Kapitel als Heatmap der Ist-Dichte + die
+           Messbefunde dieser Figur. Nested Partial (HTML-Partial-LOC-Limit); die
+           Sichtbarkeits-Weiche sitzt HIER am Platzhalter. Sichtbar, sobald die
+           Figur einen ausgearbeiteten Kern hat — auch ohne Lauf, dann traegt das
+           Band seinen „noch nie verankert"-Hinweis. -->
+      <div id="partial-werkstatt-bogen" x-show="arcVisible()" x-cloak></div>
 
       <!-- Brainstorm-Status während KI-Job -->
       <section x-show="brainstormLoading" x-cloak class="werkstatt-job-status">

@@ -77,6 +77,16 @@ button.primary .btn-count {
   cursor: pointer;
 }
 .badge--plot:hover { background: var(--color-hover-strong); }
+/* Dasselbe fuer die Motiv-Beteiligung (Werkstatt → Motiv-Werkstatt). Eigener
+   Selektor statt einer gemeinsamen Klasse mit Modifier, weil die Kante die
+   HERKUNFT signalisiert: der Akzent ist der der Zielkarte. */
+.badge--motiv {
+  background: var(--color-tag-bg);
+  color: var(--color-text);
+  box-shadow: inset 2px 0 0 var(--card-accent-motiv, var(--color-accent));
+  cursor: pointer;
+}
+.badge--motiv:hover { background: var(--color-hover-strong); }
 
 /* === Button-Gruppe (Expand/Collapse) === */
 .btn-group {

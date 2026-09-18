@@ -1,4 +1,5 @@
-// Geteilter Poll-Kern für die beiden Werkstatt-KI-Jobs (Brainstorm + Consistency).
+// Geteilter Poll-Kern für die Werkstatt-Jobs (Brainstorm, Consistency, Figuren-
+// Verankerung).
 // Sowohl der Live-Start (jobs.js) als auch der Reattach beim Öffnen (runs.js)
 // polten mit identischen onProgress/onDone/onError/onNotFound-Handlern — sie
 // unterscheiden sich nur in den State-Prop-Namen und der Result-Form. Beides
@@ -37,6 +38,19 @@ export const JOB_KINDS = {
     }),
     onDoneExtra: (self) => { self.selectedKonfliktIdx = null; },
   },
+  // Figuren-Verankerung: BUCHWEIT statt pro Draft — ein Lauf deckt alle Figuren
+  // ab (kein callAI, ein Lauf pro Figur wäre eine Job-Flut). Darum `bookScoped`:
+  // es gibt keine Draft-Zuordnung zu prüfen und kein Result, das in ein Panel
+  // wandert; das Ergebnis ist der frische Ist-Index, den `loadArc()` holt.
+  anchor: {
+    bookScoped: true,
+    loadingProp: 'anchorLoading',
+    statusProp: 'anchorStatus',
+    progressProp: 'anchorProgress',
+    timerProp: '_anchorPollTimer',
+    jobIdProp: '_anchorJobId',
+    onDoneExtra: (self) => { self.loadArc?.(); },
+  },
 };
 
 // Startet das Polling für einen laufenden Job. Erwartet, dass die Loading-/
@@ -58,11 +72,12 @@ export function startWerkstattJobPoll(self, kind, jobId) {
       // Result nur aufs aktuelle Draft anwenden; sonst landet es auf der
       // falschen Figur. History via loadRuns kriegt der Quell-Draft beim
       // nächsten Öffnen (loadRuns / _reattachActiveJobs).
-      const targetId = self[k.draftIdProp];
+      const targetId = k.bookScoped ? null : self[k.draftIdProp];
       self[k.loadingProp] = false;
       self[k.statusProp] = '';
       self[k.jobIdProp] = null;
-      self[k.draftIdProp] = null;
+      if (!k.bookScoped) self[k.draftIdProp] = null;
+      if (k.bookScoped) { k.onDoneExtra?.(self, job); return; }
       if (self.selectedDraftId === targetId) {
         self[k.resultProp] = k.mapResult(job);
         if (k.onDoneExtra) k.onDoneExtra(self);
@@ -74,16 +89,16 @@ export function startWerkstattJobPoll(self, kind, jobId) {
       self[k.loadingProp] = false;
       self[k.statusProp] = '';
       self[k.jobIdProp] = null;
-      if (self.selectedDraftId === self[k.draftIdProp]) {
+      if (k.bookScoped || self.selectedDraftId === self[k.draftIdProp]) {
         self.errorMessage = app.t(job.error || 'common.unknownError', job.errorParams || {});
       }
-      self[k.draftIdProp] = null;
+      if (!k.bookScoped) self[k.draftIdProp] = null;
     },
     onNotFound: () => {
       self[k.loadingProp] = false;
       self[k.statusProp] = '';
       self[k.jobIdProp] = null;
-      self[k.draftIdProp] = null;
+      if (!k.bookScoped) self[k.draftIdProp] = null;
     },
   });
 }
@@ -97,7 +112,7 @@ export function stopWerkstattJob(self, kind) {
   self[k.statusProp] = '';
   self[k.progressProp] = 0;
   self[k.jobIdProp] = null;
-  self[k.draftIdProp] = null;
+  if (!k.bookScoped) self[k.draftIdProp] = null;
 }
 
 // Reattach beim Öffnen einer Figur: seedet Loading-/Progress-/Status-State aus

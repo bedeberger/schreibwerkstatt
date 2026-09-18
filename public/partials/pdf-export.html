@@ -76,6 +76,10 @@
             @click="_showCreate = !_showCreate">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
     </button>
+    <button type="button" class="export-profile-btn" :data-tip="$app.t('pdfExport.templateProfile')"
+            @click="_showTemplate = !_showTemplate">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#book-open"/></svg>
+    </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile"
             :data-tip="$app.t('pdfExport.renameProfile')" @click="beginRename()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#pencil"/></svg>
@@ -112,6 +116,23 @@
     <button type="button" class="primary" data-label-ok
             :disabled="!renameValue.trim()" @click="renameProfile()"
             x-text="$app.t('common.save')"></button>
+  </div>
+
+  <!-- Gestaltungs-Vorlage übernehmen (eingeklappt). Legt ein NEUES Profil an;
+       das aktive bleibt unberührt. -->
+  <div class="export-template-row" x-show="_showTemplate" x-cloak>
+    <div class="export-create-row">
+      <div class="export-template-pick"
+           x-data="combobox($app.t('pdfExport.templatePlaceholder'))"
+           x-modelable="value" x-model="templateSel"
+           x-effect="options = templateOptions()"></div>
+      <button type="button" class="primary" data-label-ok
+              :disabled="creating || !templateSel"
+              @click="applyTemplate()"
+              x-text="$app.t('pdfExport.templateApply')"></button>
+    </div>
+    <p class="card-form-field-note" x-show="templateSel" x-text="templateDescription()"></p>
+    <p class="card-form-field-note" x-show="!templateSel" x-text="$app.t('pdfExport.templateHint')"></p>
   </div>
 
   <!-- Neues Profil anlegen (eingeklappt) -->
@@ -172,6 +193,8 @@
       <p class="card-form-error" x-show="exportError" x-text="exportError"></p>
       <p class="card-form-field-note pdfx-lowres-warn" x-show="exportLowRes > 0"
          x-text="$app.t('pdfExport.print.lowResWarning', { count: exportLowRes })"></p>
+      <p class="card-form-field-note pdfx-lowres-warn" x-show="exportHyphenOff.length"
+         x-text="$app.t('pdfExport.hyphenationDisabled', { fonts: exportHyphenOff.join(', ') })"></p>
     </div>
   </template>
 </div>

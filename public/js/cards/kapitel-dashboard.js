@@ -11,6 +11,7 @@
 //   /history/lektorat-time/:book_id            -> Lektoratszeit (per_chapter)
 //   Alpine.store('catalog').figuren/orte/szenen -> Auftritte im Kapitel
 //   kapitelReviewHistory                        -> letzte Note + Trend
+//   /history/chapter-growth/:book_id           -> Entstehung (Seitenfassungen)
 //
 // Zwei Regeln, die das Dashboard mit den uebrigen Messkarten teilt:
 //   * **Ungeprueft ist nicht fehlerfrei.** Die Befund-Dichte rechnet gegen die
@@ -25,6 +26,7 @@
 // Alpine) — die Alpine-Methoden sind nur memoisierte Huellen darum.
 import { fetchJson, charsToNormseiten, fmtExactDuration } from '../utils.js';
 import { komplettHiddenFor } from './feature-registry.js';
+import { computeGrowth } from './kapitel-growth.js';
 
 // Lesegeschwindigkeit fuer die Lesezeit-Angabe des Umfang-Tiles. Bewusst eine
 // runde, konservative Zahl fuer stilles Lesen belletristischer Prosa — die
@@ -181,6 +183,7 @@ export function initialKapitelDashboardState() {
   return {
     kdHeat: null,
     kdLektoratTime: null,
+    kdGrowthData: null,
     kdBookId: null,
     kdLoading: false,
   };
@@ -206,13 +209,17 @@ export const kapitelDashboardMethods = {
       // erst angeboten wird. Die drei Endpunkte antworteten dort mit 403 bzw.
       // leer, und die Kacheln faellen ohnehin weg.
       const narrativ = !komplettHiddenFor(root?.currentBuchtyp?.());
-      const [heat, lektoratTime] = await Promise.all([
+      const [heat, lektoratTime, growth] = await Promise.all([
         fetchJson(`/history/fehler-heatmap/${bookId}?mode=open`).catch((e) => {
           console.warn('[kapitelDashboard] Heatmap nicht ladbar', e);
           return null;
         }),
         fetchJson(`/history/lektorat-time/${bookId}`).catch((e) => {
           console.warn('[kapitelDashboard] Lektoratszeit nicht ladbar', e);
+          return null;
+        }),
+        fetchJson(`/history/chapter-growth/${bookId}`).catch((e) => {
+          console.warn('[kapitelDashboard] Entstehung nicht ladbar', e);
           return null;
         }),
         narrativ && !catalog.figuren.length ? root?.loadFiguren?.(bookId) : null,
@@ -223,6 +230,7 @@ export const kapitelDashboardMethods = {
       if (this.kdBookId !== bookId) return;
       this.kdHeat = heat;
       this.kdLektoratTime = lektoratTime;
+      this.kdGrowthData = growth;
       this._memos = {};
     } finally {
       if (this.kdBookId === bookId) this.kdLoading = false;
@@ -297,6 +305,49 @@ export const kapitelDashboardMethods = {
       const idx = chapters.findIndex(c => String(c.id) === String(id));
       return idx < 0 ? null : { index: idx + 1, total: chapters.length };
     });
+  },
+
+  // Entstehung des Kapitels: Groesse ueber die Zeit aus den Seitenfassungen.
+  // `null` heisst „dazu gibt es keine Historie" (nie in der App gespeichert,
+  // Verlauf kuerzer als ein Tag) — die Kachel faellt dann weg, statt eine
+  // gerade Linie zu zeigen, die nach „nichts passiert" aussieht.
+  // Die Punkt-Beschriftung wird hier einmal gebaut und nicht im Template: sie
+  // haengt an der UI-Sprache, und `_uiLocale()` gehoert darum in die Deps.
+  kdGrowth() {
+    const data = this.kdGrowthData;
+    const ids = this.kdScopeIds();
+    const pages = this.kdScopePages();
+    const tokEsts = window.__app.tokEsts || {};
+    return this._memo('kdGrowth', [data, ids, pages, tokEsts, this._uiLocale()], () => {
+      const g = computeGrowth(data?.chapters, ids, pages, tokEsts);
+      if (!g) return null;
+      const dateFmt = this._dateFmt({ day: 'numeric', month: 'short', year: 'numeric' });
+      const numFmt = this._numFmt();
+      const unit = window.__app?.t?.('bookstats.unit.z') || 'Z';
+      return {
+        ...g,
+        color: g.net > 0 ? 'var(--color-success)'
+             : g.net < 0 ? 'var(--color-err-border)'
+             :             'var(--color-accent)',
+        points: g.points.map(p => ({
+          ...p,
+          // Mittags-Anker: ein Mitternachts-Anker koennte in der App-Zeitzone
+          // auf den Vortag kippen (gleiche Regel wie die Buch-Sparkline).
+          label: dateFmt.format(new Date(p.iso + 'T12:00:00'))
+               + ': ' + numFmt.format(p.chars) + ' ' + unit,
+        })),
+      };
+    });
+  },
+
+  // Tages-Datum (YYYY-MM-DD) fuer die Entwicklungs-Kachel. NICHT `$app.formatDate`:
+  // das haengt eine Uhrzeit an, die eine Tagesangabe nicht hat, und legt den
+  // Wert auf UTC-Mitternacht — der Mittags-Anker haelt die Angabe in der
+  // App-Zeitzone auf demselben Tag.
+  kdDateLabel(iso) {
+    if (!iso) return '';
+    return this._dateFmt({ day: '2-digit', month: '2-digit', year: 'numeric' })
+      .format(new Date(iso + 'T12:00:00'));
   },
 
   kdLektorat() {

@@ -25,6 +25,10 @@ const jsonBody = express.json();
 const STATUSES = ['geplant', 'im_buch'];
 const MAX_TITEL = 200;
 const MAX_BESCHREIBUNG = 4000;
+// `zeit` ist Freitext wie `figure_events.datum` — ein Plan traegt „Sommer 1987"
+// so oft wie ein Datum. Die Jahreszahl zieht derselbe Parser heraus wie ueberall
+// sonst (lib/figure-years.js#yearFromString); validiert wird hier nur die Laenge.
+const MAX_ZEIT = 120;
 const MAX_ACT_NAME = 120;
 const MAX_THREAD_NAME = 120;
 
@@ -336,13 +340,15 @@ router.post('/beats', jsonBody, (req, res) => {
   const verworfen = req.body?.verworfen ? 1 : 0;
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
   const intensitaet = _validIntensitaet(req.body?.intensitaet);
+  const zeit = req.body?.zeit ? String(req.body.zeit).trim().slice(0, MAX_ZEIT) || null : null;
   const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
   if (!_actFitsThread(act, threadId)) return res.status(400).json({ error_code: 'ACT_THREAD_MISMATCH' });
   const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
   const draftFigureIds = plotDb.resolveDraftFigureIds(bookId, userEmail, req.body?.draft_figure_ids);
   const motifIds = plotDb.resolveMotifIds(bookId, userEmail, req.body?.motif_ids);
+  const locationIds = plotDb.resolveLocationIds(bookId, req.body?.location_ids);
 
-  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, verworfen, chapterId, intensitaet, threadId, figureIds, draftFigureIds, motifIds });
+  const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, verworfen, chapterId, intensitaet, zeit, threadId, figureIds, draftFigureIds, motifIds, locationIds });
   logger.info(`[plot] beat create id=${beat.id} act=${actId} book=${bookId}`);
   res.json(beat);
 });
@@ -376,6 +382,10 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
   if (typeof req.body?.intensitaet !== 'undefined') {
     fields.intensitaet = _validIntensitaet(req.body.intensitaet);
   }
+  if (typeof req.body?.zeit !== 'undefined') {
+    const z = req.body.zeit == null ? '' : String(req.body.zeit).trim();
+    fields.zeit = z ? z.slice(0, MAX_ZEIT) : null;
+  }
   // act_id-Move ohne Reorder (z.B. Detail-Edit): act muss zum Buch gehören.
   if (typeof req.body?.act_id !== 'undefined') {
     const act = plotDb.getAct(toIntId(req.body.act_id));
@@ -407,11 +417,15 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
   const motifIds = Array.isArray(req.body?.motif_ids)
     ? plotDb.resolveMotifIds(beat.book_id, userEmail, req.body.motif_ids)
     : undefined;
+  const locationIds = Array.isArray(req.body?.location_ids)
+    ? plotDb.resolveLocationIds(beat.book_id, req.body.location_ids)
+    : undefined;
 
-  if (!Object.keys(fields).length && typeof figureIds === 'undefined' && typeof draftFigureIds === 'undefined' && typeof motifIds === 'undefined') {
+  if (!Object.keys(fields).length && typeof figureIds === 'undefined' && typeof draftFigureIds === 'undefined'
+      && typeof motifIds === 'undefined' && typeof locationIds === 'undefined') {
     return res.status(400).json({ error_code: 'NO_FIELDS' });
   }
-  res.json(plotDb.updateBeat(id, fields, figureIds, draftFigureIds, motifIds));
+  res.json(plotDb.updateBeat(id, fields, figureIds, draftFigureIds, motifIds, locationIds));
 });
 
 router.delete('/beats/:id', (req, res) => {

@@ -4,6 +4,7 @@
 // Kapitelreview-Karte (kein _closeOtherMainCards).
 
 import { ideenMethods } from '../book/ideen.js';
+import { ideenLinkMethods } from '../book/ideen-links.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerIdeenCard() {
@@ -15,6 +16,18 @@ export function registerIdeenCard() {
     editingDraft: '',
     movingId: null,
     moveTargetId: '',
+
+    // Verknuepfungs-Picker (ideen-links.js, geteilt mit dem Ideen-Board).
+    linkTargets: {},
+    _linkTargetsBookId: null,
+    linkPickerIdeeId: null,
+    linkPickerKind: 'research',
+    linkPickerTargetId: '',
+    // Popover-Geometrie des Pickers (nach <body> teleportiert, am Trigger
+    // verankert — public/js/popover-anchor.js).
+    linkPickerPos: { top: 0, left: 0 },
+    _linkTriggerRect: null,
+    _linkPickerCloseHandler: null,
     menuOpenId: null,
     menuPos: { top: 0, left: 0 },
     _menuCloseHandler: null,
@@ -98,8 +111,10 @@ export function registerIdeenCard() {
     destroy() {
       this._lifecycle?.destroy();
       this._detachMenuListeners?.();
+      this._detachLinkPickerListeners?.();
     },
 
     ...ideenMethods,
+    ...ideenLinkMethods,
   }));
 }

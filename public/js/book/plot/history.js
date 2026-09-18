@@ -105,9 +105,11 @@ export const historyMethods = {
       status: beat.status || 'geplant',
       chapter_id: beat.chapter_id || null,
       intensitaet: beat.intensitaet || null,
+      zeit: beat.zeit || null,
       figure_ids: [...(beat.fig_ids || [])],
       draft_figure_ids: [...(beat.draft_fig_ids || [])],
       motif_ids: (beat.motifs || []).map(m => m.id),
+      location_ids: (beat.locations || []).map(l => l.id),
     };
   },
 

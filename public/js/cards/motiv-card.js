@@ -6,12 +6,18 @@ import { motivMethods } from '../book/motiv.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
 import { observeThemeChange } from '../graph-kit.js';
+import { ideenBacklinkMethods } from '../book/ideen-backlinks.js';
 
 export function registerMotivCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('motivCard', () => ({
     // Daten (Graph-Payload)
     themes: [],
+
+    // Ideen-Plaketten (Gegenrichtung der Ideen-Verknuepfung, read-only).
+    // Map Ziel-ID → Ideen-Anrisse; geladen in loadIdeaBacklinks (non-fatal).
+    ideaBacklinks: {},
+    _ideaBacklinkBookId: null,
     motifs: [],
     relations: [],
     allBeats: [],
@@ -221,5 +227,6 @@ export function registerMotivCard() {
     },
 
     ...motivMethods,
+    ...ideenBacklinkMethods,
   }));
 }

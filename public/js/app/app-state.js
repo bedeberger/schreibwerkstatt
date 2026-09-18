@@ -302,11 +302,15 @@ const cardsState = () => ({
   showEreignisseCard: false,
   showPlotCard: false,
   showMotivCard: false,
+  // Werkbank: die Ansicht, die Figuren-, Plot- und Motiv-Werkstatt zusammen
+  // liest (Figuren x Akte + die gemessenen Befunde). Rein lesend.
+  showWerkbankCard: false,
   showSzenenCard: false,
   showOrteCard: false,
   showSongsCard: false,
   showWorldFactsCard: false,
   showRechercheCard: false,
+  showIdeenBoardCard: false,
   showSourcesCard: false,
   showKontinuitaetCard: false,
   showErzaehlprofilCard: false,

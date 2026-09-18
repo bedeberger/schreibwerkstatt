@@ -74,3 +74,11 @@ geworden, steckt darin fast immer Technik, nicht Inhalt.
 
 Interne Refactorings, Testarbeit und Doku-Pflege gehoeren gar nicht hinein — sie
 aendern fuer den Leser nichts.
+
+## Regeln
+
+- **Geschrieben wird eine Changelog-Datei ausschliesslich vom `/release`-Befehl**, im selben Commit wie der Versions-Bump. Nicht nebenbei von Hand, nicht nachtraeglich — [tests/unit/changelog.test.mjs](../tests/unit/changelog.test.mjs) macht CI rot, solange zur aktuellen `VERSION` keine Datei existiert. **Why:** ohne dieses Gate ist „die Users koennen die Aenderungen nachlesen" eine Absicht statt einer Zusage; die erste Version ohne Eintrag faellt niemandem auf.
+- **Jeder Eintrag traegt `de` UND `en`.** Der Changelog ist User-Text und faellt damit unter die i18n-Regel — die Ansicht zeigt die UI-Sprache des Betrachters, nicht die des Autors. Die drei `kind`-Werte (`neu`/`verbessert`/`behoben`) sind **Schluessel, kein Text**: das Label kommt aus `changelog.kind.<kind>` in beiden Locales.
+- **Die Liste haengt NICHT im `/config`.** Sie waechst mit jedem Release und holt sich der Reiter lazy beim ersten Oeffnen. `/config` traegt nur `changelogLatest` (Kopf-Version) und `changelogSeen` (Stand des Users) — genug fuer den Achtungs-Punkt am „?"-Knopf im Header, ohne die Boot-Nutzlast.
+- **Der Gelesen-Stand liegt in `app_users.changelog_seen_version`**, nicht im localStorage: der Punkt soll einmal pro Release erscheinen, nicht einmal pro Browserprofil. Quittiert wird beim Oeffnen des Reiters (`POST /changelog/seen`), und **nur vorwaerts** — ein Zweitgeraet mit alter Shell darf den Stand nicht zurueckdrehen. Bewusst kein Eintrag in `onboarding_state`: das ist ein einmaliger Vorgang, der Changelog-Stand wandert bei jedem Release weiter.
+- Der Neu-Punkt und die Reiter-Vorauswahl stellen **dieselbe** Frage — `hasUnreadChangelog(shell)` aus [help-card.js](../public/js/cards/help-card.js), im Root gespreadet fuer das Header-Markup. Kein zweiter Vergleich daneben.

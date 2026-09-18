@@ -1,5 +1,5 @@
 // Plot-Werkstatt — abgeleitete Reads (Teil 3): Verworfen-Collapse, Konsistenz-
-// Befunde ↔ Beats, Kapitel-/Figuren-Coverage (lokale Aggregate, kein KI-Job),
+// Befunde ↔ Beats, Figuren-Coverage (lokales Aggregat, kein KI-Job),
 // Volltext-/Kapitel-/Figur-Filter.
 
 import { normTitle } from '../constants.js';
@@ -82,29 +82,6 @@ export const coverageMethods = {
   // Tooltip am Warn-Badge: alle Probleme dieses Beats untereinander.
   beatKonflikteTip(beat) {
     return this.beatKonflikte(beat).map(k => k.problem).filter(Boolean).join('\n');
-  },
-
-  // ── Kapitel-Coverage (lokales Aggregat, kein KI-Job) ────────────────────────
-  // Welche Buch-Kapitel haben (noch) keinen Beat, und wie viele nicht-verworfenen
-  // Beats hängen an keinem Kapitel. Match über das effektive Kapitel (eigenes oder
-  // vom Strang geerbt), Quelle sind die $app.tree-Kapitel. Deps inkl. threads, weil
-  // das geerbte Kapitel an der Strang-Bindung hängt.
-  plotCoverage() {
-    const tree = Alpine.store('nav').tree || [];
-    return this._memo('coverage', [this.beats, this.threads, tree], () => {
-      const chapters = tree.filter(it => it.type === 'chapter');
-      const covered = new Set((this.beats || []).map(b => this.effectiveChapterNameForBeat(b)).filter(Boolean));
-      const uncovered = chapters.filter(c => !covered.has(c.name)).map(c => c.name);
-      const beatsNoChapter = (this.beats || []).filter(b => !this.effectiveChapterNameForBeat(b) && !b.verworfen).length;
-      return { uncovered, beatsNoChapter, totalChapters: chapters.length };
-    });
-  },
-
-  // Lohnt die Coverage-Sektion? Nur wenn Kapitel existieren und es etwas zu
-  // melden gibt (offene Kapitel oder kapitellose Beats).
-  plotCoverageRelevant() {
-    const c = this.plotCoverage();
-    return c.totalChapters > 0 && (c.uncovered.length > 0 || c.beatsNoChapter > 0);
   },
 
   // ── Figuren-Coverage (Cross-Feature: Plot ↔ Figuren-Werkstatt) ──────────────

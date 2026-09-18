@@ -1,0 +1,570 @@
+@layer components {
+/* Ideen-Board — Raster aus Bahnen (Zeilen = Anker im Buch: Kapitel bzw. Seite)
+   und Stufen-Spalten (public/js/book/ideen-shared.js#IDEE_STATUSES).
+
+   Warum ein GRID und nicht die Flex-Spalten des Recherche-Status-Boards: dort
+   gibt es nur vier Spalten und keine Zeilen-Achse; hier muessen Karten derselben
+   Bahn ueber alle Spalten hinweg auf einer Linie liegen, sonst ist die Zeile als
+   Zusammenhang nicht mehr lesbar. Ein geteiltes `.kanban-*`-Vokabular haette
+   beide Boards aneinandergebunden, obwohl nur die Drag-Mechanik
+   (public/js/sortable-dnd.js) wirklich geteilt ist — gleiche Ueberlegung wie
+   dort gegenueber dem Plot-Board.
+
+   Die Karte selbst erbt das Ideen-Vokabular (.ideen-input, .ideen-add-btn,
+   .idee-edit-actions) aus entities/ideen.css und traegt hier nur die Deltas
+   der Board-Form. */
+
+/* Das Raster ist sein eigener Container: das Board wechselt zwischen normaler
+   Kartenbreite und Vollbild, und die Spaltenbreite ist eine Frage des Platzes an
+   der Komponente, nicht des Viewports (DESIGN.md „Mobile-Strategie pro
+   Komponente" — Container-Query, nicht Media-Query).
+
+   Der `container-type` sitzt bewusst auf dem Wrapper um das Raster und NICHT auf
+   der Karte: Floating UI (x-anchor) haelt jeden `container-type != normal` fuer
+   einen Containing Block und rechnet die Koordinaten eines `position: fixed`-
+   Popovers relativ dazu — der Browser tut das nicht. Eine Combobox irgendwo in
+   der Karte klappte dann um den Karten-Offset verschoben auf. Im Wrapper geht
+   kein Popover auf, deshalb ist die Frage dort erledigt.
+   Gegated: tests/e2e-app/combobox-anchoring.spec.js */
+.ideen-board-wrap { container-type: inline-size; }
+
+/* ── Toolbar + Anlegen ──────────────────────────────────────────────────── */
+/* Die Filterleiste bringt ihre Geometrie komplett selbst mit (.filter-bar) —
+   das breite Suchfeld ueber `.filter-search-input--wide` am Input, wie in
+   Recherche und Quellen. Hier steht darum nichts. */
+
+/* stretch statt flex-start: Bahn-Picker, einzeiliges Textfeld und Button teilen
+   sich damit eine Zeilenhoehe — die Combobox streckt ihren Trigger selbst mit. */
+.ideen-board-add {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: stretch;
+  flex-wrap: wrap;
+  /* Abstand nach unten zum Raster: der Block ist der letzte vor dem Brett, und
+     `.card-section + .card-section` regelt nur den Abstand NACH oben. */
+  margin-bottom: var(--card-gap-section);
+}
+/* Reicht die Zeile nicht, bricht sie um (flex-wrap) — ohne Query, weil die
+   Reihe ausserhalb des Query-Containers liegt (siehe .ideen-board-wrap). */
+.ideen-board-add-lane { flex: 0 1 16rem; min-width: 0; }
+.ideen-board-add-input { flex: 1 1 14rem; min-width: 0; }
+
+/* Die Anlege-Zeile traegt dieselbe Compact-Geometrie wie die Filterleiste
+   direkt darueber (12px Schrift, 4px vertikales Padding, Hairline-Border,
+   line-height 1.4 — DESIGN.md „Hoehen-Invariante"). Bahn-Picker (Combobox,
+   `--compact` per Default) und Knopf (.btn-compact am Element) bringen das
+   schon mit; das Textfeld erbt sonst die volle Formulargroesse und macht die
+   Reihe hoeher als die Leiste darueber.
+   Spezifitaets-Falle wie bei `.filter-bar .filter-search-input`: das Feld ist
+   ein `<input type=text>` und wird von der generischen Form-Regel
+   (form-elements.css, 0,1,1) getroffen — eine nackte Klasse (0,1,0) verloere,
+   darum auf die Zeile gescoped. */
+.ideen-board-add .ideen-board-add-input {
+  font-size: var(--size-compact-font-size);
+  line-height: 1.4;
+  padding: var(--size-compact-padding);
+  border: var(--border-thin) solid var(--color-border);
+  background: var(--color-bg);
+}
+
+/* ── Raster ─────────────────────────────────────────────────────────────── */
+/* Eine Spalte fuer die Bahnbeschriftung, danach eine je Stufe. Die Spaltenbreite
+   liegt am Container (nicht am Viewport): das Board steht je nach Zustand in der
+   normalen Kartenbreite oder im Vollbild. Reicht der Platz nicht, scrollt die
+   Flaeche horizontal statt die Spalten unlesbar schmal zu quetschen. */
+.ideen-board {
+  --ideen-lane-w: 11rem;
+  --ideen-col-w: 13rem;
+  display: grid;
+  grid-template-columns: var(--ideen-lane-w) repeat(4, minmax(var(--ideen-col-w), 1fr));
+  gap: var(--space-xs);
+  overflow-x: auto;
+  padding-bottom: var(--space-sm);
+}
+
+/* Kopfzeile + Bahnzeile spannen das ganze Raster und geben ihre Kinder an das
+   Eltern-Grid weiter (`display: contents`) — sonst braeuchte jede Zeile ein
+   eigenes Grid und die Spalten der Zeilen liefen auseinander. */
+.ideen-board-head,
+.ideen-board-row { display: contents; }
+
+.ideen-board-head-lane,
+.ideen-board-head-col {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-base);
+  background: var(--color-surface);
+  border-bottom: 2px solid var(--ideen-status-accent, var(--color-border));
+  padding: var(--space-xs) var(--space-sm);
+}
+.ideen-board-head-lane {
+  font-size: var(--font-size-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+.ideen-board-head-col {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.ideen-board-col-title {
+  flex: 1 1 auto;
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.ideen-board-col-count {
+  flex: 0 0 auto;
+  font-size: var(--font-size-micro);
+  color: var(--color-muted);
+  background: var(--color-tag-bg);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-xs);
+  min-width: 1.4em;
+  text-align: center;
+}
+
+/* Stufen-Farben: offen neutral, in Arbeit warnend-warm, erledigt ok, verworfen
+   zurueckgenommen. Semantische Tokens, keine Hex-Werte — dieselbe Zuordnung wie
+   im Recherche-Status-Board, damit dieselbe Stufe nicht zweimal verschieden
+   aussieht. */
+.ideen-board-head-col--offen,
+.ideen-board-cell--offen     { --ideen-status-accent: var(--color-muted); }
+.ideen-board-head-col--in_arbeit,
+.ideen-board-cell--in_arbeit { --ideen-status-accent: var(--color-warn-text); }
+.ideen-board-head-col--erledigt,
+.ideen-board-cell--erledigt  { --ideen-status-accent: var(--color-ok-border); }
+.ideen-board-head-col--verworfen,
+.ideen-board-cell--verworfen { --ideen-status-accent: var(--color-border); }
+
+/* ── Bahn ───────────────────────────────────────────────────────────────── */
+.ideen-board-lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) 0;
+  border-top: 1px solid var(--color-border);
+  border-right: 2px solid var(--card-accent);
+  min-width: 0;
+}
+.ideen-board-lane-title {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-size: var(--font-size-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.ideen-board-lane-title:disabled { cursor: default; color: var(--color-muted); }
+/* Kapitel-Bahnen heben sich ab: sie sind die groebere Ebene und ordnen die
+   Seiten-Bahnen darunter. */
+.ideen-board-row--chapter .ideen-board-lane-title { color: var(--card-accent); }
+.ideen-board-row--page    .ideen-board-lane       { padding-left: var(--space-md); }
+
+.ideen-board-lane-chapter,
+.ideen-board-lane-count {
+  font-size: var(--font-size-micro);
+  color: var(--color-muted);
+}
+
+/* ── Klapp-Griffe ───────────────────────────────────────────────────────── */
+/* Zwei Achsen in derselben Bahnbeschriftung: der Chevron vor dem Titel klappt
+   die KARTEN dieser Bahn, der Seiten-Griff darunter faltet bei einer
+   Kapitel-Bahn ihre SEITEN-BAHNEN in diese Zeile. Klapp-Marker ist beide Male
+   das App-Pattern `.history-chevron` (Mask-Icon + Rotation, DESIGN.md) — hier
+   nur auf Bahn-Groesse gebracht. Kein `collapsible`: das ist Tree-Expansion mit
+   einer Per-Bahn-Liste, kein eigenstaendiger Section-Toggle (public/CLAUDE.md). */
+.ideen-board-lane-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+/* `min-width: 0` haelt den umbrechenden Titel im Flex-Kind (sonst diktiert das
+   laengste Wort die Bahnbreite und schiebt die Stufen-Spalten aus dem Raster). */
+.ideen-board-lane-head .ideen-board-lane-title { flex: 1 1 auto; min-width: 0; }
+.ideen-board-fold,
+.ideen-board-pages {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-muted);
+  font-size: var(--font-size-micro);
+}
+.ideen-board-fold { flex: 0 0 auto; }
+.ideen-board-fold:hover,
+.ideen-board-pages:hover { color: var(--color-text); }
+.ideen-board-fold .history-chevron,
+.ideen-board-pages .history-chevron {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  color: inherit;
+}
+
+/* Seiten-Griff und Zaehler teilen sich die Fusszeile der Bahn. `wrap`, weil in
+   11rem Bahnbreite beides nebeneinander nicht immer passt. */
+.ideen-board-lane-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  width: 100%;
+}
+.ideen-board-lane-count { margin-inline-start: auto; }
+
+/* Kapitel-Zeilen sind die groebere Ebene und stehen auch dann, wenn nur ihre
+   Seiten Ideen tragen (sie sind der Griff, an dem das Kapitel zuklappt). Ein
+   leiser Farbzug durch die ganze Zeile laesst sie als Ueberschrift lesen statt
+   als leere Bahn. */
+.ideen-board-row--chapter .ideen-board-lane,
+.ideen-board-row--chapter .ideen-board-cell {
+  background: color-mix(in srgb, var(--card-accent) 5%, transparent);
+}
+
+/* Was die Klappung in dieser Zelle verbirgt. Kein Knopf — die Griffe stehen in
+   der Bahn; hier zaehlt nur, damit eine eingeklappte Pendenz nicht wie eine
+   verlorene aussieht (gleiche Ueberlegung wie der Ausblend-Zaehler der
+   Filterleiste). */
+.ideen-board-folded {
+  align-self: flex-start;
+  font-size: var(--font-size-micro);
+  color: var(--color-muted);
+  background: var(--color-tag-bg);
+  border: 1px dashed color-mix(in srgb, var(--ideen-status-accent, var(--color-border)) 55%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Zelle ──────────────────────────────────────────────────────────────── */
+/* SortableJS-Container. Fuellt die Zeilenhoehe, damit die ganze Flaeche unter
+   den Karten Drop-Ziel ist. */
+.ideen-board-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  border-top: 1px solid var(--color-border);
+  min-height: 2.5rem;
+  min-width: 0;
+}
+/* Waehrend eines Drags leere Zellen zur erreichbaren Drop-Zone aufblaehen
+   (Klasse an <body> aus ideen-board/actions.js). */
+body.ideen-dnd-active .ideen-board-cell {
+  min-height: 4rem;
+  border-radius: var(--radius-sm);
+  outline: 1px dashed color-mix(in srgb, var(--ideen-status-accent) 55%, transparent);
+  outline-offset: var(--space-3);
+}
+
+/* ── Karte ──────────────────────────────────────────────────────────────── */
+.idee-board-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--ideen-status-accent, var(--color-border));
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  position: relative;
+  /* Nur transform animieren (Compositor-billig) — gleiche Ueberlegung wie an
+     der Recherche-Status-Karte. */
+  transition: transform 0.12s ease;
+}
+.idee-board-card--verworfen { opacity: var(--opacity-muted); }
+
+/* Textzeile: Griff links, Inhalt (Text bzw. Edit + Verknuepfungs-Chips) rechts.
+   Der Griff steht neben dem Text und nicht in einer eigenen Kopfzeile — er waere
+   dort das einzige dauerhaft sichtbare Element und damit ein leerer Streifen
+   ueber jeder Notiz. `flex-start` haelt ihn an der ERSTEN Zeile, auch wenn der
+   Text drei Zeilen lang ist. */
+.idee-board-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+/* Eigener Fluss statt des Karten-Gaps: Text und Verknuepfungs-Chips liegen
+   jetzt zusammen in dieser Spalte, nicht mehr als Geschwister der Karte. */
+.idee-board-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Griff = einzige Greifflaeche (SortableJS handle), damit Text, Chips und
+   Aktionen voll klickbar bleiben. Dezent bis zur Zuwendung, gleiche Abstufung
+   wie am Recherche-Status-Board; `touch-action: none` laesst den Fallback-Drag
+   auf Touch sauber starten. */
+.idee-board-grip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--font-size-xs) * 1.5);
+  color: var(--color-border);
+  cursor: grab;
+  touch-action: none;
+  transition: color var(--transition-fast);
+}
+.idee-board-card:hover .idee-board-grip { color: var(--color-muted); }
+.idee-board-grip:hover { color: var(--color-text); }
+.idee-board-grip:active { cursor: grabbing; }
+.idee-board-grip .icon { width: 14px; height: 14px; }
+
+.idee-board-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.idee-board-edit { display: flex; flex-direction: column; gap: var(--space-xs); }
+
+/* Aktionen schweben in der oberen rechten Ecke und erscheinen erst auf
+   Zuwendung — eine Kanban-Notiz mit drei dauerhaft sichtbaren Knoepfen liest
+   sich als Werkzeugleiste. Absolut statt in einer eigenen Zeile: eine Kopfzeile
+   nur fuer sie waere im Ruhezustand ein leerer Streifen, und neben den
+   Stufen-Knoepfen nehmen sie so viel Breite, dass deren drei Wortmarken in einer
+   13rem-Spalte dreizeilig umbrechen. Der eigene Kartenhintergrund haelt sie beim
+   Ueberfahren lesbar. `:focus-within` haelt den Tastaturweg offen. */
+.idee-board-card-actions {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  gap: var(--space-3);
+  background: var(--color-card-bg);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.idee-board-card:hover .idee-board-card-actions,
+.idee-board-card:focus-within .idee-board-card-actions { opacity: 1; }
+
+/* Stufen-Knoepfe: der tastaturerreichbare Weg neben dem Drag. Sie erscheinen mit
+   den Aktionen, damit die Karte im Ruhezustand nur ihren Text zeigt, behalten
+   ihren Platz aber auch unsichtbar — sonst springt das Board beim Ueberfahren
+   einer Karte. */
+.idee-board-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.idee-board-card:hover .idee-board-steps,
+.idee-board-card:focus-within .idee-board-steps { opacity: 1; }
+.idee-board-step {
+  font-size: var(--font-size-micro);
+  line-height: 1.4;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.idee-board-step:hover { color: var(--color-text); border-color: var(--card-accent); }
+
+/* ── SortableJS-Drag-Zustaende ──────────────────────────────────────────── */
+/* Klassennamen aus ideen-board/actions.js; derselbe Satz wie am Recherche-
+   Status-Board, weil beide denselben Kern (public/js/sortable-dnd.js) mit
+   forceFallback fahren und dieselben drei Rollen zu zeigen haben. */
+/* Ghost: reservierter Slot am Ziel — gestrichelter Rahmen, Inhalt unsichtbar
+   (der Drag-Klon ist die einzige sichtbare Repraesentation der Karte). */
+.idee-board-card.idee-board-card--ghost {
+  background: color-mix(in srgb, var(--ideen-status-accent, var(--color-border)) 14%, transparent);
+  border: 1px dashed var(--ideen-status-accent, var(--color-border));
+  border-left-width: 3px;
+  opacity: 1;
+}
+.idee-board-card.idee-board-card--ghost > * { visibility: hidden; }
+.idee-board-card.idee-board-card--chosen { background: var(--color-accent-bg); }
+/* Drag-Klon: forceFallback klont nach <body> — dort fehlt der Spalten-Kontext,
+   also kein --ideen-status-accent (Rahmen sonst konturlos: var() ohne Wert →
+   currentColor) und kein .card--ideenboard, also kein --card-accent. Beides
+   explizit zurueckfallen lassen. `transition: none` ist Pflicht: SortableJS
+   setzt den Klon per inline transform pro Mousemove, und die von .idee-board-card
+   geerbte transform-Transition liesse ihn der Maus hinterherlerpen statt
+   mitzugehen. `opacity: 1` haelt auch eine verworfene Karte am Zeiger lesbar. */
+.idee-board-card.idee-board-card--dragging {
+  box-shadow: 0 12px 28px var(--color-shadow);
+  background: var(--color-card-bg);
+  border: 1px solid var(--card-accent, var(--card-accent-ideen));
+  border-radius: var(--radius-sm);
+  opacity: 0.95;
+  cursor: grabbing;
+  transition: none;
+}
+
+/* ── Verknuepfungs-Chips ────────────────────────────────────────────────── */
+/* Verknuepfungs-Picker (partials/ideen-link-picker.html) — ebenfalls geteiltes
+   Markup, darum hier neben den Chips. Nach <body> teleportiert und am Trigger
+   verankert (public/js/popover-anchor.js setzt top/left), also `fixed` und in
+   der Popover-Ebene. Die Breite ist der Schaetzwert LINK_POPOVER_W in
+   book/ideen-links.js — beide zusammen halten, sonst springt das Popover beim
+   Nachmessen sichtbar. */
+.idee-link-popover {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  width: min(320px, calc(100vw - var(--space-md)));
+  padding: var(--space-sm);
+  background: var(--color-surface);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+.idee-link-popover-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.idee-link-popover-title {
+  font-size: var(--font-size-xs);
+  color: var(--color-subtle);
+}
+/* Die Idee selbst als Beleg, woran verknuepft wird — zwei Zeilen, danach
+   abgeschnitten: der Kopf soll das Popover nicht laenger machen als seine
+   Eingabefelder. */
+.idee-link-popover-idee {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--font-size-micro);
+  color: var(--color-text);
+}
+.idee-link-popover-actions {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: flex-end;
+}
+
+/* Geteiltes Markup mit der Ideen-Karte (partials/ideen-link-chips.html), darum
+   liegt das Vokabular hier und nicht in der Board-Sektion: entities/ideen.css
+   laedt davor und benutzt dieselben Klassen. */
+.idee-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.idee-link-chip {
+  --idee-link-accent: var(--color-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--idee-link-accent) 45%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-3);
+  background: var(--color-tag-bg);
+}
+/* Ziel-Art traegt die Farbe der Karte, auf die der Chip zeigt — so erkennt man
+   ohne Lesen, ob eine Pendenz an einem Fundstueck, einem Beat oder einem Motiv
+   haengt. */
+.idee-link-chip--research { --idee-link-accent: var(--card-accent-recherche); }
+.idee-link-chip--beat     { --idee-link-accent: var(--card-accent-plot); }
+.idee-link-chip--motif    { --idee-link-accent: var(--card-accent-motiv); }
+
+.idee-link-goto {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: var(--font-size-micro);
+  color: var(--color-text);
+}
+.idee-link-kind {
+  flex: 0 0 auto;
+  color: var(--idee-link-accent);
+  font-weight: var(--fw-semibold);
+}
+.idee-link-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.idee-chip-x {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-muted);
+  display: inline-flex;
+}
+.idee-chip-x:hover { color: var(--color-err-text); }
+.idee-chip-x .icon { width: 0.75em; height: 0.75em; }
+
+/* ── Ideen-Plaketten auf den Gegenseiten ────────────────────────────────── */
+/* Read-only Chips an Recherche-Fundstueck, Plot-Beat und Motiv
+   (public/js/book/ideen-backlinks.js). Gleiche Bauart wie die Motiv-Badges auf
+   der Beat-Karte: sie zeigen und springen, kuratiert wird auf der Ideen-Seite. */
+.idee-backlinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.idee-backlink-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 14rem;
+  background: var(--color-tag-bg);
+  border: 1px solid color-mix(in srgb, var(--card-accent-ideen) 45%, transparent);
+  border-left: 3px solid var(--idee-status-accent, var(--color-muted));
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-xs);
+  cursor: pointer;
+  font-size: var(--font-size-micro);
+  color: var(--color-text);
+  text-align: left;
+}
+.idee-backlink-chip--offen     { --idee-status-accent: var(--color-muted); }
+.idee-backlink-chip--in_arbeit { --idee-status-accent: var(--color-warn-text); }
+.idee-backlink-chip--erledigt  { --idee-status-accent: var(--color-ok-border); }
+.idee-backlink-chip--verworfen { --idee-status-accent: var(--color-border); opacity: var(--opacity-muted); }
+.idee-backlink-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Schmaler Container ─────────────────────────────────────────────────── */
+/* Reicht der Platz nicht, bleibt das Raster wie es ist und die Flaeche scrollt
+   horizontal (`overflow-x: auto` am Board). Bewusst KEIN Umbau auf eine Spalte:
+   die Aussage des Boards ist der Vergleich einer Bahn ueber die Stufen hinweg,
+   und untereinander gestapelt waere genau der weg — dann waere die Ideen-Karte
+   neben dem Editor das bessere Werkzeug. Verschmalert werden nur die Spalten,
+   damit auf dem Telefon mehr als eine ins Bild passt. */
+@container (max-width: 40rem) {
+  .ideen-board {
+    --ideen-lane-w: 7rem;
+    --ideen-col-w: 10rem;
+  }
+}
+}

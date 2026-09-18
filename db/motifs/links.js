@@ -113,6 +113,41 @@ function validPageIds(bookId, pageIds) {
   return _filterIds('SELECT 1 FROM pages WHERE book_id = ? AND page_id = ?', bookId, pageIds);
 }
 
+// ── Rückrichtung: welche Motive hängen an DIESER Figur? ────────────────────
+// Das Pendant zu db/plot.js#figurePlotUsage — dieselbe Frage, andere Werkstatt.
+// Ohne sie ist die Kante Motiv ↔ Figur einseitig: die Motiv-Werkstatt kennt die
+// Figur, die Figuren-Werkstatt weiss nichts von ihren Motiven.
+//
+// Zwei Quellen wie überall, wo Figuren auftauchen: der Komplettanalyse-Katalog
+// (`motif_figures` über die Quell-Figur des Drafts) und die Werkstatt selbst
+// (`motif_draft_figures`). Ein importierter Draft erbt damit die Motive, die am
+// Katalog-Eintrag hängen — sonst hinge dieselbe Figur je nach Herkunft an zwei
+// verschiedenen Motiv-Mengen.
+//
+// `occurrenceCount` kommt mit, weil ein Motiv OHNE Ist-Belege etwas anderes
+// aussagt als eines mit: „geplant" ist nicht „trägt".
+const _stmtMotifsForFigure = db.prepare(`
+  SELECT DISTINCT m.id, m.name, COALESCE(m.farbe, t.farbe) AS farbe, m.position,
+         (SELECT COUNT(*) FROM motif_occurrences o WHERE o.motif_id = m.id) AS occurrenceCount
+    FROM motifs m
+    LEFT JOIN themes t ON t.id = m.theme_id
+   WHERE m.book_id = ? AND m.user_email = ?
+     AND (
+       (? IS NOT NULL AND m.id IN (SELECT motif_id FROM motif_draft_figures WHERE draft_figure_id = ?))
+       OR
+       (? IS NOT NULL AND m.id IN (SELECT motif_id FROM motif_figures WHERE figure_id = ?))
+     )
+   ORDER BY m.position, m.id
+`);
+
+function figureMotifUsage(bookId, userEmail, { draftFigureId = null, sourceFigureId = null } = {}) {
+  const dId = draftFigureId != null ? parseInt(draftFigureId) : null;
+  const sId = sourceFigureId != null ? parseInt(sourceFigureId) : null;
+  if (dId == null && sId == null) return { motifs: [] };
+  const motifs = _stmtMotifsForFigure.all(parseInt(bookId), userEmail, dId, dId, sId, sId);
+  return { motifs };
+}
+
 // Alle fünf Soll-Brücken eines Buchs in Lesereihenfolge — einziger Konsument ist
 // der Graph-Payload (db/motifs/graph.js), der sie auf die Motive verteilt.
 function bridgeRows(bookId, userEmail) {
@@ -129,5 +164,5 @@ function bridgeRows(bookId, userEmail) {
 module.exports = {
   setMotifFigures, setMotifDraftFigures, setMotifBeats, setMotifChapters, setMotifPages,
   resolveFigureIds, validBeatIds, validDraftFigureIds, validChapterIds, validPageIds,
-  bridgeRows,
+  bridgeRows, figureMotifUsage,
 };

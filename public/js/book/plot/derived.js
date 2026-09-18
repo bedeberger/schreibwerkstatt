@@ -6,8 +6,8 @@
 //   - board.js    — Beats/Stats, Figuren-Picker, Stränge/Swimlanes, Hybrid-Akte,
 //                    Grid-Render-Plan, Live-Vererbung, Akt-Farben
 //   - tension.js  — Spannungsbogen (global + pro Strang) + Figuren-Fokus
-//   - coverage.js — Verworfen-Collapse, Konsistenz-Befund↔Beat, Kapitel-/Figuren-
-//                    Coverage, Volltext-/Kapitel-/Figur-Filter
+//   - coverage.js — Verworfen-Collapse, Konsistenz-Befund↔Beat, Figuren-Coverage,
+//                    Volltext-/Kapitel-/Figur-Filter
 
 import { boardMethods } from './derived/board.js';
 import { tensionMethods } from './derived/tension.js';

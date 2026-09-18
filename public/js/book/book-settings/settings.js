@@ -30,6 +30,9 @@ export const settingsMethods = {
       // (kein zweiter Fetch), gespeichert wird sie aber ueber den eigenen
       // /citation-Endpunkt — siehe book-settings/citation.js.
       this._applyCitationSettings(data);
+      // Recherche-Profil: gleicher Response, eigener Schreibpfad
+      // (/booksettings/:id/research) — siehe book-settings/research.js.
+      this._applyResearchSettings(data);
     } catch (e) {
       console.error('[book-settings] Laden fehlgeschlagen:', e);
     } finally {
@@ -163,16 +166,16 @@ export const settingsMethods = {
   async saveActiveTab() {
     const taxErr = this._taxonomyError();
     if (taxErr) { this.bookSettingsError = window.__app.t(taxErr); return; }
-    await Promise.all([this.saveBookSettings(), this.savePublication(), this.saveCitationSettings(), this.saveXrefSettings()]);
+    await Promise.all([this.saveBookSettings(), this.savePublication(), this.saveCitationSettings(), this.saveXrefSettings(), this.saveResearchSettings()]);
   },
 
-  headerSaving()   { return this.bookSettingsSaving || this.pubSaving || this.citationSaving; },
+  headerSaving()   { return this.bookSettingsSaving || this.pubSaving || this.citationSaving || this.researchSaving; },
 
-  headerError()    { return this.bookSettingsError || this.pubError || this.citationError; },
+  headerError()    { return this.bookSettingsError || this.pubError || this.citationError || this.researchError; },
 
   headerSaved()    { return (this.bookSettingsSaved || this.pubSaved || this.citationSaved) && !this.headerError(); },
 
-  headerDisabled() { return this.bookSettingsSaving || this.pubSaving || this.citationSaving || this.bookSettingsLoading; },
+  headerDisabled() { return this.bookSettingsSaving || this.pubSaving || this.citationSaving || this.researchSaving || this.bookSettingsLoading; },
 
 
   async saveBookSettings() {

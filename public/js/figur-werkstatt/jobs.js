@@ -100,5 +100,8 @@ export const jobsMethods = {
   _clearJobs() {
     stopWerkstattJob(this, 'brainstorm');
     stopWerkstattJob(this, 'consistency');
+    // Die Figuren-Verankerung ist buchweit — sie gehoert beim Buchwechsel
+    // genauso gestoppt wie die beiden draft-skopierten Jobs.
+    stopWerkstattJob(this, 'anchor');
   },
 };

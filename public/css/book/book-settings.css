@@ -454,6 +454,17 @@
   margin-top: var(--space-sm);
 }
 
+/* Preset-Knoepfe der Domain-Eingrenzung (Recherche-Profil). Eigene Klasse statt
+   der Stilprofil-Zeile: hier umbrechen die Knoepfe, weil es je nach Fachgebiet
+   mehrere sind. */
+.book-settings-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
 /* Merge-Panel (Danger-Zone): pro Gattung ein Block aus Gattungs-Label, den zwei
    Auswahl-Zeilen (Quelle/Ziel) und dem Button. Nur der Abstand zwischen den
    Gattungen — Zeilen-Layout kommt von .card-form-row. */

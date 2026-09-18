@@ -171,11 +171,12 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'list_ideen',
-    description: 'Listet die Notizen/Ideen, die der User zu einzelnen Seiten oder ganzen Kapiteln gespeichert hat (mit Kapitel-/Seitenkontext). Jede Idee hat `scope: "page"` oder `"chapter"`. Ideal um offene Anmerkungen aufzugreifen, oder zu beantworten "was wollte ich an Kapitel X noch ändern?". Filterbar nach erledigt, page_id, chapter_id (Chapter-Filter umfasst sowohl direkt-am-Kapitel-Ideen als auch Ideen zu Seiten des Kapitels). Offene Ideen erscheinen zuerst.',
+    description: 'Listet die Notizen/Ideen/Pendenzen, die der User zu einzelnen Seiten oder ganzen Kapiteln gespeichert hat (mit Kapitel-/Seitenkontext). Jede Idee hat `scope: "page"` oder `"chapter"` und einen `status`: offen → in_arbeit → erledigt, daneben verworfen. VERWORFEN heisst: der Autor hat sie geprüft und sich dagegen entschieden — schlage sie nicht erneut vor. Ideal um offene Anmerkungen aufzugreifen, oder zu beantworten "was wollte ich an Kapitel X noch ändern?". Filterbar nach status bzw. offen_only, page_id, chapter_id (Chapter-Filter umfasst sowohl direkt-am-Kapitel-Ideen als auch Ideen zu Seiten des Kapitels). Noch offene Ideen erscheinen zuerst.',
     input_schema: {
       type: 'object',
       properties: {
-        erledigt:   { type: 'boolean', description: 'true = nur erledigte, false = nur offene. Ohne Angabe: beide.' },
+        status:     { type: 'string', enum: ['offen', 'in_arbeit', 'erledigt', 'verworfen'], description: 'Nur Ideen dieser Stufe.' },
+        offen_only: { type: 'boolean', description: 'true = nur noch offene (offen ODER in_arbeit). Abkürzung statt zweier status-Aufrufe.' },
         page_id:    { type: 'integer', description: 'Nur Ideen zu dieser Seite.' },
         chapter_id: { type: 'integer', description: 'Nur Ideen zu diesem Kapitel (direkt-am-Kapitel + Seiten des Kapitels).' },
         limit:      { type: 'integer', description: 'Maximale Anzahl (default 50, max 200).' },

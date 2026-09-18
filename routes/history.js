@@ -9,7 +9,8 @@
 //   history/reviews.js       — Buch-/Kapitel-Bewertungen + Tagebuch-Rueckblicke,
 //                               inkl. History-Reset eines Buchs.
 //   history/stats.js         — Seiten-Stats-Cache (lesen + Batch-Write),
-//                               Buchstatistik-Verlauf, Staleness, Stil-Metriken.
+//                               Buchstatistik-Verlauf, Kapitel-Entstehung,
+//                               Staleness, Stil-Metriken.
 //   history/heatmap.js       — Fehler-Heatmap + Fehlerdichte-Trend.
 //   history/time-tracking.js — die drei Heartbeat-Zaehler (Schreibzeit, Diktat,
 //                               Lektoratszeit), aus einer Spec generiert.
@@ -17,8 +18,9 @@
 //
 // Routen-Pfade sind ueber die Module hinweg disjunkt (literale erste Segmente
 // /check · /page · /page-ages · /coverage · /review · /chapter-review(s) ·
-// /rueckblick* · /book · /page-stats · /book-stats · /stats-stale ·
-// /style-stats · /fehler-* · /writing-time · /stt-time · /lektorat-time)
+// /rueckblick* · /book · /page-stats · /book-stats · /chapter-growth ·
+// /stats-stale · /style-stats · /fehler-* · /writing-time · /stt-time ·
+// /lektorat-time)
 // → die Registrierungs-Reihenfolge aendert das Matching nicht.
 
 const express = require('express');

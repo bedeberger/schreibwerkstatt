@@ -54,15 +54,20 @@ test('_claudeSupportsStructuredOutputs: Allowlist deckt Opus 4.7+/Sonnet 5/Fable
 });
 
 // Model-aware Tokenizer-Rate: moderne Generation rechnet konservativer (≤2.5), damit das
-// Char-Budget nicht überschätzt wird; ältere Modelle behalten den globalen CHARS_PER_TOKEN.
-test('_claudeCharsPerToken: moderne Generation ≤ 2.5, ältere = globaler Wert', () => {
-  const { _claudeCharsPerToken, CHARS_PER_TOKEN } = require('../../lib/ai');
+// Char-Budget nicht überschätzt wird; ältere Modelle bekommen die CLAUDE-Basisrate.
+// Basis ist bewusst nicht der globale CHARS_PER_TOKEN: der haengt am global
+// eingestellten Provider, und im Mischbetrieb (KI-Profile) bekaeme Claude sonst die
+// Rate eines lokalen Tokenizers. Die Provider-Unabhaengigkeit selbst prueft
+// tests/unit/claude-model-predicates.test.mjs (dort mit kontrolliertem ai.provider).
+test('_claudeCharsPerToken: moderne Generation ≤ 2.5, ältere darüber und untereinander gleich', () => {
+  const { _claudeCharsPerToken } = require('../../lib/ai');
   for (const m of ['claude-opus-4-8', 'claude-sonnet-5', 'claude-fable-5']) {
     assert.ok(_claudeCharsPerToken(m) <= 2.5, `${m} sollte ≤2.5 chars/token rechnen`);
   }
-  for (const m of ['claude-sonnet-4-6', 'claude-opus-4-6', '']) {
-    assert.equal(_claudeCharsPerToken(m), CHARS_PER_TOKEN,
-      `${m} sollte den globalen CHARS_PER_TOKEN behalten`);
+  const base = _claudeCharsPerToken('claude-sonnet-4-6');
+  assert.ok(base > 2.5, 'ältere Generation sollte über der Modern-Rate liegen');
+  for (const m of ['claude-opus-4-6', '']) {
+    assert.equal(_claudeCharsPerToken(m), base, `${m} sollte dieselbe Basisrate behalten`);
   }
 });
 

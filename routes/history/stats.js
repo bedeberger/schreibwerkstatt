@@ -1,7 +1,8 @@
 'use strict';
 // Seiten-/Buch-Statistik: Stats-Cache lesen und im Batch schreiben, der
-// Buchstatistik-Verlauf, die Staleness-Frage des Clients und die Stil-Karte
-// (verdichtetes Kapitel-Raster + Drilldown pro Zelle).
+// Buchstatistik-Verlauf, die Kapitel-Entstehung aus den Seitenfassungen, die
+// Staleness-Frage des Clients und die Stil-Karte (verdichtetes Kapitel-Raster
+// + Drilldown pro Zelle).
 
 const { db } = require('../../db/schema');
 const { toIntId } = require('../../lib/validate');
@@ -11,6 +12,9 @@ const { jsonBodyLarge } = require('./shared');
 const { loadStyleRows, loadStyleSamples, chapterNameOf } = require('../../db/style-stats');
 const { buildStilHeatmap, buildStilDetail, isSampleBucket, UNCAT } = require('../../lib/stil-heatmap');
 const { METRICS_VERSION } = require('../../lib/page-index');
+const { chapterGrowthRows } = require('../../db/chapter-growth');
+const { buildChapterGrowth } = require('../../lib/chapter-growth');
+const { currentTz } = require('../../lib/local-date');
 
 function register(router) {
   // Seiten-Stats-Cache: alle gecachten Stats für ein Buch (geteilter Cache, nicht user-spezifisch)
@@ -115,6 +119,20 @@ function register(router) {
       ORDER BY bsh.recorded_at ASC
     `).all(bookId);
     res.json(rows);
+  });
+
+  // Kapitel-Entstehung: je Kapitel eine Zeitreihe seiner ABSOLUTEN Groesse, aus
+  // den Seitenfassungen. Buchweit beantwortet (wie Fehler-Heatmap und
+  // Lektoratszeit), damit die Karte beim Kapitelwechsel und beim Umschalten von
+  // „Inkl. Sub-Kapitel" nicht neu laden muss — der Scope ist eine Frage des
+  // Clients, nicht des Servers.
+  // Vertrag + Grenzen der Quelle (absolut statt additiv, nur Tage mit Aenderung,
+  // nach hinten groebere Aufloesung durch die Fassungs-Retention) stehen in
+  // lib/chapter-growth.js.
+  router.get('/chapter-growth/:book_id', (req, res) => {
+    const tz = currentTz();
+    const rows = chapterGrowthRows(req.bookId);
+    res.json({ tz, ...buildChapterGrowth(rows, { tz }) });
   });
 
   // Stats-Staleness: hat sich der Buchstand seit dem letzten Sync (page_stats +

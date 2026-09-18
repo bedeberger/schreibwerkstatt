@@ -58,7 +58,11 @@
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-6);
 }
-.idee-status-badge--erledigt { color: var(--color-subtle); }
+/* Stufen-Farben deckungsgleich mit dem Ideen-Board (entities/ideen-board.css):
+   dieselbe Stufe darf nicht zweimal verschieden aussehen. */
+.idee-status-badge--in_arbeit { color: var(--color-warn-text); border-color: var(--color-warn-text); }
+.idee-status-badge--erledigt  { color: var(--color-subtle); }
+.idee-status-badge--verworfen { color: var(--color-subtle); text-decoration: line-through; }
 .idee-content {
   font-size: var(--font-size-sm);
   white-space: pre-wrap;

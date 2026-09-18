@@ -64,6 +64,15 @@
   --color-schwach-text: #8B1E1E;
 
   --color-card-bg: var(--color-surface);
+
+  /* „Nichts da" — Schraffur fuer leere Raster-Zellen (Heatmap-Zelle, Werkbank-
+     Zelle). Eine Deklaration fuer alle Konsumenten: eine leere Zelle soll
+     ueberall gleich aussehen, und zwei Feature-Dateien mit je eigener
+     Strichbreite sind genau die Drift, gegen die das steht. Liest
+     `--color-border`, ist damit ohne Dark-Variante theme-korrekt. */
+  --hatch-empty: repeating-linear-gradient(45deg,
+    var(--color-border) 0, var(--color-border) 2px,
+    transparent 2px, transparent 6px);
   --color-neutral-bg: #e8e8e8;
   --color-accent-bg: rgba(196, 165, 90, 0.16);
   --color-accent-text: #8a6a20;
@@ -242,7 +251,9 @@
   --card-accent-plot-base: #4a52a0;
   --card-accent-plot: var(--card-accent-plot-base);
   --card-accent-motiv-base: #7c3aed;
+  --card-accent-werkbank-base: #0f766e;
   --card-accent-motiv: var(--card-accent-motiv-base);
+  --card-accent-werkbank: var(--card-accent-werkbank-base);
   --card-accent-page-base: #6e7276;
   --card-accent-page: var(--card-accent-page-base);
 
@@ -467,6 +478,7 @@
   --card-accent-share: oklch(from var(--card-accent-share-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-plot: oklch(from var(--card-accent-plot-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-motiv: oklch(from var(--card-accent-motiv-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
+  --card-accent-werkbank: oklch(from var(--card-accent-werkbank-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
   --card-accent-page: oklch(from var(--card-accent-page-base) max(var(--accent-dark-floor), calc(l + var(--accent-dark-lift))) calc(c * var(--accent-dark-chroma)) h);
 
   /* Event-Subtyp-Akzente (Dark) — abgeleitet wie die Karten-Akzente oben. */

@@ -8,6 +8,7 @@ const { inClause } = require('../../../lib/validate');
 const { narrativeLabels } = require('../narrative-labels');
 const pageRevisions = require('../../../db/page-revisions');
 const { _truncateResult, _findFigure } = require('./shared');
+const { isIdeeStatus, isOpenIdeeStatus, normalizeIdeeStatus, openStatusSql } = require('../../../lib/ideen-status');
 
 // ── list_chapters ────────────────────────────────────────────────────────────
 
@@ -99,7 +100,11 @@ const IDEEN_CONTENT_CHARS = 400;
 
 function tool_list_ideen(input, ctx) {
   const userEmail = ctx.userEmail || '';
-  const erledigtFilter = typeof input?.erledigt === 'boolean' ? (input.erledigt ? 1 : 0) : null;
+  // `status` ist die Achse (offen → in_arbeit → erledigt, daneben verworfen);
+  // `offen_only` ist die Abkuerzung fuer die haeufigste Frage („was ist hier
+  // noch offen?") und meint offen UND in_arbeit.
+  const statusFilter = isIdeeStatus(input?.status) ? input.status : null;
+  const offenOnly = input?.offen_only === true;
   const pageFilter    = Number.isInteger(input?.page_id)    ? input.page_id    : null;
   const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
   const limit = Math.min(200, Math.max(1, Number.isInteger(input?.limit) ? input.limit : IDEEN_DEFAULT_LIMIT));
@@ -108,7 +113,7 @@ function tool_list_ideen(input, ctx) {
   // `effective_chapter_id` deckt beide Quellen ab: direkt-am-Kapitel-Idee
   // (i.chapter_id) ODER an einer Seite, die zum Kapitel gehört (p.chapter_id).
   let sql = `
-    SELECT i.id, i.content, i.erledigt, i.erledigt_at, i.created_at, i.updated_at,
+    SELECT i.id, i.content, i.status, i.status_at, i.created_at, i.updated_at,
            i.page_id, p.page_name,
            COALESCE(i.chapter_id, p.chapter_id) AS effective_chapter_id,
            COALESCE(cc.chapter_name, cp.chapter_name) AS chapter_name,
@@ -120,13 +125,14 @@ function tool_list_ideen(input, ctx) {
     WHERE i.book_id = ? AND i.user_email = ?
   `;
   const params = [ctx.bookId, userEmail];
-  if (erledigtFilter !== null) { sql += ' AND i.erledigt = ?'; params.push(erledigtFilter); }
+  if (statusFilter) { sql += ' AND i.status = ?'; params.push(statusFilter); }
+  if (offenOnly)    { sql += ` AND ${openStatusSql('i')}`; }
   if (pageFilter    !== null) { sql += ' AND i.page_id = ?'; params.push(pageFilter); }
   if (chapterFilter !== null) {
     sql += ' AND COALESCE(i.chapter_id, p.chapter_id) = ?';
     params.push(chapterFilter);
   }
-  sql += ' ORDER BY i.erledigt ASC, i.updated_at DESC, i.id DESC';
+  sql += ` ORDER BY CASE WHEN ${openStatusSql('i')} THEN 0 ELSE 1 END, i.updated_at DESC, i.id DESC`;
 
   const rows = db.prepare(sql).all(...params);
   if (!rows.length) return { ideen: [], total: 0 };
@@ -138,8 +144,8 @@ function tool_list_ideen(input, ctx) {
     content: r.content && r.content.length > IDEEN_CONTENT_CHARS
       ? r.content.slice(0, IDEEN_CONTENT_CHARS) + '…'
       : (r.content || ''),
-    erledigt: !!r.erledigt,
-    erledigt_at: r.erledigt_at || null,
+    status: normalizeIdeeStatus(r.status),
+    status_at: r.status_at || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
     page_id: r.page_id,
@@ -148,12 +154,12 @@ function tool_list_ideen(input, ctx) {
     chapter_name: r.chapter_name || null,
   }));
 
-  const offen = rows.filter(r => !r.erledigt).length;
+  const offen = rows.filter(r => isOpenIdeeStatus(r.status)).length;
   return _truncateResult({
     ideen: limited,
     total,
     offen,
-    erledigt: total - offen,
+    abgeschlossen: total - offen,
     ...(limited.length < total ? { truncated: true, shown: limited.length } : {}),
   });
 }

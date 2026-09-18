@@ -1,10 +1,17 @@
-// Methoden für die Ideen-Karte (Sub-Komponente). Verwaltet User-Notizen
-// pro Seite ODER pro Kapitel — Scope-Switch via app.ideenScope.
+// Methoden für die Ideen-Karte (Sub-Komponente). Verwaltet User-Notizen und
+// Pendenzen pro Seite ODER pro Kapitel — Scope-Switch via app.ideenScope.
 // Offene Ideen werden im Seiten-Chat als Kontext eingespielt (Backend-seitig
 // via getOpenIdeen: Page-Ideen + Chapter-Ideen des umliegenden Kapitels).
+//
+// Die Bearbeitungsstufe (`status`) ist dieselbe Achse wie im Ideen-Board; SSoT
+// der Stufen ist ideen-shared.js. „Offen" heisst hier wie dort `offen` ODER
+// `in_arbeit` — `verworfen` zaehlt NICHT als offen und setzt darum auch keine
+// Sidebar-Plakette.
 
 import { fetchJson } from '../utils.js';
 import { EVT } from '../events.js';
+import { IDEE_STATUSES, ideeStatus, isOpenIdee } from './ideen-shared.js';
+import { computePopoverPos, refinePopoverPos } from '../popover-anchor.js';
 
 // Aktive Scope-IDs aus Root lesen. Liefert { kind, id } oder null.
 function _activeScope(app) {
@@ -43,6 +50,8 @@ export const ideenMethods = {
     this.editingDraft = '';
     this.movingId = null;
     this.moveTargetId = '';
+    this.linkPickerIdeeId = null;
+    this.linkPickerTargetId = '';
     this.menuOpenId = null;
     this._detachMenuListeners?.();
     this.errorMessage = '';
@@ -56,24 +65,16 @@ export const ideenMethods = {
     window.dispatchEvent(new CustomEvent(EVT.TOOLTIP_HIDE));
     this._triggerRect = ev.currentTarget.getBoundingClientRect();
     // Schätzung vor dem Render; danach mit der echten Popover-Grösse nachjustieren.
-    // Erledigte Ideen haben ein kürzeres Menü (nur Wieder öffnen + Löschen) — eine
-    // feste Höhe würde es beim Hochklappen zu weit über den Button schieben.
-    this.menuPos = this._computeMenuPos(this._triggerRect, 220, 200);
+    // Das Menü ist je nach Stufe unterschiedlich lang (die aktuelle Stufe steht
+    // nicht als Ziel drin) — eine feste Höhe würde es beim Hochklappen zu weit
+    // über den Button schieben.
+    this.menuPos = computePopoverPos(this._triggerRect, 220, 200);
     this.menuOpenId = idee.id;
     this._attachMenuListeners();
     this.$nextTick(() => {
-      const el = this.$refs.ideenMenu;
-      if (!el || !this._triggerRect) return;
-      this.menuPos = this._computeMenuPos(this._triggerRect, el.offsetWidth, el.offsetHeight);
+      const pos = refinePopoverPos(this.$refs.ideenMenu, this._triggerRect);
+      if (pos) this.menuPos = pos;
     });
-  },
-
-  _computeMenuPos(r, pw, ph) {
-    const left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.right - pw));
-    const top  = (r.bottom + ph + 8 > window.innerHeight)
-      ? Math.max(8, r.top - ph - 4)
-      : r.bottom + 4;
-    return { top, left };
   },
 
   closeMenu() {
@@ -121,7 +122,7 @@ export const ideenMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      // Neueste offene Idee nach oben (Liste ist nach erledigt ASC, created_at DESC sortiert)
+      // Neueste offene Idee nach oben (Liste ist offen-zuerst, dann created_at DESC)
       this.ideen = [row, ...this.ideen];
       this.newContent = '';
       this.errorMessage = '';
@@ -169,17 +170,20 @@ export const ideenMethods = {
     }
   },
 
-  async toggleErledigtIdee(idee) {
+  // Einziger Schreibpfad der Stufen-Achse auf dieser Karte — das Menue ruft ihn
+  // je Ziel-Stufe auf (gleiche Bauart wie setIdeeStatus im Board).
+  async setIdeeStatus(idee, status) {
     const app = window.__app;
+    if (!IDEE_STATUSES.includes(status) || ideeStatus(idee) === status) return;
     this.busy = true;
     try {
       const row = await fetchJson(`/ideen/${idee.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ erledigt: !idee.erledigt }),
+        body: JSON.stringify({ status }),
       });
       this._replaceIdee(row);
-      // Sort halten: offene oben, erledigte unten — innerhalb je nach created_at DESC
+      // Sort halten: offene oben, abgeschlossene unten — innerhalb nach created_at DESC
       this.ideen = this._sortIdeen(this.ideen);
       this.errorMessage = '';
       this._publishIdeenCount();
@@ -189,6 +193,11 @@ export const ideenMethods = {
       this.busy = false;
     }
   },
+
+  statuses() { return IDEE_STATUSES; },
+  statusLabel(s) { return window.__app.t(`ideen.status.${s}`); },
+  ideeStatus(idee) { return ideeStatus(idee); },
+  isOpenIdee(idee) { return isOpenIdee(idee); },
 
   // ── Move ─────────────────────────────────────────────────────────────────
   startMoveIdee(idee) {
@@ -228,7 +237,7 @@ export const ideenMethods = {
       this.moveTargetId = '';
       this.errorMessage = '';
       this._publishIdeenCount();
-      // Ziel-Counts bumpen (Backend lehnt Move bei erledigt ab → +1 sicher).
+      // Ziel-Counts bumpen (Backend lehnt Move bei abgeschlossener Idee ab → +1 sicher).
       this._bumpTreeCountForTarget(idee, targetId);
     } catch (e) {
       this.errorMessage = app.t('ideen.error.move');
@@ -262,7 +271,7 @@ export const ideenMethods = {
     const app = window.__app;
     const scope = _activeScope(app);
     if (!scope) return;
-    const count = (this.ideen || []).filter(i => !i.erledigt).length;
+    const count = (this.ideen || []).filter(isOpenIdee).length;
     if (scope.kind === 'page') {
       if (app.currentPage?.id === scope.id) app.currentPageIdeenOpenCount = count;
     } else {
@@ -305,7 +314,9 @@ export const ideenMethods = {
 
   _sortIdeen(arr) {
     return [...arr].sort((a, b) => {
-      if (a.erledigt !== b.erledigt) return a.erledigt - b.erledigt;
+      const ao = isOpenIdee(a) ? 0 : 1;
+      const bo = isOpenIdee(b) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
       // created_at DESC
       return (b.created_at || '').localeCompare(a.created_at || '');
     });
@@ -315,9 +326,12 @@ export const ideenMethods = {
   // getters sofort auf, mit `this === ideenMethods` (kein `ideen`-Feld) → Crash.
   // Plain Methoden funktionieren identisch im Template via `offeneIdeen()`.
   offeneIdeen() {
-    return (this.ideen || []).filter(i => !i.erledigt);
+    return (this.ideen || []).filter(isOpenIdee);
   },
-  erledigteIdeen() {
-    return (this.ideen || []).filter(i => !!i.erledigt);
+  // Abgeschlossen = erledigt ODER verworfen. Beide gehoeren unter denselben
+  // Strich: erledigt ist getan, verworfen ist entschieden — offen ist keins von
+  // beiden. Welches davon, sagt die Plakette an der Zeile.
+  abgeschlosseneIdeen() {
+    return (this.ideen || []).filter(i => !isOpenIdee(i));
   },
 };

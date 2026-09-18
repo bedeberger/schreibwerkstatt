@@ -33,6 +33,10 @@
   </div>
 </template>
 
+<!-- Ideen-Plaketten: eigene Pendenzen, die an diesem Fundstueck haengen.
+     Read-only — gesetzt wird die Kante auf der Ideen-Seite. -->
+<div x-data="{ ideaOwnerId: item.id }"><!-- @include ideen-backlinks --></div>
+
 <!-- Tags -->
 <div class="research-tags" x-show="item.tags && item.tags.length">
   <template x-for="tag in item.tags" :key="tag">

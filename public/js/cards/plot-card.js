@@ -9,6 +9,7 @@ import { attachFullscreenSync } from '../fullscreen.js';
 import { loadSortable } from '../lazy-libs.js';
 import { EVT } from '../events.js';
 import { getUserPref, setUserPref } from '../local-prefs.js';
+import { ideenBacklinkMethods } from '../book/ideen-backlinks.js';
 
 const HIDE_IM_BUCH_PREF_KEY = 'plotHideImBuch';
 const SHOW_ARCHIVED_PREF_KEY = 'plotShowArchived';
@@ -23,6 +24,11 @@ export function registerPlotCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('plotCard', () => ({
     acts: [],
+
+    // Ideen-Plaketten (Gegenrichtung der Ideen-Verknuepfung, read-only).
+    // Map Ziel-ID → Ideen-Anrisse; geladen in loadIdeaBacklinks (non-fatal).
+    ideaBacklinks: {},
+    _ideaBacklinkBookId: null,
     // Handlungsstränge (Swimlanes): optionale zweite Ordnungsachse. Leeres Array
     // = flaches Board (heutiges Verhalten). Pro Buch + User, lokal in der Karte.
     threads: [],
@@ -84,7 +90,7 @@ export function registerPlotCard() {
 
     // Beat-Edit / -Add
     editingBeatId: null,
-    beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', intensitaet: null, figure_ids: [], draft_figure_ids: [], motif_ids: [] },
+    beatDraft: { titel: '', beschreibung: '', status: 'geplant', chapter_id: '', intensitaet: null, zeit: '', figure_ids: [], draft_figure_ids: [], motif_ids: [], location_ids: [] },
     addingActId: null,
     // Grid-Add-Beat: Zell-Schlüssel `${actId}:${threadId|null}` (statt addingActId).
     addingCell: null,
@@ -301,5 +307,6 @@ export function registerPlotCard() {
     },
 
     ...plotMethods,
+    ...ideenBacklinkMethods,
   }));
 }

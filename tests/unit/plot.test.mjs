@@ -933,24 +933,6 @@ test('plotMethods.effectiveChapterNameForBeat: eigenes Kapitel hat Vorrang, sons
   assert.equal(ctx2.effectiveChapterNameForBeat({ thread_id: 8, chapter_name: null }), '');
 });
 
-test('plotMethods.plotCoverage: geerbtes Strang-Kapitel zählt als abgedeckt + nicht als kapitelloser Beat', () => {
-  const prevAlpine = globalThis.Alpine;
-  // Nav-Tree lebt in Alpine.store('nav') (kein Root-Proxy mehr).
-  globalThis.Alpine = {
-    store: () => ({ tree: [{ type: 'chapter', name: 'Kap 5' }, { type: 'chapter', name: 'Kap 6' }] }),
-  };
-  try {
-    const threads = [{ id: 7, chapter_name: 'Kap 5' }];
-    // Beat ohne eigenes Kapitel, aber in der an Kap 5 gebundenen Strang-Lane
-    const beats = [{ id: 1, act_id: 1, thread_id: 7, chapter_name: null, verworfen: 0 }];
-    const cov = makeCtx({ beats, threads }).plotCoverage();
-    assert.deepEqual(cov.uncovered, ['Kap 6']); // Kap 5 gilt via Vererbung als abgedeckt
-    assert.equal(cov.beatsNoChapter, 0);        // der Beat hat effektiv ein Kapitel
-  } finally {
-    if (prevAlpine === undefined) delete globalThis.Alpine; else globalThis.Alpine = prevAlpine;
-  }
-});
-
 test('plotMethods._beatMatchesFilter: Kapitel-Filter trifft auch geerbte Kapitel', () => {
   const threads = [{ id: 7, chapter_name: 'Kap 5' }];
   const beats = [{ id: 1, act_id: 1, thread_id: 7, chapter_name: null, fig_ids: [], draft_fig_ids: [] }];

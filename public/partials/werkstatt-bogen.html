@@ -1,0 +1,149 @@
+<!-- Figuren-Werkstatt — „Bogen im Buch" (Kern × Kapitel als Heatmap der Ist-
+     Dichte über den Buchbogen). Nested Partial von figur-werkstatt.html wegen
+     des HTML-Partial-LOC-Limits; die Sichtbarkeits-Weiche (arcVisible()) sitzt
+     am Platzhalter dort, nicht hier.
+
+     Geteiltes Muster mit dem Motiv-Verlaufsband: dieselben `.heatmap-*`-Klassen,
+     dieselbe √-gedämpfte Intensität, dasselbe Zell-Detail — eine Färbung soll in
+     beiden Karten dasselbe heissen. -->
+  <section class="card-section werkstatt-bogen">
+    <div class="card-section-head card-section-head--baseline">
+      <h3 class="section-heading" x-text="$app.t('werkstatt.arc.title')"></h3>
+      <div class="card-actions">
+        <!-- Der Knopf hebt sich hervor, wenn die Mindmap sich seit der letzten
+             Verankerung bewegt hat (gleiche Heuristik wie „Verankerung
+             aktualisieren" der Plot-Werkstatt). -->
+        <button type="button" class="btn btn-small"
+                :class="{ 'btn-primary': arc && arc.stale }"
+                :disabled="busy || anchorLoading"
+                @click="runFigurAnchor()"
+                :data-tip="arcSemanticActive() ? $app.t('werkstatt.arc.run.tip') : $app.t('werkstatt.arc.run.noSemantic')">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#zap"/></svg>
+          <span x-text="$app.t('werkstatt.arc.run')"></span>
+        </button>
+      </div>
+    </div>
+
+    <p class="card-hint" x-text="$app.t('werkstatt.arc.hint')"></p>
+
+    <div x-show="anchorLoading" x-cloak class="werkstatt-job-status">
+      <div x-show="anchorProgress > 0" class="progress-bar-wrap">
+        <div class="progress-bar" :style="{ '--progress': anchorProgress + '%' }"></div>
+      </div>
+      <span class="card-status" x-html="anchorStatus"></span>
+    </div>
+
+    <!-- Ohne semantische Suche kann der Lauf nichts finden: ein Kern ist eine
+         Bedeutung, keine Zeichenfolge. Das sagen statt es rätselhaft zu lassen. -->
+    <p class="card-hint card-hint--warn" x-show="!arcSemanticActive()"
+       x-text="$app.t('werkstatt.arc.noSemantic')"></p>
+
+    <!-- UNGESCANNT IST UNGEPRUEFT, NICHT ABWESEND: ohne Lauf zeigt das Band
+         keine Tabelle aus Nullen (die sähe aus wie ein Befund), sondern sagt,
+         dass noch nichts gemessen wurde. -->
+    <p class="muted-msg muted-msg--spaced" x-show="arc && !arc.scanned"
+       x-text="$app.t('werkstatt.arc.neverRun')"></p>
+
+    <template x-if="arc && arc.scanned && arcKerne().length > 0 && arcChapters().length > 0">
+      <div class="heatmap-wrap">
+        <div class="heatmap-legend" x-text="$app.t('werkstatt.arc.legend')"></div>
+        <div class="heatmap-scroll">
+          <table class="heatmap-table">
+            <thead>
+              <tr>
+                <th class="heatmap-rowhead" x-text="$app.t('werkstatt.arc.kern')"></th>
+                <th class="heatmap-numcol" x-text="$app.t('werkstatt.arc.total')"></th>
+                <template x-for="ch in arcChapters()" :key="ch.id">
+                  <th :data-tip="ch.name"><span x-text="ch.name"></span></th>
+                </template>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="k in arcKerne()" :key="k">
+                <tr>
+                  <th class="heatmap-rowhead" scope="row">
+                    <span class="heatmap-rowhead-main" x-text="arcKernLabel(k)"></span>
+                  </th>
+                  <td class="heatmap-numcol" x-text="arcRowTotal(k)"></td>
+                  <!-- `heatmap-cell--clickable` + `internal-link` haengen am
+                       Praedikat arcCellClickable: eine leere Zelle hat nichts
+                       aufzuloesen und darf weder Klick-Cursor noch Tab-Stopp
+                       anbieten. -->
+                  <template x-for="ch in arcChapters()" :key="ch.id">
+                    <td class="heatmap-cell"
+                        :class="[
+                          arcCellClass(arcCount(k, ch.id)),
+                          { 'heatmap-cell--clickable': arcCellClickable(k, ch.id),
+                            'internal-link': arcCellClickable(k, ch.id),
+                            'heatmap-cell--active': activeArcDetailKey === arcDetailKey(k, ch.id) }
+                        ]"
+                        :style="arcCellVars(arcCount(k, ch.id))"
+                        :data-tip="ch.name + ' · ' + $app.t('werkstatt.arc.hits', { n: arcCount(k, ch.id) })"
+                        @click="toggleArcDetail(k, ch.id)"
+                        x-text="arcCount(k, ch.id) || ''"></td>
+                  </template>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Zell-Detail: die Fundstellen hinter einer Faerbung (Kern × Kapitel).
+             Die Zelle nennt eine Zahl, hier steht, worauf sie beruht. -->
+        <template x-if="arcActiveDetail()">
+          <div class="heatmap-detail">
+            <div class="card-section-head card-section-head--baseline">
+              <span class="heatmap-detail-title"
+                    x-text="$app.t('werkstatt.arc.detail.title', {
+                      kern: arcActiveDetail().kernLabel,
+                      chapter: arcActiveDetail().chapterName,
+                    })"></span>
+              <button type="button" class="btn-close heatmap-detail-close"
+                      @click="activeArcDetailKey = null"
+                      :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+            </div>
+            <div class="heatmap-detail-list">
+              <p class="muted-msg" x-show="arcDetailLoading" x-text="$app.t('werkstatt.arc.detail.loading')"></p>
+              <p class="muted-msg" x-show="!arcDetailLoading && !arcActiveDetail().occurrences.length"
+                 x-text="$app.t('werkstatt.arc.detail.empty')"></p>
+              <div class="motiv-occ-list" x-show="arcActiveDetail().occurrences.length">
+                <template x-for="o in arcActiveDetail().occurrences" :key="o.id">
+                  <button type="button" class="motiv-occ-row" @click="gotoArcOccurrence(o)">
+                    <span class="motiv-occ-loc" x-text="o.page_name || o.scene_titel || ''"></span>
+                    <span class="motiv-occ-snip" x-text="o.snippet" x-show="o.snippet"></span>
+                    <span class="motiv-occ-meta">
+                      <span class="badge motiv-occ-conf" x-show="o.score != null"
+                            x-text="Math.round((o.score || 0) * 100) + '%'"
+                            :data-tip="$app.t('motiv.occ.confidence')"></span>
+                    </span>
+                  </button>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Messbefunde dieser Figur. `quelle: messung` ist die Zusage, dass hier
+         nichts geraten wurde — das KI-Urteil bleibt der Consistency-Lauf. -->
+    <div class="werkstatt-arc-checks" x-show="arc && arc.scanned && arcFindings().length > 0" x-cloak>
+      <div class="card-section-head card-section-head--baseline">
+        <h4 class="section-heading" x-text="$app.t('werkstatt.arc.checks')"></h4>
+        <span class="badge-source" x-text="$app.t('werkstatt.arc.badge')"></span>
+      </div>
+      <!-- Dieselben Klassen wie die Konflikt-Liste der Consistency weiter oben:
+           ein Befund sieht in dieser Karte ueberall gleich aus; nur die Plakette
+           daneben sagt, ob er gemessen oder geurteilt ist. -->
+      <div class="entity-list entity-list--accented">
+        <template x-for="(b, idx) in arcFindings()" :key="b.code + ':' + b.kern + ':' + idx">
+          <div class="entity-row">
+            <span class="severity-tag" :class="'severity-tag--' + b.schwere"
+                  x-text="$app.t('werkstatt.severity.' + b.schwere)"></span>
+            <span class="entity-row-title" x-text="arcKernLabel(b.kern)"></span>
+            <span class="entity-row-meta" x-text="arcFindingText(b)"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+  </section>

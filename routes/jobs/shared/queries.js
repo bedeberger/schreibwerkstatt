@@ -1,23 +1,29 @@
 'use strict';
 const { db } = require('../../../db/schema');
+const { openStatusSql } = require('../../../lib/ideen-status');
 
 /**
  * Offene Ideen einer Seite + des umliegenden Kapitels (user-spezifisch).
  * Werden im Seiten-Chat als Kontext eingespielt. Kapitel-Ideen sind oft
  * relevanter fuer Folgeseiten als rein seitenspezifische Notizen — daher
  * mit-eingespielt. `scope` ('page'|'chapter') unterscheidet im Prompt-Output.
+ *
+ * „Offen" heisst `offen` ODER `in_arbeit` (lib/ideen-status.js#openStatusSql) —
+ * `erledigt` und `verworfen` fallen beide raus. Eine verworfene Idee als Absicht
+ * des Autors vorzulegen waere die schlechtere Halluzinationsquelle von beiden:
+ * das Modell schlaegt dann genau das vor, wogegen er sich entschieden hat.
  */
 function getOpenIdeen(pageId, userEmail) {
   if (!pageId || !userEmail) return [];
   return db.prepare(`
     SELECT 'page' AS scope, i.content, i.created_at
     FROM ideen i
-    WHERE i.page_id = ? AND i.user_email = ? AND i.erledigt = 0
+    WHERE i.page_id = ? AND i.user_email = ? AND ${openStatusSql('i')}
     UNION ALL
     SELECT 'chapter' AS scope, i.content, i.created_at
     FROM ideen i
     JOIN pages p ON p.chapter_id = i.chapter_id
-    WHERE p.page_id = ? AND i.user_email = ? AND i.erledigt = 0
+    WHERE p.page_id = ? AND i.user_email = ? AND ${openStatusSql('i')}
     ORDER BY scope ASC, created_at ASC
   `).all(pageId, userEmail, pageId, userEmail);
 }

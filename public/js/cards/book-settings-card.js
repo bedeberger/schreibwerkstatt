@@ -66,6 +66,14 @@ export function registerBookSettingsCard() {
     citationSaved: false,
     citationError: '',
     _citationSavedTimer: null,
+    // Kontext-Tab, Abschnitt „Recherche": Freitext + Domain-Eingrenzung des
+    // Recherche-Chats. Eigener Schreibpfad /booksettings/:id/research — siehe
+    // book/book-settings/research.js.
+    bookResearchProfile: '',
+    bookResearchDomains: '',
+    bookResearchLoaded: false,
+    researchSaving: false,
+    researchError: '',
     // Sharing: Access-Liste + Invite-Form.
     bookAccessList: [],
     bookAccessLoading: false,
@@ -219,6 +227,13 @@ export function registerBookSettingsCard() {
           bookXref: { ...XREF_DEFAULTS },
           bookCitationLoaded: false,
           citationError: '',
+          // Recherche-Profil gehoert zum ALTEN Buch. Ohne das `Loaded`-Flag hier
+          // zurueckzusetzen schriebe der naechste Speichern-Klick dessen Profil
+          // auf das neue Buch — derselbe Grund wie bei bookCitationLoaded.
+          bookResearchProfile: '',
+          bookResearchDomains: '',
+          bookResearchLoaded: false,
+          researchError: '',
         }),
         resetStateView: {
           bookSettingsSaved: false,

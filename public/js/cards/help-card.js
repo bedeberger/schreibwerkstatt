@@ -22,7 +22,7 @@ import { tzOpts } from '../utils.js';
 
 // Wiederverwendung der Landing-Feature-Texte (de.json/en.json). Reihenfolge =
 // Anzeige-Reihenfolge. Neues Landing-Feature → hier eine Zahl ergaenzen.
-const HELP_FEATURES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28].map(n => ({
+const HELP_FEATURES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29].map(n => ({
   titleKey: `landing.feat${n}Title`,
   descKey: `landing.feat${n}Desc`,
 }));

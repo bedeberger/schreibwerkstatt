@@ -69,7 +69,23 @@ function _plotBeatsLines(plotBeats) {
     .join('\n');
 }
 
-export function buildBrainstormPrompt(figurName, archetype, knotenPfad, mindmapJson, buchKontext, bestehendeFiguren = [], bestehendeOrte = [], existingChildren = [], beziehungen = [], plotBeats = []) {
+// Cross-Feature: die Motive, die laut Plan an dieser Figur haengen (Motiv-
+// Werkstatt). Die Ist-Zahl kommt MIT: „geplant" ist nicht „traegt", und genau
+// dieser Unterschied ist der Befund — ein Motiv, das der Autor an die Figur
+// gehaengt hat und das in ihrer Prosa nicht vorkommt, ist eine Luecke, kein
+// Detail. `0 Fundstellen` heisst dabei nur dann etwas, wenn ueberhaupt gescannt
+// wurde; darum reicht der Job die Zahl nur bei befuelltem Ist-Index herein.
+function _motiveLines(motive) {
+  return (motive || []).slice(0, 30)
+    .filter(m => m && typeof m.name === 'string' && m.name.trim())
+    .map(m => {
+      const ist = m.occurrenceCount != null ? ` (${m.occurrenceCount} Fundstellen im Text)` : '';
+      return `- ${m.name.trim()}${ist}`;
+    })
+    .join('\n');
+}
+
+export function buildBrainstormPrompt(figurName, archetype, knotenPfad, mindmapJson, buchKontext, bestehendeFiguren = [], bestehendeOrte = [], existingChildren = [], beziehungen = [], plotBeats = [], motive = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const archSeg = archetype ? ` (Archetyp: ${archetype})` : '';
   const figLines = _figurenLines(bestehendeFiguren);
@@ -91,10 +107,20 @@ export function buildBrainstormPrompt(figurName, archetype, knotenPfad, mindmapJ
   const plotBullet = plotLines
     ? '\n- Kommt die Figur bereits in geplanten Beats vor (oben), sollen die Ideen (besonders bei Bogen/Konflikt/Subtext) zu dieser geplanten Handlung passen und sie psychologisch fundieren'
     : '';
+  // Cross-Feature: die Motive dieser Figur (Motiv-Werkstatt). Ein Motiv ist die
+  // Bedeutungsebene ueber der Handlung — Ideen sollen es tragen, nicht daneben
+  // stehen.
+  const motivLines = _motiveLines(motive);
+  const motivSeg = motivLines
+    ? `\nMOTIVE DIESER FIGUR (aus der Motiv-Werkstatt — die Figur soll diese wiederkehrenden Bilder/Themen tragen):\n${motivLines}\n`
+    : '';
+  const motivBullet = motivLines
+    ? '\n- Die Ideen sollen die oben gelisteten Motive der Figur bedienen oder brechen — nicht an ihnen vorbeigehen'
+    : '';
   return `Du entwickelst eine Romanfigur weiter. Die Autorin arbeitet am Knoten "${knotenPfad}" einer Figuren-Mindmap und braucht 3–7 prägnante Sub-Ideen.
 
 FIGUR: ${figurName}${archSeg}
-${ctxSeg}${figSeg}${bezSeg}${ortSeg}${plotSeg}
+${ctxSeg}${figSeg}${bezSeg}${ortSeg}${plotSeg}${motivSeg}
 AKTUELLE MINDMAP (JSON):
 ${JSON.stringify(mindmapJson)}
 
@@ -105,7 +131,7 @@ Liefere 3–7 konkrete, voneinander unterscheidbare Vorschläge als Sub-Ideen f�
 - Knappe Begründung (1 Satz), warum sie zur Figur und zum Buchkontext passt
 - Keine Wiederholung bestehender Knoten in der Mindmap (insbesondere der oben gelisteten Sub-Knoten)
 - Keine Doppelung von Eigenschaften bestehender Figuren — Abgrenzung schärft Profil
-- Schauplätze, falls erwähnt, müssen zu den oben gelisteten Orten passen oder klar neu sein${plotBullet}
+- Schauplätze, falls erwähnt, müssen zu den oben gelisteten Orten passen oder klar neu sein${plotBullet}${motivBullet}
 
 Antworte mit diesem JSON-Schema:
 {
@@ -150,7 +176,7 @@ function _weltgesetzeSeg(weltgesetze) {
   return `\nETABLIERTE WELTGESETZE (aus der Buchanalyse extrahierte Regeln + Technik-Stand dieser Welt):\n${lines.join('\n')}\n`;
 }
 
-export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKontext, bestehendeFiguren, bestehendeOrte, beziehungen = [], eigeneAuftritte = null, plotBeats = [], textbelege = [], weltgesetze = []) {
+export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKontext, bestehendeFiguren, bestehendeOrte, beziehungen = [], eigeneAuftritte = null, plotBeats = [], textbelege = [], weltgesetze = [], motive = []) {
   const ctxSeg = (buchKontext || '').trim() ? `\nBUCH-KONTEXT:\n${buchKontext}\n` : '';
   const archSeg = archetype ? ` (Archetyp: ${archetype})` : '';
   const figLines = _figurenLines(bestehendeFiguren);
@@ -180,6 +206,17 @@ export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKo
   const weltCheck = weltSeg
     ? '\n- Verstoss gegen ein Weltgesetz: Traegt die Figur eine Eigenschaft, Faehigkeit oder Biografie, die nach den oben gelisteten Regeln/dem Technik-Stand dieser Welt NICHT moeglich ist? Nenne die verletzte Regel woertlich im "problem". Eine bewusste Ausnahme, die die Mindmap selbst als Besonderheit der Figur ausweist, ist KEIN Fehler. Die Regeln sind extrahiert, nicht von der Autorin kuratiert: passt eine Regel erkennbar nicht, urteile nicht dagegen.'
     : '';
+  // Cross-Feature: Motive dieser Figur. Der Pruefpunkt ist bewusst die
+  // SOLL-IST-Luecke — sie ist rechenbar (die Motiv-Werkstatt misst sie selbst),
+  // aber ob das Motiv zur geplanten Psychologie PASST, ist ein Urteil.
+  const motivLines = _motiveLines(motive);
+  const motivSeg = motivLines
+    ? `\nMOTIVE DIESER FIGUR (Motiv-Werkstatt — die Figur soll diese wiederkehrenden Bilder/Themen tragen):\n${motivLines}\n`
+    : '';
+  const motivCheck = motivLines
+    ? `
+- Figur vs. ihre Motive: Passen die oben gelisteten Motive zur geplanten Psychologie (Want/Need/Wound/Lie, Bogen, Konflikt)? Traegt die Figur ein Motiv, das ihrem Subtext widerspricht — oder fehlt dem zentralen Motiv jede Verankerung in ihrer Innenwelt? Ein Motiv mit 0 Fundstellen im Text ist geplant, aber noch nicht geschrieben: das ist eine Luecke, kein Widerspruch.`
+    : '';
   const plotCheck = plotLines
     ? `
 - Figurenbogen vs. geplante Handlung: Deckt sich der in der Mindmap skizzierte Bogen (bzw. Want/Need/Wound/Lie) mit den oben gelisteten Plot-Beats? Wird der innere Wandel in der Handlung tatsächlich eingelöst — gibt es Beats, die Need/Lie auf die Probe stellen, oder treibt der Plot nur den oberflächlichen Want?
@@ -189,7 +226,7 @@ export function buildConsistencyPrompt(figurName, archetype, mindmapJson, buchKo
   return `Du prüfst eine in Entwicklung befindliche Romanfigur auf Stimmigkeit mit der Buchwelt. Die Autorin arbeitet die Figur als Mindmap aus; deine Aufgabe ist es, Widersprüche, Lücken und Klischees zu benennen — schonungslos, aber konstruktiv.
 
 FIGUR: ${figurName}${archSeg}
-${ctxSeg}${figSeg}${bezSeg}${ortSeg}${weltSeg}${auftritteSeg}${tbSeg}${plotSeg}
+${ctxSeg}${figSeg}${bezSeg}${ortSeg}${weltSeg}${auftritteSeg}${tbSeg}${plotSeg}${motivSeg}
 FIGUR-MINDMAP (JSON):
 ${JSON.stringify(mindmapJson)}
 
@@ -197,7 +234,7 @@ Prüfe auf:
 - Widersprüche innerhalb der Mindmap (z.B. Hintergrund passt nicht zur Stimme)
 - Konflikte mit Buchkontext (z.B. Beruf passt nicht zum Setting/Epoche)
 - Konflikte mit bestehenden Figuren (z.B. Doppelung von Rolle/Funktion, namentliche Verwechslungsgefahr)
-- Konflikte mit Schauplätzen (z.B. Wohnort existiert nicht)${weltCheck}${auftritteCheck}${tbCheck}${plotCheck}
+- Konflikte mit Schauplätzen (z.B. Wohnort existiert nicht)${weltCheck}${auftritteCheck}${tbCheck}${plotCheck}${motivCheck}
 - Klischees und blasse Stellen, die mehr Substanz brauchen
 - Fehlende Aspekte, die für eine glaubwürdige Figur unverzichtbar wären
 

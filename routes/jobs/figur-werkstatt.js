@@ -17,6 +17,7 @@ const { listWorldFacts, worldFactsScanState } = require('../../db/world-facts');
 const { getDraftFigure, insertWerkstattRun } = require('../../db/draft-figures');
 const { scopedDraft } = require('../draft-figures-acl');
 const plotDb = require('../../db/plot');
+const motifsDb = require('../../db/motifs');
 const embed = require('../../lib/embed');
 const { semanticQuery } = require('../../lib/semantic-retrieval');
 const { getUser } = require('../../db/app-users');
@@ -143,6 +144,35 @@ function _loadFigurPlotBeats(draft, userEmail, logger) {
   }
 }
 
+// Cross-Feature: die Motive, die laut Plan an dieser Figur hängen (Motiv-
+// Werkstatt). Die Gegenrichtung zum Figuren-Layer der Konstellation: ohne sie
+// weiss der Werkstatt-Job nichts von der Bedeutungsebene über der Figur.
+//
+// Die Ist-Zahl (`occurrenceCount`) geht nur mit in den Prompt, wenn der Motiv-
+// Scan überhaupt gelaufen ist — ein leerer Ist-Index heisst UNGEPRÜFT, nicht
+// abwesend, und „0 Fundstellen" wäre dort eine Falschaussage (gleiche Regel wie
+// `anchorMap === null` im Plot-Check und `scanned: false` in lib/motif-consistency.js).
+//
+// Best-effort wie die Plot-Beats: eine optionale Nebenquelle darf den Kern-Job
+// (Mindmap) nicht failen.
+function _loadFigurMotive(draft, userEmail, logger) {
+  try {
+    const { motifs } = motifsDb.figureMotifUsage(draft.book_id, userEmail, {
+      draftFigureId: draft.id,
+      sourceFigureId: draft.source_figure_id,
+    });
+    if (!motifs.length) return [];
+    const scanned = motifsDb.hasOccurrences(draft.book_id, userEmail);
+    return motifs.map(m => ({
+      name: m.name,
+      occurrenceCount: scanned ? (m.occurrenceCount || 0) : null,
+    }));
+  } catch (e) {
+    logger?.warn?.(`Motiv-Kontext fehlgeschlagen draft=${draft.id}: ${e.message}`);
+    return [];
+  }
+}
+
 // „Wie ist die Figur im Manuskript tatsächlich geschrieben?" — Textstellen aus der
 // semantischen Suche über den echten Buchtext (kinds page/scene). Anders als
 // _loadFigurAuftritte (Szenen-Titel/Ereignis-Labels = strukturierte Extrakte) liefert
@@ -209,13 +239,14 @@ async function runBrainstormJob(jobId, draftId, knotenId, userEmail) {
     const orte = _loadBookOrte(draft.book_id, userEmail);
     const beziehungen = _loadBookBeziehungen(draft.book_id, userEmail);
     const plotBeats = _loadFigurPlotBeats(draft, userEmail, logger);
+    const motive = _loadFigurMotive(draft, userEmail, logger);
 
     logger.info(`Brainstorm Start: draft=${draftId} knoten="${knotenPfad}" figuren=${figuren.length} orte=${orte.length} beziehungen=${beziehungen.length} kinder=${existingChildren.length} plotBeats=${plotBeats.length}`);
     updateJob(jobId, { statusText: 'job.werkstatt.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, mindmapResolved, BUCH_KONTEXT, figuren, orte, existingChildren, beziehungen, plotBeats),
+      buildBrainstormPrompt(draft.name, draft.archetype, knotenPfad, mindmapResolved, BUCH_KONTEXT, figuren, orte, existingChildren, beziehungen, plotBeats, motive),
       SYSTEM_FIGUREN,
       10, 95, 1500, 0.3, 1500, undefined, SCHEMA_BRAINSTORM,
     );
@@ -284,6 +315,7 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
     const eigeneAuftritte = _loadFigurAuftritte(draft.source_figure_id, draft.book_id, userEmail);
     // Cross-Feature: geplante Handlung der Figur (Plot-Beats) für den Bogen-Abgleich.
     const plotBeats = _loadFigurPlotBeats(draft, userEmail, logger);
+    const motive = _loadFigurMotive(draft, userEmail, logger);
     // Textbeleg-Erdung: wie die Figur im Manuskript tatsächlich geschrieben ist
     // (semantische Suche über den echten Buchtext). Grundiert den Abgleich
     // „Mindmap-Plan vs. geschriebene Figur".
@@ -297,7 +329,7 @@ async function runConsistencyJob(jobId, draftId, userEmail) {
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte, beziehungen, eigeneAuftritte, plotBeats, textbelege, weltgesetze),
+      buildConsistencyPrompt(draft.name, draft.archetype, mindmapResolved, BUCH_KONTEXT, figuren, orte, beziehungen, eigeneAuftritte, plotBeats, textbelege, weltgesetze, motive),
       SYSTEM_FIGUREN,
       10, 95, 2500, 0.3, 3000, undefined, SCHEMA_CONSISTENCY,
     );

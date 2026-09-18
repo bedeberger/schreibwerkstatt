@@ -6,6 +6,7 @@
 
 const express = require('express');
 const motifsDb = require('../db/motifs');
+const { getDraftFigure } = require('../db/draft-figures');
 const contentStore = require('../lib/content-store');
 const { computeMotifFindings } = require('../lib/motif-consistency');
 const embed = require('../lib/embed');
@@ -104,6 +105,45 @@ function _chapterOrder(tree) {
   })(tree?.chapters);
   return out;
 }
+
+// Rueckrichtung Motiv → Figuren-Werkstatt: welche Motive haengen an DIESER
+// Werkstatt-Figur? Pendant zu GET /plot/figure-usage, speist das Motiv-Badge im
+// Detail-Header der Figuren-Werkstatt und den Prompt-Block ihrer beiden KI-Jobs.
+//
+// Ohne diese Route ist die Kante Motiv ↔ Figur einseitig: `motif_draft_figures`
+// existiert seit je, aber nur die Motiv-Werkstatt liest sie.
+//
+// Ab `viewer` (reine Lesung, wie /consistency). Vor /:id registriert — literales
+// Segment, kein Konflikt. Ein fremder/unbekannter Draft liefert eine leere Liste
+// statt 404: das Badge ist eine Nebeninformation und soll die Karte nicht mit
+// einem Fehler behelligen (gleiche Haltung wie /plot/figure-usage).
+router.get('/figure-usage', (req, res) => {
+  const userEmail = sessionEmail(req);
+  const bookId = toIntId(req.query.book_id);
+  const draftId = toIntId(req.query.draft_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!draftId) return res.status(400).json({ error_code: 'DRAFT_ID_REQ' });
+  if (!guardBook(req, res, bookId, 'viewer')) return;
+
+  const draft = getDraftFigure(draftId);
+  if (!draft || draft.user_email !== userEmail || draft.book_id !== bookId) {
+    return res.json({ motifCount: 0, belegteCount: 0, motifs: [] });
+  }
+  // Quell-Figur mitgeben: ein importierter Draft erbt die Motive, die am
+  // Katalog-Eintrag haengen — sonst haengt dieselbe Figur je nach Herkunft an
+  // zwei verschiedenen Motiv-Mengen.
+  const { motifs } = motifsDb.figureMotifUsage(bookId, userEmail, {
+    draftFigureId: draft.id, sourceFigureId: draft.source_figure_id,
+  });
+  res.json({
+    motifCount: motifs.length,
+    // „geplant" ist nicht „traegt": ein Motiv ohne Ist-Belege sagt etwas anderes
+    // aus als eines mit. Das Badge nennt darum beide Zahlen.
+    belegteCount: motifs.filter(m => (m.occurrenceCount || 0) > 0).length,
+    motifs,
+  });
+});
 
 router.get('/consistency', async (req, res) => {
   const userEmail = sessionEmail(req);

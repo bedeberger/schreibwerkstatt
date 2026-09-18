@@ -1,0 +1,156 @@
+// Verknuepfungen einer Idee: Picker, Chips, Sprung zur Gegenseite.
+//
+// Geteilt von der Ideen-Karte (Seite/Kapitel, neben dem Editor) und dem
+// Ideen-Board — beide Oberflaechen zeigen dieselben Chips an derselben Idee, und
+// eine zweite Implementierung waere die klassische Drift-Stelle (eine Seite
+// kennt die neue Ziel-Art, die andere nicht).
+//
+// Die Gegenrichtung (Ideen-Chips AN einem Fundstueck / Beat / Motiv) liegt
+// bewusst NICHT hier, sondern in ideen-backlinks.js: dort ist die Idee das Ziel,
+// nicht der Besitzer, und die drei Karten holen nur eine Map.
+
+import { fetchJson } from '../utils.js';
+import { EVT } from '../events.js';
+import { IDEA_LINK_KINDS } from './ideen-shared.js';
+import { computePopoverPos, refinePopoverPos } from '../popover-anchor.js';
+
+// Ziel-Art → Hash-View der Gegenseite. Recherche-Fundstueck und Plot-Beat
+// tragen einen Deep-Link-Permalink (`#…/recherche/<id>`, `#…/plot/<id>`); die
+// Motiv-Werkstatt hat keinen, dort waehlt `openMotifById` das Motiv ueber ein
+// Event aus. Darum zwei Wege statt einer erfundenen dritten Hash-Form.
+const LINK_VIEW = { research: 'recherche', beat: 'plot' };
+
+// Schaetzung fuer den ersten Positions-Pass (gemessen wird danach, siehe
+// popover-anchor.js). Nah an der CSS-Breite von `.idee-link-popover`.
+const LINK_POPOVER_W = 320;
+const LINK_POPOVER_H = 210;
+
+export const ideenLinkMethods = {
+  linkKinds() { return IDEA_LINK_KINDS; },
+  linkKindLabel(kind) { return window.__app.t(`ideen.link.kind.${kind}`); },
+  linkKindOptions() {
+    return IDEA_LINK_KINDS.map(k => ({ value: k, label: this.linkKindLabel(k) }));
+  },
+
+  // Ziel-Kataloge einmal pro Buch holen (Picker-Quelle fuer entityPicker
+  // `entity: 'target'`). Der Guard auf `_linkTargetsBookId` haelt einen
+  // Buchwechsel auseinander — ohne ihn boete der Picker die Beats des zuvor
+  // geoeffneten Buches an.
+  async ensureIdeaLinkTargets() {
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId || this._linkTargetsBookId === bookId) return;
+    try {
+      this.linkTargets = await fetchJson(`/ideen/link-targets?book_id=${bookId}`);
+      this._linkTargetsBookId = bookId;
+    } catch {
+      this.linkTargets = {};
+      this._linkTargetsBookId = null;
+    }
+  },
+
+  // Der Picker ist EINE Instanz ausserhalb der Ideen-Liste (eine Combobox je
+  // x-for-Zeile initialisiert nicht sauber, und im Board laege sie im
+  // SortableJS-Container). Damit er trotzdem dort erscheint, wo geklickt wurde,
+  // wird er nach <body> teleportiert und am Trigger verankert — sonst steht er
+  // bei einer Idee weit unten im Brett ausserhalb des Sichtfelds, und der Klick
+  // sieht wirkungslos aus.
+  async openLinkPicker(ev, idee) {
+    if (!idee) return;
+    // Hover-Tooltip des Triggers wegblenden — er hinge sonst ueber dem Popover.
+    window.dispatchEvent(new CustomEvent(EVT.TOOLTIP_HIDE));
+    const trigger = ev?.currentTarget;
+    this._linkTriggerRect = trigger?.getBoundingClientRect?.() || null;
+    if (this._linkTriggerRect) {
+      this.linkPickerPos = computePopoverPos(this._linkTriggerRect, LINK_POPOVER_W, LINK_POPOVER_H);
+    }
+    this.linkPickerIdeeId = idee.id;
+    this.linkPickerKind = IDEA_LINK_KINDS[0];
+    this.linkPickerTargetId = '';
+    this._attachLinkPickerListeners();
+    this.$nextTick(() => {
+      const pos = refinePopoverPos(this.$refs.ideenLinkPopover, this._linkTriggerRect);
+      if (pos) this.linkPickerPos = pos;
+    });
+    // Erst danach die Ziel-Kataloge: das Popover soll sofort stehen, die
+    // Optionen fliessen reaktiv nach (entityPicker liest `linkTargets`).
+    await this.ensureIdeaLinkTargets();
+  },
+
+  cancelLinkPicker() {
+    this.linkPickerIdeeId = null;
+    this.linkPickerTargetId = '';
+    this._linkTriggerRect = null;
+    this._detachLinkPickerListeners();
+  },
+
+  // Die Idee, an der der Picker haengt — fuer die Kopfzeile des Popovers. Ohne
+  // sie waere nach dem Scrollen nicht mehr zu sehen, was gerade verknuepft wird.
+  linkPickerIdee() {
+    if (this.linkPickerIdeeId == null) return null;
+    return (this.ideen || []).find(i => i.id === this.linkPickerIdeeId) || null;
+  },
+
+  // Nur `resize`, bewusst KEIN `scroll`: ein Capture-Scroll-Listener feuert auch
+  // beim Rollen in der Options-Liste der Combobox und schloesse den Picker
+  // mitten in der Auswahl.
+  _attachLinkPickerListeners() {
+    if (this._linkPickerCloseHandler) return;
+    this._linkPickerCloseHandler = () => this.cancelLinkPicker();
+    window.addEventListener('resize', this._linkPickerCloseHandler);
+  },
+
+  _detachLinkPickerListeners() {
+    if (!this._linkPickerCloseHandler) return;
+    window.removeEventListener('resize', this._linkPickerCloseHandler);
+    this._linkPickerCloseHandler = null;
+  },
+
+  async confirmLinkPicker() {
+    const idee = this.linkPickerIdee();
+    if (!idee || !this.linkPickerTargetId) return;
+    await this.addIdeeLink(idee, this.linkPickerKind, this.linkPickerTargetId);
+  },
+
+  async addIdeeLink(idee, targetKind, targetId) {
+    const app = window.__app;
+    if (!targetKind || !targetId) return;
+    this.busy = true;
+    try {
+      const row = await fetchJson(`/ideen/${idee.id}/links`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_kind: targetKind, target_id: parseInt(targetId, 10) }),
+      });
+      this._replaceIdee(row);
+      this.cancelLinkPicker();
+      this.errorMessage = '';
+    } catch {
+      this.errorMessage = app.t('ideen.error.link');
+    } finally {
+      this.busy = false;
+    }
+  },
+
+  async removeIdeeLink(idee, link) {
+    this.busy = true;
+    try {
+      this._replaceIdee(await fetchJson(`/ideen/${idee.id}/links/${link.link_id}`, { method: 'DELETE' }));
+      this.errorMessage = '';
+    } catch {
+      this.errorMessage = window.__app.t('ideen.error.link');
+    } finally {
+      this.busy = false;
+    }
+  },
+
+  // Sprung zur Gegenseite. Wo es einen Permalink gibt, wird der Hash gebaut und
+  // die Navigation dem Hash-Router ueberlassen (SSoT); das Motiv geht ueber den
+  // vorhandenen Cross-Feature-Sprung des Roots.
+  gotoIdeeLink(link) {
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId || !link) return;
+    if (link.target_kind === 'motif') { window.__app.openMotifById(link.target_id); return; }
+    const view = LINK_VIEW[link.target_kind];
+    if (!view) return;
+    location.hash = `#book/${bookId}/${view}/${link.target_id}`;
+  },
+};

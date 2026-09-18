@@ -99,6 +99,15 @@ export const boardMethods = {
     return (this.beatDraft.motif_ids || []).map(id => ({ id, label: byId.get(id)?.name || id }));
   },
 
+  // Aktuell gewählte Schauplätze des Edit-Drafts als entfernbare Chips. Quelle
+  // ist der globale Orte-Katalog ($store.catalog.orte) — dieselbe Liste, die der
+  // entityPicker anbietet; ein eigener Bestand hier wäre eine zweite Wahrheit.
+  beatOrtChips() {
+    const orte = window.Alpine?.store('catalog')?.orte || [];
+    const byId = new Map(orte.map(o => [o.id, o]));
+    return (this.beatDraft.location_ids || []).map(id => ({ id, label: byId.get(id)?.name || id }));
+  },
+
   // ── Stränge (Swimlanes, Derived) ───────────────────────────────────────────
   // Zeilen des Grids: Stränge in Position-Reihenfolge + die „ohne Strang"-Lane
   // (id null) immer am Ende — sie ist Drop-Ziel zum Entkoppeln und fängt alle
@@ -229,7 +238,7 @@ export const boardMethods = {
     const tid = beat && beat.thread_id;
     if (tid == null) return null;
     // O(1) über _threadById — nicht linear scannen. effectiveChapterNameForBeat
-    // (SSoT) läuft pro Beat im Filter + über alle Beats in plotCoverage; ein
+    // (SSoT) läuft pro Beat im Filter und in der Kapitel-Ableitung; ein
     // .find() hier machte das O(beats × threads).
     return this._threadById(tid);
   },
@@ -262,9 +271,9 @@ export const boardMethods = {
   },
 
   // Effektiver Kapitelname eines Beats: eigenes hat Vorrang, sonst das vom Strang
-  // geerbte. SSoT für alle Aggregationen (Coverage, Filter), die mit „dem Kapitel
-  // des Beats" arbeiten — sonst widerspricht das gezeigte geerbte Badge dem, was
-  // Coverage/Filter melden.
+  // geerbte. SSoT für alle Aggregationen (Kapitel-Ableitung, Filter), die mit „dem
+  // Kapitel des Beats" arbeiten — sonst widerspricht das gezeigte geerbte Badge
+  // dem, was der Filter meldet.
   effectiveChapterNameForBeat(beat) {
     return beat.chapter_name || this.inheritedChapterForBeat(beat) || '';
   },

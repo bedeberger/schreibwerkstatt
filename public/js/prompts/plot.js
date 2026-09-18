@@ -54,10 +54,17 @@ function _boardOutline(acts, beats, threadInfo = null, anchorMap = null) {
           ? ` → Kapitel: ${b.chapter_name}`
           : (info && info.kapitel ? ` → Kapitel: ${info.kapitel} (vom Strang)` : '');
         const str = info ? ` {Strang: ${info.name}}` : '';
+        // Erzaehlte Zeit + Schauplaetze: die beiden Achsen, die dem Board bisher
+        // fehlten. Die Zeit macht Chronologie-Urteile ueberhaupt erst moeglich,
+        // der Ort Setting-Urteile („die Konfrontation spielt dort, wo es anfing").
+        const zeit = b.zeit ? ` ⟨Zeit: ${String(b.zeit).trim()}⟩` : '';
+        const orte = (b.locations || []).length
+          ? ` ⟨Ort: ${b.locations.map(l => l.name).filter(Boolean).join(', ')}⟩`
+          : '';
         // Stabile Beat-ID als [#id]-Marker voranstellen: der Consistency-Check gibt
         // sie in `beat_id` zurück, sodass ein Befund seinen Beat auch nach einer
         // Umbenennung noch trifft (Titel-Match wäre sonst der einzige Anker).
-        return `  - [#${b.id}] ${b.titel} [${st}]${kap}${str}${_beatAnchorMarker(b, anchorMap)}`;
+        return `  - [#${b.id}] ${b.titel} [${st}]${kap}${zeit}${orte}${str}${_beatAnchorMarker(b, anchorMap)}`;
       });
     // Hybrid-Akte: ein Akt kann GETEILT sein (alle Stränge) oder einem Strang
     // EIGEN gehören (thread_id). Eigene Akte ausweisen, damit die KI versteht,
@@ -435,6 +442,21 @@ Der Marker ist Ähnlichkeit, kein Beweis — urteile am Beleg-Ausschnitt, nicht 
     ? `
 - Recherche-Abgleich: Widerspricht ein Beat dem verknüpften Recherche-Material (Fakten/Quellen)? Oder wurde zu einem Beat/Strang Recherche gesammelt, die der geplante Beat noch gar nicht aufgreift (ungenutztes Material)?`
     : '';
+  // Schauplatz-Pruefpunkte nur, wenn Beats ueberhaupt Orte tragen. Die reine
+  // Existenz eines Orts ist nichts, worueber zu urteilen waere — die Frage ist,
+  // ob der Schauplatz dramaturgisch traegt und zur Buchwelt passt.
+  const ortChecks = (beats || []).some(b => (b.locations || []).length)
+    ? `
+- Schauplaetze: Passt der Ort eines Beats zu dem, was dort geschieht, und zur etablierten Buchwelt (siehe Orte-Liste)? Faellt auf, dass ein dramaturgisch verwandtes Beat-Paar (Setup/Payoff, Konfrontation und ihr Ursprung) an unverbundenen Orten spielt, obwohl der gemeinsame Ort die Wirkung traegt? Ein Beat OHNE Ort ist kein Fehler — die Angabe ist optional.`
+    : '';
+  // Die erzaehlte Zeit wird deterministisch geprueft (Chronologie, Geburtsjahre —
+  // lib/plot-time-consistency.js). Das Modell soll darum NICHT nachrechnen,
+  // sondern beurteilen, was eine Rechnung nicht sieht: ob die Zeitspruenge zu
+  // dem passen, was dazwischen geschieht.
+  const zeitAngabenChecks = (beats || []).some(b => b.zeit)
+    ? `
+- Zeitspruenge: Passen die Abstaende zwischen datierten Beats zu dem, was dazwischen passieren muss (eine Schwangerschaft, ein Studium, eine Genesung brauchen ihre Zeit — ein Streit nicht zehn Jahre)? Rechne NICHT nach, ob ein Datum zu einem Geburtsjahr passt; das prueft die App selbst.`
+    : '';
   // Prüfpunkte für die expliziten Beat-Beziehungen nur, wenn welche gezogen wurden.
   const relChecks = relLines
     ? `
@@ -456,7 +478,7 @@ Prüfe auf:
 - Chronologie-Brüche: die Reihenfolge der Beats (Akte → Beats) passt nicht zur Reihenfolge der verknüpften Kapitel
 - Logische Brüche / Widersprüche innerhalb der Handlung (Kausalität, Motivation, Figurenlogik)
 - Lücken: Kapitel mit Szenen, für die es keinen Beat gibt — oder dramaturgische Leerstellen (fehlender Wendepunkt, fehlende Auflösung eines Konflikts)
-- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${zeitChecks}${weltChecks}${strChecks}${rechChecks}${relChecks}
+- Verworfene Beats, deren Inhalt trotzdem noch im Buch auftaucht${zeitChecks}${zeitAngabenChecks}${ortChecks}${weltChecks}${strChecks}${rechChecks}${relChecks}
 
 Schwere-Skala:
 - "kritisch": logischer Bruch oder Plan-Realität-Widerspruch, der die Handlung zerstört

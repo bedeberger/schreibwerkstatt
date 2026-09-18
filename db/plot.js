@@ -180,7 +180,7 @@ function _validThreadId(bookId, userEmail, threadId) {
 
 const _BEAT_SELECT = `
   SELECT b.id, b.book_id, b.act_id, b.thread_id, b.user_email, b.titel, b.beschreibung,
-         b.status, b.verworfen, b.chapter_id, c.chapter_name, b.intensitaet, b.sort_order,
+         b.status, b.verworfen, b.chapter_id, c.chapter_name, b.intensitaet, b.zeit, b.sort_order,
          b.created_at, b.updated_at
     FROM plot_beats b
     LEFT JOIN chapters c ON c.chapter_id = b.chapter_id
@@ -192,8 +192,8 @@ const _stmtListBeats = db.prepare(`
 `);
 const _stmtGetBeat = db.prepare(`${_BEAT_SELECT} WHERE b.id = ?`);
 const _stmtInsertBeat = db.prepare(`
-  INSERT INTO plot_beats (book_id, act_id, thread_id, user_email, titel, beschreibung, status, verworfen, chapter_id, intensitaet, sort_order, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+  INSERT INTO plot_beats (book_id, act_id, thread_id, user_email, titel, beschreibung, status, verworfen, chapter_id, intensitaet, zeit, sort_order, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
 `);
 const _stmtDeleteBeat = db.prepare('DELETE FROM plot_beats WHERE id = ?');
 // sort_order ist pro ZELLE (act_id, thread_id) lückenlos. thread_id IS ? ist
@@ -245,6 +245,34 @@ const _stmtDraftFigsForBeat = db.prepare(`
 const _stmtDeleteDraftFigsForBeat = db.prepare('DELETE FROM plot_beat_draft_figures WHERE beat_id = ?');
 const _stmtInsertDraftFig = db.prepare('INSERT OR IGNORE INTO plot_beat_draft_figures (beat_id, draft_figure_id) VALUES (?, ?)');
 
+// Schauplätze pro Beat — WO der Handlungspunkt spielt. Vierte Brücke neben
+// Katalog-Figur, Werkstatt-Figur und Motiv, und dieselbe TEXT/INTEGER-Indirektion
+// wie bei den Figuren: `plot_beat_locations.location_id` ist INTEGER-FK auf
+// `locations.id`, nach aussen exponiert wird die TEXT-`loc_id` (Frontend-Identität,
+// vgl. routes/locations.js, das `id: r.loc_id` mappt).
+//
+// Der Ort ist ein dramaturgisches Werkzeug (die Konfrontation findet dort statt,
+// wo es anfing) — ohne die Brücke kann weder die Konsistenzprüfung noch der
+// Brainstorm über Schauplätze urteilen.
+const _stmtListLocsForBook = db.prepare(`
+  SELECT pbl.beat_id, l.loc_id AS loc_id, l.name
+    FROM plot_beat_locations pbl
+    JOIN plot_beats b ON b.id = pbl.beat_id
+    JOIN locations  l ON l.id = pbl.location_id
+   WHERE b.book_id = ? AND b.user_email = ?
+   ORDER BY l.sort_order, l.id
+`);
+// Schauplätze EINES Beats (Pendant zu _stmtFigsForBeat — Einzel-Beat-Pfad ohne Buch-Map).
+const _stmtLocsForBeat = db.prepare(`
+  SELECT l.loc_id AS loc_id, l.name
+    FROM plot_beat_locations pbl
+    JOIN locations l ON l.id = pbl.location_id
+   WHERE pbl.beat_id = ?
+   ORDER BY l.sort_order, l.id
+`);
+const _stmtDeleteLocsForBeat = db.prepare('DELETE FROM plot_beat_locations WHERE beat_id = ?');
+const _stmtInsertLoc = db.prepare('INSERT OR IGNORE INTO plot_beat_locations (beat_id, location_id) VALUES (?, ?)');
+
 // Motiv-Soll-Verknüpfungen pro Beat — read-only Anzeige im Plot. `motif_beats` ist
 // eine der M:M-Soll-Brücken der Motiv-Werkstatt; kuratiert wird sie dort, der Plot
 // zeigt sie nur als Badge (Klick → Motiv-Werkstatt). Effektive Farbe = eigene
@@ -290,6 +318,23 @@ function resolveFigureIds(bookId, userEmail, figIds) {
   ).all(parseInt(bookId), userEmail, ...wanted).map(r => r.id);
 }
 
+// TEXT-loc_id (Frontend-Identität) → INTEGER locations.id, gefiltert aufs Subset
+// des Buchs. Unbekannte/Fremd-loc_ids fallen still raus (kein Cross-Buch-Leak in
+// die M:M-Tabelle) — wortgleiches Muster zu resolveFigureIds.
+//
+// Anders als bei `figures` gibt es an `locations` KEINE user_email-Achse im
+// Katalog-Sinn (die Orte-Tabelle ist buchweit gepflegt), darum filtert dieser
+// Resolver nur über book_id.
+function resolveLocationIds(bookId, locIds) {
+  if (!Array.isArray(locIds) || !locIds.length) return [];
+  const wanted = locIds.map(x => String(x).trim()).filter(Boolean);
+  if (!wanted.length) return [];
+  const placeholders = wanted.map(() => '?').join(',');
+  return db.prepare(
+    `SELECT id FROM locations WHERE book_id = ? AND loc_id IN (${placeholders})`
+  ).all(parseInt(bookId), ...wanted).map(r => r.id);
+}
+
 // Werkstatt-Figur-IDs (INTEGER draft_figures.id) aufs Subset filtern, das wirklich
 // zu (Buch, User) gehört. Unbekannte/Fremd-IDs fallen still raus (kein Cross-Buch-
 // Leak in die M:M-Tabelle). Eingang sind bereits INTEGER-IDs (Frontend-Identität).
@@ -331,6 +376,14 @@ function _draftFigMapForBook(bookId, userEmail) {
   return map;
 }
 
+function _locMapForBook(bookId, userEmail) {
+  const map = {};
+  for (const r of _stmtListLocsForBook.all(parseInt(bookId), userEmail)) {
+    (map[r.beat_id] = map[r.beat_id] || []).push({ id: r.loc_id, name: r.name });
+  }
+  return map;
+}
+
 function _motifMapForBook(bookId, userEmail) {
   const map = {};
   for (const r of _stmtListMotifsForBook.all(parseInt(bookId), userEmail)) {
@@ -357,6 +410,14 @@ function _setBeatDraftFigures(beatId, draftFigureIds) {
 
 // motifIds = INTEGER motifs.id (bereits via resolveMotifIds aufgelöst). Full-Replace
 // pro Beat: alle Motiv-Links dieses Beats löschen, die gewählten neu setzen.
+// locationIds = INTEGER locations.id (bereits via resolveLocationIds aufgelöst).
+function _setBeatLocations(beatId, locationIds) {
+  _stmtDeleteLocsForBeat.run(parseInt(beatId));
+  for (const lid of (locationIds || [])) {
+    if (Number.isInteger(lid) || /^\d+$/.test(String(lid))) _stmtInsertLoc.run(parseInt(beatId), parseInt(lid));
+  }
+}
+
 function _setBeatMotifs(beatId, motifIds) {
   _stmtDeleteMotifsForBeat.run(parseInt(beatId));
   for (const mid of (motifIds || [])) {
@@ -364,7 +425,7 @@ function _setBeatMotifs(beatId, motifIds) {
   }
 }
 
-function _beatRow(beatId, figMap = null, draftFigMap = null, motifMap = null) {
+function _beatRow(beatId, figMap = null, draftFigMap = null, motifMap = null, locMap = null) {
   const r = _stmtGetBeat.get(parseInt(beatId));
   if (!r) return null;
   // Ohne vorgebaute Buch-Map (Einzel-Beat-Pfad) gezielt nur die Links DIESES
@@ -372,35 +433,42 @@ function _beatRow(beatId, figMap = null, draftFigMap = null, motifMap = null) {
   const figs = figMap ? (figMap[r.id] || []) : _stmtFigsForBeat.all(r.id).map(x => x.fig_id);
   const draftFigs = draftFigMap ? (draftFigMap[r.id] || []) : _stmtDraftFigsForBeat.all(r.id).map(x => x.draft_id);
   const motifs = motifMap ? (motifMap[r.id] || []) : _stmtMotifsForBeat.all(r.id).map(x => ({ id: x.motif_id, name: x.name, farbe: x.farbe }));
-  return { ...r, fig_ids: figs, draft_fig_ids: draftFigs, motifs };
+  const locs = locMap ? (locMap[r.id] || []) : _stmtLocsForBeat.all(r.id).map(x => ({ id: x.loc_id, name: x.name }));
+  return { ...r, fig_ids: figs, draft_fig_ids: draftFigs, motifs, locations: locs };
 }
 
 function listBeats(bookId, userEmail) {
   const figMap = _figMapForBook(bookId, userEmail);
   const draftFigMap = _draftFigMapForBook(bookId, userEmail);
   const motifMap = _motifMapForBook(bookId, userEmail);
+  const locMap = _locMapForBook(bookId, userEmail);
   return _stmtListBeats.all(parseInt(bookId), userEmail)
-    .map(r => ({ ...r, fig_ids: figMap[r.id] || [], draft_fig_ids: draftFigMap[r.id] || [], motifs: motifMap[r.id] || [] }));
+    .map(r => ({
+      ...r,
+      fig_ids: figMap[r.id] || [], draft_fig_ids: draftFigMap[r.id] || [],
+      motifs: motifMap[r.id] || [], locations: locMap[r.id] || [],
+    }));
 }
 
-const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', verworfen = 0, chapterId = null, intensitaet = null, threadId = null, figureIds = [], draftFigureIds = [], motifIds = [], sortOrder = null }) => {
+const createBeat = db.transaction((bookId, actId, userEmail, { titel, beschreibung = null, status = 'geplant', verworfen = 0, chapterId = null, intensitaet = null, zeit = null, threadId = null, figureIds = [], draftFigureIds = [], motifIds = [], locationIds = [], sortOrder = null }) => {
   const tid = threadId != null ? parseInt(threadId) : null;
   const pos = sortOrder != null ? parseInt(sortOrder) : (_stmtMaxBeatOrder.get(parseInt(actId), tid).m + 1);
   const info = _stmtInsertBeat.run(
     parseInt(bookId), parseInt(actId), tid, userEmail, titel, beschreibung, status, verworfen ? 1 : 0,
     chapterId != null ? parseInt(chapterId) : null,
-    intensitaet != null ? parseInt(intensitaet) : null, pos
+    intensitaet != null ? parseInt(intensitaet) : null, zeit, pos
   );
   _setBeatFigures(info.lastInsertRowid, figureIds);
   _setBeatDraftFigures(info.lastInsertRowid, draftFigureIds);
   _setBeatMotifs(info.lastInsertRowid, motifIds);
+  _setBeatLocations(info.lastInsertRowid, locationIds);
   return _beatRow(info.lastInsertRowid);
 });
 
 // Partielles Update: nur übergebene Felder ändern. `fields` enthält bereits
 // validierte Werte; `figureIds`/`draftFigureIds` (falls Array) ersetzen die
 // jeweiligen Figuren-Links komplett.
-const updateBeat = db.transaction((id, fields, figureIds, draftFigureIds, motifIds) => {
+const updateBeat = db.transaction((id, fields, figureIds, draftFigureIds, motifIds, locationIds) => {
   const sets = [];
   const vals = [];
   for (const [col, val] of Object.entries(fields)) {
@@ -415,6 +483,7 @@ const updateBeat = db.transaction((id, fields, figureIds, draftFigureIds, motifI
   if (Array.isArray(figureIds)) _setBeatFigures(id, figureIds);
   if (Array.isArray(draftFigureIds)) _setBeatDraftFigures(id, draftFigureIds);
   if (Array.isArray(motifIds)) _setBeatMotifs(id, motifIds);
+  if (Array.isArray(locationIds)) _setBeatLocations(id, locationIds);
   return _beatRow(id);
 });
 
@@ -935,7 +1004,7 @@ module.exports = {
   listBeats, getBeat, getBeatMeta, createBeat, updateBeat, deleteBeat, reorderBeats, pageBeatCounts, chapterBeatCounts,
   listBeatRelations, getBeatRelation, createBeatRelation, deleteBeatRelation,
   figurePlotUsage,
-  resolveFigureIds, resolveDraftFigureIds, resolveMotifIds,
+  resolveFigureIds, resolveDraftFigureIds, resolveMotifIds, resolveLocationIds,
   insertPlotConsistencyRun, listPlotConsistencyRuns, getPlotConsistencyRun, deletePlotConsistencyRun,
   insertPlotBrainstormRun, listPlotBrainstormRuns, getPlotBrainstormRun, deletePlotBrainstormRun,
   listBeatsForAnchor, replaceBeatOccurrences, beatOccurrenceMap, beatAnchorStale,

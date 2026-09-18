@@ -125,6 +125,9 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
 
     let buffer;
     let lowResImages = 0;
+    // Familien, fuer die nicht getrennt werden konnte (non-fatal, siehe
+    // lib/pdf-render/fonts.js#_sharesHyphenGlyph).
+    let hyphenationDisabled = [];
     let coverInInterior = false;
     let interiorPages = null;
 
@@ -172,6 +175,8 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       lowResImages = Array.isArray(meta.dpiWarnings) ? meta.dpiWarnings.length : 0;
       interiorPages = Number.isInteger(meta.totalPages) ? meta.totalPages : null;
       if (lowResImages) log.warn(`${lowResImages} Bild(er) unter ${profile.config.print?.dpiWarnThreshold || 300} dpi (scope=${scope})`);
+      hyphenationDisabled = Array.isArray(meta.hyphenationDisabled) ? meta.hyphenationDisabled : [];
+      if (hyphenationDisabled.length) log.warn(`Silbentrennung deaktiviert — ${hyphenationDisabled.join(', ')} legt Soft-Hyphen und Bindestrich auf denselben Glyph (scope=${scope})`);
       // Druckfertiger Innenteil sollte kein Innen-Cover tragen — Hinweis (non-fatal).
       coverInInterior = !!(scope === 'book' && coverBuf && (profile.config.print?.bleedMm > 0));
       if (coverInInterior) log.warn(`Innenteil enthaelt Cover trotz Beschnitt — separates Umschlag-PDF empfohlen (job=${jobId})`);
@@ -239,6 +244,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       coverInInterior,
       interiorPages,
       lowResImages,
+      hyphenationDisabled,
       dpiThreshold: profile.config.print?.dpiWarnThreshold || 0,
       standard,
       pdfa: {

@@ -35,6 +35,7 @@
 //   chapter   — Kapitel aus $store.nav.tree                       (global)
 //   figur     — Katalog-Figuren aus $store.catalog (flach;        (global)
 //               grouped:true → nach Kapitel gruppiert)
+//   ort       — Schauplätze aus $store.catalog.orte                (global)
 //   werkstatt — Werkstatt-/Draft-Figuren aus `items`-Thunk        (karten-lokal)
 //   target    — cascading: `items`-Map[`kind`] → {id,label}       (karten-lokal)
 //   custom    — beliebige fertige Option-Liste aus `items`-Thunk  (karten-lokal)
@@ -67,6 +68,17 @@ const BUILDERS = {
     return {
       deps: [tree],
       build: () => tree.filter(it => it.type === 'chapter').map(c => ({ value: c.id, label: c.name })),
+    };
+  },
+
+  // Schauplätze: `orte[].id` ist bereits die TEXT-loc_id (routes/locations.js
+  // mappt `id: r.loc_id`), also dieselbe Frontend-Identität wie bei Figuren —
+  // der Wert geht unverändert als `location_ids` an den Server.
+  ort() {
+    const orte = _store('catalog').orte || [];
+    return {
+      deps: [orte],
+      build: () => orte.map(o => ({ value: o.id, label: o.name })),
     };
   },
 

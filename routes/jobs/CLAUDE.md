@@ -1,0 +1,38 @@
+# Job-Regeln (`routes/jobs/`)
+
+Gilt zusaetzlich zur Root-[CLAUDE.md](../../CLAUDE.md). Queue-Lifecycle: [docs/jobs.md](../../docs/jobs.md). Provider-Verhalten, Profile und Retry: [lib/ai/CLAUDE.md](../../lib/ai/CLAUDE.md) + [docs/ai-providers.md](../../docs/ai-providers.md).
+
+## Neuen KI-Job anlegen
+
+1. Job-Datei in `routes/jobs/` anlegen (Pattern: siehe `routes/jobs/review.js`)
+2. `runXxxJob`-Funktion + `router.post('/xxx', ...)` implementieren
+3. Router in `routes/jobs.js` mounten
+4. Prompt-Builder im passenden Submodul unter `public/js/prompts/` ergänzen (z.B. `prompts/komplett.js` für Pipeline-Prompts, `prompts/review.js` für Bewertungen) und in der Facade `public/js/prompts.js` re-exportieren — **Cache-Invalidierung passiert automatisch**: `configurePrompts()` hängt an `PROMPTS_VERSION` (Basis `'20'` in `prompts/core.js`) einen Content-Hash über alle gebauten Locale-Prompts (inkl. eingebettetem Komplett-Schema) + die cache-gateten Schemas (Lektorat/Review/Synonym/Komplett, in `prompts.js#_promptsContentHash`). Jede Wortlaut-, Schema- oder `prompt-config.json`-Änderung verschiebt den Hash → alte `chapter_extract_cache`/`book_extract_cache` (Komplettanalyse), `chapter_review_cache`/`book_review_cache` (Buchbewertung), `chapter_macro_review_cache` (Kapitelbewertung), `synonym_cache`, `lektorat_cache` matchen nicht mehr. Den Basis-Prefix nur erhöhen, wenn ein **erzwungener** Flush ohne Inhaltsänderung nötig ist. Neue cache-gatete Schemas in `_promptsContentHash` aufnehmen.
+5. Schema-Validierung nach `callAI` nicht vergessen
+6. Dedup-Check im POST-Handler: `findActiveJobId(type, entityId, userEmail)` aus `routes/jobs/shared/` (NICHT `runningJobs.get(...) && jobs.has(...)` — matcht sonst auch fertige Jobs)
+7. Logging-Context: `setContext({ book: book_id })` (aus [lib/log-context.js](../../lib/log-context.js)) im POST-Handler nach `toIntId`-Validierung, damit der `book`-Slot im Log-Tag gefüllt ist (siehe Harte Regel „Logging-Context")
+8. Stats-Label: neuen Job-Typ in `JOB_TYPE_LABELS` ([routes/jobs/shared/jobs.js](../../routes/jobs/shared/jobs.js)) auf einen `job.label.xxx`-i18n-Key mappen (Key in **beiden** Locales anlegen) — sonst erscheint der Job in den Job-Statistiken (Bucheinstellungen) nur mit roher Typ-ID. Ausnahme: reiner Sub-Job eines Superjobs (wie die komplett-analyse-Sub-Typen) → stattdessen in `STATS_EXCLUDED_TYPES` aufnehmen, damit er gar nicht als eigene Zeile erscheint.
+
+- **Job-Ergebnisse mit `updatedAt`-Staleness-Check** — Server-Jobs, deren Resultate auf einem Snapshot des Seitenstands operieren, liefern `updatedAt: pd.updated_at`. Zwei Guard-Modelle, je nach Persistenz des Resultats:
+  - **Transiente, positionsbasierte Resultate (Lektorat-Findings):** Der Client holt im `onDone` den **aktuellen Stempel selbst** (`contentRepo.loadPage(pageId, { fresh: true })`) und vergleicht ihn mit `r.updatedAt`. **Nicht gegen `currentPage.updated_at` vergleichen** — das ist eine browserlokale Kopie, die nur vorrückt, wenn `_refetchCurrentPage` lief; die dafür nötige Voraussetzung (5s-Collab-Poll, gegated auf einen 40s-Buch-Device-Ping) fehlt genau dann, wenn ein Zweitgerät (Mac-/Android-Client) offline schrieb und beim Reconnect nur pusht. Bei Mismatch wird **nicht pauschal verworfen, sondern refiltert**: frischen Stand über `_refetchCurrentPage` ziehen und die Findings mit `sortByPosition(base, fehler)` darauf ansetzen — die Funktion **ist** der Survivor-Filter (sie verwirft jedes Finding, dessen `original` per `findInHtml` im übergebenen HTML fehlt, und berechnet die Position daraus). Übrig bleibt die Teilmenge, deren Positionen auf den *aktuellen* Text zeigen; der User sieht, wie viele Befunde hinfällig wurden. **Verworfen wird nur**, wenn nichts überlebt oder die Verifikation nicht möglich war (offline/SW-Fehler → Fallback auf den lokalen Vergleich, kein ungeprüftes Weiterarbeiten auf dem Snapshot). Contract gegated durch [tests/unit/job-result-staleness.test.mjs](../../tests/unit/job-result-staleness.test.mjs).
+  - **Persistierte, textbasierte Resultate (Seiten-Chat `vorschlaege.original`, in `chat_messages` gespeichert):** werden **nicht** im `onDone` verworfen (sie leben in der DB und würden bei Session-Reload wiederkehren). Guard liegt stattdessen am **Apply-Zeitpunkt** ([public/js/chat/chat.js](../../public/js/chat/chat.js)#`applyChatVorschlag`): frischer Reload → `countInHtml` (0 → `originalNotFound`, >1 → `originalAmbiguous`, kein Blind-Ersatz der falschen Fundstelle) → `replaceInHtml`-No-Op-Check (Block-Grenzen-Vorschlag → `crossesBlockBoundary` statt still-falscher Erfolg) → `savePage(..., expectedUpdatedAt)` (409 bei Fremd-Write dazwischen).
+
+## Two-Tier-Analyse
+
+Jobs in `routes/jobs/` verwenden ein Single-Pass/Multi-Pass-Muster. Limits und Batch-Grössen sind als Konstanten in `routes/jobs/shared/` definiert — `SINGLE_PASS_LIMIT` und `PER_CHUNK_LIMIT` skalieren dynamisch aus `INPUT_BUDGET_CHARS` (70% / 35%).
+
+## Komplettanalyse-Job
+
+Kern-Pipeline (Figuren/Orte/Songs/Fakten/Szenen/Zeitstrahl/Kontinuität) — Phasen, Single-/Multi-Pass-Entscheidung, Delta-Cache + Checkpoint, Cache-Versionierung, Verify-Stufe, Nacht-Cron und Pflicht-Invarianten: **[docs/komplett.md](../../docs/komplett.md)**. Standalone-Kontinuitätscheck `POST /jobs/kontinuitaet` (`runKontinuitaetJob`) ebenda.
+
+## Finetune-Export
+
+Ziel: Buch im Modell **internalisieren** (Stil, Welt, Figuren, Fakten, Plot). Darum **maximal grosszügig extrahieren** — lieber zu viele Trainingssamples als zu wenige. Alles, was sich aus Text/Figuren/Szenen/Schauplätzen/Ereignissen/Lektorats-Findings als Q&A, Stil-Fortsetzung, Dialog, Szenen-Generierung, Fakten-Recall etc. ableiten lässt, mitnehmen. Keine künstlichen Sample-Caps, keine vorsichtigen Limits per Sampler — Modell soll Buch nach Finetune möglichst vollständig „kennen". Neue Sampler/Datenquellen tendenziell hinzufügen, nicht filtern. Code: [routes/jobs/finetune-export/](../../routes/jobs/finetune-export/).
+
+## Chat
+
+Drei unabhängige Chats — Übersicht + Vergleichstabelle in **[docs/chats.md](../../docs/chats.md)**, Harte Regel „Chat-Spezifikation Pflicht" weiter oben. Alle drei nutzen die Job-Queue und teilen `chat_sessions.kind` + `chat_messages` als Storage.
+
+- **Seiten-Chat** (`/jobs/chat`, `kind='page'`): klassisch, neben dem Editor. Antwortformat enthält `vorschlaege` mit zeichengenauem `original` für Textersetzung (Apply-Zeit-Guard: Ambiguitäts-/Block-Grenzen-/No-Op-Check + `expectedUpdatedAt`-409, siehe Harte Regel „Job-Ergebnisse mit `updatedAt`-Staleness-Check").
+- **Buch-Chat** (`/jobs/book-chat`, `kind='book'` mit `page_id IS NULL`, CHECK-Constraint erzwingt die Kombination): agentisch mit `BOOK_CHAT_TOOLS`, kein Vorschläge-System. Tool-Inventar: [docs/buchchat-tools.md](../../docs/buchchat-tools.md).
+- **Recherche-Chat** (`/jobs/research-chat`, `kind='research'`, buchweit + pro User): agentisch, Claude-only mit Web-Suche, Panel in der Recherche-Karte. Schlägt `propose_research_item` vor (User bestätigt → `POST /research`), schreibt nie in den Buchtext. Details: [docs/recherche-chat.md](../../docs/recherche-chat.md).

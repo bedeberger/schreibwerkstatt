@@ -100,6 +100,10 @@
              :placeholder="$app.t('motiv.motif.triggersHint')"
              @keydown.enter="saveMotifEdit()">
 
+      <!-- Ideen-Plaketten: eigene Pendenzen, die an diesem Motiv hängen.
+           Read-only — gesetzt wird die Kante auf der Ideen-Seite. -->
+      <div x-data="{ ideaOwnerId: selectedMotifId }"><!-- @include ideen-backlinks --></div>
+
       <!-- Ist: Fundstellen (klappbar, Zustand pro Motiv in localStorage) -->
       <div x-data="collapsible(true)" x-modelable="open" x-model="occExpanded">
         <button type="button" class="collapsible-toggle motiv-panel-heading" x-bind="trigger">

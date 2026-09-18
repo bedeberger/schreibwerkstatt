@@ -1,5 +1,5 @@
 /* Plot-Werkstatt — Analyse-/Planungs-Widgets rund ums Board: KI-Brainstorm,
-   Consistency-Panel, Kapitel-Coverage, Status-Verteilungsbalken, Akt-Farbpalette,
+   Consistency-Panel, Figuren-Coverage, Status-Verteilungsbalken, Akt-Farbpalette,
    Beat-Intensität + Editor, der Spannungsbogen und der Archiv-Schalter.
    Ergänzt plot/board.css
    (lädt NACH board.css; wiederverwendet dessen --col-accent/Tokens). */
@@ -103,7 +103,7 @@
     color: var(--color-text);
   }
 
-  /* ── Kapitel-Coverage (lokales Aggregat, kein KI-Job) ──────────────────── */
+  /* ── Coverage-Panel (lokales Aggregat, kein KI-Job) ───────────────────── */
   .plot-coverage { margin-bottom: var(--space-sm); }
   .plot-coverage-body {
     display: flex;
@@ -206,11 +206,20 @@
     padding: var(--space-xs) var(--space-sm);
   }
   .plot-tension-toggle { width: 100%; }
-  .plot-tension-body { padding: var(--space-sm) 0 var(--space-2xs); }
+  /* Innenabstand des Klapp-Panels liegt an den KINDERN, nicht am Panel selbst:
+     `x-collapse` animiert ausschliesslich `height`, vertikales Padding am Panel
+     bleibt stehen und wird damit zum Boden der Animation — die letzten Pixel
+     springen dann (Panel haelt bei Padding-Hoehe, dann `display: none`) statt zu
+     gleiten. `flow-root` ist dabei Pflicht: das Panel muss seinen Block-
+     Formatierungskontext PERMANENT aufspannen, damit die Kind-Margins immer in
+     seiner Hoehe liegen. Sonst klappen sie im Ruhezustand heraus, der Plugin-
+     Messwert beim Zuklappen faellt um genau diese Margins zu klein aus — und der
+     Sprung wandert nur vom Ende an den Anfang der Animation. */
+  .plot-tension-body { display: flow-root; padding: 0; }
   .plot-tension-chart {
     position: relative;
     height: 110px;
-    margin: 0 var(--space-sm);
+    margin: var(--space-sm) var(--space-sm) var(--space-2xs);
   }
   .plot-tension-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .plot-tension-svg polyline {
@@ -258,7 +267,7 @@
   .plot-tension-axis--low { bottom: 0; }
 
   /* ── Figur-Fokus (Figurenbogen über die Spannungskurve) ───────────────────── */
-  .plot-tension-focus { margin: 0 var(--space-sm) var(--space-2xs); display: flex; }
+  .plot-tension-focus { margin: var(--space-sm) var(--space-sm) var(--space-2xs); display: flex; }
   /* Fokus-Kurve: nur die Beats der gewählten Figur, kräftiger als die Grundkurve. */
   .plot-tension-svg--focus polyline { stroke: var(--card-accent); stroke-width: 3; opacity: 1; }
   /* Bei aktivem Fokus die Grund-/Strang-Kurven dämpfen, Punkte je nach Treffer. */
@@ -269,17 +278,5 @@
   /* ── Mobile ────────────────────────────────────────────────────────────── */
   @media (max-width: 600px) {
     .plot-tension-chart { height: 88px; }
-  }
-
-  /* ── Archiv-Schalter (abgeschlossene Akte) ─────────────────────────────────
-     Eigene Zeile über dem Board (nicht in der Filter-Leiste): der Schalter sagt
-     etwas über die SPALTEN, nicht über die Beats. Die „archiviert"-Plakette an
-     der Spalte ist das generische `.badge .badge-neutral` (DESIGN.md „Badges &
-     Tags" — wertfreie Einordnung), die Dämpfung liegt in plot/board.css. */
-  .plot-archive-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-2xs) var(--space-2xs) 0;
   }
 }

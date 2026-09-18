@@ -1,18 +1,25 @@
 'use strict';
-// Ideen pro Seite ODER pro Kapitel — User-isolierte Notizen für mögliche
-// Fortsetzungen, Szenen, inhaltliche Anker. Werden im Seiten-Chat als Kontext
-// eingespielt (nur offene; Seite + umliegendes Kapitel).
+// Ideen pro Seite ODER pro Kapitel — User-isolierte Notizen fuer moegliche
+// Fortsetzungen, Szenen, inhaltliche Anker; in der Praxis genauso oft Pendenzen
+// („hier fehlt noch …"). Offene werden im Seiten-Chat als Kontext eingespielt
+// (nur offene; Seite + umliegendes Kapitel).
 //
-// Scope-Modell: jede Idee gehört entweder zu einer Seite ODER zu einem Kapitel
+// Scope-Modell: jede Idee gehoert entweder zu einer Seite ODER zu einem Kapitel
 // (XOR-CHECK im Schema). Cross-Kind-Move ist nicht erlaubt — Page-Idee bleibt
 // Page-Idee, Chapter-Idee bleibt Chapter-Idee.
+//
+// Stufen-Modell: `status` (offen → in_arbeit → erledigt, daneben verworfen) ist
+// die einzige Wahrheit ueber den Bearbeitungsstand; SSoT der Stufen ist
+// lib/ideen-status.js. Alles SQL liegt in db/ideen.js — hier stehen nur noch
+// Validierung, ACL und die Antwortform.
 
 const express = require('express');
-const { db } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
 const { resolvePageBookId, resolveChapterBookId } = require('../lib/content-ownership');
+const { IDEE_STATUSES, isIdeeStatus, isIdeaLinkKind } = require('../lib/ideen-status');
+const ideenDb = require('../db/ideen');
 const searchIndex = require('../lib/search');
 const logger = require('../logger');
 
@@ -21,22 +28,26 @@ const jsonBody = express.json();
 
 const MAX_LEN = 4000;
 
-const SELECT_ROW = `
-  SELECT i.id, i.book_id, i.page_id, p.page_name,
-         i.chapter_id, c.chapter_name,
-         i.content, i.erledigt, i.erledigt_at, i.created_at, i.updated_at
-  FROM ideen i
-  LEFT JOIN pages    p ON p.page_id    = i.page_id
-  LEFT JOIN chapters c ON c.chapter_id = i.chapter_id
-`;
-
 function _guard(req, res, bookId, minRole) {
   setContext({ book: bookId });
   try { requireBookAccess(req, bookId, minRole); return true; }
   catch (e) { return !sendACLError(res, e); }
 }
 
-// Map page_id ODER chapter_id → Anzahl offener Ideen für ein Buch.
+// Vorspann fuer die Routen auf einer bestehenden Idee: Login, Besitz und
+// Buch-ACL in einem Zug. Liefert die Besitz-Zeile oder null (Antwort ist raus).
+function _ownedIdee(req, res) {
+  const userEmail = sessionEmail(req);
+  if (!userEmail) { res.status(401).json({ error_code: 'LOGIN_REQ' }); return null; }
+  const id = toIntId(req.params.id);
+  if (!id) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
+  const row = ideenDb.getIdeeOwned(id, userEmail);
+  if (!row) { res.status(404).json({ error_code: 'IDEE_NOT_FOUND' }); return null; }
+  if (!_guard(req, res, row.book_id, 'editor')) return null;
+  return { ...row, userEmail };
+}
+
+// Map page_id ODER chapter_id → Anzahl OFFENER Ideen fuer ein Buch.
 // `kind=page` (Default) zaehlt Seiten-Ideen; `kind=chapter` zaehlt Kapitel-Ideen.
 router.get('/counts', (req, res) => {
   const userEmail = sessionEmail(req);
@@ -45,20 +56,57 @@ router.get('/counts', (req, res) => {
   if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
   if (!_guard(req, res, bookId, 'editor')) return;
-
-  const col = kind === 'chapter' ? 'chapter_id' : 'page_id';
-  const rows = db.prepare(`
-    SELECT ${col} AS scope_id, COUNT(*) AS n
-    FROM ideen
-    WHERE book_id = ? AND user_email = ? AND erledigt = 0 AND ${col} IS NOT NULL
-    GROUP BY ${col}
-  `).all(bookId, userEmail);
-  const map = {};
-  for (const r of rows) map[r.scope_id] = r.n;
-  res.json(map);
+  res.json(ideenDb.openIdeenCounts(bookId, userEmail, kind));
 });
 
-// Liste aller Ideen einer Seite ODER eines Kapitels (offen oben, dann erledigte;
+// Alle Ideen eines Buches — die Datenquelle des Ideen-Boards.
+//
+// Bewusst OHNE Status-/Kapitel-Filter in der Abfrage: Board-Spalten, Bahnen und
+// Filterleiste rendern dieselbe Liste desselben Requests (gleiche Regel wie die
+// zwei Ansichten des Recherche-Boards). Ein serverseitiger Filter machte aus der
+// ausgeblendeten `verworfen`-Spalte eine nicht geladene — und die Zahl neben dem
+// Filter, die sagt wie viel gerade versteckt ist, waere nicht mehr zu bilden.
+router.get('/board', (req, res) => {
+  const userEmail = sessionEmail(req);
+  const bookId = toIntId(req.query.book_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId, 'editor')) return;
+  res.json({ statuses: IDEE_STATUSES, ideen: ideenDb.listBoardIdeen(bookId, userEmail) });
+});
+
+// Verknuepfbare Ziele fuer den Link-Picker (Recherche / Beat / Motiv).
+router.get('/link-targets', (req, res) => {
+  const userEmail = sessionEmail(req);
+  const bookId = toIntId(req.query.book_id);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!_guard(req, res, bookId, 'editor')) return;
+  res.json(ideenDb.listIdeaLinkTargets(bookId, userEmail));
+});
+
+// Rueckwaerts-Lesung fuer die Gegenseiten: Map Ziel-ID → Ideen-Anrisse.
+//
+// EIN Endpunkt fuer alle drei Kataloge statt drei erweiterter Payloads. Damit
+// bleiben `/research`, `/plot` und `/motifs` unveraendert — und vor allem bleibt
+// die Skopierung an EINER Stelle richtig: Ideen sind user-privat, Recherche-
+// Fundstuecke dagegen buchweit geteilt. Haengte man die Anrisse an die
+// Fundstueck-Zeile, muesste jeder ihrer Schreibpfade (capture, media, scrape,
+// interview, patch …) die E-Mail des Betrachters mitfuehren, und der erste, der
+// es vergisst, zeigt dem Mitarbeiter die privaten Pendenzen des Autors.
+router.get('/links', (req, res) => {
+  const userEmail = sessionEmail(req);
+  const bookId = toIntId(req.query.book_id);
+  const targetKind = req.query.target_kind;
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (!isIdeaLinkKind(targetKind)) return res.status(400).json({ error_code: 'INVALID_LINK_KIND' });
+  if (!_guard(req, res, bookId, 'editor')) return;
+  const map = ideenDb.ideaLinksByTarget(targetKind, bookId, userEmail);
+  res.json({ target_kind: targetKind, links: Object.fromEntries(map) });
+});
+
+// Liste aller Ideen einer Seite ODER eines Kapitels (offen oben, dann der Rest;
 // je Block neueste zuerst). Genau ein Scope-Parameter ist erforderlich.
 router.get('/', (req, res) => {
   const userEmail = sessionEmail(req);
@@ -69,28 +117,14 @@ router.get('/', (req, res) => {
     return res.status(400).json({ error_code: 'INVALID_SCOPE' });
   }
 
-  let bookId;
-  let rows;
-  if (pageId) {
-    bookId = resolvePageBookId(pageId);
-    if (!bookId) return res.status(404).json({ error_code: 'PAGE_NOT_FOUND' });
-    if (!_guard(req, res, bookId, 'editor')) return;
-    rows = db.prepare(`
-      ${SELECT_ROW}
-      WHERE i.page_id = ? AND i.user_email = ?
-      ORDER BY i.erledigt ASC, i.created_at DESC
-    `).all(pageId, userEmail);
-  } else {
-    bookId = resolveChapterBookId(chapterId);
-    if (!bookId) return res.status(404).json({ error_code: 'CHAPTER_NOT_FOUND' });
-    if (!_guard(req, res, bookId, 'editor')) return;
-    rows = db.prepare(`
-      ${SELECT_ROW}
-      WHERE i.chapter_id = ? AND i.user_email = ?
-      ORDER BY i.erledigt ASC, i.created_at DESC
-    `).all(chapterId, userEmail);
+  const kind = pageId ? 'page' : 'chapter';
+  const scopeId = pageId || chapterId;
+  const bookId = pageId ? resolvePageBookId(pageId) : resolveChapterBookId(chapterId);
+  if (!bookId) {
+    return res.status(404).json({ error_code: pageId ? 'PAGE_NOT_FOUND' : 'CHAPTER_NOT_FOUND' });
   }
-  res.json(rows);
+  if (!_guard(req, res, bookId, 'editor')) return;
+  res.json(ideenDb.listIdeenForScope(kind, scopeId, userEmail));
 });
 
 // Idee anlegen (XOR page_id / chapter_id).
@@ -110,105 +144,102 @@ router.post('/', jsonBody, (req, res) => {
   if (!_guard(req, res, bookId, 'editor')) return;
 
   // Cross-Check: page/chapter muss zum Buch gehoeren.
-  if (pageId) {
-    if (resolvePageBookId(pageId) !== bookId) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
-  } else {
-    if (resolveChapterBookId(chapterId) !== bookId) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
-  }
+  const ankerBook = pageId ? resolvePageBookId(pageId) : resolveChapterBookId(chapterId);
+  if (ankerBook !== bookId) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
 
-  const now = new Date().toISOString();
-  const result = db.prepare(`
-    INSERT INTO ideen (book_id, page_id, chapter_id, user_email, content, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(bookId, pageId || null, chapterId || null, userEmail, content, now, now);
-
-  const row = db.prepare(`${SELECT_ROW} WHERE i.id = ?`).get(result.lastInsertRowid);
-  searchIndex.upsertIdea(row.id);
-  logger.info(`[ideen] create id=${row.id} ${pageId ? 'page=' + pageId : 'chapter=' + chapterId}`);
+  const id = ideenDb.createIdee({ bookId, pageId, chapterId, userEmail, content });
+  const row = ideenDb.getIdee(id);
+  searchIndex.upsertIdea(id);
+  logger.info(`[ideen] create id=${id} ${pageId ? 'page=' + pageId : 'chapter=' + chapterId}`);
   res.json(row);
 });
 
-// Content + erledigt-Flag + Move aktualisieren (Felder optional einzeln).
+// Content + Status + Move aktualisieren (Felder optional einzeln).
 // Move bleibt within-kind: Page-Idee kann nur auf andere Seite, Chapter-Idee
 // nur auf anderes Kapitel.
 router.patch('/:id', jsonBody, (req, res) => {
-  const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
+  const existing = _ownedIdee(req, res);
+  if (!existing) return;
+  const { userEmail } = existing;
+  const id = existing.id;
 
-  const existing = db.prepare(
-    'SELECT id, book_id, page_id, chapter_id, erledigt FROM ideen WHERE id = ? AND user_email = ?'
-  ).get(id, userEmail);
-  if (!existing) return res.status(404).json({ error_code: 'IDEE_NOT_FOUND' });
-  if (!_guard(req, res, existing.book_id, 'editor')) return;
-
-  const sets = [];
-  const vals = [];
+  const fields = {};
   if (typeof req.body?.content === 'string') {
     const c = req.body.content.trim();
     if (!c) return res.status(400).json({ error_code: 'CONTENT_REQ' });
     if (c.length > MAX_LEN) return res.status(400).json({ error_code: 'CONTENT_TOO_LONG' });
-    sets.push('content = ?'); vals.push(c);
+    fields.content = c;
   }
-  if (typeof req.body?.erledigt !== 'undefined') {
-    const flag = req.body.erledigt ? 1 : 0;
-    sets.push('erledigt = ?');    vals.push(flag);
-    sets.push('erledigt_at = ?'); vals.push(flag ? new Date().toISOString() : null);
+  if (typeof req.body?.status !== 'undefined') {
+    if (!isIdeeStatus(req.body.status)) return res.status(400).json({ error_code: 'INVALID_STATUS' });
+    fields.status = req.body.status;
   }
+
   let movedFrom = null, movedTo = null, movedKind = null;
   const hasPageMove    = typeof req.body?.page_id    !== 'undefined';
   const hasChapterMove = typeof req.body?.chapter_id !== 'undefined';
   if (hasPageMove && hasChapterMove) return res.status(400).json({ error_code: 'INVALID_SCOPE' });
-  if (hasPageMove) {
-    const newPageId = toIntId(req.body.page_id);
-    if (!newPageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
-    if (existing.erledigt) return res.status(400).json({ error_code: 'IDEE_DONE' });
-    if (existing.page_id === null) return res.status(400).json({ error_code: 'KIND_MISMATCH' });
-    if (resolvePageBookId(newPageId) !== existing.book_id) {
-      return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
+  if (hasPageMove || hasChapterMove) {
+    const isPage = hasPageMove;
+    const newId = toIntId(isPage ? req.body.page_id : req.body.chapter_id);
+    if (!newId) return res.status(400).json({ error_code: isPage ? 'INVALID_PAGE_ID' : 'INVALID_CHAPTER_ID' });
+    // Eine abgeschlossene Idee (erledigt/verworfen) wandert nicht mehr: sie ist
+    // die Spur einer Entscheidung an DIESER Stelle, und anderswo hingehaengt
+    // wuerde sie zur Aussage ueber eine Stelle, an der sie nie stand.
+    if (existing.status !== 'offen' && existing.status !== 'in_arbeit') {
+      return res.status(400).json({ error_code: 'IDEE_CLOSED' });
     }
-    movedFrom = existing.page_id;
-    movedTo = newPageId;
-    movedKind = 'page';
-    sets.push('page_id = ?'); vals.push(newPageId);
-  } else if (hasChapterMove) {
-    const newChapterId = toIntId(req.body.chapter_id);
-    if (!newChapterId) return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
-    if (existing.erledigt) return res.status(400).json({ error_code: 'IDEE_DONE' });
-    if (existing.chapter_id === null) return res.status(400).json({ error_code: 'KIND_MISMATCH' });
-    if (resolveChapterBookId(newChapterId) !== existing.book_id) {
-      return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
-    }
-    movedFrom = existing.chapter_id;
-    movedTo = newChapterId;
-    movedKind = 'chapter';
-    sets.push('chapter_id = ?'); vals.push(newChapterId);
+    if (isPage && existing.page_id === null)      return res.status(400).json({ error_code: 'KIND_MISMATCH' });
+    if (!isPage && existing.chapter_id === null)  return res.status(400).json({ error_code: 'KIND_MISMATCH' });
+    const targetBook = isPage ? resolvePageBookId(newId) : resolveChapterBookId(newId);
+    if (targetBook !== existing.book_id) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
+    movedFrom = isPage ? existing.page_id : existing.chapter_id;
+    movedTo = newId;
+    movedKind = isPage ? 'page' : 'chapter';
+    fields[isPage ? 'page_id' : 'chapter_id'] = newId;
   }
-  if (!sets.length) return res.status(400).json({ error_code: 'NO_FIELDS' });
 
-  const now = new Date().toISOString();
-  sets.push('updated_at = ?'); vals.push(now);
-  vals.push(id, userEmail);
-  db.prepare(`UPDATE ideen SET ${sets.join(', ')} WHERE id = ? AND user_email = ?`).run(...vals);
-
-  const row = db.prepare(`${SELECT_ROW} WHERE i.id = ?`).get(id);
+  if (!ideenDb.updateIdee(id, userEmail, fields)) {
+    return res.status(400).json({ error_code: 'NO_FIELDS' });
+  }
+  const row = ideenDb.getIdee(id);
   searchIndex.upsertIdea(id);
   if (movedTo) logger.info(`[ideen] move id=${id} kind=${movedKind} from=${movedFrom} to=${movedTo}`);
   res.json(row);
 });
 
-// Idee löschen.
+// ── Verknuepfungen (Recherche-Fundstueck / Plot-Beat / Motiv) ───────────────
+// Beidseitig: die Gegenseiten lesen dieselbe Bruecke zurueck (db/ideen.js#
+// attachIdeasTo), gesetzt und geloest wird sie ausschliesslich hier.
+
+router.post('/:id/links', jsonBody, (req, res) => {
+  const existing = _ownedIdee(req, res);
+  if (!existing) return;
+  const targetKind = req.body?.target_kind;
+  const targetId = toIntId(req.body?.target_id);
+  if (!isIdeaLinkKind(targetKind)) return res.status(400).json({ error_code: 'INVALID_LINK_KIND' });
+  if (!targetId)                   return res.status(400).json({ error_code: 'INVALID_TARGET_ID' });
+
+  const result = ideenDb.addIdeaLink(existing.id, existing.book_id, targetKind, targetId);
+  if (result.error_code) return res.status(400).json(result);
+  res.json(ideenDb.getIdee(existing.id));
+});
+
+router.delete('/:id/links/:linkId', (req, res) => {
+  const existing = _ownedIdee(req, res);
+  if (!existing) return;
+  const linkId = toIntId(req.params.linkId);
+  if (!linkId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  ideenDb.removeIdeaLink(existing.id, linkId);
+  res.json(ideenDb.getIdee(existing.id));
+});
+
+// Idee loeschen.
 router.delete('/:id', (req, res) => {
-  const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const id = toIntId(req.params.id);
-  if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const existing = db.prepare('SELECT book_id FROM ideen WHERE id = ? AND user_email = ?').get(id, userEmail);
-  if (!existing) return res.status(404).json({ error_code: 'IDEE_NOT_FOUND' });
-  if (!_guard(req, res, existing.book_id, 'editor')) return;
-  db.prepare('DELETE FROM ideen WHERE id = ? AND user_email = ?').run(id, userEmail);
-  searchIndex.remove('idea', id);
+  const existing = _ownedIdee(req, res);
+  if (!existing) return;
+  ideenDb.deleteIdee(existing.id, existing.userEmail);
+  searchIndex.remove('idea', existing.id);
   res.json({ ok: true });
 });
 

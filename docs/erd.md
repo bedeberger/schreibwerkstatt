@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 284, 161 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 289, 164 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -38,6 +38,10 @@ erDiagram
   books ||--o{ ai_cost_ledger        : has
   books ||--o{ chat_sessions         : has
   books ||--o{ ideen                 : has
+  ideen ||--o{ idea_links            : links
+  research_items ||--o{ idea_links   : "linked from"
+  plot_beats ||--o{ idea_links       : "linked from"
+  motifs ||--o{ idea_links           : "linked from"
   books ||--o{ book_source_links     : uses
   sources ||--o{ book_source_links   : "used by"
   sources ||--o{ source_citations    : "cited in"
@@ -109,6 +113,8 @@ erDiagram
   pages ||--o{ lexicon_terms         : "first occurrence"
   pages ||--o{ lexicon_ngrams        : "first occurrence"
   plot_beats ||--o{ plot_beat_figures : has
+  plot_beats ||--o{ plot_beat_locations : "spielt-an"
+  locations  ||--o{ plot_beat_locations : "schauplatz-von"
   figures ||--o{ plot_beat_figures   : "appears in beat"
   plot_beats ||--o{ plot_beat_draft_figures : has
   draft_figures ||--o{ plot_beat_draft_figures : "appears in beat"
@@ -135,6 +141,7 @@ erDiagram
   book_categories ||--o{ book_categories : parent
 
   draft_figures ||--o{ werkstatt_runs : "ki-history"
+  draft_figures ||--o{ draft_figure_occurrences : "bogen-ist"
 
   pages ||--o{ page_checks           : has
   pages ||--|| page_textsorte        : has
@@ -437,10 +444,20 @@ erDiagram
     INTEGER chapter_id  FK "ON DELETE CASCADE, XOR mit page_id — SET NULL wuerde den XOR-CHECK verletzen"
     TEXT    user_email
     TEXT    content
-    INTEGER erledigt
-    TEXT    erledigt_at
+    TEXT    status      "offen|in_arbeit|erledigt|verworfen — eine Spalte, ein CHECK"
+    TEXT    status_at
     TEXT    created_at
     TEXT    updated_at
+  }
+  idea_links {
+    INTEGER id          PK
+    INTEGER idea_id     FK "ON DELETE CASCADE"
+    TEXT    target_kind "research|beat|motif"
+    INTEGER research_id FK "ON DELETE CASCADE, genau eins gesetzt passend zu target_kind"
+    INTEGER beat_id     FK "ON DELETE CASCADE"
+    INTEGER motif_id    FK "ON DELETE CASCADE"
+    TEXT    created_at
+    %% partielle UNIQUE-Indexe je Ziel-Art: dieselbe Kante nur einmal
   }
   book_settings {
     INTEGER book_id                  PK,FK
@@ -471,6 +488,8 @@ erDiagram
     TEXT    textsorte                "vorherrschende journalistische Textsorte (nachricht|bericht|reportage|interview|portraet|feature|kommentar|glosse|rezension) — Default für jede Seite ohne eigenen Override"
     INTEGER figure_numbering         "0|1, Abbildungen kapitelweise nummerieren („Abb. 3.2\") — buchweit, nie pro Exportprofil"
     INTEGER table_numbering          "0|1, Tabellen kapitelweise nummerieren („Tab. 3.2\") — eigener Zähler neben den Abbildungen"
+    TEXT    research_profile         "Freitext-Steuerung des Recherche-Chats (Fachgebiet, Quellenarten, Zitierwünsche) — geht als VORRANGIGE ANGABEN in dessen System-Prompt"
+    TEXT    research_domains         "Domain-Eingrenzung der Web-Suche, eine pro Zeile (NULL/leer = offenes Web) → `allowed_domains` am web_search-Werkzeug"
     TEXT    updated_at
   }
   book_snapshots {
@@ -996,6 +1015,19 @@ erDiagram
     TEXT    created_at
     TEXT    updated_at
   }
+  draft_figure_occurrences {
+    INTEGER id         PK
+    INTEGER draft_id   FK "CASCADE — verankerte Werkstatt-Figur"
+    INTEGER book_id    FK "CASCADE"
+    TEXT    kern       "want|need|wound|lie|bogen|konflikt — psychologischer Kern"
+    TEXT    kind       "page|scene — sentinel-frei via CHECK"
+    INTEGER page_id    FK "CASCADE, nullbar (kind=page)"
+    INTEGER scene_id   FK "CASCADE, nullbar (kind=scene)"
+    REAL    score      "Retrieval-Score (semantisch)"
+    TEXT    snippet
+    TEXT    source     "semantic|trigger"
+    TEXT    created_at
+  }
   werkstatt_runs {
     INTEGER id          PK
     INTEGER draft_id    FK "ON DELETE CASCADE"
@@ -1013,6 +1045,7 @@ erDiagram
   books ||--o{ figure_age_scans : "scan head (CASCADE)"
   figures ||--o{ draft_figures : "imported as (SET NULL)"
   draft_figures ||--o{ werkstatt_runs : "ki-history"
+  draft_figures ||--o{ draft_figure_occurrences : "bogen-ist"
 ```
 
 `draft_figures` lebt parallel zu `figures`. `source_figure_id` referenziert die Quell-Figur, wenn der Draft via `POST /draft-figures/:book_id/import` aus dem Figuren-Katalog erzeugt wurde — `ON DELETE SET NULL` schützt User-kuratierte Mindmap-Arbeit, wenn die Quell-Figur (z.B. durch Komplettanalyse-Reextraktion) verschwindet. Werkstatt-Jobs (Brainstorm/Consistency) blenden die Quell-Figur per `source_figure_id` aus dem Buch-Kontext aus, damit sie sich nicht selbst widerspricht. Es gibt weiterhin keinen Promotion-Pfad zurück nach `figures` — der Import ist einseitig.
@@ -1186,6 +1219,7 @@ erDiagram
     INTEGER verworfen    "0/1 — eigene Verwerfen-Achse (nicht im Status)"
     INTEGER chapter_id   FK "SET NULL — landet in Kapitel"
     INTEGER intensitaet  "1-5, optional — Spannungsbogen"
+    TEXT    zeit         "erzaehlte Zeit, Freitext (\"Sommer 1987\") — Jahr via yearFromString"
     INTEGER sort_order   "Reihenfolge in Zelle (Akt × Strang)"
     TEXT    created_at
     TEXT    updated_at
@@ -1197,6 +1231,10 @@ erDiagram
   plot_beat_draft_figures {
     INTEGER beat_id         FK "PK, CASCADE"
     INTEGER draft_figure_id FK "PK, CASCADE"
+  }
+  plot_beat_locations {
+    INTEGER beat_id     FK "PK, CASCADE"
+    INTEGER location_id FK "PK, CASCADE"
   }
   plot_consistency_runs {
     INTEGER id             PK

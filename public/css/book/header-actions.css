@@ -12,6 +12,15 @@
      oeffnet ueber den Content). */
   margin-left: auto;
 }
+/* Ring + Hilfe + Avatar als EIN Umbruch-Element: bricht die Kopfzeile um, geht
+   die Gruppe geschlossen in die Folgezeile. `gap: inherit` uebernimmt den
+   Abstand von `.header-actions` (inkl. dessen pointer:coarse-Wert), damit die
+   Zeile nicht zwei Abstandswerte fuehrt, die auseinanderlaufen. */
+.header-action-icons {
+  display: flex;
+  align-items: center;
+  gap: inherit;
+}
 .header-action-cluster {
   display: flex;
   align-items: center;
@@ -514,13 +523,9 @@
     justify-content: flex-end;
     white-space: normal;
   }
-  /* Analyse-Chip bekommt eine eigene volle Zeile; Ring + Hilfe + Avatar
-     rutschen gemeinsam rechtsbündig in die Folgezeile, statt dass der Ring
-     einzeln ans Ende der Analyse-Zeile gerissen wird. */
-  .header-action-cluster {
-    flex: 1 1 100%;
-    justify-content: flex-start;
-  }
+  /* Der Analyse-Chip bleibt inhaltsbreit — er traegt Hintergrund und Rahmen,
+     eine erzwungene Vollbreite stuende als leeres Chip-Feld neben dem Knopf.
+     Die Zeile zusammen haelt stattdessen `.header-action-icons`. */
   .avatar-menu-panel {
     position: fixed;
     top: auto;

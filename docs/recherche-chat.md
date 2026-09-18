@@ -16,7 +16,7 @@ Keine neue Tabelle — die Sessions leben in `chat_sessions` mit **`kind='resear
 
 | Tool | Handler? | Zweck |
 |------|----------|-------|
-| `web_search` | nein (Anthropic-Server-Tool, Typ `web_search_20250305`) | Echtzeit-Websuche; Ergebnis + Citations kommen in derselben Runde zurück |
+| `web_search` | nein (Anthropic-Server-Tool, Typ `web_search_20250305`) | Echtzeit-Websuche; Ergebnis + Citations kommen in derselben Runde zurück. Trägt `allowed_domains`, wenn das Buch eine Eingrenzung gesetzt hat (siehe „Recherche-Profil“) |
 | `list_research_items` | ja | vorhandenes Board durchsuchen (FTS bei `q`) |
 | `read_research_item` | ja | Volltext eines Eintrags inkl. PDF-`doc_text` (auf 8 000 Zeichen gekappt — die Kappung wird als `doc_chars`/`doc_truncated` **ausgewiesen**, sonst hält das Modell den Anfang für das ganze Dokument) |
 | `search_research_passages` | ja | semantische Passagen-Suche; mit `item_id` **innerhalb** eines langen PDFs. Nur angeboten bei `embed.isEnabled()` |
@@ -33,6 +33,23 @@ Keine neue Tabelle — die Sessions leben in `chat_sessions` mit **`kind='resear
 `propose_research_item` schreibt **nichts** — der Vorschlag landet in `context_info.proposals`. Das Frontend ([public/js/chat/research-chat.js](../public/js/chat/research-chat.js) `saveResearchProposal`) rendert pro Vorschlag einen „Speichern"-Button; **erst der Klick** ruft `POST /research` und fügt das Item ins Board ein (analog zu den KI-Verknüpfungsvorschlägen). Spiegelt das `generate_image`→`ctx.images`-Sammelmuster des Buch-Chats.
 
 Ein Vorschlag (und ein Recherche-Item generell) trägt **mehrere URLs** als `urls: [{ url, label }]` (http(s)-only, Tabelle `research_item_urls`, FK CASCADE — analog `research_item_tags`). Das Modell hängt alle belegenden Web-Quellen an einen `propose_research_item`-Aufruf; beim Speichern persistiert `POST /research` sie über `_replaceUrls`. Die alte Einzel-`url`-Spalte am `research_items` existiert nicht mehr (Migration 223).
+
+## Recherche-Profil (pro Buch)
+
+Zwei Spalten an `book_settings` (Migration 289) steuern, **wie** und **wo** der Chat sucht — gepflegt im Kontext-Tab der Bucheinstellungen (Abschnitt „Recherche“, nur sichtbar bei `researchChat.enabled`), geschrieben über den eigenen Endpunkt `PUT /booksettings/:book_id/research` (Muster `/citation`, `/xrefs`, `/textsorte`; der Header-Speichern-Knopf der Karte ruft ihn mit).
+
+| Spalte | Wirkung |
+|---|---|
+| `research_profile` | Freitext (max. 1500 Zeichen) → Block **„VORRANGIGE ANGABEN DER AUTORIN / DES AUTORS ZUR RECHERCHE“** im System-Prompt, mit Vorrang vor den allgemeinen Arbeitsregeln — dieselbe Konvention wie `buch_kontext` im Buch-Prompt. |
+| `research_domains` | Eine Domain pro Zeile (max. 20) → `allowed_domains` am serverseitigen `web_search`-Werkzeug (`buildResearchChatTools`). Leer = offenes Web. |
+
+**Am Buch, nicht am User:** „ich suche medizinische Fachliteratur“ ist eine Aussage über *diese Arbeit* — dieselbe Autorin recherchiert im nächsten Projekt Bauernkriege. Damit sitzt das Profil auf der Achse von `buch_kontext` und `stilprofil`.
+
+**Pflicht: die Eingrenzung steht doppelt im Call.** `allowed_domains` grenzt wirklich ein, der Prompt-Block sagt dem Modell, **dass** es eingegrenzt ist — samt der Anweisung, eine erfolglose Suche als eingegrenzt zu kennzeichnen statt als Nichtexistenz. Ohne die zweite Hälfte liest das Modell die leere Trefferliste als „dazu gibt es nichts“ und gibt eine Fehlanzeige weiter, die keine ist (gleiches Muster wie `scanned: false` beim Motiv-Index und `anchorMap === null` im Plot-Check).
+
+**Normalisierung ausschliesslich serverseitig** ([lib/research-profile.js](../lib/research-profile.js), gegated in [tests/unit/research-profile.test.mjs](../tests/unit/research-profile.test.mjs)): eine eingefügte ganze URL wird zum Host, `www.` fällt weg, IDN wird zu Punycode, eine nackte IP und eine Zeile ohne Punkt fallen heraus. Die Antwort des Endpunkts trägt den **gespeicherten** Stand und setzt das Eingabefeld darauf — der User soll sofort sehen, was wirklich gilt. Kein zweiter Normalisierer im Browser; die Presets in [research.js](../public/js/book/book-settings/research.js) sind reine Eingabehilfe (anhängen, nicht ersetzen) und entscheiden nichts.
+
+**Was das Profil NICHT kann:** es steuert die Formulierung und den Suchraum, nicht die Werkzeuge. Eine Fachdatenbank liefert über `web_search` gerenderte Trefferseiten, keine strukturierten Datensätze — wer DOI, Studiendesign und Fallzahl zitierfähig braucht, braucht ein eigenes Werkzeug gegen das Register (Anschlussstelle wäre [lib/source-lookup.js](../lib/source-lookup.js)#`searchWork`), kein längeres Profil.
 
 ## Loop ([routes/jobs/research-chat.js](../routes/jobs/research-chat.js))
 
@@ -56,3 +73,4 @@ Bei aktiver `web_search` schreibt das Modell `<cite index="N-…">…</cite>`-Ma
 - Nie generativ in den Buchtext (nur Recherche/Weltaufbau). Der System-Prompt verbietet Manuskript-Generierung explizit.
 - `propose_research_item` persistiert nie selbst — Speichern ist immer User-bestätigt.
 - Claude-only: Sichtbarkeit gegated + Job erzwingt `provider='claude'`.
+- Eine gesetzte Domain-Eingrenzung steht **immer** auch im System-Prompt — `allowed_domains` allein macht aus „dort nichts gefunden“ ein „gibt es nicht“.

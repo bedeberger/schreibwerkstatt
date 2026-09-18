@@ -38,6 +38,8 @@ export const lifecycleMethods = {
       this.loadMotifChecks();
       // Persistierte KI-Prüfungs-Läufe (Historie) mitladen.
       this.loadConsistencyRuns();
+      // Ideen-Plaketten (eigene Pendenzen an einem Motiv) — non-fatal.
+      this.loadIdeaBacklinks('motif');
       // Figuren fürs Figuren-Layer + Verknüpfungs-Combobox bereitstellen.
       if (!this.$store.catalog.figuren?.length) window.__app.loadFiguren(bookId);
       this.$nextTick(() => this.renderMotivGraph());

@@ -14,8 +14,9 @@
 // export-card-base.js (geteilt mit EPUB + DOCX).
 
 import { EVT } from '../events.js';
-import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice, profileTransferSlice } from './export-card-base.js';
+import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice, profileTransferSlice, uniqueProfileName } from './export-card-base.js';
 import * as presets from './pdf-export-presets.js';
+import * as templates from './pdf-export-templates.js';
 
 export function registerPdfExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -31,10 +32,15 @@ export function registerPdfExportCard() {
       errorFor: (self, d) => window.__app.t(d.error_code ? 'pdfExport.error.' + d.error_code : 'pdfExport.error.startFailed'),
       resolveDone: (self, result) => {
         self.exportLowRes = result.lowResImages || 0;
+        // Silbentrennung fiel aus (Schrift legt Soft-Hyphen und Bindestrich auf
+        // denselben Glyph) — non-fatal, aber sichtbar: sonst sieht der Satz
+        // ohne erkennbaren Grund anders aus.
+        self.exportHyphenOff = Array.isArray(result.hyphenationDisabled) ? result.hyphenationDisabled : [];
         const pdfaWarn = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
         const pdfxWarn = result.pdfx?.requested && !result.pdfx.applied;
         const coverWarn = !!result.coverInInterior;
-        const isWarning = pdfaWarn || pdfxWarn || coverWarn;
+        const hyphenWarn = self.exportHyphenOff.length > 0;
+        const isWarning = pdfaWarn || pdfxWarn || coverWarn || hyphenWarn;
         // Ganzes-Buch-Innenteil gerendert → die echte physische Seitenzahl
         // (inkl. manueller Umbrüche/Leerseiten) in die Cover-Innenteil-Seitenzahl
         // spiegeln, die Rückenbreite + KDP-Bundsteg treibt. Nur bei Abweichung
@@ -50,11 +56,14 @@ export function registerPdfExportCard() {
         const statusKey = pdfxWarn ? 'pdfExport.pdfxWarning'
           : pdfaWarn ? 'pdfExport.pdfaWarning'
           : coverWarn ? 'pdfExport.coverInInteriorWarning'
+          : hyphenWarn ? 'pdfExport.hyphenationWarning'
           : pagesCounted ? 'pdfExport.donePagesCounted'
           : 'pdfExport.done';
         return {
           statusKey,
-          statusParams: pagesCounted ? { n: result.interiorPages } : undefined,
+          statusParams: pagesCounted ? { n: result.interiorPages }
+            : hyphenWarn ? { fonts: self.exportHyphenOff.join(', ') }
+            : undefined,
           ttl: (isWarning || pagesCounted) ? 8000 : 3500,
         };
       },
@@ -83,11 +92,18 @@ export function registerPdfExportCard() {
     cloneFromId: null,
     _showCreate: false,
 
+    // Gestaltungs-Vorlage (pdf-export-templates.js). Sie legt immer ein NEUES
+    // Profil an statt das aktive zu überschreiben — eine Vorlage anzusehen darf
+    // die eigene Einrichtung nicht kosten.
+    templateSel: '',
+    _showTemplate: false,
+
     saving: false,
     savedAt: null,
     _savedAtTimer: null,
 
     exportLowRes: 0,
+    exportHyphenOff: [],
     trimPresetSel: '',
     paperPresetSel: '',
 
@@ -226,10 +242,14 @@ export function registerPdfExportCard() {
     // Profil anlegen (optional als Klon). Profile sind user-scoped — kein
     // book_id im Payload. Nach dem Anlegen wird genau einmal selectProfile
     // gerufen (ein Form-Mount-Zyklus, keine Race mit laufenden Klicks).
-    async _createProfileNamed(name, cloneFromId) {
+    // `config` (optional) legt das Profil auf einer mitgegebenen Konfiguration
+    // an — Weg der Gestaltungs-Vorlagen. Sie ist eine Teilkonfiguration; der
+    // Server füllt sie über validateConfig aus den Defaults auf.
+    async _createProfileNamed(name, cloneFromId, config) {
       const body = { name: String(name || '').trim() };
       if (!body.name) return;
       if (cloneFromId) body.clone_from = cloneFromId;
+      else if (config) body.config = config;
       this.creating = true;
       try {
         const r = await fetch('/pdf-export/profiles', {
@@ -255,6 +275,25 @@ export function registerPdfExportCard() {
 
     async createProfile() {
       await this._createProfileNamed(this.newProfileName, this.cloneFromId);
+    },
+
+    // ── Gestaltungs-Vorlagen ──────────────────────────────────────────────
+    templateOptions() { return templates.templateOptions(window.__app.t); },
+    templateDescription() { return templates.templateDescription(this.templateSel, window.__app.t); },
+
+    // Vorlage als neues Profil anlegen. Der Name wird gegen die vorhandenen
+    // Profile eindeutig gemacht, damit ein zweiter Klick nicht auf
+    // PROFILE_NAME_TAKEN läuft — umbenennen kann der User danach.
+    async applyTemplate() {
+      const cfg = templates.templateConfig(this.templateSel);
+      if (!cfg || this.creating) return;
+      this.exportError = '';
+      const base = templates.templateName(this.templateSel, window.__app.t);
+      const name = uniqueProfileName(base, this.profiles);
+      await this._createProfileNamed(name, null, cfg);
+      if (this.exportError) return;
+      this._showTemplate = false;
+      this.templateSel = '';
     },
 
     async deleteProfile(id) {
@@ -466,6 +505,7 @@ export function registerPdfExportCard() {
       // kommen weiterhin aus book_publication).
       const snapId = target === 'interior' ? this._exportSnapshotIdForSubmit() : null;
       this.exportLowRes = 0;
+      this.exportHyphenOff = [];
       await this._runExportJob({
         scope: ref.scope,
         entityId: ref.id,

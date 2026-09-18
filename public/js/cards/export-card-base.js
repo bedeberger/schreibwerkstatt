@@ -302,7 +302,7 @@ export function exportJobSlice(cfg) {
 function _profileNameSlug(name) {
   return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 }
-function _uniqueProfileName(base, profiles) {
+export function uniqueProfileName(base, profiles) {
   const names = new Set((profiles || []).map(p => p.name));
   if (!names.has(base)) return base.slice(0, 80);
   for (let n = 2; n < 1000; n++) {
@@ -358,7 +358,7 @@ export function profileTransferSlice(cfg) {
     async duplicateProfile() {
       if (!this.activeProfile) return;
       const base = `${this.activeProfile.name} (${window.__app.t('common.copySuffix')})`;
-      const name = _uniqueProfileName(base, this.profiles);
+      const name = uniqueProfileName(base, this.profiles);
       try {
         const r = await fetch(`${cfg.basePath}/profiles`, {
           method: 'POST',
@@ -411,7 +411,7 @@ export function profileTransferSlice(cfg) {
           return;
         }
         const base = String(data.name || '').trim() || window.__app.t(`${cfg.i18nPrefix}.importedName`);
-        const name = _uniqueProfileName(base, this.profiles);
+        const name = uniqueProfileName(base, this.profiles);
         const r = await fetch(`${cfg.basePath}/profiles`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

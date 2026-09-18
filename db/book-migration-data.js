@@ -27,6 +27,7 @@ const { db } = require('./connection');
 // in den Datumsspalten tragen (siehe lib/datum-parse#normalizeDatumFields) —
 // beim Import bereinigen, sonst wandert der Defekt mit dem Buch mit.
 const { normalizeDatumFields } = require('../lib/datum-parse');
+const { normalizeIdeeStatus } = require('../lib/ideen-status');
 
 function _now() { return new Date().toISOString(); }
 
@@ -432,15 +433,27 @@ function restoreAnalysis(bookId, data, ctx) {
   }
 
   // 9) ideen (XOR page/chapter — die remappte Referenz muss gesetzt bleiben)
+  //
+  // `idea_links` reist NICHT mit: die Bruecke zeigt auf Recherche-Fundstuecke,
+  // Plot-Beats und Motive, und keiner der drei Kataloge steht im Bundle. Eine
+  // mitgenommene Kante haette auf der Zielinstanz kein Gegenueber — sie waere
+  // entweder ein Fremdschluss-Fehler oder, schlimmer, ein Treffer auf eine
+  // gleich nummerierte fremde Zeile.
+  //
+  // Alt-Bundles (vor dem Stufen-Modell) tragen `erledigt`/`erledigt_at` statt
+  // `status`/`status_at` — beide Formen werden gelesen, geschrieben wird nur die
+  // aktuelle. Ein unbekannter Wert faellt auf `offen` zurueck, weil der CHECK
+  // sonst den ganzen Import abbraecht.
   const insIdee = db.prepare(`INSERT INTO ideen
-    (book_id,page_id,chapter_id,user_email,content,erledigt,erledigt_at,created_at,updated_at)
+    (book_id,page_id,chapter_id,user_email,content,status,status_at,created_at,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?)`);
   for (const r of arr('ideen')) {
     let pid = null; let cid = null;
     if (r.page_id != null) { pid = pageOf(r.page_id); if (!pid) continue; }
     else if (r.chapter_id != null) { cid = chapterOf(r.chapter_id); if (!cid) continue; }
     else continue;
-    insIdee.run(bookId, pid, cid, email, r.content, r.erledigt ?? 0, r.erledigt_at ?? null,
+    const status = normalizeIdeeStatus(r.status ?? (r.erledigt ? 'erledigt' : 'offen'));
+    insIdee.run(bookId, pid, cid, email, r.content, status, r.status_at ?? r.erledigt_at ?? null,
       r.created_at || _now(), r.updated_at || _now());
   }
 

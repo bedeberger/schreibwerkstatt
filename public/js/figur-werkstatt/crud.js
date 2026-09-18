@@ -48,6 +48,11 @@ export const crudMethods = {
     } finally {
       if (!isStale()) this.loading = false;
     }
+    // Bogen-Ansicht (Ist-Index + Messung) nachziehen. Eigenstaendig vom Draft-
+    // Load und best-effort: der Bogen ist eine Nebenansicht, sein Ausfall darf
+    // die Werkstatt nicht blockieren (gleiche Regel wie loadConsistencyRuns in
+    // der Plot-Werkstatt).
+    if (!isStale()) await this.loadArc();
   },
 
   // Vollstaendiger Karten-Reset (Buchwechsel, view:reset). Verdrahtet in
@@ -79,9 +84,14 @@ export const crudMethods = {
     this.importing = false;
     this.importables = [];
     this.selectedImportFigureId = '';
+    this.linking = false;
+    this.linkCandidates = [];
+    this.linkCandidatesLoading = false;
+    this.selectedLinkFigureId = '';
     this.runs = { brainstorm: [], consistency: [] };
     this.runsLoadedDraftId = null;
     this.plotUsage = null;
+    this.motifUsage = null;
     this.selectedRunId = null;
     this.selectedKonfliktIdx = null;
     this.runsLoading = false;
@@ -95,6 +105,13 @@ export const crudMethods = {
     // Karte nach dem Wechsel auf eine Figur, die es hier nicht gibt.
     this._pendingDraftId = null;
     this._pendingKnotenId = null;
+    // Bogen-Ansicht: Ist-Index und Zell-Cache gehoeren zum alten Buch (der
+    // laufende Anchor-Job wird oben von _clearJobs gestoppt).
+    this.arc = null;
+    this.arcOccCache = {};
+    this.activeArcDetailKey = null;
+    this.arcDetailLoading = false;
+    this._memos = {};
   },
 
   async selectDraft(id) {
@@ -128,6 +145,7 @@ export const crudMethods = {
     this._mindmapDirty = false;
     this.loadRuns?.();
     this.loadPlotUsage?.();
+    this.loadMotifUsage?.();
     this._reattachActiveJobs?.(id);
   },
 
@@ -160,6 +178,53 @@ export const crudMethods = {
     if (u.activeBeatCount > 0) return app.t('werkstatt.plotUsage.badge', { n: u.activeBeatCount });
     if (u.threads && u.threads.length) return app.t('werkstatt.plotUsage.threadBadge');
     return '';
+  },
+
+  // Cross-Feature: Motiv-Beteiligung der ausgewählten Werkstatt-Figur (welche
+  // Motive hängen laut Plan an ihr?) → Badge mit Navigation in die Motiv-
+  // Werkstatt. Pendant zu loadPlotUsage; ohne sie ist die Kante Motiv ↔ Figur
+  // einseitig. Best-effort wie dort.
+  async loadMotifUsage() {
+    const bookId = Alpine.store('nav').selectedBookId;
+    const draftId = this.selectedDraftId;
+    this.motifUsage = null;
+    if (!bookId || !draftId) return;
+    try {
+      const u = await fetchJson(`/motifs/figure-usage?book_id=${bookId}&draft_id=${draftId}`);
+      if (this.selectedDraftId !== draftId) return; // Stale (Draft inzwischen gewechselt)
+      this.motifUsage = u || null;
+    } catch { this.motifUsage = null; }
+  },
+
+  motifUsageVisible() {
+    const u = this.motifUsage;
+    return !!(u && u.motifCount > 0);
+  },
+
+  motifUsageLabel() {
+    const u = this.motifUsage;
+    if (!u) return '';
+    return window.__app.t('werkstatt.motifUsage.badge', { n: u.motifCount });
+  },
+
+  // Der Tooltip nennt die Motive beim Namen UND sagt, wie viele davon im Text
+  // überhaupt belegt sind — „geplant" ist nicht „trägt", und ein Badge, das nur
+  // die Planzahl zeigt, verschweigt genau den Unterschied.
+  motifUsageTip() {
+    const u = this.motifUsage;
+    const app = window.__app;
+    if (!u || !u.motifs?.length) return '';
+    const names = u.motifs.map(m => m.name).filter(Boolean).join(', ');
+    return app.t('werkstatt.motifUsage.tip', { names, belegt: u.belegteCount, n: u.motifCount });
+  },
+
+  // Sprung in die Motiv-Werkstatt: das erste Motiv dieser Figur öffnen. Ein
+  // gefilterter Bestand wie beim Plot-Badge gibt es dort nicht — die
+  // Konstellation ist keine Liste.
+  openMotifForFigure() {
+    const first = this.motifUsage?.motifs?.[0];
+    if (!first) return;
+    window.__app.openMotifById(first.id);
   },
 
   plotUsageTip() {

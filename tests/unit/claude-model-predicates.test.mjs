@@ -16,6 +16,25 @@ import { join } from 'node:path';
 
 const require_ = createRequire(import.meta.url);
 
+// Wie _bootstrap, setzt aber `ai.provider` VOR dem Laden von lib/ai/config: die
+// Provider-Defaults der Zeichen/Token-Rate werden beim Modul-Load eingefroren.
+function _bootstrapWithProvider(provider) {
+  const dir = mkdtempSync(join(tmpdir(), 'claude-pred-'));
+  process.env.DB_PATH = join(dir, 'test.db');
+  process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test';
+  for (const key of Object.keys(require_.cache)) {
+    if (key.includes('/db/') || key.includes('/lib/')) delete require_.cache[key];
+  }
+  require_('../../db/connection');
+  require_('../../db/migrations').runMigrations();
+  require_('../../lib/app-settings').set('ai.provider', provider);
+  return {
+    dir,
+    cfg: require_('../../lib/ai/config'),
+    teardown: () => { try { rmSync(dir, { recursive: true, force: true }); } catch {} },
+  };
+}
+
 function _bootstrap() {
   const dir = mkdtempSync(join(tmpdir(), 'claude-pred-'));
   process.env.DB_PATH = join(dir, 'test.db');
@@ -107,5 +126,21 @@ test('Tokenizer-Rate: moderne Generation konservativer als der globale Default',
     assert.ok(cfg._claudeCharsPerToken('claude-opus-5') <= 2.5);
     assert.ok(cfg._claudeCharsPerToken('claude-sonnet-5') <= 2.5);
     assert.ok(cfg._claudeCharsPerToken('claude-opus-5') < cfg._claudeCharsPerToken('claude-sonnet-4-6'));
+  } finally { teardown(); }
+});
+
+// Mischbetrieb: `ai.provider` ist global, die KI-Profile haengen pro User daran vorbei.
+// Die Zeichen/Token-Rate muss deshalb am GEFRAGTEN Provider haengen, nicht am global
+// eingestellten — sonst rechnet ein Claude-Call mit der Rate eines lokalen Tokenizers
+// (~4 statt ~3 Zeichen/Token), das Zeichenbudget faellt ein Drittel zu gross aus und der
+// Prompt kippt mitten im Job ins Kontext-Overflow.
+test('Tokenizer-Rate haengt am gefragten Provider, nicht am global eingestellten', () => {
+  const { cfg, teardown } = _bootstrapWithProvider('ollama');
+  try {
+    assert.equal(cfg.CHARS_PER_TOKEN, 4, 'globale Anzeige-Rate folgt dem globalen Provider');
+    assert.equal(cfg._claudeCharsPerToken('claude-sonnet-4-6'), 3,
+      'Claude behaelt seine eigene Rate, auch wenn global ein lokaler Provider eingestellt ist');
+    assert.equal(cfg.getContextConfigFor('ollama').charsPerToken, 4);
+    assert.equal(cfg.getContextConfigFor('claude').charsPerToken <= 3, true);
   } finally { teardown(); }
 });

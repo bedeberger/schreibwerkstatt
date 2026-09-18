@@ -181,6 +181,12 @@
   padding-bottom: var(--space-10);
   border-bottom: 1px solid var(--color-border);
 }
+/* Folgt die Leiste einem Hinweis, muss der Abstand aus dem FLUSS kommen: der
+   Hinweis bringt selbst keinen mit (Abschnitt 4), das Suchfeld klebte sonst am
+   Erklaertext und beide laesen sich als ein Block statt als zwei Zeilen. Wie
+   der uebrige Rhythmus am FOLGENDEN Block notiert (Abschnitt 1) — ein per
+   `x-show` ausgeblendeter Hinweis erzeugt so keinen Leerraum. */
+.card-hint + .filter-bar { margin-top: var(--card-gap-section); }
 .filter-count { font-size: var(--font-size-xs); color: var(--color-muted); margin-left: auto; }
 
 /* Eingebettete Variante: die Leiste steht nicht als eigener Abschnitt ueber der

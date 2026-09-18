@@ -1,0 +1,44 @@
+<!-- Verknuepfungs-Picker einer Idee (Recherche-Fundstueck / Plot-Beat / Motiv).
+     Fragment (string-seitiger @include), weil Ideen-Karte und Ideen-Board
+     denselben Picker zeigen; Methoden kommen aus public/js/book/ideen-links.js,
+     das sich beide Karten spreaden.
+
+     EINE Instanz ausserhalb der Ideen-Liste — eine Combobox je x-for-Zeile
+     initialisiert nicht sauber, und im Board laege sie im SortableJS-Container.
+     Damit sie trotzdem bei der geklickten Idee steht, wird sie nach <body>
+     teleportiert und am Trigger verankert (openLinkPicker misst die echte
+     Popover-Hoehe nach, siehe public/js/popover-anchor.js). Ein Block im
+     Kartenkopf stuende bei einer Idee weit unten im Brett ausserhalb des
+     Sichtfelds — der Klick saehe wirkungslos aus.
+
+     Die Kopfzeile nennt die Idee: sobald das Popover schwebt, ist sonst nicht
+     mehr zu sehen, woran gerade verknuepft wird. -->
+<template x-teleport="body">
+  <div class="idee-link-popover"
+       x-ref="ideenLinkPopover"
+       x-show="linkPickerIdeeId !== null && !!linkPickerIdee()" x-cloak
+       :style="`top:${linkPickerPos.top}px;left:${linkPickerPos.left}px`"
+       @click.outside="cancelLinkPicker()"
+       @keydown.escape.window="cancelLinkPicker()"
+       role="dialog" :aria-label="$app.t('ideen.link.add')">
+    <div class="idee-link-popover-head">
+      <span class="idee-link-popover-title" x-text="$app.t('ideen.link.pickerLabel')"></span>
+      <span class="idee-link-popover-idee" x-text="linkPickerIdee()?.content || ''"></span>
+    </div>
+
+    <div x-data="combobox($app.t('ideen.link.pickKind'))"
+         x-modelable="value" x-model="linkPickerKind"
+         x-effect="options = linkKindOptions()"
+         @combobox-change="linkPickerTargetId = ''"></div>
+
+    <div x-data="entityPicker({ entity: 'target', placeholder: $app.t('ideen.link.pickTarget'), items: () => linkTargets, kind: () => linkPickerKind })"
+         x-modelable="value" x-model="linkPickerTargetId"></div>
+
+    <div class="idee-link-popover-actions">
+      <button type="button" class="btn-compact" @click="confirmLinkPicker()"
+              :disabled="busy || !linkPickerTargetId" x-text="$app.t('ideen.link.confirm')"></button>
+      <button type="button" class="btn-compact" @click="cancelLinkPicker()"
+              :disabled="busy" x-text="$app.t('common.cancel')"></button>
+    </div>
+  </div>
+</template>

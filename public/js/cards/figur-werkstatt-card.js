@@ -38,12 +38,34 @@ export function registerFigurWerkstattCard() {
     importables: [],
     importablesLoading: false,
     selectedImportFigureId: '',
+    // Nachtraegliche Verknuepfung Draft → Katalog-Figur (source_figure_id):
+    // der Weg fuer alle, die erst geplant und dann geschrieben haben.
+    linking: false,
+    linkCandidates: [],
+    linkCandidatesLoading: false,
+    selectedLinkFigureId: '',
     runs: { brainstorm: [], consistency: [] },
     runsLoadedDraftId: null,
     runsLoading: false,
     // Cross-Feature: Plot-Beteiligung der ausgewählten Figur ({ beatCount,
     // activeBeatCount, threads }) fürs „in N Beats geplant"-Badge → Navigation Plot.
     plotUsage: null,
+    // Cross-Feature: Motiv-Beteiligung der ausgewählten Figur ({ motifCount,
+    // belegteCount, motifs }) fürs „trägt N Motive"-Badge → Motiv-Werkstatt.
+    motifUsage: null,
+    // Bogen im Buch: Ist-Index + Messung aller Werkstatt-Figuren des Buchs
+    // ({ drafts, befunde, scanned, stale, kerne }) aus GET /draft-figures/:b/arc.
+    // null = noch nicht geladen ODER Ladefehler; das Band zeigt dann seinen
+    // Leerzustand statt einer Tabelle aus Nullen.
+    arc: null,
+    // Fundstellen-Detail einer Band-Zelle (kern:chapterId) + Fundstellen-Cache
+    // pro Draft (eine Bandzeile hat so viele Zellen wie das Buch Kapitel).
+    activeArcDetailKey: null,
+    arcOccCache: {},
+    arcDetailLoading: false,
+    anchorLoading: false,
+    anchorProgress: 0,
+    anchorStatus: '',
     selectedRunId: null,
     selectedKonfliktIdx: null,
     _runsLoadDraftId: null,
@@ -58,6 +80,10 @@ export function registerFigurWerkstattCard() {
     _consistencyJobDraftId: null,
     _brainstormPollTimer: null,
     _consistencyPollTimer: null,
+    _anchorJobId: null,
+    _anchorPollTimer: null,
+    // Speicher des geteilten _memo-Helpers (cards/card-memo.js); pro Instanz.
+    _memos: {},
     _ctxOutsideHandler: null,
     _ctxEscHandler: null,
     _pendingDraftId: null,
@@ -103,7 +129,7 @@ export function registerFigurWerkstattCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'figurWerkstatt',
         showFlag: 'showFigurWerkstattCard',
-        timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer'],
+        timerKeys: ['_brainstormPollTimer', '_consistencyPollTimer', '_anchorPollTimer'],
         // Kein resetState-Literal: der Reset dieser Karte muss die jsMind-
         // Instanz abraeumen, die Poll-Timer stoppen und ein offenes Vollbild
         // verlassen — das kann nur resetDrafts() (crud.js), und zwei Fassungen

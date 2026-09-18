@@ -21,6 +21,9 @@
   .card--kapitel          { --card-accent: var(--card-accent-kapitel); }
   .card--chat             { --card-accent: var(--card-accent-chat); }
   .card--ideen            { --card-accent: var(--card-accent-ideen); }
+  /* Board und Ideen-Karte teilen den Akzent: es sind dieselben Zeilen in zwei
+     Ansichten. Eine eigene Hue wuerde zwei Features vortaeuschen. */
+  .card--ideenboard       { --card-accent: var(--card-accent-ideen); }
   .card--erzaehlprofil    { --card-accent: var(--card-accent-erzaehlprofil); }
   .card--recherche        { --card-accent: var(--card-accent-recherche); }
   .card--sources          { --card-accent: var(--card-accent-sources); }
@@ -50,6 +53,7 @@
   .card--werkstatt        { --card-accent: var(--card-accent-werkstatt); }
   .card--plot             { --card-accent: var(--card-accent-plot); }
   .card--motiv            { --card-accent: var(--card-accent-motiv); }
+  .card--werkbank         { --card-accent: var(--card-accent-werkbank); }
   .card--page             { --card-accent: var(--card-accent-page); }
   .card--admin-usage      { --card-accent: var(--color-accent); }
   .card--admin-users      { --card-accent: var(--color-accent); }

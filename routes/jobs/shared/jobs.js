@@ -290,6 +290,7 @@ const JOB_TYPE_LABELS = {
   'motif-brainstorm':      'job.label.motivBrainstorm',
   'motif-consistency':     'job.label.motivConsistency',
   'beat-anchor':           'job.label.beatAnchor',
+  'figur-anchor':          'job.label.figurAnchor',
   'erzaehlprofil':         'job.label.erzaehlprofil',
   'faktencheck':           'job.label.faktencheck',
   'lexicon-scan':          'job.label.lexiconScan',

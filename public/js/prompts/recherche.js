@@ -89,7 +89,7 @@ export const RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION =
   + 'Fasse JETZT aus dem bereits Gesammelten die bestmögliche Antwort zusammen und liefere sie über das Werkzeug `final_answer`. '
   + 'Wenn etwas offen blieb, weise kurz darauf hin. Sprache der Antwort: die der Userfrage.';
 
-export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolIter = 6, figures = [], locations = []) {
+export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolIter = 6, figures = [], locations = [], profile = {}) {
   // Figuren + Schauplätze werden vorgeladen (kompakte Liste), damit das Modell
   // schon bei der ERSTEN Web-Suche den Welt-Kontext in den Suchbegriff
   // einarbeiten kann — ohne erst eine list_book_entities-Runde zu verbrauchen.
@@ -99,11 +99,30 @@ export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolI
     : '';
   const worldBlock = entityBlock('Figuren des Buchs (Kontext — nutze sie, um gezielt FÜR die Geschichte zu recherchieren)', figures)
     + entityBlock('Schauplätze des Buchs (Kontext)', locations);
+  // Recherche-Profil des Buchs (book_settings.research_profile/_domains).
+  // Der Freitext folgt der Konvention des Buch-Kontexts: eine Angabe des Autors
+  // hat Vorrang vor den allgemeinen Arbeitsregeln darueber.
+  const profileText = (profile?.text || '').trim();
+  const domains = Array.isArray(profile?.domains) ? profile.domains.filter(Boolean) : [];
+  const profileBlock = profileText
+    ? `\nVORRANGIGE ANGABEN DER AUTORIN / DES AUTORS ZUR RECHERCHE (gehen bei Konflikt den allgemeinen Regeln unten vor):\n${profileText}\n`
+    : '';
+  // Die Eingrenzung MUSS im Prompt stehen, nicht nur als allowed_domains am
+  // Werkzeug: sonst liest das Modell eine leere Trefferliste als „dazu gibt es
+  // nichts" statt als „dort gibt es nichts" und gibt eine Fehlanzeige weiter,
+  // die keine ist. Gleiches Muster wie `scanned: false` beim Motiv-Index.
+  const domainBlock = domains.length
+    ? `\nEINGRENZUNG DER WEB-SUCHE: \`web_search\` erreicht ausschliesslich diese Domains — ${domains.join(', ')}. `
+      + 'Das ist eine Vorgabe des Autors, kein Fehler. Formuliere deine Suchbegriffe so, dass sie DORT treffen. '
+      + 'Findest du etwas nicht, sage ausdrücklich, dass die Suche eingegrenzt war — behaupte nie, es gebe die Information nicht.\n'
+    : '';
   return [
     'Du bist ein Recherche-Assistent für ein Buchprojekt. Du hilfst dem Autor / der Autorin, Hintergrund-, Sach- und Weltaufbau-Material zu recherchieren, einzuordnen und zu sammeln — neben dem Manuskript, NICHT darin.',
     '',
     `Buch: «${bookName}» — das Recherche-Archiv enthält aktuell ${itemCount} Einträge (Notizen, Links, Zitate, Faktensplitter, hochgeladene PDFs).`,
     worldBlock,
+    profileBlock,
+    domainBlock,
     'Deine Werkzeuge:',
     '- `web_search` — durchsucht das offene Web in Echtzeit. Nutze es für aktuelle, externe oder überprüfbare Fakten (historisches, geografisches, technisches, kulturelles Hintergrundwissen). Gib in der Antwort die Quelle/URL an, auf die du dich stützt.',
     '- `list_research_items` / `read_research_item` — durchsuche und lies das vorhandene Recherche-Material des Autors (inkl. PDF-Volltext). Prüfe es, bevor du etwas Neues recherchierst — vieles ist evtl. schon gesammelt.',
@@ -218,3 +237,19 @@ export const RESEARCH_CHAT_TOOLS = [
     },
   },
 ];
+
+/**
+ * Werkzeugliste fuer EINEN Call. Einziger Unterschied zur Basisliste ist die
+ * Domain-Eingrenzung am serverseitigen `web_search` — sie haengt am Buch und
+ * kann deshalb keine Konstante sein.
+ *
+ * Leere Liste ⇒ `allowed_domains` wird gar nicht erst gesetzt: ein leeres Array
+ * waere fuer die API eine Eingrenzung auf nichts.
+ */
+export function buildResearchChatTools({ allowedDomains = [] } = {}) {
+  const domains = (allowedDomains || []).filter(Boolean);
+  if (!domains.length) return RESEARCH_CHAT_TOOLS;
+  return RESEARCH_CHAT_TOOLS.map(t => (
+    t.name === 'web_search' ? { ...t, allowed_domains: domains } : t
+  ));
+}

@@ -2,7 +2,16 @@
    Mobile via Container-Query (Karte lebt im Admin-Slot). */
 
 @layer components {
-  .card--admin-logs { --card-accent: var(--color-running); container-type: inline-size; }
+  .card--admin-logs { --card-accent: var(--color-running); }
+
+  /* Query-Container um die LISTE, nicht um die Karte: Floating UI (x-anchor)
+     haelt jeden Vorfahren mit `container-type != normal` fuer einen Containing
+     Block und rechnet die Koordinaten eines `position: fixed`-Popovers relativ
+     dazu — der Browser tut das nicht. Auf der Karten-Wurzel klappten die
+     Filter-Comboboxen darum um den Karten-Offset verschoben auf. In diesem
+     Wrapper geht kein Popover auf.
+     Gegated: tests/e2e-app/combobox-anchoring.spec.js */
+  .log-list-wrap { container-type: inline-size; }
 
   .admin-logs-filter {
     display: grid;
@@ -163,8 +172,8 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Container-Query: Karte hat container-type:inline-size → reagiert auf
-     Slot-Breite, nicht Viewport (admin-home-Slot ist meist =viewport). */
+  /* Container-Query fuer die LISTE: .log-list-wrap hat container-type:inline-size
+     → die Zeilen reagieren auf die Breite der Liste, nicht auf den Viewport. */
   @container (max-width: 720px) {
     .log-list { overflow-x: visible; }
     .log-row {
@@ -187,16 +196,26 @@
     /* User/Book als Mini-Label statt rohe Werte (sonst kein Kontext). */
     .log-row-user::before  { content: 'user: '; color: var(--color-faint); }
     .log-row-book::before  { content: 'book: '; color: var(--color-faint); }
-    .admin-logs-filter-label--wide { grid-column: span 1; }
   }
 
   @container (max-width: 480px) {
+    .log-row { padding: var(--space-1) var(--space-2xs); }
+    .log-row-ts { font-size: var(--font-size-xs); }
+  }
+
+  /* Filter-Leiste und Fuss liegen AUSSERHALB des Query-Containers (er darf nicht
+     ueber den Filter-Comboboxen liegen, siehe oben) — fuer sie ist der Viewport
+     das Mass. Das trifft die Sache hier: die Karte fuellt den admin-home-Slot,
+     und der ist praktisch so breit wie der Viewport. */
+  @media (max-width: 720px) {
+    .admin-logs-filter-label--wide { grid-column: span 1; }
+  }
+
+  @media (max-width: 480px) {
     .admin-logs-filter { grid-template-columns: 1fr; }
     .admin-logs-filter-actions { flex-wrap: wrap; }
     .admin-logs-footer { flex-direction: column; align-items: stretch; }
     .admin-logs-downloads { flex-direction: column; align-items: stretch; }
     .admin-logs-download-btn { justify-content: flex-start; }
-    .log-row { padding: var(--space-1) var(--space-2xs); }
-    .log-row-ts { font-size: var(--font-size-xs); }
   }
 }

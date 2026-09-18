@@ -4,6 +4,7 @@
 // in book-settings/_shared.js.
 import { settingsMethods } from './book-settings/settings.js';
 import { citationMethods } from './book-settings/citation.js';
+import { researchMethods } from './book-settings/research.js';
 import { adminMethods } from './book-settings/admin.js';
 import { accessMethods } from './book-settings/access.js';
 import { blogMethods } from './book-settings/blog.js';
@@ -13,6 +14,7 @@ import { mergeMethods } from './book-settings/merge.js';
 export const bookSettingsMethods = {
   ...settingsMethods,
   ...citationMethods,
+  ...researchMethods,
   ...adminMethods,
   ...accessMethods,
   ...blogMethods,

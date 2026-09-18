@@ -1,0 +1,29 @@
+<!-- Ideen-Plaketten an einer Gegenseite (Recherche-Fundstück, Plot-Beat, Motiv).
+     Fragment (string-seitiger @include) — dieselbe Frage, dieselbe Antwortform
+     auf allen drei Karten; Methoden aus public/js/book/ideen-backlinks.js.
+
+     Der Host nennt das Ziel `ideaOwnerId`, weil die drei Karten ihre Entität
+     verschieden benennen (item / beat / selectedMotifId). Er setzt das per
+     `x-data` auf einem Wrapper unmittelbar über dem Include-Marker:
+     `<div x-data="{ ideaOwnerId: beat.id }">` … `</div>`. (Den Marker selbst in
+     diesem Kommentar NIE ausschreiben — der Resolver würde ihn erneut
+     expandieren, und sein Delimiter beendete den Kommentar vorzeitig.)
+
+     READ-ONLY. Kuratiert wird die Kante ausschliesslich auf der Ideen-Seite
+     (Ideen-Karte neben dem Editor, Ideen-Board) — genau wie die Motiv-Badges auf
+     der Beat-Karte in der Motiv-Werkstatt kuratiert werden. Klick springt an die
+     Stelle im Buch, an der die Pendenz hängt.
+
+     Nur die EIGENEN Ideen: `ideen.user_email` ist Sichtbarkeits-Scope, nicht
+     Attribution — der Server filtert, hier wird nichts nachgeprüft. -->
+<div class="idee-backlinks" x-show="ideasFor(ideaOwnerId).length">
+  <template x-for="idee in ideasFor(ideaOwnerId)" :key="idee.link_id">
+    <button type="button" class="idee-backlink-chip"
+            :class="'idee-backlink-chip--' + ideaStatusKey(idee)"
+            @click.stop="gotoIdee(idee)"
+            :data-tip="ideaChipTip(idee)"
+            :aria-label="$app.t('ideen.link.gotoIdee') + ': ' + idee.content">
+      <span class="idee-backlink-text" x-text="idee.content"></span>
+    </button>
+  </template>
+</div>

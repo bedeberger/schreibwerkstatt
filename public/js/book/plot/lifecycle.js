@@ -37,6 +37,9 @@ export const lifecycleMethods = {
       // bietet „Verankerung aktualisieren" an.
       this.beatAnchorStale = !!(data.beatAnchor && data.beatAnchor.stale);
       this.errorMessage = '';
+      // Ideen-Plaketten (eigene Pendenzen an einem Beat) — non-fatal und ohne
+      // await: eine fehlende Nebenlesung darf das Board nicht aufhalten.
+      this.loadIdeaBacklinks('beat');
     } catch (e) {
       this.errorMessage = app.t('plot.error.load');
       this.acts = []; this.threads = []; this.beats = []; this.relations = [];

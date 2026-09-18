@@ -56,6 +56,14 @@ Die Karte hat **drei Ansichten** (`motivView` ∈ {`graph`,`band`,`checks`}, Ums
   - **Pflicht:** die Detail-Route löst das Kapitel **genau wie** die Zellzahl auf — `_stmtOccDetail` in [db/motifs/occurrences.js](../db/motifs/occurrences.js) coalesct `pages.chapter_id` mit `figure_scenes.page_id → pages.chapter_id`, wie `_stmtOccChapters`. Sonst zählt das Band einen Szenen-Fund in seiner Zelle, während dieselbe Zelle im Detail leer bleibt.
 - **Datenpfad**: `GET /motifs?book_id` liefert den Graph-Payload (`themes` + `motifs` mit Soll-Links, Ist-Count **und** `occChapters` [{chapterId, n}] fürs Verlaufsband + `relations`); jede Mutation ruft `loadBoard()` neu (Boards sind klein).
 
+## Rückrichtung: Motive einer Figur
+
+`GET /motifs/figure-usage?book_id=&draft_id=` ([db/motifs/links.js](../db/motifs/links.js)#`figureMotifUsage`) — das Pendant zu `GET /plot/figure-usage`, dieselbe Frage aus der anderen Werkstatt.
+
+**Why:** `motif_draft_figures` und `motif_figures` existieren seit je, aber nur die Motiv-Werkstatt las sie. Die Kante Motiv ↔ Figur war damit einseitig: die Konstellation kannte die Figur, die [Figuren-Werkstatt](figur-werkstatt.md) wusste nichts von ihren Motiven.
+
+Konsumenten: das `.badge--motiv` im Detail-Header der Figuren-Werkstatt (Klick öffnet die Konstellation beim ersten Motiv) und der Prompt-Block `MOTIVE DIESER FIGUR` ihrer beiden KI-Jobs. Pflicht: **zwei Quellen** (Werkstatt-Brücke **und** `motif_figures` über die Quell-Figur — ein importierter Draft erbt die Motive des Katalog-Eintrags, sonst hinge dieselbe Figur je nach Herkunft an zwei Mengen), und **`occurrenceCount` geht nur mit, wenn gescannt wurde** — „0 Fundstellen" wäre sonst eine Falschaussage über einen nie erhobenen Index.
+
 ## Konsistenz — zwei Schichten
 
 Die dritte Ansicht trägt **beides** und hält es sichtbar auseinander: oben die **Messung** (deterministisch, kostenlos, immer aktuell), unten das **KI-Urteil** (knopfgesteuert, historisiert). Jeder Befund trägt `quelle` (`messung` | `ki`) — eine Messung darf nicht wie eine Modellmeinung aussehen und umgekehrt.
@@ -99,6 +107,16 @@ Vier Punkte, die beim Ändern nicht verloren gehen dürfen:
 - **Das Sprungziel kommt aus dem Index, nicht aus dem Modelltext.** `motiv_id` wird gegen das eigene Motiv-Subset validiert (Fremd-ID → Fallback über den Namen → sonst übergreifend), die `fundstelle` deterministisch aus der stärksten Fundstelle gebaut. Ein halluziniertes Sprungziel fiele niemandem auf.
 
 Gegated: [tests/integration/motif-consistency.test.js](../tests/integration/motif-consistency.test.js) (Vorbefund im Prompt, Ungescannt-Block, Rückabbildung, Historie, leerer Katalog failt ohne KI-Call).
+
+## Rückrichtung: Pendenzen am Motiv
+
+Das Seitenpanel zeigt die eigenen Ideen, die auf das gewählte Motiv zeigen, als
+`.idee-backlink-chip` — geladen über `GET /ideen/links?target_kind=motif`
+(non-fatal, [ideen-backlinks.js](../public/js/book/ideen-backlinks.js)). Read-only:
+kuratiert wird die Kante auf der Ideen-Seite, Klick springt an die Stelle im Buch,
+an der die Pendenz hängt. Ideen sind **user-privat** (Sichtbarkeits-Scope, nicht
+Attribution) — der Endpunkt liefert nur die des Anfragenden. Details:
+[ideen-board.md](ideen-board.md).
 
 ## Routen ([routes/motifs.js](../routes/motifs.js), gemountet `/motifs`)
 

@@ -4,9 +4,9 @@ Schreiben, Lektorat und Buchanalyse mit KI. Eigenständiger Node.js-Service, Mul
 
 ## Gehostete Version
 
-Wer nicht selbst hosten will, kann die betriebene Instanz unter **[schreibwerkstatt.app](https://schreibwerkstatt.app)** nutzen — gleicher Stand wie dieses Repository, ohne eigene Installation, Reverse-Proxy-Konfiguration oder API-Keys. Zugang über Selbst-Registrierung mit Admin-Freigabe (siehe [Registrierung mit Approval](#multi-user--kollaboration)); die nativen Clients für macOS und Android verbinden sich ebenfalls dorthin.
+Wer nicht selbst hosten will, kann die betriebene Instanz unter **[schreibwerkstatt.app](https://schreibwerkstatt.app)** nutzen — gleicher Stand wie dieses Repository, ohne eigene Installation, Reverse-Proxy-Konfiguration oder API-Keys. Zugang über Selbst-Registrierung mit Admin-Freigabe; die nativen Clients für macOS und Android verbinden sich ebenfalls dorthin.
 
-Das übrige README beschreibt das **Selbst-Hosting** — für die gehostete Version ist davon nichts nötig.
+Das übrige README beschreibt das **Selbst-Hosting** und die Architektur — für die gehostete Version ist davon nichts nötig.
 
 ## Features
 
@@ -14,329 +14,81 @@ Das übrige README beschreibt das **Selbst-Hosting** — für die gehostete Vers
 - **Bearbeitungsmodus** (Notebook-Editor) – Seiten direkt bearbeiten. Auto-Save (Idle 60 s / Max 120 s), lokaler Draft (localStorage), Offline-Modus mit Retry, Block-Level-Merge bei parallelen Edits mit Konflikt-Auflösung.
 - **Fokusmodus** (Cmd/Ctrl+Shift+E) – Vollbild, Typewriter-Scroll, Absatz-Hervorhebung. Auto-Save, Schreibzeit-Tracking, Live-Zeichen-/Wortzähler, Mobile-/IME-Support. Auch als native Clients (offline-first, lokaler SQLite-Store + Sync) verfügbar: **macOS** im [Mac App Store](https://apps.apple.com/app/id6797073919?mt=12) (Quellcode: [schreibwerkstatt-focuseditor](https://github.com/bedeberger/schreibwerkstatt-focuseditor)), **Android** [schreibwerkstatt-mobile](https://github.com/bedeberger/schreibwerkstatt-mobile).
 - **Bucheditor** – Ganzes Buch als scrollbarer Stream mit Kapitel-Trennern und Outline. Inline-Edit pro Seite, Save-All sequenziell. Buchweite Suche & Ersetzen (Case/Whole-Word, Treffer-Navigation, Replace-All).
-- **Live-Rechtschreibung** – Optionale LanguageTool-Integration (self-hosted, regelbasiert) auf allen drei Editoren und Prosa-Formularfeldern, mit eigenem Wörterbuch.
-- **Diktat** – Speech-to-Text im Notebook-Editor über einen self-hosted Whisper-Endpunkt (browserseitige Sprachpausen-Erkennung, Text verbatim am Cursor). [docs/stt.md](docs/stt.md).
-- **Vorlesen** – Text-to-Speech / Proof-Listening in der Notebook-Leseansicht über einen self-hosted Speech-Endpunkt (satzweise, aktueller Satz hervorgehoben, schwebender Vorlese-Dock). [docs/tts.md](docs/tts.md).
+- **Live-Rechtschreibung** – Optionale LanguageTool-Integration (self-hosted, regelbasiert) auf allen drei Editoren und Prosa-Formularfeldern, mit eigenem Wörterbuch. [docs/languagetool.md](docs/languagetool.md).
+- **Diktat** – Speech-to-Text im Notebook-Editor über einen self-hosted Whisper-Endpunkt. [docs/stt.md](docs/stt.md).
+- **Vorlesen** – Text-to-Speech / Proof-Listening in der Notebook-Leseansicht. [docs/tts.md](docs/tts.md).
 - **Volltextsuche** – FTS5-Index über alle Seiten, Filterung nach Kapitel/Buch.
-- **Buchorganizer** – Kapitel & Seiten per Drag&Drop ordnen, anlegen, umbenennen, löschen. Kapitel-Hierarchie bis 3 Ebenen.
-- **Ordner-Import** – Tagebuch-Archive (ZIP mit Jahr/Monat/Tag-Struktur, Formate docx/doc/odt/abw) mit regelbasierter Datumserkennung + KI-Fallback.
+- **Buchorganizer** – Kapitel & Seiten per Drag&Drop ordnen, anlegen, umbenennen, löschen. Kapitel-Hierarchie bis 3 Ebenen. [docs/chapter-hierarchy.md](docs/chapter-hierarchy.md).
+- **Ordner-Import** – Tagebuch-Archive (ZIP mit Jahr/Monat/Tag-Struktur) mit regelbasierter Datumserkennung + KI-Fallback. [docs/folder-import.md](docs/folder-import.md).
 - **Seiten-Verlauf** – Revisionen pro Seite mit Vergleich + Restore.
-- **Fassungen** – Ganze-Buch-Snapshots als Manuskript-Meilensteine: Capture, Liste, Side-by-Side-Diff und (destruktiver) Restore ins selbe Buch. [docs/fassungen.md](docs/fassungen.md).
+- **Fassungen** – Ganze-Buch-Snapshots als Manuskript-Meilensteine. [docs/fassungen.md](docs/fassungen.md).
 
 ### KI-Lektorat & Chat
 - **Seitenlektorat** – Rechtschreib-, Grammatik- und Stilprüfung mit selektiver Korrekturübernahme.
 - **Synonym-Finder** – Wort markieren → Rechtsklick → Vorschläge aus [OpenThesaurus](https://www.openthesaurus.de/) + KI mit Satzkontext.
-- **Seiten-Chat** – KI-Dialog zu einer Seite. Änderungsvorschläge übernehmbar.
-- **Buch-Chat** – Agentischer KI-Dialog über das ganze Buch mit Werkzeugen (Pronomen-Zählung, Figurenverteilung, Volltextsuche, Seitenabruf) auf vorberechnetem Index; optional Bild-Generierung (`generate_image`) über einen self-hosted, OpenAI-kompatiblen Bild-Endpunkt zur Welt-/Chat-Visualisierung (nie in den Manuskript-Text). [docs/image.md](docs/image.md).
+- **Seiten-Chat** – KI-Dialog zu einer Seite. Änderungsvorschläge übernehmbar. [docs/chats.md](docs/chats.md).
+- **Buch-Chat** – Agentischer KI-Dialog über das ganze Buch mit Werkzeugen auf vorberechnetem Index; optional Bild-Generierung (`generate_image`). [docs/buchchat-tools.md](docs/buchchat-tools.md), [docs/image.md](docs/image.md).
 - **Buchbewertung / Kapitelbewertung** – Stärken, Schwächen, Empfehlungen.
-- **Lektorat-Verlauf** – Frühere Korrekturen als Inline-Highlights, selektiv nachträglich übernehmbar.
 
 ### Analyse & Übersichten
 - **Buch-Übersicht** – Dashboard pro Buch: Zeichen-Trend, Schreib-Heatmap, Lektorat-Abdeckung, Top-Fehlertypen, Kapitel-Qualität, Figuren-/Orts-Präsenz.
-- **Komplettanalyse** – Pipeline, die Figuren, Schauplätze, Szenen, Ereignisse, Weltfakten, Soziogramm und Kontinuität aus dem Buch extrahiert (Delta-Cache + Checkpoint, Nacht-Cron). [docs/komplett.md](docs/komplett.md).
-- **Figurenübersicht** – Charakterextraktion mit Beziehungsgraph (Vollbild); Figurenkontext im Lektorat einblendbar.
-- **Figuren-Werkstatt** – jsMind-Mindmap-Editor mit KI-Brainstorm pro Knoten + Konsistenz-Check. [docs/figur-werkstatt.md](docs/figur-werkstatt.md).
-- **Plot-Werkstatt** – Beat-Board zum Planen der Handlung: Akte & Handlungspunkte als Kanban, optionale Handlungsstränge als Swimlanes (Raster Akt × Strang), KI-Brainstorm pro Akt/Zelle + Konsistenz-Check gegen die Buchrealität (nie generativ im Text). [docs/plot.md](docs/plot.md).
-- **Ereignisse / Schauplätze / Szenen** – Übersichten pro Kapitel, Ereignisse zusätzlich als Jahres-Zeitstrahl.
-- **Orte-Karte** – Geocodierte Schauplätze auf interaktiver Leaflet-Karte; KI-gestützte Verortung, Geocoding via Nominatim/Photon. [docs/geocode.md](docs/geocode.md).
-- **Weltfakten** – Sammlung von Weltregeln/Lore/Kanon aus der Komplettanalyse.
-- **Kontinuitätsprüfer** – Findet Widersprüche.
-- **Stil-Heatmap / Fehler-Heatmap** – Satzlänge, Adverbien, Füllwörter, Fehlertypen pro Kapitel.
-- **Buchstatistik** – Tägliche Snapshots (Zeichen, Wörter, Tokens) als Zeitliniendiagramm.
-- **Ideen-Sammlung** – Notiz-Sammelbox pro Buch oder Seite.
-- **Recherche** – Buchweites Wissensboard: Notizen, Links, Zitate, Faktensplitter und Bilder, mit Buch-Entitäten (Kapitel/Seite/Figur/Ort/Szene/Beat) verknüpfbar und über Tags filterbar; KI-gestützte Verknüpfungs-Vorschläge zu bestehenden Entitäten.
-- **Musikbibliothek** – Pro Buch kuratierte Tracks (Titel, Interpret, Genre, Stimmung, Kontext-Typ) als Schreib-Inspiration; KI-gestützter Stimmungs-Match.
-- **Tagebuch-Rückblick** – Rückwärtsgewandte KI-Verdichtung für Bücher vom Typ Tagebuch.
+- **Komplettanalyse** – Pipeline, die Figuren, Schauplätze, Szenen, Ereignisse, Weltfakten, Soziogramm und Kontinuität extrahiert. [docs/komplett.md](docs/komplett.md).
+- **Figurenübersicht & Figuren-Werkstatt** – Charakterextraktion mit Beziehungsgraph und jsMind-Mindmap. [docs/graph.md](docs/graph.md), [docs/figur-werkstatt.md](docs/figur-werkstatt.md).
+- **Plot-Werkstatt** – Beat-Board zum Planen der Handlung (Kanban & Swimlanes). [docs/plot.md](docs/plot.md).
+- **Orte-Karte** – Geocodierte Schauplätze auf interaktiver Leaflet-Karte. [docs/geocode.md](docs/geocode.md).
+- **Weltfakten & Kontinuitätsprüfer** – Lore, Regeln und Widerspruchserkennung.
+- **Wortschatz-Analyse** – Quantitative Stilistik (MATTR, MTLD, Hapax, Keyness). [docs/wortschatz.md](docs/wortschatz.md).
+- **Recherche** – Buchweites Wissensboard mit Entitäten-Verknüpfung und Recherche-Chat. [docs/recherche-chat.md](docs/recherche-chat.md).
 
 ### Multi-User & Kollaboration
-- **Rollen-ACL pro Buch** – owner / editor / lektor / viewer. Apply-only-Pfad für Lektoren (Korrekturen anwenden ohne freie Edit-Rechte).
-- **Presence** – Mit-Anwesende pro Seite/Buch sichtbar (Avatar-Pip im Sidebar-Tree, Banner im Editor).
-- **Page-Locks** – Soft-Lock beim Edit, automatische Heartbeats, Banner bei fremdem Lock.
-- **Registrierung mit Approval** – Selbst-Registrierung mit Admin-Approval; Anti-Enumeration; optional Captcha.
-- **Share-Links** – Seiten/Kapitel über opaken Token öffentlich (read-only) teilen; SSR-Reader-View, Rate-Limit + Honeypot, GDPR-IP-Hashing, Unread-Tracking für den Owner. [docs/share-link.md](docs/share-link.md).
+- **Rollen-ACL pro Buch** – owner / editor / lektor / viewer.
+- **Presence & Page-Locks** – Mit-Anwesende und Soft-Locks im Editor.
+- **Registrierung mit Approval** – Selbst-Registrierung mit Admin-Freigabe.
+- **Share-Links** – Seiten/Kapitel über opaken Token öffentlich teilen. [docs/share-link.md](docs/share-link.md).
 - **Admin-Konsole** – Web-UI für User, Bücher, Settings, Kategorien, Usage.
 
 ### Export & Tooling
-- **Command-Palette** (Cmd/Ctrl+K bzw. `/`) – Fuzzy-Suche über Karten, Aktionen, Seiten, Kapitel, Figuren, Orte, Szenen. Prefix-Modi: `>` `#` `!` `@` `$` `%`.
-- **Fine-Tuning-Export** – JSONL-Trainingsdaten (Stil, Szenen, Dialoge, Q&A, Korrekturen). [docs/finetuning.md](docs/finetuning.md).
-- **Buch-Export** – PDF, HTML, Markdown, Plaintext, EPUB mit Timestamp-Filename.
-- **Custom-PDF-Export** – Eigener pdfkit-Renderer mit druckfertiger PDF/A-2B- bzw. PDF/X-3-Konformität, freier Schriftwahl aus Google Fonts (30-Tage-Cache), Cover (inkl. Umschlagbogen mit Rücken/EAN-13), TOC, Profile pro Buch+User. Optional Server-Validierung via veraPDF.
-- **EPUB-Export** – Reflow-fähiges E-Book mit eigenem Builder (Cover, Frontmatter, TOC, Blocksatz). Optionale Validierung via EPUBCheck.
-- **Custom-Word-Export** – Lektorats-/Verlags-Manuskript als DOCX über die programmatische `docx`-Lib (Shunn-Kopfzeile mit Seitenzahl, echtes Word-TOC-Feld, benannte Heading-Styles, Titelei aus den Publikations-Metadaten), Profile pro Buch+User wie beim PDF. [docs/word-export.md](docs/word-export.md).
-- **Publikations-Metadaten** – Zentrale Pflege (Titel, Autor, ISBN, Impressum, Widmung …) als gemeinsame Quelle für PDF- und EPUB-Export. [docs/publikation-export.md](docs/publikation-export.md).
-- **Buch-Migration** – Verlustfreier Buch-Round-Trip zwischen Instanzen als `.swbook`-Bundle (Export + Import-Job). [docs/book-migration.md](docs/book-migration.md).
-- **Bucheinstellungen** – Sprache, Buchtyp, Erzählperspektive, Erzählzeit, Freitext-Kontext fliessen in alle Prompts.
-- **Theme** – Hell/Dunkel/Auto, Sprachumschaltung Deutsch/Englisch.
+- **Command-Palette** (Cmd/Ctrl+K bzw. `/`) – Fuzzy-Suche und Schnellstart.
+- **Fine-Tuning-Export** – JSONL-Trainingsdaten. [docs/finetuning.md](docs/finetuning.md).
+- **Buch-Export** – PDF, HTML, Markdown, Plaintext, EPUB.
+- **Custom-PDF-Export & EPUB-Export** – Eigener pdfkit-Renderer (PDF/A-2B / PDF/X-3), Google Fonts, Cover-Generierung sowie EPUB-Builder. [docs/publikation-export.md](docs/publikation-export.md).
+- **Custom-Word-Export** – Lektorats-/Verlags-Manuskript als DOCX. [docs/word-export.md](docs/word-export.md).
+- **Buch-Migration** – Verlustfreier Buch-Round-Trip als `.swbook`-Bundle. [docs/book-migration.md](docs/book-migration.md).
 
 ### Integrationen & Monitoring
-- **Blog-Sync (WordPress)** – Bücher vom Typ `blog` mit WordPress synchronisieren: Initial-Import, Pull, Push, LWW-Konfliktstrategie, Gutenberg-Block-Mapping. [docs/blog-sync.md](docs/blog-sync.md).
-- **HubSpot-Sync** – Initial-Import + Push als Blog-Draft (kein Update/Pull-back). [docs/hubspot-sync.md](docs/hubspot-sync.md).
-- **Browser-Erweiterung (Chrome)** – `schreibwerkstatt-browser-extension`: Webseiten beim Surfen als Recherche-Fundstück und/oder Quelle erfassen — ein transaktionaler Aufruf (`POST /capture`), Dublettenprüfung über die normalisierte URL, Metadaten liest die Erweiterung aus dem DOM (auch hinter Login/Paywall). Läuft mit einem eigenen Geräte-Token, das **ausschliesslich erfassen** darf und nie am Manuskript schreibt. [docs/clients.md](docs/clients.md).
-- **Metrics-API** – `GET /metrics` im Prometheus-Format (Bearer-Token mit Scopes); fertige Dashboards für Home Assistant und Grafana. [docs/metrics-api.md](docs/metrics-api.md).
+- **Blog-Sync (WordPress) & HubSpot-Sync** – Synchronisation für Bücher vom Typ `blog`. [docs/blog-sync.md](docs/blog-sync.md), [docs/hubspot-sync.md](docs/hubspot-sync.md).
+- **Browser-Erweiterung (Chrome)** – Webseiten als Recherche-Fundstück/Quelle erfassen (`/capture`). [docs/clients.md](docs/clients.md).
+- **Metrics-API** – Prometheus-Format (`GET /metrics`), Dashboards für Home Assistant und Grafana. [docs/metrics-api.md](docs/metrics-api.md), [docs/homeassistant/](docs/homeassistant/).
 
-## Voraussetzungen
+---
 
-- Node.js v20–25 (`engines: >=20 <26`; Node 26 noch nicht unterstützt: better-sqlite3 11.x baut nicht gegen das V8 in Node 26 — Bump auf 12.x ausstehend). Empfohlen: `.nvmrc` (Node 24).
-- Öffentliche HTTPS-URL (Reverse-Proxy mit TLS) für Produktion.
-- Login-Pfad: **Admin-Bootstrap** (Email+Passwort via ENV) und/oder **Google OAuth2** (Callback `https://<domain>/auth/callback`). Mindestens einer muss konfiguriert sein.
+## Selbst-Hosting & Deployment
 
-## Quick Start
+Ausführliche Anleitungen für den Betrieb, Reverse-Proxies, Backups und Testinstanzen:
 
-Nur fürs Selbst-Hosting — die gehostete Instanz läuft unter [schreibwerkstatt.app](https://schreibwerkstatt.app).
-
-```bash
-git clone https://github.com/<user>/schreibwerkstatt.git
-cd schreibwerkstatt
-cp .env.example .env   # SESSION_SECRET (32+ Hex) ist Pflicht
-npm ci --omit=dev
-node server.js         # Port 3737
-```
-
-KI-Provider, Google-OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF/EPUBCheck sowie die optionalen self-hosted Dienste (LanguageTool, Whisper-Diktat) konfiguriert die **Admin-Konsole** (Tabelle `app_settings`, kein Restart nötig).
-
-Produktiv: systemd-Service via [deploy/schreibwerkstatt.service](deploy/schreibwerkstatt.service), Erst-Install `bash deploy/install.sh`, CD `bash deploy/deploy.sh`.
-
-### Deploy-Migrations
-
-Einmalige Prod-Anpassungen (Dateisystem-Cleanup, chown-Fixes, sqlite3-Touches) gehören als idempotente Shell-Scripts unter [deploy/migrations/](deploy/migrations/) — Konvention `NNN-slug.sh` (3-stellige fortlaufende Nummer). [deploy/apply-migrations.sh](deploy/apply-migrations.sh) läuft nach jedem Deploy (nach rsync + chown, vor `npm install`), führt nur Scripts aus, deren `NNN` nicht in `$INSTALL_DIR/.deploy-migrations-applied` steht, und appendet bei Erfolg. Script erhält `$INSTALL_DIR` als `$1`. Fehler bricht Deploy ab. Migration trotzdem idempotent schreiben (Marker könnte verloren gehen).
-
-### Reverse-Proxy
-
-Fertige, kommentierte NGINX-Konfiguration: [deploy/nginx.conf](deploy/nginx.conf) (TLS-Terminierung, HTTP→HTTPS-Redirect, ungepufferte SSE-Streams, ZIP-Import bis 200 MB, STT-Audio, Long-Cache für Vendor/Fonts). `<DOMAIN>` + Zertifikatspfade ersetzen, nach `/etc/nginx/sites-available/` kopieren, symlinken, `nginx -t && systemctl reload nginx`.
-
-Wer **NPMplus / Nginx Proxy Manager** nutzt: [deploy/nginx-npmplus.conf](deploy/nginx-npmplus.conf) — die UI-Feldwerte (Forward `http://…:3737`, Cache/HSTS aus) plus den Override-Block für den „Advanced"-Tab des Proxy-Hosts. Der `X-Forwarded-*`-Block darin ist Pflicht, damit die App über `trust proxy` die **echte Client-IP** (`req.ip`) in ihre Audit-/Sicherheits-Logs schreibt statt der Proxy-IP.
-
-Wesentlich: Die App lauscht auf `127.0.0.1:3737`, terminiert kein TLS und liest `X-Forwarded-Proto` (`trust proxy`). SSE braucht ungepufferte Verbindungen (`proxy_buffering off`), und die Kompression macht die App selbst — NGINX-gzip daher aus.
-
-### Optional: veraPDF (PDF/A-Validierung)
-
-Ohne veraPDF läuft die Validierung im Skip-Modus, das PDF wird trotzdem geliefert. Für strikte Validierung:
-
-```bash
-apt-get install -y default-jre-headless curl unzip   # oder: apk add openjdk17-jre-headless curl unzip
-
-VERAPDF_VERSION=1.26.2
-curl -sSL "https://software.verapdf.org/releases/verapdf-greenfield-${VERAPDF_VERSION}.zip" -o /tmp/verapdf.zip
-mkdir -p /opt/verapdf && unzip -q /tmp/verapdf.zip -d /opt/verapdf
-cd /opt/verapdf/verapdf-greenfield-${VERAPDF_VERSION}
-java -cp installer-${VERAPDF_VERSION}.jar org.verapdf.apps.Installer -options auto-install-options.xml
-# /opt/verapdf-installation in PATH oder VERAPDF_BIN setzen
-```
-
-### Optional: EPUBCheck (EPUB-Validierung)
-
-Auf Prod erledigt das die Deploy-Migration [deploy/migrations/004-install-epubcheck.sh](deploy/migrations/004-install-epubcheck.sh) automatisch (läuft bei jedem Deploy, idempotent). Ohne EPUBCheck läuft die EPUB-Validierung im Skip-Modus, das EPUB wird trotzdem geliefert. Manuell (W3C-Referenzvalidator, Java):
-
-```bash
-# Einfachster Weg: paketverwalteter Wrapper (liefert ein 'epubcheck'-Executable in PATH)
-apt-get install -y epubcheck            # oder: apk add epubcheck / brew install epubcheck
-
-# Alternativ ein eigenes Wrapper-Skript anlegen und via EPUBCHECK_BIN referenzieren —
-# EPUBCHECK_BIN muss ein aufrufbares Executable sein (kein "java -jar …"-String):
-#   #!/bin/sh
-#   exec java -jar /opt/epubcheck/epubcheck.jar "$@"
-# Deaktivieren ohne Deinstallation: app_settings epub.validate.disabled = true
-```
-
-### Optional: GITHUB_TOKEN (Client-Versionen im Profil)
-
-Das Profil (`/me`) zeigt eingeloggten Usern Installationsweg + Version der Clients. Für die **Android-App** ([schreibwerkstatt-mobile](https://github.com/bedeberger/schreibwerkstatt-mobile)) und die **Chrome-Erweiterung** ([schreibwerkstatt-browser-extension](https://github.com/bedeberger/schreibwerkstatt-browser-extension)) liest der Server das `latest`-Release des öffentlichen Repos über die GitHub-Public-API ([lib/github-release.js](lib/github-release.js), In-Memory-Cache ~10 min). Kein Token nötig. Wird ein GitHub-Token (PAT) hinterlegt, wird es als Bearer mitgeschickt, um das API-Rate-Limit anzuheben (60→5000 Requests/h). Konfiguration: **Admin-Settings → Erweitert → `macclient.github_token`** (verschlüsselt in `app_settings` gespeichert; der Key-Name stammt aus der Zeit des DMG-Downloads). `GITHUB_TOKEN` in `.env` dient nur noch als einmaliger Boot-Seed in die DB.
-
-Die **macOS-App** braucht das Token nicht: sie kommt aus dem [Mac App Store](https://apps.apple.com/app/id6797073919?mt=12), und ihre Version liest der Server aus der öffentlichen iTunes-Lookup-API ([lib/appstore-lookup.js](lib/appstore-lookup.js)).
-
-### Update
-
-```bash
-git pull && npm ci --omit=dev && systemctl restart schreibwerkstatt
-```
+- **[Deployment & Selbst-Hosting Guide](docs/deployment.md)** – Systemvoraussetzungen, Quick Start, NGINX / NPMplus, veraPDF / EPUBCheck, GitHub-Token, Backups.
+- **[Demo-Hosting & Testinstanzen](docs/demo-hosting.md)** – Einrichtung einer separaten Demo-LXC für Store-Reviews, automatisierter Reset-Timer, fixe Device-Tokens und CD-Integration.
 
 ## Admin-Konsole
 
 Unter `/admin` für User mit `global_role = 'admin'`:
-- **Users** — Rollen, Sperren, Provider-Override pro User.
-- **Books** — alle Bücher mit ACL-Einsicht/Übertragung.
-- **Registrierungs-Anfragen** — Approval-Queue für `/register`-Selbstanmeldungen.
-- **Settings** — KI-Provider + Keys, Google OAuth, App-URL, Modell-Limits, Mailer, Cron, veraPDF/EPUBCheck, LanguageTool + Diktat, Metrics-Token.
-- **Kategorien** — globaler Pool, Zuordnung pro Buch via ACL.
-- **Usage** — Token-Verbrauch pro User/Provider/Job-Typ.
-
-`ADMIN_EMAIL` in `.env` wird beim Start als globale Admin-Rolle gespiegelt (idempotent). Passwort lebt ausschliesslich in der ENV (timing-safe Vergleich, Rate-Limit pro IP).
-
-## Demo-Zugang (Store-Reviews, Testinstanz)
-
-Dritter Login-Pfad neben Google-OIDC und Admin-Passwort: ein **fixer Passwort-Login mit Rolle `user`**. Existenzgrund sind die App-Store-Reviews — Apple (Guideline 2.1, Feld „Sign-in required") und Google Play (`App access`) verlangen einen funktionierenden Demo-Account als Pflichtangabe, der Chrome Web Store Test-Credentials in den Reviewer-Notes. Ein Google-Konto lässt sich Reviewern nicht geben (2FA, Googles ToS, Login-Blocks aus Datacenter-IPs), und der Admin-Pfad würde `/admin/*` und fremde Bücher freigeben.
-
-Vollständig kommentierte Vorlage mit allen Variablen: **[.env.demo.example](.env.demo.example)** (nicht `.env.example` — das ist die Prod-Vorlage ohne Demo-Pfad). Sie ist gleichzeitig die Vorlage, aus der [deploy/install-demo.sh](deploy/install-demo.sh) generiert; wer eine Variable ergänzt, tut es dort und nirgends sonst.
-
-Aktivierung ausschliesslich über `.env` — fehlt eines der beiden, existiert der Pfad nicht:
-
-```bash
-DEMO_EMAIL=demo@example.com
-DEMO_PASSWORD=<langes Zufallspasswort>
-```
-
-Verhalten ([lib/demo-user.js](lib/demo-user.js), Route `POST /auth/demo-login` in [routes/auth.js](routes/auth.js)):
-
-- **Rolle ist immer `user`**, kein Invite-Recht. Wird die Row von Hand auf `admin` gehoben, drückt sie der nächste Demo-Login zurück — der Zugang ist öffentlich bekannt.
-- **Gleiche Härtung wie der Admin-Login** (geteilte Factory: Rate-Limit pro IP, ALTCHA, timing-safe Vergleich, Audit-Event mit `method: 'demo'`) und **derselbe IP-Bucket** — Brute-Force gegen den einen Pfad deckelt auch den anderen.
-- **Beispielbuch wird bei jedem Login geseedet** (idempotent über den Buchnamen, gemeinfreie Prosa, kein KI-Call). Ein Reviewer landet nie in einer leeren App, auch wenn der vorige alles gelöscht hat.
-- **Dazu ein zweites Buch „Fremdes Buch"**, das einem erfundenen `example.org`-Konto gehört und auf dem der Demo-User nur `viewer` ist ([lib/demo-book.js](lib/demo-book.js)#`createForeignDemoBook`, idempotent über die Besitz-Row). **Why:** die Store-Prüfung der Browser-Erweiterung soll sehen, dass ein fehlendes Recht *benannt* wird — auf diesem Buch antwortet der Server `403 INSUFFICIENT_ROLE` mit `detail: { actual: 'viewer', required: 'editor' }` statt stumm zu scheitern. Die Besitzer-Adresse muss auf `example.org` liegen: `GET /content/books` gibt `owner_email` heraus und der Prüfer sieht die Antwort. Details in [docs/clients.md](docs/clients.md).
-- **Status-Gate greift:** `suspended`/`deleted` im Admin-Tab → `403 USER_NOT_ACTIVE`. So lässt sich der Zugang ohne ENV-Änderung stilllegen.
-- **`DEMO_EMAIL === ADMIN_EMAIL` deaktiviert den Demo-Pfad** (sonst streiten sich beide Routen um die Rolle derselben Row).
-
-### Fixe Device-Tokens für die Clients
-
-Die nativen Clients (macOS/Android) und die Browser-Erweiterung authentisieren per Bearer-Token und sehen die Login-Seite nie — ein Reviewer müsste sich sonst erst im Browser einloggen, im Profil ein Token minten und es in die App kopieren. Darum lassen sich beide Token-Arten in der ENV festnageln:
-
-```bash
-DEMO_DEVICE_TOKEN=swd_$(openssl rand -hex 32)    # macOS + Android (content:write)
-DEMO_CAPTURE_TOKEN=swd_$(openssl rand -hex 32)   # Chrome-Erweiterung (capture:write)
-```
-
-Der Klartext gehört danach in die Store-Reviewer-Notes (zusammen mit der Server-URL); die DB kennt weiter nur den SHA-256-Hash. Registriert werden sie beim **Serverstart** ([lib/demo-user.js](lib/demo-user.js)#`ensureDemoAccess`, aufgerufen in [server.js](server.js)) — nicht erst beim ersten Login, denn genau diese Clients loggen sich nie über den Browser ein. Die Scopes folgen den bestehenden Token-Arten aus [lib/device-scopes.js](lib/device-scopes.js); der Demo-Zugang bekommt damit **keine** Sonderrechte, die Erweiterung bleibt auf die Capture-Allowlist beschränkt.
-
-- **Format ist Pflicht:** `swd_` + 64 Hex-Zeichen. Ein formal ungültiger Wert wird abgelehnt und **nicht** registriert (Log-Error) — sonst wandert ein `swd_test` als vollwertiger Schreibzugang auf eine öffentlich erreichbare Instanz.
-- **Rotation entzieht wirklich:** neuer Wert in derselben Variable + Neustart → das alte Token gilt nicht mehr (der Slot wird über den `device_name` identifiziert und aufgeräumt).
-- **Nicht über die UI entziehbar:** die Tokens erscheinen im Demo-Profil wie jedes andere Gerät, aber Widerrufen/Löschen antwortet `403 DEMO_TOKEN_FIXED` — sonst schaltet ein neugieriger Reviewer den Zugang für alle folgenden ab. Entzogen wird über die ENV.
-- **Beide Slots brauchen unterschiedliche Werte** (`token_hash` ist UNIQUE — derselbe Wert in beiden würde die Scopes des ersten überschreiben). Wird das verletzt, bleibt der zweite Slot unregistriert.
-- Sichtbar im Admin-Tab „Geräte" unter `Demo-Client (macOS/Android)` bzw. `Demo-Erweiterung (Chrome)` — inkl. `last_used_at` und gemeldeter Client-Version, sodass man sieht, ob ein Reviewer die App tatsächlich gestartet hat.
-
-Ein Token teilt sich macOS und Android bewusst (dasselbe Device-Token darf laut [docs/clients.md](docs/clients.md) auf mehreren Geräten laufen, `X-Client-Platform` unterscheidet sie zur Laufzeit). Wer die beiden trennen will, ergänzt einen weiteren Slot in `TOKEN_SLOTS` ([lib/demo-user.js](lib/demo-user.js)).
-
-> **Nur auf einer separaten Demo-Instanz setzen, nie auf Prod.** Reviewer schreiben, und KI-Jobs kosten Geld. Das Setup-Script unten richtet genau so eine Instanz ein (eigene DB, eigener Service, Budget-Cap, nächtlicher Reset); den KI-Provider wählt man danach in der Admin-Konsole.
-
-### Demo-Instanz aufsetzen (LXC)
-
-[deploy/install-demo.sh](deploy/install-demo.sh) ist das Pendant zu [deploy/install.sh](deploy/install.sh) und läuft genauso **im Container** aus einem Repo-Checkout. Es kann neben einer Prod-Installation auf demselben Host laufen — eigenes Verzeichnis (`/opt/schreibwerkstatt-demo`), eigener Service (`schreibwerkstatt-demo`), eigener Port (3738), eigener System-User (`swdemo`, nicht der CD-Runner).
-
-```bash
-# Im Container, als root, aus dem Checkout:
-bash deploy/install-demo.sh --domain demo.example.com
-```
-
-Der `pct create`-Aufruf zum Anlegen des LXC steht als Kommentar im Kopf des Scripts. Überschreibbar per Env-Var: `INSTALL_DIR`, `SERVICE`, `PORT`, `RUN_USER`, `DEMO_BUDGET_USD`. Optional `--with-export-tools` für veraPDF/Ghostscript/ICC/EPUBCheck (~200 MB inkl. JRE) plus das Headless-Chromium des serverseitigen Diagramm-Renderings (~170 MB); ohne das laufen PDF-/EPUB-Export weiterhin, nur ohne Normvalidierung, und Diagramme erscheinen im Export als Quelltext (am Bildschirm rendert der Client-Bundle).
-
-Was das Script tut:
-
-1. Node 20 + `sqlite3`-CLI (letzteres ist hier **Pflicht**, nicht optional wie auf Prod — Snapshot und Reset laufen darüber), System-User, Dateien, `npm install --omit=dev`.
-2. **Generiert die `.env` aus [.env.demo.example](.env.demo.example)** — die Vorlage ist die SSoT des ENV-Layouts, der Installer ersetzt nur die `__PLATZHALTER__` durch frische Zufallswerte (`SESSION_SECRET`, Admin-Passwort, Demo-Passwort, beide Device-Tokens im `swd_`-Format). Bleibt ein Platzhalter stehen, bricht er ab statt eine Instanz mit 18-Zeichen-„Secret" zu starten. **Eine bestehende `.env` wird nie überschrieben** — sonst würden bei einer Neuinstallation die Zugangsdaten rotieren, die bereits bei Apple/Google eingetragen sind, und das Review scheitert an einem Login-Fehler.
-3. Installiert Service + **Reset-Timer** (04:30 lokal, nach dem Nacht-Cron der App) statt des Backup-Timers.
-4. Wartet, bis die App antwortet — erst dann existieren Demo-User, Device-Tokens und Beispielbuch (Boot-Bootstrap) —, setzt `app.public_url` und das **Monatsbudget des Demo-Users** (Default 5 USD, `mode: hard`), und schreibt den **Golden-Snapshot** fest.
-5. Gibt den **Credential-Block für die Store-Formulare** aus. Erneut abrufbar mit `bash deploy/install-demo.sh --print-credentials` (rotiert nichts).
-
-Reverse-Proxy: dieselbe Konfiguration wie Prod ([deploy/nginx.conf](deploy/nginx.conf) bzw. [deploy/nginx-npmplus.conf](deploy/nginx-npmplus.conf)), nur `<DOMAIN>` = Demo-Domain und Upstream-Port 3738. **TLS ist Pflicht** — Apples App Transport Security lässt einen nativen Client sonst nicht gegen den Server sprechen.
-
-#### Was auf der Demo-Instanz bewusst offen ist
-
-Die Zugangsdaten stehen in Store-Formularen und sind damit öffentlich. Wer sie hat, hat einen vollwertigen `user`-Account: Bücher schreiben und löschen, Dateien hochladen (Cover bis 20 MB, Recherche-Anhänge), Inhalte über Share-Links öffentlich unter der Demo-Domain stellen (`noindex,nofollow`, siehe [docs/share-link.md](docs/share-link.md)) und sich eigene Device-Tokens ausstellen. Das ist Absicht — genau das soll ein Reviewer können. Eingegrenzt wird es durch die Trennung (eigener Container, eigene DB, eigenes `SESSION_SECRET`, Rolle nie `admin`), das Monatsbudget und den nächtlichen Reset, der alles davon zurücknimmt.
-
-Zwei Dinge, die der Reset **nicht** abdeckt und die darum auf Infrastruktur-Ebene gehören:
-
-- **Netz-Isolation des Containers.** Alles, was die App an ausgehenden Requests macht, macht sie aus diesem Container heraus — ein öffentlich bekannter Account ist damit ein Fuss im internen Netz. Anwendungsseitig ist der eine user-kontrollierte Pfad (Bild-URLs im Manuskript, geholt beim PDF-Export) über [lib/ssrf-guard.js](lib/ssrf-guard.js) geschlossen, ebenso die Blog-Connection. Verlassen sollte man sich darauf nicht: die Demo-LXC gehört in ein Segment, aus dem Prod und die Management-Oberflächen **nicht** erreichbar sind. **Achtung beim Egress-Filter:** eine pauschale Regel gegen RFC-1918-Ziele trifft auch den DNS-Resolver, wenn der das Default-Gateway ist — Resolver vorher auf einen öffentlichen Dienst umstellen oder die Regel um seine Adresse ausnehmen, sonst löst die Instanz keinen Namen mehr auf.
-- **Anfragen-Rate.** Innerhalb der App gibt es Rate-Limits nur für Login, Registrierung und Share-Reader; ein authentifizierter Aufrufer kann also Requests und Analyse-Jobs in beliebiger Zahl absetzen (parallel laufen davon `jobs.max_concurrent`, Default 2). Auf einer 2-Core-Demo genügt das, um sie unbenutzbar zu machen. Gehört an den Reverse-Proxy, nicht in die App — und **nicht** in die geteilte [deploy/nginx.conf](deploy/nginx.conf), sondern in den Demo-Vhost: die SPA pollt Job-Status und Presence im Sekundenbereich, eine zu knappe Zone bricht ihr die Live-Updates. Grosszügig ansetzen und beobachten:
-
-  ```nginx
-  # http-Block:
-  limit_req_zone $binary_remote_addr zone=swdemo:10m rate=20r/s;
-  # server-Block der Demo-Domain:
-  limit_req zone=swdemo burst=200 nodelay;
-  limit_conn_zone $binary_remote_addr zone=swdemoconn:10m;
-  limit_conn swdemoconn 24;
-  ```
-
-#### Reset-Mechanik
-
-[deploy/demo-reset.sh](deploy/demo-reset.sh) hält einen **Golden-Snapshot** und setzt die Instanz darauf zurück. Ohne das sieht Reviewer Nr. 2 die Textreste von Nr. 1 — im schlimmsten Fall ein leeres Buch, weil Nr. 1 alles gelöscht hat.
-
-```bash
-bash deploy/demo-reset.sh capture   # aktuellen Stand als Ziel festschreiben (Service darf laufen)
-bash deploy/demo-reset.sh reset     # DESTRUKTIV: Service stoppen, Snapshot einsetzen, starten
-bash deploy/demo-reset.sh status    # Snapshot-Alter, Marker, Service- und Timer-Zustand
-```
-
-`capture` nutzt `sqlite3 .backup` (lock-frei, WAL-konsistent) und schwenkt die Datei atomar ein. `reset` löscht `-wal`/`-shm` mit — bleiben sie liegen, mischt SQLite die alten Transaktionen über die frisch eingesetzte DB und der Reset ist teilweise wieder aufgehoben. Nach jeder bewussten Verbesserung des Demo-Inhalts erneut `capture` aufrufen, sonst fällt die Nacht den Fortschritt wieder ab.
-
-`reset` verlangt **zwei** Bedingungen, sonst bricht es ab: die Marker-Datei `.demo-instance` neben der Live-DB **und** ein gesetztes `DEMO_EMAIL` in der `.env`. **Why:** das Script überschreibt eine Datenbank; ein versehentlicher Aufruf gegen `/opt/schreibwerkstatt` wäre der teuerste mögliche Fehler, und je einzelnes Kriterium wäre zu leicht erfüllt (der Marker kann mitkopiert werden, `DEMO_EMAIL` steht auch in einer Entwickler-`.env`). Fehlt der Golden-Snapshot, bricht es **vor** dem `systemctl stop` ab — sonst stünde die Demo still.
-
-#### CD: Demo-Instanz automatisch aktuell halten
-
-Die Demo bekommt bei jedem grünen `main`-Push denselben Stand wie Prod. Beide Deploys hängen an denselben Test-Jobs, laufen aber **unabhängig** (kein `needs` zwischen ihnen): ein Prod-Fehler darf die Demo nicht auf einem alten Stand einfrieren, und umgekehrt.
-
-Mechanik: ein **zweiter self-hosted Runner** auf der Demo-LXC, adressiert über das Label `demo`. Der Job `deploy-demo` in [.github/workflows/deploy.yml](.github/workflows/deploy.yml) ruft dasselbe [deploy/deploy.sh](deploy/deploy.sh) auf wie Prod, nur mit `SW_FLAVOUR=demo`.
-
-**Einrichtung** (einmalig, auf der Demo-LXC, nach `install-demo.sh`):
-
-1. **Label am bestehenden Runner nachtragen.** Zuerst, nicht danach: sobald ein zweiter Runner im Repo hängt, matcht ein blosses `runs-on: self-hosted` **beide** — die Testjobs würden auf der Demo-LXC landen und der Prod-Deploy dort ins Leere greifen. Der Prod-Runner braucht darum das Label `prod` (GitHub → Settings → Actions → Runners → Labels; kein Neu-Registrieren nötig), passend zu den `runs-on: [self-hosted, prod]` im Workflow.
-2. **Runner auf der Demo-LXC registrieren** via [deploy/install-runner.sh](deploy/install-runner.sh) (als root, aus dem Checkout):
-
-   ```bash
-   # Token holen (gilt eine Stunde) — lokal, mit gh:
-   gh api -X POST repos/bedeberger/schreibwerkstatt/actions/runners/registration-token --jq .token
-
-   # auf der Demo-LXC:
-   bash deploy/install-runner.sh --token <TOKEN> --label demo --name schreibwerkstatt-demo
-   ```
-
-   Das Script installiert die Systempakete, lädt das neueste Runner-Release passend zur Architektur, zieht dessen .NET-Abhängigkeiten (`libicu` — fehlt auf einem minimalen Debian-LXC und der Runner stirbt sonst mit einem Globalization-Fehler, der nicht nach fehlendem Paket aussieht), registriert und richtet den systemd-Service ein. Weiter: `--status`, `--uninstall`, `--force` (neu registrieren), `--version` (Release pinnen). Der Runner läuft **als root**, weil `deploy.sh` `systemctl`, `/etc/systemd/system` und `chown` ohne `sudo` benutzt — dieselbe Annahme wie auf Prod; `RUNNER_ALLOW_RUNASROOT` setzt das Script als systemd-Drop-in, damit es eine Neuinstallation des Service überlebt.
-
-   Nur das Zusatz-Label angeben: `self-hosted`, `Linux` und `X64` vergibt GitHub selbst. **Kein** Playwright nötig — auf der Demo-LXC laufen keine Tests.
-3. Fertig. `SW_INSTALL_DIR`/`SW_SERVICE`/`SW_OWNER`/`SW_PORT` stehen im Job-`env` und müssen zu den Werten der Installation passen — wer die Demo mit abweichendem `INSTALL_DIR` installiert hat, zieht sie dort nach.
-
-Was der Demo-Deploy **anders** macht als Prod (alles in `deploy.sh` am `SW_FLAVOUR` aufgehängt, damit kein zweites Deploy-Skript daneben driftet):
-
-- **Kein DB-Backup vorher** — der Golden-Snapshot ist die Sicherung. Ein `capture` an dieser Stelle wäre sogar schädlich: es würde festschreiben, was der letzte Reviewer hinterlassen hat.
-- **Zusätzliche rsync-Excludes** für `demo-golden.db`, `.demo-instance` und `.with-export-tools`. **Why:** diese Dateien leben im Installationsverzeichnis, stehen aber nicht im Repo — ohne Exclude räumt `--delete` sie beim ersten Deploy weg, und `demo-reset.sh` verweigert danach jeden Reset, weil sein Marker-Guard fehlt.
-- **Reset-Timer statt Backup-Timer**, Units über [deploy/demo-units.sh](deploy/demo-units.sh) (geteilte SSoT mit `install-demo.sh` — sonst zwei sed-Blöcke mit derselben heiklen Ersetzungsreihenfolge).
-- **Deploy-Migrations nur mit Marker:** die Scripts unter `deploy/migrations/` installieren veraPDF/Ghostscript/EPUBCheck (~200 MB inkl. JRE). Auf einer bewusst schlanken Demo laufen sie nur, wenn `install-demo.sh --with-export-tools` den Marker `.with-export-tools` gesetzt hat. **Dasselbe Gate hält das Headless-Chromium** des serverseitigen Diagramm-Renderings (~170 MB) von der Demo fern — dort fällt die Leseansicht auf den mermaid-Client-Bundle zurück, siehe [docs/diagramme.md](docs/diagramme.md).
-
-**Der Golden-Snapshot altert mit dem Schema und wird nie automatisch neu aufgenommen.** Ein Reset setzt eine DB mit älterer `schema_version` ein; die Migrationen laufen beim nächsten Serverstart erneut durch, das ist unkritisch. Aber der *Inhalt* bleibt auf dem Stand des letzten `capture` — nach jeder bewussten Verbesserung des Demo-Inhalts (und vor einer Store-Einreichung) einmal `bash deploy/demo-reset.sh capture` aufrufen. Der Job gibt am Ende `demo-reset.sh status` aus, damit man das Alter im Actions-Log sieht.
-
-## Backup
-
-Tägliches Online-Backup der SQLite-DB via systemd-Timer (`schreibwerkstatt-backup.timer`, Default 03:00). `sqlite3 .backup` (lock-frei, WAL-konsistent), gzip-komprimiert, Retention nach `mtime`. Pre-Deploy zusätzlicher Snapshot.
-
-Konfig via `.env`: `BACKUP_DIR`, `BACKUP_RETENTION_DAYS`, `BACKUP_DB_FILE`. Script + Units: [deploy/backup.sh](deploy/backup.sh), [deploy/schreibwerkstatt-backup.service](deploy/schreibwerkstatt-backup.service), [deploy/schreibwerkstatt-backup.timer](deploy/schreibwerkstatt-backup.timer).
-
-Backup-Ordner offsite spiegeln (rsync nach NAS/S3) — sonst Single-Point-of-Failure.
-
-## Prompts anpassen
-
-`prompt-config.json` im Projektroot (Pflichtdatei). Konfigurierbar: `locales` (`de-CH`/`de-DE`/`en-US`/`en-GB` mit Regeln, Rollen, Stoppwortlisten), `buchtypen` (Genre pro Sprache mit Label + Kontext), `erklaerungRule` (globale Fehlerfilter-Regel), `defaultLocale`. Per-Buch in der UI: Buchtyp + Freitext-Kontext. Änderungen beim nächsten Serverstart aktiv.
+- **Users, Books, Registration Requests, Settings, Categories, Usage** (Token-Verbrauch).
 
 ## Lokale Entwicklung
 
-`LOCAL_DEV_MODE=true` in `.env` überspringt OAuth, legt Dev-Session an (`dev@local`).
+`LOCAL_DEV_MODE=true` in `.env` überspringt OAuth und legt eine Dev-Session an (`dev@local`).
 
 > Niemals in Produktion – Auth-Guard wird komplett deaktiviert.
 
-## Credits
+## Vertiefende Dokumentation
 
-### Plattformen & Modelle
-
-- **[Anthropic Claude](https://www.anthropic.com/)** – KI-Modell (Anthropic Usage Policies; Outputs frei nutzbar)
-- **[Ollama](https://ollama.com/)** (MIT) / **[llama.cpp](https://github.com/ggerganov/llama.cpp)** (MIT) / **[LM Studio](https://lmstudio.ai/)** – lokale LLMs
-- **[OpenThesaurus](https://www.openthesaurus.de/)** – Synonyme (LGPL/CC-BY-SA; Nutzung via öffentliche API, keine Redistribution)
-- **[veraPDF](https://verapdf.org/)** – PDF/A-Validierung (GPL-3.0; externer Prozess)
-
-### Frontend-Libraries (vendored in [public/vendor/](public/vendor/))
-
-- **[Alpine.js](https://alpinejs.dev/)** (MIT), **[vis-network](https://visjs.github.io/vis-network/)** (Apache-2.0 + MIT), **[Chart.js](https://www.chartjs.org/)** (MIT), **[SortableJS](https://github.com/SortableJS/Sortable)** (MIT), **[jsMind](https://github.com/hizzgdev/jsmind)** (BSD-3-Clause), **[d3-cloud](https://github.com/jasondavies/d3-cloud)** (BSD-3-Clause), **[Mermaid](https://mermaid.js.org/)** (MIT).
-
-Originallizenztexte: [public/vendor/LICENSES/](public/vendor/LICENSES/).
-
-### Fonts
-
-- **[Inter](https://rsms.me/inter/)** © Rasmus Andersson – SIL Open Font License 1.1
-- **[Source Serif 4](https://github.com/adobe-fonts/source-serif)** © Adobe – SIL Open Font License 1.1
-
-Schriftdateien in [public/fonts/](public/fonts/), Lizenz [public/fonts/OFL.txt](public/fonts/OFL.txt). Custom-PDF-Export bettet zur Laufzeit Google-Fonts-Familien ein (jeweils SIL OFL 1.1 oder Apache-2.0).
-
-### Server-Dependencies
-
-Vollständige Liste in [package.json](package.json) – durchgehend OSI-genehmigte permissive Lizenzen (MIT/Apache-2.0/BSD/ISC). Auswahl: Express, better-sqlite3, pdfkit, sharp, linkedom, jsonrepair, winston, helmet, openid-client, node-cron, xmlbuilder2, epub-gen-memory, docx.
+Alle tiefergehenden Fachkonzepte, Datenmodelle und Architekturentscheidungen liegen in [docs/](docs/):
+- Job-Queue & Lifecycle: [docs/jobs.md](docs/jobs.md)
+- KI-Provider & Profile: [docs/ai-providers.md](docs/ai-providers.md)
+- Schema-ERD: [docs/erd.md](docs/erd.md)
+- Testkonventionen: [docs/testing.md](docs/testing.md)
+- (und viele weitere spezifische Themen unter `docs/`)
 
 ## Lizenz
 
-**GNU Affero General Public License v3.0** (AGPL-3.0) – siehe [LICENSE](LICENSE). Wer den Dienst über ein Netzwerk anbietet, muss den modifizierten Quellcode den Nutzern verfügbar machen (§ 13 AGPL).
-
-Drittsoftware-Lizenzen: [public/vendor/LICENSES/](public/vendor/LICENSES/), Schriften [public/fonts/OFL.txt](public/fonts/OFL.txt).
+**GNU Affero General Public License v3.0** (AGPL-3.0) – siehe [LICENSE](LICENSE).

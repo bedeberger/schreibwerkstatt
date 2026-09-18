@@ -63,25 +63,32 @@
   <div x-show="adminLogsStreamError" class="muted-msg card-section" x-text="$app.t('admin.logs.streamError')"></div>
 
   <!-- Log-Liste -->
-  <div class="log-list" x-show="adminLogsEntries.length">
-    <template x-for="(e, idx) in adminLogsEntries" :key="adminLogsRowKey(e, idx)">
-      <div class="log-row" :class="'log-row--' + e.level">
-        <span class="log-row-ts" x-text="adminLogsFmtTs(e.ts)"></span>
-        <span class="log-badge" :class="'log-badge--' + e.level" x-text="e.level.toUpperCase()"></span>
-        <span class="log-row-scope" x-text="e.scope || '-'"></span>
-        <span class="log-row-user" x-text="e.user || '-'"></span>
-        <span class="log-row-book" x-text="e.book ? ('#' + e.book) : '-'"></span>
-        <span class="log-row-msg" x-text="e.msg"></span>
-        <button type="button" class="log-row-toggle"
-                x-show="e.stack && e.stack.length"
-                @click="adminLogsToggleStack(idx)"
-                :aria-expanded="adminLogsExpanded[String(idx)] ? 'true' : 'false'"
-                :aria-label="$app.t('admin.logs.toggleStack')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"></use></svg>
-        </button>
-        <pre class="log-stack" x-show="e.stack && adminLogsExpanded[String(idx)]" x-text="(e.stack || []).join('\n')"></pre>
-      </div>
-    </template>
+  <!-- Der Query-Container sitzt auf diesem Wrapper, NICHT auf der Karte:
+       Floating UI (x-anchor) haelt jeden `container-type != normal` fuer einen
+       Containing Block, der Browser nicht — die Filter-Comboboxen darueber
+       klappten sonst um den Karten-Offset verschoben auf. Im Wrapper geht kein
+       Popover auf. Gegated: tests/e2e-app/combobox-anchoring.spec.js -->
+  <div class="log-list-wrap">
+    <div class="log-list" x-show="adminLogsEntries.length">
+      <template x-for="(e, idx) in adminLogsEntries" :key="adminLogsRowKey(e, idx)">
+        <div class="log-row" :class="'log-row--' + e.level">
+          <span class="log-row-ts" x-text="adminLogsFmtTs(e.ts)"></span>
+          <span class="log-badge" :class="'log-badge--' + e.level" x-text="e.level.toUpperCase()"></span>
+          <span class="log-row-scope" x-text="e.scope || '-'"></span>
+          <span class="log-row-user" x-text="e.user || '-'"></span>
+          <span class="log-row-book" x-text="e.book ? ('#' + e.book) : '-'"></span>
+          <span class="log-row-msg" x-text="e.msg"></span>
+          <button type="button" class="log-row-toggle"
+                  x-show="e.stack && e.stack.length"
+                  @click="adminLogsToggleStack(idx)"
+                  :aria-expanded="adminLogsExpanded[String(idx)] ? 'true' : 'false'"
+                  :aria-label="$app.t('admin.logs.toggleStack')">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"></use></svg>
+          </button>
+          <pre class="log-stack" x-show="e.stack && adminLogsExpanded[String(idx)]" x-text="(e.stack || []).join('\n')"></pre>
+        </div>
+      </template>
+    </div>
   </div>
 
   <div x-show="!adminLogsEntries.length && !adminLogsLoading" class="muted-msg" x-text="$app.t('admin.logs.empty')"></div>

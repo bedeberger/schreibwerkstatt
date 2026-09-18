@@ -3,6 +3,7 @@
 // Erzaehlform, Ziele, Quellen-/Querverweis-Einstellungen, Textsorte, Stilprofil.
 
 const { db } = require('./connection');
+const { parseDomains, serializeDomains, normalizeProfile } = require('../lib/research-profile');
 // Prepared Statements dieses Moduls sitzen auf migrierten Spalten — die
 // Migrationen muessen vor dem Anlegen gelaufen sein.
 require('./migrations');
@@ -35,7 +36,15 @@ const XREF_DEFAULTS = Object.freeze({
   table_numbering: 0,
 });
 
-const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, entities_enabled, orte_real, schauplatz_land, zeitlinie_real, weltfakten_real_pruefen, exclude_from_stats, citation_style, bibliography_enabled, bibliography_title, bibliography_scope, bibliography_in_blog, citation_notes, figure_numbering, table_numbering, textsorte FROM book_settings WHERE book_id = ?');
+// Recherche-Profil (Migration 289). `research_domains` verlaesst die DB immer
+// als ARRAY, nie als Rohtext — gespeichert wird zeilenweise, gelesen wird
+// geparst; sonst haette jeder Konsument seine eigene Trennlogik.
+const RESEARCH_DEFAULTS = Object.freeze({
+  research_profile: null,
+  research_domains: [],
+});
+
+const _getBookSettings = db.prepare('SELECT language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, entities_enabled, orte_real, schauplatz_land, zeitlinie_real, weltfakten_real_pruefen, exclude_from_stats, citation_style, bibliography_enabled, bibliography_title, bibliography_scope, bibliography_in_blog, citation_notes, figure_numbering, table_numbering, textsorte, research_profile, research_domains FROM book_settings WHERE book_id = ?');
 const _upsertBookSettings = db.prepare(`
   INSERT INTO book_settings (book_id, language, region, buchtyp, buch_kontext, stilprofil, erzaehlperspektive, erzaehlzeit, is_finished, allow_lektor_book_chat, daily_goal_chars, goal_target_chars, goal_deadline, orte_real, schauplatz_land, zeitlinie_real, weltfakten_real_pruefen, exclude_from_stats, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -140,16 +149,18 @@ function getBookSettings(bookId, userEmail = null) {
     figure_numbering: row.figure_numbering ? 1 : 0,
     table_numbering: row.table_numbering ? 1 : 0,
     textsorte: row.textsorte || null,
+    research_profile: row.research_profile || null,
+    research_domains: parseDomains(row.research_domains),
   };
   if (userEmail) {
     const u = require('./app-users').getUser(userEmail);
     if (u && (u.default_language || u.default_buchtyp)) {
       const language = u.default_language || 'de';
       const region   = u.default_region   || (language === 'en' ? 'US' : 'CH');
-      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null, zeitlinie_real: 0, weltfakten_real_pruefen: 0, exclude_from_stats: 0, textsorte: null, ...CITATION_DEFAULTS, ...XREF_DEFAULTS };
+      return { language, region, buchtyp: u.default_buchtyp || null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null, zeitlinie_real: 0, weltfakten_real_pruefen: 0, exclude_from_stats: 0, textsorte: null, ...RESEARCH_DEFAULTS, ...CITATION_DEFAULTS, ...XREF_DEFAULTS };
     }
   }
-  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null, zeitlinie_real: 0, weltfakten_real_pruefen: 0, exclude_from_stats: 0, textsorte: null, ...CITATION_DEFAULTS, ...XREF_DEFAULTS };
+  return { language: 'de', region: 'CH', buchtyp: null, buch_kontext: null, stilprofil: null, erzaehlperspektive: null, erzaehlzeit: null, is_finished: 0, allow_lektor_book_chat: 0, daily_goal_chars: null, goal_target_chars: null, goal_deadline: null, entities_enabled: 0, orte_real: 0, schauplatz_land: null, zeitlinie_real: 0, weltfakten_real_pruefen: 0, exclude_from_stats: 0, textsorte: null, ...RESEARCH_DEFAULTS, ...CITATION_DEFAULTS, ...XREF_DEFAULTS };
 }
 
 /** Locale-Key für ein Buch: z.B. "de-CH", "en-US". */
@@ -227,6 +238,31 @@ function setBookCitationSettings(bookId, {
   );
 }
 
+// Recherche-Profil, eigener Schreibpfad aus demselben Grund wie /citation und
+// /xrefs: es steuert nur den Recherche-Chat und soll die 18-stellige
+// Positionsliste von saveBookSettings nicht weiter verlaengern.
+const _updateBookResearchSettings = db.prepare(`
+  INSERT INTO book_settings (book_id, research_profile, research_domains, updated_at)
+  VALUES (?, ?, ?, ?)
+  ON CONFLICT(book_id) DO UPDATE SET
+    research_profile=excluded.research_profile,
+    research_domains=excluded.research_domains,
+    updated_at=excluded.updated_at
+`);
+
+/** Recherche-Profil eines Buchs (Freitext + Domain-Eingrenzung). Normalisiert
+ *  ueber lib/research-profile.js — ein Fremdwert landet nie in der Spalte, und
+ *  `allowed_domains` bekommt nur, was auch ein Hostname ist.
+ *  Gibt den gespeicherten Stand zurueck (Domains als Array). */
+function setBookResearchSettings(bookId, { research_profile, research_domains } = {}) {
+  const profile = normalizeProfile(research_profile);
+  const domains = serializeDomains(research_domains);
+  _updateBookResearchSettings.run(
+    parseInt(bookId), profile, domains, new Date().toISOString(),
+  );
+  return { research_profile: profile, research_domains: parseDomains(domains) };
+}
+
 /** Querverweis-Einstellungen pro Buch. Eigener Schreibpfad — beruehrt keine
  *  anderen Settings. */
 function setBookXrefSettings(bookId, { figure_numbering, table_numbering } = {}) {
@@ -285,6 +321,7 @@ module.exports = {
   setBookStilprofil,
   setBookTextsorte,
   setBookCitationSettings,
+  setBookResearchSettings,
   setBookXrefSettings,
   VALID_CITATION_STYLES,
   VALID_CITATION_NOTES,

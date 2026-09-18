@@ -328,3 +328,19 @@
   border-color: var(--color-primary);
 }
 
+
+/* ── Bogen im Buch (Kern × Kapitel) ─────────────────────────────────────────
+   Der Abschnitt traegt `.card-section` und bekommt seinen Aussenabstand
+   dadurch aus dem Karten-Rhythmus (`--card-gap-section`) — hier steht nur,
+   was daran wirklich anders ist. Die Tabelle selbst kommt vollstaendig aus
+   dem geteilten `.heatmap-*`-Vokabular (analysis/heatmap.css); eine eigene
+   Fassung waere ein zweiter Name fuer dieselbe Erscheinung. */
+.werkstatt-bogen .heatmap-rowhead-main {
+  /* Kern-Namen sind kurz und stehen als Zeilenachse — kein Umbruch mitten im
+     Wort, sonst rutscht die ganze Bandzeile in der Hoehe. */
+  white-space: nowrap;
+}
+
+.werkstatt-arc-checks {
+  margin-top: var(--card-gap-section);
+}

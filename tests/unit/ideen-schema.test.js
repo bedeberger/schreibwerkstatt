@@ -2,6 +2,11 @@
 // ideen-Tabelle: CRUD + User-Isolation + Scope-XOR (page_id XOR chapter_id)
 // gegen frische In-Memory-DB. Wir replizieren das Migrations-DDL hier, damit
 // der Test ohne schreibwerkstatt.db läuft.
+//
+// Gegenstand sind hier die reinen Tabellen-Zusagen (XOR-CHECK, Stufen-CHECK,
+// Ownership im WHERE). Die Datenschicht darüber (db/ideen.js: Board-Abfrage,
+// Verknüpfungen, Rückwärts-Lesung) prüft tests/unit/ideen-db.test.js gegen das
+// ECHTE migrierte Schema — dort, wo FK-Kanten und Indexe mitwirken.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -18,8 +23,9 @@ function freshDb() {
       chapter_id  INTEGER,
       user_email  TEXT NOT NULL,
       content     TEXT NOT NULL,
-      erledigt    INTEGER NOT NULL DEFAULT 0,
-      erledigt_at TEXT,
+      status      TEXT NOT NULL DEFAULT 'offen'
+                    CHECK(status IN ('offen','in_arbeit','erledigt','verworfen')),
+      status_at   TEXT,
       created_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL,
       CHECK ((page_id IS NOT NULL AND chapter_id IS NULL)
@@ -42,30 +48,42 @@ test('ideen: Insert + Select pro User isoliert', () => {
   assert.deepEqual(b.map(r => r.content), ['Idee B']);
 });
 
-test('ideen: getOpenIdeen-Filter (erledigt=0)', () => {
+test('ideen: getOpenIdeen-Filter — offen UND in_arbeit, nicht verworfen', () => {
   const db = freshDb();
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO ideen (book_id, page_id, user_email, content, erledigt, created_at, updated_at)
-              VALUES (1, 10, 'u@x.de', 'offen', 0, ?, ?)`).run(now, now);
-  db.prepare(`INSERT INTO ideen (book_id, page_id, user_email, content, erledigt, created_at, updated_at)
-              VALUES (1, 10, 'u@x.de', 'erledigt', 1, ?, ?)`).run(now, now);
+  const ins = (content, status) => db.prepare(
+    `INSERT INTO ideen (book_id, page_id, user_email, content, status, created_at, updated_at)
+     VALUES (1, 10, 'u@x.de', ?, ?, ?, ?)`
+  ).run(content, status, now, now);
+  ins('offen', 'offen');
+  ins('dran', 'in_arbeit');
+  ins('fertig', 'erledigt');
+  ins('weg', 'verworfen');
   const open = db.prepare(
-    'SELECT content FROM ideen WHERE page_id = ? AND user_email = ? AND erledigt = 0 ORDER BY created_at ASC'
+    `SELECT content FROM ideen
+      WHERE page_id = ? AND user_email = ? AND status IN ('offen','in_arbeit')
+      ORDER BY id ASC`
   ).all(10, 'u@x.de');
-  assert.deepEqual(open.map(r => r.content), ['offen']);
+  assert.deepEqual(open.map(r => r.content), ['offen', 'dran']);
 });
 
-test('ideen: PATCH erledigt → erledigt_at', () => {
+test('ideen: Default-Stufe ist `offen`', () => {
   const db = freshDb();
   const now = new Date().toISOString();
   const ins = db.prepare(`INSERT INTO ideen (book_id, page_id, user_email, content, created_at, updated_at)
                           VALUES (1, 10, 'u@x.de', 'X', ?, ?)`).run(now, now);
-  const id = ins.lastInsertRowid;
-  const later = new Date(Date.now() + 1000).toISOString();
-  db.prepare('UPDATE ideen SET erledigt = 1, erledigt_at = ?, updated_at = ? WHERE id = ?').run(later, later, id);
-  const row = db.prepare('SELECT erledigt, erledigt_at FROM ideen WHERE id = ?').get(id);
-  assert.equal(row.erledigt, 1);
-  assert.equal(row.erledigt_at, later);
+  const row = db.prepare('SELECT status, status_at FROM ideen WHERE id = ?').get(ins.lastInsertRowid);
+  assert.equal(row.status, 'offen');
+  assert.equal(row.status_at, null);
+});
+
+test('ideen: eine Stufe ausserhalb des CHECK kommt nicht in die Tabelle', () => {
+  const db = freshDb();
+  const now = new Date().toISOString();
+  assert.throws(() => {
+    db.prepare(`INSERT INTO ideen (book_id, page_id, user_email, content, status, created_at, updated_at)
+                VALUES (1, 10, 'u@x.de', 'X', 'quatsch', ?, ?)`).run(now, now);
+  }, /CHECK constraint failed/);
 });
 
 test('ideen: DELETE nur eigene Zeilen (Ownership-Pattern)', () => {
@@ -122,14 +140,14 @@ test('ideen: Counts pro kind (page vs chapter)', () => {
 
   const pageCounts = db.prepare(`
     SELECT page_id AS scope_id, COUNT(*) AS n FROM ideen
-    WHERE book_id = ? AND user_email = ? AND erledigt = 0 AND page_id IS NOT NULL
+    WHERE book_id = ? AND user_email = ? AND status IN ('offen','in_arbeit') AND page_id IS NOT NULL
     GROUP BY page_id
   `).all(1, 'u@x.de');
   assert.deepEqual(pageCounts, [{ scope_id: 10, n: 2 }]);
 
   const chapCounts = db.prepare(`
     SELECT chapter_id AS scope_id, COUNT(*) AS n FROM ideen
-    WHERE book_id = ? AND user_email = ? AND erledigt = 0 AND chapter_id IS NOT NULL
+    WHERE book_id = ? AND user_email = ? AND status IN ('offen','in_arbeit') AND chapter_id IS NOT NULL
     GROUP BY chapter_id
   `).all(1, 'u@x.de');
   assert.deepEqual(chapCounts, [{ scope_id: 5, n: 1 }]);

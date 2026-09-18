@@ -95,9 +95,14 @@ export function comboboxData(cfg = {}) {
         for (let i = 0; i < f.length; i++) {
           const opt = f[i];
           const g = (opt.group == null || opt.group === '') ? null : opt.group;
-          if (g !== null && g !== lastGroup) rows.push({ kind: 'header', label: g, key: 'h:' + g });
+          // Der Index gehoert in den Key: `x-for` braucht EINDEUTIGE Keys, und
+          // weder Gruppenname noch Wert sind das zwangslaeufig — eine Liste, in
+          // der dieselbe Gruppe spaeter noch einmal auftaucht, haette zweimal
+          // denselben Header-Key, und Alpine wirft davon eine Zeile weg
+          // (sichtbar als fehlende Kopfzeile ganz oben).
+          if (g !== null && g !== lastGroup) rows.push({ kind: 'header', label: g, key: 'h:' + i + ':' + g });
           lastGroup = g;
-          rows.push({ kind: 'option', opt, optIndex: i, key: 'o:' + (g ?? '') + ':' + String(opt.value) });
+          rows.push({ kind: 'option', opt, optIndex: i, key: 'o:' + i + ':' + (g ?? '') + ':' + String(opt.value) });
         }
         return rows;
       },
@@ -256,7 +261,15 @@ export function comboboxData(cfg = {}) {
           // clippenden Vorfahren (Plot-Swimlane-Grid), Flip nach oben passiert
           // automatisch, wenn unten kein Platz ist (auch auf Mobile). Breite via
           // ddWidth (= Trigger-Breite).
-          '<div class="combobox-dropdown" :style="ddWidth ? { width: ddWidth } : {}" x-anchor:bottom-start.fixed="$refs.cbTrigger" x-show="open" x-cloak>',
+          // `x-id` ist Pflicht und nicht bloss Kosmetik: `$id()` memoisiert pro
+          // ELEMENT und zieht ohne einen solchen Scope bei jedem Aufruf auf einem
+          // anderen Element eine neue Nummer. `aria-activedescendant` steht am
+          // <ul>, die `id` an jedem <li> (und im x-for je Zeile ein eigenes
+          // Element) — ohne die Klammer zeigt der Verweis auf eine ID, die es
+          // nicht gibt, und der Screenreader verliert die aktive Option. Der
+          // Scope sitzt am Dropdown, weil es beide Seiten umschliesst; pro
+          // Combobox-Instanz vergibt Alpine darin genau eine Nummer.
+          '<div class="combobox-dropdown" x-id="[\'cb-opt\']" :style="ddWidth ? { width: ddWidth } : {}" x-anchor:bottom-start.fixed="$refs.cbTrigger" x-show="open" x-cloak>',
           '  <input type="text" class="combobox-search" x-model="query" x-ref="cbInput"',
           '         :placeholder="$app.t(\'common.searchShort\')" role="searchbox" :aria-label="$app.t(\'common.searchShort\')">',
           '  <ul class="combobox-list" role="listbox"',

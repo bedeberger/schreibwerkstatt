@@ -10,7 +10,7 @@
 // Recherche-spezifischen Achsen (eigenes Tool-Set + Web-Suche, ohne
 // Seiten-Vorladen/Zitat-Validierung).
 
-const { db } = require('../../db/schema');
+const { db, getBookSettings } = require('../../db/schema');
 const { resolveProvider } = require('../../lib/ai');
 const { getPrompts, getBookPrompts, i18nError } = require('./shared');
 const { executeResearchTool, entityList } = require('./research-chat-tools');
@@ -41,7 +41,7 @@ const runResearchChatJob = makeAgenticChatJob({
   `).get(parseInt(sessionId), userEmail),
 
   async prepare({ session, userEmail, userToken, aiCfg, logger, jobSignal }) {
-    const { buildResearchChatAgentSystemPrompt, RESEARCH_CHAT_TOOLS, RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts(userEmail);
+    const { buildResearchChatAgentSystemPrompt, buildResearchChatTools, RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts(userEmail);
     const itemCount = db.prepare('SELECT COUNT(*) AS n FROM research_items WHERE book_id = ? AND archived = 0').get(session.book_id)?.n || 0;
     const { SYSTEM_BOOK_CHAT } = await getBookPrompts(session.book_id, userEmail);
     const maxToolIter = _maxToolIter();
@@ -51,16 +51,26 @@ const runResearchChatJob = makeAgenticChatJob({
     const entityCtx = { bookId: session.book_id, userEmail };
     const figures = entityList('figur', entityCtx);
     const locations = entityList('ort', entityCtx);
-    const baseSystemPrompt = buildResearchChatAgentSystemPrompt(session.book_name || '', itemCount, maxToolIter, figures, locations);
+    // Recherche-Profil des Buchs (Freitext + Domain-Eingrenzung). Geht doppelt in
+    // den Call: als Klartext in den System-Prompt UND als `allowed_domains` ans
+    // serverseitige web_search — nur das Werkzeug grenzt wirklich ein, nur der
+    // Prompt sagt dem Modell, DASS es eingegrenzt ist.
+    const bookSettings = getBookSettings(session.book_id, userEmail);
+    const researchProfile = {
+      text: bookSettings.research_profile || '',
+      domains: bookSettings.research_domains || [],
+    };
+    const baseSystemPrompt = buildResearchChatAgentSystemPrompt(session.book_name || '', itemCount, maxToolIter, figures, locations, researchProfile);
     // Per-Buch-Override (Buchtyp/Autoren-Freitext) als zusätzlichen Kontext anhängen.
     const systemPrompt = SYSTEM_BOOK_CHAT ? `${baseSystemPrompt}\n\n${SYSTEM_BOOK_CHAT}` : baseSystemPrompt;
 
     // Ohne Embedding-Endpunkt hat die Passagen-Suche keine Datenbasis — das
     // Werkzeug gar nicht erst anbieten, statt das Modell eine Runde an einen
     // garantierten Fehlschlag zu verlieren.
+    const allTools = buildResearchChatTools({ allowedDomains: researchProfile.domains });
     const tools = embed.isEnabled()
-      ? RESEARCH_CHAT_TOOLS
-      : RESEARCH_CHAT_TOOLS.filter(t => t.name !== 'search_research_passages');
+      ? allTools
+      : allTools.filter(t => t.name !== 'search_research_passages');
 
     return {
       systemPrompt,

@@ -82,6 +82,7 @@ const { reindexAllUserSources } = require('./routes/jobs/source-embed-index');
 const { reindexAllXrefs } = require('./lib/xref-index');
 const { scanAllBooks: scanAllMotifs } = require('./routes/jobs/motif-scan');
 const { anchorAllBooks: anchorAllBeats } = require('./routes/jobs/beat-anchor');
+const { anchorAllDraftFigures } = require('./routes/jobs/figur-anchor');
 const { scanAllBooks: scanAllLexicons } = require('./routes/jobs/lexicon-scan');
 const chatRouter = require('./routes/chat');
 const ideenRouter = require('./routes/ideen');
@@ -90,6 +91,7 @@ const sourcesRouter = require('./routes/sources');
 const xrefsRouter = require('./routes/xrefs');
 const plotRouter = require('./routes/plot');
 const motifsRouter = require('./routes/motifs');
+const werkbankRouter = require('./routes/werkbank');
 const bookSettingsRouter = require('./routes/booksettings');
 const userSettingsRouter = require('./routes/usersettings');
 const { router: proxiesRouter } = require('./routes/proxies');
@@ -539,6 +541,7 @@ app.use('/capture', require('./routes/capture'));
 app.use('/xrefs', xrefsRouter);
 app.use('/plot', plotRouter);
 app.use('/motifs', motifsRouter);
+app.use('/werkbank', werkbankRouter);
 app.use('/lexicon', require('./routes/lexicon'));
 app.use('/textsorte', require('./routes/textsorte'));
 app.use('/redaktion', require('./routes/redaktion'));
@@ -770,7 +773,8 @@ try {
       // Semantische Suche: Embedding-Indizes aller Bücher frisch halten. Reiht
       // pro Buch einen Job ein (Delta-Cache → nur geänderte Chunks neu
       // embeddet); nie-indizierte Bücher bekommen ihren Erst-Index. Danach den
-      // Motiv-Ist-Index + Plot-Beat-Verankerung nachziehen (motif-scan / beat-anchor
+      // Motiv-Ist-Index + Plot-Beat- + Figurenbogen-Verankerung nachziehen
+      // (motif-scan / beat-anchor / figur-anchor
       // pro Buch/User) — beide reihen sich hinter die Embed-Jobs ein und lesen den
       // frischen Index. Keiner ruft callAI; sie nutzen nur den Embedding-/FTS-Index.
       // Querverweis-Index nachziehen: holt Bestandsinhalte nach, die seit
@@ -783,7 +787,8 @@ try {
       reindexAllBooks()
         .then(() => scanAllMotifs())
         .then(() => anchorAllBeats())
-        .catch(e => logger.error('Cron Embedding-Reindex/Motiv-Scan/Beat-Anchor Fehler: ' + e.message));
+        .then(() => anchorAllDraftFigures())
+        .catch(e => logger.error('Cron Embedding-Reindex/Motiv-Scan/Beat-/Figur-Anchor Fehler: ' + e.message));
 
       // Quellen-PDF-Index zieht nach dem Buch-Index nach (eigene Tabelle, eigener
       // Job — user-skopiert, nicht buchskopiert). Delta-Cache hält billig, was

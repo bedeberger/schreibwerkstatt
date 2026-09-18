@@ -1,0 +1,173 @@
+'use strict';
+// Figuren-Verankerung (Figuren-Werkstatt, Ist-Index): findet die tatsächlichen
+// Fundstellen der geplanten psychologischen Kerne (want/need/wound/lie/bogen/
+// konflikt) im Buchtext und legt sie in draft_figure_occurrences ab (Full-
+// Replace pro Draft + Kern). Rein rückwärtsgewandt — liest bestehende Inhalte,
+// schreibt NIE in den Buchtext. Kein KI-Prompt/callAI: die Erkennung nutzt den
+// bereits vorhandenen Embedding-Index, genau wie motif-scan und beat-anchor.
+//
+// Der Query-Bau ist die eine inhaltliche Entscheidung hier: gefragt wird nach
+// dem KERN, nicht nach der Figur. Der Figurenname geht trotzdem mit hinein,
+// damit die Hybrid-Fusion ihn wörtlich trägt und die Semantik nicht in die
+// Wunden fremder Figuren läuft — aber er steht nicht allein, sonst käme jede
+// Seite zurück, auf der die Figur vorkommt (das beantwortet figure_appearances).
+
+const express = require('express');
+const {
+  makeJobLogger, updateJob, completeJob, failJob,
+  createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+} = require('./shared');
+const draftDb = require('../../db/draft-figures');
+const occDb = require('../../db/draft-figure-occurrences');
+const { extractPsychologie, PSYCHE_KERNE } = require('../../lib/draft-mindmap-extract');
+const appSettings = require('../../lib/app-settings');
+const embed = require('../../lib/embed');
+const { semanticQuery } = require('../../lib/semantic-retrieval');
+const { toIntId } = require('../../lib/validate');
+const { setContext } = require('../../lib/log-context');
+const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const logger = require('../../logger');
+
+const figurAnchorRouter = express.Router();
+
+// Fund-Kinds im Text — genau die, die draft_figure_occurrences via CHECK erlaubt.
+const SCAN_KINDS = ['page', 'scene'];
+const TOP_K = 25;
+
+const _TAG = /<\/?[^>]+>/g;
+const _ENT = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
+function _plainSnippet(s) {
+  return String(s || '').replace(_TAG, '').replace(/&(amp|lt|gt|quot|#39);/g, m => _ENT[m] || m).trim().slice(0, 400);
+}
+
+function _occKey(kind, entityId) { return `${kind}:${entityId}`; }
+function _toOcc(kind, entityId, score, snippet, source) {
+  const isPage = kind === 'page';
+  return { kind, pageId: isPage ? entityId : null, sceneId: isPage ? null : entityId, score, snippet, source };
+}
+
+// Query eines Kerns: Figurenname + die vom Autor formulierten Kern-Zeilen.
+// Mehrere Zeilen unter einem Container werden zu EINER Anfrage verbunden — sie
+// beschreiben denselben Kern aus verschiedenen Winkeln, und getrennte Anfragen
+// würden dieselben Stellen mehrfach zurückgeben.
+function _kernQuery(draftName, zeilen) {
+  const kernText = (zeilen || []).map(s => String(s || '').trim()).filter(Boolean).join('. ');
+  if (!kernText) return '';
+  return `${String(draftName || '').trim()}. ${kernText}`.trim();
+}
+
+// Fundstellen EINES Kerns sammeln. Dedup pro (kind, entity) — ein Ort zählt
+// einmal je Kern (über Kerne hinweg darf dieselbe Seite mehrfach stehen: sie
+// trägt dann Wunde UND Lüge, und genau das soll das Verlaufsband zeigen).
+//
+// Ohne Embedding-Backend läuft hier NICHTS: ein Kern ist eine Bedeutung
+// („sie glaubt, nur ihre Leistung macht sie wertvoll"), keine Zeichenfolge —
+// eine wörtliche Suche darüber liefert Zufallstreffer. Das ist der bewusste
+// Unterschied zum Motiv-Scan, der wörtliche `trigger_terms` hat, und zum
+// Beat-Anchor, dessen Titel wenigstens Eigennamen trägt.
+async function _anchorKern(bookId, query, signalFn, minScore) {
+  if (!query) return [];
+  const found = new Map();
+  const hits = await semanticQuery(bookId, query, { kinds: SCAN_KINDS, topK: TOP_K, signal: signalFn() });
+  for (const h of hits) {
+    if (h.score == null) continue;                  // reine FTS-Fusions-Kandidaten: kein Konfidenzwert
+    if (minScore > 0 && h.score < minScore) continue;
+    found.set(_occKey(h.kind, h.entity_id), _toOcc(h.kind, h.entity_id, h.score, _plainSnippet(h.text), 'semantic'));
+  }
+  return [...found.values()];
+}
+
+async function runFigurAnchorJob(jobId, bookId, userEmail) {
+  const log = makeJobLogger(jobId);
+  try {
+    const signal = () => jobAbortControllers.get(jobId)?.signal;
+    const throwIfAborted = () => {
+      if (signal()?.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
+    };
+
+    if (!embed.isEnabled()) {
+      // Kein stiller Teil-Erfolg: ohne Semantik gibt es zu dieser Frage keine
+      // Antwort, und ein leerer Index wäre als „nichts im Buch" lesbar.
+      completeJob(jobId, { drafts: 0, occurrences: 0, semantic: false }, null, 'kein Embedding-Backend');
+      return;
+    }
+
+    const floor = Number(appSettings.get('werkstatt.anchor.min_score')) || 0;
+    const drafts = draftDb.listDraftFigures(bookId, userEmail);
+
+    updateJob(jobId, {
+      statusText: 'job.phase.figurAnchor',
+      statusParams: { done: 0, total: drafts.length }, progress: 5,
+    });
+
+    let totalOcc = 0, scanned = 0;
+    for (let i = 0; i < drafts.length; i++) {
+      throwIfAborted();
+      const draft = drafts[i];
+      const psy = extractPsychologie(draft.mindmap);
+      if (!psy) {
+        // Kein ausgearbeiteter Kern → Index dieses Drafts räumen, sonst bliebe
+        // ein Bogen stehen, den die Mindmap nicht mehr behauptet.
+        occDb.clearDraftOccurrences(draft.id);
+      } else {
+        scanned++;
+        for (const kern of PSYCHE_KERNE) {
+          throwIfAborted();
+          const rows = await _anchorKern(bookId, _kernQuery(draft.name, psy[kern]), signal, floor);
+          occDb.replaceKernOccurrences(draft.id, bookId, kern, rows);
+          totalOcc += rows.length;
+        }
+      }
+      updateJob(jobId, {
+        statusText: 'job.phase.figurAnchor',
+        statusParams: { done: i + 1, total: drafts.length },
+        progress: 5 + Math.round(((i + 1) / Math.max(drafts.length, 1)) * 90),
+      });
+    }
+
+    log.info(`Figur-Anchor ${bookId}: ${scanned}/${drafts.length} Drafts mit Kernen, ${totalOcc} Fundstellen.`);
+    completeJob(jobId, { drafts: scanned, occurrences: totalOcc, semantic: true }, null,
+      `${scanned} Figuren, ${totalOcc} Fundstellen`);
+  } catch (e) {
+    if (e.name !== 'AbortError') log.error(`Figur-Anchor Fehler: ${e.message}`, { stack: e.stack });
+    failJob(jobId, e);
+  }
+}
+
+// Nacht-Cron: hält den Ist-Index aller Bücher/User frisch (nach dem embed-
+// Reindex, wie motif-scan und beat-anchor). Ein Anchor pro (Buch, User) mit
+// Drafts; Dedup gegen laufende Jobs.
+const { db } = require('../../db/schema');
+async function anchorAllDraftFigures() {
+  if (!embed.isEnabled()) {
+    logger.info('Figur-Anchor (Cron): uebersprungen (kein Embedding-Backend).');
+    return { enqueued: 0, skipped: 0 };
+  }
+  const scopes = db.prepare('SELECT DISTINCT book_id, user_email FROM draft_figures').all();
+  let enqueued = 0, skipped = 0;
+  for (const { book_id, user_email } of scopes) {
+    if (findActiveJobId('figur-anchor', book_id, user_email)) { skipped++; continue; }
+    const jobId = createJob('figur-anchor', book_id, user_email, 'job.label.figurAnchor', null, book_id);
+    enqueueJob(jobId, () => runFigurAnchorJob(jobId, book_id, user_email));
+    enqueued++;
+  }
+  logger.info(`Figur-Anchor (Cron): ${enqueued} Scope(s) eingereiht, ${skipped} uebersprungen (laeuft bereits).`);
+  return { enqueued, skipped };
+}
+
+figurAnchorRouter.post('/figur-anchor', jsonBody, (req, res) => {
+  const book_id = toIntId(req.body?.book_id);
+  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: book_id });
+  try { requireBookAccess(req, book_id, 'editor'); }
+  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  const userEmail = sessionEmail(req);
+  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  const existing = findActiveJobId('figur-anchor', book_id, userEmail);
+  if (existing) return res.json({ jobId: existing, existing: true });
+  const jobId = createJob('figur-anchor', book_id, userEmail, 'job.label.figurAnchor', null, book_id);
+  enqueueJob(jobId, () => runFigurAnchorJob(jobId, book_id, userEmail));
+  res.json({ jobId });
+});
+
+module.exports = { figurAnchorRouter, runFigurAnchorJob, anchorAllDraftFigures };

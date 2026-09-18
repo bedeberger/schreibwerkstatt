@@ -52,6 +52,10 @@
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
+  /* `font: inherit` setzt die font-size mit zurueck und erbt damit den
+     Browser-Default (16px) statt der App-Buttongroesse — die Klasse gewinnt
+     gegen den globalen `button`-Selektor. Darum hier explizit nachziehen. */
+  font-size: var(--font-size-base);
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }

@@ -1,5 +1,6 @@
 // Teil von appViewMethods (siehe Facade app-view.js).
 import { fetchJson } from './_shared.js';
+import { isOpenIdee } from '../../book/ideen-shared.js';
 
 export const badgesMethods = {
 
@@ -12,7 +13,9 @@ export const badgesMethods = {
         fetchJson(`/chat/sessions/${pageId}`).catch(() => []),
       ]);
       if (this.currentPage?.id !== pageId) return;
-      const openCount = (Array.isArray(ideen) ? ideen : []).filter(i => !i.erledigt).length;
+      // „Offen" = offen ODER in_arbeit (SSoT ideen-shared.js). Eine verworfene
+      // Idee ist keine offene Pendenz und setzt darum keine Plakette.
+      const openCount = (Array.isArray(ideen) ? ideen : []).filter(isOpenIdee).length;
       this.currentPageIdeenOpenCount = openCount;
       // Recherche-Count aus der buchweit geladenen Map (kein Extra-Request);
       // wird bei Link-Änderungen in der Recherche-Karte frisch gehalten.

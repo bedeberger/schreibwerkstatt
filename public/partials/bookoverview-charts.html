@@ -56,9 +56,15 @@
 
 <!-- Sparkline mit Gradient-Fill + farb-codiert + Endpunkt-Marker.
      SVG ist aria-hidden — Trend-Prozent darunter trägt die Info,
-     das Tile selbst hat ein zusammenfassendes aria-label. -->
+     das Tile selbst hat ein zusammenfassendes aria-label.
+     `x-id` ist Pflicht: `$id()` memoisiert pro ELEMENT und zieht ohne einen
+     solchen Scope bei jedem weiteren Aufruf eine neue Nummer. Der Verlauf und
+     das `url(#…)` der Fläche stehen auf zwei verschiedenen Elementen — ohne die
+     Klammer zeigt die Füllung auf eine ID, die es nicht gibt, und bleibt
+     unsichtbar. -->
 <template x-if="!overviewIsFinished && overviewSparkline().d">
   <div class="overview-tile internal-link"
+       x-id="['sl-grad']"
        @click="_openLengthStats(30, 'chars')"
        :aria-label="$app.t('overview.trend') + ', ' + $app.t('overview.trendDelta', { pct: (overviewSparkline().deltaPct >= 0 ? '+' : '') + overviewSparkline().deltaPct })">
     <div class="overview-tile-label" x-text="$app.t('overview.trend')"></div>

@@ -33,6 +33,9 @@ export const rechercheBoardMethods = {
       this.errorMessage = '';
       this._loadTags();
       this.ensureLinkTargets();
+      // Ideen-Plaketten (eigene Pendenzen an einem Fundstueck) — non-fatal und
+      // ohne await: eine fehlende Nebenlesung darf das Board nicht aufhalten.
+      this.loadIdeaBacklinks('research');
     } catch (e) {
       this.errorMessage = app.t('recherche.error.load');
       this.items = [];

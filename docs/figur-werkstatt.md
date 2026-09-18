@@ -137,6 +137,39 @@ Beide Jobs grundieren zusätzlich mit der **geplanten Handlung der Figur** aus d
 
 **Navigation Werkstatt → Plot (Badge):** `loadPlotUsage()` (in [crud.js](../public/js/figur-werkstatt/crud.js), nach `selectDraft`) holt `GET /plot/figure-usage?book_id=&draft_id=` → `{ beatCount, activeBeatCount, threads }`. Das klickbare Badge `.badge--plot` im Detail-Header (`plotUsageVisible/Label/Tip`) öffnet via `$app.openPlotForDraftFigure(draftId)` das Beat-Board, gefiltert auf diese Figur (`plot:filter-draft-figure`-Event). State `plotUsage` wird bei Draft-Wechsel/Reset/Delete genullt.
 
+## Bogen im Buch (Ist-Index + Messung)
+
+Das Pendant zum Kapitel-Verlaufsband der Motiv-Werkstatt und zum Drift-Badge der Plot-Werkstatt — und der Schritt, den die Figuren-Werkstatt als letzte der drei gegangen ist: **ein Plan ist erst dann etwas wert, wenn ihm eine Messung gegen den geschriebenen Text gegenübersteht.**
+
+**Was gemessen wird:** die sechs psychologischen Kerne der Mindmap (`want`/`need`/`wound`/`lie`/`bogen`/`konflikt`, SSoT `PSYCHE_KERNE` in [lib/draft-mindmap-extract.js](../lib/draft-mindmap-extract.js)) gegen den Buchtext. Nicht „kommt die Figur vor" — das beantwortet `figure_appearances` längst —, sondern **wo über den Buchbogen ihre Wunde trägt und wo ihre Lüge bricht**. Ein Bogen ist eine Verteilung, keine Zahl; darum eine Zeile pro Kern und Fundstelle.
+
+- **Ist-Index `draft_figure_occurrences`** (Migration 285, DB-Modul [db/draft-figure-occurrences.js](../db/draft-figure-occurrences.js)): `draft_id` CASCADE, `book_id` CASCADE, `kern` als CHECK-gated Diskriminator, `kind` page/scene sentinel-frei. Full-Replace **pro (Draft, Kern)** je Anchor-Lauf; abgeleitet, nie handgepflegt. Kapitel-Auflösung wortgleich mit [db/motifs/occurrences.js](../db/motifs/occurrences.js) — Zellzahl und ihre Auflösung müssen dieselbe Frage stellen.
+- **Job `figur-anchor`** ([routes/jobs/figur-anchor.js](../routes/jobs/figur-anchor.js)) — **kein `callAI`/Prompt**, Klon des `motif-scan`/`beat-anchor`-Musters. Query je Kern = Figurenname + die vom Autor formulierten Kern-Zeilen (der Name trägt die Hybrid-Fusion wörtlich, damit die Semantik nicht in fremde Wunden läuft; allein stünde er für „kommt vor"). Buchweit, nicht pro Figur — ein Lauf pro Draft wäre eine Job-Flut. Nacht-Cron `anchorAllDraftFigures` hinter `beat-anchor`. Score-Floor `werkstatt.anchor.min_score` (Default 0.35, höher als `embed.min_score`: ein Kern ist eine Bedeutung, und schwache Treffer sind dort systematisch Zufall).
+- **Ohne Embedding-Backend läuft NICHTS** — bewusster Unterschied zu `motif-scan` (hat wörtliche `trigger_terms`) und `beat-anchor` (dessen Titel wenigstens Eigennamen trägt). Der Job endet mit `semantic: false` statt einen leeren Index zu schreiben, der als „nichts im Buch" lesbar wäre.
+- **Messung `lib/figure-arc.js`** — pure Rechnung, `quelle: 'messung'` wie [lib/motif-consistency.js](../lib/motif-consistency.js). Vier Codes: `kernOhneText` (geplant, im Text nirgends — nur wenn die Figur sonst im Buch steht), `kernNurPunktuell` (ein einziges Kapitel), `wandelOhneEinloesung` (Lüge/Wunde im Schlussdrittel so dicht wie im Kopfdrittel — der häufigste stille Fehler) und `bogenOhneBeleg`. Die Verteilung wiegt **Fundstellen, nicht Kapitel**; `bogenOhneBeleg` verdrängt den allgemeinen Befund für `bogen` (keine doppelte Buchführung). Gegated: [tests/unit/figure-arc.test.mjs](../tests/unit/figure-arc.test.mjs).
+- **Pflicht-Invariante: UNGESCANNT IST UNGEPRÜFT, NICHT ABWESEND.** Leerer Index ⇒ `scanned: false` und **keine** Befunde; das Band zeigt seinen „noch nicht verankert"-Hinweis statt einer Tabelle aus Nullen, die wie ein Befund aussähe. Gleiches Muster wie `motif_occurrences` und `anchorMap === null` im Plot-Check.
+- **Route** `GET /draft-figures/:book_id/arc` liefert Ist-Zahlen, Kapitel-Aufschlüsselung **und** Befunde in EINER Antwort — dieselbe Liste, die die [Werkbank](werkbank.md) liest; ein zweiter Lesepfad zeigte zwei Bestände. Dazu `GET /draft-figures/by-id/:id/occurrences[?kern=]` fürs Zell-Detail.
+- **Frontend** [public/js/figur-werkstatt/bogen.js](../public/js/figur-werkstatt/bogen.js) + [werkstatt-bogen.html](../public/partials/werkstatt-bogen.html): Kern × Kapitel als Heatmap über das geteilte `.heatmap-*`-Vokabular, √-gedämpft mit Boden 14 % — **wortgleich mit dem Motiv-Band, damit dieselbe Färbung in beiden Karten dasselbe heisst**. Zeilen sind nur die GEPLANTEN Kerne (ein nicht ausgearbeiteter Kern ist keine leere Zeile, sondern keine Zeile). Zell-Klick löst die Fundstellen auf, Klick darin springt an die Textstelle.
+
+## Cross-Feature: Motiv-Werkstatt
+
+Beide Jobs bekommen zusätzlich die **Motive dieser Figur** (`_loadFigurMotive` → `motifsDb.figureMotifUsage`, Prompt-Block `MOTIVE DIESER FIGUR` in [prompts/figur-werkstatt.js](../public/js/prompts/figur-werkstatt.js)#`_motiveLines`). Die Gegenrichtung zum Figuren-Layer der Konstellation: `motif_draft_figures` existiert seit je, aber nur die Motiv-Werkstatt las sie.
+
+- Quelle sind **zwei Brücken**: `motif_draft_figures` (Werkstatt) und `motif_figures` über die Quell-Figur — ein importierter Draft erbt damit die Motive des Katalog-Eintrags, sonst hinge dieselbe Figur je nach Herkunft an zwei Motiv-Mengen.
+- Die **Ist-Zahl geht nur mit, wenn der Motiv-Scan gelaufen ist** (`hasOccurrences`): „0 Fundstellen" wäre sonst eine Falschaussage über einen nie erhobenen Index.
+- **Consistency** bekommt den Prüfpunkt *Figur vs. ihre Motive* (widerspricht ein Motiv dem Subtext? fehlt dem zentralen Motiv die Verankerung in der Innenwelt?); **Brainstorm** eine Regel-Bullet (Ideen sollen die Motive bedienen oder brechen, nicht an ihnen vorbeigehen).
+- **Badge** `.badge--motiv` im Detail-Header (`GET /motifs/figure-usage`), Klick öffnet die Konstellation beim ersten Motiv. Der Tooltip nennt **geplant UND belegt** — „geplant" ist nicht „trägt", und ein Badge nur mit der Planzahl verschwiege genau den Unterschied.
+
+## Nachträgliche Verknüpfung mit dem Figuren-Katalog
+
+`POST /draft-figures/by-id/:id/link-figure { figureId }` setzt `source_figure_id` nachträglich (`figureId: null` löst wieder); `GET /draft-figures/:book_id/link-candidates` liefert die Katalog-Figuren des Buchs, die an keinem Draft hängen.
+
+**Why:** die Werkstatt entwickelt eine Figur **vorwärts**, die Komplettanalyse extrahiert sie **rückwärts** aus dem geschriebenen Text. Wer erst plant und dann schreibt, hat sie danach zwangsläufig zweimal — und jede Brücke im Haus führt seither zwei Spalten (`plot_beat_figures` + `plot_beat_draft_figures`, `motif_figures` + `motif_draft_figures`), jede Combobox zwei Gruppen. Der Zeiger löst das **zur Lesezeit** auf, ohne eine der beiden Zeilen zu töten.
+
+**Bewusst kein Promotion-Pfad** (ein Draft wird nie zur Katalog-Figur): `figures` ist der abgeleitete Index der Komplettanalyse und überschriebe eine hineingeschriebene Zeile beim nächsten Lauf. Gesetzt wird nur ein Zeiger — dieselbe Haltung wie [db/entity-merge.js](../db/entity-merge.js) beim Verschmelzen zweier Katalog-Zeilen: Referenzen umhängen, nichts erfinden.
+
+Pflicht: **bestätigt wird von Hand** (Namensgleichheit ist bloss vorausgewählt — ein automatisch gesetzter Zeiger wäre eine Behauptung über zwei Figuren, die nur der Autor treffen kann), eine Katalog-Figur hängt an **höchstens einem** Draft (`409 ALREADY_IMPORTED` sonst, wie beim Import), und der Owner-Check verbietet Pre-Migration-Figuren mit `user_email IS NULL` (kein Zeiger ohne reverse-Owner-Pfad). Der Lesepfad liefert zusätzlich `source_fig_id` (die TEXT-`fig_id` der Quelle) — das ist die Identität, mit der Frontend und Werkbank Katalog-Figuren adressieren.
+
 ## Run-Historie
 
 `werkstatt_runs` listet alle KI-Läufe pro Draft. Frontend rendert zwei klappbare Sektionen (brainstorm + consistency) mit `created_at DESC`. Re-Open lädt `result_json`; bei Brainstorm prüft Apply client-seitig, ob `knoten_id` noch existiert (Mindmap kann sich seit dem Lauf geändert haben).

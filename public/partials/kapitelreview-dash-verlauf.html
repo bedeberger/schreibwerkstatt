@@ -1,0 +1,73 @@
+<!--
+  Kapitel-Entwicklung — Groesse des Kapitels ueber die Zeit, aus den
+  Seitenfassungen (`page_revisions`). Kein KI-Call, kein eigener Index.
+  Compute: public/js/cards/kapitel-growth.js, Methode `kdGrowth()`.
+  Als Fragment eingebunden (`@include`), weil das Dashboard-Raster in einem
+  <template> liegt — dort greift der `partial-<name>`-Platzhalter nicht.
+-->
+<template x-if="kdGrowth()">
+  <!-- `x-id` ist Pflicht, nicht Zierde: ohne die Klammer liefert `$id('kd-grow')`
+       bei JEDEM Aufruf einen neuen Wert — die Flaeche zeigte dann auf einen
+       Verlauf, den es nicht gibt, und bliebe unsichtbar. -->
+  <div class="overview-tile overview-tile--wide kapitel-dash-growth"
+       x-id="['kd-grow']"
+       :aria-label="$app.t('kapitelReview.dash.growth') + ': '
+         + (kdGrowth().net >= 0 ? '+' : '−') + _fmtNum(Math.abs(kdGrowth().net))
+         + ' ' + $app.t('bookstats.unit.z')">
+    <div class="overview-tile-head">
+      <span class="overview-tile-label"
+            :data-tip="$app.t('kapitelReview.dash.growthTip')"
+            x-text="$app.t('kapitelReview.dash.growth')"></span>
+      <span class="overview-tile-median"
+            x-text="$app.t('kapitelReview.dash.growthSince', { date: kdDateLabel(kdGrowth().firstIso) })"></span>
+    </div>
+
+    <div class="overview-sparkline-wrap">
+      <!-- viewBox literal, NICHT gebunden: der HTML-Parser schreibt Attributnamen
+           klein, ein `:viewBox` landete als wirkungsloses `viewbox` im SVG.
+           Die Zahlen sind die Vorgaben von growthGeometry() — Drift ist in
+           tests/unit/chapter-growth.test.mjs gegated. -->
+      <svg class="overview-sparkline" viewBox="0 0 480 96"
+           preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient :id="$id('kd-grow')" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   :style="'stop-color:' + kdGrowth().color + ';stop-opacity:0.3'"></stop>
+            <stop offset="100%" :style="'stop-color:' + kdGrowth().color + ';stop-opacity:0'"></stop>
+          </linearGradient>
+        </defs>
+        <path :d="kdGrowth().geometry.area" :fill="'url(#' + $id('kd-grow') + ')'" stroke="none"></path>
+        <path :d="kdGrowth().geometry.d" fill="none" :stroke="kdGrowth().color"
+              stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"></path>
+        <circle :cx="kdGrowth().geometry.endX" :cy="kdGrowth().geometry.endY" r="2.2"
+                :fill="kdGrowth().color"></circle>
+      </svg>
+      <div class="overview-sparkline-hover" aria-hidden="true">
+        <template x-for="(p, i) in kdGrowth().points" :key="p.iso + ':' + i">
+          <div class="overview-sparkline-hover-col" :data-tip="p.label">
+            <span class="overview-sparkline-tick" aria-hidden="true"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="kapitel-dash-foot">
+      <span class="overview-trend-pct"
+            :class="kdGrowth().net > 0 ? 'overview-trend-pct--up'
+                  : kdGrowth().net < 0 ? 'overview-trend-pct--down' : ''"
+            x-text="(kdGrowth().net >= 0 ? '+' : '−') + _fmtNum(Math.abs(kdGrowth().net))
+                    + ' ' + $app.t('bookstats.unit.z')"></span>
+      <span class="kapitel-dash-foot-label" x-text="$app.t('kapitelReview.dash.growthStart')"></span>
+      <span class="kapitel-dash-foot-value"
+            x-text="_fmtNum(kdGrowth().startChars) + ' ' + $app.t('bookstats.unit.z')"></span>
+      <span class="kapitel-dash-foot-label" x-text="$app.t('kapitelReview.dash.growthLast')"></span>
+      <span class="kapitel-dash-foot-value" x-text="kdDateLabel(kdGrowth().lastChangeIso)"></span>
+      <!-- Seiten ohne Fassungs-Historie werden benannt, nicht verschwiegen:
+           sie stecken als konstanter Sockel in der Kurve. -->
+      <span class="kapitel-dash-foot-label" x-show="kdGrowth().untrackedPages > 0" x-cloak
+            :data-tip="$app.t('kapitelReview.dash.growthUntrackedTip')"
+            x-text="kdGrowth().untrackedPages === 1
+              ? $app.t('kapitelReview.dash.growthUntrackedOne')
+              : $app.t('kapitelReview.dash.growthUntracked', { n: kdGrowth().untrackedPages })"></span>
+    </div>
+  </div>
+</template>

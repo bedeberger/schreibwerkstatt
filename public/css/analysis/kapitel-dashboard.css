@@ -150,6 +150,18 @@
   white-space: nowrap;
 }
 
+/* ── Entwicklung (Groesse ueber die Zeit) ─────────────────────────────────
+   Kurve, Hover-Spalten und Trend-Prozent kommen aus book-overview/stats.css
+   (`.overview-sparkline*`, `.overview-trend-pct`) und werden hier NICHT
+   nachgebaut. Eigen ist nur die Hoehe: die Kachel ist breit und traegt einen
+   Verlauf ueber Monate, nicht die 30-Tage-Sparkline der Uebersicht. */
+.kapitel-dash-growth .overview-sparkline {
+  height: 84px;
+}
+.kapitel-dash-growth .kapitel-dash-foot {
+  margin-top: var(--space-6);
+}
+
 /* Schmales Tile (Mobile / Single-Span): die Rangliste verliert die feste
    Namensspalte, sonst wird der Balken zum Strich. */
 @container (max-width: 380px) {

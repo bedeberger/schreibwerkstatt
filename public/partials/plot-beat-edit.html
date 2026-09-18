@@ -1,0 +1,165 @@
+<!-- Beat-Karte, Bearbeiten-Modus. Aus plot-beat-cell.html herausgeloest, weil
+     das gemeinsame Markup sonst ueber dem HTML-Partial-LOC-Limit laege; es ist
+     derselbe Fragment-Include (rekursiv aufgeloest) und damit weiterhin EINE
+     Fassung fuer flaches Board und Grid. -->
+<!-- Bearbeiten -->
+<template x-if="editingBeatId === beat.id">
+  <!-- Klick ausserhalb speichert den Beat und schliesst ihn. Guard editingBeatId
+       === beat.id: beim Wechsel auf einen anderen Beat hat dessen startEditBeat
+       den Wert schon umgesetzt, sodass dieser alte Handler nicht gegen-speichert.
+       (Escape verwirft weiterhin via cancelEditBeat.) -->
+  <div class="plot-beat-edit"
+       @keydown="onBeatEditKeydown($event, beat)"
+       @click.outside="editingBeatId === beat.id && commitEditBeat(beat)">
+    <input type="text" class="plot-beat-edit-titel" x-model="beatDraft.titel"
+           data-spellcheck="spelling" :placeholder="$app.t('plot.beat.titelPlaceholder')"
+           @keydown.enter.prevent="commitEditBeat(beat)">
+    <textarea class="plot-beat-edit-desc" x-model="beatDraft.beschreibung" rows="3"
+              data-spellcheck="spelling" :placeholder="$app.t('plot.beat.descPlaceholder')"></textarea>
+    <div class="tabs plot-status-tabs" role="group" :aria-label="$app.t('plot.beat.statusLabel')">
+      <template x-for="s in statusList()" :key="s">
+        <button type="button" class="tabs-btn"
+                :class="{ ['plot-status-seg--' + s]: true, 'tabs-btn--active': beatDraft.status === s }"
+                @click="beatDraft.status = s"
+                x-text="$app.t('plot.status.' + s)"></button>
+      </template>
+    </div>
+    <label class="plot-edit-label" x-text="$app.t('plot.beat.intensitaet')"></label>
+    <div class="plot-intensity" role="group" :aria-label="$app.t('plot.beat.intensitaet')">
+      <template x-for="n in intensitaetScale()" :key="n">
+        <button type="button" class="plot-intensity-step"
+                :class="{ 'plot-intensity-step--on': beatDraft.intensitaet && n <= beatDraft.intensitaet }"
+                @click="setBeatDraftIntensitaet(n)"
+                :data-tip="$app.t('plot.beat.intensitaetTip')"
+                :aria-pressed="beatDraft.intensitaet === n ? 'true' : 'false'"
+                x-text="n"></button>
+      </template>
+    </div>
+    <label class="plot-edit-label" x-text="$app.t('plot.beat.chapter')"></label>
+    <div x-data="entityPicker({ entity: 'chapter', placeholder: $app.t('plot.beat.chapterPlaceholder'), emptyLabel: $app.t('plot.beat.noChapter') })"
+         x-modelable="value" x-model="beatDraft.chapter_id"></div>
+    <!-- Erzaehlte Zeit: Freitext wie das Datum eines Lebensereignisses („Sommer
+         1987" so oft wie ein Datum). Die Jahreszahl zieht derselbe Parser heraus
+         wie ueberall sonst; kein numInput, weil der Wert keine Zahl IST. -->
+    <label class="plot-edit-label" x-text="$app.t('plot.beat.zeit')"></label>
+    <input type="text" class="plot-edit-input" x-model="beatDraft.zeit"
+           data-spellcheck="spelling"
+           :placeholder="$app.t('plot.beat.zeitPlaceholder')">
+    <!-- Figuren: eine Combobox, zwei Quellen als opt-Gruppen (Katalog =
+         Komplettanalyse, Werkstatt = Plotwerkstatt-Drafts) — spart Platz wie in
+         der Motiv-Werkstatt. Wert trägt Präfix fig:/draft:, addBeatFigureLink
+         legt in der richtigen Draft-Liste an. -->
+    <label class="plot-edit-label" x-show="$store.catalog.figuren.length || draftFiguren.length"
+           x-text="$app.t('plot.beat.figuren')"></label>
+    <div x-show="$store.catalog.figuren.length || draftFiguren.length"
+         x-data="combobox({ placeholder: $app.t('plot.beat.figurenPick'), transient: true })"
+         x-effect="options = [
+           ...($store.catalog.figuren||[]).map(f=>({value:'fig:'+f.id, label:(f.kurzname||f.name), group:$app.t('plot.beat.figureGroup.katalog')})),
+           ...(draftFiguren||[]).map(d=>({value:'draft:'+d.id, label:d.name, group:$app.t('plot.beat.figureGroup.werkstatt')}))
+         ]"
+         @combobox-change="addBeatFigureLink($event.detail)"></div>
+    <div class="plot-fig-chips" x-show="beatFigureChips().length || beatWerkstattChips().length">
+      <template x-for="chip in beatFigureChips()" :key="chip.id">
+        <span class="tag plot-fig-chip">
+          <span x-text="chip.label"></span>
+          <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                  @click="toggleBeatDraftFigure(chip.id)">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+          </button>
+        </span>
+      </template>
+      <template x-for="chip in beatWerkstattChips()" :key="'d' + chip.id">
+        <span class="tag tag--werkstatt plot-fig-chip">
+          <span x-text="chip.label"></span>
+          <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                  @click="toggleBeatDraftWerkstattFigure(chip.id)">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+          </button>
+        </span>
+      </template>
+    </div>
+    <!-- Motive (Motiv-Werkstatt): schreibt in dieselbe motif_beats-Brücke. Nur sichtbar,
+         wenn der Motiv-Katalog des Buchs Einträge hat. -->
+    <label class="plot-edit-label" x-show="motifsCatalog.length" x-text="$app.t('plot.beat.motifs')"></label>
+    <div x-show="motifsCatalog.length"
+         x-data="entityPicker({ entity: 'custom', multiple: true, placeholder: $app.t('plot.beat.motifPick'), items: () => beatMotifOptions() })"
+         x-modelable="value" x-model="beatDraft.motif_ids"></div>
+    <div class="plot-fig-chips" x-show="beatMotifChips().length">
+      <template x-for="chip in beatMotifChips()" :key="'m' + chip.id">
+        <span class="tag tag--motif plot-fig-chip">
+          <span x-text="chip.label"></span>
+          <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                  @click="toggleBeatDraftMotif(chip.id)">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+          </button>
+        </span>
+      </template>
+    </div>
+    <!-- Schauplaetze (plot_beat_locations): WO der Handlungspunkt spielt. Vierte
+         Bruecke neben Katalog-Figur, Werkstatt-Figur und Motiv; nur sichtbar,
+         wenn das Buch ueberhaupt Orte katalogisiert hat. -->
+    <label class="plot-edit-label" x-show="$store.catalog.orte.length" x-text="$app.t('plot.beat.orte')"></label>
+    <div x-show="$store.catalog.orte.length"
+         x-data="entityPicker({ entity: 'ort', multiple: true, placeholder: $app.t('plot.beat.ortPick') })"
+         x-modelable="value" x-model="beatDraft.location_ids"></div>
+    <div class="plot-fig-chips" x-show="beatOrtChips().length">
+      <template x-for="chip in beatOrtChips()" :key="'l' + chip.id">
+        <span class="tag tag--ort plot-fig-chip">
+          <span x-text="chip.label"></span>
+          <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                  @click="toggleBeatDraftOrt(chip.id)">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+          </button>
+        </span>
+      </template>
+    </div>
+    <!-- Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff): Typ + Ziel-Beat wählen,
+         sofort persistiert (eigene Achse neben dem Draft-Save). Nur sinnvoll ab 2 Beats. -->
+    <label class="plot-edit-label" x-show="beats.length > 1" x-text="$app.t('plot.relation.label')"></label>
+    <div class="plot-rel-editor" x-show="beats.length > 1">
+      <div class="plot-rel-add">
+        <div class="plot-rel-typ"
+             x-data="combobox({ placeholder: $app.t('plot.relation.typPick') })"
+             x-modelable="value" x-model="relDraftTyp"
+             x-effect="options = relationTypes().map(tp => ({ value: tp, label: relTypeLabel(tp) }))"></div>
+        <div class="plot-rel-target"
+             x-data="combobox({ placeholder: $app.t('plot.relation.targetPick') })"
+             x-modelable="value" x-model="relDraftTarget"
+             x-effect="options = relTargetOptions(beat)"></div>
+        <button type="button" class="btn-compact" :disabled="busy || !relDraftTyp || !relDraftTarget"
+                @click="addBeatRelation(beat)" x-text="$app.t('plot.relation.add')"></button>
+      </div>
+      <div class="plot-fig-chips" x-show="beatRelationsOut(beat).length">
+        <template x-for="rel in beatRelationsOut(beat)" :key="rel.id">
+          <span class="tag plot-fig-chip plot-rel-chip">
+            <span x-text="relTypeLabel(rel.typ) + ' → ' + rel.to_titel"></span>
+            <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
+                    @click="deleteBeatRelationById(rel.id)">
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+            </button>
+          </span>
+        </template>
+      </div>
+    </div>
+    <div class="plot-beat-edit-actions">
+      <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditBeat(beat)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+      </button>
+      <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="cancelEditBeat()" :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+      </button>
+      <span class="action-sep" aria-hidden="true"></span>
+      <!-- Verwerfen ist eine eigene Achse (Flag), kein Status — sofort persistiert. -->
+      <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-beat-discard"
+              :class="{ 'is-active': beat.verworfen }"
+              @click="toggleBeatVerworfen(beat)"
+              :data-tip="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')"
+              :aria-label="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')">
+        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=691#' + (beat.verworfen ? 'rotate-ccw' : 'minus')"/></svg>
+      </button>
+      <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger plot-beat-delete" @click="deleteBeat(beat)" :data-tip="$app.t('plot.beat.delete')" :aria-label="$app.t('plot.beat.delete')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+      </button>
+    </div>
+  </div>
+</template>

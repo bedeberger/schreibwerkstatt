@@ -63,6 +63,20 @@
 }
 .export-create-clone > .combobox-wrap { min-width: 180px; }
 
+/* === Vorlagen-Zeile (eingeklappt unter der Profil-Leiste) ===
+   Auswahl einer Gestaltungs-Vorlage + erklaerender Satz darunter. Eigene Zeile
+   statt einer dritten Spalte in `.export-create-row`: die Beschreibung gehoert
+   unter die Auswahl, nicht neben den Uebernehmen-Knopf. Den Abstand traegt der
+   Wrapper — der Hinweistext bringt keinen eigenen mit (card-blocks.css). */
+.export-template-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin-bottom: var(--space-sm);
+}
+.export-template-row > .export-create-row { margin-bottom: 0; }
+.export-template-pick { min-width: 240px; }
+
 /* === Tabs ===
    .tabs rendert nur die Button-Reihe (kein Panel-Container) — die Panels
    brauchen darum eigenes Padding. */
@@ -133,6 +147,7 @@
   .export-scope-picker { width: 100%; }
   .export-scope-picker > .combobox-wrap { min-width: 0; flex: 1; }
   .export-profile-pick { min-width: 0; flex: 1; }
+  .export-template-pick { min-width: 0; flex: 1; }
   .export-create-clone,
   .export-create-clone > .combobox-wrap { width: 100%; min-width: 0; }
 }

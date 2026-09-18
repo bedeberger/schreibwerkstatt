@@ -381,7 +381,10 @@
     flex-direction: column;
     gap: var(--space-xs);
   }
+  /* `.plot-edit-input` (erzaehlte Zeit) teilt die Feld-Optik von Titel und
+     Beschreibung — kein zweiter Name fuer dieselbe Erscheinung. */
   .plot-beat-edit-titel,
+  .plot-edit-input,
   .plot-beat-edit-desc {
     width: 100%;
     font-family: inherit;
@@ -454,6 +457,12 @@
   .plot-beat-meta .tag--motif {
     border-left: 3px solid var(--motif-accent, var(--card-accent-motiv));
   }
+  /* Schauplatz-Badge: Akzent-Streifen wie beim Motiv, in der Farbe der Orte-
+     Karte — die Kante signalisiert das Ziel des Klicks. Die erzaehlte Zeit
+     bekommt keine, weil sie auf kein Objekt zeigt. */
+  .plot-beat-meta .tag--ort,
+  .plot-fig-chip.tag--ort { border-left: 3px solid var(--card-accent-orte, var(--color-accent)); }
+  .plot-beat-meta .tag--zeit { font-variant-numeric: tabular-nums; color: var(--color-muted); }
   .plot-beat-edit-actions {
     display: flex;
     align-items: center;

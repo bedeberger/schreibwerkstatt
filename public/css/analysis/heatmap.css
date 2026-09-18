@@ -125,7 +125,7 @@
   opacity: var(--heatmap-opacity, 1);
 }
 .heatmap-cell--empty {
-  background: repeating-linear-gradient(45deg, var(--color-border) 0, var(--color-border) 2px, transparent 2px, transparent 6px);
+  background: var(--hatch-empty);
   opacity: var(--opacity-disabled);
 }
 .heatmap-cell:hover {

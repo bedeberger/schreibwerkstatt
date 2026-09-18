@@ -139,4 +139,51 @@
       </div>
     </section>
 
+    <!-- Recherche-Profil: steuert AUSSCHLIESSLICH den Recherche-Chat
+         (docs/recherche-chat.md). Eigener Schreibpfad /booksettings/:id/research;
+         der Header-Speichern-Knopf schreibt ihn mit. -->
+    <section class="book-settings-section" x-show="$store.config.researchChatEnabled" x-cloak>
+      <h3 class="card-section-title" x-text="$app.t('book.settings.section.research')"></h3>
+      <p class="card-hint" x-text="$app.t('book.settings.research.hint')"></p>
+
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" for="bs-research-profile" x-text="$app.t('book.settings.research.profile')"></label>
+        <div class="book-settings-kontext-wrap">
+          <textarea
+            id="bs-research-profile"
+            class="card-form-textarea"
+            x-model="bookResearchProfile"
+            :placeholder="$app.t('book.settings.research.profilePlaceholder')"
+            rows="5"
+            maxlength="1500"
+            data-spellcheck="spelling"
+          ></textarea>
+          <p class="card-form-hint" x-text="(bookResearchProfile || '').length + ' / 1500'"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" for="bs-research-domains" x-text="$app.t('book.settings.research.domains')"></label>
+        <div class="book-settings-kontext-wrap">
+          <p class="card-form-hint" x-text="$app.t('book.settings.research.domainsHint')"></p>
+          <textarea
+            id="bs-research-domains"
+            class="card-form-textarea"
+            x-model="bookResearchDomains"
+            :placeholder="$app.t('book.settings.research.domainsPlaceholder')"
+            rows="4"
+            spellcheck="false"
+          ></textarea>
+          <div class="book-settings-preset-row">
+            <template x-for="preset in researchDomainPresets()" :key="preset.key">
+              <button type="button" class="btn-compact"
+                      @click="applyResearchPreset(preset.key)"
+                      x-text="researchPresetLabel(preset.key)"></button>
+            </template>
+          </div>
+          <p class="card-form-hint" x-text="$app.t('book.settings.research.domainsCount', { n: researchDomainCount() })"></p>
+        </div>
+      </div>
+    </section>
+
     </div><!-- /tab: context -->
