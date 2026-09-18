@@ -29,7 +29,7 @@ test.describe('pdf-export-card', () => {
   async function createProfile(page, name) {
     await page.locator('.export-profile-bar button:has(use[href$="#plus"])').click();
     await page.locator('.export-create-row:not(.export-rename-row) .card-form-input').fill(name);
-    await page.locator('.export-create-row button.primary', { hasText: 'Anlegen' }).click();
+    await page.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.export-tabs')).toBeVisible();
   }
 
