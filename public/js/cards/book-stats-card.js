@@ -10,6 +10,7 @@ import { getUserPref, setUserPref } from '../local-prefs.js';
 
 const METRIC_PREF_KEY = 'bookStatsMetric';
 const METRIC_DEFAULT = 'chars';
+const AVG_PREF_KEY = 'bookStatsShowAvg';
 
 export function registerBookStatsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -19,6 +20,8 @@ export function registerBookStatsCard() {
     bookStatsSyncStatus: '',
     bookStatsMetric: METRIC_DEFAULT,
     bookStatsRange: 0,
+    bookStatsShowAvg: true,
+    bookStatsAvg: null,
     bookStatsCoverage: null,
     bookStatsDelta: null,
     writingTimeData: null,
@@ -33,6 +36,10 @@ export function registerBookStatsCard() {
       this.bookStatsMetric = getUserPref(email, METRIC_PREF_KEY, METRIC_DEFAULT);
       this.$watch('bookStatsMetric', (v) => {
         setUserPref(Alpine.store('session').currentUser?.email, METRIC_PREF_KEY, v);
+      });
+      this.bookStatsShowAvg = getUserPref(email, AVG_PREF_KEY, true) !== false;
+      this.$watch('bookStatsShowAvg', (v) => {
+        setUserPref(Alpine.store('session').currentUser?.email, AVG_PREF_KEY, v);
       });
 
       // Deep-Link aus Overview-Tiles: metric + range vorab setzen, damit der
@@ -53,6 +60,7 @@ export function registerBookStatsCard() {
         load: (root) => this.loadBookStats(Alpine.store('nav').selectedBookId),
         resetState: {
           bookStatsData: [],
+          bookStatsAvg: null,
           bookStatsCoverage: null,
           bookStatsDelta: null,
           writingTimeData: null,
@@ -62,6 +70,7 @@ export function registerBookStatsCard() {
         onViewReset: (e, ctx) => {
           ctx.bookStatsData = [];
           ctx.bookStatsSyncStatus = '';
+          ctx.bookStatsAvg = null;
           ctx.bookStatsCoverage = null;
           ctx.bookStatsDelta = null;
           ctx.writingTimeData = null;

@@ -1,0 +1,26 @@
+{
+  "version": "4.8.1",
+  "date": "2026-09-19",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Buchentwicklung: Über der Kurve steht jetzt der Durchschnitt des gewählten Zeitraums — je nach Metrik der Ø-Zuwachs pro Tag, Woche und Monat oder die Ø-Menge pro Tag. Der Ø-Knopf blendet die Durchschnittslinien im Diagramm ein und aus.",
+      "en": "Book progress: the average for the selected period now sits above the curve — depending on the metric, the average growth per day, week and month, or the average amount per day. The Ø button shows or hides the average lines in the chart."
+    },
+    {
+      "kind": "neu",
+      "de": "Ideen-Board: Erledigte Ideen sind ausgeblendet und lassen sich mit «Erledigte anzeigen» wieder einblenden. Das Brett zeigt damit standardmässig nur, was noch offen ist.",
+      "en": "Idea board: completed ideas are hidden and can be brought back with \"Show done\". By default the board now shows only what is still open."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Datenschutzerklärung: Der Abschnitt zur Reichweitenmessung nennt jetzt jedes anonyme Merkmal einzeln. Buch-, Seiten- und Link-Kennungen werden vor dem Senden entfernt.",
+      "en": "Privacy Policy: the section on usage measurement now lists every anonymous attribute individually. Book, page and link identifiers are removed before anything is sent."
+    },
+    {
+      "kind": "behoben",
+      "de": "Motiv-Werkstatt: Die Eingabefelder in der Leiste waren höher als die Knöpfe daneben, auf schmalen Fenstern rutschte der Knopf in die nächste Zeile.",
+      "en": "Motif Workshop: the input fields in the toolbar were taller than the buttons beside them, and on narrow windows the button slipped onto the next line."
+    }
+  ]
+}

@@ -61,6 +61,20 @@
           @click="bookStatsRange = r.v; renderStatsChart()" x-text="$app.t('bookstats.range.' + r.k)"></button>
       </template>
     </div>
+    <div class="btn-group">
+      <button type="button" class="btn-compact" :class="{ primary: bookStatsShowAvg }"
+        @click="bookStatsShowAvg = !bookStatsShowAvg; renderStatsChart()"
+        :aria-pressed="bookStatsShowAvg ? 'true' : 'false'"
+        :data-tip="$app.t('bookstats.avgToggleTip')" x-text="$app.t('bookstats.avgToggle')"></button>
+    </div>
+  </div>
+
+  <!-- Durchschnitt im gewählten Zeitraum -->
+  <div x-show="bookStatsAvg" class="book-stats-avg">
+    <span class="card-hint" x-text="bookStatsAvg?.label"></span>
+    <template x-for="(b, i) in (bookStatsAvg?.badges || [])" :key="i">
+      <span class="tok-badge tok-neutral" :data-tip="bookStatsAvg?.metricLabel" x-text="b"></span>
+    </template>
   </div>
 
   <!-- Diagramm -->

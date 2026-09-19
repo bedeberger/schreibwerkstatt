@@ -3,8 +3,18 @@
 .book-stats-chart-wrap {
   position: relative;
   width: 100%;
-  height: 220px;
+  /* 220px Plotflaeche + Platz fuer die Legende der Ø-Overlays darunter. */
+  height: 248px;
   margin: var(--space-md) 0 var(--space-10);
+}
+
+/* Ø-Kennzahlen des gewaehlten Zeitraums, zwischen Umschaltern und Diagramm. */
+.book-stats-avg {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  margin-top: var(--space-sm);
 }
 
 .book-stats-controls {

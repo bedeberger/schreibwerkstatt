@@ -3,6 +3,9 @@
 
 import { fetchJson, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
+import {
+  computeAvgSummary, metricKind, rollingSeries, rollingWindowForRange, trendSeries,
+} from './bookstats-avg.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -61,6 +64,29 @@ export function _disconnectThemeObserver() {
 
 export function _destroyStatsChart() {
   if (_statsChart) { _statsChart.destroy(); _statsChart = null; }
+}
+
+// Badge-Texte der Ø-Zeile. Bestandsgrössen zeigen den Ø-ZUWACHS (mit Vorzeichen),
+// Tagesmengen die Ø-Menge pro Kalendertag plus Σ und Ø je aktivem Tag,
+// Verhältniszahlen den Ø-Wert.
+function _avgBadges(s, metricLabel, fmtAvg) {
+  const t = (key, params) => window.__app.t(key, params);
+  const num = v => ((s.kind === 'stock' && v >= 0) ? '+' : '') + fmtAvg(v);
+  const badges = [];
+  if (s.kind === 'rate') {
+    badges.push(t('bookstats.avgLevelBadge', { v: fmtAvg(s.perDay) }));
+  } else {
+    badges.push(t('bookstats.avgPerDay', { v: num(s.perDay) }));
+    badges.push(t('bookstats.avgPerWeek', { v: num(s.perWeek) }));
+    badges.push(t('bookstats.avgPerMonth', { v: num(s.perMonth) }));
+  }
+  if (s.kind === 'flow') {
+    badges.push(t('bookstats.avgTotal', { v: fmtAvg(s.total) }));
+    if (s.activeDays && s.activeDays < s.spanDays) {
+      badges.push(t('bookstats.avgPerActiveDay', { v: fmtAvg(s.mean), n: s.activeDays }));
+    }
+  }
+  return { label: t('bookstats.avgTitle', { days: s.spanDays }), metricLabel, badges };
 }
 
 export const bookstatsMethods = {
@@ -173,7 +199,7 @@ export const bookstatsMethods = {
     else if (isLektorat) rows = (this.lektoratTimeData?.daily || []).map(d => ({ recorded_at: d.date, seconds: d.seconds }));
     else if (isStt)      rows = (this.sttTimeData?.daily      || []).map(d => ({ recorded_at: d.date, seconds: d.seconds, chars: d.chars }));
     else                 rows = this.bookStatsData;
-    if (!rows.length) return;
+    if (!rows.length) { this.bookStatsAvg = null; return; }
 
     // Zeitraum-Filter
     if (this.bookStatsRange > 0) {
@@ -201,7 +227,7 @@ export const bookstatsMethods = {
     // der gewählten Metrik (z.B. "wörter" erst ab Tag, an dem der Wert existiert).
     const firstIdx = data.findIndex(v => v !== null && v !== undefined);
     if (firstIdx > 0) { rows = rows.slice(firstIdx); data = data.slice(firstIdx); }
-    else if (firstIdx === -1) return;
+    else if (firstIdx === -1) { this.bookStatsAvg = null; return; }
 
     const labels = rows.map(r => {
       const [y, m, d] = r.recorded_at.split('-');
@@ -224,36 +250,97 @@ export const bookstatsMethods = {
       return ` ${ctx.dataset.label}: ${isDelta && v >= 0 ? '+' : ''}${fmt(v)}`;
     };
 
+    // Durchschnitte sind Mittelwerte, keine Messpunkte: eine Nachkommastelle
+    // auch dort, wo die Kurve selbst ganzzahlig tickt (0,4 Seiten/Tag ist eine
+    // Aussage, gerundete "0" ist keine).
+    const fmtAvg = (v) => {
+      if (isDecimal) return fmt(v);
+      const digits = Math.abs(v) < 10 ? 1 : 0;
+      return v.toLocaleString(localeTag, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    };
+
     const primary  = cssVar('--color-primary');
     const muted    = cssVar('--color-muted');
+    const accent   = cssVar('--color-accent');
     const gridLine = cssVar('--color-border');
+
+    // Ø-Auswertung des sichtbaren Ausschnitts: Kennzahlen unter dem Diagramm
+    // (Ø/Tag, Ø/Woche, Ø/Monat) und die Overlay-Serien im Diagramm.
+    const kind = metricKind(metric);
+    const dates = rows.map(r => r.recorded_at);
+    const summary = computeAvgSummary({ kind, dates, values: data });
+    this.bookStatsAvg = summary ? _avgBadges(summary, metricLabel, fmtAvg) : null;
+
+    const overlay = (label, series, color, dash, tension) => ({
+      label,
+      data: series,
+      borderColor: color,
+      borderWidth: 1.5,
+      borderDash: dash,
+      tension,
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: false,
+      spanGaps: true,
+    });
+
+    const datasets = [{
+      label: metricLabel,
+      data,
+      borderColor: primary,
+      backgroundColor: primary + '12',
+      borderWidth: 2,
+      tension: 0.35,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      pointBackgroundColor: primary,
+      fill: true,
+      spanGaps: false,
+    }];
+
+    let rollingWindow = 0;
+    if (summary && this.bookStatsShowAvg) {
+      if (kind === 'stock') {
+        // Bestandsgrösse: die Gerade vom ersten zum letzten Messpunkt zeigt,
+        // welche Phasen über und welche unter dem Ø-Zuwachs lagen. Ein
+        // gleitendes Mittel waere hier nur eine verzoegerte Kopie der Kurve.
+        const trend = trendSeries(dates, data);
+        if (trend.some(v => v != null)) {
+          datasets.push({ ...overlay(window.__app.t('bookstats.avgTrend'), trend, muted, [6, 4], 0), swNoTooltip: true });
+        }
+      } else {
+        datasets.push({
+          ...overlay(window.__app.t('bookstats.avgLine'), data.map(() => summary.perDay), muted, [6, 4], 0),
+          swNoTooltip: true,
+        });
+        rollingWindow = rollingWindowForRange(this.bookStatsRange);
+        const rolling = rollingSeries(dates, data, rollingWindow, { perDay: kind === 'flow' });
+        if (rolling.some(v => v != null)) {
+          datasets.push(overlay(
+            window.__app.t('bookstats.avgRolling', { n: rollingWindow }), rolling, accent, [4, 3], 0.3,
+          ));
+        }
+      }
+    }
 
     _ensureThemeObserver(this);
 
     _statsChart = new Chart(canvas, {
       type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: metricLabel,
-          data,
-          borderColor: primary,
-          backgroundColor: primary + '12',
-          borderWidth: 2,
-          tension: 0.35,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          pointBackgroundColor: primary,
-          fill: true,
-          spanGaps: false,
-        }],
-      },
+      data: { labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: datasets.length > 1,
+            position: 'bottom',
+            labels: { color: muted, boxWidth: 18, boxHeight: 1, font: { size: 11 }, padding: 12 },
+          },
           tooltip: {
+            // Die konstante Ø-Linie bzw. die Ø-Gerade steht in der Legende und
+            // in den Badges — im Tooltip waere sie an jedem Punkt dieselbe Zahl.
+            filter: item => !item.dataset.swNoTooltip,
             callbacks: {
               label: makeTooltip(),
             },
