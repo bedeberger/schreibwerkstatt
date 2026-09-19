@@ -4374,6 +4374,7 @@
   "ideenBoard.filterChapter": "Filter by chapter…",
   "ideenBoard.filterChapterAll": "All chapters",
   "ideenBoard.search": "Search idea text…",
+  "ideenBoard.showErledigt": "Show done",
   "ideenBoard.showVerworfen": "Show dropped",
   "ideenBoard.countAll": "{n} ideas",
   "ideenBoard.countFiltered": "{n} of {total} — {hidden} hidden",

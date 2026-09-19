@@ -70,7 +70,7 @@ function matchesQuery(idee, q) {
  * einer verlorenen nicht zu unterscheiden.
  */
 export function buildBoard({
-  ideen, laneOrder, filterChapterId = '', showVerworfen = true, query = '',
+  ideen, laneOrder, filterChapterId = '', showErledigt = true, showVerworfen = true, query = '',
   collapsedLanes = [], collapsedChapters = [],
 }) {
   const q = (query || '').trim().toLowerCase();
@@ -98,6 +98,7 @@ export function buildBoard({
     // Filter „Kapitel 3" nur die Ideen, die direkt am Kapitel haengen.
     const laneChapterId = idee.lane_chapter_id ?? idee.chapter_id ?? null;
     if (chapterFilter != null && laneChapterId !== chapterFilter) { hiddenByFilter++; continue; }
+    if (!showErledigt && status === 'erledigt') { hiddenByFilter++; continue; }
     if (!showVerworfen && status === 'verworfen') { hiddenByFilter++; continue; }
     if (!matchesQuery(idee, q)) { hiddenByFilter++; continue; }
 

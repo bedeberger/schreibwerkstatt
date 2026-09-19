@@ -30,7 +30,7 @@ import { buildLaneOrder } from '../book/ideen-board/model.js';
 const IDEEN_BOARD_FILTER_SCOPES = [
   {
     scope: 'ideenBoard',
-    defaults: { filterChapterId: '', showVerworfen: false, query: '', collapsedLanes: [], collapsedChapters: [] },
+    defaults: { filterChapterId: '', showErledigt: false, showVerworfen: false, query: '', collapsedLanes: [], collapsedChapters: [] },
   },
 ];
 
@@ -42,6 +42,7 @@ export function registerIdeenBoardCard() {
 
     // Filterleiste + Klappung (Besitz: IDEEN_BOARD_FILTER_SCOPES).
     filterChapterId: '',
+    showErledigt: false,
     showVerworfen: false,
     query: '',
     // Bahn-Keys. Immer als NEUE Liste schreiben (toggleLaneFold/toggleChapterFold

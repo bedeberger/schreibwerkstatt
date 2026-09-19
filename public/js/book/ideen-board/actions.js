@@ -26,12 +26,13 @@ export const ideenBoardActions = {
   // das Template fragt das Board mehrfach pro Render — Bahnen, Karten, Zaehler).
   board() {
     return this._memo('board',
-      [this.ideen, this.laneOrder, this.filterChapterId, this.showVerworfen, this.query,
+      [this.ideen, this.laneOrder, this.filterChapterId, this.showErledigt, this.showVerworfen, this.query,
         this.collapsedLanes, this.collapsedChapters],
       () => buildBoard({
         ideen: this.ideen,
         laneOrder: this.laneOrder,
         filterChapterId: this.filterChapterId,
+        showErledigt: this.showErledigt,
         showVerworfen: this.showVerworfen,
         query: this.query,
         collapsedLanes: this.collapsedLanes,

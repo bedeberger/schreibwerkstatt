@@ -4374,6 +4374,7 @@
   "ideenBoard.filterChapter": "Kapitel filtern …",
   "ideenBoard.filterChapterAll": "Alle Kapitel",
   "ideenBoard.search": "Im Text der Ideen suchen …",
+  "ideenBoard.showErledigt": "Erledigte anzeigen",
   "ideenBoard.showVerworfen": "Verworfene anzeigen",
   "ideenBoard.countAll": "{n} Ideen",
   "ideenBoard.countFiltered": "{n} von {total} — {hidden} ausgeblendet",
