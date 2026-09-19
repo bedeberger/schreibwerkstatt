@@ -129,6 +129,27 @@ test('Filter: verworfene ausblenden zaehlt sie als ausgeblendet, nicht als weg',
   assert.equal(on.hiddenByFilter, 0);
 });
 
+test('Filter: erledigte ausblenden laesst den Spalten-Zaehler unberuehrt', () => {
+  // Zwei unabhaengige Haken (erledigt / verworfen): die abgeschlossenen Stufen
+  // sind getrennt ausblendbar, weil sie Verschiedenes beantworten — „fertig"
+  // und „dagegen entschieden".
+  const ideen = [
+    idee(1, { page_id: 10, lane_chapter_id: 1, status: 'offen' }),
+    idee(2, { page_id: 10, lane_chapter_id: 1, status: 'erledigt' }),
+    idee(3, { page_id: 10, lane_chapter_id: 1, status: 'verworfen' }),
+  ];
+  const off = buildBoard({ ideen, laneOrder: buildLaneOrder(TREE), showErledigt: false, showVerworfen: true });
+  assert.equal(off.total, 3);
+  assert.equal(off.visible, 2);
+  assert.equal(off.hiddenByFilter, 1);
+  // Die Spalte misst den Gesamtbestand, nicht die gefilterte Sicht.
+  assert.equal(statusTotals(ideen).erledigt, 1);
+
+  const on = buildBoard({ ideen, laneOrder: buildLaneOrder(TREE), showErledigt: true, showVerworfen: true });
+  assert.equal(on.visible, 3);
+  assert.equal(on.hiddenByFilter, 0);
+});
+
 test('Filter: Volltext trifft den Ideentext, ohne Gross-/Kleinschreibung', () => {
   const ideen = [
     idee(1, { page_id: 10, lane_chapter_id: 1, content: 'Beleg für die Zahl nachtragen' }),

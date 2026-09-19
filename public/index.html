@@ -356,8 +356,11 @@
   <script defer src="vendor/alpine-3.15.12.min.js"></script>
   <!-- Geteilter Tooltip-Layer für [data-tip]. -->
   <script type="module" src="js/tooltip.js"></script>
-  <!-- Privacy-friendly analytics by Plausible (self-hosted). Nur auf Produktion (kein localhost/.local). -->
-  <script defer src="js/plausible-init.js"></script>
+  <!-- Reichweitenmessung (Plausible, self-hosted). Einziges Gate ist der
+       Admin-Toggle; das Script rendert server.js aus app_settings und liefert
+       bei ausgeschaltetem Analytics ein no-op. `surface` benennt die Oberflaeche
+       und wird als Property mitgeschickt. -->
+  <script defer src="js/plausible-init.js?surface=app"></script>
 </head>
 <body x-data="lektorat"
       @keydown.ctrl.enter.window="if (showEditorCard && !checkLoading && !focusActive) runCheck()"

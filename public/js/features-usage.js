@@ -39,6 +39,18 @@ export const featuresUsageMethods = {
     this._bumpRecentFeatureKey(key);
   },
 
+  // Custom-Event an die Reichweitenmessung (Plausible). No-op, solange Analytics
+  // aus ist — dann existiert window.plausible gar nicht.
+  //
+  // Properties sind Dimensionen, keine Messwerte: Plausible zaehlt Ereignisse und
+  // aggregiert keine Zahlen. Dauer, Tokenverbrauch und Karten-Oeffnungen liegen
+  // first-party in page_stats bzw. /usage/track und in der Admin-Usage-Karte —
+  // sie hier zu spiegeln erzeugte nur eine zweite Wahrheit.
+  trackAnalytics(event, props = null) {
+    try { window.plausible?.(event, props ? { props } : undefined); }
+    catch (e) { /* Tracking ist Best-Effort, niemals UI blockieren. */ }
+  },
+
   // Audit-Event an /me/event POSTen. Server loggt unter Allowlist
   // (siehe routes/usersettings.js#AUDIT_EVENTS). Best-Effort, niemals throwen.
   logAuditEvent(event, meta = null) {

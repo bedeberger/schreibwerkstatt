@@ -11,6 +11,11 @@
   <link rel="stylesheet" href="/css/components/comment-rail.css">
   <link rel="stylesheet" href="/css/components/floating-dock.css">
   <script src="/js/share-theme-init.js"></script>
+  <!-- Reichweitenmessung (Plausible, self-hosted). Der Bootstrap rendert bei
+       ausgeschaltetem Analytics ein no-op; `kind` wird als Property `umfang`
+       mitgeschickt. Der Token im Pfad faellt in der URL-Normalisierung weg
+       (lib/analytics-url.js) — er ist der Zugriffsschluessel auf den Text. -->
+  <script defer src="/js/plausible-init.js?surface=share&amp;kind={{analytics_kind}}"></script>
 </head>
 <body class="share-page">
   <a class="share-skip" href="#share-content">{{t_skip}}</a>
@@ -59,6 +64,8 @@
 
   <footer class="share-footer">
     <a class="share-footer__link" href="{{app_url}}" target="_blank" rel="noopener noreferrer">{{app_name}}</a>
+    ·
+    <a class="share-footer__link" href="{{privacy_url}}" target="_blank" rel="noopener noreferrer">{{t_privacy}}</a>
   </footer>
 
   <script id="share-config" type="application/json">{{config_json}}</script>

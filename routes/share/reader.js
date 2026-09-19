@@ -278,6 +278,12 @@ function register(router) {
       form_block: formBlock,
       app_name: 'Schreibwerkstatt',
       app_url: escHtml((appSettings.get('app.public_url') || '').replace(/\/$/, '') || '/'),
+      // Datenschutz-Link im Footer: sonst sieht der anonyme Leser nirgends, was
+      // beim Lesen erfasst wird (Verweildauer, Lesetiefe, Reichweitenmessung).
+      privacy_url: escHtml(((appSettings.get('app.public_url') || '').replace(/\/$/, '')) + '/datenschutz'),
+      t_privacy: escHtml(tServer('privacy.footerLink', lang)),
+      // Umfang als Property; der Token im Pfad faellt in lib/analytics-url.js weg.
+      analytics_kind: encodeURIComponent(link.kind || ''),
     });
 
     res.set('Cache-Control', 'no-store');

@@ -127,11 +127,15 @@ export const hashBuildMethods = {
   },
 
   _writeHash(newHash) {
+    this._syncAnalyticsProps();
     const cleanUrl = location.pathname + location.search;
     const firstWrite = !this._hashInitialized;
     this._hashInitialized = true;
     if (!newHash) {
-      if (location.hash) history.replaceState(null, '', cleanUrl);
+      // Alle Karten zu → zurueck auf die Uebersicht. Das ist eine Navigation wie
+      // jede andere, und replaceState feuert kein hashchange: ohne den Aufruf
+      // hier bliebe der Heimweg in der Reichweitenmessung unsichtbar.
+      if (location.hash) { history.replaceState(null, '', cleanUrl); this._trackPageview(); }
       return;
     }
     if (location.hash === newHash) return;
@@ -144,11 +148,38 @@ export const hashBuildMethods = {
       history.pushState(null, '', newHash);
     }
     // pushState/replaceState feuern kein hashchange → Plausible manuell triggern.
+    // Der Tracker selbst haengt bei hashBasedRouting ausschliesslich an
+    // hashchange (Zurueck/Vorwaerts), zaehlt hier also nicht doppelt mit.
+    this._trackPageview();
+  },
+
+  _trackPageview() {
     try { window.plausible?.('pageview'); } catch { /* noop */ }
+  },
+
+  // Properties fuer die Reichweitenmessung, die nur die App kennt. Der Bootstrap
+  // (server.js#/js/plausible-init.js) liest das Objekt beim Senden aus und
+  // ergaenzt daraus jede Meldung — auch die, die der Tracker selbst ausloest.
+  //
+  // Bewusst ohne IDs: Buch- und Entitaets-IDs beantworten keine Frage, die man
+  // an eine Reichweitenmessung stellt, und die URL-Normalisierung wirft sie auf
+  // der Gegenseite ohnehin weg. Bleiben drei Achsen, die erklaeren, WER gerade
+  // arbeitet: Werktyp, eigene Rolle im Buch und Modellklasse.
+  _syncAnalyticsProps() {
+    try {
+      const p = {};
+      const typ = this.currentBuchtyp?.();
+      if (typ) p.buchtyp = typ;
+      if (this.currentBookRole) p.rolle = this.currentBookRole;
+      const klasse = this.$store?.config?.effectiveProviderClass;
+      if (klasse) p.modell = klasse;
+      window.__plausibleProps = p;
+    } catch { /* noop */ }
   },
 
   // Synchroner URL-Sync ohne neuen History-Eintrag (initial + nach Hash-Apply).
   _syncUrlNow() {
+    this._syncAnalyticsProps();
     const newHash = this._computeHash();
     const cleanUrl = location.pathname + location.search;
     if (!newHash) {

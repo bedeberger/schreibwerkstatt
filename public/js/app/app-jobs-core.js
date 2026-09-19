@@ -128,6 +128,15 @@ export const appJobsCoreMethods = {
       this.loadLastKomplettRun?.(this.$store.nav.selectedBookId);
     }
     this._maybeShowJobToast(detail);
+    // Reichweitenmessung: ein Ereignis pro beendetem Job. Dieser Handler ist die
+    // einzige Stelle, an der JEDER Job-Typ genau einmal vorbeikommt — die
+    // Disappearance-Detection in _detectFinishedJobs ist die alleinige Quelle des
+    // Events. Export (pdf/epub/docx/finetune), Import und KI-Laeufe brauchen
+    // darum keinen eigenen Haken; `typ` unterscheidet sie.
+    this.trackAnalytics?.('job:done', {
+      typ: String(detail.type || 'unbekannt'),
+      status: String(detail.job?.status || 'unbekannt'),
+    });
   },
 
   // Job-Done-Toast. Whitelist langlaufender Job-Typen. Toast feuert auch dann,

@@ -131,6 +131,13 @@ unterscheiden.
 `chapter_id` gefiltert fände „Kapitel 3" nur die Ideen, die direkt am Kapitel
 hängen — also die wenigsten.
 
+**Zwei Haken für die zwei Schlussstufen.** `erledigt` und `verworfen` sind
+getrennt ausblendbar, beide per Default aus: das Board ist eine Pendenzenliste,
+und beide Stufen sollen beim Öffnen nicht mitarbeiten. Getrennt, weil sie
+Verschiedenes beantworten — „fertig" und „dagegen entschieden"; wer den Stand
+eines Kapitels prüft, will das Erledigte sehen, ohne das Verworfene
+zurückzuholen. Ausgeblendet wird nur die Karte, nie die Spalte samt Zähler.
+
 **Der Filter blendet aus und sagt es.** `hiddenByFilter` steht als Zahl in der
 Filterleiste; ohne sie ist eine versteckte Pendenz von einer verlorenen nicht zu
 unterscheiden. Die **Spalten-Zähler messen dagegen den ganzen Bestand** — sonst

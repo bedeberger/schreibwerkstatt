@@ -110,7 +110,7 @@ const CATEGORIES = [
       'routes/snapshots.js': 655,
       'routes/usersettings.js': 641,
       'routes/jobs/book-chat-tools/tools-text.js': 646,
-      'routes/share/reader.js': 623,
+      'routes/share/reader.js': 629,
       'routes/jobs/lektorat.js': 605,
       'db/plot.js': 1011,
     },

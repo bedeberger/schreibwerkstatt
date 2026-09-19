@@ -21,6 +21,7 @@ const bookAccess = require('./db/book-access');
 const { ensureAdminFromEnv, touchUserLastSeen, addUserActivity } = appUsers;
 const appSettings = require('./lib/app-settings');
 const { getVersion } = require('./lib/version');
+const { normalizeAnalyticsUrl, analyticsProps } = require('./lib/analytics-url');
 
 // Admin-Bootstrap: ADMIN_EMAIL aus ENV → app_users-Row mit
 // global_role='admin'. Idempotent + ENV-Wechsel-tauglich (kein Restart-Zwang).
@@ -285,8 +286,16 @@ app.use('/share', shareRouter);
 // Plausible-Bootstrap dynamisch rendern: enabled+URL aus app_settings.
 // Disabled oder leere URL → no-op JS (kein Tracking, keine Console-Error).
 // Admin-Toggle ist die einzige Aktivierungs-Bedingung — keine Host-/Env-Filter.
-// Vor dem Auth-Guard, damit Landing/Login/Register das Script ebenfalls laden.
-// Cache-Control: no-store, damit Toggle ohne Browser-Reload-Hack greift.
+// Vor dem Auth-Guard, damit Landing/Login/Register/Share das Script ebenfalls
+// laden. Cache-Control: no-store, damit Toggle ohne Browser-Reload-Hack greift.
+//
+// `?surface=…` (+ bei Share `?kind=…`) benennt die aufrufende Oberflaeche und
+// wird als Property mitgeschickt. Der Umweg ueber die Query ist Pflicht, nicht
+// Geschmack: die CSP fuehrt kein 'unsafe-inline' fuer script-src, ein Inline-
+// Snippet auf der Seite koennte die Werte also gar nicht setzen.
+const ANALYTICS_SURFACES = new Set(['app', 'landing', 'register', 'datenschutz', 'share', 'share-abgelaufen']);
+const ANALYTICS_SHARE_KINDS = new Set(['page', 'chapter', 'book']);
+
 app.get('/js/plausible-init.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
@@ -295,17 +304,43 @@ app.get('/js/plausible-init.js', (req, res) => {
   if (!enabled || !scriptUrl) {
     return res.send('/* plausible disabled */\n');
   }
+  const surface = String(req.query.surface || '');
+  const kind = String(req.query.kind || '');
+  const base = {};
+  if (ANALYTICS_SURFACES.has(surface)) base.oberflaeche = surface;
+  if (ANALYTICS_SHARE_KINDS.has(kind)) base.umfang = kind;
+
   const safeUrl = JSON.stringify(scriptUrl);
+  const safeBase = JSON.stringify(base);
   res.send(
     `// Plausible-Bootstrap. URL aus Admin-Settings (analytics.plausible.script_url).\n` +
+    `// Die beiden Funktionen sind der woertliche Quelltext aus lib/analytics-url.js\n` +
+    `// (eine Quelle fuer Browser und Test, siehe Kommentar dort).\n` +
     `(function () {\n` +
+    `  var BASE = ${safeBase};\n` +
+    `  ${normalizeAnalyticsUrl.toString().replace(/\n/g, '\n  ')}\n` +
+    `  ${analyticsProps.toString().replace(/\n/g, '\n  ')}\n` +
     `  var s = document.createElement('script');\n` +
     `  s.async = true;\n` +
     `  s.src = ${safeUrl};\n` +
     `  document.head.appendChild(s);\n` +
     `  window.plausible = window.plausible || function () { (plausible.q = plausible.q || []).push(arguments); };\n` +
     `  plausible.init = plausible.init || function (i) { plausible.o = i || {}; };\n` +
-    `  plausible.init({ hashBasedRouting: true });\n` +
+    `  plausible.init({\n` +
+    `    hashBasedRouting: true,\n` +
+    // transformRequest statt customProperties: die Web-Variante des Trackers hat
+    // transformRequest immer einkompiliert, customProperties haengt dagegen am
+    // Dashboard-Schalter — und nur transformRequest kann ausserdem die URL
+    // aufraeumen. Ein Hebel fuer beide Aufgaben.
+    `    transformRequest: function (payload) {\n` +
+    `      payload.u = normalizeAnalyticsUrl(payload.u);\n` +
+    `      payload.p = Object.assign(\n` +
+    `        analyticsProps(BASE, window.__plausibleProps, document, window),\n` +
+    `        payload.p || {}\n` +
+    `      );\n` +
+    `      return payload;\n` +
+    `    },\n` +
+    `  });\n` +
     `})();\n`
   );
 });
