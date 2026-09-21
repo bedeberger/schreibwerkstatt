@@ -1,8 +1,32 @@
     <!-- Auth-Tab -->
     <section x-show="adminSettingsTab === 'auth'" class="admin-settings-section">
       <div x-data="settingField({ k: 'app.public_url', type: 'url', label: 'admin.settings.label.appPublicUrl', ph: 'https://app.example.com' })"></div>
-      <div x-data="settingField({ k: 'auth.google.client_id', label: 'admin.settings.label.authGoogleClientId', secret: true })"></div>
-      <div x-data="settingField({ k: 'auth.google.client_secret', type: 'password', label: 'admin.settings.label.authGoogleClientSecret' })"></div>
+
+      <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.auth.methodTitle')"></span></h4>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.methodHint')"></p>
+      <div x-data="settingField({ k: 'auth.method', type: 'select', label: 'admin.settings.label.authMethod', opts: [
+             { value: 'google', label: 'Google' },
+             { value: 'local',  label: 'Lokal' },
+           ] })"></div>
+
+      <!-- Nur das gewaehlte Verfahren zeigt seine Felder: ein Google-Secret auf
+           einer lokal anmeldenden Instanz ist kein Zustand, den das UI anbieten
+           soll. Die Keys bleiben gesetzt, ein Zurueckschalten verliert nichts. -->
+      <template x-if="adminSettingsForm['auth.method'] !== 'local'">
+        <div>
+          <div x-data="settingField({ k: 'auth.google.client_id', label: 'admin.settings.label.authGoogleClientId', secret: true })"></div>
+          <div x-data="settingField({ k: 'auth.google.client_secret', type: 'password', label: 'admin.settings.label.authGoogleClientSecret' })"></div>
+        </div>
+      </template>
+      <template x-if="adminSettingsForm['auth.method'] === 'local'">
+        <div>
+          <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.auth.localHint')"></p>
+          <div x-data="settingField({ k: 'auth.local.min_password_length', type: 'num', label: 'admin.settings.label.authLocalMinPasswordLength', num: { integer: true, min: 8, max: 128 }, help: 'admin.settings.help.authLocalMinPasswordLength' })"></div>
+          <div x-data="settingField({ k: 'auth.local.token_ttl_hours', type: 'num', label: 'admin.settings.label.authLocalTokenTtl', num: { integer: true, min: 1, max: 720 }, help: 'admin.settings.help.authLocalTokenTtl' })"></div>
+          <div x-data="settingField({ k: 'auth.local.allow_self_reset', type: 'toggle', label: 'admin.settings.label.authLocalAllowSelfReset', help: 'admin.settings.help.authLocalAllowSelfReset' })"></div>
+        </div>
+      </template>
+
       <div x-data="settingField({ k: 'auth.allow_open_signup', type: 'toggle', label: 'admin.settings.label.authAllowOpenSignup' })"></div>
       <div x-data="settingField({ k: 'auth.registration.expire_days', type: 'num', label: 'admin.settings.label.authRegistrationExpireDays', num: { integer: true, min: 1, max: 365 }, help: 'admin.settings.help.registrationExpireDays' })"></div>
 
@@ -19,7 +43,7 @@
       <div x-data="settingField({ k: 'auth.altcha.complexity', type: 'num', label: 'admin.settings.label.authAltchaComplexity', num: { integer: true, min: 1000, max: 5000000 }, help: 'admin.settings.help.altchaComplexity' })"></div>
       <div x-data="settingField({ k: 'auth.altcha.challenge_ttl_min', type: 'num', label: 'admin.settings.label.authAltchaChallengeTtl', num: { integer: true, min: 1, max: 120 }, help: 'admin.settings.help.altchaChallengeTtl' })"></div>
 
-      <div class="admin-settings-actions">
+      <div class="admin-settings-actions" x-show="adminSettingsForm['auth.method'] !== 'local'">
         <button type="button" @click="adminSettingsTest('oauth')" x-text="$app.t('admin.settings.test.oauth')"></button>
       </div>
     </section>

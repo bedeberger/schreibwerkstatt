@@ -11717,6 +11717,91 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 289 abgeschlossen (book_settings.research_profile/research_domains).');
   }
 
+  if (version < 290) {
+    // Lokale Anmeldung (auth.method='local'): Passwort-Hash je Konto + Einmal-
+    // Tokens fuer „Passwort setzen" / „Passwort vergessen".
+    //
+    // Eigene Tabelle statt Spalten auf app_users: ein Konto hat einen Hash nur,
+    // wenn die Instanz ueberhaupt lokal anmeldet — auf einer Google-Instanz
+    // bleibt `user_credentials` leer statt dass jede Konto-Zeile zwei tote
+    // Spalten traegt. Ausserdem faellt der Hash mit einem einzigen DELETE, wenn
+    // der Admin die Instanz auf einen IdP umstellt.
+    //
+    // `password_hash` traegt Algorithmus + Parameter im String selbst
+    // (lib/password.js) — ein Wechsel der Kostenparameter muss bestehende
+    // Hashes weiter verifizieren koennen, darum keine eigene Algo-Spalte.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS user_credentials (
+        user_email    TEXT    PRIMARY KEY REFERENCES app_users(email) ON DELETE CASCADE,
+        password_hash TEXT    NOT NULL,
+        must_change   INTEGER NOT NULL DEFAULT 0 CHECK(must_change IN (0,1)),
+        updated_by    TEXT    REFERENCES app_users(email) ON DELETE SET NULL,
+        created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_user_credentials_updated_by ON user_credentials(updated_by)');
+
+    // Einmal-Token. Gespeichert wird nur der SHA-256-Hash: wer die DB liest,
+    // soll keinen gueltigen Link daraus bauen koennen (dieselbe Ueberlegung wie
+    // beim Passwort-Hash, nur mit hoher Entropie statt Kostenfaktor).
+    // `purpose` trennt den Erst-Setz-Link (Konto hat noch kein Passwort) vom
+    // Reset-Link — die Mail-Texte und die Ablauffristen unterscheiden sich.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS user_password_tokens (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email  TEXT NOT NULL REFERENCES app_users(email) ON DELETE CASCADE,
+        token_hash  TEXT NOT NULL UNIQUE,
+        purpose     TEXT NOT NULL CHECK(purpose IN ('set','reset')),
+        created_by  TEXT REFERENCES app_users(email) ON DELETE SET NULL,
+        created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        expires_at  TEXT NOT NULL,
+        used_at     TEXT
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_user_password_tokens_email ON user_password_tokens(user_email)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_user_password_tokens_created_by ON user_password_tokens(created_by)');
+
+    // Vier neue Audit-Ereignisse. Der CHECK auf `user_sessions_audit.event` ist
+    // eine Aufzaehlung, und SQLite kann sie nicht per ALTER erweitern — also
+    // Recreate. Der Audit-Trail ist der einzige Nachweis darueber, wer wem ein
+    // Passwort gesetzt hat; ohne diese Werte wuerde der Schreibversuch die
+    // ganze Transaktion abbrechen statt still zu verschlucken.
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DROP TABLE IF EXISTS user_sessions_audit_new').run();
+    db.exec(`
+      CREATE TABLE user_sessions_audit_new (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        event      TEXT NOT NULL CHECK(event IN
+                       ('login','logout','login-denied','suspended','reactivated',
+                        'role-changed','deleted','budget-changed','usage-viewed',
+                        'ai-provider-changed','self-deleted','demo-reset',
+                        'password-set','password-removed','password-link-sent',
+                        'password-reset-requested')),
+        ip         TEXT,
+        user_agent TEXT,
+        meta_json  TEXT,
+        created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+    db.exec(`
+      INSERT INTO user_sessions_audit_new (id, user_email, event, ip, user_agent, meta_json, created_at)
+      SELECT id, user_email, event, ip, user_agent, meta_json, created_at FROM user_sessions_audit
+    `);
+    db.prepare('DROP TABLE user_sessions_audit').run();
+    db.prepare('ALTER TABLE user_sessions_audit_new RENAME TO user_sessions_audit').run();
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_user_audit_user ON user_sessions_audit(user_email, created_at DESC)').run();
+    db.pragma('foreign_keys = ON');
+
+    const fkErrors290 = db.pragma('foreign_key_check');
+    if (fkErrors290.length) {
+      throw new Error(`Migration 290: foreign_key_check meldet ${fkErrors290.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 290').run();
+    logger.info('DB-Migration auf Version 290 abgeschlossen (user_credentials, user_password_tokens).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

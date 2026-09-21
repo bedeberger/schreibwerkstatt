@@ -1,0 +1,21 @@
+{
+  "version": "4.9.0",
+  "date": "2026-09-21",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Anmeldung: Neben Google gibt es neu die Anmeldung mit E-Mail und Passwort. Welches Verfahren für die Instanz gilt, wählt der Administrator in den Einstellungen unter «Anmeldeverfahren».",
+      "en": "Sign-in: alongside Google, accounts can now sign in with email and password. The administrator picks which method applies to the instance under \"Login method\" in the settings."
+    },
+    {
+      "kind": "neu",
+      "de": "Administration, Reiter «Benutzer»: Zu jedem Konto steht jetzt eine Spalte «Passwort». Darüber lässt sich ein Initialpasswort setzen, ein Link zum Festlegen per Mail schicken oder das Passwort wieder entziehen.",
+      "en": "Administration, \"Users\" tab: every account now has a \"Password\" column. From there you can set an initial password, send a link by email to choose one, or revoke the password again."
+    },
+    {
+      "kind": "neu",
+      "de": "Anmeldeseite: «Passwort vergessen?» schickt einen einmaligen Link an die hinterlegte Adresse, mit dem sich ein neues Passwort setzen lässt. Der Administrator kann diesen Weg abschalten.",
+      "en": "Sign-in page: \"Forgot password?\" sends a one-time link to the stored address for choosing a new password. The administrator can switch this option off."
+    }
+  ]
+}

@@ -19,6 +19,7 @@ export const adminUsersMethods = {
       }
       const data = await usersResp.json();
       this.adminUsersList = data.users || [];
+      if (data.auth_method) this.adminUsersAuthMethod = data.auth_method;
       if (settingResp && settingResp.ok) {
         const s = await settingResp.json().catch(() => null);
         const v = s?.setting?.value;
@@ -69,6 +70,63 @@ export const adminUsersMethods = {
     } finally {
       this.adminUsersInviting = false;
     }
+  },
+
+  // ── Passwoerter (nur bei auth.method='local') ──────────────────────────────
+  // Drei Wege, ein Ergebnis: Initialpasswort vom Admin, Setz-/Reset-Link per
+  // Mail, oder Entzug. Alle drei laufen ueber /admin/users/:email/password*
+  // und laden danach die Liste neu, damit die Badge stimmt.
+
+  adminUsersPasswordOpen(u) {
+    this.adminUsersPasswordEmail = u.email;
+    this.adminUsersPasswordValue = '';
+    this.adminUsersPasswordResult = null;
+  },
+
+  async _adminUsersPasswordCall(email, path, opts) {
+    this.adminUsersPasswordBusy = email;
+    this.adminUsersError = '';
+    try {
+      const r = await fetch(`/admin/users/${encodeURIComponent(email)}${path}`, {
+        credentials: 'same-origin', ...opts,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      await this.adminUsersLoad();
+      return j;
+    } catch (e) {
+      this.adminUsersError = e.message;
+      return null;
+    } finally {
+      this.adminUsersPasswordBusy = null;
+    }
+  },
+
+  async adminUsersPasswordSave() {
+    const email = this.adminUsersPasswordEmail;
+    const password = this.adminUsersPasswordValue;
+    if (!email || !password) return;
+    const j = await this._adminUsersPasswordCall(email, '/password', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    if (!j) return;
+    this.adminUsersPasswordEmail = null;
+    this.adminUsersPasswordValue = '';
+    this.adminUsersPasswordResult = null;
+  },
+
+  async adminUsersPasswordLink(u) {
+    const j = await this._adminUsersPasswordCall(u.email, '/password-link', { method: 'POST' });
+    if (!j) return;
+    const url = j.url && !j.url.startsWith('http') ? `${location.origin}${j.url}` : j.url;
+    this.adminUsersPasswordResult = { email: u.email, url, expiresAt: j.expiresAt, mail: j.mail || null };
+  },
+
+  async adminUsersPasswordRemove(u) {
+    if (!window.confirm(window.__app.t('admin.users.password.removeConfirm', { email: u.email }))) return;
+    await this._adminUsersPasswordCall(u.email, '/password', { method: 'DELETE' });
   },
 
   async adminUsersInvitesLoad() {

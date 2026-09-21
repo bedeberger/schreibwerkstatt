@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "78ee0e8b951078fe";
+self.__SHELL_BUILD = "059218242fd4c74e";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-backup.css",
   "/css/admin/admin-home.css",
@@ -607,6 +607,7 @@ self.__SHELL_MANIFEST = [
   "/js/modal.js",
   "/js/num-input.js",
   "/js/page-revision-diff.js",
+  "/js/password-form.js",
   "/js/popover-anchor.js",
   "/js/prompts.js",
   "/js/prompts/autorenprofil.js",
@@ -745,6 +746,9 @@ self.__SHELL_MANIFEST = [
   "/partials/admin-settings-tts.html",
   "/partials/admin-settings.html",
   "/partials/admin-usage.html",
+  "/partials/admin-users-tab-invites.html",
+  "/partials/admin-users-tab-requests.html",
+  "/partials/admin-users-tab-users.html",
   "/partials/admin-users.html",
   "/partials/autorenprofil.html",
   "/partials/avatar-menu.html",

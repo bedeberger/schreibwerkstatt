@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 289, 164 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 290, 166 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -189,6 +189,8 @@ erDiagram
   app_users ||--o{ budget_alerts     : dedupes
   app_users ||--o{ user_dictionary   : owns
   app_users ||--o{ js_errors         : logs
+  app_users ||--|| user_credentials  : "local password hash"
+  app_users ||--o{ user_password_tokens : "set/reset links"
   ai_profiles ||--o{ app_users       : "assigned to"
   books     ||--o{ user_dictionary   : "scoped (NULL=global)"
 
@@ -1735,10 +1737,28 @@ erDiagram
     TEXT    last_reminder_at
     INTEGER reminder_count
   }
+  user_credentials {
+    TEXT    user_email    PK,FK "app_users(email) CASCADE — 1:1, nur bei auth.method='local'"
+    TEXT    password_hash "scrypt$N$r$p$salt$hash; Parameter im String (lib/password.js)"
+    INTEGER must_change   "1 = vom Admin vergebenes Initialpasswort (Mig 290)"
+    TEXT    updated_by    FK "app_users(email) ON DELETE SET NULL; NULL = User selbst"
+    TEXT    created_at
+    TEXT    updated_at
+  }
+  user_password_tokens {
+    INTEGER id         PK "AUTOINCREMENT"
+    TEXT    user_email  FK "app_users(email) CASCADE"
+    TEXT    token_hash  "UNIQUE; SHA-256 des Tokens, nie der Klartext"
+    TEXT    purpose     "set | reset"
+    TEXT    created_by  FK "app_users(email) ON DELETE SET NULL; NULL = Selbstbedienung"
+    TEXT    created_at
+    TEXT    expires_at
+    TEXT    used_at     "NULL = offen; gesetzt = verbraucht/entwertet (Mig 290)"
+  }
   user_sessions_audit {
     INTEGER id         PK "AUTOINCREMENT"
     TEXT    user_email
-    TEXT    event      "login | logout | login-denied | suspended | reactivated | role-changed | deleted | budget-changed | usage-viewed | ai-provider-changed | self-deleted | demo-reset"
+    TEXT    event      "login | logout | login-denied | suspended | reactivated | role-changed | deleted | budget-changed | usage-viewed | ai-provider-changed | self-deleted | demo-reset | password-set | password-removed | password-link-sent | password-reset-requested"
     TEXT    ip
     TEXT    user_agent
     TEXT    meta_json  "JSON-Encoded Detail (method, from/to-Rolle, ...)"

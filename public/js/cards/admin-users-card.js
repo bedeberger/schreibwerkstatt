@@ -19,6 +19,13 @@ export function registerAdminUsersCard() {
     adminUsersInviteResult: null,
     adminUsersAuditEmail: null,
     adminUsersAuditEvents: [],
+    // Aktives Anmeldeverfahren (vom Server, nicht geraten): steuert, ob die
+    // Passwort-Spalte ueberhaupt Sinn hat.
+    adminUsersAuthMethod: 'google',
+    adminUsersPasswordEmail: null,           // offener Passwort-Drawer
+    adminUsersPasswordValue: '',
+    adminUsersPasswordBusy: null,            // email waehrend set/link/remove
+    adminUsersPasswordResult: null,          // { url, expiresAt, mail }
     // Registration-Requests-Tab.
     adminUsersTab: 'users',                  // 'users' | 'invites' | 'requests'
     adminUsersRequestsList: [],
@@ -55,6 +62,9 @@ export function registerAdminUsersCard() {
         this.adminUsersAuditEvents = [];
         this.adminUsersRequestsResult = null;
         this.adminUsersInvitesResult = null;
+        this.adminUsersPasswordEmail = null;
+        this.adminUsersPasswordValue = '';
+        this.adminUsersPasswordResult = null;
       };
       window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
     },

@@ -1,4 +1,5 @@
-// Handler fuer die Passwort-Formen der Login-Seite (Admin-Pfad + Demo-Zugang).
+// Handler fuer die Passwort-Formen der Login-Seite (lokale Anmeldung,
+// ENV-Admin-Pfad, Demo-Zugang).
 // Eigene Datei statt inline, weil CSP `script-src 'self'` ohne 'unsafe-inline'
 // Inline-Scripts blockiert. Strings + Endpoint + returnTo kommen per data-*.
 //
@@ -13,6 +14,7 @@
   forms.forEach((form) => {
     const endpoint = form.dataset.loginEndpoint;
     const returnTo = form.dataset.returnto || '/';
+    const safe = (p) => (typeof p === 'string' && p.startsWith('/') && !p.startsWith('//') ? p : null);
     const msgInvalid = form.dataset.msgInvalid || 'Invalid credentials.';
     const msgRateTpl = form.dataset.msgRateTpl || 'Too many attempts. Retry in {sec}s.';
     const msgCaptcha = form.dataset.msgCaptcha || 'Verification failed. Please retry.';
@@ -38,7 +40,11 @@
           body: JSON.stringify({ email, password, altcha }),
         });
         if (r.ok) {
-          window.location.href = returnTo;
+          // Der Server darf ein Ziel vorgeben — bei einem vom Admin vergebenen
+          // Initialpasswort entsteht noch keine Sitzung, sondern der Wechsel
+          // auf die Setz-Seite. Nur eigene, relative Pfade werden gefolgt.
+          const ok = await r.json().catch(() => ({}));
+          window.location.href = safe(ok.redirect) || returnTo;
           return;
         }
         const j = await r.json().catch(() => ({}));

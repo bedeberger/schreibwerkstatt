@@ -8,13 +8,24 @@ const appSettings = require('../lib/app-settings');
 //   POST   /admin/users/invite         — Token-Invite + Audit
 //   PUT    /admin/users/:email         — global_role / status / can_invite_users
 //   DELETE /admin/users/:email         — Soft-Delete (status='deleted')
+//   POST   /admin/users/:email/password       — Initialpasswort setzen (lokale Anmeldung)
+//   POST   /admin/users/:email/password-link  — Setz-Link ausstellen + mailen
+//   DELETE /admin/users/:email/password       — lokales Passwort entfernen
+//
+// Die drei Passwort-Routen gelten nur, solange `auth.method='local'` ist; bei
+// jedem anderen Verfahren antworten sie 409. Sie sind der Admin-Weg neben der
+// Selbstbedienung des Users (routes/auth/providers/local.js) — beide schreiben
+// ueber dieselbe Facade (db/user-credentials.js).
 //
 // Privacy: Admin sieht hier nur User-Identitaet/Rolle/Status, keine Buecher.
 // Buchsichtbarkeit laeuft ueber book_access.
 
 const express = require('express');
 const appUsers = require('../db/app-users');
+const creds = require('../db/user-credentials');
 const aiProfiles = require('../db/ai-profiles');
+const password = require('../lib/password');
+const authProviders = require('./auth/providers');
 const mailer = require('../lib/mailer');
 const { buildInviteUrl } = require('../lib/invite-url');
 const { requireAdmin } = require('../lib/admin-mw');
@@ -50,8 +61,112 @@ function _clientIp(req) {
 
 // Router-Mount: app.use('/admin/users', router) — Pfade hier sind relativ.
 router.get('/', (req, res) => {
-  const users = appUsers.listUsers();
-  res.json({ users });
+  // Passwort-Zustand in EINER Abfrage dazu (statt einer pro Zeile). `has_password`
+  // ist absichtlich ein Boolean und nicht der Hash — die Admin-Konsole braucht
+  // nur zu wissen, ob sich das Konto lokal anmelden kann.
+  const pw = new Map(creds.listEmailsWithPassword().map(r => [r.user_email, r]));
+  const users = appUsers.listUsers().map(u => ({
+    ...u,
+    has_password: pw.has(u.email),
+    must_change_password: pw.get(u.email)?.must_change === 1,
+  }));
+  res.json({ users, auth_method: authProviders.activeProviderId() });
+});
+
+// Passwort-Routen gelten nur beim lokalen Verfahren. 409 statt 404, weil die
+// Route existiert — sie passt nur nicht zum aktiven Anmeldeweg.
+function _requireLocalAuth(req, res) {
+  if (authProviders.isActive('local')) return true;
+  res.status(409).json({ error_code: 'AUTH_METHOD_NOT_LOCAL', method: authProviders.activeProviderId() });
+  return false;
+}
+
+// Zielkonto laden + Vorbedingungen pruefen. Antwortet selbst und liefert dann null.
+function _passwordTarget(req, res) {
+  if (!_requireLocalAuth(req, res)) return null;
+  const target = (req.params.email || '').toLowerCase();
+  const user = appUsers.getUser(target);
+  if (!user) {
+    res.status(404).json({ error_code: 'USER_NOT_FOUND' });
+    return null;
+  }
+  if (user.status === 'deleted') {
+    res.status(409).json({ error_code: 'USER_NOT_ACTIVE', reason: user.status });
+    return null;
+  }
+  return user;
+}
+
+// Initialpasswort. `must_change=1`: die naechste Anmeldung fuehrt zwingend auf
+// die Setz-Seite, statt eine Sitzung zu eroeffnen — der Admin kennt das
+// Passwort, also darf es nicht das bleiben, mit dem der User arbeitet.
+router.post('/:email/password', express.json(), async (req, res) => {
+  const user = _passwordTarget(req, res);
+  if (!user) return;
+  const actor = req.session.user.email;
+  const pw = (req.body || {}).password;
+  const policyError = password.validatePassword(pw);
+  if (policyError) {
+    return res.status(400).json({ error_code: 'PASSWORD_WEAK', detail: policyError, min: password.minLength() });
+  }
+  creds.setPassword(user.email, await password.hashPassword(pw), { mustChange: 1, updatedBy: actor });
+  // Offene Setz-/Reset-Links entwerten: sonst haengt neben dem frisch
+  // vergebenen Passwort noch ein aelterer Link, der es wieder aushebelt.
+  creds.revokeOpenTokens(user.email);
+  appUsers.recordAuditEvent(user.email, 'password-set', {
+    ip: _clientIp(req),
+    userAgent: req.headers['user-agent'] || null,
+    meta: { by: actor, mustChange: true },
+  });
+  logger.info(`Initialpasswort gesetzt fuer ${user.email}`, { user: actor });
+  res.json({ ok: true, must_change: true });
+});
+
+// Setz-/Reset-Link ausstellen und mailen. Die URL kommt mit zurueck, damit der
+// Admin sie von Hand weitergeben kann, wenn kein Mailer konfiguriert ist.
+router.post('/:email/password-link', express.json(), async (req, res) => {
+  const user = _passwordTarget(req, res);
+  if (!user) return;
+  const actor = req.session.user.email;
+  const purpose = creds.hasPassword(user.email) ? 'reset' : 'set';
+  const local = authProviders.getProvider('local');
+  let result;
+  try {
+    result = await local.issuePasswordLink(user.email, {
+      purpose, createdBy: actor, locale: user.language || 'de',
+    });
+  } catch (e) {
+    logger.error(`password-link: ${e.message}`, { user: actor });
+    return res.status(500).json({ error_code: 'PASSWORD_LINK_FAILED', detail: e.message });
+  }
+  appUsers.recordAuditEvent(user.email, 'password-link-sent', {
+    ip: _clientIp(req),
+    userAgent: req.headers['user-agent'] || null,
+    meta: { by: actor, purpose, mailSent: !!result.mail.sent },
+  });
+  logger.info(`Passwort-Link (${purpose}) ausgestellt fuer ${user.email}`, { user: actor });
+  res.json({ ok: true, purpose, url: result.url, expiresAt: result.expiresAt, mail: result.mail });
+});
+
+// Lokales Passwort entfernen. Das Konto bleibt, kann sich aber nicht mehr
+// anmelden, bis ein neues gesetzt ist — der Weg, ein Konto stillzulegen, ohne
+// seine Inhalte anzufassen.
+router.delete('/:email/password', (req, res) => {
+  const user = _passwordTarget(req, res);
+  if (!user) return;
+  const actor = req.session.user.email;
+  if (user.email === actor.toLowerCase()) {
+    return res.status(400).json({ error_code: 'CANNOT_REMOVE_OWN_PASSWORD' });
+  }
+  creds.deleteCredential(user.email);
+  creds.revokeOpenTokens(user.email);
+  appUsers.recordAuditEvent(user.email, 'password-removed', {
+    ip: _clientIp(req),
+    userAgent: req.headers['user-agent'] || null,
+    meta: { by: actor },
+  });
+  logger.info(`Lokales Passwort entfernt fuer ${user.email}`, { user: actor });
+  res.json({ ok: true });
 });
 
 router.get('/:email/audit', (req, res) => {

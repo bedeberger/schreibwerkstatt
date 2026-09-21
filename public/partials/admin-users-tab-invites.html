@@ -1,0 +1,92 @@
+<!-- Fragment: Tab „Eingeladene Benutzer" der Admin-User-Karte. Scope:
+     `adminUsersCard` (siehe admin-users.html). -->
+  <div class="card-form-grid" x-show="!adminUsersLoading && adminUsersTab === 'invites'">
+
+    <div class="admin-users-requests-filter">
+      <button type="button" class="icon-btn icon-btn--ghost" @click="adminUsersInvitesLoad()" :disabled="adminUsersInvitesLoading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
+    </div>
+
+    <div x-show="adminUsersInvitesLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
+
+    <!-- Reminder-Result -->
+    <div class="admin-users-invite-result" x-show="adminUsersInvitesResult">
+      <span class="muted-msg muted-msg--sm"
+            x-show="adminUsersInvitesResult?.mail?.sent"
+            x-text="$app.t('admin.users.invites.reminderSent')"></span>
+      <span class="muted-msg muted-msg--sm"
+            x-show="adminUsersInvitesResult && !adminUsersInvitesResult.cooldown && !adminUsersInvitesResult?.mail?.sent"
+            x-text="$app.t('admin.users.invites.reminderMailerDisabled')"></span>
+      <span class="muted-msg muted-msg--sm"
+            x-show="adminUsersInvitesResult?.cooldown"
+            x-text="$app.t('admin.users.invites.reminderCooldown', { hours: Math.ceil((adminUsersInvitesResult?.retryAfter || 0) / 3600) })"></span>
+    </div>
+
+    <div class="table-scroll" x-show="adminUsersInvitesList.length">
+    <table class="admin-users-table"
+           x-data="sortableTable({
+             rows: () => adminUsersInvitesList,
+             defaultKey: 'invited_at',
+             defaultDir: 'desc',
+             persistKey: 'admin.users.invites',
+             types: { invited_at: 'date', expires_at: 'date', last_clicked_at: 'date', last_reminder_at: 'date' },
+           })">
+      <thead>
+        <tr>
+          <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+              @click="sortBy('email')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('global_role')" :aria-sort="ariaSort('global_role')"
+              @click="sortBy('global_role')" x-text="$app.t('admin.users.role')"></th>
+          <th class="sortable-th" :class="sortClass('invited_at')" :aria-sort="ariaSort('invited_at')"
+              @click="sortBy('invited_at')" x-text="$app.t('admin.users.invites.invitedAt')"></th>
+          <th class="sortable-th" :class="sortClass('expires_at')" :aria-sort="ariaSort('expires_at')"
+              @click="sortBy('expires_at')" x-text="$app.t('admin.users.invites.expiresAt')"></th>
+          <th class="sortable-th" :class="sortClass('last_clicked_at')" :aria-sort="ariaSort('last_clicked_at')"
+              @click="sortBy('last_clicked_at')" x-text="$app.t('admin.users.invites.clickStatus')"></th>
+          <th class="sortable-th" :class="sortClass('last_reminder_at')" :aria-sort="ariaSort('last_reminder_at')"
+              @click="sortBy('last_reminder_at')" x-text="$app.t('admin.users.invites.reminderStatus')"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="inv in sorted" :key="inv.id">
+          <tr>
+            <td>
+              <div x-text="inv.email"></div>
+              <div class="muted-msg muted-msg--sm" x-show="inv.invited_by" x-text="$app.t('admin.users.invites.invitedBy', { email: inv.invited_by })"></div>
+            </td>
+            <td><span class="badge" x-text="$app.t('admin.users.role.' + inv.global_role)"></span></td>
+            <td>
+              <span class="muted-msg muted-msg--sm" x-text="inv.invited_at ? new Date(inv.invited_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) : '—'"></span>
+            </td>
+            <td>
+              <span class="badge" :class="inv.expired ? 'badge--status-suspended' : ''"
+                    x-text="inv.expires_at ? new Date(inv.expires_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) : '—'"></span>
+            </td>
+            <td>
+              <span x-show="!inv.last_clicked_at" class="badge" x-text="$app.t('admin.users.invites.click.never')"></span>
+              <span x-show="inv.last_clicked_at" class="badge badge--status-active"
+                    x-text="$app.t('admin.users.invites.click.clicked', { count: inv.click_count, at: new Date(inv.last_clicked_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) })"></span>
+            </td>
+            <td>
+              <span x-show="!inv.last_reminder_at" class="muted-msg muted-msg--sm" x-text="$app.t('admin.users.invites.reminder.never')"></span>
+              <span x-show="inv.last_reminder_at" class="muted-msg muted-msg--sm"
+                    x-text="$app.t('admin.users.invites.reminder.last', { count: inv.reminder_count, at: new Date(inv.last_reminder_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) })"></span>
+            </td>
+            <td class="admin-users-actions">
+              <button x-data="copyButton({ text: () => inv.invite_url?.startsWith('http') ? inv.invite_url : location.origin + inv.invite_url, label: () => window.__app.t('admin.users.invites.copyUrl') })"></button>
+              <button type="button" @click="adminUsersInviteRemind(inv)"
+                      :disabled="inv.expired || adminUsersInvitesBusy === inv.id"
+                      x-text="$app.t('admin.users.invites.remind')"></button>
+              <button type="button" class="danger" @click="adminUsersInviteRevoke(inv)"
+                      :disabled="adminUsersInvitesBusy === inv.id"
+                      x-text="$app.t('admin.users.invites.revoke')"></button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    </div>
+
+    <p class="muted-msg" x-show="!adminUsersInvitesLoading && !adminUsersInvitesList.length"
+       x-text="$app.t('admin.users.invites.empty')"></p>
+  </div>

@@ -1,0 +1,171 @@
+<!-- Fragment: Tab „Benutzer" der Admin-User-Karte, eingebunden von
+     admin-users.html. Eigene Datei, damit das Partial unter dem LOC-Cap
+     bleibt; der Alpine-Scope ist weiterhin `adminUsersCard`. -->
+  <div class="card-form-grid" x-show="!adminUsersLoading && adminUsersTab === 'users'">
+
+    <!-- Invite-Sektion -->
+    <fieldset class="admin-users-invite">
+      <legend x-text="$app.t('admin.users.invite')"></legend>
+      <div class="admin-users-invite-row">
+        <input type="email" x-model="adminUsersInviteEmail"
+               :placeholder="$app.t('admin.users.invite.emailPlaceholder')"
+               :disabled="adminUsersInviting">
+        <div x-data="combobox({ placeholder: $app.t('admin.users.role'), compact: false })"
+             x-modelable="value" x-model="adminUsersInviteRole"
+             x-effect="options = [
+               { value: 'user',  label: $app.t('admin.users.role.user') },
+               { value: 'admin', label: $app.t('admin.users.role.admin') },
+             ]"></div>
+        <button type="button" @click="adminUsersInvite()" :disabled="adminUsersInviting || !adminUsersInviteEmail">
+          <span x-text="adminUsersInviting ? $app.t('common.saving') : $app.t('admin.users.invite.submit')"></span>
+        </button>
+      </div>
+      <div class="admin-users-invite-result" x-show="adminUsersInviteResult">
+        <span class="muted-msg muted-msg--sm" x-text="$app.t('admin.users.invite.created', { email: adminUsersInviteResult?.email })"></span>
+        <span class="muted-msg muted-msg--sm"
+              x-show="adminUsersInviteResult?.mail?.sent"
+              x-text="$app.t('admin.users.invite.mailSent')"></span>
+        <span class="muted-msg muted-msg--sm"
+              x-show="adminUsersInviteResult && adminUsersInviteResult.mail && !adminUsersInviteResult.mail.sent"
+              x-text="$app.t('admin.users.invite.mailerDisabledHint')"></span>
+        <div class="admin-users-invite-url">
+          <code x-text="adminUsersInviteResult?.url"></code>
+          <button x-data="copyButton({ text: () => adminUsersInviteResult?.url })"></button>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- User-Tabelle -->
+    <div class="table-scroll" x-show="adminUsersList.length">
+    <table class="admin-users-table"
+           x-data="sortableTable({
+             rows: () => adminUsersList,
+             defaultKey: 'email',
+             persistKey: 'admin.users',
+             types: { last_seen_at: 'date' },
+           })">
+      <thead>
+        <tr>
+          <th class="sortable-th" :class="sortClass('email')" :aria-sort="ariaSort('email')"
+              @click="sortBy('email')" x-text="$app.t('admin.users.email')"></th>
+          <th class="sortable-th" :class="sortClass('global_role')" :aria-sort="ariaSort('global_role')"
+              @click="sortBy('global_role')" x-text="$app.t('admin.users.role')"></th>
+          <th x-text="$app.t('admin.users.aiProfile')"></th>
+          <th class="sortable-th" :class="sortClass('status')" :aria-sort="ariaSort('status')"
+              @click="sortBy('status')" x-text="$app.t('admin.users.status')"></th>
+          <th x-show="adminUsersAuthMethod === 'local'" x-text="$app.t('admin.users.password')"></th>
+          <th class="sortable-th" :class="sortClass('last_seen_at')" :aria-sort="ariaSort('last_seen_at')"
+              @click="sortBy('last_seen_at')" x-text="$app.t('admin.users.lastLogin')"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="u in sorted" :key="u.email">
+          <tr>
+            <td>
+              <div x-text="u.display_name || u.email"></div>
+              <div class="muted-msg muted-msg--sm" x-text="u.email"></div>
+              <div class="muted-msg muted-msg--sm" x-show="u.invited_by"
+                   x-text="$app.t('admin.users.invitedBy', { name: u.invited_by_name || u.invited_by })"></div>
+            </td>
+            <td>
+              <div x-data="combobox($app.t('admin.users.role'))"
+                   x-effect="value = u.global_role; options = [
+                     { value: 'user',  label: $app.t('admin.users.role.user') },
+                     { value: 'admin', label: $app.t('admin.users.role.admin') },
+                   ]"
+                   @combobox-change="if ($event.detail && $event.detail !== u.global_role) adminUsersUpdate(u, { global_role: $event.detail })"></div>
+            </td>
+            <td>
+              <div x-data="combobox($app.t('admin.users.aiProfile'))"
+                   x-effect="value = u.ai_profile_id ? String(u.ai_profile_id) : ''; options = [
+                     { value: '', label: $app.t('admin.users.aiProfile.global', { provider: adminUsersGlobalProvider }) },
+                     ...adminUsersProfiles.map(p => ({ value: String(p.id), label: p.name + ' · ' + p.provider })),
+                   ]"
+                   @combobox-change="if ($event.detail !== (u.ai_profile_id ? String(u.ai_profile_id) : '')) adminUsersUpdate(u, { ai_profile_id: $event.detail ? Number($event.detail) : null })"></div>
+            </td>
+            <td>
+              <span class="badge" :class="'badge--status-' + u.status" x-text="$app.t('admin.users.status.' + u.status)"></span>
+            </td>
+            <!-- Passwort-Spalte nur beim lokalen Verfahren: bei einem IdP gibt
+                 es in dieser Instanz kein Passwort, das der Admin setzen koennte. -->
+            <td x-show="adminUsersAuthMethod === 'local'" class="admin-users-actions">
+              <span class="badge" :class="u.has_password ? (u.must_change_password ? 'badge--status-invited' : 'badge--status-active') : ''"
+                    x-text="!u.has_password ? $app.t('admin.users.password.none') : (u.must_change_password ? $app.t('admin.users.password.initial') : $app.t('admin.users.password.set'))"></span>
+              <button type="button" @click="adminUsersPasswordOpen(u)"
+                      :disabled="adminUsersPasswordBusy === u.email"
+                      x-text="$app.t('admin.users.password.set.action')"></button>
+              <button type="button" @click="adminUsersPasswordLink(u)"
+                      :disabled="adminUsersPasswordBusy === u.email"
+                      x-text="$app.t('admin.users.password.link')"></button>
+              <button type="button" class="danger" @click="adminUsersPasswordRemove(u)"
+                      x-show="u.has_password && u.email !== $store.session.currentUser?.email"
+                      :disabled="adminUsersPasswordBusy === u.email"
+                      x-text="$app.t('admin.users.password.remove')"></button>
+            </td>
+            <td>
+              <span class="muted-msg muted-msg--sm" x-text="u.last_seen_at ? new Date(u.last_seen_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone }) : '—'"></span>
+            </td>
+            <td class="admin-users-actions">
+              <button type="button"
+                      @click="adminUsersUpdate(u, { status: u.status === 'suspended' ? 'active' : 'suspended' })"
+                      x-text="u.status === 'suspended' ? $app.t('admin.users.reactivate') : $app.t('admin.users.suspend')"></button>
+              <button type="button" @click="adminUsersToggleAudit(u)"
+                      x-text="adminUsersAuditEmail === u.email ? $app.t('admin.users.auditClose') : $app.t('admin.users.audit')"></button>
+              <button type="button" class="danger" @click="adminUsersDelete(u)"
+                      x-show="u.email !== $store.session.currentUser?.email"
+                      x-text="$app.t('admin.users.delete')"></button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    </div>
+
+    <!-- Passwort-Drawer: Initialpasswort vergeben bzw. ausgestellten Link
+         anzeigen (der Weg ohne Mailer). -->
+    <div class="admin-users-audit" x-show="adminUsersPasswordEmail">
+      <h3 x-text="$app.t('admin.users.password.title', { email: adminUsersPasswordEmail })"></h3>
+      <div class="admin-users-invite-row">
+        <input type="password" x-model="adminUsersPasswordValue" autocomplete="new-password"
+               :placeholder="$app.t('admin.users.password.placeholder')"
+               :disabled="adminUsersPasswordBusy === adminUsersPasswordEmail">
+        <button type="button" @click="adminUsersPasswordSave()"
+                :disabled="!adminUsersPasswordValue || adminUsersPasswordBusy === adminUsersPasswordEmail"
+                x-text="$app.t('common.save')"></button>
+        <button type="button" @click="adminUsersPasswordEmail = null; adminUsersPasswordValue = ''"
+                x-text="$app.t('common.cancel')"></button>
+      </div>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.users.password.hint')"></p>
+    </div>
+
+    <div class="admin-users-invite-result" x-show="adminUsersPasswordResult">
+      <span class="muted-msg muted-msg--sm"
+            x-show="adminUsersPasswordResult?.mail?.sent"
+            x-text="$app.t('admin.users.password.mailSent')"></span>
+      <span class="muted-msg muted-msg--sm"
+            x-show="adminUsersPasswordResult && adminUsersPasswordResult.url && !adminUsersPasswordResult.mail?.sent"
+            x-text="$app.t('admin.users.password.mailerDisabledHint')"></span>
+      <div class="admin-users-invite-url" x-show="adminUsersPasswordResult?.url">
+        <code x-text="adminUsersPasswordResult?.url"></code>
+        <button x-data="copyButton({ text: () => adminUsersPasswordResult?.url })"></button>
+      </div>
+    </div>
+
+    <!-- Audit-Drawer -->
+    <div class="admin-users-audit" x-show="adminUsersAuditEmail">
+      <h3 x-text="$app.t('admin.users.auditTitle', { email: adminUsersAuditEmail })"></h3>
+      <ul>
+        <template x-for="ev in adminUsersAuditEvents" :key="ev.id">
+          <li>
+            <span class="badge" :class="'badge--event-' + ev.event" x-text="ev.event"></span>
+            <span class="muted-msg muted-msg--sm" x-text="new Date(ev.created_at).toLocaleString(($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH'), { timeZone: $store.shell.appTimezone })"></span>
+            <span class="muted-msg" x-show="ev.ip" x-text="' • ' + ev.ip"></span>
+            <pre class="admin-users-meta" x-show="ev.meta_json" x-text="ev.meta_json"></pre>
+          </li>
+        </template>
+        <li x-show="!adminUsersAuditEvents.length" class="muted-msg" x-text="$app.t('admin.users.auditEmpty')"></li>
+      </ul>
+    </div>
+
+  </div>
