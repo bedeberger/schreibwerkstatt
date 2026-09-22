@@ -182,6 +182,29 @@
     font-style: italic;
     text-align: center;
   }
+  /* --- Bildnachweis („Foto: …"). Eigene Zeile unter der Unterschrift und
+         kleiner als sie: fachlich eine andere Angabe (siehe Modulkopf von
+         public/js/figure/figure-html.js), und im Abbildungsverzeichnis taucht
+         er nicht auf. Nicht kursiv — sonst verschwimmt er mit der Legende. --- */
+  :is(.page-content-view, .book-editor-page-body, .share-content) .figure-credit {
+    margin: var(--space-xs, 4px) 0 0;
+    font-size: var(--font-size-xs, 11px);
+    color: var(--mc-subtle);
+    text-align: center;
+    opacity: 0.85;
+  }
+
+  /* --- Nummern-Badge der Legende („Abb. 3.2: "). LAUFZEIT, NIE PERSISTIERT:
+         public/js/xrefs/caption-preview.js setzt es in die Leseansichten, beide
+         Bereinigungsschichten strippen es wieder (lib/html-clean.js und
+         editor/shared/html-clean.js). Es sieht aus wie Legendentext, weil es im
+         fertigen Dokument genau das ist — dort schreibt lib/xref-render.js es
+         beim Export direkt in die Beschriftung. --- */
+  :is(.page-content-view, .book-editor-page-body) :is(figcaption, caption) .xref-num {
+    font-style: inherit;
+    font-weight: 600;
+    color: var(--mc-muted);
+  }
 
   /* --- Trenner. `hr.pagebreak` erzeugt im PDF-Export addPage(), `hr.blankpage`
          zusätzlich eine leere Seite — beide müssen sich vom gewöhnlichen

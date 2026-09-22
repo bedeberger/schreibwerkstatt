@@ -2,8 +2,10 @@
 // (editorToolbarCard). Im Fokus-Modus deaktiviert (Trigger im keydown-Dispatch
 // hinter dem Focus-Hard-Stop).
 
-import { getEditEl, placeCaretIn, SLASH_ITEMS, _formatStamp } from './_shared.js';
+import { getEditEl, placeCaretIn, replaceBlockOutsideList, SLASH_ITEMS, _formatStamp } from './_shared.js';
 import { createTodoList } from '../../shared/todo-html.js';
+import { htmlToElement } from './caret-panel.js';
+import { buildFigureHtml, FIGURE_CAPTION_SEL } from '../../../figure/figure-html.js';
 import { contentRepo } from '../../../repo/content.js';
 
 const SLASH_GAP = 4;
@@ -187,23 +189,22 @@ export const slashMethods = {
     input.click();
   },
 
+  // Markup kommt aus der SSoT (figure/figure-html.js), nicht von Hand: Ersatztext
+  // und Bildnachweis haben dort ihre Traeger, und der Bild-Dialog liest dieselbe
+  // Form wieder aus. Frisch eingefuegt sind beide leer — der Caret landet in der
+  // Legende, das ist der erste Handgriff.
   _insertImageFigure(block, result) {
     const editEl = getEditEl();
     if (!editEl || !result?.url) return;
-    const fig = document.createElement('figure');
-    const img = document.createElement('img');
-    img.src = result.url;
-    img.alt = '';
-    const cap = document.createElement('figcaption');
-    cap.appendChild(document.createElement('br'));
-    fig.appendChild(img);
-    fig.appendChild(cap);
+    const fig = htmlToElement(buildFigureHtml({ src: result.url }));
+    if (!fig) return;
     if (block && block.isConnected && block.parentNode && editEl.contains(block)) {
-      block.parentNode.replaceChild(fig, block);
+      replaceBlockOutsideList(editEl, block, fig);
     } else {
       editEl.appendChild(fig);
     }
-    placeCaretIn(cap);
+    const cap = fig.querySelector(FIGURE_CAPTION_SEL);
+    if (cap) placeCaretIn(cap);
     window.__app?._markEditDirty?.();
   },
 
@@ -256,7 +257,7 @@ export const slashMethods = {
       const stamp = _formatStamp(item.insertText);
       const p = document.createElement('p');
       p.textContent = stamp;
-      block.parentNode.replaceChild(p, block);
+      replaceBlockOutsideList(editEl, block, p);
       const sel = document.getSelection();
       if (sel) {
         const range = document.createRange();
@@ -276,7 +277,7 @@ export const slashMethods = {
     if (item.tag === 'hr') {
       replacement = document.createElement('hr');
       if (item.className) replacement.className = item.className;
-      block.parentNode.replaceChild(replacement, block);
+      replaceBlockOutsideList(editEl, block, replacement);
       const next = document.createElement('p');
       next.appendChild(document.createElement('br'));
       replacement.insertAdjacentElement('afterend', next);
@@ -285,14 +286,14 @@ export const slashMethods = {
       // Struktur kommt aus der Markup-SSoT editor/shared/todo-html.js.
       const todo = createTodoList();
       replacement = todo.list;
-      block.parentNode.replaceChild(replacement, block);
+      replaceBlockOutsideList(editEl, block, replacement);
       caretTarget = todo.text;
     } else if (item.list) {
       replacement = document.createElement(item.tag);
       const li = document.createElement('li');
       li.appendChild(document.createElement('br'));
       replacement.appendChild(li);
-      block.parentNode.replaceChild(replacement, block);
+      replaceBlockOutsideList(editEl, block, replacement);
       caretTarget = li;
     } else if (item.wrapP) {
       // blockquote / .poem → enthält ein <p> als Schreibfläche.
@@ -301,13 +302,13 @@ export const slashMethods = {
       const p = document.createElement('p');
       p.innerHTML = '<br>';
       replacement.appendChild(p);
-      block.parentNode.replaceChild(replacement, block);
+      replaceBlockOutsideList(editEl, block, replacement);
       caretTarget = p;
     } else {
       // Einfacher Tag-Swap (p, h2, h3).
       replacement = document.createElement(item.tag);
       replacement.innerHTML = '<br>';
-      block.parentNode.replaceChild(replacement, block);
+      replaceBlockOutsideList(editEl, block, replacement);
       caretTarget = replacement;
     }
 

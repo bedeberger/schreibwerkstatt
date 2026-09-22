@@ -19,6 +19,7 @@ import { markCitesAtomic } from '../../sources/cite-html.js';
 import { markXrefsAtomic } from '../../xrefs/xref-html.js';
 import { markDiagramsAtomic } from '../../diagram/mermaid-html.js';
 import { markTablesAtomic } from '../../table/table-html.js';
+import { markFiguresAtomic } from '../../figure/figure-html.js';
 
 // Setzt `html` in `el` und stellt Block-Konsistenz + Caret-Slot her.
 // Liefert `{ repaired }` — true, wenn `normalizeEditorBlocks` am gelieferten
@@ -56,6 +57,9 @@ export function mountEditorHtml(el, html) {
   // wird ausschliesslich im Gitter-Dialog (notebook-only). Auch hier nur ein
   // Laufzeit-Attribut.
   markTablesAtomic(el);
+  // Bildnachweise ebenso — ein Feld mit fester Rolle, bearbeitet im Bild-Dialog.
+  // Die `<figcaption>` daneben bleibt frei tippbar: sie ist Manuskripttext.
+  markFiguresAtomic(el);
   return { repaired };
 }
 

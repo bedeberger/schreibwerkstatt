@@ -83,6 +83,24 @@
 /* Zitat-Einzug ist Notebook-spezifisch (Lesekasten mit 12px-Innenabstand); die
    Innenabstände der Kinder + das orphan-<br>-Artefakt liegen in der SSoT. */
 .page-content-view blockquote { border-left: 3px solid var(--color-border); padding: 0.3em 0 0.3em 12px; margin: 0.4em 0; color: var(--color-subtle); font-style: italic; }
+/* Leere Bildunterschrift im Edit-Modus sichtbar machen. Ohne das ist die
+   `<figcaption>` einer frisch eingefügten Abbildung eine Zeile aus Nichts — der
+   Autor sieht nicht, dass dort ein Schreibplatz ist, und lässt sie leer.
+   Chromium hält den Caret-Slot mit einem einzelnen `<br>` offen, `:empty` allein
+   greift deshalb nicht.
+   Der Text kommt aus der i18n-Registry: `--figcaption-ph` setzt
+   page-view.js#_setCaptionPlaceholder am Editier-Container. Der ist NICHT Teil
+   des gespeicherten `innerHTML` — hier entsteht also nichts, was persistiert
+   werden könnte. Nur Edit-Modus: in der Leseansicht wäre der Platzhalter ein
+   Geistertext im fertigen Manuskript. */
+.page-content-view--editing figcaption:is(:empty, :has(> br:only-child))::before {
+  content: var(--figcaption-ph, '');
+  color: var(--color-subtle);
+  opacity: 0.6;
+  font-style: italic;
+  pointer-events: none;
+}
+.page-content-view--editing figure img { cursor: pointer; }
 .page-content-view--editing hr { cursor: pointer; }
 .page-content-view--editing hr.hr-selected { border-top-color: var(--color-accent); border-top-width: 2px; outline: 2px solid var(--color-accent); outline-offset: 4px; }
 /* hr ist void ohne Caret-Slot: der Caret landet quer zwischen Linie und

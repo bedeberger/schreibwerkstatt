@@ -23,6 +23,7 @@ import { handleEditorPaste, handleEditorCopy, handleEditorCut } from '../editor/
 import { createAutosaveTimers } from '../editor/shared/autosave.js';
 import { createTimerBag } from '../editor/shared/timers.js';
 import { renderDiagramsIn, clearRenderedDiagrams } from '../diagram/mermaid-view.js';
+import { stampCaptionNumbers, clearCaptionNumbers } from '../xrefs/caption-preview.js';
 import { EVT } from '../events.js';
 
 // Re-Export für Tests/Konsumenten: die Facade ist der Einstieg.
@@ -294,6 +295,7 @@ export function registerBookEditorCard() {
       el.innerHTML = block.html;
       el.dataset.rev = String(block._rev || 0);
       this._syncBlockDiagrams(el, block);
+      this._syncBlockCaptionNumbers(el, block);
     },
 
     // Diagramme im Stream: inaktive Blöcke zeigen das Bild, der aktive den
@@ -316,6 +318,27 @@ export function registerBookEditorCard() {
         .catch(() => {});
     },
 
+    // Nummern in Abbildungslegenden und Tabellenbeschriftungen („Abb. 3.2: ").
+    // Dieselbe Mechanik wie beim Diagramm und aus demselben Grund: das Badge ist
+    // ein Fremdknoten im Block-DOM, und sobald der Block aktiv wird, gehört
+    // dieses DOM dem User und läuft durch den Save-Pfad. Der aktive Block
+    // bekommt deshalb seinen nackten Legendentext zurück, alle übrigen zeigen
+    // die Nummer.
+    //
+    // Dass ein Badge auch bei einem Fehlgriff nicht in `pages.content` landen
+    // kann, sichern zwei Bereinigungsschichten (editor/shared/html-clean.js für
+    // den Dirty-Vergleich, lib/html-clean.js am Schreib-Chokepoint) — hier geht
+    // es darum, dass der User im aktiven Block keinen Text vor sich hat, den er
+    // nicht geschrieben hat.
+    _syncBlockCaptionNumbers(el, block) {
+      if (!el) return;
+      if (this.activePageId === block.pageId) {
+        clearCaptionNumbers(el);
+        return;
+      }
+      stampCaptionNumbers(el, window.Alpine?.store('nav')?.selectedBookId).catch(() => {});
+    },
+
     // Schreibt block.html in DOM-Container; läuft NICHT auf dem aktiven Block
     // (DOM gehört dort dem User). Per-Block-_rev triggert Re-Hydrate bei
     // externen Mutationen (Find/Replace, Reload).
@@ -328,6 +351,7 @@ export function registerBookEditorCard() {
       el.innerHTML = block.html;
       el.dataset.rev = String(block._rev);
       this._syncBlockDiagrams(el, block);
+      this._syncBlockCaptionNumbers(el, block);
     },
 
     // ── Klick-aktiviert-Block ─────────────────────────────────────────────
@@ -353,13 +377,17 @@ export function registerBookEditorCard() {
         if (prevId != null) {
           const prevEl = this.$root.querySelector(`[data-book-editor-page="${prevId}"]`);
           const prevBlock = this._blockById(prevId);
-          if (prevEl && prevBlock) this._syncBlockDiagrams(prevEl, prevBlock);
+          if (prevEl && prevBlock) {
+            this._syncBlockDiagrams(prevEl, prevBlock);
+            this._syncBlockCaptionNumbers(prevEl, prevBlock);
+          }
         }
         // $root, nicht $el: in einer aus @click gerufenen Methode zeigt $el auf
         // das auslösende Element (den Block-Body), $root auf die Karten-Wurzel.
         const el = this.$root.querySelector(`[data-book-editor-page="${block.pageId}"]`);
         if (!el) return;
         clearRenderedDiagrams(el);
+        clearCaptionNumbers(el);
         el.focus({ preventScroll: true });
         const md = this._pendingMousedown?.pageId === block.pageId ? this._pendingMousedown : null;
         this._pendingMousedown = null;

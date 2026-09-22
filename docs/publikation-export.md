@@ -97,6 +97,17 @@ Datenquelle ist [lib/bibliography.js](../lib/bibliography.js)#`buildBibliography
 
 **Fassungs-Export liest die Fundstellen aus dem eingefrorenen HTML** (`citationsFromGroups(groups)` in [routes/snapshots.js](../routes/snapshots.js), übersteuert `pageIds`): `source_citations` beschreibt den heutigen Seitenstand, die Fassung aber einen alten — sonst trägt ein Chip im numerischen Stil eine Nummer, die zum Verzeichnis dieser Fassung nicht passt. Die Quellen-Stammdaten bleiben bewusst live (eine korrigierte ISBN soll auch dort stimmen).
 
+## Abbildungs- und Tabellenverzeichnis
+
+Zweites Verzeichnis neben dem Quellenverzeichnis, mit denselben zwei Invarianten (Render-Artefakt, nie persistiert) und derselben Sichtbarkeitsregel (**nur `scope='book'`**). Der dritte Schalter ist die Nummerierung des Buchs selbst — `book_settings.figure_numbering` / `table_numbering`; ohne Nummern gäbe es nichts, worauf ein Eintrag zeigen könnte. Einen eigenen Schalter im Exportprofil gibt es bewusst **nicht**.
+
+Die Einträge kommen in jedem Ausgabeweg aus dem Xref-Kontext, der die Legenden im Text nummeriert hat (siehe [docs/xrefs.md](xrefs.md)). Zwei Bauarten:
+
+- **Ohne Seitenzahlen** — [lib/anchor-directory.js](../lib/anchor-directory.js), verwendet von HTML, Markdown, TXT, DOCX und EPUB. Dort ist die „Seite" eine Funktion des Lesegeräts. Im EPUB sind es zwei Backmatter-Abschnitte vor dem Quellenverzeichnis, im Inhaltsverzeichnis sichtbar (ein Verzeichnis springt man gezielt an).
+- **Mit Seitenzahlen** — [lib/pdf-render/anchor-dir.js](../lib/pdf-render/anchor-dir.js), Zweipass wie beim Inhaltsverzeichnis: die Verzeichnisseiten entstehen hinter dem Inhaltsverzeichnis und merken sich ihre Zeilenpositionen, die Buchseite meldet der Body-Renderer beim Zeichnen (`onAnchorStart`), der Stempel-Pass trägt sie nach. Typografie aus der TOC-Rolle des Profils — ein Verzeichnis ist ein Verzeichnis, zwei Schriftbilder im selben Buch wären ein Fehler.
+
+**Der EPUB-Export läuft seit dieser Fassung durch `applyXrefsInGroups`** wie jeder andere Ausgabeweg. Ohne diesen Schritt trüge er den Verweistext vom Einfüge-Zeitpunkt und Legenden ohne Nummer.
+
 ## Anmerkungsapparat (Endnoten pro Kapitel)
 
 `book_settings.citation_notes` (Migration 256) wählt die **Belegdarstellung** — buchweit, wie `citation_style`, weil sie eine Eigenschaft des Werks ist und nicht des Exports:

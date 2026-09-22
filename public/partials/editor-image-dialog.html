@@ -1,0 +1,56 @@
+<!-- Bild-Dialog des Notebook-Editors: Ersatztext (alt) und Bildnachweis einer
+     eingefügten Abbildung. Lebt im Scope von editorToolbarCard (Methoden in
+     public/js/editor/notebook/toolbar/image.js) — darum `x-ref` + showModal()
+     statt des modal()-Primitivs, und `@close` ist der einzige Aufräumpunkt
+     (ESC, Backdrop und Abbrechen laufen alle durch dlg.close()).
+
+     Die Bildunterschrift fehlt hier bewusst: sie ist Manuskripttext und wird
+     direkt in der `<figcaption>` getippt (siehe Modulkopf von image.js).
+
+     Beide Felder tragen `data-spellcheck="spelling"` — Prosatext, den sonst
+     keine Schicht prüft (harte Regel „LanguageTool auf Prosatextfeldern"). -->
+<dialog class="editor-dialog image-dialog" x-ref="imageDlg" @close="onImageDialogClose()"
+        @click.self="closeImageDialog()">
+  <div class="editor-dialog__inner">
+    <div class="editor-dialog__head">
+      <span class="editor-dialog__title" x-text="$app.t('editor.image.title')"></span>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="closeImageDialog()"
+              :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+      </button>
+    </div>
+
+    <div class="image-dialog-body">
+      <div class="image-dialog-preview">
+        <img class="image-dialog-thumb" :src="imageSrc" :alt="imageAlt" x-show="imageSrc">
+      </div>
+
+      <div class="image-dialog-fields">
+        <label class="card-form-label" for="image-alt-input"
+               x-text="$app.t('editor.image.alt')"></label>
+        <input type="text" id="image-alt-input" class="image-dialog-input"
+               x-ref="imageAltInput" x-model="imageAlt"
+               data-spellcheck="spelling" autocomplete="off"
+               :placeholder="$app.t('editor.image.altPlaceholder')">
+        <p class="card-hint card-hint--sm" x-text="$app.t('editor.image.altHint')"></p>
+
+        <label class="card-form-label" for="image-credit-input"
+               x-text="$app.t('editor.image.credit')"></label>
+        <input type="text" id="image-credit-input" class="image-dialog-input"
+               x-model="imageCredit"
+               data-spellcheck="spelling" autocomplete="off"
+               :placeholder="$app.t('editor.image.creditPlaceholder')">
+        <p class="card-hint card-hint--sm" x-text="$app.t('editor.image.creditHint')"></p>
+      </div>
+    </div>
+
+    <div class="editor-dialog__actions">
+      <button type="button" class="danger" @click="removeImage()"
+              x-text="$app.t('editor.image.remove')"></button>
+      <span class="editor-dialog__spacer"></span>
+      <button type="button" @click="closeImageDialog()" x-text="$app.t('common.cancel')"></button>
+      <button type="button" class="primary" @click="applyImageMeta()"
+              x-text="$app.t('common.save')"></button>
+    </div>
+  </div>
+</dialog>

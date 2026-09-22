@@ -49,7 +49,13 @@ export function stripLektoratMarks(html) {
   // die Revision — und bekommt es beim naechsten Laden als Inhalt zurueck.
   // Der Trigger gehoert zwingend in diese Bedingung: sonst greift der
   // Early-Return und der Filter unten laeuft nie.
-  const hasLtUi = out && (out.indexOf('lt-popover') !== -1 || out.indexOf('lt-badge') !== -1);
+  // `.xref-num` ist die Vorschau-Nummer der Legende („Abb. 3.2: ",
+  // public/js/xrefs/caption-preview.js). Sie steht in der Leseansicht und im
+  // Bucheditor-Stream; bliebe sie in der Vergleichsform, gaelte jede Seite mit
+  // Abbildung beim blossen Hinsehen als veraendert — und ein Save schriebe die
+  // Zaehlung in den Text. Server-Pendant: lib/html-clean.js#_UI_ARTEFACT_SEL.
+  const hasLtUi = out && (out.indexOf('lt-popover') !== -1 || out.indexOf('lt-badge') !== -1
+    || out.indexOf('xref-num') !== -1);
   // `contenteditable` ist Editor-Laufzeit, kein Inhalt: der Quellen-Chip
   // (public/js/sources/cite-html.js) bekommt es beim Mount gesetzt, damit der
   // Caret ihn ueberspringt. Bliebe es in der Vergleichsform stehen, gaelte jede
@@ -60,7 +66,7 @@ export function stripLektoratMarks(html) {
   if (hasMark || hasIns || hasLtUi || hasEditableAttr) {
     const tmp = parseFragment(out);
     if (tmp) {
-      tmp.querySelectorAll('.lt-popover, .lt-badge').forEach(ui => {
+      tmp.querySelectorAll('.lt-popover, .lt-badge, .xref-num').forEach(ui => {
         ui.parentNode?.removeChild(ui);
       });
       tmp.querySelectorAll('[contenteditable]').forEach(el => {

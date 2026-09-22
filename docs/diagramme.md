@@ -101,6 +101,23 @@ Inhalt + Theme). Die Farben stehen im SVG; mit einem rein inhaltsbasierten
 Schlüssel galten Diagramme nach einem Hell/Dunkel-Wechsel als „schon gerendert"
 und blieben im alten Modus stehen.
 
+**Ein Theme-Wechsel wird nachgezogen.** Die Farben stecken im
+Server-SVG, ein fertiges Diagramm reagiert also nicht von selbst auf
+`data-theme` — dieselbe Lage wie bei den Canvas-Graphen. Ein MutationObserver in
+[mermaid-view.js](../public/js/diagram/mermaid-view.js) beobachtet das Attribut
+(das [theme-init.js](../public/js/theme-init.js) vor dem ersten Paint und
+[app/app-chrome.js](../public/js/app/app-chrome.js)#`_applyTheme` bei jeder
+Umschaltung setzt, auch der vom System durchgereichten) und holt die betroffenen
+Diagramme neu. Angefasst wird **nur, was schon einen Render-Knoten trägt**: der
+aktive Bucheditor-Block und die Notebook-Editieransicht zeigen bewusst
+Quelltext, ein Lauf über das ganze Dokument hängte ihnen ein SVG ein
+(Invariante 4). Anschliessend geht `DIAGRAMS_REDRAWN` an `document`: die
+Notebook-Leseansicht deckelt ihren Kasten anhand der *gemessenen* Diagrammhöhe
+([page-view.js](../public/js/book/page-view.js)#`_measuredPageViewPx`) und muss
+nach dem Knotentausch neu messen — ein Ereignis statt eines Griffs nach
+`window.__app`, denn der Bucheditor braucht die Nachmessung nicht. Gegated:
+[tests/e2e-app/notebook-diagram.spec.js](../tests/e2e-app/notebook-diagram.spec.js).
+
 **Der Share-Reader bekommt beide Themes** (`mode: 'screen'` in
 [diagram-export.js](../lib/diagram-export.js)): die SSR-Antwort kann nicht wissen,
 in welchem Modus der Leser sitzt — `prefers-color-scheme` ist Browser-Sache, die
@@ -149,6 +166,12 @@ die eigentliche Arbeit macht [lib/diagram-export.js](../lib/diagram-export.js).
 | Substack | `code` | Quelltext in `<pre>` (Substack strippt Klassen, kann kein `data:`-Bild) |
 | WordPress | — | Quelltext als `wp:code`-Block, siehe unten |
 | HubSpot | — | Quelltext in `<pre>` |
+
+**Der Export rendert immer hell.** Kein Ausgabeweg gibt ein `theme` an
+`resolveDiagramsInGroups`/`resolveDiagramsInHtml` weiter, der Renderer nimmt
+also `default`. Ein Manuskript-PDF, ein DOCX für das Lektorat oder ein EPUB sind
+Dokumente zum Drucken und Weitergeben; der Dunkelmodus ist eine Eigenschaft des
+Bildschirms, an dem gelesen wird, nicht des Dokuments.
 
 **Default ist `'code'`, also nichts tun.** Ein Builder, der Bilder tragen kann,
 wählt aktiv `svg` oder `png`. Bewusst diese Richtung: ein vergessenes Opt-in
@@ -304,7 +327,10 @@ Text:
 8. **Ein Sync-Weg, der zurückliest, muss die Diagramm-Klasse zurückbekommen.**
    Sonst degradiert der Pull den Block im Manuskript dauerhaft (siehe
    Blog-Sync-Abschnitt).
-9. **Mermaid-Version aktualisieren heisst:** Vendor-Datei ersetzen, den Pfad in
+9. **Dunkelmodus ist Bildschirm-Sache.** Die Anzeige-Oberflächen holen ihr SVG
+   pro Theme und ziehen einen Wechsel nach; die Exportwege setzen kein Theme und
+   bleiben hell.
+10. **Mermaid-Version aktualisieren heisst:** Vendor-Datei ersetzen, den Pfad in
    [lazy-libs.js](../public/js/lazy-libs.js), [share-reader/diagrams.js](../public/js/share-reader/diagrams.js)
    und `PUBLIC_ASSETS` in [server.js](../server.js) mitziehen und
    `RENDER_VERSION` in [lib/mermaid-render.js](../lib/mermaid-render.js) erhöhen

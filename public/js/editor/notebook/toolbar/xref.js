@@ -20,68 +20,17 @@
 import { getEditEl, caretRangeIn } from './_shared.js';
 import { capHits, cycleIdx, insertHtmlAtRange, onPickerKeydown, panelAnchorFor } from './caret-panel.js';
 import { buildXrefHtml, markXrefsAtomic } from '../../../xrefs/xref-html.js';
-import { defaultChapterLabels, anchorNumbers } from '../../../xrefs/xref-number.js';
 import { formatXref } from '../../../xrefs/xref-format.js';
+// Ziel-Liste und Vorschau-Nummern teilt sich der Picker mit den
+// Legenden-Nummern der Leseansichten (xrefs/caption-preview.js) — ein Cache,
+// ein Stand.
+import { loadXrefTargets, previewNumbers, invalidateXrefTargetCache } from '../../../xrefs/target-cache.js';
+
+export { invalidateXrefTargetCache };
 
 // Deckel der Trefferliste — wie beim Beleg-Picker: mehr als 40 Zeilen scannt
 // niemand, und der Picker soll bei langen Büchern nicht zur Endlosliste werden.
 const XREF_MAX_HITS = 40;
-
-// Ziele je Buch nur einmal holen. Sie ändern sich beim Umbauen des Buchs oder
-// beim Einfügen einer Abbildung; beides dispatcht `xrefs:changed`.
-const _targetCache = new Map();
-
-export function invalidateXrefTargetCache(bookId = null) {
-  if (bookId == null) _targetCache.clear();
-  else _targetCache.delete(String(bookId));
-}
-
-async function loadTargets(bookId) {
-  const key = String(bookId);
-  if (_targetCache.has(key)) return _targetCache.get(key);
-  const res = await fetch(`/xrefs/targets?book_id=${encodeURIComponent(key)}`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  const out = {
-    chapters: Array.isArray(data?.chapters) ? data.chapters : [],
-    figures: Array.isArray(data?.figures) ? data.figures : [],
-    tables: Array.isArray(data?.tables) ? data.tables : [],
-  };
-  _targetCache.set(key, out);
-  return out;
-}
-
-// Vorschau-Nummern über beide Achsen — dieselbe pure Logik, die auch der
-// Renderer benutzt, nur ohne Profil-Labels.
-function previewNumbers({ chapters, figures, tables }) {
-  // Tiefe aus der Elternkette (max 3 Ebenen, siehe docs/chapter-hierarchy.md).
-  const byId = new Map(chapters.map(c => [String(c.target), c]));
-  const shaped = chapters.map((c) => {
-    let depth = 1;
-    let cur = c;
-    const seen = new Set();
-    while (cur && cur.parentId != null && !seen.has(cur.target) && depth < 3) {
-      seen.add(cur.target);
-      cur = byId.get(String(cur.parentId));
-      if (!cur) break;
-      depth++;
-    }
-    return { chapterId: c.target, depth, title: c.title };
-  });
-  const chapterLabels = defaultChapterLabels(shaped);
-  // Zwei Aufrufe, zwei Zaehler: Abbildungen und Tabellen zaehlen getrennt (siehe
-  // xref-number.js). Ein gemeinsamer Aufruf zeigte im Picker Nummern, die der
-  // Renderer nachher nicht setzt.
-  const toAnchors = (list) => (list || []).map(a => ({ bid: a.target, chapterId: a.chapterId }));
-  const figNums = anchorNumbers(toAnchors(figures), chapterLabels);
-  const tblNums = anchorNumbers(toAnchors(tables), chapterLabels);
-  return {
-    chapterLabels, figNums, tblNums,
-    depthById: new Map(shaped.map(s => [String(s.chapterId), s.depth])),
-  };
-}
 
 export const xrefMethods = {
   // Panel öffnen: Caret-Range sichern, positionieren, Ziele laden.
@@ -113,7 +62,7 @@ export const xrefMethods = {
     if (!bookId) { this.xrefTargets = []; this.xrefHits = []; return; }
     this.xrefLoading = true;
     try {
-      const data = await loadTargets(bookId);
+      const data = await loadXrefTargets(bookId);
       const { chapterLabels, figNums, tblNums, depthById } = previewNumbers(data);
       // Eine flache Liste in Buch-Leserichtung: erst die Kapitel (mit ihrer
       // Hierarchie-Einrückung), dann die Abbildungen, dann die Tabellen. Alle

@@ -8,7 +8,8 @@
 
 import { readNormalSnapshot, clearNormalSnapshot } from './storage.js';
 import { readDraft } from '../draft-storage.js';
-import { renderDiagramsIn } from '../../diagram/mermaid-view.js';
+import { DIAGRAMS_REDRAWN, renderDiagramsIn } from '../../diagram/mermaid-view.js';
+import { stampCaptionNumbers } from '../../xrefs/caption-preview.js';
 
 // Restore nur, wenn für die Seite ein lokaler Draft (ungespeicherter Inhalt)
 // existiert. Ohne Draft hat der User keinen nennenswerten Edit-State —
@@ -76,6 +77,40 @@ export const notebookCardMethods = {
     });
     this.$watch(() => window.__app?.renderedPageHtml, draw);
     this.$watch(() => window.__app?.editMode, draw);
+    // Nach einem Theme-Wechsel steht ein neuer Render-Knoten im DOM: das
+    // Rendern selbst ist dann schon erledigt (der Lauf ist idempotent), aber
+    // die Kastenhoehe muss neu gemessen werden.
+    document.addEventListener(DIAGRAMS_REDRAWN, draw);
     queueMicrotask(draw);
+  },
+
+  // Nummern in Abbildungslegenden und Tabellenbeschriftungen der Leseansicht
+  // („Abb. 3.2: Der Käfer"). Ohne sie steht die Legende am Bildschirm nackt da,
+  // und wer prüfen will, ob „vgl. Abb. 3.2" im Text auf die richtige Abbildung
+  // zeigt, muss erst ein PDF bauen.
+  //
+  // NUR die Leseansicht (`.page-content-view` ohne `--editing`) — dieselbe
+  // Grenze wie beim Diagramm, aber hier mit schärferer Begründung: das Badge ist
+  // ein Fremdknoten, und im Edit-Modus liefe es durch den Save-Pfad. Dass es
+  // dort nichts anrichten KANN, sichern zwei Bereinigungsschichten
+  // (editor/shared/html-clean.js und lib/html-clean.js) — der Editier-Container
+  // bleibt trotzdem frei davon, statt sich auf sie zu verlassen.
+  //
+  // Die Nummer ist eine VORSCHAU nach nested-arabischer Vorgabe. Was im
+  // fertigen Dokument steht, entscheidet das Exportprofil (lib/xref-render.js).
+  _setupNotebookCaptionNumbers() {
+    const stamp = () => this.$nextTick(() => {
+      const app = window.__app;
+      if (!app || app.editMode || app.focusActive) return;
+      const view = document.querySelector('.page-content-view:not(.page-content-view--editing)');
+      if (!view) return;
+      const bookId = window.Alpine?.store('nav')?.selectedBookId;
+      // Fehler bleiben lokal: ohne Nummern ist die Leseansicht vollständig,
+      // nur ohne diese Zusatzinformation.
+      stampCaptionNumbers(view, bookId).catch(() => {});
+    });
+    this.$watch(() => window.__app?.renderedPageHtml, stamp);
+    this.$watch(() => window.__app?.editMode, stamp);
+    queueMicrotask(stamp);
   },
 };

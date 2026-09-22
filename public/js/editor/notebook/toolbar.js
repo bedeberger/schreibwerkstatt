@@ -1,7 +1,7 @@
 // Facade: toolbarCardMethods aus thematischen Submodulen in toolbar/.
 // Bubble-Toolbar + Link-Bar (bubble.js), Slash-Menü (slash.js), Quellen-Picker
 // (cite.js), Querverweis-Picker (xref.js), Diagramm-Dialog (diagram.js),
-// Tabellen-Dialog (table.js) und der
+// Tabellen-Dialog (table.js), Bild-Dialog (image.js) und der
 // zentrale Keydown-Dispatcher
 // (keydown.js) teilen sich zur
 // Laufzeit ein `this` (in das
@@ -20,6 +20,7 @@ import { citeMethods } from './toolbar/cite.js';
 import { xrefMethods } from './toolbar/xref.js';
 import { diagramMethods } from './toolbar/diagram.js';
 import { tableMethods } from './toolbar/table.js';
+import { imageMethods } from './toolbar/image.js';
 
 export const toolbarCardMethods = {
   ...bubbleMethods,
@@ -29,4 +30,5 @@ export const toolbarCardMethods = {
   ...xrefMethods,
   ...diagramMethods,
   ...tableMethods,
+  ...imageMethods,
 };

@@ -23,7 +23,7 @@
 // Save-Pfad das DOM zurueckliest.
 
 import { loadMermaid } from '../lazy-libs.js';
-import { collectDiagrams, diagramKey } from './mermaid-html.js';
+import { collectDiagrams, diagramCode, diagramKey, isDiagramEl } from './mermaid-html.js';
 
 // Klasse des eingefuegten Render-Knotens. Traegt den Schluessel des Quelltexts,
 // damit ein zweiter Lauf ueber denselben Container nicht neu rendert.
@@ -108,6 +108,64 @@ export function mermaidTheme() {
   return dark ? 'dark' : 'default';
 }
 
+// Letztes Fehler-Label der Oberflaeche. Gebraucht vom Theme-Nachziehen, das
+// kein Aufrufer-`opts` hat — i18n gehoert nicht in dieses Modul, und ein
+// englischer Notnagel waere in einer deutschen App sichtbar falsch.
+let _errorLabel = null;
+
+// Beobachter auf `data-theme` (einer pro Sitzung, `null` = noch keiner).
+let _themeWatch = null;
+
+/** Ereignis nach einem Theme-Nachzug. Oberflaechen, deren Geometrie an der
+ *  GEMESSENEN Diagrammhoehe haengt, muessen danach neu messen — die
+ *  Notebook-Leseansicht deckelt ihren Kasten so
+ *  (public/js/book/page-view.js#_measuredPageViewPx), und zwischen Abriss und
+ *  Einhaengen des neuen Knotens ist die Messung ungueltig. Ein Ereignis statt
+ *  eines Griffs nach `window.__app`: das Modul kennt seine Konsumenten nicht,
+ *  und der Bucheditor braucht die Nachmessung nicht. */
+export const DIAGRAMS_REDRAWN = 'diagrams-redrawn';
+
+/** Theme-Wechsel nachziehen.
+ *
+ *  Die Farben stehen im SVG — ein Server-Render traegt sie gebacken, also
+ *  reagiert ein fertiges Diagramm nicht von selbst auf `data-theme`. Dieselbe
+ *  Lage wie bei den Canvas-Graphen (public/js/graph-kit/theme.js). Das Attribut
+ *  setzt [theme-init.js](../theme-init.js) vor dem ersten Paint und
+ *  [app/app-chrome.js](../app/app-chrome.js)#_applyTheme bei jeder Umschaltung,
+ *  auch der vom System durchgereichten — es zu beobachten deckt beide Wege.
+ *
+ *  NICHT im Export: dort rendert der Server ohne Theme-Argument, also immer
+ *  hell (lib/diagram-export.js). Ein Manuskript-PDF in Dunkelfarben waere kein
+ *  Dokument, das man verschickt oder druckt.
+ *
+ *  Angefasst wird nur, was SCHON einen Render-Knoten hat. Der aktive
+ *  Bucheditor-Block und die Notebook-Editieransicht zeigen bewusst Quelltext
+ *  (Invarianten 3+4 in docs/diagramme.md) — ein Lauf ueber das ganze Dokument
+ *  haenge ihnen ein SVG ein, das der naechste Tastendruck ins Manuskript
+ *  schreibt. */
+function _watchTheme() {
+  if (_themeWatch || typeof MutationObserver !== 'function') return;
+  _themeWatch = new MutationObserver(() => { _redrawForTheme().catch(() => {}); });
+  _themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+}
+
+async function _redrawForTheme() {
+  const theme = mermaidTheme();
+  const pending = [];
+  for (const host of document.querySelectorAll('.' + RENDER_CLASS)) {
+    const el = host.previousElementSibling;
+    if (!isDiagramEl(el)) continue;
+    const code = diagramCode(el);
+    // Ein gleicher Schluessel heisst: schon im Zieltheme. `_applyTheme` setzt
+    // das Attribut auch dann, wenn sich der Wert nicht aendert.
+    if (!code || _isDrawn(el, code, theme)) continue;
+    pending.push({ el, code });
+  }
+  if (!pending.length) return;
+  await _draw(pending, theme);
+  document.dispatchEvent(new CustomEvent(DIAGRAMS_REDRAWN));
+}
+
 /** Einen einzelnen Quelltext zu SVG rendern. Wirft bei ungueltigem Code —
  *  Aufrufer entscheidet, ob er den Fehler zeigt (Dialog) oder den Quelltext
  *  stehen laesst (Leseansicht). */
@@ -138,14 +196,26 @@ export async function renderDiagramsIn(root, opts = {}) {
   const found = collectDiagrams(root);
   if (!found.length) return { rendered: 0, failed: 0 };
 
-  const pending = found.filter(({ el, code }) => {
-    const next = el.nextElementSibling;
-    const done = next?.classList?.contains(RENDER_CLASS)
-      && next.getAttribute(RENDER_KEY_ATTR) === _renderKey(code, theme);
-    return !done;
-  });
-  if (!pending.length) return { rendered: 0, failed: 0 };
+  // Label und Theme-Beobachtung erst hier: eine Oberflaeche ohne Diagramm soll
+  // keinen Observer hinterlassen.
+  if (opts.errorLabel) _errorLabel = opts.errorLabel;
+  _watchTheme();
 
+  const pending = found.filter(({ el, code }) => !_isDrawn(el, code, theme));
+  if (!pending.length) return { rendered: 0, failed: 0 };
+  return _draw(pending, theme, opts);
+}
+
+/** Traegt `el` schon das Bild zu diesem Quelltext UND diesem Theme? */
+function _isDrawn(el, code, theme) {
+  const next = el.nextElementSibling;
+  return !!next?.classList?.contains(RENDER_CLASS)
+    && next.getAttribute(RENDER_KEY_ATTR) === _renderKey(code, theme);
+}
+
+/** Der gemeinsame Zeichen-Pfad: erst der Server fuer alle offenen Diagramme,
+ *  dann — nur wenn hier gar nichts rendert — der Client-Bundle. */
+async function _draw(pending, theme, opts = {}) {
   // Stufe 1: alle offenen Diagramme parallel beim Server anfragen. Parallel,
   // weil ein langsames Diagramm die anderen nicht aufhalten soll — und weil ein
   // Cache-Treffer ohnehin nur ein Roundtrip ist.
@@ -197,7 +267,7 @@ export async function renderDiagramsIn(root, opts = {}) {
       host.classList.add(ERROR_CLASS);
       // Kein x-html-Sink und kein innerHTML mit Fremdtext: die Meldung von
       // mermaid enthaelt Teile des Quelltexts.
-      host.textContent = opts.errorLabel || 'Diagram error';
+      host.textContent = opts.errorLabel || _errorLabel || 'Diagram error';
       el.classList.remove('mermaid--rendered');
       failed++;
     }

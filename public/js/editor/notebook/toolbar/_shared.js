@@ -173,3 +173,48 @@ export function findTodoLi(node, root) {
 export function findPoemP(node, root) {
   return findAncestor(node, root, 'div.poem > p');
 }
+
+// Listen-Hüllen, aus denen ein neu erzeugter Block herauswandern muss.
+const LIST_ESCAPE_TAGS = new Set(['UL', 'OL', 'LI']);
+
+// Setzt `node` an die Stelle von `block` — und, wenn `block` in einer Liste
+// sass, AUSSERHALB davon. Der Caret-Block ist in einer Liste das `<li>`
+// (`CARET_BLOCK_SEL`); ein an dessen Stelle gesetzter Block landete damit als
+// Kind der `<ul>`/`<ol>`. Das ist ungültiges Markup, es passiert `cleanPageHtml`
+// unverändert, und Chromium hängt jeden per Enter erzeugten Folgeblock ebenfalls
+// in die Liste — der Weg aus einer Liste heraus ist damit zu.
+// Die Liste wird an der Stelle aufgetrennt: was danach kam, bleibt als zweite
+// Liste hinter `node` stehen (bei `<ol>` mit fortgesetzter Nummerierung),
+// verschachtelte Listen Ebene für Ebene, bis `node` Kind von `editEl` ist. Eine
+// leer gewordene Hülle verschwindet. Andere Wrapper (`blockquote`, `div.poem`)
+// bleiben unangetastet — dort ist ein Block IM Wrapper gewollt.
+export function replaceBlockOutsideList(editEl, block, node) {
+  block.parentNode.replaceChild(node, block);
+  // Tiefe gedeckelt: eine Fehlform im DOM darf die Schleife nicht offen lassen.
+  let guard = 16;
+  while (guard-- > 0) {
+    const parent = node.parentNode;
+    if (!parent || parent === editEl || !editEl.contains(parent)) break;
+    if (!LIST_ESCAPE_TAGS.has(parent.tagName)) break;
+    const grand = parent.parentNode;
+    if (!grand) break;
+    const tail = parent.cloneNode(false);
+    let sib = node.nextSibling;
+    while (sib) {
+      const next = sib.nextSibling;
+      tail.appendChild(sib);
+      sib = next;
+    }
+    grand.insertBefore(node, parent.nextSibling);
+    if (tail.childNodes.length) {
+      // Nummerierte Liste: der zweite Teil zählt weiter, statt bei 1 neu zu
+      // beginnen. `start` ist 1, wenn das Attribut fehlt.
+      if (parent.tagName === 'OL') {
+        tail.setAttribute('start', String((parent.start || 1) + parent.querySelectorAll(':scope > li').length));
+      }
+      grand.insertBefore(tail, node.nextSibling);
+    }
+    if (!parent.childNodes.length) parent.remove();
+  }
+  return node;
+}

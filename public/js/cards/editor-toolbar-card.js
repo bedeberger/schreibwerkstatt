@@ -14,6 +14,7 @@ import { TODO_LIST_SEL } from '../editor/shared/todo-html.js';
 import { invalidateSourceCache } from '../sources/source-cache.js';
 import { closestCiteEl } from '../sources/cite-html.js';
 import { closestTableEl } from '../table/table-html.js';
+import { closestFigureEl } from '../figure/figure-html.js';
 import { invalidateXrefTargetCache } from '../editor/notebook/toolbar/xref.js';
 import { EVT } from '../events.js';
 
@@ -99,6 +100,14 @@ export function registerEditorToolbarCard() {
     tableLossy: false,
     _tableBlock: null,
     _tableEditEl: null,
+    // Bild-Dialog (siehe editor/notebook/toolbar/image.js). `imageSrc` ist nur
+    // die Vorschau-Quelle im Dialog, `imageAlt`/`imageCredit` die beiden
+    // bearbeitbaren Felder, `_imageEl` die angeklickte `<figure>`. Einen
+    // Einfüge-Weg gibt es nicht — Abbildungen entstehen im Slash-Menü.
+    imageSrc: '',
+    imageAlt: '',
+    imageCredit: '',
+    _imageEl: null,
     _toolbarAbort: null,
 
     init() {
@@ -235,6 +244,24 @@ export function registerEditorToolbarCard() {
         const table = closestTableEl(e.target, editEl);
         if (!table) return;
         this.openTableForEl(table);
+      }, { signal });
+
+      // Klick auf ein Bild öffnet den Bild-Dialog (Ersatztext, Bildnachweis,
+      // Abbildung entfernen). `<img>` ist ein void-Element: es hat keinen
+      // Caret-Slot, ist nach der harten Regel „Löschen an Blockgrenzen" kein
+      // Löschziel für Backspace, und der Ersatztext hat im Satzspiegel
+      // überhaupt keine Darstellung — ohne diesen Weg wäre beides unerreichbar.
+      // Die `<figcaption>` daneben bleibt frei tippbar, ein Klick auf die
+      // Legende öffnet also nichts. Ebenfalls notebook-only.
+      document.addEventListener('click', (e) => {
+        const app = window.__app;
+        if (!app?.editMode || app.focusActive) return;
+        const editEl = e.target?.closest?.('.page-content-view--editing');
+        if (!editEl) return;
+        if (e.target?.tagName !== 'IMG') return;
+        const fig = closestFigureEl(e.target, editEl);
+        if (!fig) return;
+        this.openImageForEl(fig);
       }, { signal });
 
       // <hr> ist ein void-Element ohne Caret-Slot — per Klick als

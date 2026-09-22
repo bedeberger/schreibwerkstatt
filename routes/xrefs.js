@@ -10,21 +10,14 @@
 // Rein kuratierend: nie generativ im Buchtext.
 
 const express = require('express');
-const { db } = require('../db/schema');
+const { db, getBookSettings } = require('../db/schema');
 const { listBookAnchors, listXrefBacklinks } = require('../db/xrefs');
 const { ensureBookXrefsIndexed } = require('../lib/xref-index');
 const { toIntId } = require('../lib/validate');
-const { setContext } = require('../lib/log-context');
-const { requireBookAccess, sendACLError } = require('../lib/acl');
+const { guardBook, sessionEmail } = require('../lib/acl');
 const logger = require('../logger');
 
 const router = express.Router();
-
-function _guard(req, res, bookId, minRole) {
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, minRole); return true; }
-  catch (e) { return !sendACLError(res, e); }
-}
 
 // Kapitel in Buch-Leserichtung, mit Elternzeiger fuer die Tiefe. Der Picker
 // zeigt die Hierarchie eingerueckt; die NUMMER steht hier bewusst nicht dabei —
@@ -44,7 +37,7 @@ const _stmtChapters = db.prepare(`
 router.get('/targets', async (req, res) => {
   const bookId = toIntId(req.query.book_id);
   if (!bookId) return res.status(400).json({ error: 'book_id fehlt' });
-  if (!_guard(req, res, bookId, 'viewer')) return;
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   // Bestandsinhalte nachindizieren, falls noch nie geschehen. Ohne das zeigt der
   // Picker in einem gewachsenen Buch keine Abbildung und keine Tabelle, weil
@@ -72,10 +65,21 @@ router.get('/targets', async (req, res) => {
     chapterId: a.chapter_id,
   }));
 
+  // Nummerierungs-Schalter und Buchsprache fahren mit: die Oberflaeche zeigt
+  // Vorschau-Nummern („Abb. 3.2") im Ziel-Picker UND in den Leseansichten
+  // (public/js/xrefs/caption-preview.js), und beides muss schweigen, wenn das
+  // Buch den Typ nicht nummeriert — sonst zeigte die Vorschau eine Zahl, die im
+  // fertigen Dokument nirgends steht. Dieselbe Weiche wie serverseitig in
+  // lib/xref-render.js#buildXrefContext.
+  const settings = getBookSettings(bookId, sessionEmail(req)) || {};
+
   res.json({
     chapters,
     figures: anchors.filter(a => a.kind === 'figure'),
     tables: anchors.filter(a => a.kind === 'table'),
+    figureNumbering: !!settings.figure_numbering,
+    tableNumbering: !!settings.table_numbering,
+    lang: settings.language === 'en' ? 'en' : 'de',
   });
 });
 
@@ -86,7 +90,7 @@ router.get('/targets', async (req, res) => {
 router.get('/backlinks', (req, res) => {
   const bookId = toIntId(req.query.book_id);
   if (!bookId) return res.status(400).json({ error: 'book_id fehlt' });
-  if (!_guard(req, res, bookId, 'viewer')) return;
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   const kind = String(req.query.kind || '');
   if (kind !== 'chapter' && kind !== 'figure') {

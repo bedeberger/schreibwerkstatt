@@ -1,0 +1,36 @@
+{
+  "version": "4.9.1",
+  "date": "2026-09-22",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Ein Klick auf ein Bild im Seiten-Editor öffnet jetzt einen Dialog für Ersatztext und Bildnachweis. Dort lässt sich die Abbildung auch wieder entfernen.",
+      "en": "Clicking an image in the page editor now opens a dialog for alt text and image credit. You can also remove the figure from there."
+    },
+    {
+      "kind": "neu",
+      "de": "Beim PDF-Export steht hinter dem Inhaltsverzeichnis nun ein Abbildungs- und Tabellenverzeichnis mit Seitenzahlen. Das EPUB bekommt beide Verzeichnisse ohne Seitenzahlen.",
+      "en": "PDF exports now include a list of figures and tables with page numbers, right after the table of contents. EPUB gets both lists without page numbers."
+    },
+    {
+      "kind": "neu",
+      "de": "Beim Lesen einer Seite und im Bucheditor steht die Nummer jetzt schon vor der Bildunterschrift, etwa «Abb. 3.2». Endgültig vergeben wird sie beim Export.",
+      "en": "When reading a page and in the book editor, the number now appears before the caption, for example \"Fig. 3.2\". The final numbering happens on export."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Im Lese-Link und im EPUB zeigen Querverweise jetzt den aktuellen Kapitelnamen statt den Stand vom Einfügen.",
+      "en": "In shared reading links and in EPUB, cross-references now show the current chapter name instead of the one from when they were inserted."
+    },
+    {
+      "kind": "behoben",
+      "de": "Diagramme behalten beim Umschalten zwischen hellem und dunklem Modus nicht mehr die alten Farben.",
+      "en": "Diagrams no longer keep their old colors when you switch between light and dark mode."
+    },
+    {
+      "kind": "behoben",
+      "de": "Wer in einer Aufzählung «/» tippte und etwa eine Tabelle oder ein Bild einfügte, bekam den neuen Block in die Liste hineingesetzt. Er steht jetzt darunter, die Liste zählt dahinter weiter.",
+      "en": "Typing \"/\" inside a list and inserting a table or image used to place the new block inside the list. It now sits below it, and the list continues afterwards."
+    }
+  ]
+}

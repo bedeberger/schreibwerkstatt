@@ -33,6 +33,7 @@ export function registerEditorNotebookCard() {
       window.__notebookCard = this;
       this._setupNotebookRestore();
       this._setupNotebookDiagrams();
+      this._setupNotebookCaptionNumbers();
     },
 
     destroy() {

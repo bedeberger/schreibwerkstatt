@@ -18,6 +18,7 @@
 // stellen Tabellen nur dar.
 
 import { getEditEl } from '../../utils.js';
+import { replaceBlockOutsideList } from './_shared.js';
 import { htmlToElement } from './caret-panel.js';
 import {
   buildTableHtml, tableModel, emptyTableModel,
@@ -188,7 +189,7 @@ export const tableMethods = {
 
     const target = this._tableEditEl || this._tableBlock;
     if (target && target.isConnected && target.parentNode && editEl.contains(target)) {
-      target.parentNode.replaceChild(node, target);
+      replaceBlockOutsideList(editEl, target, node);
     } else {
       editEl.appendChild(node);
     }

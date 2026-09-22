@@ -119,6 +119,24 @@ test('Diagramm: Leseansicht rendert daneben und blendet den Quelltext aus', asyn
     preExists: true, preHidden: true, hostIsSibling: true, hasSvg: true, hasForeignObject: false,
   });
 
+  // Dunkelmodus: die Farben stecken im SVG (Server-Render), also muss ein
+  // Theme-Wechsel dieselben Diagramme neu holen — sonst bleibt das Bild im
+  // alten Modus stehen, waehrend die Seite umschaltet. Nur Bildschirm; die
+  // Exportwege rendern ohne Theme-Argument und damit immer hell.
+  const pref0 = await page.evaluate(() => window.Alpine.store('shell').themePref);
+  const keyEndsWith = (suffix) => page.waitForFunction(({ sel, suffix: sfx }) => {
+    const host = document.querySelector(`${sel} .mermaid-render`);
+    return !!host && (host.getAttribute('data-mermaid-key') || '').endsWith(sfx)
+      && !!host.querySelector('svg');
+  }, { sel: READ_SEL, suffix }, { timeout: 30000 });
+
+  await page.evaluate(() => window.__app.setTheme('light'));
+  await keyEndsWith(':default');
+  await page.evaluate(() => window.__app.setTheme('dark'));
+  await keyEndsWith(':dark');
+  await page.evaluate((p) => window.__app.setTheme(p), pref0);
+  await keyEndsWith(':default');
+
   // Der Render-Knoten darf beim erneuten Bearbeiten nicht in den Save-Pfad
   // geraten: im Edit-Modus wird der Quelltext gezeigt, das Bild verschwindet.
   await page.evaluate(() => window.__app.startEdit());

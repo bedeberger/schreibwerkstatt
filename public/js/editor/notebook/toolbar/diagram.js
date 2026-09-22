@@ -14,6 +14,7 @@
 // Aufraeumpunkt — ESC, Backdrop und Abbrechen laufen alle durch `dlg.close()`.
 
 import { getEditEl } from '../../utils.js';
+import { replaceBlockOutsideList } from './_shared.js';
 import { htmlToElement } from './caret-panel.js';
 import { buildDiagramHtml, diagramCode, DIAGRAM_MAX_CHARS } from '../../../diagram/mermaid-html.js';
 import { renderDiagramSvg } from '../../../diagram/mermaid-view.js';
@@ -171,7 +172,7 @@ export const diagramMethods = {
 
     const target = this._diagramEditEl || this._diagramBlock;
     if (target && target.isConnected && target.parentNode && editEl.contains(target)) {
-      target.parentNode.replaceChild(node, target);
+      replaceBlockOutsideList(editEl, target, node);
     } else {
       editEl.appendChild(node);
     }

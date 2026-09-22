@@ -187,6 +187,13 @@ export const lifecycleMethods = {
         app.editDirty = true;
         this._scheduleDraftSave();
       }
+      // Platzhalter der leeren Bildunterschrift. Als CSS-Custom-Property am
+      // Editier-Container, nicht als Attribut im Inhalt: die Attribute dieses
+      // Elements sind nicht Teil des gespeicherten `innerHTML`, es kann also
+      // nichts davon in die Persistenz laufen. Den Text zieht die Regel in
+      // page-view.css über `content: var(--figcaption-ph)`; CSS kann die
+      // i18n-Registry nicht selbst lesen.
+      el.style.setProperty('--figcaption-ph', JSON.stringify(app.t('editor.image.captionPlaceholder')));
     }
     setTimeout(() => this._getEditEl()?.focus(), 0);
 
