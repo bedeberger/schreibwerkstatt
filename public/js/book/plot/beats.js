@@ -305,6 +305,7 @@ export const beatsMethods = {
       this.errorMessage = '';
       // Gelöschter Beat kann ein Kapitel-Count gewesen sein → Indikator syncen.
       app.refreshPlotBeatCounts?.();
+      this.loadTimeChecks();
     } catch (e) {
       this.errorMessage = app.t('plot.error.delete');
     } finally { this.busy = false; }
@@ -313,6 +314,8 @@ export const beatsMethods = {
   _replaceBeat(row) {
     this.beats = this.beats.map(b => (b.id === row.id ? row : b));
     this._memos = {};
+    // Zeit, Figuren oder Verworfen-Flag können sich geändert haben.
+    this.loadTimeChecks();
   },
 
   // ── Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff) ────────────────────
@@ -425,6 +428,8 @@ export const beatsMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, order }),
       });
+      // Die Reihenfolge ist die Achse der Chronologie-Prüfung.
+      this.loadTimeChecks();
       return true;
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');

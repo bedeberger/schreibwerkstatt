@@ -78,7 +78,7 @@
         </div>
       </div>
 
-      <!-- Abbildungs-Nummerierung: keine Zitier-Einstellung, steht aber im
+      <!-- Abbildungs- und Tabellen-Nummerierung: keine Zitier-Einstellung, steht aber im
            selben Tab, weil beides zur Fachtext-Ausstattung gehoert und buchweit
            fuer alle Ausgabewege gilt (eigener Endpunkt /booksettings/:id/xrefs). -->
       <div class="card-form-row">
@@ -89,6 +89,13 @@
             <span>
               <span class="form-check-title" x-text="$app.t('book.settings.xref.figureNumbering')"></span>
               <span class="form-check-desc" x-text="$app.t('book.settings.xref.figureNumbering.desc')"></span>
+            </span>
+          </label>
+          <label class="form-check">
+            <input type="checkbox" id="bs-table-numbering" x-model="bookXref.table_numbering">
+            <span>
+              <span class="form-check-title" x-text="$app.t('book.settings.xref.tableNumbering')"></span>
+              <span class="form-check-desc" x-text="$app.t('book.settings.xref.tableNumbering.desc')"></span>
             </span>
           </label>
         </div>

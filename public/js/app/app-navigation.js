@@ -141,23 +141,6 @@ export const appNavigationMethods = {
     }
   },
 
-  // Cross-Feature: aus der Werkbank ins Plot-Board springen und dort GENAU
-  // diesen Beat oeffnen. Die Plot-Karte hoert `plot:focus-beat` und parkt das
-  // Ziel in `_pendingFocusBeatId`, falls das Board noch nicht geladen ist —
-  // derselbe Weg, den der Hash-Permalink `#book/:b/plot/:beatId` nimmt.
-  async openPlotBeatById(beatId) {
-    this._beginNavigation();
-    try {
-      const bid = _coerceId(beatId);
-      if (!this.showPlotCard) {
-        await this.togglePlotCard();
-      }
-      window.dispatchEvent(new CustomEvent(EVT.PLOT_FOCUS_BEAT, { detail: { beatId: bid } }));
-    } finally {
-      this._endNavigation();
-    }
-  },
-
   // Cross-Feature: aus dem Plot-Board (Beat-Motiv-Badge) in die Motiv-Werkstatt
   // springen und dort das Motiv auswählen. Die Motiv-Karte hört `motiv:select`
   // und parkt die ID, falls das Board noch nicht geladen ist.

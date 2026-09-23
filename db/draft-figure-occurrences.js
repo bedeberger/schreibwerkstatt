@@ -60,6 +60,7 @@ const _stmtCounts = db.prepare(`
     FROM draft_figure_occurrences o
     JOIN draft_figures d ON d.id = o.draft_id
    WHERE d.book_id = ? AND d.user_email = ?
+     AND (o.score IS NULL OR o.score >= ?)
    GROUP BY o.draft_id, o.kern
 `);
 
@@ -76,6 +77,7 @@ const _stmtChapters = db.prepare(`
     LEFT JOIN figure_scenes s ON s.id = o.scene_id
     LEFT JOIN pages sp ON sp.page_id = s.page_id
    WHERE d.book_id = ? AND d.user_email = ?
+     AND (o.score IS NULL OR o.score >= ?)
    GROUP BY o.draft_id, o.kern, COALESCE(pp.chapter_id, sp.chapter_id)
 `);
 
@@ -124,14 +126,19 @@ function hasDraftOccurrences(bookId, userEmail) {
 }
 
 // Aggregate fuer die Board-/Karten-Payloads. Beide sind pro Buch + User
-// skopiert; der Score-Floor wirkt am Lese-Chokepoint, damit Plakette, Band und
-// Messung dieselbe Schwelle sehen.
-function occCounts(bookId, userEmail, floor = 0) {
-  const rows = _stmtCounts.all(parseInt(bookId), userEmail);
-  return floor > 0 ? rows.filter(r => (r.avg_score == null || r.avg_score >= floor)) : rows;
+// skopiert; der Score-Floor wirkt am Lese-Chokepoint PRO FUNDSTELLE und in
+// beiden Aggregaten gleich, damit Zeilensumme, Band-Zellen, Zell-Detail und
+// Messung dieselbe Menge zaehlen (Muster db/motifs/occurrences.js). Woertliche
+// Treffer (score = null) fallen nie. floor <= 0 heisst „aus".
+function _floorParam(floor) {
+  const f = Number(floor) || 0;
+  return f > 0 ? f : -1e9;
 }
-function occChapters(bookId, userEmail) {
-  return _stmtChapters.all(parseInt(bookId), userEmail);
+function occCounts(bookId, userEmail, floor = 0) {
+  return _stmtCounts.all(parseInt(bookId), userEmail, _floorParam(floor));
+}
+function occChapters(bookId, userEmail, floor = 0) {
+  return _stmtChapters.all(parseInt(bookId), userEmail, _floorParam(floor));
 }
 
 // Frischestand: der juengste Draft-Stand gegen den juengsten Anchor-Lauf. Wie

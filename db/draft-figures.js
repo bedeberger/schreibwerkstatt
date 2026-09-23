@@ -56,7 +56,7 @@ function _row(r) {
     notes: r.notes || null,
     source_figure_id: r.source_figure_id || null,
     // Die TEXT-fig_id der Quell-Figur: das ist die Identitaet, mit der das
-    // Frontend (und die Werkbank) Katalog-Figuren adressiert — die INTEGER-id
+    // Frontend Katalog-Figuren adressiert — die INTEGER-id
     // daneben ist nur der FK-Traeger.
     source_fig_id: r.source_fig_id || null,
     source_figure_name: r.source_figure_name || null,

@@ -86,7 +86,7 @@ Lies das Doc, **bevor** du im jeweiligen Bereich etwas änderst — nicht danach
 
 **Analyse:** [komplett.md](docs/komplett.md) Kern-Pipeline + Welt-Fakten · [wortschatz.md](docs/wortschatz.md) · [semantic-search.md](docs/semantic-search.md) Embeddings + Buchlandkarte · [graph.md](docs/graph.md) Figuren-Graph
 
-**Werkstätten:** [werkbank.md](docs/werkbank.md) Figuren × Akte + gemessene Befunde · [figur-werkstatt.md](docs/figur-werkstatt.md) inkl. Bogen im Buch · [figur-alter.md](docs/figur-alter.md) · [figur-lebenslauf.md](docs/figur-lebenslauf.md) · [plot.md](docs/plot.md) Beat-Board · [motiv-werkstatt.md](docs/motiv-werkstatt.md) · [buchorganizer.md](docs/buchorganizer.md) · [buecherregal.md](docs/buecherregal.md) · [autorenprofil.md](docs/autorenprofil.md) · [recherche-board.md](docs/recherche-board.md) · [ideen-board.md](docs/ideen-board.md) Pendenzen: Stufen-Achse, Board, beidseitige Verknüpfungen
+**Werkstätten:** [figur-werkstatt.md](docs/figur-werkstatt.md) inkl. Bogen im Buch · [figur-alter.md](docs/figur-alter.md) · [figur-lebenslauf.md](docs/figur-lebenslauf.md) · [plot.md](docs/plot.md) Beat-Board · [motiv-werkstatt.md](docs/motiv-werkstatt.md) · [buchorganizer.md](docs/buchorganizer.md) · [buecherregal.md](docs/buecherregal.md) · [autorenprofil.md](docs/autorenprofil.md) · [recherche-board.md](docs/recherche-board.md) · [ideen-board.md](docs/ideen-board.md) Pendenzen: Stufen-Achse, Board, beidseitige Verknüpfungen
 
 **Chats:** [chats.md](docs/chats.md) Vergleich der drei · [buchchat-tools.md](docs/buchchat-tools.md) Tool-Inventar · [recherche-chat.md](docs/recherche-chat.md) Claude-only, Web-Suche
 

@@ -8,7 +8,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   getPrompts, getBookPrompts,
   htmlToText, jobAbortControllers,
-  getFiguren, getLatestReview, buildChatMessageHistory,
+  getFiguren, getLatestReview, getLatestPageCheck, getOpenIdeen, buildChatMessageHistory,
 } = require('../shared');
 const contentStore = require('../../../lib/content-store');
 const { generateSessionTitle } = require('../chat-title');
@@ -50,6 +50,8 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
       : null;
     const figuren = getFiguren(session.book_id, userEmail, pageRow?.chapter_id ?? null);
     const review  = getLatestReview(session.book_id, userEmail);
+    const ideen    = getOpenIdeen(session.page_id, userEmail);
+    const lektorat = getLatestPageCheck(session.page_id, userEmail);
     const { SYSTEM_CHAT: chatSysPrompt } = await getBookPrompts(session.book_id, userEmail);
     // opening_page_text: Snapshot, der beim Chat-Öffnen gesichert wurde. Wird als
     // Vergleichsbasis nur an die KI gegeben, wenn er sich vom aktuellen Stand
@@ -60,7 +62,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     // Figuren sind hier kapitel-gefiltert, aber ebenfalls Volldossiers → gebudgetet
     // (gleicher Deckel wie im Buch-Chat, siehe figurenBlockChars).
     const systemPrompt = buildChatSystemPrompt(session.page_name || 'Unbekannte Seite', pageText, figuren, review,
-      chatSysPrompt, openingPageText, null, null, { figurenMaxChars: figurenBlockChars(aiCfg) });
+      chatSysPrompt, openingPageText, ideen, lektorat, { figurenMaxChars: figurenBlockChars(aiCfg) });
 
     // Konversationshistorie aufbauen
     const historyWithoutLast = buildChatMessageHistory(session.id).slice(0, -1);

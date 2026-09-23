@@ -6,6 +6,7 @@
 
 import { loadJsMind } from '../lazy-libs.js';
 import { toggleWrapFullscreen } from '../fullscreen.js';
+import { observeThemeChange } from '../graph-kit/theme.js';
 
 const I18N_MARKER = /^__i18n:([a-zA-Z0-9_.-]+)__$/;
 
@@ -29,6 +30,18 @@ export function resolveMindmapForDisplay(mindmap, markers) {
   };
   return { ...mindmap, data: clone(mindmap.data) };
 }
+
+// jsMind zeichnet die Verbindungslinien mit einer festen Farbe auf SVG — kein
+// CSS-Target. Darum Token lesen und bei Theme-Wechsel neu setzen.
+function _lineColor() {
+  const cs = getComputedStyle(document.documentElement);
+  return cs.getPropertyValue('--color-border').trim() || '#888';
+}
+
+// iOS feuert bei langem Druck kein `contextmenu` — ohne Long-Press waeren
+// Umbenennen/Anlegen/Loeschen auf einem Tablet ohne Tastatur unerreichbar.
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP_PX = 10;
 
 export function _newNodeId() {
   return 'n' + crypto.randomUUID();
@@ -64,12 +77,19 @@ export const mindmapMethods = {
     this._jm = new jsMind(this._buildJmConfig(container));
     this._mindmapEl = container;
     this._attachJmListeners();
+    this._themeObs = observeThemeChange(() => this._applyLineColor());
     container.addEventListener('contextmenu', (ev) => this._onMindmapContextMenu(ev));
+    this._attachLongPress(container);
     container.addEventListener('mousedown', (ev) => {
       if (ev.button !== 2 && this.contextMenuOpen) this._hideContextMenu();
     });
     this._topicMarkers = {};
-    this._jm.show(resolveMindmapForDisplay(sel.mindmap, this._topicMarkers));
+    const display = resolveMindmapForDisplay(sel.mindmap, this._topicMarkers);
+    // Wurzel = Figurname (Server-Invariante); ungespeicherte Umbenennung im
+    // Formular gilt schon beim Mount.
+    const name = (this.editName || '').trim();
+    if (display?.data && name) display.data.topic = name;
+    this._jm.show(display);
     this._jmDraftId = sel.id;
     this.selectedKnotenId = sel.mindmap?.data?.id || 'root';
     if (this._pendingKnotenId) {
@@ -99,8 +119,7 @@ export const mindmapMethods = {
   },
 
   _buildJmConfig(container) {
-    const cs = getComputedStyle(document.documentElement);
-    const lineColor = (cs.getPropertyValue('--color-border').trim() || '#888');
+    const lineColor = _lineColor();
     return {
       container,
       editable: true,
@@ -142,8 +161,66 @@ export const mindmapMethods = {
         if (id && !this._suppressCenter) this._centerNodeInView(id);
       } else if (type === 3) {
         this._mindmapDirty = true;
+        // Umbenennung der Wurzel im Canvas → Namensfeld. Die Gegenrichtung
+        // macht _syncRootTopic; update_node mit gleichem Topic feuert nicht,
+        // die beiden schaukeln sich also nicht auf.
+        if (data?.evt === 'update_node' && data.node === this._jm?.get_root?.()?.id) {
+          const topic = data.data?.[1];
+          if (typeof topic === 'string' && topic.trim()) this.editName = topic;
+        }
       }
     });
+  },
+
+  // Namensfeld → Wurzel-Knoten, live. Nur fuer den Canvas der aktuellen
+  // Figur; leerer Name bleibt stehen (jsMind lehnt leere Topics ab, das
+  // Formular zeigt den Fehler).
+  _syncRootTopic(name) {
+    const n = (name || '').trim();
+    if (!n || !this._jm || this._jmDraftId !== this.selectedDraftId) return;
+    const root = this._jm.get_root?.();
+    if (!root || root.topic === n) return;
+    try { this._jm.update_node(root.id, n); } catch {}
+  },
+
+  _applyLineColor() {
+    const view = this._jm?.view;
+    if (!view?.opts) return;
+    view.opts.line_color = _lineColor();
+    try { view.show_lines(); } catch {}
+  },
+
+  // Long-Press oeffnet dasselbe Knoten-Menue wie der Rechtsklick. Loest der
+  // Browser nativ `contextmenu` aus (Android), raeumt dessen Handler den Timer
+  // ab. Nach dem Ausloesen verhindert touchend die emulierten Maus-Events —
+  // sonst schlosse der nachgereichte mousedown das Menue sofort wieder.
+  _attachLongPress(container) {
+    let timer = null, startX = 0, startY = 0, fired = false;
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    this._cancelLongPress = cancel;
+    container.addEventListener('touchstart', (ev) => {
+      fired = false;
+      cancel();
+      if (ev.touches.length !== 1) return;
+      const t = ev.touches[0];
+      const node = t.target?.closest?.('jmnode');
+      if (!node) return;
+      startX = t.clientX; startY = t.clientY;
+      timer = setTimeout(() => {
+        timer = null;
+        fired = true;
+        this._openNodeMenu(node, startX, startY);
+      }, LONG_PRESS_MS);
+    }, { passive: true });
+    container.addEventListener('touchmove', (ev) => {
+      const t = ev.touches[0];
+      if (t && Math.hypot(t.clientX - startX, t.clientY - startY) > LONG_PRESS_SLOP_PX) cancel();
+    }, { passive: true });
+    container.addEventListener('touchend', (ev) => {
+      cancel();
+      if (fired) { ev.preventDefault(); fired = false; }
+    });
+    container.addEventListener('touchcancel', cancel);
   },
 
   _selectNodeQuiet(id) {
@@ -186,6 +263,10 @@ export const mindmapMethods = {
     if (container) {
       while (container.firstChild) container.removeChild(container.firstChild);
     }
+    this._themeObs?.disconnect();
+    this._themeObs = null;
+    this._cancelLongPress?.();
+    this._cancelLongPress = null;
     this._jm = null;
     this._jmDraftId = null;
     this._mindmapEl = null;

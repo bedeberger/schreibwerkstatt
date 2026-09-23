@@ -1,9 +1,10 @@
 // Alpine.data('helpCard') — Hilfe & Funktionen: zwei Reiter.
 //
-//   „Funktionen"   — statischer Funktionsueberblick fuer den Einstieg. Inhalt
-//                    sind die Feature-Bloecke der Landing-Page (i18n-Keys
-//                    `landing.featNTitle/Desc`) — SSoT, damit oeffentliche
-//                    Landing und In-App-Hilfe nicht auseinanderdriften.
+//   „Funktionen"   — Funktionsueberblick, gruppiert nach Bereich. Inhalt kommt
+//                    aus [help-catalog.js](help-catalog.js) (Feature-Registry +
+//                    Funktionen ohne eigene Karte); bei offenem Buch gefiltert
+//                    nach Buchtyp und Rolle. „Oeffnen" ruft den Registry-Toggle
+//                    bzw. die Registry-Aktion.
 //   „Neuigkeiten"  — Release-Notizen aus `changelog/` (GET /changelog), neueste
 //                    Version zuerst. Lazy: erst beim ersten Oeffnen des Reiters
 //                    geholt, nicht beim Mount der Karte.
@@ -19,13 +20,8 @@
 // mit — ohne das bliebe der Punkt bis zum naechsten Reload stehen.
 
 import { tzOpts } from '../utils.js';
-
-// Wiederverwendung der Landing-Feature-Texte (de.json/en.json). Reihenfolge =
-// Anzeige-Reihenfolge. Neues Landing-Feature → hier eine Zahl ergaenzen.
-const HELP_FEATURES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29].map(n => ({
-  titleKey: `landing.feat${n}Title`,
-  descKey: `landing.feat${n}Desc`,
-}));
+import { featureByKey } from './feature-registry.js';
+import { buildHelpSections } from './help-catalog.js';
 
 /** Semver-Vergleich; ein leerer/ungueltiger Stand gilt als „aelter als alles".
  *  Spiegel von routes/changelog.js#_cmp — die Frage „gibt es Neues?" wird auf
@@ -53,7 +49,8 @@ export function hasUnreadChangelog(shell) {
 export function registerHelpCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('helpCard', () => ({
-    helpFeatures: HELP_FEATURES,
+    helpQuery: '',
+    _memos: {},
 
     // Aktiver Reiter (SSoT; die `tabs`-Komponente haengt via x-modelable dran).
     helpTab: 'features',
@@ -76,6 +73,64 @@ export function registerHelpCard() {
       // Watcher statt an einem zweiten Aufruf hier.
       this.$watch('helpTab', (v) => { if (v === 'changelog') this.onChangelogTab(); });
       if (this.helpTab === 'changelog') this.onChangelogTab();
+    },
+
+    /** Kontext wie in der Palette: Buch, Rolle, Buchtyp, Modell-Klasse. */
+    _helpCtx() {
+      const root = window.__app || {};
+      const nav = window.Alpine.store('nav') || {};
+      return {
+        selectedBookId: nav.selectedBookId || null,
+        pages: nav.pages || [],
+        bookRole: root.currentBookRole || null,
+        buchtyp: (typeof root.currentBuchtyp === 'function' ? root.currentBuchtyp() : null) || null,
+        cloudModelEffective: (window.Alpine.store('config')?.effectiveProviderClass || 'cloud') === 'cloud',
+      };
+    },
+
+    _memo(key, deps, fn) {
+      const m = this._memos[key];
+      if (m && m.deps.length === deps.length && m.deps.every((d, i) => d === deps[i])) return m.value;
+      const value = fn();
+      this._memos[key] = { deps, value };
+      return value;
+    },
+
+    /** Sektionen, gefiltert nach Suchbegriff (Titel + Beschreibung in der
+     *  UI-Sprache). Leere Sektionen fallen weg. */
+    helpSections() {
+      const ctx = this._helpCtx();
+      const t = window.__app.t.bind(window.__app);
+      const locale = window.Alpine.store('shell')?.uiLocale || '';
+      const q = this.helpQuery.trim().toLowerCase();
+      return this._memo('sections', [
+        ctx.selectedBookId, (ctx.pages || []).length, ctx.bookRole, ctx.buchtyp, ctx.cloudModelEffective, locale, q,
+      ], () => {
+        const sections = buildHelpSections(ctx);
+        if (!q) return sections;
+        return sections
+          .map(s => ({ ...s, entries: s.entries.filter(e => (t(e.titleKey) + ' ' + t(e.descKey)).toLowerCase().includes(q)) }))
+          .filter(s => s.entries.length > 0);
+      });
+    },
+
+    /** Plaketten-Text; `typ` ist eine Liste von Buchtyp-Keys. */
+    helpNeedLabel(need) {
+      const t = window.__app.t.bind(window.__app);
+      const typ = need.params?.typ;
+      return typ ? t(need.key, { typ: typ.map(x => t(x.i18n)).join(', ') }) : t(need.key);
+    },
+
+    /** Karte oeffnen bzw. Aktion ausfuehren. Toggle ueber den Root: das
+     *  schliesst die Hilfe (Exklusivitaet) und oeffnet das Ziel. */
+    helpOpen(entry) {
+      if (!entry?.open || !entry.available) return;
+      const root = window.__app;
+      if (entry.open.run) {
+        featureByKey(entry.open.run)?.run?.(root);
+      } else if (typeof root[entry.open.toggle] === 'function') {
+        root[entry.open.toggle]();
+      }
     },
 
     /** Reiter „Neuigkeiten" ist aktiv: einmal laden, dann quittieren. */

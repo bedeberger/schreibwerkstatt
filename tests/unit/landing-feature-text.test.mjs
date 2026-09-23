@@ -1,11 +1,10 @@
-// Feature-Text (Landing + Hilfe) — Laengenrahmen aus DESIGN.md „Feature-Text
-// (Landing + Hilfe)".
+// Feature-Text der Landing-Page — Laengenrahmen aus DESIGN.md „Feature-Text
+// (Landing)".
 //
-// Die Keys `landing.feat<N>Title/Desc` stehen als Kacheln in einem Raster —
-// auf der oeffentlichen Landing-Page und im Hilfe-Reiter „Funktionen"
-// ([help-card.js](public/js/cards/help-card.js)#HELP_FEATURES). Ein
-// 700-Zeichen-Block neben einem 80-Zeichen-Block laesst das Raster zerfallen
-// und die kurz beschriebenen Features nebensaechlich wirken. Der Rahmen driftet
+// Die Keys `landing.feat<N>Title/Desc` stehen als Kacheln in einem Raster auf
+// der oeffentlichen Landing-Page. Ein 700-Zeichen-Block neben einem
+// 80-Zeichen-Block laesst das Raster zerfallen und die kurz beschriebenen
+// Features nebensaechlich wirken. Der Rahmen driftet
 // ohne Gate zuverlaessig auseinander: jedes neue Feature wirkt beim Schreiben
 // erklaerungsbeduerftiger als das davor.
 
@@ -17,7 +16,6 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const I18N = path.join(ROOT, 'public', 'js', 'i18n');
-const HELP_CARD = path.join(ROOT, 'public', 'js', 'cards', 'help-card.js');
 
 const TITLE_MAX = 26;
 const DESC_MIN = 160;
@@ -26,19 +24,20 @@ const DESC_MAX = 200;
 const locales = Object.fromEntries(['de', 'en'].map(l =>
   [l, JSON.parse(fs.readFileSync(path.join(I18N, `${l}.json`), 'utf8'))]));
 
-/** Die im Hilfe-Reiter gelisteten Nummern — SSoT ist HELP_FEATURES. */
-function helpFeatureNumbers() {
-  const src = fs.readFileSync(HELP_CARD, 'utf8');
-  const m = src.match(/const HELP_FEATURES = \[([^\]]*)\]/);
-  assert.ok(m, 'HELP_FEATURES nicht gefunden — Konstante umbenannt?');
-  return m[1].split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
+/** Alle vorhandenen Feature-Nummern (de ist Fallback-Locale und SSoT der Keys). */
+function featureNumbers() {
+  return Object.keys(locales.de)
+    .map(k => k.match(/^landing\.feat(\d+)Title$/))
+    .filter(Boolean)
+    .map(m => Number(m[1]))
+    .sort((a, b) => a - b);
 }
 
-const numbers = helpFeatureNumbers();
+const numbers = featureNumbers();
 
-test('Feature-Text: HELP_FEATURES ist lueckenlos ab 1', () => {
+test('Feature-Text: Nummern sind lueckenlos ab 1', () => {
   assert.deepEqual(numbers, numbers.map((_, i) => i + 1),
-    'HELP_FEATURES muss 1..N in Reihenfolge listen (Nummern nie umnummerieren)');
+    'landing.feat<N> muss 1..N lueckenlos sein (Nummern nie umnummerieren)');
 });
 
 test('Feature-Text: jede Nummer hat Titel + Beschreibung in beiden Locales', () => {
@@ -72,14 +71,12 @@ test(`Feature-Text: Beschreibung ${DESC_MIN}–${DESC_MAX} Zeichen`, () => {
   assert.deepEqual(bad, [], `Beschreibung ausserhalb ${DESC_MIN}–${DESC_MAX}:\n${bad.join('\n')}`);
 });
 
-test('Feature-Text: Landing-Page rendert einen Prefix von HELP_FEATURES', () => {
-  // Die Landing-Page zeigt bewusst nur die ersten Kacheln (kuratierter
-  // Einstieg), die Hilfe alle. Sie muessen aber dieselben Keys in derselben
-  // Reihenfolge nutzen — sonst zeigt die Landing ein Feature, das die Hilfe
-  // nicht kennt, oder eine andere Reihenfolge.
+test('Feature-Text: Landing-Page rendert genau die vorhandenen Nummern', () => {
+  // Kein Vorrat: ein Key, den die Landing nicht zeigt, sieht niemand — und
+  // veraltet dann unbemerkt. Reihenfolge = Nummer.
   const html = fs.readFileSync(path.join(ROOT, 'public', 'landing.html'), 'utf8');
   const rendered = [...html.matchAll(/\{\{feat(\d+)Title\}\}/g)].map(m => Number(m[1]));
   assert.ok(rendered.length > 0, 'landing.html rendert keinen Feature-Block');
-  assert.deepEqual(rendered, numbers.slice(0, rendered.length),
-    'landing.html und HELP_FEATURES zeigen nicht dieselben Features in derselben Reihenfolge');
+  assert.deepEqual(rendered, numbers,
+    'landing.html muss jede landing.feat<N> genau einmal in Reihenfolge rendern');
 });

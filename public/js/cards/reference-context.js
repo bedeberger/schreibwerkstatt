@@ -253,6 +253,7 @@ export const referenceContextMethods = {
 
   referenceCount(tab) {
     switch (tab) {
+      case 'plan':       return this.referencePlanBeats().length;
       case 'figuren':    return this.referenceFiguren().length;
       case 'orte':       return this.referenceOrte().length;
       case 'szenen':     return this.referenceSzenen().length;

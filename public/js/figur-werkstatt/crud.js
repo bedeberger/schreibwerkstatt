@@ -345,6 +345,7 @@ export const crudMethods = {
         this.runs = { brainstorm: [], consistency: [] };
         this.runsLoadedDraftId = null;
         this.plotUsage = null;
+        this.motifUsage = null;
         this.selectedRunId = null;
         this.selectedKonfliktIdx = null;
         if (this.drafts.length > 0) this.selectDraft(this.drafts[0].id);

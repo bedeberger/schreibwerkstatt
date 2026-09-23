@@ -8,7 +8,7 @@ export const hashSetupMethods = {
     this._teardownHashRouting();
     const watchers = [
       'currentPage', 'showEditorCard',
-      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showMotivCard', 'showWerkbankCard', 'showWorldFactsCard',
+      'showFiguresCard', 'showFigurWerkstattCard', 'showOrteCard', 'showSongsCard', 'showSzenenCard', 'showEreignisseCard', 'showPlotCard', 'showMotivCard', 'showWorldFactsCard',
       'showRechercheCard',
       'showIdeenBoardCard',
       'showSourcesCard',

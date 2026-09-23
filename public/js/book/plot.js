@@ -15,6 +15,7 @@
 //   - dnd.js       — SortableJS-Anbindung (Init/Reattach/Revert → _dropBeat)
 //   - history.js   — Undo/Redo (max 10 Schritte) über alle reversiblen Mutationen
 //   - ai.js        — KI-Jobs (Brainstorm/Consistency), Lauf-Historie, Fullscreen
+//   - time-check.js — Zeit-Messung (deterministisch, GET /plot/time-check)
 
 import { lifecycleMethods } from './plot/lifecycle.js';
 import { derivedMethods } from './plot/derived.js';
@@ -24,6 +25,7 @@ import { beatsMethods } from './plot/beats.js';
 import { dndMethods } from './plot/dnd.js';
 import { historyMethods } from './plot/history.js';
 import { aiMethods } from './plot/ai.js';
+import { timeCheckMethods } from './plot/time-check.js';
 
 export const plotMethods = {
   ...lifecycleMethods,
@@ -34,4 +36,5 @@ export const plotMethods = {
   ...dndMethods,
   ...historyMethods,
   ...aiMethods,
+  ...timeCheckMethods,
 };

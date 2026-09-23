@@ -160,7 +160,7 @@ Klick auf `confirmed` **oder `promote`** öffnet das **Fundstellen-Popover** (si
 
 ## Zeit-Messung (deterministisch, kein KI-Call)
 
-Pendant zur Motiv-Messung und zur Bogen-Messung der Figuren-Werkstatt: pure Rechnung in [lib/plot-time-consistency.js](../lib/plot-time-consistency.js), Befunde tragen `quelle: 'messung'`. Gelesen wird sie in der [Werkbank](werkbank.md) (`GET /werkbank/befunde`).
+Pendant zur Motiv-Messung und zur Bogen-Messung der Figuren-Werkstatt: pure Rechnung in [lib/plot-time-consistency.js](../lib/plot-time-consistency.js), Befunde tragen `quelle: 'messung'`. Angezeigt wird sie im Beat-Board als Panel **Zeit-Messung** unter dem Board, getrennt vom KI-Urteil (`GET /plot/time-check`, Frontend [time-check.js](../public/js/book/plot/time-check.js)); nachgeladen mit jedem Board-Load und nach jeder Beat-Mutation (Speichern, Löschen, Umsortieren — die Reihenfolge ist die Achse der Chronologie-Prüfung). Das Panel erscheint nur, wenn es Befunde gibt: ein undatierter Beat ist ungeprüft, kein Mangel.
 
 **Why hier und nicht im KI-Check:** „Beat spielt 1987, Figur X ist laut Geburtsjahr dann acht" ist eine Subtraktion, kein Urteil. Ein Modell danach zu fragen kostet Geld und liefert eine Aussage, die niemand nachrechnen kann; hier ist sie reproduzierbar und gratis. Der KI-Check bekommt dafür den Prüfpunkt, den eine Rechnung *nicht* leisten kann — ob die **Zeitsprünge** zu dem passen, was dazwischen geschieht (eine Schwangerschaft braucht ihre Zeit, ein Streit nicht zehn Jahre) — und die ausdrückliche Anweisung, **nicht** nachzurechnen.
 
@@ -282,6 +282,15 @@ springt an die Stelle im Buch, an der die Pendenz hängt.
 **User-privat.** Anders als `plot_beats` (pro Buch + User) sind Ideen ein
 Sichtbarkeits-Scope: der Endpunkt liefert nur die Ideen des Anfragenden. Details:
 [ideen-board.md](ideen-board.md).
+
+## Plan-Reiter im Referenz-Slot (am Schreibort)
+
+Der Referenz-Slot neben dem **Notebook-Editor** hat einen Reiter „Plan" ([reference-plan.js](../public/js/cards/reference-plan.js), Partial [reference-plan.html](../public/partials/reference-plan.html)): die aktiven Beats des offenen Kapitels in Board-Lesereihenfolge, mit Status, Akt · Strang · Zeit, Beschreibung, beteiligten Figuren/Orten und Motiven. Buch-Scope zeigt alle aktiven Beats. Daten: derselbe `GET /plot/`-Payload wie das Board, kein eigener Endpunkt.
+
+- **Kapitel, nicht Seite.** Ein Beat hängt am Kapitel — eigenes `chapter_id`, sonst geerbt vom Strang. „hier im Text" (`refCtx: 'page'`) kommt ausschliesslich aus der Beat-Verankerung (`occ_top[].page_id`), steht also erst nach einem Anker-Lauf.
+- **Read-only.** Jede Zeile springt per Beat-Permalink (`#book/<id>/plot/<beatId>`) aufs Board; gepflegt wird dort. Der Reiter ist ohne aktiven Beat im Buch ausgeblendet.
+- **Nur Notebook-Editor** — Focus-Editor und Bucheditor haben keinen Referenz-Slot.
+- Gegated: [tests/unit/reference-plan.test.mjs](../tests/unit/reference-plan.test.mjs) (Reihenfolge, Kontext-Regel, Strang-Vererbung), [tests/e2e-app/reference-plan-tab.spec.js](../tests/e2e-app/reference-plan-tab.spec.js) (echte App, Kapitel-Filter + Permalink).
 
 ## Buch-Chat-Integration
 

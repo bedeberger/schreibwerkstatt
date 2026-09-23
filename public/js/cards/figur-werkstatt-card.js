@@ -74,6 +74,8 @@ export function registerFigurWerkstattCard() {
     _jmDraftId: null,
     _mindmapEl: null,
     _topicMarkers: null,
+    _themeObs: null,
+    _cancelLongPress: null,
     _brainstormJobId: null,
     _brainstormJobDraftId: null,
     _consistencyJobId: null,
@@ -101,6 +103,8 @@ export function registerFigurWerkstattCard() {
       // Drafts-Liste in den Store spiegeln, damit die Command-Palette
       // (figuren-Provider) auch werkstatt-Drafts findet, ohne selbst zu fetchen,
       // sobald die Karte mindestens einmal geladen hat.
+      // Namensfeld → Wurzel-Knoten der Mindmap (die Wurzel IST die Figur).
+      this.$watch('editName', (name) => this._syncRootTopic(name));
       this.$watch('drafts', (list) => {
         if (window.Alpine) window.Alpine.store('nav').werkstattDrafts = Array.isArray(list) ? list : [];
       });

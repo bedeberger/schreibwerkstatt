@@ -28,7 +28,16 @@ const PREVIEW_SOURCE = Object.freeze({
 
 export const XREF_DEFAULTS = Object.freeze({
   figure_numbering: 0,
+  table_numbering: 0,
 });
+
+/** Beide Nummerierungs-Schalter aus einem Settings-/PUT-Response. */
+function _xrefFrom(data) {
+  return {
+    figure_numbering: data?.figure_numbering ? 1 : 0,
+    table_numbering: data?.table_numbering ? 1 : 0,
+  };
+}
 
 /** Belegdarstellung. Deckungsgleich mit lib/endnotes.js#CITATION_NOTES_MODES und
  *  db/schema.js#VALID_CITATION_NOTES — laeuft es auseinander, verwirft der
@@ -60,11 +69,11 @@ export const citationMethods = {
       bibliography_scope: data?.bibliography_scope === 'all' ? 'all' : 'cited',
       bibliography_in_blog: data?.bibliography_in_blog ? 1 : 0,
     };
-    this.bookXref = { figure_numbering: data?.figure_numbering ? 1 : 0 };
+    this.bookXref = _xrefFrom(data);
     this.bookCitationLoaded = true;
   },
 
-  /** Abbildungs-Nummerierung. Eigener Endpunkt (`PUT /booksettings/:id/xrefs`),
+  /** Abbildungs- und Tabellen-Nummerierung (je eigener Schalter). Eigener Endpunkt (`PUT /booksettings/:id/xrefs`),
    *  weil es keine Zitier-Einstellung ist — es steht nur im selben Tab, weil
    *  beides zur Fachtext-Ausstattung gehoert und buchweit fuer alle Ausgabewege
    *  gilt. `saveActiveTab` ruft beide Speicherpfade nebeneinander auf. */
@@ -75,17 +84,17 @@ export const citationMethods = {
       const r = await fetch(`/booksettings/${bookId}/xrefs`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ figure_numbering: this.bookXref?.figure_numbering ? 1 : 0 }),
+        body: JSON.stringify(_xrefFrom(this.bookXref)),
       });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
         throw new Error(window.__app.tError(d) || `HTTP ${r.status}`);
       }
       const data = await r.json();
-      this.bookXref = { figure_numbering: data?.figure_numbering ? 1 : 0 };
+      this.bookXref = _xrefFrom(data);
       window.__app?.invalidateBookSettingsCache?.();
-      // Der Ziel-Picker im Editor cacht die Abbildungen samt Vorschau-Nummer;
-      // ohne Nummerierung zeigt er den Legendentext. Cache verwerfen.
+      // Der Ziel-Picker im Editor cacht Abbildungen und Tabellen samt
+      // Vorschau-Nummer; ohne Nummerierung zeigt er den Beschriftungstext. Cache verwerfen.
       window.dispatchEvent(new CustomEvent(EVT.XREFS_CHANGED, { detail: { bookId } }));
     } catch (e) {
       this.citationError = e.message;

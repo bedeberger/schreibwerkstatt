@@ -125,10 +125,16 @@ export const graphMethods = {
 
     // Themen-Anker. shape:'circle' rendert das Label INNERHALB der farbigen
     // Blase (wächst mit dem Text) — dafür ist die weisse Schrift gedacht.
+    // `chosen.label: false`: vis-network setzt das Label bei Hover/Selektion sonst
+    // fett; ein Name knapp unter der Umbruchbreite bricht dann um und die Blase
+    // springt. Die Breitenspanne gibt allen Blasen eine gemeinsame Mindestgrösse
+    // und bricht mehrwortige Namen stabil auf zwei Zeilen um.
     for (const t of this.themes) {
       const tc = _themeColor(t.id, this.themes, paletteVars);
       nodes.push({
-        id: nodeId('theme', t.id), label: t.name, shape: 'circle', margin: 10, widthConstraint: { maximum: 140 },
+        id: nodeId('theme', t.id), label: t.name, shape: 'circle', margin: 10,
+        widthConstraint: { minimum: 70, maximum: 110 },
+        chosen: { label: false },
         // highlight/hover explizit auf die Thema-Farbe: sonst kippt vis-network die
         // Blase bei Selektion/Hover auf seine hellblaue Default-Farbe → weisse
         // Schrift wird unlesbar. Selektion signalisiert stattdessen borderWidthSelected.

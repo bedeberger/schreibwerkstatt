@@ -1,0 +1,28 @@
+<!--
+  Plan-Reiter im Referenz-Panel neben dem Notebook-Editor: die Beats des
+  Beat-Boards für das offene Kapitel (bzw. das ganze Buch im Buch-Scope).
+  Fragment-Include (Marker @include reference-plan in reference.html), Methoden
+  aus cards/reference-plan.js. Read-only — gepflegt wird im Board, jede Zeile
+  springt dorthin.
+-->
+<div x-show="referenceTab === 'plan'" class="reference-panel">
+  <div x-show="referencePlanLoading" class="reference-empty" x-text="$app.t('reference.loading')"></div>
+  <template x-if="!referencePlanLoading && referencePlanBeats().length === 0">
+    <div class="reference-empty" x-text="$app.t('reference.empty.plan')"></div>
+  </template>
+  <template x-for="beat in referencePlanBeats()" :key="'rp-' + beat.id">
+    <div class="reference-row reference-row--clickable internal-link" @click="openReferenceBeat(beat)"
+         :data-tip="$app.t('reference.plan.openTip')">
+      <div class="reference-row-head">
+        <span class="reference-row-title" x-text="beat.titel"></span>
+        <span x-show="beat.status" class="tag" x-text="referencePlanStatus(beat)"></span>
+        <span x-show="beat.refCtx === 'page'" class="tag" :data-tip="$app.t('reference.plan.foundHereTip')" x-text="$app.t('reference.plan.foundHere')"></span>
+      </div>
+      <div class="reference-row-sub" x-show="referencePlanMeta(beat)" x-text="referencePlanMeta(beat)"></div>
+      <div class="reference-row-desc" x-show="beat.beschreibung" x-text="beat.beschreibung"></div>
+      <div class="reference-row-sub" x-show="referencePlanCast(beat)" x-text="referencePlanCast(beat)"></div>
+      <div class="reference-row-sub" x-show="referencePlanMotifs(beat)"
+           x-text="$app.t('reference.plan.motifs', { list: referencePlanMotifs(beat) })"></div>
+    </div>
+  </template>
+</div>

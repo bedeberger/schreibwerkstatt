@@ -14,6 +14,28 @@
   </div>
 </div>
 
+<!-- Zeit-Messung: deterministische Befunde (GET /plot/time-check), getrennt vom
+     KI-Urteil darunter. Nur sichtbar, wenn es etwas zu melden gibt — ein Beat
+     ohne Zeitangabe ist ungeprüft, kein Mangel. -->
+<div x-show="timeChecks.length > 0" class="plot-consistency-panel" x-cloak>
+  <div class="plot-consistency-head">
+    <span class="bewertung-section-title" x-text="$app.t('plot.timeCheck.title')"></span>
+  </div>
+  <p class="card-hint" x-text="$app.t('plot.timeCheck.hint')"></p>
+  <div class="plot-konflikt-list">
+    <template x-for="(f, idx) in timeChecks" :key="f.code + ':' + f.beat_id + ':' + idx">
+      <div class="plot-konflikt internal-link" @click="gotoKonfliktBeat(f)"
+           :data-tip="$app.t('plot.consistency.gotoBeat')">
+        <div class="plot-konflikt-head">
+          <span class="severity-tag" :class="timeCheckSeverityClass(f)" x-text="$app.t('plot.severity.' + f.schwere)"></span>
+          <span class="plot-konflikt-beat" x-text="f.beat"></span>
+          <span class="plot-konflikt-problem" x-text="timeCheckText(f)"></span>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
 <div x-show="consistencyResult" class="plot-consistency-panel" x-cloak>
   <div class="plot-consistency-head">
     <span class="bewertung-section-title" x-text="$app.t('plot.consistency.title')"></span>

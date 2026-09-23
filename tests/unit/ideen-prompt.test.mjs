@@ -32,3 +32,14 @@ test('Ideen-Section: leeres Array erzeugt keinen Block', () => {
   const out = joinBlocks(buildChatSystemPrompt('Seite A', 'Inhalt.', [], null, null, null, []));
   assert.ok(!out.includes('OFFENE IDEEN'));
 });
+
+// Verdrahtung: der Builder allein beweist nichts — der Seiten-Chat-Job muss
+// Ideen und letztes Lektorat auch LADEN und übergeben. Ohne diesen Test fiel
+// die Übergabe beim Umzug in die Job-Queue unbemerkt auf `null, null`.
+test('Seiten-Chat-Job übergibt offene Ideen + letztes Lektorat an den Builder', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../routes/jobs/chat/page-chat.js', import.meta.url), 'utf8');
+  assert.match(src, /getOpenIdeen\(session\.page_id, userEmail\)/);
+  assert.match(src, /getLatestPageCheck\(session\.page_id, userEmail\)/);
+  assert.match(src, /buildChatSystemPrompt\([\s\S]*?openingPageText, ideen, lektorat,/);
+});

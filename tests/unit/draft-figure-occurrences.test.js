@@ -83,6 +83,22 @@ test('Szenen-Fund loest sein Kapitel ueber die Ankerseite auf', () => {
   assert.equal(detail[0].scene_page_id, 101, 'Ankerseite macht den Fund anspringbar');
 });
 
+test('Score-Floor wirkt pro Fundstelle gleich auf Zahl, Zellen und Detail', () => {
+  occDb.replaceKernOccurrences(draft.id, 1, 'konflikt', [
+    { kind: 'page', pageId: 100, score: 0.9, snippet: 'stark', source: 'semantic' },
+    { kind: 'page', pageId: 100, score: 0.2, snippet: 'schwach', source: 'semantic' },
+    { kind: 'page', pageId: 100, score: null, snippet: 'woertlich', source: 'trigger' },
+  ]);
+  const floor = 0.5;
+  const count = occDb.occCounts(1, USER, floor).find(r => r.kern === 'konflikt');
+  const cells = occDb.occChapters(1, USER, floor).filter(r => r.kern === 'konflikt');
+  const detail = occDb.listDraftOccurrences(draft.id, { kern: 'konflikt', minScore: floor });
+  assert.equal(count.n, 2, 'schwacher Treffer faellt, woertlicher bleibt');
+  assert.equal(cells.reduce((s, r) => s + r.n, 0), 2, 'Zellen zaehlen dieselbe Menge');
+  assert.equal(detail.length, 2, 'Detail loest dieselbe Menge auf');
+  assert.equal(occDb.occCounts(1, USER).find(r => r.kern === 'konflikt').n, 3, 'ohne Floor alles');
+});
+
 test('hasDraftOccurrences trennt „nie verankert" von „nichts gefunden"', () => {
   assert.equal(occDb.hasDraftOccurrences(1, USER), true);
   const leer = draftDb.createDraftFigure(1, USER, {
@@ -125,8 +141,8 @@ test('setDraftSourceFigure setzt und loest den Katalog-Zeiger', () => {
 
   const verknuepft = draftDb.setDraftSourceFigure(d.id, 900);
   assert.equal(verknuepft.source_figure_id, 900);
-  // Die TEXT-fig_id ist die Identitaet, mit der Frontend und Werkbank
-  // Katalog-Figuren adressieren — sie muss am Lesepfad mitkommen.
+  // Die TEXT-fig_id ist die Identitaet, mit der das Frontend
+  // Katalog-Figuren adressiert — sie muss am Lesepfad mitkommen.
   assert.equal(verknuepft.source_fig_id, 'fig-mara');
   assert.equal(verknuepft.source_figure_name, 'Mara');
 

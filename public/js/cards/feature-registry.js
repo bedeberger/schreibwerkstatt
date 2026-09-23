@@ -113,10 +113,6 @@ export const FEATURES = [
     aliases: ['plot','handlung','beat','beat-board','board','akt','struktur','outline','dramaturgie','story','plotten','beats','skizze','wendepunkt'] },
   { key: 'motiv',          kind: 'toggle', group: 'world',  labelKey: 'tile.motiv',          descKey: 'tile.motiv.desc',          flag: 'showMotivCard',          toggle: 'toggleMotivCard',          requiresBook: true, minRole: 'editor', hiddenForBuchtyp: ['journalismus'],
     aliases: ['motiv','motive','thema','themen','theme','motif','leitmotiv','symbol','symbolik','konstellation','bildsprache','metapher'] },
-  // Werkbank: liest die drei Werkstaetten zusammen. `minRole: 'editor'` wie sie
-  // selbst — sie zeigt planende Inhalte, und die Route gated ebenso.
-  { key: 'werkbank',       kind: 'toggle', group: 'world',  labelKey: 'tile.werkbank',       descKey: 'tile.werkbank.desc',       flag: 'showWerkbankCard',       toggle: 'toggleWerkbankCard',       requiresBook: true, minRole: 'editor', hiddenForBuchtyp: ['journalismus'],
-    aliases: ['werkbank','uebersicht','matrix','befunde','kreuz','zusammen','gesamt','check','pruefung','workbench'] },
   { key: 'weltfakten',     kind: 'toggle', group: 'world',  labelKey: 'tile.weltfakten',     descKey: 'tile.weltfakten.desc',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     requiresBook: true, minRole: 'editor', dependsOnKomplett: true, hiddenForBuchtyp: ['journalismus'],
     aliases: ['facts','fakten','weltregeln','worldbuilding','lore','magiesystem','rules','kanon','canon','regeln'] },
   { key: 'recherche',      kind: 'toggle', group: 'world',  labelKey: 'tile.recherche',      descKey: 'tile.recherche.desc',      flag: 'showRechercheCard',      toggle: 'toggleRechercheCard',      requiresBook: true, minRole: 'editor',
@@ -276,7 +272,6 @@ export const EXCLUSIVE_CARDS = [
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
   { key: 'motiv',          flag: 'showMotivCard',          toggle: 'toggleMotivCard',          onReclick: 'refresh', requiresBook: true, partial: 'motiv', hiddenForBuchtyp: ['journalismus'],
     loadDeps: [{ method: 'loadFiguren', skipIfNonEmpty: 'figuren' }] },
-  { key: 'werkbank',       flag: 'showWerkbankCard',       toggle: 'toggleWerkbankCard',       onReclick: 'refresh', requiresBook: true, partial: 'werkbank', hiddenForBuchtyp: ['journalismus'] },
   { key: 'weltfakten',     flag: 'showWorldFactsCard',     toggle: 'toggleWorldFactsCard',     onReclick: 'refresh', extraRefreshOnOpen: true, partial: 'world-facts', hiddenForBuchtyp: ['journalismus'] },
   { key: 'recherche',      flag: 'showRechercheCard',      toggle: 'toggleRechercheCard',      onReclick: 'refresh', requiresBook: true, partial: 'recherche' },
   { key: 'ideenBoard',     flag: 'showIdeenBoardCard',     toggle: 'toggleIdeenBoardCard',     onReclick: 'refresh', requiresBook: true, partial: 'ideen-board' },

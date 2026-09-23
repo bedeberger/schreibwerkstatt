@@ -183,6 +183,8 @@ export function registerPlotCard() {
 
     // Konsistenz-Prüfungs-Historie (persistierte Läufe pro Buch). Klick auf einen
     // Eintrag lädt sein Result in das bestehende Consistency-Panel (selectedRunId).
+    // Zeit-Messung (GET /plot/time-check) — deterministisch, mit jedem Board-Load.
+    timeChecks: [],
     consistencyRuns: [],
     selectedRunId: null,
 

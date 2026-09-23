@@ -4,7 +4,7 @@
 //
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
-self.__SHELL_BUILD = "611e2bfe45b5c6a0";
+self.__SHELL_BUILD = "a4b2f6d0b3d0c787";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-backup.css",
   "/css/admin/admin-home.css",
@@ -50,7 +50,6 @@ self.__SHELL_MANIFEST = [
   "/css/book/plot/swimlane.css",
   "/css/book/plot/widgets.css",
   "/css/book/titelwerkstatt.css",
-  "/css/book/werkbank.css",
   "/css/card-accents.css",
   "/css/chat.css",
   "/css/components/autorenprofil.css",
@@ -299,6 +298,7 @@ self.__SHELL_MANIFEST = [
   "/js/book/plot/history.js",
   "/js/book/plot/lifecycle.js",
   "/js/book/plot/threads.js",
+  "/js/book/plot/time-check.js",
   "/js/book/recherche.js",
   "/js/book/recherche/board.js",
   "/js/book/recherche/interview.js",
@@ -327,7 +327,6 @@ self.__SHELL_MANIFEST = [
   "/js/book/tree/permissions.js",
   "/js/book/tree/stats.js",
   "/js/book/tree/ui.js",
-  "/js/book/werkbank.js",
   "/js/book/wortschatz-cloud.js",
   "/js/book/wortschatz.js",
   "/js/book/writing-time.js",
@@ -402,6 +401,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/finetune-export-card.js",
   "/js/cards/folder-import-card.js",
   "/js/cards/help-card.js",
+  "/js/cards/help-catalog.js",
   "/js/cards/hubspot-sync-card.js",
   "/js/cards/ideen-board-card.js",
   "/js/cards/ideen-card.js",
@@ -440,6 +440,7 @@ self.__SHELL_MANIFEST = [
   "/js/cards/reference-card.js",
   "/js/cards/reference-context.js",
   "/js/cards/reference-interview.js",
+  "/js/cards/reference-plan.js",
   "/js/cards/search-card.js",
   "/js/cards/session-store.js",
   "/js/cards/share-links-card.js",
@@ -460,7 +461,6 @@ self.__SHELL_MANIFEST = [
   "/js/cards/titelwerkstatt-card.js",
   "/js/cards/tts-store.js",
   "/js/cards/user-settings-card.js",
-  "/js/cards/werkbank-card.js",
   "/js/cards/world-facts-card.js",
   "/js/cards/wortschatz-card.js",
   "/js/catalog-filter.js",
@@ -900,6 +900,7 @@ self.__SHELL_MANIFEST = [
   "/partials/recherche.html",
   "/partials/redundanz.html",
   "/partials/reference-oton.html",
+  "/partials/reference-plan.html",
   "/partials/reference.html",
   "/partials/search.html",
   "/partials/share-links.html",
@@ -924,7 +925,6 @@ self.__SHELL_MANIFEST = [
   "/partials/user-settings-clients.html",
   "/partials/user-settings-devices.html",
   "/partials/user-settings.html",
-  "/partials/werkbank.html",
   "/partials/werkstatt-bogen.html",
   "/partials/werkstatt-create-fields.html",
   "/partials/werkstatt-import-fields.html",

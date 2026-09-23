@@ -1,0 +1,61 @@
+{
+  "version": "4.10.0",
+  "date": "2026-09-23",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Das Referenz-Panel neben dem Editor hat einen Reiter «Plan». Er zeigt die Beats, die dem Kapitel im Beat-Board zugeordnet sind, samt Motiven und dem Hinweis, ob ein Beat auf dieser Seite im Text steckt.",
+      "en": "The reference panel next to the editor has a new \"Plan\" tab. It shows the beats assigned to the chapter on the beat board, with their motifs and a note when a beat appears on this page."
+    },
+    {
+      "kind": "neu",
+      "de": "Die Hilfe listet jetzt alle Funktionen nach Bereich, durchsuchbar und mit «Öffnen»-Knopf. Plaketten zeigen, was eine Funktion voraussetzt, und bei offenem Buch erscheint nur, was zu seinem Buchtyp passt.",
+      "en": "Help now lists every feature by area, searchable and with an \"Open\" button. Badges show what a feature requires, and with a book open you only see what fits its book type."
+    },
+    {
+      "kind": "neu",
+      "de": "In der Plot-Karte prüft die «Zeit-Messung» datierte Beats ohne KI gegen die Geburtsjahre der Figuren und die Reihenfolge auf dem Board. Ein Klick auf einen Befund springt zum Beat.",
+      "en": "In the plot card, the new \"Time check\" compares dated beats with the characters' birth years and the order on the board, without AI. Clicking a finding jumps to the beat."
+    },
+    {
+      "kind": "neu",
+      "de": "In den Bucheinstellungen gibt es den Schalter «Tabellen nummerieren». Er setzt «Tab. 3.2:» vor jede Tabellenbeschriftung, damit Querverweise auf Tabellen eine Nummer nennen.",
+      "en": "Book settings have a new \"Number tables\" switch. It puts \"Tab. 3.2:\" in front of every table caption so cross-references to tables can show a number."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Der Seiten-Chat kennt jetzt die offenen Ideen zur Seite und das letzte Lektorat. Fragen wie «Was sollte ich hier noch angehen?» beantwortet er damit konkreter.",
+      "en": "The page chat now knows the page's open ideas and its latest proofreading. It answers questions like \"What should I still work on here?\" more concretely."
+    },
+    {
+      "kind": "verbessert",
+      "de": "In der Figuren-Werkstatt trägt die Mindmap-Mitte immer den Namen der Figur. Wer eines von beiden umbenennt, ändert das andere gleich mit.",
+      "en": "In the Character Workshop, the centre of the mind map always carries the character's name. Renaming one now updates the other as well."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Auf Tablets und Handys öffnet ein langer Druck auf einen Mindmap-Knoten der Figuren-Werkstatt dasselbe Menü wie der Rechtsklick.",
+      "en": "On tablets and phones, a long press on a mind map node in the Character Workshop opens the same menu as a right-click."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Die Karte «Werkbank» entfällt. Ihre Befunde stehen dort, wo man sie bearbeitet: in Figuren-Werkstatt, Plot-Karte und Motiv-Werkstatt.",
+      "en": "The \"Workbench\" card has been removed. Its findings now appear where you act on them: in the Character Workshop, the plot card and the Motif Workshop."
+    },
+    {
+      "kind": "behoben",
+      "de": "Eine bestehende Figur liess sich nicht in die Figuren-Werkstatt übernehmen. Das klappt wieder, und die Notiz dazu steht in der eigenen Sprache.",
+      "en": "Importing an existing character into the Character Workshop failed. It works again, and the note it adds is now in your own language."
+    },
+    {
+      "kind": "behoben",
+      "de": "Im Reiter «Bogen im Buch» zeigte eine Zelle beim Anklicken mehr Fundstellen, als sie zählte. Zahl und Liste stimmen jetzt überein.",
+      "en": "In the \"Arc in the book\" tab, clicking a cell listed more occurrences than it counted. The number and the list now match."
+    },
+    {
+      "kind": "behoben",
+      "de": "In der Motiv-Werkstatt springen die Blasen beim Überfahren mit der Maus nicht mehr. In der Figuren-Mindmap passen sich die Linien beim Wechsel zwischen hell und dunkel an.",
+      "en": "Bubbles in the Motif Workshop no longer jump when you hover over them. Lines in the character mind map now adapt when switching between light and dark mode."
+    }
+  ]
+}

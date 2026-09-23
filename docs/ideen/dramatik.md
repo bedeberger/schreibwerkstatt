@@ -154,7 +154,7 @@ Neue Bereiche, je in **`de.json` und `en.json`** (Anker: Journalismus brauchte ~
 | `fehlerHeatmap.cluster.dramatik` | neue Cluster-Spalte |
 | `review.section.*`, `kapitelReview.section.*`, `review.cat.*` | `dialog`, `figurenstimmen`, `szenenoekonomie`, `produzierbarkeit` |
 | `tile.rollen` + `tile.rollen.desc` | Karte in Palette/Pills |
-| `landing.feat<N>Title` / `Desc` | plus `<N>` in `HELP_FEATURES` |
+| `help.feat.rollen` | Hilfetext der Karte (Hilfe-Katalog) |
 
 ## DB
 

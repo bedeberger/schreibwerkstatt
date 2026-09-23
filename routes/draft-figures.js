@@ -17,8 +17,12 @@ const { extractPsychologie, PSYCHE_KERNE } = require('../lib/draft-mindmap-extra
 const { computeArcFindings } = require('../lib/figure-arc');
 const appSettings = require('../lib/app-settings');
 const { buildMindmapFromFigure, mapArchetype } = require('../lib/draft-mindmap-builder');
+const { defaultMindmap } = require('../lib/draft-mindmap-default');
 const { toIntId } = require('../lib/validate');
 const { aclParamGuard, sessionEmail } = require('../lib/acl');
+const { getUser } = require('../db/app-users');
+const { tServerParams } = require('../lib/i18n-server');
+const { localIsoDate } = require('../lib/local-date');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -37,40 +41,6 @@ const MAX_NAME_LEN = 200;
 const MAX_NOTES_LEN = 8000;
 const MAX_MINDMAP_BYTES = 256 * 1024;
 
-function defaultMindmap(name) {
-  return {
-    meta: { name: 'figur-werkstatt', version: '1' },
-    format: 'node_tree',
-    data: {
-      id: 'root',
-      topic: name,
-      children: [
-        { id: 'steckbrief', topic: '__i18n:werkstatt.tree.steckbrief__', expanded: true, children: [
-          { id: 'aussehen',        topic: '__i18n:werkstatt.tree.aussehen__' },
-          { id: 'persoenlichkeit', topic: '__i18n:werkstatt.tree.persoenlichkeit__' },
-          { id: 'hintergrund',     topic: '__i18n:werkstatt.tree.hintergrund__' },
-          { id: 'beziehungen',     topic: '__i18n:werkstatt.tree.beziehungen__' },
-          { id: 'konflikt',        topic: '__i18n:werkstatt.tree.konflikt__' },
-          { id: 'bogen',           topic: '__i18n:werkstatt.tree.bogen__' },
-          { id: 'musikgeschmack',  topic: '__i18n:werkstatt.tree.musikgeschmack__' },
-        ]},
-        { id: 'stimme', topic: '__i18n:werkstatt.tree.stimme__', expanded: true, children: [
-          { id: 'sprechweise', topic: '__i18n:werkstatt.tree.sprechweise__' },
-          { id: 'phrasen',     topic: '__i18n:werkstatt.tree.phrasen__' },
-          { id: 'verben',      topic: '__i18n:werkstatt.tree.verben__' },
-        ]},
-        { id: 'subtext', topic: '__i18n:werkstatt.tree.subtext__', expanded: true, children: [
-          { id: 'want',  topic: '__i18n:werkstatt.tree.want__' },
-          { id: 'need',  topic: '__i18n:werkstatt.tree.need__' },
-          { id: 'wound', topic: '__i18n:werkstatt.tree.wound__' },
-          { id: 'lie',   topic: '__i18n:werkstatt.tree.lie__' },
-        ]},
-        { id: 'custom', topic: '__i18n:werkstatt.tree.custom__', children: [] },
-      ],
-    },
-  };
-}
-
 function _validateMindmap(obj) {
   if (!obj || typeof obj !== 'object') return false;
   if (!obj.data || typeof obj.data !== 'object') return false;
@@ -78,6 +48,16 @@ function _validateMindmap(obj) {
   const json = JSON.stringify(obj);
   if (json.length > MAX_MINDMAP_BYTES) return false;
   return true;
+}
+
+// Die Wurzel der Mindmap IST die Figur: ihr Topic folgt dem Namen, nie umgekehrt
+// als zweite Quelle. Ohne das zeigte die Mindmap nach einer Umbenennung im
+// Formular den alten Namen, und die KI saehe ihn im Knotenpfad („Mara > Stimme").
+// Das Frontend spiegelt eine Umbenennung der Wurzel ins Namensfeld; hier wird
+// die Invariante fuer jeden Schreibweg gezogen, auch fuer fremde Clients.
+function _withRootName(mindmap, name) {
+  if (!mindmap?.data || mindmap.data.topic === name) return mindmap;
+  return { ...mindmap, data: { ...mindmap.data, topic: name } };
 }
 
 // Werkstatt-Runs: KI-Lauf-Historie pro Draft (Brainstorm + Consistency).
@@ -99,7 +79,10 @@ router.get('/by-id/:id/occurrences', (req, res) => {
   const draft = scopedDraft(req, res, req.params.id);
   if (!draft) return;
   const kern = PSYCHE_KERNE.includes(req.query.kern) ? req.query.kern : null;
-  res.json(occDb.listDraftOccurrences(draft.id, { kern }));
+  // Derselbe Floor wie in der Bogen-Ansicht — sonst loeste die Zelle mehr
+  // Fundstellen auf, als sie zaehlt.
+  const minScore = Number(appSettings.get('werkstatt.anchor.min_score')) || 0;
+  res.json(occDb.listDraftOccurrences(draft.id, { kern, minScore }));
 });
 
 router.get('/runs/:run_id', (req, res) => {
@@ -139,7 +122,7 @@ router.post('/:book_id', jsonBody, (req, res) => {
 
   const archetype = req.body?.archetype ? String(req.body.archetype).trim().slice(0, 50) : null;
   const notes = req.body?.notes ? String(req.body.notes).slice(0, MAX_NOTES_LEN) : null;
-  const mindmap = req.body?.mindmap || defaultMindmap(name);
+  const mindmap = _withRootName(req.body?.mindmap || defaultMindmap(name), name);
   if (!_validateMindmap(mindmap)) return res.status(400).json({ error_code: 'MINDMAP_INVALID' });
 
   const created = createDraftFigure(bookId, userEmail, { name, archetype, mindmap, notes });
@@ -164,7 +147,7 @@ router.put('/:id', jsonBody, (req, res) => {
   const notes = req.body?.notes != null
     ? (req.body.notes ? String(req.body.notes).slice(0, MAX_NOTES_LEN) : null)
     : draft.notes;
-  const mindmap = req.body?.mindmap != null ? req.body.mindmap : draft.mindmap;
+  const mindmap = _withRootName(req.body?.mindmap != null ? req.body.mindmap : draft.mindmap, name);
   if (!_validateMindmap(mindmap)) return res.status(400).json({ error_code: 'MINDMAP_INVALID' });
 
   const updated = updateDraftFigure(draft.id, { name, archetype, mindmap, notes });
@@ -217,7 +200,7 @@ router.get('/:book_id/arc', async (req, res) => {
       counts.get(r.draft_id)[r.kern] = r.n;
     }
     const chapters = new Map();
-    for (const r of occDb.occChapters(bookId, userEmail)) {
+    for (const r of occDb.occChapters(bookId, userEmail, floor)) {
       if (r.chapter_id == null) continue;   // Fundstelle ohne aufloesbares Kapitel
       if (!chapters.has(r.draft_id)) chapters.set(r.draft_id, {});
       const perKern = chapters.get(r.draft_id);
@@ -276,8 +259,10 @@ router.post('/:book_id/import', jsonBody, (req, res) => {
   const mindmap = buildMindmapFromFigure(fig);
   if (!_validateMindmap(mindmap)) return res.status(500).json({ error_code: 'MINDMAP_INVALID' });
   const archetype = mapArchetype(fig.typ);
-  const now = new Date().toISOString().slice(0, 10);
-  const notes = `Importiert aus Figur "${fig.name}" am ${now}.`;
+  // Notiz in der Sprache des Users zum Import-Zeitpunkt, KEIN __i18n:-Marker:
+  // das Notizfeld ist Freitext, ein Marker stuende dort roh im Textarea.
+  const locale = getUser(userEmail)?.language || 'de';
+  const notes = tServerParams('werkstatt.importNote', { name: fig.name, date: localIsoDate() }, locale);
 
   const created = createDraftFigure(bookId, userEmail, {
     name: fig.name,
@@ -342,4 +327,4 @@ router.delete('/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-module.exports = { router, defaultMindmap };
+module.exports = { router, defaultMindmap, _withRootName };

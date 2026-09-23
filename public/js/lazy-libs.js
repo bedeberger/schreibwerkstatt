@@ -37,6 +37,23 @@ function _ensureCss(href) {
   document.head.appendChild(l);
 }
 
+// Vendor-CSS, gegen das App-CSS mit GLEICHER Spezifitaet ueberschreibt: es muss
+// VOR dem ersten App-Stylesheet stehen, sonst gewinnt es als spaeter geladene
+// unlayered Regel. Das Promise loest erst nach dem Laden auf — Libs, die beim
+// Rendern Knotengroessen messen (jsMind), brauchen die Regeln vorher.
+// Ein Ladefehler blockiert nicht: ohne CSS rendert die Lib haesslich, aber sie rendert.
+function _ensureCssFirst(href) {
+  const existing = document.querySelector(`link[href="${href}"]`);
+  if (existing) return existing._ready || Promise.resolve();
+  const l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = href;
+  l._ready = new Promise(resolve => { l.onload = resolve; l.onerror = resolve; });
+  const first = document.head.querySelector('link[rel="stylesheet"]');
+  document.head.insertBefore(l, first || null);
+  return l._ready;
+}
+
 // Lädt ein Vendor-Script und gibt sein Global erst heraus, wenn es wirklich
 // steht. `pick()` MUSS dieselbe Bedingung prüfen wie der Cache-Hit des jeweiligen
 // Loaders — die Asymmetrie zwischen beiden ist der eigentliche Fehler, den dieser
@@ -80,7 +97,12 @@ export function loadChart() {
 export function loadJsMind() {
   if (typeof window.jsMind !== 'undefined') return Promise.resolve(window.jsMind);
   if (!_jsMindPromise) {
-    _jsMindPromise = _loadGlobal('vendor/jsmind-0.8.7.js', () => window.jsMind, 'jsMind')
+    // Das Vendor-CSS laedt erst mit der Werkstatt, nicht mit jeder Seite.
+    // figur-werkstatt.css ueberschreibt es — darum vor das App-CSS.
+    _jsMindPromise = Promise.all([
+      _ensureCssFirst('vendor/jsmind-0.8.7.css'),
+      _loadGlobal('vendor/jsmind-0.8.7.js', () => window.jsMind, 'jsMind'),
+    ]).then(([, jm]) => jm)
       .catch(err => { _jsMindPromise = null; throw err; });
   }
   return _jsMindPromise;

@@ -1,18 +1,25 @@
-// Rechtsklick-Menü auf Mindmap-Knoten: Brainstorm/Rename/AddChild/AddSibling/Delete.
+// Rechtsklick-/Long-Press-Menü auf Mindmap-Knoten: Brainstorm/Rename/AddChild/AddSibling/Delete.
 
 import { _newNodeId } from './mindmap.js';
 
 export const contextMenuMethods = {
   _onMindmapContextMenu(ev) {
+    this._cancelLongPress?.();
     const target = ev.target.closest?.('jmnode');
     if (!target) { this._hideContextMenu(); return; }
+    if (!target.getAttribute('nodeid')) return;
+    ev.preventDefault();
+    this._openNodeMenu(target, ev.clientX, ev.clientY);
+  },
+
+  // Gemeinsamer Einstieg fuer Rechtsklick und Long-Press (mindmap.js).
+  _openNodeMenu(target, x, y) {
     const nodeId = target.getAttribute('nodeid');
     if (!nodeId) return;
-    ev.preventDefault();
     this._selectNodeQuiet(nodeId);
     this.selectedKnotenId = nodeId;
     this.contextMenuNodeId = nodeId;
-    this.contextMenuPos = this._clampMenuPos(ev.clientX, ev.clientY);
+    this.contextMenuPos = this._clampMenuPos(x, y);
     this.contextMenuOpen = true;
     if (!this._ctxOutsideHandler) {
       this._ctxOutsideHandler = (e) => {

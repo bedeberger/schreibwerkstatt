@@ -203,3 +203,24 @@ test.after(() => {
   try { fs.unlinkSync(tmp + '-wal'); } catch {}
   try { fs.unlinkSync(tmp + '-shm'); } catch {}
 });
+
+test('_withRootName: Wurzel-Topic folgt dem Figurnamen, Rest bleibt unberuehrt', () => {
+  const { _withRootName } = require('../../routes/draft-figures');
+  const m = sampleMindmap('Anna');
+  const renamed = _withRootName(m, 'Mara');
+  assert.equal(renamed.data.topic, 'Mara');
+  assert.equal(m.data.topic, 'Anna', 'Eingabe wird nicht mutiert');
+  assert.strictEqual(renamed.data.children, m.data.children, 'Kinder unveraendert');
+  assert.strictEqual(_withRootName(m, 'Anna'), m, 'gleicher Name → dasselbe Objekt');
+  assert.equal(_withRootName(null, 'X'), null);
+});
+
+test('Katalog-Import-Builder funktioniert bei der Ladereihenfolge des Servers (Route zuerst)', () => {
+  // server.js laedt die Route vor dem Builder. Ein Import-Kreis zwischen den
+  // beiden liess den Builder dann mit `defaultMindmap = undefined` zurueck.
+  require('../../routes/draft-figures');
+  const { buildMindmapFromFigure } = require('../../lib/draft-mindmap-builder');
+  const m = buildMindmapFromFigure({ name: 'Kreis' });
+  assert.equal(m.data.topic, 'Kreis');
+  assert.ok(m.data.children.length > 0);
+});

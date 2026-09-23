@@ -26,9 +26,13 @@
 
   <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')). Nur der Tablist im tabs-
        Scope; die Panels lesen referenceTab direkt aus der Karte. -->
-  <div class="card-section" x-data="tabs(['figuren','orte','szenen','ereignisse','recherche','quellen','verwandt'])"
+  <div class="card-section" x-data="tabs(['plan','figuren','orte','szenen','ereignisse','recherche','quellen','verwandt'])"
        x-modelable="value" x-model="referenceTab">
     <div class="tabs tabs--scrollable" x-bind="tablist">
+      <button class="tabs-btn" x-bind="tabBtn('plan')" x-show="referenceHasPlan()">
+        <span x-text="$app.t('reference.tab.plan')"></span>
+        <span class="reference-tab-count" x-show="referenceCount('plan') > 0" x-text="referenceCount('plan')"></span>
+      </button>
       <button class="tabs-btn" x-bind="tabBtn('figuren')">
         <span x-text="$app.t('reference.tab.figuren')"></span>
         <span class="reference-tab-count" x-show="referenceCount('figuren') > 0" x-text="referenceCount('figuren')"></span>
@@ -61,6 +65,8 @@
   </div>
 
   <div class="reference-body">
+    <!-- @include reference-plan -->
+
     <!-- Figuren -->
     <div x-show="referenceTab === 'figuren'" class="reference-panel">
       <template x-if="referenceFiguren().length === 0">

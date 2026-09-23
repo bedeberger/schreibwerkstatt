@@ -34,7 +34,7 @@ const ALLOWED_KEYS = new Set([
   'songs',
   'ereignisse',
   'plot',
-  'motiv', 'werkbank',
+  'motiv',
   'weltfakten',
   'recherche',
   'ideenBoard',

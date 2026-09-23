@@ -20,6 +20,8 @@ Die App hat **drei unabhängige Chats**. Sie teilen sich nur das Storage-Modell 
 
 Läuft **neben dem Editor** (Ausnahme zur Exklusivitäts-Regel: kein `_closeOtherMainCards` beim Öffnen). Klassischer Chat ohne Tool-Loop. Antwortformat enthält `vorschlaege` mit zeichengenauem `original` für Textersetzung; unterliegt dem `updatedAt`-Staleness-Check (Vorschlag wird verworfen, wenn der User während der Analyse gespeichert hat). Session-`kind = 'page'` mit gesetztem `page_id`; Root dispatcht `chat:reset` beim Seitenwechsel.
 
+**Kontext im Prompt** ([page-chat.js](../routes/jobs/chat/page-chat.js)): Seitentext (plus Stand beim Chat-Start, falls geändert), Figuren des Kapitels (gebudgetet), letzte Buchbewertung, **offene Ideen** der Seite + des Kapitels (`getOpenIdeen`) und **letztes Lektorat** der Seite (`getLatestPageCheck`), beide aus [routes/jobs/shared/queries.js](../routes/jobs/shared/queries.js). Die Übergabe an den Builder ist gegated durch [tests/unit/ideen-prompt.test.mjs](../tests/unit/ideen-prompt.test.mjs) — der Builder allein beweist nicht, dass der Job ihn befüllt.
+
 ## Buch-Chat
 
 Buchweiter agentischer Chat **ohne** Vorschläge-System. Sessions: `kind = 'book'` mit `page_id IS NULL` (CHECK-Constraint erzwingt die Kombination). Read-only-Tool-Vertrag mit 33 Tools (Inventar, `ctx`-Vertrag, Truncation, Loop-Constraints, neues Tool anlegen: **[docs/buchchat-tools.md](buchchat-tools.md)**). Einzige bewusste Ausnahme zum Read-Only-Vertrag: `generate_image` (**[docs/image.md](image.md)**) — nie in den Manuskript-Text. Per-Job-Claude-Override möglich (`ai.claude.*.bookchat`). Root dispatcht `book-chat:reset`.

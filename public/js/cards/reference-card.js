@@ -42,8 +42,9 @@ import { groupCitedSources } from '../sources/cited-index.js';
 import { primaryPersonLabel } from '../sources/fields.js';
 import { referenceInterviewMethods, referenceInterviewState } from './reference-interview.js';
 import { referenceContextMethods } from './reference-context.js';
+import { referencePlanMethods, referencePlanState } from './reference-plan.js';
 
-const TABS = ['figuren', 'orte', 'szenen', 'ereignisse', 'recherche', 'quellen', 'verwandt'];
+const TABS = ['plan', 'figuren', 'orte', 'szenen', 'ereignisse', 'recherche', 'quellen', 'verwandt'];
 
 export function registerReferenceCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -51,6 +52,8 @@ export function registerReferenceCard() {
     referenceTab: 'figuren',
     // O-Toene aus Interview-Transkripten (Slice cards/reference-interview.js).
     ...referenceInterviewState(),
+    // Plan-Reiter: Beats des Beat-Boards (Slice cards/reference-plan.js).
+    ...referencePlanState(),
     referenceScope: 'page',            // 'page' (aktueller Kontext) | 'book'
     referenceRecherche: [],
     referenceRechercheLoading: false,
@@ -128,6 +131,7 @@ export function registerReferenceCard() {
 
     _resetReference() {
       this.referenceRecherche = [];
+      this.referencePlan = null;
       this.referenceSources = [];
       this.referenceCitations = [];
       this.referenceSourcesError = '';
@@ -162,6 +166,7 @@ export function registerReferenceCard() {
       if (!(cat.globalZeitstrahl || []).length) app._reloadZeitstrahl?.();
       this._loadReferenceRecherche();
       this._loadReferenceSources();
+      this._loadReferencePlan();
     },
 
     async _loadReferenceRecherche() {
@@ -430,6 +435,7 @@ export function registerReferenceCard() {
     },
 
     ...referenceInterviewMethods,
+    ...referencePlanMethods,
     // Kontext-Regel + gefilterte Listen (Slice cards/reference-context.js).
     ...referenceContextMethods,
   }));

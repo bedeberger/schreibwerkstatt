@@ -218,6 +218,16 @@
   font-size: var(--font-size-base);
   padding: var(--space-6) var(--space-10);
   box-shadow: var(--shadow-sm);
+  /* Long-Press öffnet das Knoten-Menü (mindmap.js#_attachLongPress) — iOS
+     legte sonst Textauswahl + System-Callout darüber. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Inline-Editor (F2/Doppelklick) im Knoten: Textauswahl muss dort gehen. */
+.werkstatt-mindmap jmnode input {
+  -webkit-user-select: text;
+  user-select: text;
 }
 .werkstatt-mindmap jmnode.root {
   background: var(--color-primary);

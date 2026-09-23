@@ -7,13 +7,15 @@
 // (routes/jobs/plot.js), nicht hier.
 
 const express = require('express');
-const { getDraftFigure } = require('../db/schema');
+const { getDraftFigure, listFigurenWithDetails } = require('../db/schema');
 const plotDb = require('../db/plot');
 const { toIntId } = require('../lib/validate');
 const { resolveChapterBookId } = require('../lib/content-ownership');
 const { setContext } = require('../lib/log-context');
 const { requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
 const appSettings = require('../lib/app-settings');
+const { computeTimeFindings } = require('../lib/plot-time-consistency');
+const { yearFromString, bookYearSpan } = require('../lib/figure-years');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -124,6 +126,37 @@ router.get('/', (req, res) => {
     beats,
     relations: plotDb.listBeatRelations(bookId, userEmail),
     beatAnchor: { stale: plotDb.beatAnchorStale(bookId, userEmail, staleStatuses) },
+  });
+});
+
+// ── Zeit-Messung ────────────────────────────────────────────────────────────
+// Datierte Beats gegen Geburtsjahre, Buchspanne und Board-Reihenfolge — pure
+// Rechnung in lib/plot-time-consistency.js, kein Job, kein callAI. Der KI-Check
+// verlässt sich darauf, dass die App das selbst nachrechnet (prompts/plot.js).
+// Das Geburtsjahr liefert `listFigurenWithDetails` bereits über die SSoT
+// lib/figure-years.js; ohne echte Zeitlinie ist es null, dann entsteht nur der
+// Chronologie-Teil. `scanned` = mindestens ein Beat trägt eine Jahreszahl —
+// undatiert ist ungeprüft, nicht in Ordnung.
+router.get('/time-check', (req, res) => {
+  const ctx = _requireBook(req, res);
+  if (!ctx) return;
+  const { userEmail, bookId } = ctx;
+  const acts = plotDb.listActs(bookId, userEmail);
+  const actPos = new Map(acts.map((a, i) => [a.id, a.position ?? i]));
+  // Board-Lesereihenfolge: Akt-Position, dann sort_order — dieselbe Ordnung,
+  // die das Board zeichnet; die Chronologie-Prüfung urteilt über genau sie.
+  const beats = plotDb.listBeats(bookId, userEmail)
+    .sort((a, b) => ((actPos.get(a.act_id) ?? 0) - (actPos.get(b.act_id) ?? 0))
+                 || ((a.sort_order ?? 0) - (b.sort_order ?? 0))
+                 || (a.id - b.id))
+    .map((b, i) => ({ ...b, ordnung: i, jahr: yearFromString(b.zeit) }));
+  const figures = new Map();
+  for (const f of ((listFigurenWithDetails(bookId, userEmail) || {}).figuren || [])) {
+    if (f.geburtsjahr != null) figures.set(f.id, { name: f.name, geburtsjahr: f.geburtsjahr });
+  }
+  res.json({
+    befunde: computeTimeFindings({ beats, figures, bookSpan: bookYearSpan(bookId, userEmail) }),
+    scanned: beats.some(b => Number.isFinite(b.jahr)),
   });
 });
 

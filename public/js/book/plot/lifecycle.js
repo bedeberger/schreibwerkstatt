@@ -71,7 +71,8 @@ export const lifecycleMethods = {
       this.motifsCatalog = [];
       this.themesCatalog = [];
     }
-    // Konsistenz- + Brainstorm-Historie laden (best-effort, eigenständig vom Board).
+    // Zeit-Messung + Konsistenz-/Brainstorm-Historie (best-effort, eigenständig vom Board).
+    this.loadTimeChecks();
     this.loadConsistencyRuns();
     this.loadBrainstormRuns();
     // Deep-Link-Ziel (#book/X/plot/<beatId>) nach Board-Load anwenden.
@@ -118,6 +119,7 @@ export const lifecycleMethods = {
     this.brainstormThreadId = null;
     this.consistencyResult = null;
     this.selectedKonfliktIdx = null;
+    this.timeChecks = [];
     this.consistencyRuns = [];
     this.selectedRunId = null;
     this.brainstormRuns = [];

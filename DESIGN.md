@@ -12,7 +12,8 @@ Token-Referenz (Farben, Radien, Spacing, Schriftgrössen): [public/css/tokens.cs
 - [Motion-Patterns](#motion-patterns) — cardFadeIn, `@starting-style`-Eintritt, View Transition beim Kartenwechsel, Hover-Mechaniken
 - [Alpine-Plugins](#alpine-plugins-inventar) — was geladen ist (`x-anchor`/`x-trap`/`x-collapse`/`x-resize`), was mit Absicht nicht
 - [Mikro-Typografie](#mikro-typografie-memory-regeln) — Doppelpunkt, Zahlen, Icons, Konsistenz
-- [Feature-Text (Landing + Hilfe)](#feature-text-landing--hilfe) — Titel- und Längenrahmen für `landing.feat<N>Title/Desc`
+- [Feature-Text (Landing)](#feature-text-landing) — Titel- und Längenrahmen für `landing.feat<N>Title/Desc`
+- [Hilfetext (Hilfe-Katalog)](#hilfetext-hilfe-katalog) — `help.feat.<key>` / `help.extra.<key>` im Reiter „Funktionen"
 - [Mobile-Breakpoints + Darkmode](#mobile-breakpoints--darkmode) — 480/600/768/1024 + Token-Pflicht für Farben
 - [Container-Queries vs. Media-Queries](#container-queries-vs-media-queries)
 - [Print-Styles](#print-styles) — nicht supported
@@ -131,7 +132,7 @@ Wiederkehrende Werte gehen über Tokens. Ad-hoc-Werte (`box-shadow: 0 4px 12px .
 | **Spacing** | `--space-xs` (4px), `--space-sm` (8px), `--space-md` (12px), `--space-lg` (16px), `--space-xl` (24px), `--space-2xl` (32px) | Margins, Gaps, Row-Gaps. 4-Pixel-Raster. Ad-hoc Pixel nur bei wirklich nicht-passendem Token. |
 | **Transition** | `--transition-fast` (0.1s), `--transition-base` (0.12s), `--transition-slow` (0.15s), `--transition-emphasized` (0.3s) | Standard-Cadence. Emphasized für Modal/Drawer-Slides, Card-Eingang, längere Fades. **NIE als `--x: var(--x)` definieren** — zirkuläre Custom-Property ist invalid → ganze `transition`/`animation`-Property kippt auf Default `0s` → Chevron-Rotationen, `cardFadeIn`, Hover-Tints sind tot, Erweiterungen „wackeln" weil Section snappt ohne Chevron-Maskierung. Definitionen müssen Literalwerte tragen, [public/css/tokens/motion.css](public/css/tokens/motion.css). `prefers-reduced-motion: reduce` flippt alle Transition-Tokens auf `0s` (globaler Override in derselben Datei). **Easing:** `--ease-out` (Quint, `cubic-bezier(0.22, 1, 0.36, 1)`) für Eingänge — `--transition-emphasized` nutzt es bereits; Hover-Tints/Zustandswechsel bleiben auf `ease`. |
 | **Opacity** | `--opacity-disabled` (0.6), `--opacity-muted` (0.5), `--opacity-hint` (0.4), `--opacity-faint` (0.35), `--opacity-strong` (0.75) | Semantische Stufen. `:disabled` immer `--opacity-disabled`. |
-| **Muster** | `--hatch-empty` | Schraffur fuer die leere Raster-Zelle (45°, 2px Strich / 6px Periode, liest `--color-border`). Konsumenten: `.heatmap-cell--empty`, `.werkbank-cell--empty` — beide zusaetzlich `opacity: var(--opacity-disabled)`. Eine Deklaration, damit „nichts da“ ueberall gleich aussieht; keine zweite Schraffur in einer Feature-Datei. |
+| **Muster** | `--hatch-empty` | Schraffur fuer die leere Raster-Zelle (45°, 2px Strich / 6px Periode, liest `--color-border`). Konsument: `.heatmap-cell--empty`, zusaetzlich `opacity: var(--opacity-disabled)`. Eine Deklaration, damit „nichts da“ ueberall gleich aussieht; keine zweite Schraffur in einer Feature-Datei. |
 | **Focus-Ring** | — | Kein wildcard-`:focus-visible`-Token. Browser-Default-Outline aktiv; per-Element-Fokus-Styles für Tab-Navigation in [base.css](public/css/layout/base.css) (Skip-Link, `.page-item`, `.tree-chapter-header`, `.lektorat-split-findings .finding`). Komponenten mit eigenem Fokus-Signal setzen `outline: none` ohne `!important`. |
 | **Font-Size** | `--font-size-xs` (11px), `--font-size-sm` (13px), `--font-size-base` (14px), `--font-size-md` (15px), `--font-size-lg` (18px), `--font-size-xl` (22px), `--font-size-2xl` (26px) | xs/sm/base/md = UI-Stufen. lg = Sub-Heading. xl = Card-Title-Standard. 2xl = Hero/H1. |
 | **Font-Family** | `--font-sans` (Inter), `--font-serif` (Source Serif 4) | UI immer `--font-sans`, Reading-Frame + Headings `--font-serif`. |
@@ -1502,11 +1503,11 @@ Kein neuer Marker ohne Eintrag hier.
 
 ---
 
-## Feature-Text (Landing + Hilfe)
+## Feature-Text (Landing)
 
-**Use:** Die Kurzbeschreibung eines Features, die in der öffentlichen Landing-Page **und** in der In-App-Hilfe als Kachel steht. Beide lesen dieselben i18n-Keys `landing.feat<N>Title` / `landing.feat<N>Desc` (SSoT, siehe CLAUDE.md „Hilfe-Karte + Landing pflegen").
+**Use:** Die Kurzbeschreibung eines Features als Kachel auf der öffentlichen Landing-Page, i18n-Keys `landing.feat<N>Title` / `landing.feat<N>Desc`. Werbetext für Unbekannte — die In-App-Hilfe hat ihren eigenen Textsatz ([Hilfetext](#hilfetext-hilfe-katalog)).
 
-**Markup:** Kachel in einem Raster — [landing.html](public/landing.html) `li.public-feature`, [help.html](public/partials/help.html) `li.help-feature`. Beide sind `<h3>` + `<p>`, kein Markdown, keine Links, keine Icons. Die Hilfe zeigt **alle** Nummern aus `HELP_FEATURES`, die Landing-Page bewusst nur die ersten als kuratierten Einstieg — dieselben Keys, dieselbe Reihenfolge, kein zweiter Textsatz.
+**Markup:** Kachel in einem Raster — [landing.html](public/landing.html) `li.public-feature`, `<h3>` + `<p>`, kein Markdown, keine Links, keine Icons. Jede vorhandene Nummer steht auf der Landing-Page — kein Vorrat unbenutzter Keys, der ungesehen veraltet. Die Auswahl ist kuratiert: was es noch gibt, beschreibt die Hilfe.
 
 **Regeln:**
 - **Titel: 1–3 Wörter, höchstens 26 Zeichen.** Der Name des Features, nicht seine Erklärung — kein „und", kein Klammerzusatz, kein Doppelpunkt-Anhang. Steht auf einer Zeile, auch mobil.
@@ -1516,9 +1517,23 @@ Kein neuer Marker ohne Eintrag hier.
 - **Beide Locales im selben Commit**, in derselben Länge — `de` ist nicht die Langfassung von `en`.
 - **Reihenfolge = Erscheinungsreihenfolge**: `<N>` hängt hinten an, das neueste Feature steht unten. Bestehende Nummern nie umnummerieren (der Landing-Block trägt sie hartcodiert).
 
-**Gate:** [tests/unit/landing-feature-text.test.mjs](tests/unit/landing-feature-text.test.mjs) — Titel-/Beschreibungslänge in beiden Locales, Lückenlosigkeit von `HELP_FEATURES`, Landing als Prefix davon.
+**Gate:** [tests/unit/landing-feature-text.test.mjs](tests/unit/landing-feature-text.test.mjs) — Titel-/Beschreibungslänge in beiden Locales, Lückenlosigkeit der Nummern, Landing rendert genau diese Nummern.
 
-**Beispiele:** `landing.feat6Desc` (Export — breites Feature, ein Satz Umfang + ein Satz Beigabe), `landing.feat23Desc` (Buchlandkarte — abstraktes Feature, Satz 1 sagt was es ist, Satz 2 was man sieht).
+**Beispiele:** `landing.feat6Desc` (Export — breites Feature, ein Satz Umfang + ein Satz Beigabe), `landing.feat9Desc` (Testleser — Satz 1 sagt was es tut, Satz 2 wo es sich von einem Mail-Anhang unterscheidet).
+
+---
+
+## Hilfetext (Hilfe-Katalog)
+
+**Use:** Der Eintrag einer Funktion im Reiter „Funktionen" der Hilfe-Karte. Katalog: [help-catalog.js](public/js/cards/help-catalog.js)#`buildHelpSections` — jede Karte aus `FEATURES` (Titel = `labelKey`, Text = `help.feat.<key>`), die Aktionen aus `HELP_ACTION_KEYS` und die Funktionen ohne eigene Karte aus `HELP_EXTRAS` (`help.extra.<key>.title`/`.desc`), gruppiert nach `HELP_GROUPS`. Bei offenem Buch gefiltert nach Buchtyp und Rolle wie die Palette; Voraussetzungen (Buchtyp, Komplettanalyse, Cloud-Modell, Semantik-Index, Admin-Dienst, Claude) stehen als `badge-neutral`-Plaketten am Kachelfuss.
+
+**Regeln:**
+- **Text: 60–320 Zeichen, ein bis drei Sätze.** Was die Funktion tut und — wo sie nicht offensichtlich ist — **wo** man sie findet („Rechtsklick auf ein Wort", „im Avatar-Menü"). Hilfe erklärt, sie wirbt nicht.
+- **Voraussetzungen nicht in den Text**, sondern in die Registry (`requiresBuchtyp`, `hiddenForBuchtyp`, `dependsOnKomplett`, `requiresCloudModel`) bzw. `EXTRA_NEEDS`/`needs` im Katalog — dann erscheinen sie als Plakette und bleiben mit dem Gate synchron.
+- **Nicht hineinschreiben:** Tabellen-/Routen-/Job-Namen, Dateipfade, Konfigurations-Keys.
+- **Beide Locales im selben Commit.**
+
+**Gate:** [tests/unit/help-catalog.test.mjs](tests/unit/help-catalog.test.mjs) — jede Registry-Karte hat einen Eintrag, alle Keys in de + en, keine verwaisten `help.feat.*`/`help.extra.*`-Keys, Längenrahmen, Buchtyp-/Rollen-Filter.
 
 ---
 
@@ -3038,7 +3053,6 @@ Drei Editoren leben in eigenen Subfoldern (`book/`, `focus/`, `notebook/`); edit
 | [book/plot/swimlane.css](public/css/book/plot/swimlane.css) | Plot-Werkstatt: Swimlane-Grid (Akte × Stränge) + Strang-Leiste. Ergänzt plot/board.css + plot/widgets.css. |
 | [book/plot/relations.css](public/css/book/plot/relations.css) | Plot-Werkstatt: Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff) — read-only Badges auf der Beat-Karte + Beziehungs-Editor (Typ-/Ziel-Combobox + Chips). Ergänzt plot/board.css. |
 | [book/motiv.css](public/css/book/motiv.css) | Motiv-Werkstatt (Themen & Motive als Konstellation): Anlege-/Layer-Leiste, Zwei-Spalten-Layout (Graph + Seitenpanel), Motiv-Editor, Fundstellen-Liste, Soll-Verknüpfungs-Chips, Beziehungs-Editor. Akzent via `var(--card-accent)` (`.card--motiv`). Layer-Toggle-Buttons (`.motiv-layer-btn`) + entfernbare Chips (`.motiv-chip`) sind feature-skopiert. |
-| [book/werkbank.css](public/css/book/werkbank.css) | Werkbank (Figuren × Akte + gemessene Befunde): in beide Richtungen scrollendes Raster (`max-height` am Container — ohne Deckel klebt die Kopfzeile nicht) mit klebendem Zeilenkopf und Kopfzeile, Ecke auf `calc(var(--z-sticky) + 1)`. `border-collapse: separate`, damit die Kante der klebenden Spalte an der Spalte bleibt. Beat-Karten in den Zellen mit den Statusfarben des Beat-Boards (`--color-muted` / `--color-ok-border`), Leerzelle via `--hatch-empty`. Akzent via `var(--card-accent)` (`.card--werkbank`). Bewusst KEINE `.heatmap-*`-Klassen — dort steht eine Zahl mit Intensität, hier stehen Karten; das Raster-Gerüst folgt ihr trotzdem. |
 | [book/export.css](public/css/book/export.css) | Buch-Export (Standard-Format-Tiles + .swbook-Migration). |
 | [book/export-shared.css](public/css/book/export-shared.css) | Geteilte Grammatik der drei Export-Karten (PDF/Word/EPUB): Scope-Picker, einzeilige Profil-Leiste + Anlege-Zeile, Tabs/Tab-Panels, Chips, Progress, Mobile. |
 | [book/pdf-export.css](public/css/book/pdf-export.css) | PDF-Export-Spezifika (Inputs, Num-Grids, Schrift-Akkordeon, Farbpicker, Cover-Vorschau). Aufbau aus export-shared.css. |
