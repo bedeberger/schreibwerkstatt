@@ -872,6 +872,16 @@ try {
   }, { timezone: cronTz });
   logger.info(`Cron-Job registriert: registration_requests-Expire täglich 02:30 (${cronTz})`);
 
+  // 05:15 – Anthropic-Kosten aus der Cost-Report-API nachziehen (Abgleich
+  // gegen das Ledger, Admin-Usage → Abrechnung). No-op ohne Admin-Key.
+  cron.schedule('15 5 * * *', () => {
+    runWithContext({ job: 'cron', user: 'system' }, () => {
+      require('./lib/anthropic-billing').syncBilling()
+        .catch(e => logger.error('Cron Anthropic-Billing Fehler: ' + (e.code || e.message)));
+    });
+  }, { timezone: cronTz });
+  logger.info(`Cron-Job registriert: Anthropic-Kostenabgleich täglich 05:15 (${cronTz})`);
+
   // 03:00 – Nacht-Komplettanalyse für alle Bücher × alle User (DEAKTIVIERT).
   // Bei Reaktivierung den Body in runWithContext({ job: 'cron', user: 'system' }, …) wrappen
   // (wie die aktiven Crons oben), damit die enqueue-Logs den ALS-Context tragen; die

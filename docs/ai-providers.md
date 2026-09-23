@@ -264,6 +264,16 @@ Rückgabe enthält:
 
 Lokale Provider: bei vollständigem Cache-Hit (`prompt_eval_count=0`) Fallback auf Char-Schätzung, damit Anzeige nicht 0 wird. Während Streaming KEIN Schätzwert für `tokIn` — sonst weicht Job-Status vom finalen `usage` ab.
 
+## Kosten: Ledger und Anthropic-Abrechnung
+
+Zwei Kostenquellen mit getrennten Aufgaben:
+
+- **Ledger** (`ai_cost_ledger`, [db/cost-ledger.js](../db/cost-ledger.js)) — pro Call mit dem Tarif aus [lib/pricing.js](../lib/pricing.js) eingefrorene USD, mit User, Buch und Job-Typ. Grundlage für Budget-Gate, Pro-User-Auswertung und `/metrics`. Eine Preisänderung in `PRICING` wirkt nur auf künftige Calls.
+  Admin-Usage → **Users** schlüsselt das Ledger pro User nach Job-Typ auf (Chat je Session-Art `page`/`book`/`research`, [db/admin-usage.js](../db/admin-usage.js)#`userJobBreakdown`, Route `GET /admin/usage/breakdown`), dazu eine Matrix User × die sechs teuersten Job-Typen. Calls ohne User laufen als eigene Zeile mit, damit die Summe der Aufschlüsselung der Ledger-Summe entspricht. Admin-Konten sind in allen Usage-Auswertungen nur mit `?includeAdmins=1` enthalten; das UI schickt den Parameter per Default (Schalter „Admins einbeziehen"), weil Admin-Calls genauso auf der Rechnung stehen.
+- **Anthropic-Abrechnung** (`anthropic_cost_daily`, [lib/anthropic-billing.js](../lib/anthropic-billing.js)) — die tatsächlich abgerechneten Tageskosten aus der Cost-Report-API der Admin-API, je UTC-Tag × Modell/Token-Art/Workspace, ohne User-Bezug. Referenzwert, keine Zuordnung: Admin-Usage → **Abrechnung** stellt beides gegenüber. Weicht es ab, ist `PRICING` veraltet oder im Workspace läuft Fremdverbrauch.
+
+Konfiguration: `ai.claude.admin_api_key` (Admin-Key `sk-ant-admin01-…`, ENV `ANTHROPIC_ADMIN_KEY`; ein normaler API-Key wird von der API abgewiesen) und `ai.claude.billing.workspace_id` (leer = ganze Organisation, `default` = Default-Workspace). Der Workspace-Filter greift beim Lesen — gespeichert werden alle Workspaces. Abruf täglich 05:15 per Cron (Korrekturwoche; bei leerer Tabelle 90 Tage Erstbefüllung) oder von Hand im Tab (31 Tage). Der Sync **ersetzt** den abgerufenen Tagesbereich, weil Anthropic jüngste Tage nachträglich korrigiert; leere Tage bekommen eine 0-Zeile, damit „abgerufen, nichts angefallen" von „nie abgerufen" unterscheidbar bleibt.
+
 ## Provider-Unterschiede in Prompts
 
 `_isLocal`-Flag aus [public/js/prompts/state.js](../public/js/prompts/state.js) wird in `configurePrompts` gesetzt. Lokale Modelle bekommen abgespeckte Prompts (kein POV-/Tempus-Block, keine Figuren-Beziehungen, kein Vorseiten-Kontext) — sparen Tokens, weil lokale Kontextfenster meist 32-128K statt 200K sind.

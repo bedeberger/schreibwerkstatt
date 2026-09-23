@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
-const { newer, classifyPull } = await import('../../lib/blog-merge.js');
+const { newer, latest, syncPoint, classifyPull } = await import('../../lib/blog-merge.js');
 
 test('newer: fehlendes a nie neuer', () => {
   assert.equal(newer('', '2024-01-01T00:00:00.000Z'), false);
@@ -67,4 +67,32 @@ test('classifyPull: beide unveraendert -> skip (no-op)', () => {
     lastPulledAt: '2024-02-15T00:00:00.000Z',
   });
   assert.equal(action, 'skip');
+});
+
+test('latest/syncPoint: juengerer von Pull und Push', () => {
+  assert.equal(latest(null, '', undefined), '');
+  assert.equal(latest('2024-01-01T00:00:00.000Z', '2024-02-01T00:00:00.000Z'), '2024-02-01T00:00:00.000Z');
+  assert.equal(syncPoint({ last_pulled_at: '2024-03-01T00:00:00.000Z', last_pushed_at: '2024-02-01T00:00:00.000Z' }), '2024-03-01T00:00:00.000Z');
+  assert.equal(syncPoint({ last_pulled_at: null, last_pushed_at: '2024-02-01T00:00:00.000Z' }), '2024-02-01T00:00:00.000Z');
+});
+
+test('classifyPull: nach Push ist der gepushte Edit kein lokaler Edit mehr', () => {
+  const base = {
+    hasLink: true, wpModifiedAt: '2024-05-01T00:00:00', linkModifiedAt: '2024-04-01T00:00:00',
+    pageUpdatedAt: '2024-04-10T00:00:00.000Z',
+  };
+  // per Push angelegt: kein Pull-Stamp
+  assert.equal(classifyPull({ ...base, lastPulledAt: null, lastPushedAt: '2024-04-10T00:00:01.000Z' }), 'update');
+  // Edit → Push → WP-Edit
+  assert.equal(classifyPull({ ...base, lastPulledAt: '2024-03-01T00:00:00.000Z', lastPushedAt: '2024-04-10T00:00:01.000Z' }), 'update');
+  // Edit NACH dem Push bleibt ein Konflikt
+  assert.equal(classifyPull({ ...base, lastPulledAt: null, lastPushedAt: '2024-04-09T00:00:00.000Z' }), 'conflict');
+});
+
+test('classifyPull: Titel-Werkstatt-Edit zaehlt als lokaler Edit', () => {
+  assert.equal(classifyPull({
+    hasLink: true, wpModifiedAt: '2024-05-01T00:00:00', linkModifiedAt: '2024-04-01T00:00:00',
+    pageUpdatedAt: '2024-03-01T00:00:00.000Z', headlineUpdatedAt: '2024-04-20T00:00:00.000Z',
+    lastPulledAt: '2024-04-01T00:00:00.000Z',
+  }), 'conflict');
 });

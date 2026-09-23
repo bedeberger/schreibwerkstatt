@@ -41,6 +41,7 @@ const SW_SRC = fs.readFileSync(path.join(ROOT, 'public/sw.js'), 'utf8');
 const SHELL_HTML = '<body x-data="lektorat">GENERATION-A</body>';
 const SHELL_HEADERS = { 'X-App-Shell': '1' };
 
+
 class FakeResponse {
   constructor(body, init = {}) {
     this.body = body;
@@ -61,6 +62,9 @@ class FakeResponse {
     });
   }
 }
+
+// Vollstaendigkeits-Marke, die der Install als letzten Eintrag ablegt.
+const COMPLETE = { '/__sw-generation-complete': new FakeResponse('testbuild') };
 
 class FakeRequest {
   constructor(url, init = {}) {
@@ -103,7 +107,7 @@ function makeCache(initial = {}) {
 // (handleNavigate) landen dabei als Globals des Contexts und sind aufrufbar,
 // waehrend die `const`-Bindings (SHELL_CACHE, SHELL_PATH) im Scope sichtbar
 // bleiben.
-function loadSw({ cache, fetchImpl }) {
+function loadSw({ cache, fetchImpl, posted = [], updates = [] }) {
   const caches = {
     async open() { return cache; },
     async keys() { return []; },
@@ -129,7 +133,8 @@ function loadSw({ cache, fetchImpl }) {
   sandbox.self.__SHELL_BUILD = 'testbuild';
   sandbox.self.__SHELL_MANIFEST = ['/js/app.js', '/partials/x.html'];
   sandbox.self.addEventListener = (type, fn) => { listeners[type] = fn; };
-  sandbox.self.clients = { matchAll: async () => [] };
+  sandbox.self.clients = { matchAll: async () => [{ postMessage: (m) => posted.push(m) }] };
+  sandbox.self.registration = { update: async () => { updates.push(1); } };
   const ctx = vm.createContext(sandbox);
   vm.runInContext(SW_SRC, ctx);
   ctx.__listeners = listeners;
@@ -145,7 +150,7 @@ function runInstall(ctx) {
 
 test('handleNavigate ueberschreibt eine gecachte Shell NICHT mit der Netzkopie', async () => {
   const cachedShell = new FakeResponse(SHELL_HTML, { headers: SHELL_HEADERS });
-  const cache = makeCache({ '/index.html': cachedShell });
+  const cache = makeCache({ '/index.html': cachedShell, ...COMPLETE });
   let fetchCalls = 0;
   const ctx = loadSw({
     cache,
@@ -171,7 +176,7 @@ test('handleNavigate serviert eine gecachte Shell OHNE Marker weiter (Altbestand
   // Eintraege aus einer Generation vor dem Marker sind echte Shells. Sie durch
   // die Netzkopie zu ersetzen waere nach einem Deploy neues HTML gegen alte
   // Module — genau der Skew von oben. Erkannt wird das am Inhalt.
-  const cache = makeCache({ '/index.html': new FakeResponse(SHELL_HTML) });
+  const cache = makeCache({ '/index.html': new FakeResponse(SHELL_HTML), ...COMPLETE });
   let fetchCalls = 0;
   const ctx = loadSw({
     cache,
@@ -189,7 +194,7 @@ test('handleNavigate liefert eine eingefangene Landing-Seite NICHT als Shell aus
   // Die kaputte Lage: ein Install ohne Session hat die Landing-Seite als Shell
   // abgelegt. Sie auszuliefern hiesse, dem eingeloggten User die anonyme
   // Startseite zu zeigen — die Falle, aus der nur der Hard-Refresh half.
-  const cache = makeCache({ '/index.html': new FakeResponse('<h1>Landing</h1>') });
+  const cache = makeCache({ '/index.html': new FakeResponse('<h1>Landing</h1>'), ...COMPLETE });
   const ctx = loadSw({
     cache,
     fetchImpl: async () => new FakeResponse(SHELL_HTML, { headers: SHELL_HEADERS }),
@@ -202,7 +207,11 @@ test('handleNavigate liefert eine eingefangene Landing-Seite NICHT als Shell aus
     'aber kein Write in die fremde Generation — die raeumt der naechste Install auf.');
 });
 
-test('handleNavigate faellt bei kaltem Cache aufs Netz zurueck und fuellt einmalig', async () => {
+test('handleNavigate liefert bei kaltem Cache vom Netz, schreibt aber nichts dazwischen', async () => {
+  // Kalt heisst beim laufenden SW immer: die Generation ist verloren (der
+  // Install fuellt sie vollstaendig). Frueher legte dieser Pfad die Netz-Shell
+  // ab — heraus kam „Shell da, Assets weg", und jeder Asset-Miss meldete
+  // 'shell-incoherent'. Nachfuellen ist Sache von repairGeneration.
   const cache = makeCache({});
   const ctx = loadSw({
     cache,
@@ -212,8 +221,7 @@ test('handleNavigate faellt bei kaltem Cache aufs Netz zurueck und fuellt einmal
   const res = await ctx.handleNavigate(new FakeRequest('/'));
 
   assert.equal(res.body, '<html>FRISCH</html>');
-  assert.deepEqual(cache.writes, ['/index.html'],
-    'Erstbefuellung ist erlaubt — es gibt keine kohaerente Generation, die ueberschrieben wuerde.');
+  assert.deepEqual(cache.writes, [], 'kein Einzel-Eintrag in eine unvollstaendige Generation');
 });
 
 test('handleNavigate cacht die anonyme Landing-Seite nicht als Shell', async () => {
@@ -309,6 +317,106 @@ test('Install cacht die markierte Shell unter beiden Schluesseln', async () => {
   assert.equal(cache.store.get('/').body, SHELL_HTML,
     'Navigation fragt "/", der Lookup greift auf SHELL_PATH — beide muessen treffen.');
   assert.ok(cache.store.has('/partials/x.html'), 'der uebrige Satz ist ebenfalls drin');
+});
+
+// --- Verlorene Generation: Netz-Modus + Selbstreparatur ----------------------
+//
+// Die Lage aus der Telemetrie: der SW dieser Generation laeuft, sein SHELL_CACHE
+// ist aber leer (Cache-Wurf der Heilungspfade; `unregister()` wird vom naechsten
+// `register()` derselben Script-URL zurueckgeholt, ohne neuen Install). Jeder
+// Asset-Request war ein Miss, jeder meldete 'shell-incoherent', der Client lud
+// neu, der Banner-Klick fand keinen wartenden SW — nur Ctrl-F5 kam heraus.
+
+function assetEnv({ cache, serverBuild = 'testbuild' }) {
+  const posted = [];
+  const updates = [];
+  const netSeen = [];
+  const ctx = loadSw({
+    cache, posted, updates,
+    fetchImpl: async (req) => {
+      netSeen.push(req.pathname);
+      if (req.pathname === '/sw-manifest.js') {
+        return new FakeResponse(`self.__SHELL_BUILD = "${serverBuild}";`);
+      }
+      if (req.pathname === '/') return new FakeResponse(SHELL_HTML, { headers: SHELL_HEADERS });
+      return new FakeResponse('NETZ ' + req.pathname);
+    },
+  });
+  const pending = [];
+  const event = { waitUntil: (p) => pending.push(p) };
+  const asset = (p) => ctx.handleShellAsset(new FakeRequest(p, { mode: 'no-cors' }), new URL('https://example.test' + p), event);
+  return { ctx, posted, updates, netSeen, pending, event, asset };
+}
+
+test('Install legt die Vollstaendigkeits-Marke als LETZTEN Eintrag ab', async () => {
+  const cache = makeCache({});
+  const ctx = loadSw({
+    cache,
+    fetchImpl: async (req) => (req.pathname === '/'
+      ? new FakeResponse(SHELL_HTML, { headers: SHELL_HEADERS })
+      : new FakeResponse('asset')),
+  });
+  await runInstall(ctx);
+  assert.equal(cache.writes.at(-1), '/__sw-generation-complete',
+    'erst wenn alles drin ist, darf die Generation als vollstaendig gelten');
+});
+
+test('Verlorene Generation: Asset vom Netz, KEIN shell-incoherent, Reparatur fuellt nach', async () => {
+  const cache = makeCache({});
+  const env = assetEnv({ cache });
+
+  const res = await env.asset('/js/app.js');
+  assert.equal(res.body, 'NETZ /js/app.js', 'die Seite bootet aus dem Netz');
+  await Promise.all(env.pending);
+
+  assert.deepEqual(env.posted.filter(m => m.type === 'shell-incoherent'), [],
+    'ein Reload landete im selben Zustand — die Meldung triebe nur die Schleife');
+  assert.ok(cache.store.has('/__sw-generation-complete'), 'Generation ist wieder vollstaendig');
+  assert.ok(cache.store.has('/partials/x.html') && cache.store.has('/index.html'));
+});
+
+test('Verlorene Generation, Server schon weiter: nichts Fremdes ablegen, Update anstossen', async () => {
+  const cache = makeCache({});
+  const env = assetEnv({ cache, serverBuild: 'neuerbuild' });
+
+  await env.asset('/js/app.js');
+  await Promise.all(env.pending);
+
+  assert.deepEqual(cache.writes, [],
+    'Netz-Bytes einer anderen Generation in diesen Cache = genau der Skew, den cache-only verhindert');
+  assert.equal(env.updates.length, 1, 'der neue SW kommt ueber den regulaeren Update-Weg');
+});
+
+test('Einzel-Eviction in vollstaendiger Generation meldet weiterhin shell-incoherent', async () => {
+  const cache = makeCache({ ...COMPLETE, '/partials/x.html': new FakeResponse('P') });
+  const env = assetEnv({ cache });
+
+  await env.asset('/js/app.js');
+  await new Promise(r => setImmediate(r));
+
+  assert.equal(env.posted.filter(m => m.type === 'shell-incoherent').length, 1);
+  assert.deepEqual(cache.writes, [], 'der Notnagel wird nicht in die Generation geschrieben');
+});
+
+test('/sw-manifest.js nennt den Build DIESES SW, nicht den des Servers', async () => {
+  const cache = makeCache({ ...COMPLETE });
+  const env = assetEnv({ cache, serverBuild: 'neuerbuild' });
+
+  const res = await env.asset('/sw-manifest.js');
+
+  assert.match(res.body, /self\.__SHELL_BUILD = "testbuild"/,
+    'sonst vergleicht der Build-Guard gegen die Zahl des Servers beim ersten Load');
+  assert.ok(!env.netSeen.includes('/sw-manifest.js'));
+  assert.deepEqual(cache.writes, []);
+});
+
+test('/sw-manifest.js kommt im Netz-Modus vom Netz (die ganze Seite stammt dort her)', async () => {
+  const cache = makeCache({});
+  const env = assetEnv({ cache, serverBuild: 'neuerbuild' });
+
+  const res = await env.asset('/sw-manifest.js');
+
+  assert.match(res.body, /neuerbuild/);
 });
 
 // --- Drift-Gate --------------------------------------------------------------

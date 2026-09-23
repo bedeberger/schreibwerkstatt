@@ -21,7 +21,7 @@ Drei Zustände pro Page (`computeStatus` in [hubspot-sync-card.js](../public/js/
 | Status | Bedingung | UI |
 |---|---|---|
 | `new` | Kein `hubspot_page_links`-Eintrag | Push-Button aktiv, Erst-Push ohne Confirm |
-| `pushed-dirty` | Link existiert + `page.updated_at > COALESCE(last_pushed_at, hubspot_created_at)` | Push-Button aktiv, öffnet `appConfirm`-Warn-Dialog vor Re-Push |
+| `pushed-dirty` | Link existiert + `max(page.updated_at, headline_updated_at) > COALESCE(last_pushed_at, hubspot_created_at)` — ein Titel-Werkstatt-Edit zählt mit (`/links` liefert `headline_updated_at` per Join) | Push-Button aktiv, öffnet `appConfirm`-Warn-Dialog vor Re-Push |
 | `pushed` | Link existiert + lokal unverändert seit Sync-Punkt | Indikator + externer Link, Push-Button ausgeblendet |
 
 Re-Push ruft den Warn-Dialog (Keys `hubspot.repush.warning`/`hubspot.repush.confirm`) via `confirmPush`-Hook in [sync-core.js](../public/js/cards/sync/sync-core.js) auf. Bestätigt der User, sendet das Backend `PATCH …/draft` an HubSpot. Bricht der User ab, ändert sich nichts. Sync-Baseline ist `last_pushed_at || hubspot_created_at`. Der Initial-Import setzt `last_pushed_at` auf den Anlage-Zeitpunkt der frisch erzeugten Page (`created.updated_at`), damit sie direkt nach dem Import als `pushed` (synchron) gilt — sonst würde die Seitenanlage selbst (`updated_at` = jetzt > `hubspot_created_at`) als lokaler Edit zählen und der Status fälschlich `pushed-dirty` sein. Erst ein echter User-Edit schiebt `updated_at` über die Baseline → `pushed-dirty`.
@@ -121,9 +121,11 @@ Multi-Select-Push. Sequentiell, da gemeinsame Rate-Limit-Quota.
    - `updateJob` mit Key `job.hubspot.push.upload`, Params `{ current, total }`.
    - Page laden via `contentStore.loadPage(pageId)`; Mismatch `book_id` → `PAGE_WRONG_BOOK`-Error im Errors-Array.
    - **Quellen:** `buildBibliography({ bookId, pageIds: [pageId], userEmail })` (Einheit ist die Seite — ein Post ist eine Seite, die Nummern des numerischen Stils folgen den Fundstellen dieses Posts ab 1), dann `resolveCitesInHtml` über das Seiten-HTML (der gespeicherte Chip-Text ist nur ein Cache). Bei `bibliography_enabled && bibliography_in_blog` kommt `bibliographySectionHtml(bib, { list: true })` dahinter.
-   - `appToHubspotHtml(appHtml + bibSection)` (Fallback `<p></p>`).
-   - **Erst-Push (kein Link):** `client.createPost({ name, postBody, contentGroupId, blogAuthorId, authorName, state: 'DRAFT' })` — kein `publishDate`, kein `slug`, kein `metaDescription`; User finalisiert drüben. `authorName` einmal pro Job aus `listAuthors()` resolved (HubSpot v3 ignoriert `blogAuthorId` allein bei manchen Portalen — Name muss mit).
-   - **Re-Push (Link existiert):** `client.updatePostDraft(hubspot_post_id, { name, postBody })` → `PATCH /cms/v3/blogs/posts/{id}/draft` aktualisiert nur den Buffer; Live-Version drüben unverändert. UI hat User vorher via `appConfirm` über Verlust HubSpot-spezifischer Formatierungen aufgeklärt.
+   - **Titel** nach [lib/blog-title.js](../lib/blog-title.js) (dieselbe Regel wie WordPress, [blog-sync.md](blog-sync.md) → „Titel"): Titel-Werkstatt-Titel, sonst Seitenname **ohne** Datums-Präfix `YYYY-MM-DD: `. Geht als `name` **und** `htmlTitle` raus — sonst bliebe einer der beiden auf dem Stand des Erst-Pushs bzw. leer.
+   - **Lead** (Titel-Werkstatt) als erster Absatz vor dem Body (`leadHtml`, die Allowlist behält das `<em>`); **Teaser** als `postSummary` (escapet). Keine Marker nötig — HubSpot liest nie zurück. Die **Dachzeile** geht nicht mit (sie stünde unter dem Titel).
+   - `appToHubspotHtml(lead + appHtml + bibSection)` (Fallback `<p></p>`).
+   - **Erst-Push (kein Link):** `client.createPost({ name, htmlTitle, postSummary?, postBody, contentGroupId, blogAuthorId, authorName, state: 'DRAFT' })` — kein `publishDate`, kein `slug`, kein `metaDescription`; User finalisiert drüben. `authorName` einmal pro Job aus `listAuthors()` resolved (HubSpot v3 ignoriert `blogAuthorId` allein bei manchen Portalen — Name muss mit).
+   - **Re-Push (Link existiert):** `client.updatePostDraft(hubspot_post_id, { name, htmlTitle, postSummary?, postBody })` → `PATCH /cms/v3/blogs/posts/{id}/draft` aktualisiert nur den Buffer; Live-Version drüben unverändert. UI hat User vorher via `appConfirm` über Verlust HubSpot-spezifischer Formatierungen aufgeklärt.
    - **Auto-Revive bei 404 im Re-Push:** Schlägt `updatePostDraft` mit `HUBSPOT_HTTP_404` fehl (User hat Draft drüben gelöscht), wird der Link entfernt und derselbe Push als Create neu ausgeführt — Page bekommt einen frischen Draft-Post, kein Sackgassen-Status.
    - `upsertLink({ pageId, hubId, hubspotPostId, hubspotState, hubspotCreatedAt, lastPushedAt: now })` — `lastPushedAt` immer aktualisiert, ist die Sync-Baseline für `pushed-dirty`-Erkennung.
 3. `touchPush(conn.id)`. Job-Result: `{ pushed, errors: [{ pageId, code }] }`.
@@ -213,7 +215,7 @@ Server-Fehler-Codes werden 1:1 als i18n-Keys gemappt (`hubspot.error.${code}`). 
   - [hubspot-html.test.mjs](../tests/unit/hubspot-html.test.mjs) — `hubspotToAppHtml` / `appToHubspotHtml`: Whitelist, Image-Strip, Jinja-Strip, https-only Links, Heading-Normalize, leerer Input; **Quellen:** Chip → Klartext ohne `data-src`, angehängtes Verzeichnis überlebt als `<h2>` + `<ul>` (numerisch: Absätze mit `[n]`), Marker-`<div>` wird entpackt, Titel escapet.
   - [hubspot-db.test.js](../tests/unit/hubspot-db.test.js) — Connection + Link CRUD, Token-Encrypt/Decrypt-Roundtrip, `UNIQUE(hub_id, hubspot_post_id)`-Constraint.
 - **Integration** ([tests/integration/](../tests/integration/)):
-  - [hubspot-sync.test.js](../tests/integration/hubspot-sync.test.js) — Initial-Import (Year-Chapter-Aggregation, Link-Eintrag) gegen [mock-hubspot.js](../tests/integration/_helpers/mock-hubspot.js); `HUBSPOT_ALREADY_IMPORTED` bei zweitem Run; Push-Job (Draft + Link) + `HUBSPOT_ALREADY_PUSHED` bei Re-Push; `HUBSPOT_REQUIRES_BLOG_TYPE` bei falschem Buchtyp.
+  - [hubspot-sync.test.js](../tests/integration/hubspot-sync.test.js) — Initial-Import (Year-Chapter-Aggregation, Link-Eintrag) gegen [mock-hubspot.js](../tests/integration/_helpers/mock-hubspot.js); `HUBSPOT_ALREADY_IMPORTED` bei zweitem Run; Push-Job (Draft + Link) + Re-Push als `PATCH …/draft`; Titel ohne Datums-Präfix, Titel-Werkstatt-Vorrang, Lead + `postSummary`; `HUBSPOT_REQUIRES_BLOG_TYPE` bei falschem Buchtyp.
 - **Drift-Gates:** [erd-drift.test.mjs](../tests/unit/erd-drift.test.mjs) + [squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) decken `hubspot_connections` + `hubspot_page_links` ab.
 
 ## Edge-Cases
@@ -234,6 +236,6 @@ Server-Fehler-Codes werden 1:1 als i18n-Keys gemappt (`hubspot.error.${code}`). 
 
 ## Konvention
 
-- **Year-Chapter `YYYY`:** identisch zu Blog-Sync, geteilt nutzbar bei gleichem Jahr.
-- **Page-Name `YYYY-MM-DD: Titel`:** beim Import gesetzt, Datum aus `publishDate`/`created`/`updated`. Push lässt Titel unverändert (rohen `page_name` durchreichen).
+- **Year-Chapter `YYYY`:** identisch zu Blog-Sync (geteilter Helfer `lib/blog-pull.js#resolveYearChapter`), geteilt nutzbar bei gleichem Jahr.
+- **Page-Name `YYYY-MM-DD: Titel`:** beim Import gesetzt, Datum aus `publishDate`/`created`/`updated`. Der Push schickt den Titel ohne diesen Präfix (siehe Push-Job).
 - **`publishDate`/`slug`/`meta_description`:** nicht gesetzt — HubSpot defaultet bzw. User füllt drüben.

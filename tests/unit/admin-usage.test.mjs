@@ -220,3 +220,41 @@ test('Privacy: listUsersWithUsage liefert KEIN books.name', () => {
   // Stringified Response darf keinen Buchtitel enthalten.
   assert.ok(!JSON.stringify(rows).includes('Geheim-Buch'));
 });
+
+test('userJobBreakdown: Kosten je User x Job-Typ, Chat je Session-Art', () => {
+  seedUser('brk@ex.com');
+  seedBook(5300);
+  insertJobRun({ email: 'brk@ex.com', type: 'komplett-analyse', tokensIn: 1_000_000, tokensOut: 0 });
+  insertJobRun({ email: 'brk@ex.com', type: 'komplett-analyse', tokensIn: 1_000_000, tokensOut: 0 });
+  insertJobRun({ email: 'brk@ex.com', type: 'check', tokensIn: 100_000, tokensOut: 0 });
+  insertChatMsg({ email: 'brk@ex.com', bookId: 5300, kind: 'book', tokensIn: 0, tokensOut: 100_000 });
+
+  const rows = adminUsage.userJobBreakdown({}).filter(r => r.email === 'brk@ex.com');
+  const komplett = rows.find(r => r.source === 'job' && r.type === 'komplett-analyse');
+  assert.equal(komplett.calls, 2);
+  assert.equal(Math.round(komplett.usd * 100) / 100, 6.00); // 2 x 1M Input Sonnet 4.6
+  assert.equal(rows.find(r => r.type === 'check').calls, 1);
+  const chat = rows.find(r => r.source === 'chat');
+  assert.equal(chat.type, 'book');
+  assert.equal(Math.round(chat.usd * 100) / 100, 1.50); // 100k Output
+  // Summe der Aufschluesselung == User-Summe der Users-Liste.
+  const total = rows.reduce((s, r) => s + r.usd, 0);
+  const user = adminUsage.listUsersWithUsage({}).find(u => u.email === 'brk@ex.com');
+  assert.equal(Math.round(total * 1e6), Math.round(user.usd * 1e6));
+});
+
+test('includeAdmins: Admin-Kosten nur mit Schalter in den Auswertungen', () => {
+  appUsers.createUser({ email: 'boss@ex.com', globalRole: 'admin' });
+  insertJobRun({ email: 'boss@ex.com', type: 'review', tokensIn: 1_000_000, tokensOut: 0 });
+
+  assert.equal(adminUsage.listUsersWithUsage({}).some(u => u.email === 'boss@ex.com'), false);
+  assert.equal(adminUsage.userJobBreakdown({}).some(r => r.email === 'boss@ex.com'), false);
+  assert.equal(adminUsage.monthlyTotals({}).topUsers.some(u => u.email === 'boss@ex.com'), false);
+
+  const boss = adminUsage.listUsersWithUsage({ includeAdmins: true }).find(u => u.email === 'boss@ex.com');
+  assert.equal(Math.round(boss.usd * 100) / 100, 3.00);
+  assert.ok(adminUsage.userJobBreakdown({ includeAdmins: true }).some(r => r.email === 'boss@ex.com' && r.type === 'review'));
+  assert.ok(adminUsage.monthlyTotals({ includeAdmins: true }).topUsers.some(u => u.email === 'boss@ex.com'));
+  assert.ok(adminUsage.getJobRuns({ includeAdmins: true }).rows.some(r => r.userEmail === 'boss@ex.com'));
+  assert.equal(adminUsage.getJobRuns({}).rows.some(r => r.userEmail === 'boss@ex.com'), false);
+});

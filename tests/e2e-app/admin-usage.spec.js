@@ -1,0 +1,114 @@
+// Admin-Usage (Abrechnung + Kosten je User x Job) gegen die ECHTE App. Abrechnung: der Tab ist ein nachgeladenes
+// Sub-Partial im adminUsageCard-Scope, seine Alpine-Ausdruecke laufen nur im
+// vollen Baum. Ohne Admin-Key zeigt er den Hinweis; mit Daten die Vergleichs-
+// tabellen. Der Report wird im zweiten Fall direkt in den Scope gesetzt — die
+// Rechnung selbst deckt tests/unit/anthropic-billing.test.js ab.
+
+const { test, expect } = require('@playwright/test');
+const { bootApp } = require('./_helpers/app');
+
+function collectErrors(page) {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  return errors;
+}
+
+async function openBillingTab(page) {
+  await page.evaluate(async () => {
+    window.__app.adminUsageTab = 'billing';
+    await window.__app.toggleAdminUsageCard();
+  });
+  const pane = page.locator('[x-show="adminUsageTab === \'billing\'"]');
+  await expect(pane).toBeVisible();
+  return pane;
+}
+
+test('Abrechnung ohne Admin-Key: Hinweis statt Tabellen', async ({ page }) => {
+  const errors = collectErrors(page);
+  await bootApp(page);
+  const pane = await openBillingTab(page);
+  await expect(pane.locator('p.muted-msg').first()).toContainText(/Admin-Key|admin key/);
+  await expect(pane.locator('table')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('Abrechnung mit Daten: KPIs, Modell- und Tagestabelle, Abweichung markiert', async ({ page }) => {
+  const errors = collectErrors(page);
+  await bootApp(page);
+  const pane = await openBillingTab(page);
+  await page.evaluate(() => {
+    const c = window.Alpine.$data(document.querySelector('[x-data="adminUsageCard"]'));
+    c.adminUsageBilling = {
+      configured: true, workspace: 'wrkspc_app', fromDay: '2026-09-01', toDay: '2026-09-03',
+      lastFetchedAt: '2026-09-02T05:15:00.000Z', lastError: null,
+      totals: { billedUsd: 12, ledgerUsd: 10, diffUsd: 2, diffPct: 0.2, coveredDays: 1 },
+      days: [
+        { day: '2026-09-01', billedUsd: 12, ledgerUsd: 10, diffUsd: 2, diffPct: 0.2 },
+        { day: '2026-09-02', billedUsd: null, ledgerUsd: 1, diffUsd: null, diffPct: null },
+      ],
+      models: [
+        { key: 'claude-opus-5-5', billedUsd: 11.5, ledgerUsd: 10, diffUsd: 1.5, diffPct: 0.15 },
+        { key: 'cost:web_search', billedUsd: 0.5, ledgerUsd: 0, diffUsd: 0.5, diffPct: null },
+      ],
+      workspaces: [{ workspace_id: 'wrkspc_app', usd: 12 }, { workspace_id: null, usd: 3 }],
+    };
+  });
+  await expect(pane.locator('table')).toHaveCount(2);
+  await expect(pane.locator('table').first().locator('tbody tr')).toHaveCount(2);
+  await expect(pane.locator('table').first()).toContainText(/Web-Suche|Web search/);
+  await expect(pane.locator('.admin-usage-diff--off').first()).toBeVisible();
+  await expect(pane.locator('table').nth(1)).toContainText(/nicht abgerufen|not fetched/);
+  await expect(pane.locator('.admin-usage-billing-ws li')).toHaveCount(2);
+  expect(errors).toEqual([]);
+});
+
+// Users-Tab: Aufschluesselung je User x Job-Typ + Matrix (admin-usage-breakdown.html).
+async function openUsersTab(page) {
+  await page.evaluate(async () => {
+    window.__app.adminUsageTab = 'users';
+    await window.__app.toggleAdminUsageCard();
+  });
+  const pane = page.locator('[x-show="adminUsageTab === \'users\'"]');
+  await expect(pane).toBeVisible();
+  return pane;
+}
+
+test('Users-Tab: Matrix + Aufschluesselung pro User', async ({ page }) => {
+  const errors = collectErrors(page);
+  await bootApp(page);
+  const pane = await openUsersTab(page);
+  await page.evaluate(() => {
+    const c = window.Alpine.$data(document.querySelector('[x-data="adminUsageCard"]'));
+    c.adminUsageBreakdown = [
+      { email: 'anna@ex.com', source: 'job', type: 'komplett-analyse', calls: 2, usd: 6, tokensIn: 2e6, tokensOut: 0 },
+      { email: 'anna@ex.com', source: 'chat', type: 'book', calls: 5, usd: 1.5, tokensIn: 0, tokensOut: 1e5 },
+      { email: 'ben@ex.com', source: 'job', type: 'check', calls: 1, usd: 0.3, tokensIn: 1e5, tokensOut: 0 },
+      { email: '', source: 'job', type: 'check', calls: 1, usd: 0.1, tokensIn: 1e4, tokensOut: 0 },
+    ];
+  });
+  const matrix = pane.locator('.admin-usage-breakdown-matrix table');
+  await expect(matrix.locator('tbody tr')).toHaveCount(3);
+  await expect(matrix.locator('thead th')).toHaveCount(1 + 3 + 2); // User + 3 Typen + Übrige + Total
+
+  await matrix.locator('tbody .internal-link', { hasText: 'anna@ex.com' }).click();
+  const detail = pane.locator('.admin-usage-breakdown-detail');
+  await expect(detail).toBeVisible();
+  await expect(detail.locator('tbody tr')).toHaveCount(2);
+  await expect(detail).toContainText(/Buch-Chat|Book chat/);
+  await expect(detail).toContainText('80 %');
+  expect(errors).toEqual([]);
+});
+
+test('Schalter „Admins einbeziehen“ steuert includeAdmins im Request', async ({ page }) => {
+  await bootApp(page);
+  await openUsersTab(page);
+  const toggle = page.locator('.admin-usage-range .toggle-switch__btn');
+  await expect(toggle).toBeVisible();
+  const req = page.waitForRequest(r => r.url().includes('/admin/usage/users'));
+  await toggle.click(); // Default an → aus
+  expect(new URL((await req).url()).searchParams.get('includeAdmins')).toBeNull();
+  const req2 = page.waitForRequest(r => r.url().includes('/admin/usage/breakdown'));
+  await toggle.click();
+  expect(new URL((await req2).url()).searchParams.get('includeAdmins')).toBe('1');
+});

@@ -129,8 +129,11 @@ export function registerServiceWorker() {
       // alte Shell + alte sw-manifest.js weiter, der Build-Guard feuert erneut,
       // der Banner kommt wieder (Endlos-Loop). Dann erst einen Update-Check
       // erzwingen; bleibt es nach dem zweiten Versuch beim Mismatch, hart
-      // heilen: Shell-Caches wegwerfen + SW abmelden + frisch laden, sodass der
-      // nächste Load garantiert die deployte Generation vom Netz zieht.
+      // heilen: Shell-Caches wegwerfen + SW abmelden + frisch laden. Tragend ist
+      // der Cache-Wurf, nicht die Abmeldung — Chromium holt die Registrierung beim
+      // nächsten register() derselben Script-URL ohne Install zurück. Der SW
+      // erkennt die fehlende Generation selbst (sw.js#GENERATION_COMPLETE_PATH),
+      // bedient die Seite dann vom Netz und füllt nach.
       const applyUpdate = async () => {
         const w = window.__pendingWorker || reg.waiting;
         if (w) {

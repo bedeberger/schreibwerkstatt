@@ -16,7 +16,7 @@
 
   <!-- Tab-Bar -->
   <div class="tabs" role="tablist">
-    <template x-for="tab in ['users','jobs','chat','summary','features','time']" :key="tab">
+    <template x-for="tab in ['users','jobs','chat','summary','features','time','billing']" :key="tab">
       <button type="button" role="tab"
               class="tabs-btn"
               :class="adminUsageTab === tab ? 'tabs-btn--active' : ''"
@@ -36,6 +36,8 @@
       <span x-text="$app.t('admin.usage.to')"></span>
       <input type="date" x-model="adminUsageTo">
     </label>
+    <div x-data="toggleSwitch({ label: () => $app.t('admin.usage.includeAdmins') })"
+         x-modelable="value" x-model="adminUsageIncludeAdmins" @toggle-change="adminUsageIncludeAdmins = $event.detail; adminUsageLoadTab()"></div>
   </div>
 
   <div x-show="adminUsageLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
@@ -95,6 +97,8 @@
                         x-text="u._saving ? $app.t('common.saving') : (u._savedAt && (Date.now() - u._savedAt < 2000) ? $app.t('common.saved') : $app.t('common.save'))"></button>
                 <button type="button" @click="adminUsageDrillDownToJobs(u.email)"
                         x-text="$app.t('admin.usage.user.drillDown')"></button>
+                <button type="button" @click="adminUsageShowBreakdown(u.email)" :aria-pressed="adminUsageBreakdownUser === u.email"
+                        x-text="$app.t('admin.usage.breakdown.show')"></button>
               </div>
             </td>
           </tr>
@@ -103,6 +107,7 @@
     </table>
     </div>
     <div x-show="!adminUsageUsersList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
+    <div id="partial-admin-usage-breakdown"></div>
   </div>
 
   <!-- ── Jobs-Tab ──────────────────────────────────────────────────────── -->
@@ -449,4 +454,5 @@
       </div>
     </div>
   </div>
+  <div id="partial-admin-usage-billing"></div>
 </div>

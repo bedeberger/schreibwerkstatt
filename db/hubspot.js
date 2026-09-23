@@ -138,9 +138,14 @@ function getLinkByPost(hubId, hubspotPostId) {
   return _stmtGetLinkByPost.get(parseInt(hubId, 10), String(hubspotPostId)) || null;
 }
 
+// `headline_updated_at`: Titel-Werkstatt-Edits (Titel/Lead/Teaser gehen mit
+// dem Push raus) bewegen `pages.updated_at` nicht — der Badge braucht beide.
 const _stmtListLinksForConn = db.prepare(`
-  SELECT page_id, hub_id, hubspot_post_id, hubspot_state, hubspot_created_at, last_pushed_at, hubspot_url
-    FROM hubspot_page_links WHERE hub_id = ?
+  SELECT l.page_id, l.hub_id, l.hubspot_post_id, l.hubspot_state, l.hubspot_created_at,
+         l.last_pushed_at, l.hubspot_url, h.updated_at AS headline_updated_at
+    FROM hubspot_page_links l
+    LEFT JOIN page_headline h ON h.page_id = l.page_id
+   WHERE l.hub_id = ?
 `);
 function listLinksForConnection(hubId) {
   return _stmtListLinksForConn.all(parseInt(hubId, 10));

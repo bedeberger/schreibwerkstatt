@@ -1,0 +1,46 @@
+{
+  "version": "4.10.1",
+  "date": "2026-09-23",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Admin-Usage hat einen Reiter «Abrechnung». Er stellt die von Anthropic tatsächlich abgerechneten Kosten den Kosten gegenüber, die die App bucht, nach Modell und nach Tag.",
+      "en": "Admin usage has a new \"Billing\" tab. It compares the costs Anthropic actually billed with the costs the app records, by model and by day."
+    },
+    {
+      "kind": "neu",
+      "de": "Im Reiter «Users» von Admin-Usage zeigt «Nach Job», wofür ein User seine Kosten verursacht hat, dazu eine Übersicht User × Job-Typ. Der Schalter «Admins einbeziehen» nimmt Admin-Konten mit auf.",
+      "en": "In the \"Users\" tab of admin usage, \"By job\" shows what a user's costs were spent on, plus an overview of users by job type. The \"Include admins\" switch adds admin accounts."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Die WordPress-Synchronisation überträgt Titel jetzt in beide Richtungen: ein Titel aus der Titel-Werkstatt oder eine Umbenennung kommt beim erneuten Senden an, und ein in WordPress geänderter Titel kommt zurück.",
+      "en": "WordPress sync now carries titles both ways: a title from the title workshop or a rename arrives when you send again, and a title changed in WordPress comes back."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Beim Senden an HubSpot gehen Titel, Lead und Teaser aus der Titel-Werkstatt mit, und der Titel erscheint ohne das Datum vorne.",
+      "en": "Sending to HubSpot now includes the title, lead and teaser from the title workshop, and the title appears without the date in front."
+    },
+    {
+      "kind": "behoben",
+      "de": "Wurde ein Beitrag in WordPress geändert, überschrieb das nächste Senden aus der App diese Änderung stillschweigend. Jetzt erscheint stattdessen ein Konflikt, den du in der Blog-Karte löst.",
+      "en": "If a post had been changed in WordPress, the next send from the app silently overwrote that change. Now a conflict appears instead, which you resolve in the blog card."
+    },
+    {
+      "kind": "behoben",
+      "de": "Beiträge, die aus der App an WordPress gesendet wurden, meldeten nach der nächsten Änderung in WordPress fälschlich einen Konflikt. Ein abgebrochener Blog-Import liess sich ausserdem nicht erneut starten.",
+      "en": "Posts sent from the app to WordPress wrongly reported a conflict after the next change in WordPress. An interrupted blog import also could not be started again."
+    },
+    {
+      "kind": "behoben",
+      "de": "Aus WordPress geholte Titel zeigten Apostrophe und Gedankenstriche als Zeichencodes wie «&#8217;».",
+      "en": "Titles fetched from WordPress showed apostrophes and dashes as character codes like \"&#8217;\"."
+    },
+    {
+      "kind": "behoben",
+      "de": "Nach einem App-Update lud die Seite manchmal ein zweites Mal neu oder zeigte den Update-Hinweis erneut.",
+      "en": "After an app update, the page sometimes reloaded a second time or showed the update notice again."
+    }
+  ]
+}

@@ -33,6 +33,14 @@ import { EVT } from '../../events.js';
 //                         Push abgebrochen (z.B. wenn ein UI-Dialog erst eine
 //                         Bestätigung einholen muss).
 
+// Jüngster von mehreren ISO-Stamps ('' wenn keiner). Frontend-Pendant zu
+// lib/blog-merge.js#latest — beide Provider rechnen ihren Sync-Status damit.
+export function latestStamp(...stamps) {
+  let out = '';
+  for (const s of stamps) if (s && String(s) > out) out = String(s);
+  return out;
+}
+
 export function createSyncCard(spec) {
   const refreshTypes = new Set([
     ...(spec.jobTypes?.refresh || []),
@@ -77,8 +85,11 @@ export function createSyncCard(spec) {
             this.loadLinks();
           }
           // source:'job' → frischer Tree-Read: Import-/Pull-Jobs legen die Seiten
-          // SERVERSEITIG an, im Browser lief also kein Cache-Bust.
-          else if (refreshTypes.has(t)) window.__app?.loadPages?.({ source: 'job' });
+          // SERVERSEITIG an, im Browser lief also kein Cache-Bust. Ein Pull kann
+          // Seiten umbenennen (WP-Titel) — dann laedt _applyPushRenames den Tree.
+          else if (refreshTypes.has(t)) {
+            if (!this._applyPushRenames(ev?.detail?.job)) window.__app?.loadPages?.({ source: 'job' });
+          }
         };
         window.addEventListener(EVT.PAGES_LOADED, this._onPagesLoaded);
         window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
@@ -204,15 +215,16 @@ export function createSyncCard(spec) {
       // No-op, wenn der Job nichts umbenannt hat (z.B. reiner Update-Push).
       _applyPushRenames(job) {
         const renamed = job?.result?.renamed;
-        if (!Array.isArray(renamed) || !renamed.length) return;
+        if (!Array.isArray(renamed) || !renamed.length) return false;
         const app = window.__app;
-        if (!app) return;
+        if (!app) return false;
         for (const r of renamed) {
           if (app.currentPage && String(app.currentPage.id) === String(r.pageId)) {
             app.currentPage.name = r.name;
           }
         }
         app.loadPages?.({ source: 'job' });
+        return true;
       },
 
       _clearPushBusy(pageId) {

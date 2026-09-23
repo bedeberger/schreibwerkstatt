@@ -25,30 +25,18 @@ const {
   buildBibliography, resolveCitesInHtml, bibliographySectionHtml,
 } = require('../../lib/bibliography');
 const { assertBlogBook } = require('../../lib/buchtyp');
+const { getHeadline } = require('../../db/headline');
+const { leadHtml } = require('../../lib/headline-render');
+const { outgoingTitle } = require('../../lib/blog-title');
+const { resolveYearChapter, seedImportBaseline } = require('../../lib/blog-pull');
 const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
-const { db } = require('../../db/connection');
-const { localIsoDate, localIsoDaysAgo } = require('../../lib/local-date');
 
 const hubspotSyncRouter = express.Router();
 
 function _abortSignal(jobId) {
   return jobAbortControllers.get(jobId)?.signal || null;
-}
-
-async function _resolveYearChapter(bookId, year, cache) {
-  if (cache.has(year)) return cache.get(year);
-  const existing = await contentStore.listChapters(bookId, null);
-  for (const ch of existing) {
-    if (String(ch.name) === year) {
-      cache.set(year, ch.id);
-      return ch.id;
-    }
-  }
-  const created = await contentStore.createChapter({ book_id: bookId, name: year }, null);
-  cache.set(year, created.id);
-  return created.id;
 }
 
 function _postDate(post) {
@@ -64,6 +52,10 @@ function _postPageName(post) {
   const day = String(_postDate(post)).slice(0, 10);
   const title = (post.htmlTitle || post.name || post.slug || `Post ${post.id}`).trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(day) ? `${day}: ${title}` : title;
+}
+
+function _escText(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function _resolveHubConn(bookId) {
@@ -135,7 +127,7 @@ async function runHubspotImportJob(jobId, bookId, userEmail) {
       const appHtml = hubspotToAppHtml(rawHtml) || '<p></p>';
       const pageName = _postPageName(post);
       const year = _postYear(post);
-      const chapterId = await _resolveYearChapter(bookId, year, chapterCache);
+      const chapterId = await resolveYearChapter(bookId, year, chapterCache);
 
       const created = await contentStore.createPage({
         book_id: bookId,
@@ -166,26 +158,7 @@ async function runHubspotImportJob(jobId, bookId, userEmail) {
 
     hubspot.markInitialImportDone(conn.id);
 
-    if (imported > 0) {
-      try {
-        const { syncBook } = require('../sync');
-        await syncBook(bookId, { session: { user: { email: userEmail } } });
-        const yesterday = localIsoDaysAgo(1);
-        const today = localIsoDate();
-        db.prepare(`
-          INSERT INTO book_stats_history (book_id, recorded_at, page_count, words, chars, tok, unique_words, chapter_count, avg_sentence_len, avg_lix, avg_flesch_de)
-          SELECT book_id, ?, page_count, words, chars, tok, unique_words, chapter_count, avg_sentence_len, avg_lix, avg_flesch_de
-            FROM book_stats_history WHERE book_id = ? AND recorded_at = ?
-          ON CONFLICT(book_id, recorded_at) DO UPDATE SET
-            page_count=excluded.page_count, words=excluded.words, chars=excluded.chars, tok=excluded.tok,
-            unique_words=excluded.unique_words, chapter_count=excluded.chapter_count,
-            avg_sentence_len=excluded.avg_sentence_len, avg_lix=excluded.avg_lix, avg_flesch_de=excluded.avg_flesch_de
-        `).run(yesterday, bookId, today);
-        logger.info(`Vortags-Baseline gesetzt (${yesterday}) aus HubSpot-Import.`);
-      } catch (e) {
-        logger.warn(`Baseline-Snapshot nach HubSpot-Import fehlgeschlagen: ${e.message}`);
-      }
-    }
+    if (imported > 0) await seedImportBaseline(bookId, userEmail, logger, 'HubSpot-Import');
 
     logger.info(`HubSpot-Initial-Import: ${imported} importiert, ${dropped} uebersprungen.`);
     completeJob(jobId, { imported, dropped }, null, `${imported} Posts importiert`);
@@ -262,12 +235,27 @@ async function runHubspotPushJob(jobId, bookId, userEmail, pageIds) {
       const bib = await buildBibliography({ bookId, pageIds: [pageId], userEmail });
       const appHtml = await resolveCitesInHtml(pageRow.html || pageRow.body_html || '<p></p>', bib);
       const bibSection = bib.inBlog ? bibliographySectionHtml(bib, { list: true }) : '';
-      const postBody = appToHubspotHtml(appHtml + bibSection);
-      const name = (pageRow.name || `Page ${pageId}`).trim();
+
+      // Titel-Werkstatt (lib/blog-title.js, dieselbe Regel wie beim
+      // WordPress-Push): Titel gewinnt, sonst Seitenname OHNE den app-internen
+      // Datums-Praefix. Der Lead steht als erster Absatz im Body (die Allowlist
+      // behaelt davon das `<em>`); ohne Pull-Back gibt es nichts, was ihn
+      // zurueckholen muesste. Der Teaser wird zur `postSummary` (Anreisser in
+      // der Blog-Uebersicht). Dachzeile bleibt draussen: HubSpot setzt den Titel
+      // ueber den Body, sie stuende unter der Schlagzeile.
+      const hl = getHeadline(pageId);
+      const lead = leadHtml({ hl });
+      const postBody = appToHubspotHtml(lead + appHtml + bibSection);
+      const name = outgoingTitle(pageRow.name, hl) || (pageRow.name || `Page ${pageId}`).trim();
+      const teaser = String(hl?.teaser || '').trim();
+      // `name` ist der Post-Titel, `htmlTitle` der Seitentitel (Browser-Tab,
+      // Suchergebnis) — beide gleich setzen, sonst bleibt einer auf dem Stand
+      // des Erst-Pushs bzw. leer.
+      const titleFields = { name, htmlTitle: name, ...(teaser ? { postSummary: _escText(teaser) } : {}) };
       let revivedThis = false;
 
       const doCreate = () => client.createPost({
-        name,
+        ...titleFields,
         postBody,
         contentGroupId: conn.blogId,
         blogAuthorId: conn.authorId,
@@ -284,7 +272,7 @@ async function runHubspotPushJob(jobId, bookId, userEmail, pageIds) {
           // werden im Buffer durch den App-HTML-Body überschrieben — UI hat den
           // User vorab darauf hingewiesen (Warn-Dialog).
           try {
-            remote = await client.updatePostDraft(existing.hubspot_post_id, { name, postBody });
+            remote = await client.updatePostDraft(existing.hubspot_post_id, { ...titleFields, postBody });
           } catch (e) {
             // Remote-Post weg → Link entfernen, als neuer Push fahren.
             if (e.code === 'HUBSPOT_HTTP_404' || e.status === 404) {

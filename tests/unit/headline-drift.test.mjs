@@ -139,7 +139,7 @@ test('ein Feld ohne Limit in einem Kanal taucht dort nicht auf', () => {
 const { db } = require(path.join(ROOT, 'db/connection.js'));
 require(path.join(ROOT, 'db/migrations.js'));
 const {
-  getHeadline, listBookHeadlines, setHeadline,
+  getHeadline, listBookHeadlines, setHeadline, headlineUpdatedAt,
   listVariants, addVariant, deleteVariant, promoteVariant, MAX_LEN,
 } = require(path.join(ROOT, 'db/headline.js'));
 
@@ -244,4 +244,24 @@ test('Löschen der Seite nimmt Titel und Varianten mit (CASCADE)', () => {
 test.after(() => {
   try { db.close(); } catch { /* egal */ }
   fs.rmSync(TMP, { recursive: true, force: true });
+});
+
+test('alle vier geleert: Platzhalter behaelt den Zeitpunkt, Leser sehen keinen Titelapparat', () => {
+  const { bookId, pageId } = seed();
+  // nie gesetzt → kein Platzhalter, kein Zeitpunkt
+  setHeadline(pageId, bookId, { titel: '' }, 'a@b.ch');
+  assert.equal(headlineUpdatedAt(pageId), null);
+
+  setHeadline(pageId, bookId, { titel: 'Weg damit', teaser: 'auch' }, 'a@b.ch');
+  const before = headlineUpdatedAt(pageId);
+  setHeadline(pageId, bookId, { titel: '', teaser: null }, 'a@b.ch');
+  assert.equal(getHeadline(pageId), null);
+  assert.equal(listBookHeadlines(bookId)[String(pageId)], undefined);
+  // Der Sync-Status braucht genau diesen Stamp: „Titel geloescht" ist ein Edit.
+  const after = headlineUpdatedAt(pageId);
+  assert.ok(after && after >= before, `${after} >= ${before}`);
+
+  // Wieder befuellt → normale Zeile
+  setHeadline(pageId, bookId, { titel: 'Zurueck' }, 'a@b.ch');
+  assert.equal(getHeadline(pageId).titel, 'Zurueck');
 });

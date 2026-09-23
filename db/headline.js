@@ -43,12 +43,16 @@ function _clean(v, feld) {
   return s.slice(0, MAX_LEN[feld] || 400);
 }
 
+// Eine Zeile mit vier leeren Feldern ist ein Platzhalter (siehe setHeadline) und
+// fuer jeden Leser „kein Titelapparat" — darum filtern ALLE Lesewege sie weg.
+const _HAS_CONTENT = 'COALESCE(dachzeile, titel, lead, teaser) IS NOT NULL';
 const _stmtGet = db.prepare(
-  'SELECT page_id, dachzeile, titel, lead, teaser, updated_by, updated_at FROM page_headline WHERE page_id = ?',
+  `SELECT page_id, dachzeile, titel, lead, teaser, updated_by, updated_at FROM page_headline WHERE page_id = ? AND ${_HAS_CONTENT}`,
 );
 const _stmtListForBook = db.prepare(
-  'SELECT page_id, dachzeile, titel, lead, teaser, updated_by, updated_at FROM page_headline WHERE book_id = ?',
+  `SELECT page_id, dachzeile, titel, lead, teaser, updated_by, updated_at FROM page_headline WHERE book_id = ? AND ${_HAS_CONTENT}`,
 );
+const _stmtUpdatedAt = db.prepare('SELECT updated_at FROM page_headline WHERE page_id = ?');
 const _stmtUpsert = db.prepare(`
   INSERT INTO page_headline (page_id, book_id, dachzeile, titel, lead, teaser, updated_by, updated_at)
   VALUES (@page_id, @book_id, @dachzeile, @titel, @lead, @teaser, @updated_by, ${NOW_ISO_SQL})
@@ -61,11 +65,18 @@ const _stmtUpsert = db.prepare(`
     updated_by = excluded.updated_by,
     updated_at = excluded.updated_at
 `);
-const _stmtDelete = db.prepare('DELETE FROM page_headline WHERE page_id = ?');
 
 /** Geltender Stand einer Seite oder null. */
 function getHeadline(pageId) {
   return _stmtGet.get(parseInt(pageId)) || null;
+}
+
+/** Zeitpunkt der letzten Aenderung am Titelapparat, auch der, die ihn geleert
+ *  hat (Platzhalter-Zeile) — oder null, wenn die Seite nie einen hatte. Fuer den
+ *  Sync-Status (Blog/HubSpot): „alles geloescht" ist ein lokaler Edit, der beim
+ *  naechsten Push rausgehen muss. */
+function headlineUpdatedAt(pageId) {
+  return _stmtUpdatedAt.get(parseInt(pageId))?.updated_at || null;
 }
 
 /** Alle Titel-Saetze eines Buchs als { [page_id]: row }. */
@@ -82,9 +93,13 @@ function listBookHeadlines(bookId) {
  * die drei anderen mitzuschicken — und ein Teil-PUT aus einer alten Tab-Sitzung
  * wuerde die inzwischen woanders gesetzten Felder leeren.
  *
- * Sind am Ende alle vier leer, faellt die Zeile ganz weg: eine Seite ohne
- * Titel-Werkstatt soll keine leere Zeile hinterlassen (die Kennzahl „wie viele
- * Beitraege haben schon einen Titel" zaehlt sonst falsch).
+ * Sind am Ende alle vier leer, bleibt die Zeile als PLATZHALTER stehen (vier
+ * NULL-Felder, frischer `updated_at`) — geloescht ginge der Zeitpunkt verloren,
+ * und der Blog-/HubSpot-Sync saehe nicht, dass der Beitrag seit dem letzten Push
+ * seinen Titel verloren hat. Fuer alle Leser ist der Platzhalter „kein
+ * Titelapparat": getHeadline/listBookHeadlines filtern ihn weg, damit die
+ * Kennzahl „wie viele Beitraege haben schon einen Titel" stimmt. Gab es nie eine
+ * Zeile, entsteht auch keine.
  */
 function setHeadline(pageId, bookId, patch = {}, userEmail = null) {
   const pid = parseInt(pageId);
@@ -94,7 +109,9 @@ function setHeadline(pageId, bookId, patch = {}, userEmail = null) {
     next[f] = Object.prototype.hasOwnProperty.call(patch, f) ? _clean(patch[f], f) : (cur[f] ?? null);
   }
   if (HEADLINE_FIELDS.every(f => next[f] === null)) {
-    _stmtDelete.run(pid);
+    if (headlineUpdatedAt(pid)) {
+      _stmtUpsert.run({ page_id: pid, book_id: parseInt(bookId), updated_by: userEmail, ...next });
+    }
     return null;
   }
   _stmtUpsert.run({ page_id: pid, book_id: parseInt(bookId), updated_by: userEmail, ...next });
@@ -186,6 +203,6 @@ function getVariant(id) {
 
 module.exports = {
   HEADLINE_FIELDS, HEADLINE_HERKUNFT, MAX_LEN, isValidHeadlineField,
-  getHeadline, listBookHeadlines, setHeadline,
+  getHeadline, listBookHeadlines, setHeadline, headlineUpdatedAt,
   listVariants, addVariant, deleteVariant, promoteVariant, getVariant,
 };

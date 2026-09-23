@@ -3,7 +3,7 @@
 // Lebt als headless display-contents-Anker in index.html, via `$blog`-Magic
 // global erreichbar. Root-Zugriffe gehen über window.__app.
 
-import { createSyncCard } from './sync/sync-core.js';
+import { createSyncCard, latestStamp as _latest } from './sync/sync-core.js';
 
 const blogSpec = {
   key: 'blog',
@@ -16,14 +16,16 @@ const blogSpec = {
   // Badge-Status für eine Page (oder null = kein Badge).
   // 'new'         — kein Link → lokal angelegt, noch nie zu WP gepusht.
   // 'conflict'    — beide Seiten geändert, conflict_state='detected'.
-  // 'push-needed' — Page lokal geändert seit last_pulled_at/last_pushed_at.
+  // 'push-needed' — Seite oder Titel-Werkstatt lokal geändert seit dem
+  //                 Sync-Punkt (jüngerer von last_pulled_at/last_pushed_at —
+  //                 dieselbe Regel wie lib/blog-merge.js#classifyPull).
   // 'synced'      — Stand identisch zum WP-Snapshot.
   computeStatus(page, link) {
     if (!link) return 'new';
     if (link.conflict_state === 'detected') return 'conflict';
-    const lastSync = link.last_pushed_at || link.last_pulled_at || '';
-    const pageUpdated = page.updated_at || '';
-    if (pageUpdated && lastSync && pageUpdated > lastSync) return 'push-needed';
+    const lastSync = _latest(link.last_pushed_at, link.last_pulled_at);
+    const localUpdated = _latest(page.updated_at, link.headline_updated_at);
+    if (localUpdated && lastSync && localUpdated > lastSync) return 'push-needed';
     return 'synced';
   },
   statusLabels: {
@@ -92,7 +94,12 @@ const blogSpec = {
         this.closeConflict();
         await this.loadLinks();
         // Der Server hat die Seite gerade ueberschrieben (kein Bust im Browser).
-        if (side === 'wp') window.__app?.loadPages?.({ source: 'job' });
+        // Hat der WP-Titel den Seitennamen geaendert, zieht _applyPushRenames
+        // auch den offenen Editor-Titel nach (und laedt den Tree).
+        if (side === 'wp') {
+          if (data.name) this._applyPushRenames({ result: { renamed: [{ pageId, name: data.name }] } });
+          else window.__app?.loadPages?.({ source: 'job' });
+        }
       } catch (e) {
         console.error('[blogSync] Resolve fehlgeschlagen:', e);
       }

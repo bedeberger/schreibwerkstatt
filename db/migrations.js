@@ -11802,6 +11802,43 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 290 abgeschlossen (user_credentials, user_password_tokens).');
   }
 
+  if (version < 291) {
+    // Abgerechnete Anthropic-Kosten, gespiegelt aus der Cost-Report-API der
+    // Admin-API (lib/anthropic-billing.js). Eine Zeile pro Tag x Kostenposten
+    // (Modell, Token-Art, Tier, Kontextfenster, Workspace), so wie die API sie
+    // bei group_by=description,workspace_id liefert. Referenzwert neben dem
+    // eigenen ai_cost_ledger: das Ledger ordnet Kosten Usern/Buechern zu, diese
+    // Tabelle haelt, was Anthropic tatsaechlich in Rechnung stellt.
+    //
+    // Keine FKs: externe Daten ohne Konto- oder Buchbezug. Kein natuerlicher
+    // UNIQUE-Schluessel, weil fast alle Dimensionen NULL sein koennen — der Sync
+    // ersetzt stattdessen einen ganzen Tagesbereich (DELETE + INSERT in einer
+    // Transaktion), denn Anthropic korrigiert juengste Tage nachtraeglich.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS anthropic_cost_daily (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        day            TEXT NOT NULL,
+        workspace_id   TEXT,
+        description    TEXT,
+        model          TEXT,
+        cost_type      TEXT,
+        token_type     TEXT,
+        service_tier   TEXT,
+        context_window TEXT,
+        usd            REAL NOT NULL,
+        fetched_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_anthropic_cost_daily_day ON anthropic_cost_daily(day)');
+
+    const fkErrors291 = db.pragma('foreign_key_check');
+    if (fkErrors291.length) {
+      throw new Error(`Migration 291: foreign_key_check meldet ${fkErrors291.length} Verstoesse.`);
+    }
+    db.prepare('UPDATE schema_version SET version = 291').run();
+    logger.info('DB-Migration auf Version 291 abgeschlossen (anthropic_cost_daily).');
+  }
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

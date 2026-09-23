@@ -232,8 +232,16 @@ export const appInitMethods = {
       // 0-Latenz) → in eine kohärente Generation reloaden, statt auf den
       // 60-s-Update-Timer zu warten. Greift nur online + ausserhalb Editier-/
       // Fokusmodus (requestCoherentReload entscheidet).
+      // Ein Mismatch wird erst gegen ein FRISCHES /config bestätigt: `/config`
+      // ist SWR, und direkt nach dem Generationswechsel trägt die gecachte Kopie
+      // noch den Build von vorher — ohne Bestätigung folgte jedem Update ein
+      // zweiter Reload bzw. (innerhalb der 30-s-Sperre) erneut das Banner.
       if (cfg.shellBuild && window.__SHELL_BUILD && cfg.shellBuild !== window.__SHELL_BUILD) {
-        window.__requestCoherentReload?.();
+        const loaded = window.__SHELL_BUILD;
+        fetchJson('/config?__fresh=1').then((fresh) => {
+          if (fresh?.shellBuild && fresh.shellBuild !== loaded) window.__requestCoherentReload?.();
+          else if (fresh?.shellBuild) { try { sessionStorage.removeItem('sw-update-attempts'); } catch {} }
+        }).catch(() => {});
       } else if (cfg.shellBuild && window.__SHELL_BUILD) {
         // Generation stimmt → Loop-Breaker-Zähler des Update-Banners zurücksetzen.
         try { sessionStorage.removeItem('sw-update-attempts'); } catch {}

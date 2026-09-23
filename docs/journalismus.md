@@ -88,9 +88,17 @@ ohne dass es dafür eine eigene Undo-Historie braucht.
 
 **Teil-PUT ist Pflicht-Semantik:** `setHeadline` schreibt nur die *übergebenen*
 Felder. Ohne diese Unterscheidung leerte ein Speichern aus einer alten
-Tab-Sitzung die inzwischen woanders gesetzten Felder. Sind am Ende alle vier
-leer, fällt die Zeile ganz weg (sonst zählt „wie viele Beiträge haben schon
-einen Titel" falsch).
+Tab-Sitzung die inzwischen woanders gesetzten Felder.
+
+**Alle vier leer ⇒ Platzhalter, nicht Löschung.** Die Zeile bleibt mit vier
+`NULL`-Feldern und frischem `updated_at` stehen; `getHeadline` und
+`listBookHeadlines` filtern sie weg, für jeden Leser gibt es also keinen
+Titelapparat (und „wie viele Beiträge haben schon einen Titel" zählt richtig).
+Den Zeitpunkt braucht der Blog-/HubSpot-Sync: „Titel gelöscht" ist ein lokaler
+Edit, der den Beitrag auf push-needed setzen muss — gelöscht wäre er
+unsichtbar. Den rohen Stamp liest nur `headlineUpdatedAt` bzw. der Join in
+`db/blogs.js`/`db/hubspot.js`. Hatte eine Seite nie einen Titelapparat, entsteht
+auch kein Platzhalter.
 
 ### Zeichenlimits sind Anzeige, keine Validierung
 
@@ -141,8 +149,8 @@ soll sich nicht ändern, weil jemand den Titel umformuliert hat.
 
 **Der Teaser gehört nicht in den Beitrag.** Er ist der Anreisser für Übersichten
 und Vorschaukarten; im Artikel selbst wäre er die Wiederholung des Leads mit
-anderen Worten. Er verlässt die App weiterhin nur als WordPress-`excerpt` und
-wird ausschliesslich in der Titel-Werkstatt gepflegt (Feldliste
+anderen Worten. Er verlässt die App nur als WordPress-`excerpt` bzw.
+HubSpot-`postSummary` und wird ausschliesslich in der Titel-Werkstatt gepflegt (Feldliste
 [channels.js](../public/js/headline/channels.js)#`HEADLINE_HEAD_FIELDS` vs.
 `HEADLINE_FIELDS`).
 

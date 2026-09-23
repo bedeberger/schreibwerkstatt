@@ -50,6 +50,11 @@
         <div x-data="settingField({ k: 'ai.claude.max_tokens_out.bookchat', type: 'num', label: 'admin.settings.label.aiClaudeMaxTokensOutBookchat', num: { integer: true, min: 0, max: 200000 }, help: 'admin.settings.help.bookchatMaxTokensOut' })"></div>
         <div x-data="settingField({ k: 'ai.claude.timeout_ms.bookchat', type: 'num', label: 'admin.settings.label.aiClaudeTimeoutMsBookchat', num: { integer: true, min: 0, max: 3600000 }, help: 'admin.settings.help.bookchatTimeoutMs' })"></div>
 
+        <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.billingTitle')"></span></h4>
+        <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.claude.billingIntro')"></small>
+        <div x-data="settingField({ k: 'ai.claude.admin_api_key', type: 'password', label: 'admin.settings.label.aiClaudeAdminApiKey', help: 'admin.settings.help.claudeAdminApiKey' })"></div>
+        <div x-data="settingField({ k: 'ai.claude.billing.workspace_id', label: 'admin.settings.label.aiClaudeBillingWorkspace', ph: 'wrkspc_…', help: 'admin.settings.help.claudeBillingWorkspace' })"></div>
+
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.advancedTitle')"></span></h4>
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.help.advancedClaude')"></small>
         <div x-data="settingField({ k: 'ai.claude.retry_max', type: 'num', label: 'admin.settings.label.aiRetryMax', num: { step: 1, min: 0, max: 10 } })"></div>

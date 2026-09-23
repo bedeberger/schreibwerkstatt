@@ -15,6 +15,7 @@ const { getBookSettings } = require('../db/schema');
 const { isBlogBook, requireBlogTypeRoute } = require('../lib/buchtyp');
 const blogs = require('../db/blogs');
 const { createWpClient, validateBaseUrl } = require('../lib/wp-client');
+const { wpTitleText } = require('../lib/blog-title');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -145,7 +146,7 @@ router.get('/:book_id/pages/:page_id/remote', aclParamGuard('viewer'), async (re
     const { wpToAppHtml } = require('../lib/wp-html');
     return res.json({
       wpPostId: link.wp_post_id,
-      title: (remote.title && (remote.title.raw || remote.title.rendered)) || '',
+      title: wpTitleText(remote.title),
       html: await wpToAppHtml((remote.content && (remote.content.raw || remote.content.rendered)) || ''),
       status: remote.status,
       modifiedAt: remote.modified_gmt || remote.date_gmt || '',
@@ -176,30 +177,39 @@ router.post('/:book_id/pages/:page_id/resolve', aclParamGuard('editor'), jsonBod
   if (!conn || conn.id !== link.blog_id) {
     return res.status(404).json({ error_code: 'BLOG_NOT_CONNECTED' });
   }
-  if (resolve === 'wp') {
-    try {
-      const wp = createWpClient({
-        baseUrl: conn.baseUrl, username: conn.username, password: conn.password,
-      });
-      const remote = await wp.getPost(link.wp_post_id);
-      const { wpToAppHtml } = require('../lib/wp-html');
+  // Beide Seiten brauchen den aktuellen Remote-Stand: 'wp' uebernimmt ihn,
+  // 'app' markiert ihn als gesehen (sonst meldete der naechste Pull denselben
+  // WP-Edit wieder als Konflikt).
+  let renamedTo = null;
+  try {
+    const wp = createWpClient({
+      baseUrl: conn.baseUrl, username: conn.username, password: conn.password,
+    });
+    const remote = await wp.getPost(link.wp_post_id);
+    const wpModifiedAt = remote.modified_gmt || remote.date_gmt || '';
+    if (resolve === 'wp') {
       const contentStore = require('../lib/content-store');
-      const html = await wpToAppHtml((remote.content && (remote.content.raw || remote.content.rendered)) || '') || '<p></p>';
-      const title = (remote.title && (remote.title.raw || remote.title.rendered)) || undefined;
-      await contentStore.savePage(pageId, { html, ...(title ? { name: title } : {}) }, null);
+      const { applyPostToPage } = require('../lib/blog-pull');
+      const pageRow = await contentStore.loadPage(pageId).catch(() => null);
+      if (!pageRow || pageRow.book_id !== req.bookId) {
+        return res.status(404).json({ error_code: 'PAGE_NOT_FOUND' });
+      }
+      ({ name: renamedTo } = await applyPostToPage({
+        pageId, bookId: req.bookId, pageRow, post: remote, userEmail: sessionEmail(req),
+      }));
       blogs.markLinkPulled(pageId, {
-        wpModifiedAt: remote.modified_gmt || remote.date_gmt || '',
+        wpModifiedAt,
         wpStatus: remote.status || null,
         wpSlug: remote.slug || null,
       });
-    } catch (e) {
-      const code = e.code || 'BLOG_REMOTE_FETCH_FAILED';
-      return res.status(code === 'BLOG_AUTH_FAILED' ? 401 : 502).json({ error_code: code });
+    } else {
+      blogs.markConflictResolvedApp(pageId, wpModifiedAt);
     }
-  } else {
-    blogs.setConflictState(pageId, 'resolved-app');
+  } catch (e) {
+    const code = e.code || 'BLOG_REMOTE_FETCH_FAILED';
+    return res.status(code === 'BLOG_AUTH_FAILED' ? 401 : 502).json({ error_code: code });
   }
-  return res.json({ ok: true, resolve });
+  return res.json({ ok: true, resolve, ...(renamedTo ? { name: renamedTo } : {}) });
 });
 
 module.exports = router;

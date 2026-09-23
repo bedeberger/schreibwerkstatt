@@ -21,7 +21,8 @@
 //    Einzeleinträge) holt bewusst KEINE evtl. neuere Einzeldatei nach, sondern
 //    meldet den Clients 'shell-incoherent' → sauberer Reload in eine
 //    kohärente Generation; die Netzkopie wird nur als Notnagel ungecacht
-//    durchgereicht.
+//    durchgereicht. Fehlt dagegen die ganze Generation (GENERATION_COMPLETE_PATH),
+//    geht die Seite komplett ans Netz und der SW füllt nach (repairGeneration).
 //  - Nicht-kritische Shell-Assets (vendor/*, fonts/*): self-contained,
 //    versionsstabil → eigener VENDOR_CACHE (NICHT an SHELL_BUILD gekoppelt),
 //    Cache-First mit Netz-Fallback. Da der Cache-Name generationsunabhängig ist,
@@ -175,32 +176,91 @@ async function precacheWithRetry(cache, paths, attempts = 3) {
   throw lastErr;
 }
 
+// Vollständigkeits-Marke der Generation: der Install legt sie als LETZTEN
+// Eintrag ab, nachdem Shell + Asset-Satz komplett drin sind. Fehlt sie im Cache
+// des laufenden SW, ist die Generation nicht „einzeln evictiert", sondern als
+// Ganzes weg (Cache-Wurf der Heilungspfade in sw-register.js/failsafe-reveal.js,
+// Storage-Druck, DevTools) — und der SW, der sie bedient, läuft trotzdem weiter.
+// **Why:** `unregister()` greift nicht verlässlich: Chromium holt eine abgemeldete
+// Registrierung beim nächsten `register()` derselben Script-URL zurück, ohne
+// neuen Install. Ohne Marke hiesse das: jeder Asset-Request ein Cache-Miss, jeder
+// meldet 'shell-incoherent', der Client lädt neu, der Banner-Klick findet keinen
+// wartenden SW — eine Schleife, aus der nur Ctrl-F5 (am SW vorbei) herausführt.
+const GENERATION_COMPLETE_PATH = '/__sw-generation-complete';
+const SW_MANIFEST_PATH = '/sw-manifest.js';
+
+async function isGenerationComplete(cache) {
+  return !!(await cache.match(GENERATION_COMPLETE_PATH));
+}
+
+// Füllt den SHELL_CACHE dieser Generation vollständig: erst die Shell (klärt, ob
+// überhaupt eine Session da ist), dann der Asset-Satz, dann die Shell unter beiden
+// Schlüsseln, zuletzt die Marke. Geteilt von Install und Reparatur.
+async function fillGeneration() {
+  const cache = await caches.open(SHELL_CACHE);
+  // ZUERST die Shell holen — ihre Antwort sagt autoritativ, ob diese Generation
+  // überhaupt installierbar ist. Ohne gültige Session antwortet `/` mit der
+  // Landing-Seite (200, kein Marker) und jedes auth-pflichtige Partial mit
+  // einem Redirect auf /login; der Precache liefe dann in Müll. Ein Request
+  // klärt das, statt erst ~700 öffentliche Assets zu laden und beim ersten
+  // Partial aufzulaufen (die stehen alphabetisch hinter /css und /js).
+  const shellRes = await fetch(new Request('/', { cache: 'reload' }));
+  if (!isShellResponse(shellRes)) {
+    throw new Error('Install abgebrochen: `/` liefert keine SPA-Shell (Session abgelaufen?).');
+  }
+  // Den VOLLSTÄNDIGEN kohärenz-kritischen Asset-Satz dieser Generation ATOMAR
+  // vorcachen: App-JS + Partials + App-CSS + i18n + Icon-Sprite. So zieht zur
+  // Laufzeit nie ein lazy-gefetchtes Partial / dynamisch importiertes Modul eine
+  // fremde Generation vom Netz. `cache: 'reload'` umgeht den HTTP-Cache, damit
+  // der Precache wirklich diese Generation holt.
+  await precacheWithRetry(cache, SHELL_MANIFEST);
+  // Einstiegspunkt (SPA-Shell) zuletzt — nicht im Manifest, weil er unter zwei
+  // Schlüsseln adressiert wird ('/' bei Navigation, SHELL_PATH beim Lookup).
+  // Unter BEIDEN ablegen, damit der Lookup in handleNavigate deterministisch
+  // die Kopie DIESER Generation trifft. Erst nach dem Precache, damit ein
+  // gescheiterter Install keine Shell ohne ihren Asset-Satz hinterlässt.
+  await cache.put(SHELL_PATH, shellRes.clone());
+  await cache.put('/', shellRes.clone());
+  await cache.put(GENERATION_COMPLETE_PATH, new Response(SHELL_BUILD));
+}
+
+// Reparatur einer verlorenen Generation, single-flight. Nachgefüllt wird NUR,
+// wenn der Server noch genau diesen Build ausliefert — dann sind die Netz-Bytes
+// per Content-Hash identisch mit denen dieser Generation. Ist der Server weiter,
+// gehört der Netzstand einer anderen Generation; ihn hier abzulegen wäre der
+// Skew, den der cache-only-Satz verhindert. Dann stattdessen den Update-Check
+// anstossen: der neue SW installiert seinen eigenen Satz und kommt über den
+// regulären Banner-/skip-waiting-Weg.
+let _repairing = null;
+function repairGeneration() {
+  if (_repairing) return _repairing;
+  _repairing = (async () => {
+    try {
+      const res = await fetch(new Request(SW_MANIFEST_PATH, { cache: 'reload', redirect: 'error' }));
+      const src = res && res.ok ? await res.text() : '';
+      const m = src.match(/self\.__SHELL_BUILD\s*=\s*"([^"]+)"/);
+      if (!m || m[1] !== SHELL_BUILD) {
+        await self.registration?.update?.();
+        return;
+      }
+      await fillGeneration();
+    } catch {
+      // Offline/keine Session: nächster Request versucht es erneut.
+    } finally {
+      _repairing = null;
+    }
+  })();
+  return _repairing;
+}
+
+function startRepair(event) {
+  const p = repairGeneration();
+  try { event?.waitUntil?.(p); } catch {}
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    const cache = await caches.open(SHELL_CACHE);
-    // ZUERST die Shell holen — ihre Antwort sagt autoritativ, ob diese Generation
-    // überhaupt installierbar ist. Ohne gültige Session antwortet `/` mit der
-    // Landing-Seite (200, kein Marker) und jedes auth-pflichtige Partial mit
-    // einem Redirect auf /login; der Precache liefe dann in Müll. Ein Request
-    // klärt das, statt erst ~700 öffentliche Assets zu laden und beim ersten
-    // Partial aufzulaufen (die stehen alphabetisch hinter /css und /js).
-    const shellRes = await fetch(new Request('/', { cache: 'reload' }));
-    if (!isShellResponse(shellRes)) {
-      throw new Error('Install abgebrochen: `/` liefert keine SPA-Shell (Session abgelaufen?).');
-    }
-    // Den VOLLSTÄNDIGEN kohärenz-kritischen Asset-Satz dieser Generation ATOMAR
-    // vorcachen: App-JS + Partials + App-CSS + i18n + Icon-Sprite. So zieht zur
-    // Laufzeit nie ein lazy-gefetchtes Partial / dynamisch importiertes Modul eine
-    // fremde Generation vom Netz. `cache: 'reload'` umgeht den HTTP-Cache, damit
-    // der Precache wirklich diese Generation holt.
-    await precacheWithRetry(cache, SHELL_MANIFEST);
-    // Einstiegspunkt (SPA-Shell) zuletzt — nicht im Manifest, weil er unter zwei
-    // Schlüsseln adressiert wird ('/' bei Navigation, SHELL_PATH beim Lookup).
-    // Unter BEIDEN ablegen, damit der Lookup in handleNavigate deterministisch
-    // die Kopie DIESER Generation trifft. Erst nach dem Precache, damit ein
-    // gescheiterter Install keine Shell ohne ihren Asset-Satz hinterlässt.
-    await cache.put(SHELL_PATH, shellRes.clone());
-    await cache.put('/', shellRes.clone());
+    await fillGeneration();
     // Bewusst KEIN skipWaiting hier: der neue SW bleibt `waiting`, bis der
     // User das Update-Banner klickt (applyUpdate → 'skip-waiting'-Message).
     // Sonst übernähme der neue SW eine laufende (Editor-)Seite sofort und
@@ -220,8 +280,8 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-// Navigate (HTML-Shell): Cache-Only innerhalb der Generation, mit Netz-Fallback
-// nur bei kaltem Cache. Der Shell-HTML gehört zum kohärenz-kritischen Satz wie
+// Navigate (HTML-Shell): Cache-Only innerhalb der Generation, Netz nur, wenn die
+// Generation nicht vollständig vorliegt (keine Marke, oder keine echte Shell). Der Shell-HTML gehört zum kohärenz-kritischen Satz wie
 // jedes Modul und Partial — er wird beim Install dieser Generation gecacht und
 // danach unverändert ausgeliefert.
 //
@@ -240,29 +300,28 @@ self.addEventListener('activate', (event) => {
 // Innerhalb einer Generation ist das HTML ohnehin unveränderlich: seine Bytes
 // gehen in __SHELL_BUILD ein (scripts/sw-manifest.js), jede Änderung erzeugt also
 // eine neue Generation samt neuem Precache.
-async function handleNavigate(req) {
+async function handleNavigate(req, event) {
   const cache = await caches.open(SHELL_CACHE);
   const cached = await cache.match(SHELL_PATH) || await cache.match('/');
-  if (await isCachedShell(cached)) return cached;
+  const complete = await isGenerationComplete(cache);
+  if (complete && await isCachedShell(cached)) return cached;
 
-  // Ab hier ist entweder gar nichts gecacht (kalter Cache — der Install-Precache
-  // der Shell ist best-effort) oder der Eintrag ist nachweislich keine Shell:
-  // eine eingefangene Landing-/Login-Seite aus einem Install ohne Session. Die
-  // darf nicht ausgeliefert werden — sonst sieht der eingeloggte User die
-  // anonyme Startseite und kommt nur per Hard-Refresh daran vorbei.
+  // Ab hier ist die Generation nicht auslieferbar: entweder fehlt sie als Ganzes
+  // (keine Marke, siehe GENERATION_COMPLETE_PATH) oder der Shell-Eintrag ist
+  // nachweislich keine Shell (eingefangene Landing-/Login-Seite). Die Seite kommt
+  // dann komplett vom Netz — Shell UND Assets (handleShellAsset reicht im selben
+  // Zustand durch), also kohärent aus dem deployten Stand. Nichts davon wird in
+  // diese Generation geschrieben; das Nachfüllen ist Sache von repairGeneration,
+  // die den Build prüft, bevor sie schreibt.
+  if (!complete) startRepair(event);
   try {
     const net = await fetch(req);
-    // Erstbefüllung NUR bei wirklich kaltem Cache und nur mit markierter Shell.
-    // Lag schon etwas da, gehört die übrige Generation noch zusammen; wir
-    // schreiben nicht dazwischen, sondern liefern nur aus. Der nächste Install
-    // räumt sie vollständig auf (er überschreibt jeden Eintrag).
-    if (!cached && isShellResponse(net)) cache.put(SHELL_PATH, net.clone());
     // Keine Shell (anonym → Landing mit 200, oder ein Redirect auf /login):
-    // unverändert durchreichen und NICHT cachen.
+    // ebenso unverändert durchreichen.
     if (net) return net;
   } catch {}
 
-  // Offline: ein unmarkierter Alt-Eintrag ist besser als gar keine App.
+  // Offline: ein vorhandener Alt-Eintrag ist besser als gar keine App.
   if (cached) return cached;
   return new Response('Offline – Shell nicht im Cache.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }
@@ -296,7 +355,7 @@ function notifyIncoherent(pathname) {
 // Nicht-kritische Shell-Assets (vendor/*, fonts/*): self-contained und
 // versionsstabil, kein Skew auf App-Feldern möglich → klassisch Cache-First mit
 // Netz-Fallback (lazy nachladbar, auch nach Eviction).
-async function handleShellAsset(req, url) {
+async function handleShellAsset(req, url, event) {
   // Versionsstabile Assets (vendor/*, fonts/*) liegen im generationsunabhängigen
   // VENDOR_CACHE → ein Hit überlebt jeden Deploy, kein erneuter Netz-Fetch beim
   // Generationswechsel. Kein Skew möglich (self-contained, kein App-Feld-Bezug).
@@ -314,6 +373,24 @@ async function handleShellAsset(req, url) {
   }
 
   const cache = await caches.open(SHELL_CACHE);
+
+  // Die Build-ID der Seite (index.html lädt /sw-manifest.js klassisch) muss die
+  // Generation nennen, die die Seite tatsächlich bedient — sonst vergleicht der
+  // Build-Guard (app-init.js) gegen eine fremde Zahl. Die Datei steht nicht im
+  // Manifest (sie hasht sich nicht selbst); vom Netz geholt und lazy abgelegt,
+  // trüge sie den Build des Servers zum Zeitpunkt des ersten Loads, nicht den
+  // dieses SW. Darum hier aus den eigenen Konstanten — ausser im Netz-Modus
+  // einer verlorenen Generation, dort stammt die ganze Seite vom Netz.
+  if (url.pathname === SW_MANIFEST_PATH) {
+    if (!(await isGenerationComplete(cache))) {
+      try { return await fetch(req); } catch { return new Response('', { status: 503 }); }
+    }
+    return new Response(
+      `self.__SHELL_BUILD = ${JSON.stringify(SHELL_BUILD)};\nself.__SHELL_MANIFEST = ${JSON.stringify(SHELL_MANIFEST)};\n`,
+      { headers: { 'Content-Type': 'application/javascript; charset=utf-8' } },
+    );
+  }
+
   const cached = await cache.match(req);
   if (cached) return cached;
 
@@ -326,6 +403,14 @@ async function handleShellAsset(req, url) {
     // die ganze Generation wird neu precacht.
     const ignoreSearchHit = await cache.match(req, { ignoreSearch: true });
     if (ignoreSearchHit) return ignoreSearchHit;
+    // Generation als Ganzes weg (keine Marke): kein Einzel-Loch, sondern der
+    // Netz-Modus aus handleNavigate — die Shell dieses Loads kam ebenfalls vom
+    // Netz, also passt die Netzkopie zu ihr. KEIN 'shell-incoherent': ein Reload
+    // landete im selben Zustand und triebe die Schleife, statt sie zu lösen.
+    if (!(await isGenerationComplete(cache))) {
+      startRepair(event);
+      try { return await fetch(req); } catch { return new Response('Offline', { status: 503 }); }
+    }
     notifyIncoherent(url.pathname);
     try {
       return await fetch(req); // Notnagel, bewusst NICHT in diese Generation cachen
@@ -674,7 +759,7 @@ self.addEventListener('fetch', (event) => {
     // SPA-Load mit der falschen Seite (z.B. der Datenschutzerklärung) bedienen.
     // Diese Pfade gehen unbehandelt ans Netz.
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      event.respondWith(handleNavigate(req));
+      event.respondWith(handleNavigate(req, event));
     }
     return;
   }
@@ -689,6 +774,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (isShellRequest(url)) {
-    event.respondWith(handleShellAsset(req, url));
+    event.respondWith(handleShellAsset(req, url, event));
   }
 });

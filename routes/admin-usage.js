@@ -9,6 +9,7 @@
 
 const express = require('express');
 const adminUsage = require('../db/admin-usage');
+const billing = require('../lib/anthropic-billing');
 const appUsers = require('../db/app-users');
 const { requireAdmin } = require('../lib/admin-mw');
 const logger = require('../logger');
@@ -38,10 +39,15 @@ function _range(req) {
   return { from, to };
 }
 
+// `?includeAdmins=1` schaltet die Calls der Admin-Konten in die Auswertung zu.
+function _includeAdmins(req) {
+  return req.query.includeAdmins === '1';
+}
+
 // GET /admin/usage/users?from=&to=
 router.get('/users', (req, res) => {
   const range = _range(req);
-  const rows = adminUsage.listUsersWithUsage(range);
+  const rows = adminUsage.listUsersWithUsage({ ...range, includeAdmins: _includeAdmins(req) });
   _auditView(req, 'users', { from: range.from, to: range.to });
   res.json({ users: rows, from: range.from || null, to: range.to || null });
 });
@@ -65,7 +71,7 @@ router.get('/jobs', (req, res) => {
   const range = _range(req);
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
-  const result = adminUsage.getJobRuns({ emails, ...range, limit, offset });
+  const result = adminUsage.getJobRuns({ emails, ...range, limit, offset, includeAdmins: _includeAdmins(req) });
   _auditView(req, 'jobs', { target: emails.length ? emails.join(',') : '*all*', ...range });
   res.json(result);
 });
@@ -76,7 +82,7 @@ router.get('/chat', (req, res) => {
   const range = _range(req);
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
-  const result = adminUsage.getChatMessages({ emails, ...range, limit, offset });
+  const result = adminUsage.getChatMessages({ emails, ...range, limit, offset, includeAdmins: _includeAdmins(req) });
   _auditView(req, 'chat', { target: emails.length ? emails.join(',') : '*all*', ...range });
   res.json(result);
 });
@@ -84,16 +90,26 @@ router.get('/chat', (req, res) => {
 // GET /admin/usage/summary?from=&to=
 router.get('/summary', (req, res) => {
   const range = _range(req);
-  const summary = adminUsage.monthlyTotals(range);
+  const summary = adminUsage.monthlyTotals({ ...range, includeAdmins: _includeAdmins(req) });
   _auditView(req, 'summary', range);
   res.json(summary);
+});
+
+// GET /admin/usage/breakdown?from=&to=&includeAdmins=
+// Kosten je User x Job-Typ (Chat je Session-Art) aus dem Ledger.
+router.get('/breakdown', (req, res) => {
+  const range = _range(req);
+  const rows = adminUsage.userJobBreakdown({ ...range, includeAdmins: _includeAdmins(req) });
+  _auditView(req, 'breakdown', range);
+  res.json({ rows, from: range.from || null, to: range.to || null });
 });
 
 // GET /admin/usage/features?from=&to=
 router.get('/features', (req, res) => {
   const range = _range(req);
-  const items   = adminUsage.listFeatureUsage(range);
-  const totals  = adminUsage.featureUsageTotals(range);
+  const opts = { ...range, includeAdmins: _includeAdmins(req) };
+  const items   = adminUsage.listFeatureUsage(opts);
+  const totals  = adminUsage.featureUsageTotals(opts);
   _auditView(req, 'features', range);
   res.json({ items, totals, from: range.from || null, to: range.to || null });
 });
@@ -101,7 +117,7 @@ router.get('/features', (req, res) => {
 // GET /admin/usage/time?from=&to=
 router.get('/time', (req, res) => {
   const range = _range(req);
-  const items = adminUsage.listTimeUsage(range);
+  const items = adminUsage.listTimeUsage({ ...range, includeAdmins: _includeAdmins(req) });
   _auditView(req, 'time', range);
   res.json({ items, from: range.from || null, to: range.to || null });
 });
@@ -117,6 +133,29 @@ router.get('/time/:email/:bookId/series', (req, res) => {
   const series = adminUsage.dailyTimeSeries(email, bookId, range);
   _auditView(req, 'time-series', { target: email, bookId, ...range });
   res.json({ series, email, bookId, from: range.from || null, to: range.to || null });
+});
+
+// GET /admin/usage/billing?from=&to=
+// Abgerechnete Anthropic-Kosten (Cost-Report-API, gespiegelt in
+// anthropic_cost_daily) gegen das App-Ledger, je UTC-Tag und je Modell.
+router.get('/billing', (req, res) => {
+  const range = _range(req);
+  const report = billing.buildReport(range);
+  _auditView(req, 'billing', range);
+  res.json(report);
+});
+
+// POST /admin/usage/billing/sync — Abruf von Hand (sonst taeglich per Cron).
+// Holt einen Monat, damit auch ein nachtraeglich eingetragener Admin-Key
+// sofort einen vollen Vergleich zeigt.
+router.post('/billing/sync', async (req, res) => {
+  if (!billing.isConfigured()) return res.status(400).json({ error_code: 'BILLING_NOT_CONFIGURED' });
+  try {
+    const result = await billing.syncBilling({ days: 31 });
+    res.json(result);
+  } catch (e) {
+    res.status(502).json({ error_code: e.code || 'BILLING_FETCH_FAILED', status: e.status || null });
+  }
 });
 
 module.exports = router;

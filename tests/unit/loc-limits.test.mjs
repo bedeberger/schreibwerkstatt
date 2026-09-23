@@ -66,7 +66,7 @@ const CATEGORIES = [
     ext: '.html',
     cap: 250,
     allow: {
-      'public/partials/admin-usage.html': 452,
+      'public/partials/admin-usage.html': 458,
       'public/partials/figur-werkstatt.html': 406,
       'public/partials/book-editor.html': 358,
       'public/partials/epub-export.html': 321,

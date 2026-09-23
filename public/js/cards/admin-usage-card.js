@@ -18,8 +18,17 @@ export function registerAdminUsageCard() {
     adminUsageFrom: '',
     adminUsageTo: '',
 
+    // Admin-Konten in alle Auswertungen einbeziehen (Server: ?includeAdmins=1).
+    // Default an: nutzt ein Admin die KI-Funktionen, stehen seine Calls auf der
+    // Anthropic-Rechnung — ohne ihn fehlten sie in jeder User-Summe.
+    adminUsageIncludeAdmins: true,
+
     // Users-Tab
     adminUsageUsersList: [],
+    // Kosten je User x Job-Typ (Ledger) + gewaehlter User der Aufschluesselung
+    // (null = zu, '' = Calls ohne User).
+    adminUsageBreakdown: [],
+    adminUsageBreakdownUser: null,
 
     // Filter fuer Jobs/Chat-Drilldown — Array von Emails (Multi-Select).
     adminUsageFilterUsers: [],
@@ -36,6 +45,10 @@ export function registerAdminUsageCard() {
 
     // Summary-Tab
     adminUsageSummary: null,
+
+    // Abrechnungs-Tab (Anthropic Cost-Report vs. Ledger)
+    adminUsageBilling: null,
+    adminUsageBillingSyncing: false,
 
     // Features-Tab
     adminUsageFeatureItems: [],

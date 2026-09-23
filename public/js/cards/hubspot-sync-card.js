@@ -12,7 +12,7 @@
 //
 // Headless display-contents-Anker, via `$hubspot`-Magic global erreichbar.
 
-import { createSyncCard } from './sync/sync-core.js';
+import { createSyncCard, latestStamp } from './sync/sync-core.js';
 
 function _syncBaseline(link) {
   return link?.last_pushed_at || link?.hubspot_created_at || '';
@@ -29,7 +29,9 @@ const hubspotSpec = {
   computeStatus(page, link) {
     if (!link) return 'new';
     const baseline = _syncBaseline(link);
-    const updated = page?.updated_at || '';
+    // Titel-Werkstatt-Edits (Titel/Lead/Teaser gehen mit dem Push raus)
+    // bewegen pages.updated_at nicht — beide Stamps zählen.
+    const updated = latestStamp(page?.updated_at, link.headline_updated_at);
     if (updated && baseline && updated > baseline) return 'pushed-dirty';
     return 'pushed';
   },

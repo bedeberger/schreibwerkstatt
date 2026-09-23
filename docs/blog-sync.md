@@ -15,16 +15,23 @@ Spec für bidirektionale Synchronisation zwischen einem self-hosted WordPress-Bl
 
 ## Konflikt-Strategie (LWW)
 
-Vergleich `wp.modified_gmt` ↔ `pages.updated_at`. 4 Fälle pro Pull:
+Zwei Fragen pro Post (`lib/blog-merge.js#classifyPull`):
 
-| WP neuer als Link | App neuer als Link | Aktion |
+- **WP neuer?** — `post.modified_gmt` > `blog_page_links.wp_modified_at` (der zuletzt gesehene WP-Stand; Pull, Push und „App gewinnt" schreiben ihn).
+- **App neuer?** — der jüngere von `pages.updated_at` und `page_headline.updated_at` (ein Titel-Werkstatt-Edit ist ein Edit des Beitrags, bewegt aber die Seite nicht) > **Sync-Punkt** = der jüngere von `last_pulled_at` und `last_pushed_at`.
+
+| WP neuer | App neuer | Aktion |
 |---|---|---|
 | ja | nein | WP → App (Update der Page) |
 | nein | ja | nichts; gehört in Push |
 | nein | nein | no-op |
 | ja | ja | `conflict_state='detected'` → User löst via Diff |
 
-`blog_page_links.last_pulled_at` ist der Referenzpunkt für „App seit letztem Pull geändert".
+**Der Sync-Punkt ist Pull ODER Push.** Ein Push macht den App-Stand genauso zum gemeinsamen Stand wie ein Pull; nur gegen `last_pulled_at` verglichen, liefe jede gepushte Seite beim nächsten WP-Edit in einen Konflikt (und eine per Push entstandene Seite hat gar keinen Pull-Stamp). Das Badge im Buchorganizer rechnet mit derselben Regel (`blog-sync-card.js#computeStatus`, Helfer `latestStamp` in `sync-core.js`).
+
+**Push-Pre-Check:** vor jedem Update-Push liest der Job den Post (`getPost`). Ist `modified_gmt` jünger als `wp_modified_at`, hat jemand in WordPress geändert, was die App nie gesehen hat → `conflict_state='detected'`, `BLOG_CONFLICT` im Result, **kein** Schreib-Call (und kein Bild-Upload — der Check läuft vor dem Media-Pass). Ohne ihn überschriebe der Push fremde Änderungen stumm.
+
+**Konflikt lösen** (`POST /blog/:book_id/pages/:page_id/resolve`): beide Seiten lesen den aktuellen Remote-Stand. `wp` übernimmt ihn über denselben Weg wie der Pull (`lib/blog-pull.js#applyPostToPage`, inkl. Titel-Regel). `app` setzt `wp_modified_at` auf den gesehenen Stand und `conflict_state='resolved-app'` (`blogs.markConflictResolvedApp`) — sonst meldeten Pull und Pre-Check denselben WP-Edit sofort wieder.
 
 ## Schema-Migration N
 
@@ -67,9 +74,11 @@ CREATE INDEX idx_blog_page_links_blog ON blog_page_links(blog_id);
 | File | Inhalt |
 |---|---|
 | `lib/wp-client.js` | Basic-Auth-Header, HTTPS-Pflicht + SSRF-Guard (`validateBaseUrl`), Pagination via `X-WP-TotalPages`, Retry/Backoff bei 429/5xx. Methoden: `me()`, `listPosts({ page, perPage, modifiedAfter? })`, `getPost(id)`, `createPost(payload)`, `updatePost(id, payload)`, `uploadMedia({ data, filename, mimeType })` (Binär-Upload via `raw`-Body + `Content-Disposition`). Keine Categories/Tags-Endpoints. |
-| `lib/wp-html.js` | `wpToAppHtml(raw, stats?)` (**async**): strip alle `<!-- wp:* -->`/`<!-- /wp:* -->` Kommentare, **angehängtes Quellenverzeichnis entfernen** (`div.sw-bibliography`, siehe „Quellenverzeichnis im Post"), **Quellen-Chips ohne `data-src` zu Klartext degradieren** (zählt in `stats.citesDegraded`), `img` auf `src`/`alt`/`class`(`wp-image-<n>`) reduzieren, Nicht-Bild-Embeds + bild-lose Figuren entfernen, dann durch `lib/html-clean.js` (Single Chokepoint). Async, weil die Chip-Selektoren aus der ESM-SSoT `public/js/sources/cite-html.js` kommen statt aus einer Kopie. `appToWpHtml(html, { bibliography? })`: parse via linkedom, pro Block-Element passenden Gutenberg-Kommentar wrappen (siehe Block-Mapping); `<figure>`/`<img>` → `wp:image`. `appToWpHtmlWithMedia(html, { resolveImage, bibliography? })`: async Variante mit vorgelagertem Media-Pass (jedes `<img>` durch `resolveImage(src)` → src ersetzen / verwerfen). |
+| `lib/wp-html.js` | `wpToAppHtml(raw, stats?)` (**async**): strip alle `<!-- wp:* -->`/`<!-- /wp:* -->` Kommentare, **angehängtes Quellenverzeichnis entfernen** (`div.sw-bibliography`, siehe „Quellenverzeichnis im Post"), **Quellen-Chips ohne `data-src` zu Klartext degradieren** (zählt in `stats.citesDegraded`), `img` auf `src`/`alt`/`class`(`wp-image-<n>`) reduzieren, Nicht-Bild-Embeds + bild-lose Figuren entfernen, dann durch `lib/html-clean.js` (Single Chokepoint). Async, weil die Chip-Selektoren aus der ESM-SSoT `public/js/sources/cite-html.js` kommen statt aus einer Kopie. `appToWpHtml(html, { bibliography?, lead? })`: parse via linkedom, pro Block-Element passenden Gutenberg-Kommentar wrappen (siehe Block-Mapping); `<figure>`/`<img>` → `wp:image`. `appToWpHtmlWithMedia(html, { resolveImage, bibliography? })`: async Variante mit vorgelagertem Media-Pass (jedes `<img>` durch `resolveImage(src)` → src ersetzen / verwerfen). |
 | `lib/wp-media.js` | `makeImageResolver({ wp, blogOrigin, signal, logger, fetchImpl? })` → async `resolveImage(src)`: blog-gehostet → unverändert behalten; data-URI/fremde URL → Bytes holen (SSRF-Guard `assertPublicUrl` pro Hop; Redirects via `redirect: 'manual'` selbst gefolgt + jeder Hop neu validiert, Hop-Limit 5 — verhindert Redirect-Bypass auf interne IPs) + `wp.uploadMedia`. MIME-Allowlist (jpeg/png/gif/webp/avif) + 20-MB-Cap. Fehler → Bild verwerfen (`null`), nie Job-Abbruch. |
-| `lib/blog-merge.js` | Pure `classifyPull({ hasLink, wpModifiedAt, linkModifiedAt, pageUpdatedAt, lastPulledAt })` → `'create'`/`'update'`/`'conflict'`/`'skip'` + `newer(a,b)`. Ausgelagert für testbare LWW-Logik ohne Job-/DB-Kontext. |
+| `lib/blog-merge.js` | Pure `classifyPull({ hasLink, wpModifiedAt, linkModifiedAt, pageUpdatedAt, headlineUpdatedAt, lastPulledAt, lastPushedAt })` → `'create'`/`'update'`/`'conflict'`/`'skip'` + `newer(a,b)`, `latest(...)`, `syncPoint(link)`. Ausgelagert für testbare LWW-Logik ohne Job-/DB-Kontext. |
+| `lib/blog-title.js` | Titel-Regeln für **beide** Blog-Syncs (WordPress + HubSpot), siehe „Titel". `splitDatePrefix`, `outgoingTitle`, `wpTitleText`, `importedPageName`, `planPulledTitle`. |
+| `lib/blog-pull.js` | WP-Post → Seite für Import, Pull und „WP gewinnt": `createPageFromPost`, `applyPostToPage` (HTML, Titel, Lead, Teaser). Dazu die Import-Helfer, die WordPress und HubSpot teilen: `resolveYearChapter`, `seedImportBaseline`. |
 | `db/blogs.js` | CRUD für `blog_connections` + `blog_page_links`. Passwort beim Read via `lib/crypto.js` entschlüsseln, nie an Client returnen. |
 | `routes/blog.js` | `GET /blog/:book_id/status`, `POST /blog/:book_id/connect`, `DELETE /blog/:book_id/disconnect`. `router.param('book_id', bookParamHandler)` aus `lib/log-context.js`. Connect prüft serverseitig `buchtyp === 'blog'` (sonst 400 `BLOG_REQUIRES_BLOG_TYPE`). |
 | `routes/jobs/blog-sync.js` | Job-Typen `blog-import`, `blog-pull`, `blog-push`, `blog-reconcile`. Dedup via `findActiveJobId(type, bookId, userEmail)`. |
@@ -93,6 +102,22 @@ App-HTML → WP-Block-HTML:
 | `<video>`, `<audio>`, `<iframe>`, `<embed>`, `<object>` | strip (nicht round-trip-fähig) |
 
 Unit-Test pro Mapping in `tests/unit/wp-html.test.mjs`.
+
+## Titel
+
+SSoT [lib/blog-title.js](../lib/blog-title.js), gilt für WordPress **und** HubSpot.
+
+**Raus (Push, Create und Update):** Titel-Werkstatt-Titel (`page_headline.titel`), sonst der Seitenname **ohne** den app-internen Datums-Präfix `YYYY-MM-DD: `. Beim Update geht der Titel immer mit (leer → nicht), damit eine Umbenennung in der App in WordPress ankommt — der Push-Pre-Check fängt vorher ab, dass drüben jemand den Titel geändert hat.
+
+**Rein (Pull-Update, „WP gewinnt"):** `title.raw` (context=edit, unkodiert); nur ohne `raw` wird `title.rendered` gelesen und **entity-dekodiert** — wptexturize schreibt dort `&#8217;`/`&#8211;`/`&amp;`. Ziel ist dieselbe Stelle, aus der der Push liest: hat die Seite einen Werkstatt-Titel, landet ein geänderter WP-Titel **dort** (sonst überschriebe der nächste Push ihn mit dem alten); sonst im Seitennamen, und dessen **lokaler Datums-Präfix bleibt stehen** (er ist Ordnung im Buchorganizer und soll nicht auf das UTC-Datum des Posts springen). Umbenennungen landen in `job.result.renamed`; `sync-core.js#_applyPushRenames` zieht Tree und offenen Editor-Titel nach.
+
+**Neu angelegt (Import, Pull-Create):** `YYYY-MM-DD: Titel` mit dem Datum des Posts (`date_gmt`, sonst `date`/`modified_gmt`).
+
+**Titel-Werkstatt, übrige Felder:**
+
+- **Lead** → erster Block des Posts, in einem `wp:group` mit Marker-Klasse `sw-headline` (`HEADLINE_MARKER_CLASS` in `lib/wp-html.js`). Der Pull schneidet ihn heraus und meldet den Text (`stats.lead`) → `page_headline.lead`. Derselbe Akkumulations-Schutz wie beim Quellenverzeichnis: im Manuskript darf er nie ankommen. Fehlt der Block im Post, bleibt der Werkstatt-Lead unangetastet (keine Aussage).
+- **Teaser** → `excerpt`. Zurück nur, wenn die Seite einen Teaser führt — ohne ihn schickt der Push auch keinen, und ein in WordPress gepflegter Auszug gehört WordPress.
+- **Dachzeile** → geht nicht mit: WordPress setzt den Post-Titel über den Inhalt, eine Dachzeile im Inhalt stünde **unter** der Schlagzeile.
 
 ## Quellenverzeichnis im Post
 
@@ -134,30 +159,30 @@ Ein `span.cite` mit unbrauchbarem `data-src` (`"0"`, `"abc"`) ist laut SSoT kein
 Gated: `initial_import_done_at IS NULL`. Zweiter Aufruf → 400 `ALREADY_IMPORTED`.
 
 1. paginate `listPosts({ perPage: 100 })`
-2. pro Post: Page via Content-Store (`createPage`) anlegen mit `wpToAppHtml(content.rendered)`, `page_name = title.rendered`
-3. Link-Eintrag in `blog_page_links` mit `wp_modified_at = post.modified_gmt`, `last_pulled_at = NOW_ISO_SQL`
+2. pro Post: **bereits verlinkt → überspringen** (`job.result.skipped`). Ein abgebrochener Import hinterlässt Links ohne `initial_import_done_at`; ohne den Skip scheiterte jeder weitere Lauf an `UNIQUE(blog_id, wp_post_id)`.
+3. sonst Page anlegen (`lib/blog-pull.js#createPageFromPost`, Name siehe „Titel") + Link mit `wp_modified_at = post.modified_gmt`, `last_pulled_at = jetzt`
 4. Status via `updateJob` mit Key `job.blog.import.progress`, Params `{done, total}`
-5. am Ende `initial_import_done_at = NOW_ISO_SQL`
+5. am Ende `initial_import_done_at`, `last_pull_at = Start des Laufs`
 
 ### `runBlogPullJob(bookId)` — manuell, Delta
 
 Voraussetzung: Initial-Import durch. Sonst 400 `IMPORT_FIRST`.
 
 1. `listPosts({ modifiedAfter: conn.last_pull_at })` paginieren
-2. pro Post: 4-Fall-LWW aus „Konflikt-Strategie"
-3. neue Posts (kein Link, kein Slug-Match) → Page anlegen + Link
-4. `last_pull_at = NOW_ISO_SQL`
+2. pro Post: 4-Fall-LWW aus „Konflikt-Strategie"; `update` schreibt über `applyPostToPage` (HTML, Titel, Lead, Teaser)
+3. neue Posts (kein Link) → Page anlegen + Link
+4. `last_pull_at = Start des Laufs` — ein Stempel vom Ende liesse Posts aus, die WordPress während des Laufs geändert hat
 
 ### `runBlogPushJob(bookId, pageIds[])` — manuell, Multi-Select
 
 Vor dem Upload läuft `appToWpHtmlWithMedia(html, { resolveImage, bibliography })` mit einem `makeImageResolver` (Blog-Origin aus `conn.base_url`): Inline-Bilder werden ggf. in die WP-Mediathek geladen (`job.result.imagesUploaded` zählt neue Uploads). Upload-Fehler verwerfen nur das Bild, nicht den Push. Quellen-Chips werden vorher per `resolveCitesInHtml` aktualisiert, das Verzeichnis kommt bei aktivem `bibliography_in_blog` als markierter Block dazu (siehe „Quellenverzeichnis im Post").
 
 1. pro `pageId`:
-   - kein Link → `createPost({ title, content: appToWpHtmlWithMedia, status: conn.default_status, slug })` → Link anlegen.
-     **Titel-Normalisierung (nur Create):** Der Datum-Prefix `YYYY-MM-DD:` ist **app-intern**. Der lokale `page_name` wird auf `YYYY-MM-DD: Rest` gebracht (Datum = `localIsoDate()`); leerer Rest → nur das Datum; vorhandener Prefix (`^\d{4}-\d{2}-\d{2}(?:\s*:\s*…)?$`) wird durch heute ersetzt. **WordPress bekommt den Titel ohne Datum** (nur `Rest`; leerer Rest → leerer WP-Titel). Lokaler `page_name` zieht via `contentStore.savePage` synchron nach; jede Umbenennung landet in `job.result.renamed: [{ pageId, name }]`, damit das Frontend Sidebar-Tree + offenen Editor-Titel nachzieht (`sync-core.js#_applyPushRenames`). Updates rühren den Titel nicht an.
-   - Link da, kein Konflikt → `updatePost(id, …)`, `wp_modified_at` aus Response übernehmen
-   - `conflict_state='detected'` → skip, Fehler in Job-Result
-   - **WP-Post drüben gelöscht** (`BLOG_HTTP_404` von `updatePost`) → Link wird entfernt, Error-Code `BLOG_REMOTE_GONE` ins Result; Page-Badge flippt auf `new`. Erneuter Push erstellt einen frischen Post.
+   - kein Link → `createPost({ title, content, excerpt?, status: conn.default_status })` → Link anlegen.
+     **Lokaler Name beim Create:** Der Datum-Prefix `YYYY-MM-DD:` ist **app-intern**. Der lokale `page_name` wird auf `YYYY-MM-DD: Rest` gebracht (Datum = `localIsoDate()`); leerer Rest → nur das Datum; ein vorhandener Prefix wird durch heute ersetzt. Die Umbenennung landet in `job.result.renamed: [{ pageId, name }]` (`sync-core.js#_applyPushRenames`). WordPress bekommt den Titel nach „Titel".
+   - Link da → Push-Pre-Check (siehe „Konflikt-Strategie"), dann `updatePost(id, { content, title?, excerpt? })`, `wp_modified_at` aus Response übernehmen
+   - `conflict_state='detected'` → skip, `BLOG_CONFLICT` im Job-Result
+   - **WP-Post drüben gelöscht** (`BLOG_HTTP_404` von Pre-Check oder `updatePost`) → Link wird entfernt, Error-Code `BLOG_REMOTE_GONE` ins Result; Page-Badge flippt auf `new`. Erneuter Push erstellt einen frischen Post.
 2. `last_push_at = NOW_ISO_SQL`
 
 ### `runBlogReconcileJob(bookId)` — on demand
@@ -197,9 +222,9 @@ Aktion-Buttons:
 
 Pro Page ein eckiges Badge (`--card-accent-blog`) mit Status:
 
-- `synced` — `wp_modified_at == link.wp_modified_at && page.updated_at <= link.last_pulled_at`
-- `push-needed` — `page.updated_at > link.last_pulled_at`
-- `pull-needed` — Pull hat neueren WP-Modified-Stamp gesehen (selten direkt im Tree, da Pull schon mergt)
+- `new` — kein Link
+- `synced` — Seite und Titel-Werkstatt nicht jünger als der Sync-Punkt
+- `push-needed` — `max(page.updated_at, headline_updated_at) > max(last_pulled_at, last_pushed_at)` (`/blog/:book_id/links` liefert `headline_updated_at` per Join mit)
 - `conflict` — `conflict_state='detected'`
 
 Tooltip via `data-tip`.
@@ -250,13 +275,16 @@ Buchtyp-Label in [prompt-config.json](../prompt-config.json):
 ## Tests
 
 ### Unit (`tests/unit/`)
+- `wp-html-lead.test.mjs` — Lead-Block: Marker + Escape beim Push, `stats.lead` beim Pull, nie im Seitentext, genau einmal über drei Zyklen
+- `blog-title.test.mjs` — Titel-Regeln (Datums-Präfix, Werkstatt-Vorrang, Entity-Decode, Pull-Plan)
 - `wp-html.test.mjs` — Block-Wrap/Unwrap Round-Trip, Inline-Erhalt, Bild-Erhalt bei Import + `wp:image`-Wrap bei Export (inkl. Attachment-ID + figcaption), Nicht-Bild-Embed-Strip, async Media-Pass (`appToWpHtmlWithMedia`); **Quellenverzeichnis:** markierter `wp:group`-Anhang, Listen- vs. Absatz-Form je Zitierstil, die Akkumulations-Invariante (Round-Trip mit == ohne Verzeichnis, auch über drei Zyklen, `data-src` erhalten — mutationsgeprüft) und der KSES-Guard (Chip ohne `data-src` → Klartext + gezählt, nie geraten)
 - `wp-client.test.mjs` — Pagination via `X-WP-TotalPages`, 401-Handling, HTTPS-Reject, Backoff bei 429/5xx
 - `wp-media.test.mjs` — Resolver: blog-gehostet unverändert, data-URI/fremde URL → Upload, MIME-Reject, Fetch-Fehler → `null`
-- `blog-merge.test.mjs` — alle 4 LWW-Fälle (`classifyPull`) + `newer`-Vergleich
+- `blog-merge.test.mjs` — alle 4 LWW-Fälle (`classifyPull`) + `newer`-Vergleich, Sync-Punkt Pull-oder-Push, Titel-Werkstatt-Edit als lokaler Edit
 
 ### Integration (`tests/integration/`)
-- `blog-sync.test.js` — Express-WP-Stub, Round-Trip: Initial-Import → lokales Edit → Push → Pull → no-op. Konflikt-Pfad: gleichzeitige Änderung beidseits → `conflict_state='detected'`.
+- `blog-sync.test.js` — WP-Stub ([_helpers/mock-wp.js](../tests/integration/_helpers/mock-wp.js)), Initial-Import, Push (Update/Create mit Datums-Präfix), Konflikt-Pfad: gleichzeitige Änderung beidseits → `conflict_state='detected'`.
+- `blog-sync-roundtrip.test.js` — mehrstufige Fälle: Push → WP-Edit → Pull ohne falschen Konflikt (Create- und Update-Weg), Push-Pre-Check + „App gewinnt", Import nach Abbruch, Entity-Titel, Titel-Werkstatt raus und zurück. Die ersten drei plus der Werkstatt-Fall sind mutationsgeprüft (Sync-Punkt nur Pull bzw. Pre-Check aus ⇒ rot).
 
 ### Drift
 - `tests/unit/erd-drift.test.mjs` grünt nach ERD-Update

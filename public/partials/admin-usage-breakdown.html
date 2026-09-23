@@ -1,0 +1,108 @@
+<!-- Admin-Usage → Users-Tab: Kosten je User x Job-Typ -->
+<!--
+  Sub-Partial von admin-usage.html (Scope: adminUsageCard), im Users-Tab unter
+  der User-Liste. Quelle: GET /admin/usage/breakdown (Ledger, eingefrorene USD).
+  Oben die Aufschluesselung des per „Nach Job"-Button gewaehlten Users, darunter
+  die Matrix aller User gegen die teuersten Job-Typen.
+-->
+<div class="admin-usage-breakdown" x-show="adminUsageBreakdown.length">
+  <section class="admin-usage-breakdown-detail" x-ref="breakdownDetail" x-show="adminUsageBreakdownUser !== null">
+    <div class="admin-usage-billing-head">
+      <h4 class="admin-usage-billing-subheading"
+          x-text="$app.t('admin.usage.breakdown.titleUser', { user: adminUsageUserLabel(adminUsageBreakdownUser) })"></h4>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="adminUsageBreakdownUser = null"
+              :aria-label="$app.t('common.close')" :data-tip="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+    </div>
+    <div class="table-scroll">
+    <table class="admin-usage-table"
+           x-data="sortableTable({
+             rows: () => adminUsageBreakdownDetail(),
+             defaultKey: 'usd',
+             defaultDir: 'desc',
+             persistKey: 'admin.usage.breakdown.detail',
+             types: { calls: 'number', tokensIn: 'number', tokensOut: 'number', usd: 'number', share: 'number' },
+           })">
+      <thead>
+        <tr>
+          <th class="sortable-th" :class="sortClass('label')" :aria-sort="ariaSort('label')"
+              @click="sortBy('label')" x-text="$app.t('admin.usage.job.type')"></th>
+          <th class="sortable-th" :class="sortClass('calls')" :aria-sort="ariaSort('calls')"
+              @click="sortBy('calls')" x-text="$app.t('admin.usage.breakdown.calls')"></th>
+          <th class="sortable-th" :class="sortClass('tokensIn')" :aria-sort="ariaSort('tokensIn')"
+              @click="sortBy('tokensIn')" x-text="$app.t('admin.usage.column.tokensIn')"></th>
+          <th class="sortable-th" :class="sortClass('tokensOut')" :aria-sort="ariaSort('tokensOut')"
+              @click="sortBy('tokensOut')" x-text="$app.t('admin.usage.column.tokensOut')"></th>
+          <th class="sortable-th" :class="sortClass('usd')" :aria-sort="ariaSort('usd')"
+              @click="sortBy('usd')" x-text="$app.t('admin.usage.column.cost')"></th>
+          <th class="sortable-th" :class="sortClass('share')" :aria-sort="ariaSort('share')"
+              @click="sortBy('share')" x-text="$app.t('admin.usage.breakdown.share')"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="r in sorted" :key="r.key">
+          <tr>
+            <td x-text="r.label"></td>
+            <td class="admin-usage-cell-num" x-text="adminUsageInt(r.calls)"></td>
+            <td class="admin-usage-cell-num" x-text="adminUsageInt(r.tokensIn)"></td>
+            <td class="admin-usage-cell-num" x-text="adminUsageInt(r.tokensOut)"></td>
+            <td class="admin-usage-cell-num" x-text="adminUsageMoney(r.usd)"></td>
+            <td class="admin-usage-cell-num" x-text="adminUsagePct(r.share)"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    </div>
+    <div x-show="!adminUsageBreakdownDetail().length" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
+  </section>
+
+  <div x-data="collapsible(true)" class="admin-usage-breakdown-matrix">
+    <button type="button" class="collapsible-toggle" x-bind="trigger">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+      <span x-text="$app.t('admin.usage.breakdown.matrixTitle')"></span>
+    </button>
+    <div x-bind="panel" x-cloak>
+      <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.usage.breakdown.matrixHint')"></p>
+      <div class="table-scroll">
+      <table class="admin-usage-table"
+             x-data="sortableTable({
+               rows: () => adminUsageMatrix().rows,
+               defaultKey: 'total',
+               defaultDir: 'desc',
+               persistKey: 'admin.usage.breakdown.matrix',
+               types: { total: 'number', other: 'number', c0: 'number', c1: 'number', c2: 'number', c3: 'number', c4: 'number', c5: 'number' },
+             })">
+        <thead>
+          <tr>
+            <th class="sortable-th" :class="sortClass('label')" :aria-sort="ariaSort('label')"
+                @click="sortBy('label')" x-text="$app.t('admin.users.email')"></th>
+            <template x-for="(col, i) in adminUsageMatrix().cols" :key="col.key">
+              <th class="sortable-th" :class="sortClass('c' + i)" :aria-sort="ariaSort('c' + i)"
+                  @click="sortBy('c' + i)" x-text="col.label"></th>
+            </template>
+            <th class="sortable-th" :class="sortClass('other')" :aria-sort="ariaSort('other')"
+                @click="sortBy('other')" x-text="$app.t('admin.usage.breakdown.other')"></th>
+            <th class="sortable-th" :class="sortClass('total')" :aria-sort="ariaSort('total')"
+                @click="sortBy('total')" x-text="$app.t('admin.usage.breakdown.total')"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="row in sorted" :key="row.id">
+            <tr>
+              <td class="admin-usage-cell-email">
+                <span class="internal-link" @click="adminUsageShowBreakdown(row.email)" x-text="row.label"></span>
+              </td>
+              <template x-for="(col, i) in adminUsageMatrix().cols" :key="col.key">
+                <td class="admin-usage-cell-num" :class="row['c' + i] ? '' : 'admin-usage-cell--zero'"
+                    x-text="row['c' + i] ? adminUsageMoney(row['c' + i]) : '—'"></td>
+              </template>
+              <td class="admin-usage-cell-num" :class="row.other ? '' : 'admin-usage-cell--zero'"
+                  x-text="row.other ? adminUsageMoney(row.other) : '—'"></td>
+              <td class="admin-usage-cell-num admin-usage-cell--total" x-text="adminUsageMoney(row.total)"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>

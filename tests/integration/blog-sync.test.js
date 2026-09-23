@@ -28,89 +28,7 @@ test.before(() => {
 });
 test.after(() => { ctx.cleanup(); });
 
-// ── Mock-WP ───────────────────────────────────────────────────────────────
-
-function makeWpStub({ posts = [], me = { id: 1, name: 'Editor', capabilities: { edit_posts: true } } } = {}) {
-  const state = {
-    posts: posts.map(p => ({ ...p })),
-    me,
-    nextId: posts.reduce((m, p) => Math.max(m, p.id), 100) + 1,
-    calls: [],
-  };
-
-  function respond(status, body, headers = {}) {
-    const hdr = new Map(Object.entries(headers));
-    return {
-      ok: status >= 200 && status < 300,
-      status,
-      headers: { get: k => hdr.get(k) ?? hdr.get(k.toLowerCase()) ?? null },
-      json: async () => body,
-      text: async () => JSON.stringify(body),
-    };
-  }
-
-  state.fetch = async (rawUrl, init) => {
-    const u = new URL(rawUrl);
-    const method = (init?.method || 'GET').toUpperCase();
-    state.calls.push({ url: rawUrl, method, body: init?.body });
-
-    if (u.pathname === '/wp-json/wp/v2/users/me') return respond(200, state.me);
-
-    if (u.pathname === '/wp-json/wp/v2/posts' && method === 'GET') {
-      const perPage = parseInt(u.searchParams.get('per_page') || '10', 10);
-      const page = parseInt(u.searchParams.get('page') || '1', 10);
-      const modifiedAfter = u.searchParams.get('modified_after');
-      let pool = state.posts.slice();
-      if (modifiedAfter) pool = pool.filter(p => (p.modified_gmt || '') > modifiedAfter);
-      pool.sort((a, b) => (a.modified_gmt || '').localeCompare(b.modified_gmt || ''));
-      const total = pool.length;
-      const totalPages = Math.max(1, Math.ceil(total / perPage));
-      const slice = pool.slice((page - 1) * perPage, page * perPage);
-      return respond(200, slice, {
-        'X-WP-Total': String(total),
-        'X-WP-TotalPages': String(totalPages),
-      });
-    }
-
-    const updMatch = u.pathname.match(/^\/wp-json\/wp\/v2\/posts\/(\d+)$/);
-    if (updMatch && method === 'POST') {
-      const id = Number(updMatch[1]);
-      const post = state.posts.find(p => p.id === id);
-      if (!post) return respond(404, { code: 'rest_post_invalid_id' });
-      const payload = JSON.parse(init.body || '{}');
-      if (payload.title) post.title = { rendered: payload.title, raw: payload.title };
-      if (payload.content) post.content = { rendered: payload.content, raw: payload.content };
-      if (payload.status) post.status = payload.status;
-      post.modified_gmt = new Date().toISOString().replace('Z', '');
-      return respond(200, post);
-    }
-
-    if (u.pathname === '/wp-json/wp/v2/posts' && method === 'POST') {
-      const payload = JSON.parse(init.body || '{}');
-      const newPost = {
-        id: state.nextId++,
-        title: { rendered: payload.title || '', raw: payload.title || '' },
-        content: { rendered: payload.content || '', raw: payload.content || '' },
-        status: payload.status || 'draft',
-        slug: payload.slug || `post-${Date.now()}`,
-        modified_gmt: new Date().toISOString().replace('Z', ''),
-        date_gmt: new Date().toISOString().replace('Z', ''),
-      };
-      state.posts.push(newPost);
-      return respond(201, newPost);
-    }
-
-    return respond(404, { code: 'rest_no_route' });
-  };
-
-  return state;
-}
-
-function installFetch(stub) {
-  const prev = globalThis.fetch;
-  globalThis.fetch = stub.fetch;
-  return () => { globalThis.fetch = prev; };
-}
+const { makeWpStub, installFetch } = require('./_helpers/mock-wp');
 
 // ── Test-Buch + Blog-Settings ─────────────────────────────────────────────
 
@@ -230,8 +148,8 @@ test('Push: lokal editierte Seite wird zu WP gepusht (Update)', async () => {
   const connId = blogs.getConnection(bookId).id;
   blogs.markInitialImportDone(connId);
 
-  // Seed-Page + Link. Page-Name in App weicht absichtlich vom WP-Titel ab,
-  // damit der Test absichert, dass Push den WP-Titel nicht überschreibt.
+  // Seed-Page + Link. Page-Name in App weicht vom WP-Titel ab: eine
+  // Umbenennung in der App muss beim Update-Push in WordPress ankommen.
   const page = await contentStore.createPage({
     book_id: bookId, chapter_id: null, name: 'App-Name',
     html: '<h2>Update</h2><p>Geänderter Text.</p>',
@@ -267,7 +185,7 @@ test('Push: lokal editierte Seite wird zu WP gepusht (Update)', async () => {
     const updatedRemote = wp.posts.find(p => p.id === 11);
     assert.match(updatedRemote.content.raw, /wp:heading/);
     assert.match(updatedRemote.content.raw, /Geänderter Text/);
-    assert.equal(updatedRemote.title.raw, 'WP-Original', 'Update-Push darf WP-Titel nicht überschreiben');
+    assert.equal(updatedRemote.title.raw, 'App-Name', 'Update-Push traegt den Seitennamen als Titel');
   } finally {
     restore();
   }

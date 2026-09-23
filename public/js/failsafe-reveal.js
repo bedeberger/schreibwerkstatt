@@ -100,8 +100,11 @@
   // init(), das Update-Banner braucht Alpine, und der SW liefert die Shell
   // cache-only weiter — auch ein Hard-Reload landet wieder dort.
   //
-  // Darum hier hart heilen: Shell-Caches wegwerfen + SW abmelden + neu laden,
-  // damit der nächste Load garantiert eine kohärente Generation vom Netz zieht.
+  // Darum hier hart heilen: Shell-Caches wegwerfen + SW abmelden + neu laden.
+  // Tragend ist der Cache-Wurf: ein SW ohne vollständige Generation
+  // (sw.js#GENERATION_COMPLETE_PATH) bedient die Seite komplett vom Netz und
+  // füllt nach — auch dann, wenn der Browser die Abmeldung beim nächsten
+  // register() zurücknimmt.
   // Genau EINMAL pro Session (sessionStorage-Guard) und nur online — offline
   // wäre nach dem Cache-Wurf gar nichts mehr ladbar. app.js#init() löscht das
   // Flag nach erfolgreichem Boot.

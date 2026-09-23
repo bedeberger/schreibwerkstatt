@@ -117,10 +117,13 @@ function markInitialImportDone(connId) {
 }
 
 const _stmtTouchPull = db.prepare(`
-  UPDATE blog_connections SET last_pull_at = ${NOW_ISO_SQL}, updated_at = ${NOW_ISO_SQL} WHERE id = ?
+  UPDATE blog_connections SET last_pull_at = COALESCE(?, ${NOW_ISO_SQL}), updated_at = ${NOW_ISO_SQL} WHERE id = ?
 `);
-function touchPull(connId) {
-  _stmtTouchPull.run(parseInt(connId, 10));
+/** `at` = Start-Zeitpunkt des Pulls (ISO). Der naechste Delta-Pull fragt ab dort —
+ *  ein Stempel vom ENDE liesse Posts aus, die WordPress waehrend des Laufs
+ *  geaendert hat. Ohne `at`: jetzt. */
+function touchPull(connId, at = null) {
+  _stmtTouchPull.run(at || null, parseInt(connId, 10));
 }
 
 const _stmtTouchPush = db.prepare(`
@@ -155,10 +158,16 @@ function getLinkByPost(blogId, wpPostId) {
   return _stmtGetLinkByPost.get(parseInt(blogId, 10), parseInt(wpPostId, 10)) || null;
 }
 
+// `headline_updated_at`: ein Titel-Werkstatt-Edit ist ein lokaler Edit des
+// Beitrags (Titel/Lead/Teaser gehen mit dem Push raus), bewegt aber
+// `pages.updated_at` nicht — der Badge braucht beide Stamps.
 const _stmtListLinksForBlog = db.prepare(`
-  SELECT page_id, blog_id, wp_post_id, wp_modified_at, wp_status, wp_slug,
-         last_pulled_at, last_pushed_at, conflict_state
-    FROM blog_page_links WHERE blog_id = ?
+  SELECT l.page_id, l.blog_id, l.wp_post_id, l.wp_modified_at, l.wp_status, l.wp_slug,
+         l.last_pulled_at, l.last_pushed_at, l.conflict_state,
+         h.updated_at AS headline_updated_at
+    FROM blog_page_links l
+    LEFT JOIN page_headline h ON h.page_id = l.page_id
+   WHERE l.blog_id = ?
 `);
 function listLinksForBlog(blogId) {
   return _stmtListLinksForBlog.all(parseInt(blogId, 10));
@@ -218,6 +227,17 @@ function markLinkPushed(pageId, { wpModifiedAt, wpStatus = null, wpSlug = null }
   _stmtMarkPushed.run(String(wpModifiedAt || ''), wpStatus, wpSlug, parseInt(pageId, 10));
 }
 
+// Konflikt zugunsten der App geloest: der WP-Stand, den der User im Diff
+// gesehen und verworfen hat, gilt als bekannt (`wp_modified_at`). Sonst saehe der
+// naechste Pull denselben WP-Edit wieder als neu und meldete den Konflikt erneut;
+// der Push-Pre-Check ebenso.
+const _stmtResolveApp = db.prepare(`
+  UPDATE blog_page_links SET wp_modified_at = ?, conflict_state = 'resolved-app' WHERE page_id = ?
+`);
+function markConflictResolvedApp(pageId, wpModifiedAt) {
+  _stmtResolveApp.run(String(wpModifiedAt || ''), parseInt(pageId, 10));
+}
+
 const _stmtSetConflict = db.prepare(`
   UPDATE blog_page_links SET conflict_state = ? WHERE page_id = ?
 `);
@@ -249,6 +269,7 @@ module.exports = {
   listLinksForBlog,
   upsertLink,
   markLinkPulled,
+  markConflictResolvedApp,
   markLinkPushed,
   setConflictState,
   deleteLink,

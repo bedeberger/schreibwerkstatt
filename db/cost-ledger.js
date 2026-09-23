@@ -169,9 +169,25 @@ function sumUsdSince(email, sinceIso) {
   return _sumUsdSince.get(email, sinceIso).usd || 0;
 }
 
+const _claudeByDayModel = db.prepare(`
+  SELECT substr(ts, 1, 10) AS day, model, SUM(usd) AS usd
+    FROM ai_cost_ledger
+   WHERE provider = 'claude' AND ts >= ? AND ts < ?
+   GROUP BY day, model
+`);
+
+// Claude-Kosten je UTC-Tag x Modell, fuer den Abgleich mit der Anthropic-
+// Rechnung (lib/anthropic-billing.js). Bewusst OHNE den Admin-Ausschluss der
+// Usage-Summaries: Anthropic stellt auch die Calls der Admins in Rechnung.
+// ts ist ISO mit Z, substr(1,10) ist damit der UTC-Tag — wie die API-Buckets.
+function claudeByDayModel(fromDay, toDay) {
+  return _claudeByDayModel.all(fromDay, toDay);
+}
+
 module.exports = {
   recordJobLedger,
   recordChatLedgerForMessage,
   queryRange,
   sumUsdSince,
+  claudeByDayModel,
 };

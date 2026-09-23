@@ -76,6 +76,9 @@ test('fallbackFamily: 5er-Serie inkl. Suffix-/Punktversionen', () => {
   assert.equal(fallbackFamily('claude-opus-5'),          'claude-opus-5');
   assert.equal(fallbackFamily('claude-opus-5[1m]'),      'claude-opus-5');
   assert.equal(fallbackFamily('claude-opus-5-1'),        'claude-opus-5');
+  // Opus 5.5 hat einen eigenen (guenstigeren) Tarif — darf nicht am 'claude-opus-5'-Prefix haengenbleiben.
+  assert.equal(fallbackFamily('claude-opus-5-5'),        'claude-opus-5-5');
+  assert.equal(fallbackFamily('claude-opus-5-5[1m]'),    'claude-opus-5-5');
   assert.equal(fallbackFamily('claude-sonnet-5'),        'claude-sonnet-5');
   assert.equal(fallbackFamily('claude-sonnet-5[1m]'),    'claude-sonnet-5');
   assert.equal(fallbackFamily('claude-fable-5'),         'claude-fable-5');
@@ -98,8 +101,8 @@ test('PRICING: jedes per Setting waehlbare Claude-Modell hat einen Tarif', () =>
   // Die aktuell empfohlenen Modelle aus docs/komplett.md + docs/ai-providers.md.
   // Neues Modell in einer Empfehlung ⇒ hier UND in lib/pricing.js ergaenzen.
   const candidates = new Set([...declared,
-    'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6',
-    'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-fable-5',
+    'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6',
+    'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-fable-5', 'claude-fable-5-1',
   ]);
   for (const model of candidates) {
     const usd = costUsd({ provider: 'claude', model, tokensIn: 1_000_000 });

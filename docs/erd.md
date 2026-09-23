@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 290, 166 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 291, 167 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -1559,6 +1559,19 @@ erDiagram
     INTEGER web_searches "Anzahl Anthropic-Web-Suchen (Server-Tool-Kostenposten, ~$10/1k)"
     REAL    usd         "eingefroren zur Call-Zeit (inkl. Web-Such-Kosten)"
     TEXT    source_ref  "UNIQUE: job:<job_id> | chatmsg:<id>"
+  }
+  anthropic_cost_daily {
+    INTEGER id             PK
+    TEXT    day            "UTC YYYY-MM-DD (Bucket der Cost-Report-API)"
+    TEXT    workspace_id   "NULL = Default-Workspace"
+    TEXT    description
+    TEXT    model          "NULL bei Nicht-Token-Kosten"
+    TEXT    cost_type      "tokens|web_search|code_execution|session_usage"
+    TEXT    token_type
+    TEXT    service_tier   "standard|batch"
+    TEXT    context_window "0-200k|200k-1M"
+    REAL    usd            "abgerechnet (API liefert Cent-Strings)"
+    TEXT    fetched_at
   }
   job_checkpoints {
     INTEGER id          PK

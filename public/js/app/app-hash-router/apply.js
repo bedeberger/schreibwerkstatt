@@ -159,7 +159,7 @@ export const hashApplyMethods = {
         } else if (sub === 'usage') {
           if (!this.showAdminUsageCard) await this.toggleAdminUsageCard();
           const tab = parts[2];
-          const valid = ['users', 'jobs', 'chat', 'summary', 'features', 'time'];
+          const valid = ['users', 'jobs', 'chat', 'summary', 'features', 'time', 'billing'];
           if (tab && valid.includes(tab)) this.adminUsageTab = tab;
           else if (!tab) this.adminUsageTab = 'users';
         } else if (sub === 'categories') {

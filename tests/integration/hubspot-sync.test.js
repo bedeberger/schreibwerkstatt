@@ -176,3 +176,31 @@ test('hubspot-push: Buchtyp != blog → HUBSPOT_REQUIRES_BLOG_TYPE', async () =>
   assert.equal(job.status, 'error');
   assert.match(String(job.error || ''), /HUBSPOT_REQUIRES_BLOG_TYPE/);
 });
+
+test('hubspot-push: Titel ohne Datums-Praefix, Titel-Werkstatt gewinnt, Lead + Teaser gehen mit', async () => {
+  const BOOK_ID = 74;
+  seedBlogBook(BOOK_ID);
+  hubspot.upsertConnection({ bookId: BOOK_ID, token: 'pat-x', blogId: '555', authorId: '111' });
+  const contentStore = require('../../lib/content-store');
+  const headline = require('../../db/headline');
+
+  const plain = await contentStore.createPage(
+    { book_id: BOOK_ID, name: '2025-01-02: Nur Seitenname', html: '<p>A</p>' }, null);
+  const withHl = await contentStore.createPage(
+    { book_id: BOOK_ID, name: '2025-01-03: Arbeitstitel', html: '<p>B</p>' }, null);
+  headline.setHeadline(withHl.id, BOOK_ID, { titel: 'Die Schlagzeile', lead: 'Der Lead.', teaser: 'A & B' });
+
+  const jobId = ctx.shared.createJob('hubspot-push', BOOK_ID, 'tester@test.dev', 'job.label.hubspotPushCount', { count: 2 });
+  ctx.shared.enqueueJob(jobId, () => hubspotSync.runHubspotPushJob(jobId, BOOK_ID, 'tester@test.dev', [plain.id, withHl.id]));
+  const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 4000 });
+  assert.equal(job.status, 'done', `got ${job.status}: ${job.error || ''}`);
+
+  const [p1, p2] = mock.state.created.slice(-2);
+  assert.equal(p1.name, 'Nur Seitenname');
+  assert.equal(p1.htmlTitle, 'Nur Seitenname');
+  assert.equal(p1.postSummary, undefined);
+  assert.equal(p2.name, 'Die Schlagzeile');
+  assert.equal(p2.htmlTitle, 'Die Schlagzeile');
+  assert.equal(p2.postSummary, 'A &amp; B');
+  assert.match(p2.postBody, /^<p><em>Der Lead\.<\/em><\/p>/);
+});

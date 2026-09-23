@@ -44,18 +44,23 @@ function _cost(row) {
   });
 }
 
-// Admin-User nutzen die KI-Pipelines nicht (nur Plattform-Mgmt); aus allen
-// Cost-/Usage-Aggregaten ausschliessen, damit Reports den echten KI-Verbrauch
-// zeigen.
+// Admin-Konten sind per Default aus allen Cost-/Usage-Aggregaten
+// ausgeschlossen (reine Plattform-Verwaltung). Nutzt ein Admin die KI-Funktionen
+// selbst, stehen seine Calls aber auf der Anthropic-Rechnung — darum schaltet
+// `includeAdmins` sie in jeder Auswertung wieder zu (Admin-UI: Schalter
+// „Admins einbeziehen").
 const _stmtAdminEmails = db.prepare(`SELECT email FROM app_users WHERE global_role = 'admin'`);
 function _adminEmailSet() {
   const s = new Set();
   for (const r of _stmtAdminEmails.all()) s.add(r.email);
   return s;
 }
+function _excludedEmails(includeAdmins) {
+  return includeAdmins ? new Set() : _adminEmailSet();
+}
 
-function _aggregateByUser({ fromIso, toIso }) {
-  const admins = _adminEmailSet();
+function _aggregateByUser({ fromIso, toIso, includeAdmins }) {
+  const admins = _excludedEmails(includeAdmins);
   const acc = new Map();
   for (const row of costLedger.queryRange({ fromIso, toIso })) {
     const email = row.user_email || '';
@@ -79,14 +84,14 @@ function _aggregateByUser({ fromIso, toIso }) {
 
 // Liefert alle User mit Monatskosten + Budget + Mode. Nicht-Claude-Provider
 // landen mit usd=0 in der Liste (Token-Counts trotzdem korrekt).
-function listUsersWithUsage({ from, to } = {}) {
+function listUsersWithUsage({ from, to, includeAdmins = false } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
-  const agg = _aggregateByUser({ fromIso, toIso });
+  const agg = _aggregateByUser({ fromIso, toIso, includeAdmins });
   const users = db.prepare(`
     SELECT email, display_name, global_role, status,
            monthly_budget_usd, budget_mode, last_seen_at
       FROM app_users
-     WHERE status != 'deleted' AND global_role != 'admin'
+     WHERE status != 'deleted'${includeAdmins ? '' : " AND global_role != 'admin'"}
      ORDER BY email
   `).all();
   return users.map(u => {
@@ -147,12 +152,12 @@ function _adminEmailWhereClause(set) {
   return `(user_email IS NULL OR user_email NOT IN (${list}))`;
 }
 
-function getJobRuns({ emails, email, from, to, limit = 50, offset = 0 } = {}) {
+function getJobRuns({ emails, email, from, to, limit = 50, offset = 0, includeAdmins = false } = {}) {
   const list = Array.isArray(emails) ? emails : (email ? [email] : []);
   const { fromIso, toIso } = _resolveRange({ from, to });
   const lim = Math.max(1, Math.min(500, Number(limit) || 50));
   const off = Math.max(0, Number(offset) || 0);
-  const adminFilter = list.length ? null : _adminEmailWhereClause(_adminEmailSet());
+  const adminFilter = list.length ? null : _adminEmailWhereClause(_excludedEmails(includeAdmins));
   const listSql  = _buildJobsQuery({ emailCount: list.length, includeWhere: adminFilter });
   const countSql = _buildJobsCountQuery({ emailCount: list.length, includeWhere: adminFilter });
   const args = [fromIso, toIso, ...list, lim, off];
@@ -214,12 +219,12 @@ function _adminChatWhereClause(set) {
   return `cs.user_email NOT IN (${list})`;
 }
 
-function getChatMessages({ emails, email, from, to, limit = 50, offset = 0 } = {}) {
+function getChatMessages({ emails, email, from, to, limit = 50, offset = 0, includeAdmins = false } = {}) {
   const list = Array.isArray(emails) ? emails : (email ? [email] : []);
   const { fromIso, toIso } = _resolveRange({ from, to });
   const lim = Math.max(1, Math.min(500, Number(limit) || 50));
   const off = Math.max(0, Number(offset) || 0);
-  const adminFilter = list.length ? null : _adminChatWhereClause(_adminEmailSet());
+  const adminFilter = list.length ? null : _adminChatWhereClause(_excludedEmails(includeAdmins));
   const listSql  = _buildChatQuery({ emailCount: list.length, includeWhere: adminFilter });
   const countSql = _buildChatCountQuery({ emailCount: list.length, includeWhere: adminFilter });
   const args = [fromIso, toIso, ...list, lim, off];
@@ -238,9 +243,9 @@ function getChatMessages({ emails, email, from, to, limit = 50, offset = 0 } = {
 
 // ── Summary: Gesamt + Top-User + Pro-Modell + Pro-Job-Typ ──────────────────
 
-function monthlyTotals({ from, to } = {}) {
+function monthlyTotals({ from, to, includeAdmins = false } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
-  const admins = _adminEmailSet();
+  const admins = _excludedEmails(includeAdmins);
   const rows = costLedger.queryRange({ fromIso, toIso })
     .filter(r => r.user_email && !admins.has(r.user_email));
 
@@ -296,6 +301,38 @@ function monthlyTotals({ from, to } = {}) {
   };
 }
 
+// ── Kosten pro User x Job-Typ (aus dem Ledger) ─────────────────────────────
+
+// Eine Zeile je User x Quelle x Typ: welche Jobs (bzw. welche Chat-Art) die
+// Kosten eines Users verursachen. `type` ist bei Jobs der Job-Typ, bei Chat die
+// Session-Art (page|book|research). Calls ohne User (system-seitig
+// ausgeloest) laufen mit email=null mit, damit die Summe der Aufschluesselung
+// der Summe des Ledgers entspricht.
+function userJobBreakdown({ from, to, includeAdmins = false } = {}) {
+  const { fromIso, toIso } = _resolveRange({ from, to });
+  const excluded = _excludedEmails(includeAdmins);
+  const acc = new Map();
+  for (const r of costLedger.queryRange({ fromIso, toIso })) {
+    const email = r.user_email || null;
+    if (email && excluded.has(email)) continue;
+    const type = r.type || 'unknown';
+    const key = `${email || ''}\u0000${r.source}\u0000${type}`;
+    const v = acc.get(key) || {
+      email, source: r.source, type,
+      calls: 0, usd: 0, tokensIn: 0, tokensOut: 0, cacheReadIn: 0, cacheCreationIn: 0, webSearches: 0,
+    };
+    v.calls += 1;
+    v.usd += r.usd || 0;
+    v.tokensIn        += r.tokens_in || 0;
+    v.tokensOut       += r.tokens_out || 0;
+    v.cacheReadIn     += r.cache_read_in || 0;
+    v.cacheCreationIn += r.cache_creation_in || 0;
+    v.webSearches     += r.web_searches || 0;
+    acc.set(key, v);
+  }
+  return [...acc.values()].sort((a, b) => b.usd - a.usd);
+}
+
 // ── Feature-Usage (welche Karten/Aktionen) ─────────────────────────────────
 
 const _stmtFeatureUsage = db.prepare(`
@@ -305,11 +342,11 @@ const _stmtFeatureUsage = db.prepare(`
    ORDER BY user_email, feature_key
 `);
 
-function listFeatureUsage({ from, to } = {}) {
+function listFeatureUsage({ from, to, includeAdmins = false } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
   const fromMs = Date.parse(fromIso);
   const toMs   = Date.parse(toIso);
-  const admins = _adminEmailSet();
+  const admins = _excludedEmails(includeAdmins);
   const rows = _stmtFeatureUsage.all(fromMs, toMs).filter(r => !admins.has(r.user_email));
   return rows.map(r => ({
     email: r.user_email, featureKey: r.feature_key,
@@ -317,8 +354,8 @@ function listFeatureUsage({ from, to } = {}) {
   }));
 }
 
-function featureUsageTotals({ from, to } = {}) {
-  const items = listFeatureUsage({ from, to });
+function featureUsageTotals({ from, to, includeAdmins = false } = {}) {
+  const items = listFeatureUsage({ from, to, includeAdmins });
   const byKey = new Map();
   for (const r of items) {
     const v = byKey.get(r.featureKey) || { featureKey: r.featureKey, count: 0 };
@@ -346,11 +383,11 @@ const _stmtLektoratTime = db.prepare(`
    GROUP BY user_email, book_id
 `);
 
-function listTimeUsage({ from, to } = {}) {
+function listTimeUsage({ from, to, includeAdmins = false } = {}) {
   const { fromIso, toIso } = _resolveRange({ from, to });
   const fromDay = _yyyymmdd(fromIso);
   const toDay   = _yyyymmdd(toIso);
-  const admins = _adminEmailSet();
+  const admins = _excludedEmails(includeAdmins);
   const skipAdmin = (r) => !admins.has(r.user_email);
   const writing  = _stmtWritingTime.all(fromDay, toDay).filter(skipAdmin);
   const lektorat = _stmtLektoratTime.all(fromDay, toDay).filter(skipAdmin);
@@ -407,6 +444,7 @@ module.exports = {
   listUsersWithUsage,
   getJobRuns, getChatMessages,
   monthlyTotals,
+  userJobBreakdown,
   listFeatureUsage, featureUsageTotals,
   listTimeUsage, dailyTimeSeries,
 };

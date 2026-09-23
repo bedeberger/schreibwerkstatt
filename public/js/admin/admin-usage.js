@@ -4,7 +4,7 @@
 // Buchtitel.
 
 import { loadChart } from '../lazy-libs.js';
-import { localIsoDate } from '../utils.js';
+import { localIsoDate, tzOpts } from '../utils.js';
 
 function _fmt(n, locale, opts) {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
@@ -18,6 +18,11 @@ function _money(n, locale) {
 function _int(n, locale) {
   return _fmt(n, locale, { maximumFractionDigits: 0 });
 }
+
+// Matrix-Memo ausserhalb des reaktiven Karten-States: ein Schreiben in den
+// Scope waehrend des Renderns wuerde die lesenden Effekte erneut anstossen.
+// Schluessel ist das rohe Breakdown-Array (neues Array = neuer Ladevorgang).
+const _matrixMemo = new WeakMap();
 
 function _hhmm(seconds) {
   if (!seconds || seconds < 60) return seconds ? '< 1 min' : '0 min';
@@ -106,12 +111,14 @@ export const adminUsageMethods = {
     if (tab === 'chat')     return this.adminUsageLoadChat();
     if (tab === 'features') return this.adminUsageLoadFeatures();
     if (tab === 'time')     return this.adminUsageLoadTime();
+    if (tab === 'billing')  return this.adminUsageLoadBilling();
   },
 
   _adminUsageQuery() {
     const qs = new URLSearchParams();
     if (this.adminUsageFrom) qs.set('from', this.adminUsageFrom);
     if (this.adminUsageTo)   qs.set('to',   this.adminUsageTo);
+    if (this.adminUsageIncludeAdmins) qs.set('includeAdmins', '1');
     return qs.toString();
   },
 
@@ -131,7 +138,11 @@ export const adminUsageMethods = {
     if (this.adminUsageLoading) return;
     this.adminUsageLoading = true;
     try {
-      const data = await this._adminUsageFetch('/admin/usage/users');
+      const [data, breakdown] = await Promise.all([
+        this._adminUsageFetch('/admin/usage/users'),
+        this._adminUsageFetch('/admin/usage/breakdown'),
+      ]);
+      this.adminUsageBreakdown = (breakdown.rows || []).map(r => ({ ...r, email: r.email || '' }));
       this.adminUsageUsersList = (data.users || []).map(u => ({
         ...u,
         _draftBudget: u.monthlyBudgetUsd ?? '',
@@ -141,6 +152,74 @@ export const adminUsageMethods = {
       }));
     } catch (e) { this.adminUsageError = e.message; }
     finally { this.adminUsageLoading = false; }
+  },
+
+  // ── Users-Tab: Kosten je User x Job-Typ ───────────────────────────────────
+  adminUsageShowBreakdown(email) {
+    const key = email || '';
+    this.adminUsageBreakdownUser = this.adminUsageBreakdownUser === key ? null : key;
+    if (this.adminUsageBreakdownUser !== null) {
+      this.$nextTick(() => this.$refs.breakdownDetail?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    }
+  },
+
+  adminUsageUserLabel(email) {
+    if (!email) return window.__app.t('admin.usage.breakdown.noUser');
+    const u = this.adminUsageUsersList.find(x => x.email === email);
+    return u?.displayName || email;
+  },
+
+  adminUsagePct(share) {
+    if (share === null || share === undefined) return '—';
+    return `${_fmt(share * 100, this._adminUsageLocale(), { maximumFractionDigits: 1 })} %`;
+  },
+
+  adminUsageBreakdownDetail() {
+    const email = this.adminUsageBreakdownUser;
+    if (email === null) return [];
+    const rows = this.adminUsageBreakdown.filter(r => r.email === email);
+    const total = rows.reduce((s, r) => s + r.usd, 0);
+    return rows.map(r => ({
+      ...r,
+      key: `${r.source}:${r.type}`,
+      // Chat-Arten (page/book/research) haben eigene jobType-Keys („Seiten-Chat" …).
+      label: this._adminUsageTypeLabel(r.type),
+      share: total > 0 ? r.usd / total : null,
+    }));
+  },
+
+  // Matrix User x die sechs teuersten Job-Typen des Zeitraums, Rest in „Übrige".
+  // Memoisiert auf die Breakdown-Liste: thead, tbody und der sortableTable-Getter
+  // lesen sie pro Render mehrfach.
+  adminUsageMatrix() {
+    const src = this.adminUsageBreakdown;
+    const raw = window.Alpine?.raw ? window.Alpine.raw(src) : src;
+    const hit = _matrixMemo.get(raw);
+    if (hit) return hit;
+    const TOP = 6;
+    const byType = new Map();
+    for (const r of src) {
+      const key = `${r.source}:${r.type}`;
+      const v = byType.get(key) || { key, label: this._adminUsageTypeLabel(r.type), usd: 0 };
+      v.usd += r.usd;
+      byType.set(key, v);
+    }
+    const cols = [...byType.values()].sort((a, b) => b.usd - a.usd).slice(0, TOP);
+    const colIndex = new Map(cols.map((c, i) => [c.key, i]));
+    const byUser = new Map();
+    for (const r of src) {
+      const row = byUser.get(r.email) || {
+        id: r.email || '__none__', email: r.email, label: this.adminUsageUserLabel(r.email), total: 0, other: 0,
+      };
+      const i = colIndex.get(`${r.source}:${r.type}`);
+      if (i === undefined) row.other += r.usd;
+      else row['c' + i] = (row['c' + i] || 0) + r.usd;
+      row.total += r.usd;
+      byUser.set(r.email, row);
+    }
+    const val = { cols, rows: [...byUser.values()] };
+    _matrixMemo.set(raw, val);
+    return val;
   },
 
   async adminUsageSaveBudget(row) {
@@ -201,6 +280,74 @@ export const adminUsageMethods = {
       this.adminUsageChatTotal = data.total || 0;
     } catch (e) { this.adminUsageError = e.message; }
     finally { this.adminUsageLoading = false; }
+  },
+
+  // ── Tab: Abrechnung (Anthropic Cost-Report vs. Ledger) ─────────────────────
+  async adminUsageLoadBilling() {
+    this.adminUsageLoading = true;
+    try {
+      this.adminUsageBilling = await this._adminUsageFetch('/admin/usage/billing');
+    } catch (e) {
+      this.adminUsageError = e.message;
+    } finally {
+      this.adminUsageLoading = false;
+    }
+  },
+
+  async adminUsageBillingSync() {
+    this.adminUsageBillingSyncing = true;
+    this.adminUsageError = '';
+    try {
+      const r = await fetch('/admin/usage/billing/sync', { method: 'POST', credentials: 'same-origin' });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        this.adminUsageError = this.adminUsageBillingErrorText({ code: j.error_code, status: j.status });
+      }
+      await this.adminUsageLoadBilling();
+    } finally {
+      this.adminUsageBillingSyncing = false;
+    }
+  },
+
+  adminUsageBillingErrorText(err) {
+    if (!err) return '';
+    const t = window.__app.t.bind(window.__app);
+    const key = `admin.usage.billing.error.${err.code}`;
+    const msg = t(key);
+    return (msg && msg !== key ? msg : t('admin.usage.billing.error.BILLING_FETCH_FAILED'))
+      + (err.status ? ` (HTTP ${err.status})` : '');
+  },
+
+  // Rechnung minus Ledger, z. B. "+$1.20 (+4.1 %)".
+  adminUsageBillingDiff(usd, pct) {
+    if (usd === null || usd === undefined) return '—';
+    const locale = this._adminUsageLocale();
+    const sign = usd > 0 ? '+' : '';
+    const money = sign + _money(usd, locale);
+    if (pct === null || pct === undefined) return money;
+    return `${money} (${sign}${_fmt(pct * 100, locale, { maximumFractionDigits: 1 })} %)`;
+  },
+
+  // Ab 5 % Abweichung markieren: darunter liegen Rundung und die wenigen
+  // Minuten Verzug, mit denen Anthropic die juengsten Calls bucht.
+  adminUsageBillingDiffClass(pct) {
+    if (pct === null || pct === undefined || Math.abs(pct) < 0.05) return '';
+    return 'admin-usage-diff--off';
+  },
+
+  adminUsageBillingModelLabel(key) {
+    if (key && key.startsWith('cost:')) {
+      const t = window.__app.t.bind(window.__app);
+      const k = `admin.usage.billing.costType.${key.slice(5)}`;
+      const label = t(k);
+      return label && label !== k ? label : key.slice(5);
+    }
+    return key === 'unknown' ? window.__app.t('admin.usage.billing.unknownModel') : key;
+  },
+
+  adminUsageDateTime(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString(this._adminUsageLocale(), tzOpts({ dateStyle: 'short', timeStyle: 'short' }));
   },
 
   // ── Tab: Summary (mit Charts) ──────────────────────────────────────────────
