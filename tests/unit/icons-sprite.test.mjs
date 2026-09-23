@@ -3,6 +3,10 @@
 //     zweite würde die erste im Sprite still überschreiben).
 //  2. Jede `<use href="/icons.svg...#NAME">`-Referenz im Frontend löst auf ein
 //     existierendes Symbol auf (kein Tippfehler → unsichtbares Icon).
+//  3. Referenzen tragen keinen Query-String (`/icons.svg#NAME`, kein `?v=`).
+//     Jede Query-Variante ist für den Browser eine eigene URL — ohne SW-Kontrolle
+//     (Hard-Reload, Bypass) ein eigener Fetch pro Variante. Frische kommt aus
+//     `no-cache` + ETag bzw. der SW-Generation, nicht aus einem Handzähler.
 // Reine statische Analyse, kein Browser. Dynamisch zusammengebaute `#`-Refs
 // (String-Konkat) deckt der Test bewusst nicht ab — die gibt es aktuell nicht.
 
@@ -61,4 +65,17 @@ test('jede icons.svg-Referenz im Frontend existiert im Sprite', () => {
     }
   }
   assert.equal(broken.length, 0, `Referenz auf nicht existierendes Icon:\n  ${broken.join('\n  ')}`);
+});
+
+test('icons.svg-Referenzen ohne Query-String', () => {
+  const files = walk(join(ROOT, 'public'), ['.html', '.js', '.css']);
+  const offenders = [];
+  for (const file of files) {
+    if (file.endsWith(join('public', 'sw.js'))) continue; // ignoreSearch-Kommentar
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(/icons\.svg\?[^"')\s#]*/g)) {
+      offenders.push(`${file.slice(ROOT.length + 1)} → ${m[0]}`);
+    }
+  }
+  assert.equal(offenders.length, 0, `icons.svg mit Query-String (nur /icons.svg#NAME):\n  ${offenders.join('\n  ')}`);
 });

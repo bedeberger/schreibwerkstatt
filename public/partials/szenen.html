@@ -28,7 +28,7 @@
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
             :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
@@ -109,7 +109,7 @@
     <div class="filter-bar">
       <span class="filter-search-wrap">
         <input type="text" x-model="$store.catalogUi.szenenFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-        <button type="button" class="search-clear--icon" x-show="$store.catalogUi.szenenFilters.suche" @click="$store.catalogUi.szenenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+        <button type="button" class="search-clear--icon" x-show="$store.catalogUi.szenenFilters.suche" @click="$store.catalogUi.szenenFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </span>
       <div class="tabs">
         <button type="button" class="tabs-btn"
@@ -162,7 +162,7 @@
             <button type="button" x-show="s.stale" class="icon-btn danger entity-row-delete"
                     @click.stop="$app.deleteStaleSzene(s)"
                     :aria-label="$app.t('common.delete')" :data-tip="$app.t('entity.deleteStale')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
             </button>
             <span class="kapitel-badges">
               <span class="kapitel-badge kapitel-badge--primary internal-link"

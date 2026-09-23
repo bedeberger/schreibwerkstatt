@@ -34,7 +34,7 @@
               <!-- Griff = einzige Greiffläche (SortableJS handle), damit Titel,
                    Chips und Menue voll klickbar bleiben. -->
               <span class="research-status-grip" :data-tip="$app.t('recherche.status.drag')" :aria-label="$app.t('recherche.status.drag')">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#grip-vertical"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#grip-vertical"/></svg>
               </span>
               <span class="research-kind-badge palette-badge" :class="'research-kind-badge--' + item.kind" x-text="kindLabel(item.kind)"></span>
               <div class="research-item-actions research-status-card-actions" x-data="{ menuCtx: 'status' }">
@@ -70,7 +70,7 @@
             <!-- „Eingearbeitet" ohne Stelle im Buch: Befund, nicht Korrektur —
                  der Fund gilt als verwendet, aber nirgends steht, wo. -->
             <p class="research-status-noplace" x-show="statusNeedsPlace(item)" x-cloak>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
               <span x-text="$app.t('recherche.status.noPlace')"></span>
             </p>
 

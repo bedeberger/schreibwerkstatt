@@ -29,10 +29,10 @@
                 : ''"></span>
         <button type="button" class="edit-find-btn" @click="findPrev()"
                 :disabled="findMatches.length === 0"
-                :data-tip="$app.withHotkey($app.t('find.prev'), 'findPrev')" :aria-label="$app.t('find.prev')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#chevron-up"/></svg></button>
+                :data-tip="$app.withHotkey($app.t('find.prev'), 'findPrev')" :aria-label="$app.t('find.prev')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg></button>
         <button type="button" class="edit-find-btn" @click="findNext()"
                 :disabled="findMatches.length === 0"
-                :data-tip="$app.withHotkey($app.t('find.next'), 'findNext')" :aria-label="$app.t('find.next')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#chevron-down"/></svg></button>
+                :data-tip="$app.withHotkey($app.t('find.next'), 'findNext')" :aria-label="$app.t('find.next')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"/></svg></button>
         <button type="button" class="edit-find-btn edit-find-btn--toggle"
                 :class="{ 'edit-find-btn--active': findCaseSensitive }"
                 @click="findCaseSensitive = !findCaseSensitive; recomputeFindMatches()"
@@ -44,7 +44,7 @@
                 :data-tip="$app.t('find.wholeWord')" :aria-label="$app.t('find.wholeWord')"
                 :aria-pressed="findWholeWord">W</button>
         <button type="button" class="edit-find-close" @click="closeFind()"
-                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </div>
       <div class="edit-find-row">
         <input type="text"

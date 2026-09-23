@@ -9,7 +9,7 @@
     <span class="komplett-scope-title" x-text="t('komplett.scope.title')"></span>
     <button type="button" class="komplett-scope-close" @click="close()"
             :data-tip="t('common.close')" :aria-label="t('common.close')">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
     </button>
   </div>
   <p class="card-hint komplett-scope-hint" x-text="t('komplett.scope.hint')"></p>
@@ -22,7 +22,7 @@
       <ul class="komplett-scope-core">
         <template x-for="key in komplettCoreSteps()" :key="key">
           <li class="komplett-scope-core-item">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
             <span x-text="t('komplett.step.' + key)"></span>
           </li>
         </template>

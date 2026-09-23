@@ -46,7 +46,7 @@
           <span x-text="$app.t('admin.settings.api.listTitle')"></span>
           <button type="button" class="admin-settings-refresh-inline icon-btn icon-btn--ghost"
                   @click="adminApiTokensLoad()" :disabled="adminApiTokensLoading"
-                  :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
+                  :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg></button>
         </h4>
         <div x-show="adminApiTokensError" class="error-msg" x-text="adminApiTokensError"></div>
         <div x-show="adminApiTokensLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>

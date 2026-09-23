@@ -22,19 +22,19 @@
                 :class="{ 'is-active': outlineOpen }"
                 :data-tip="$app.t('bookEditor.btn.outlineTitle')"
                 :aria-label="$app.t('bookEditor.btn.outline')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#list"/></svg>
         </button>
         <button type="button" class="icon-btn icon-btn--ghost" @click="openFind()"
                 :data-tip="$app.withHotkey($app.t('bookEditor.btn.findTitle'), 'find')"
                 :aria-label="$app.t('bookEditor.btn.find')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#search"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>
         </button>
         <span class="icon-btn-badge-wrap" x-show="(commentThreads.length + commentGeneralThreads.length) > 0" x-cloak>
           <button type="button" class="icon-btn icon-btn--ghost" @click="toggleCommentRail()"
                   :class="{ 'is-active': commentRailVisible }"
                   :aria-pressed="commentRailVisible"
                   :data-tip="$app.t('share.rail.toggle')" :aria-label="$app.t('share.rail.toggle')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#users"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#users"/></svg>
           </button>
           <span class="icon-btn-badge" x-text="commentThreads.length + commentGeneralThreads.length"
                 :data-tip="$app.t('share.openCommentsTitle', { n: commentThreads.length + commentGeneralThreads.length })"></span>
@@ -45,7 +45,7 @@
                   :data-tip="saveAllRunning ? $app.t('bookEditor.btn.saveAllProgress', { done: saveAllDone, total: saveAllTotal }) : $app.withHotkey($app.t('bookEditor.btn.saveAllTitle'), 'save')"
                   :aria-label="$app.t('bookEditor.btn.saveAll')">
             <span x-show="saveAllRunning" class="spinner"></span>
-            <svg x-show="!saveAllRunning" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+            <svg x-show="!saveAllRunning" class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
           </button>
           <span class="icon-btn-badge" x-show="dirtyCount > 0" x-text="dirtyCount"></span>
         </span>
@@ -54,7 +54,7 @@
                 @click="toggleBookEditorFullscreen()"
                 :aria-label="bookEditorFullscreen ? $app.t('bookEditor.fullscreenExit.tip') : $app.t('bookEditor.fullscreen.tip')"
                 :data-tip="bookEditorFullscreen ? $app.t('bookEditor.fullscreenExit.tip') : $app.t('bookEditor.fullscreen.tip')">
-          <svg class="icon" aria-hidden="true"><use :href="bookEditorFullscreen ? '/icons.svg?v=693#minimize-2' : '/icons.svg?v=693#maximize-2'"/></svg>
+          <svg class="icon" aria-hidden="true"><use :href="bookEditorFullscreen ? '/icons.svg#minimize-2' : '/icons.svg#maximize-2'"/></svg>
         </button>
       </div>
     </div>
@@ -162,7 +162,7 @@
                  @cut="onBlockClipboard(block, $event, 'cut')"></div>
 
             <div x-show="block.conflict" x-cloak class="book-editor-conflict">
-              <svg class="icon book-editor-conflict__icon" aria-hidden="true"><use href="/icons.svg?v=690#alert-triangle"/></svg>
+              <svg class="icon book-editor-conflict__icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
               <span x-text="conflictBanner(block.conflict)"></span>
               <button type="button" class="danger" @click="resolveConflictOverwrite(block)"
                       x-text="$app.t('bookEditor.conflict.overwrite')"></button>
@@ -301,11 +301,11 @@
         <button type="button" class="book-editor-find-btn" @click="findPrev()"
                 :disabled="findMatches.length === 0"
                 :data-tip="$app.withHotkey($app.t('find.prev'), 'findPrev')" :aria-label="$app.t('find.prev')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#chevron-up"/></svg></button>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg></button>
         <button type="button" class="book-editor-find-btn" @click="findNext()"
                 :disabled="findMatches.length === 0"
                 :data-tip="$app.withHotkey($app.t('find.next'), 'findNext')" :aria-label="$app.t('find.next')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#chevron-down"/></svg></button>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"/></svg></button>
         <button type="button" class="book-editor-find-btn"
                 :class="{ 'book-editor-find-btn--active': findCaseSensitive }"
                 @click="findCaseSensitive = !findCaseSensitive; recomputeFindMatches()"
@@ -318,7 +318,7 @@
                 :aria-pressed="findWholeWord">W</button>
         <button type="button" class="book-editor-find-close" @click="closeFind()"
                 :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </div>
       <div class="book-editor-find-row">
         <input type="text"

@@ -10,25 +10,25 @@
         <div class="motiv-editor-titlerow">
           <button type="button" class="icon-btn icon-btn--ghost" @click="deselectTheme()" :disabled="busy"
                   :data-tip="$app.t('motiv.theme.backToList')" :aria-label="$app.t('motiv.theme.backToList')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-left"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg>
           </button>
           <input type="text" class="motiv-name-input motiv-theme-name-input" x-model="editThemeName" data-spellcheck="spelling"
                  @keydown.enter="saveThemeEdit()">
           <button type="button" class="icon-btn icon-btn--ghost" @click="deleteTheme(selectedTheme())"
                   :data-tip="$app.t('motiv.graph.menu.deleteTheme')" :aria-label="$app.t('motiv.graph.menu.deleteTheme')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
           </button>
         </div>
         <div class="motiv-editor-actions" x-show="themeDirty()" x-cloak>
           <button type="button" class="icon-btn icon-btn--ghost icon-btn--success"
                   @click="saveThemeEdit()" :disabled="busy || !editThemeName.trim()"
                   :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
           </button>
           <button type="button" class="icon-btn icon-btn--ghost"
                   @click="cancelThemeEdit()" :disabled="busy"
                   :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
           </button>
         </div>
       </div>

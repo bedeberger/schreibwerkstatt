@@ -36,6 +36,11 @@ const CATCH_UP_MAX_RETRIES = 5;
 // kostet gar keinen Roundtrip. Die beiden anderen Melder wissen nur, DASS sich
 // etwas geaendert hat; ihr Cache-Eintrag ist noch der alte, sie brauchen `fresh`.
 const CACHE_IS_FRESH_FOR = new Set(['sw-revalidate']);
+// Dieselbe Frage (Buch + Cursor) nicht zweimal kurz hintereinander stellen: beim
+// Boot fragen `loadPages` und der erste Geraete-Ping, spaeter jeder Seitenwechsel
+// (`_pingDevicePresenceNow`) mit unveraendertem Baum. Kuerzer als der 40-s-Tick,
+// damit die periodische Probe nie in das Fenster faellt.
+const DRIFT_PROBE_DEDUP_MS = 30_000;
 
 // Als reine Funktion herausgezogen — gleiche Bauart wie `readsFresh` in
 // tree/load.js: die Regel ist eine Aussage ueber Melder, keine Implementierung.
@@ -119,6 +124,11 @@ export const treeCatchUpMethods = {
     if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
     const since = this._treeSince();
     if (!since) return;
+    const key = `${bookId}|${since}`;
+    const now = Date.now();
+    const last = this._lastDriftProbe;
+    if (last?.key === key && now - last.ts < DRIFT_PROBE_DEDUP_MS) return;
+    this._lastDriftProbe = { key, ts: now };
     const params = new URLSearchParams({ since, device_id: getDeviceId() });
     try {
       const r = await fetch(`/content/books/${bookId}/changes?${params}`);

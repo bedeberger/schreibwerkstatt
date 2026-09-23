@@ -42,13 +42,13 @@
                 :data-tip="$app.withHotkey($app.t('editor.btn.saveEditTitle'), 'save')"
                 :aria-label="$app.t('common.save')">
           <span x-show="$app.editSaving" class="spinner"></span>
-          <svg x-show="!$app.editSaving" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+          <svg x-show="!$app.editSaving" class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
         </button>
         <button type="button" class="icon-btn icon-btn--ghost"
                 @click="exitFocusMode()"
                 :data-tip="$app.withHotkey($app.t('editor.btn.leaveFocusTitle'), 'focusExit')"
                 :aria-label="$app.t('editor.btn.leaveFocus')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#minimize-2"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#minimize-2"/></svg>
         </button>
       </div>
     </div>

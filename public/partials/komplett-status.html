@@ -11,7 +11,7 @@
           :style="{ '--progress': ($store.jobs.alleAktualisierenProgress || 0) + '%' }"
           aria-hidden="true"></span>
     <span class="update-all-btn-icon" x-show="!$store.jobs.alleAktualisierenLoading" aria-hidden="true">
-      <svg class="icon"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <svg class="icon"><use href="/icons.svg#rotate-cw"/></svg>
     </span>
     <span class="update-all-btn-label" x-text="t('header.updateAll')"></span>
   </button>
@@ -24,7 +24,7 @@
           :aria-label="t('header.statusMenu')"
           aria-haspopup="menu"
           :aria-expanded="showKomplettStatus">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#more-horizontal"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#more-horizontal"/></svg>
   </button>
   <span class="komplett-last-run"
         x-show="!$store.jobs.alleAktualisierenLoading && $store.jobs.alleAktualisierenLastRun"
@@ -42,8 +42,8 @@
         <div class="komplett-progress-label">
           <span x-text="$store.jobs.alleAktualisierenStatus || t('komplett.done')"></span>
           <span x-show="$store.jobs.alleAktualisierenTokIn > 0 || $store.jobs.alleAktualisierenTokOut > 0" class="komplett-tokens">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#arrow-up"/></svg><span x-text="_fmtTok($store.jobs.alleAktualisierenTokIn)"></span>
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#arrow-down"/></svg><span x-text="_fmtTok($store.jobs.alleAktualisierenTokOut)"></span>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-up"/></svg><span x-text="_fmtTok($store.jobs.alleAktualisierenTokIn)"></span>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-down"/></svg><span x-text="_fmtTok($store.jobs.alleAktualisierenTokOut)"></span>
             <span x-show="$store.jobs.alleAktualisierenTps" x-text="' · ' + Math.round($store.jobs.alleAktualisierenTps) + ' tok/s'"></span>
           </span>
         </div>
@@ -51,7 +51,7 @@
           <template x-for="phase in _komplettPhasen()" :key="phase.key || phase.label">
             <li class="komplett-phase-item" :class="{ 'is-done': phase.done, 'is-active': phase.active }">
               <span class="komplett-phase-icon">
-                <svg class="icon" aria-hidden="true"><use :href="phase.done ? '/icons.svg?v=691#check' : (phase.active ? '/icons.svg?v=691#play' : '/icons.svg?v=691#circle')"/></svg>
+                <svg class="icon" aria-hidden="true"><use :href="phase.done ? '/icons.svg#check' : (phase.active ? '/icons.svg#play' : '/icons.svg#circle')"/></svg>
               </span>
               <span x-text="phase.label"></span>
             </li>
@@ -68,7 +68,7 @@
          x-show="!$store.jobs.alleAktualisierenLoading && $store.jobs.alleAktualisierenCoverage && $store.jobs.alleAktualisierenCoverage.score !== null"
          :class="{ 'komplett-coverage--low': ($store.jobs.alleAktualisierenCoverage?.score ?? 1) < 0.8 }"
          :data-tip="t('komplett.coverageTip', { erkannt: $store.jobs.alleAktualisierenCoverage?.erkannt || 0, fehlend: $store.jobs.alleAktualisierenCoverage?.fehlend || 0, chapters: $store.jobs.alleAktualisierenCoverage?.sampledChapters || 0 })">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
       <span x-text="t('komplett.coverageLabel', { score: Math.round(($store.jobs.alleAktualisierenCoverage?.score || 0) * 100) })"></span>
     </div>
     <!-- Kosten pro Call-Klasse: bewusst NEBEN dem Coverage-Score. Eine Tier-/Effort-
@@ -96,7 +96,7 @@
               @click="showKomplettStatus = false; clearChapterCache()"
               :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId"
               :data-tip="t('header.clearCacheTitle')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
         <span x-text="t('header.clearCache')"></span>
       </button>
     </div>

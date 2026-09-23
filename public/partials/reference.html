@@ -14,10 +14,10 @@
               @click="toggleReferenceScope()"
               :data-tip="referenceScope === 'page' ? $app.t('reference.scope.toBook') : $app.t('reference.scope.toContext')"
               :aria-label="referenceScope === 'page' ? $app.t('reference.scope.toBook') : $app.t('reference.scope.toContext')">
-        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=693#' + (referenceScope === 'book' ? 'book-open' : 'scroll')"/></svg>
+        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + (referenceScope === 'book' ? 'book-open' : 'scroll')"/></svg>
       </button>
     </div>
-    <button type="button" class="btn-card-close" @click="$app.toggleReferenceCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+    <button type="button" class="btn-card-close" @click="$app.toggleReferenceCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
   </div>
 
   <div class="card-hint card-hint--sm card-section" x-text="referenceScope === 'page'
@@ -207,7 +207,7 @@
                     :data-tip="verwandtLoading ? $app.t('reference.verwandt.searching') : $app.t('reference.verwandt.search')"
                     :aria-label="verwandtLoading ? $app.t('reference.verwandt.searching') : $app.t('reference.verwandt.search')">
               <span x-show="verwandtLoading" class="spinner" aria-hidden="true"></span>
-              <svg x-show="!verwandtLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#search"/></svg>
+              <svg x-show="!verwandtLoading" class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>
             </button>
           </div>
           <div class="card-hint card-hint--sm" x-show="verwandtBasis === 'absatz'" x-text="$app.t('reference.verwandt.absatzHint')"></div>

@@ -35,7 +35,7 @@
              :placeholder="$app.t('headline.filterSuche')" :aria-label="$app.t('headline.filterSuche')">
       <button type="button" class="search-clear--icon" x-show="twFilterSuche" @click="twFilterSuche = ''"
               :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
     </span>
     <div x-show="twChapterOptions().length > 0"
@@ -145,7 +145,7 @@
                                 x-text="$app.t('headline.promote')"></button>
                         <button type="button" class="organizer-delete-btn" @click="twDeleteVariant(v.id)"
                                 :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
-                          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+                          <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
                         </button>
                       </li>
                     </template>

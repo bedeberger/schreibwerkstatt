@@ -17,18 +17,18 @@
         <div class="context-menu-header" x-text="graphMenuTheme().name"></div>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                 @click.stop="selectTheme(graphMenuTheme().id); closeGraphMenu()">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
           <span x-text="$app.t('motiv.graph.menu.editTheme')"></span>
         </button>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                 @click.stop="createMotifAt(graphMenuTheme().id)">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
           <span x-text="$app.t('motiv.graph.menu.addMotif')"></span>
         </button>
         <div class="context-menu-sep" role="separator"></div>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger"
                 @click.stop="deleteTheme(graphMenuTheme()); closeGraphMenu()">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
           <span x-text="$app.t('motiv.graph.menu.deleteTheme')"></span>
         </button>
       </div>
@@ -40,18 +40,18 @@
         <div class="context-menu-header" x-text="graphMenuMotif().name"></div>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                 @click.stop="selectMotif(graphMenuMotif().id); closeGraphMenu()">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
           <span x-text="$app.t('motiv.graph.menu.editMotif')"></span>
         </button>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                 @click.stop="createMotifAt(graphMenuMotif().theme_id || null)">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
           <span x-text="$app.t('motiv.graph.menu.addMotif')"></span>
         </button>
         <div class="context-menu-sep" role="separator"></div>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger"
                 @click.stop="deleteMotif(graphMenuMotif()); closeGraphMenu()">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
           <span x-text="$app.t('motiv.graph.menu.deleteMotif')"></span>
         </button>
       </div>
@@ -62,12 +62,12 @@
       <div>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                 @click.stop="createMotifAt(null)">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
           <span x-text="$app.t('motiv.graph.menu.addMotif')"></span>
         </button>
         <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                 @click.stop="createThemeQuick()">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
           <span x-text="$app.t('motiv.graph.menu.addTheme')"></span>
         </button>
       </div>

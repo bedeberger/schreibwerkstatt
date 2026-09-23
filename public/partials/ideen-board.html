@@ -19,7 +19,7 @@
     </div>
     <button type="button" class="btn-card-close" @click="$app.showIdeenBoardCard = false"
             :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
     </button>
   </div>
 
@@ -38,7 +38,7 @@
              :placeholder="$app.t('ideenBoard.search')" :aria-label="$app.t('ideenBoard.search')">
       <button type="button" class="search-clear--icon" x-show="query" @click="query = ''"
               :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
     </span>
 
@@ -155,17 +155,17 @@
                     <button type="button" class="icon-btn icon-btn--ghost"
                             @click.stop="startEdit(idee)" :disabled="busy"
                             :data-tip="$app.t('ideen.edit')" :aria-label="$app.t('ideen.edit')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
                     </button>
                     <button type="button" class="icon-btn icon-btn--ghost"
                             @click.stop="openLinkPicker($event, idee)" :disabled="busy"
                             :data-tip="$app.t('ideen.link.add')" :aria-label="$app.t('ideen.link.add')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#external-link"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#external-link"/></svg>
                     </button>
                     <button type="button" class="icon-btn icon-btn--ghost icon-btn--danger"
                             @click.stop="deleteIdee(idee)" :disabled="busy"
                             :data-tip="$app.t('ideen.delete')" :aria-label="$app.t('ideen.delete')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
                     </button>
                   </div>
                   <!-- Griff neben dem Text statt in einer eigenen Kopfzeile: er ist
@@ -176,7 +176,7 @@
                   <div class="idee-board-card-body">
                     <span class="idee-board-grip" :data-tip="$app.t('ideenBoard.drag')"
                           :aria-label="$app.t('ideenBoard.drag')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#grip-vertical"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#grip-vertical"/></svg>
                     </span>
                     <div class="idee-board-card-main">
                       <template x-if="editingId !== idee.id">

@@ -115,7 +115,7 @@
                   class="revision-viewer__close"
                   @click="closeViewer()"
                   :data-tip="$app.t('editor.revisions.viewer.close')"
-                  :aria-label="$app.t('editor.revisions.viewer.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                  :aria-label="$app.t('editor.revisions.viewer.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
         </header>
 
         <nav class="revision-viewer__tabs" role="tablist">
@@ -174,7 +174,7 @@
                     @click="gotoRev('prev')"
                     :disabled="!hasPrevRev()"
                     :data-tip="$app.t('editor.revisions.viewer.prevTitle')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-left"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg>
               <span x-text="$app.t('editor.revisions.viewer.prev')"></span>
             </button>
             <button type="button"
@@ -183,7 +183,7 @@
                     :disabled="!hasNextRev()"
                     :data-tip="$app.t('editor.revisions.viewer.nextTitle')">
               <span x-text="$app.t('editor.revisions.viewer.next')"></span>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-right"/></svg>
             </button>
           </div>
           <div class="revision-viewer__foot-actions">

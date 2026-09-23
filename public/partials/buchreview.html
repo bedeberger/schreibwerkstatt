@@ -17,7 +17,7 @@
               :data-tip="bookReviewOut ? $app.t('review.rerun') : $app.t('review.start')"
               :aria-label="bookReviewOut ? $app.t('review.rerun') : $app.t('review.start')">
         <span x-show="bookReviewLoading" class="spinner"></span>
-        <svg x-show="!bookReviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scale"/></svg>
+        <svg x-show="!bookReviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg#scale"/></svg>
       </button>
     </div>
   </div>
@@ -45,7 +45,7 @@
         </div>
         <div x-show="selectedBookReviewId === entry.id" class="history-detail">
           <div x-html="entry.review_json ? _renderReviewHtml(entry.review_json) : ''"></div>
-          <button type="button" class="btn-delete-history" @click.stop="$app.deleteBookReview(entry.id)" :data-tip="$app.t('common.deleteEntry')" :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+          <button type="button" class="btn-delete-history" @click.stop="$app.deleteBookReview(entry.id)" :data-tip="$app.t('common.deleteEntry')" :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
         </div>
       </div>
     </template>

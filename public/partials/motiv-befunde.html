@@ -68,13 +68,13 @@
       <h4 class="motiv-panel-heading" x-text="$app.t('motiv.consistency.title')"></h4>
       <button type="button" class="icon-btn icon-btn--ghost" @click="dismissConsistency()"
               :data-tip="$app.t('motiv.consistency.closePanel')" :aria-label="$app.t('motiv.consistency.closePanel')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
     </div>
     <!-- Ohne gelaufene Erkennung stand der KI keine Ist-Seite zur Verfügung — das
          gehört an den Befund, nicht in die Fussnote. -->
     <div class="motiv-hint motiv-hint--warn" x-show="consistencyResult && consistencyResult.scanned === false" x-cloak>
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
       <span x-text="$app.t('motiv.consistency.unscannedNote')"></span>
     </div>
     <p class="motiv-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit"
@@ -124,7 +124,7 @@
         <button type="button" class="history-item-delete"
                 @click.stop="deleteConsistencyRun(r.id)"
                 :data-tip="$app.t('common.deleteEntry')"
-                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
       </div>
     </template>
   </div>

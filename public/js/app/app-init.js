@@ -318,12 +318,12 @@ export const appInitMethods = {
       if (!this.isAdminOnly) await this._maybeOpenBookOverview();
       this._syncUrlNow();
       this._applyingHash = false;
-      // Startbuch als „zuletzt offen" melden — aber NUR aus einem sichtbaren
-      // Tab. Nach einem Deploy laden alle Tabs neu (controllerchange → reload);
-      // stempelte jeder Boot, gewaenne der zuletzt fertig gewordene, also die
-      // Netz-Latenz. Ein verstecktes Neuladen ist kein Oeffnen.
-      if (this.$store.nav.selectedBookId && !document.hidden) {
-        this._touchBookOpened(this.$store.nav.selectedBookId, { force: true });
+      // Startbuch als „zuletzt offen" melden. Ohne `force`: hat `_applyHash`
+      // schon eine Seite geoeffnet, hat `selectPage` dieses Buch eben gestempelt,
+      // und die Drossel verhindert den zweiten PUT. Den Schutz vor versteckten
+      // Tabs (Deploy-Reload aller Tabs) haelt der Helfer selbst.
+      if (this.$store.nav.selectedBookId) {
+        this._touchBookOpened(this.$store.nav.selectedBookId);
       }
       this._setupHashRouting();
       // Buchwechsel (Combobox, Hash-Nav oder programmatisch) → Seiten/Tree neu laden.

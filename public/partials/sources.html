@@ -18,7 +18,7 @@
         <span class="card-form-saved" x-show="sourcesSaved" x-cloak x-transition.opacity.duration.250ms
               x-text="$app.t('common.settingsSaved')"></span>
         <button type="button" class="icon-btn icon-btn--ghost" @click="$app.closeCard('sources')"
-                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </div>
     </div>
   </div>
@@ -29,12 +29,12 @@
   <!-- Toolbar: Anlegen + aus der Bibliothek uebernehmen + Filter -->
   <div class="card-toolbar">
     <button type="button" class="btn-compact" @click="srcEditingId === 'new' ? cancelSourceEdit() : startCreateSource()" :disabled="sourcesBusy">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#plus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
       <span x-text="$app.t('sources.new')"></span>
     </button>
     <button type="button" class="btn-compact" @click="toggleSourcePicker()" :disabled="sourcesBusy"
             :aria-expanded="srcPickerOpen">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#book-open"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg>
       <span x-text="$app.t('sources.fromLibrary')"></span>
     </button>
     <!-- Quellen-Erkennung: findet im Buchtext erwaehnte Werke und schlaegt sie
@@ -42,7 +42,7 @@
          Editor. Panel-Fragment: partials/sources-detect.html -->
     <button type="button" class="btn-compact" @click="toggleSourceDetect()" :disabled="sourcesBusy"
             :aria-expanded="srcDetectOpen">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#scan"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
       <span x-text="$app.t('sources.detect.open')"></span>
     </button>
     <div class="filter-bar filter-bar--inline">
@@ -50,7 +50,7 @@
         <input type="text" class="filter-search-input filter-search-input--wide" x-model="srcFilterText"
                :placeholder="$app.t('sources.filter.search')" :aria-label="$app.t('sources.filter.search')">
         <button type="button" class="search-clear--icon" x-show="srcFilterText" @click="srcFilterText = ''"
-                :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+                :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </span>
       <div x-data="combobox($app.t('sources.filter.type'), $app.t('sources.filter.allTypes'))"
            x-modelable="value" x-model="srcFilterType"
@@ -183,14 +183,14 @@
             <td class="sources-cell-actions">
               <span class="sources-row-actions">
                 <button type="button" class="icon-btn icon-btn--ghost" x-show="srcIsOwner(s)" @click="startEditSource(s)"
-                        :data-tip="$app.t('sources.edit')" :aria-label="$app.t('sources.edit')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#pencil"/></svg></button>
+                        :data-tip="$app.t('sources.edit')" :aria-label="$app.t('sources.edit')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg></button>
                 <button type="button" class="icon-btn icon-btn--ghost" x-show="srcIsOwner(s)" @click="toggleSourceArchived(s)" :disabled="sourcesBusy"
                         :data-tip="s.archived ? $app.t('sources.unarchive') : $app.t('sources.archive')"
-                        :aria-label="s.archived ? $app.t('sources.unarchive') : $app.t('sources.archive')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#archive"/></svg></button>
+                        :aria-label="s.archived ? $app.t('sources.unarchive') : $app.t('sources.archive')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#archive"/></svg></button>
                 <button type="button" class="icon-btn icon-btn--ghost" @click="unlinkSourceFromBook(s)" :disabled="sourcesBusy"
-                        :data-tip="$app.t('sources.remove')" :aria-label="$app.t('sources.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#unlink"/></svg></button>
+                        :data-tip="$app.t('sources.remove')" :aria-label="$app.t('sources.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#unlink"/></svg></button>
                 <button type="button" class="icon-btn icon-btn--ghost" x-show="srcIsOwner(s)" @click="deleteSource(s)" :disabled="sourcesBusy"
-                        :data-tip="$app.t('sources.deleteFromLibrary')" :aria-label="$app.t('sources.deleteFromLibrary')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#trash"/></svg></button>
+                        :data-tip="$app.t('sources.deleteFromLibrary')" :aria-label="$app.t('sources.deleteFromLibrary')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
               </span>
             </td>
           </tr>
@@ -205,11 +205,11 @@
        Tabelle besser als in einer quer scrollenden Zelle. -->
   <div class="sources-citations" x-show="srcCitationsId !== null" x-cloak>
     <div class="sources-citations-head">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#quote"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#quote"/></svg>
       <span class="sources-citations-title"
             x-text="$app.t('sources.citations.title', { title: srcCitationsSource()?.title || $app.t('sources.untitled') })"></span>
       <button type="button" class="icon-btn icon-btn--ghost" @click="closeSourceCitations()"
-              :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+              :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </div>
     <div class="muted-msg muted-msg--sm" x-show="srcCitationsLoading" x-text="$app.t('sources.citations.loading')"></div>
     <p class="card-form-error" x-show="srcCitationsError" x-cloak x-text="srcCitationsError"></p>

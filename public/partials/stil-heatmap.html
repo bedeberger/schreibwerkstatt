@@ -18,7 +18,7 @@
         <button type="button" class="icon-btn icon-btn--ghost" @click="runStilSync()" :disabled="stilSyncing || stilLoading"
                 :data-tip="$app.t('stil.recompute')" :aria-label="$app.t('stil.recompute')">
           <span x-show="stilSyncing" class="spinner"></span>
-          <svg x-show="!stilSyncing" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+          <svg x-show="!stilSyncing" class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
         </button>
       </div>
     </div>
@@ -89,7 +89,7 @@
                   })"></span>
             <button type="button" class="btn-close heatmap-detail-close"
                     @click="closeStilDetail()"
-                    :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                    :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
           </div>
           <div class="heatmap-detail-list">
             <template x-if="stilDetail.entries.length === 0">

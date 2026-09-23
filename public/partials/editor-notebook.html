@@ -68,7 +68,7 @@
                       :data-tip="t(prov.key + '.action.push')"
                       :aria-label="t(prov.key + '.action.push')">
                 <template x-if="!prov.card.pushBusy[currentPage?.id]">
-                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-up"/></svg>
                 </template>
                 <template x-if="prov.card.pushBusy[currentPage?.id]">
                   <span class="display-contents">
@@ -89,7 +89,7 @@
                       @click="window.open(prov.card.viewUrl(currentPage), '_blank', 'noopener')"
                       :data-tip="t(prov.key + '.action.view')"
                       :aria-label="t(prov.key + '.action.view')">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#external-link"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#external-link"/></svg>
               </button>
             </template>
           </span>
@@ -174,7 +174,7 @@
   <!-- Cross-User-Konflikt aus _checkPageConflict / Server-OCC. Bleibt im
        Fokusmodus sichtbar (eigene Klasse, nicht via #status versteckt). -->
   <div class="editor-conflict-banner" role="alert" x-show="editConflict" x-cloak>
-    <svg class="icon editor-conflict-banner__icon" aria-hidden="true"><use href="/icons.svg?v=690#alert-triangle"/></svg>
+    <svg class="icon editor-conflict-banner__icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
     <span class="editor-conflict-banner__text" x-text="editConflictBannerText()"></span>
     <button type="button" class="editor-conflict-banner__action"
             @click="saveEdit()" :disabled="editSaving"
@@ -221,7 +221,7 @@
       <button type="button" class="editor-presence-banner__dismiss"
               @click="pageLastEditor = null"
               :aria-label="t('common.close')" :data-tip="t('common.close')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
     </div>
   </template>

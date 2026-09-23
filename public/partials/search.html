@@ -37,12 +37,12 @@
   <div class="search-like-banner" x-show="likeEntity">
     <span x-text="$app.t('search.semantic.similarTo', { label: likeEntity?.label || '' })"></span>
     <button type="button" class="btn-compact" @click="clearLike()"
-      :title="$app.t('search.clear')" :aria-label="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+      :title="$app.t('search.clear')" :aria-label="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
   </div>
 
   <div class="search-q-row" x-show="!likeEntity">
     <span class="search-affix">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#search"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>
       <input
         type="search"
         class="search-q"
@@ -57,7 +57,7 @@
       class="btn-compact search-clear"
       x-show="q"
       @click="q=''; runSearch();"
-      :title="$app.t('search.clear')" :aria-label="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+      :title="$app.t('search.clear')" :aria-label="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
   </div>
 
   <div class="search-filters">

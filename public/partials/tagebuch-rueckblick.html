@@ -24,12 +24,12 @@
               :data-tip="hasRueckblickResult() ? $app.t('rueckblick.rerun') : $app.t('rueckblick.start')"
               :aria-label="hasRueckblickResult() ? $app.t('rueckblick.rerun') : $app.t('rueckblick.start')">
         <span x-show="rueckblickLoading" class="spinner"></span>
-        <svg x-show="!rueckblickLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scroll"/></svg>
+        <svg x-show="!rueckblickLoading" class="icon" aria-hidden="true"><use href="/icons.svg#scroll"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost" x-show="hasRueckblickResult() || rueckblickEmpty" x-cloak
               @click="closeRueckblick()"
               :data-tip="$app.t('rueckblick.close')" :aria-label="$app.t('rueckblick.close')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
     </div>
   </div>
@@ -195,7 +195,7 @@
                :placeholder="$app.t('rueckblick.historySearch')" :aria-label="$app.t('rueckblick.historySearch')">
         <button type="button" class="search-clear--icon" x-show="rbHistorySearch" @click="rbHistorySearch=''"
                 :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
         </button>
       </span>
       <template x-for="entry in filteredRueckblickHistory()" :key="entry.id">

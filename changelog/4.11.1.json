@@ -1,0 +1,16 @@
+{
+  "version": "4.11.1",
+  "date": "2026-09-23",
+  "entries": [
+    {
+      "kind": "verbessert",
+      "de": "Nach einem Update steht die App auch bei wackliger Verbindung zuverlässiger wieder offline bereit. Beim ersten Öffnen und beim Neuladen lädt sie spürbar weniger doppelt.",
+      "en": "After an update, the app is more reliably available offline again, even on a shaky connection. On first open and on reload it fetches noticeably less twice."
+    },
+    {
+      "kind": "behoben",
+      "de": "Nach einem Update öffnete die App manchmal ein anderes Buch als das, an dem zuletzt gearbeitet wurde, wenn mehrere Tabs offen waren.",
+      "en": "After an update, the app sometimes opened a different book than the one last worked on when several tabs were open."
+    }
+  ]
+}

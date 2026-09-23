@@ -142,7 +142,7 @@
                       :disabled="!coverSpecReady() || !$store.nav.selectedBookId"
                       :data-tip="!coverSpecReady() ? $app.t('pdfExport.cover.spineNeedsValues') : ''"
                       @click="exportPdf('cover')">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
                 <span x-text="$app.t('pdfExport.cover.renderCover')"></span>
               </button>
             </div>

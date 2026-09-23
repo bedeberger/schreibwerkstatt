@@ -9,7 +9,7 @@
 -->
 <div class="research-transcript" x-show="item.kind === 'transcript' || ivTranscript">
   <div class="research-transcript__head">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#mic"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#mic"/></svg>
     <span class="research-transcript__title" x-text="$app.t('interview.section')"></span>
     <span class="badge" x-show="ivTranscript?.status"
           :class="'badge--iv-' + (ivTranscript?.status || 'pending')"

@@ -21,7 +21,7 @@
               :data-tip="$app.t(prov.key + '.action.push')"
               :aria-label="$app.t(prov.key + '.action.push')">
         <template x-if="!prov.card.pushBusy[page.id]">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-up"/></svg>
         </template>
         <template x-if="prov.card.pushBusy[page.id]">
           <span class="display-contents">
@@ -72,4 +72,4 @@
        @combobox-change="movePageToBook(page.id, $event.detail)"></div>
 </template>
 <button type="button" class="organizer-delete-btn" @click="deletePage(page.id)" :disabled="organizerSaving"
-        :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+        :data-tip="$app.t('bookOrganizer.deletePage')" :aria-label="$app.t('bookOrganizer.deletePage')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>

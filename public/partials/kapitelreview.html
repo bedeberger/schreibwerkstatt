@@ -43,7 +43,7 @@
                 :aria-pressed="kapitelReviewIncludeSubchapters($app.kapitelReviewChapterId)"
                 :data-tip="$app.t('kapitelReview.includeSubchaptersTip')"
                 :aria-label="$app.t('kapitelReview.includeSubchapters')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#list-tree"/></svg>
         </button>
         <button type="button"
                 class="icon-btn icon-btn--ghost"
@@ -52,7 +52,7 @@
                 :data-tip="kapitelReviewOut ? $app.t('kapitelReview.rerun') : $app.t('kapitelReview.start')"
                 :aria-label="kapitelReviewOut ? $app.t('kapitelReview.rerun') : $app.t('kapitelReview.start')">
           <span x-show="kapitelReviewLoading" class="spinner"></span>
-          <svg x-show="!kapitelReviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scale"/></svg>
+          <svg x-show="!kapitelReviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg#scale"/></svg>
         </button>
         <span class="action-overflow" x-data="menu()">
           <span class="icon-btn-badge-wrap">
@@ -60,7 +60,7 @@
                     :class="{ 'is-active': open }"
                     aria-haspopup="menu"
                     :data-tip="$app.t('editor.btn.moreActions')" :aria-label="$app.t('editor.btn.moreActions')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#more-horizontal"/></svg>
             </button>
             <span class="icon-btn-badge" x-show="($store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
           </span>
@@ -70,21 +70,21 @@
                     role="menuitem"
                     :disabled="!$app.kapitelReviewChapterId"
                     @click="$app.toggleChapterIdeenCard($app.kapitelReviewChapterId)">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#lightbulb"/></svg>
               <span x-text="$app.t('ideen.chapter.toggle')"></span>
               <span class="btn-count" x-show="($store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId] || 0) > 0" x-text="$store.badges.chapterIdeenCounts[$app.kapitelReviewChapterId]"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="($store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId] || 0) > 0"
                     @click="$app.openRechercheForChapter($app.kapitelReviewChapterId)">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#book-open"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg>
               <span x-text="$app.t('recherche.title')"></span>
               <span class="btn-count" x-text="$store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('recherche.openCountTitle', { n: $store.badges.chapterRechercheCounts[$app.kapitelReviewChapterId] })"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="($store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId] || 0) > 0"
                     @click="$app.openPlotBoard()">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#list-tree"/></svg>
               <span x-text="$app.t('plot.title')"></span>
               <span class="btn-count" x-text="$store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId]" :data-tip="$app.t('plot.chapterBeatsCountTitle', { n: $store.badges.chapterPlotBeatCounts[$app.kapitelReviewChapterId] })"></span>
             </button>
@@ -92,20 +92,20 @@
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="$app.kapitelReviewChapterId"
                     @click="$app.openShareLinksForChapter($app.kapitelReviewChapterId)">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#share-2"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#share-2"/></svg>
               <span x-text="$app.t('share.btn.shareChapter')"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="$app.kapitelReviewChapterId"
                     @click="$app.openExportFor('chapter', $app.kapitelReviewChapterId)">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#download"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
               <span x-text="$app.t('pagetreeCtx.export')"></span>
             </button>
             <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                     x-show="$app.canEdit() && $app.kapitelReviewChapterId"
                     :class="{ 'context-menu-item--on': kapitelReviewSelectedChapter()?.excluded }"
                     @click="$app.setChapterExcluded($app.kapitelReviewChapterId, !kapitelReviewSelectedChapter()?.excluded)">
-              <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=693#' + (kapitelReviewSelectedChapter()?.excluded ? 'rotate-cw' : 'archive')"/></svg>
+              <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + (kapitelReviewSelectedChapter()?.excluded ? 'rotate-cw' : 'archive')"/></svg>
               <span x-text="kapitelReviewSelectedChapter()?.excluded ? $app.t('pagetreeCtx.includeChapter') : $app.t('pagetreeCtx.excludeChapter')"></span>
             </button>
           </div>

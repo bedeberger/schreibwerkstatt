@@ -1678,7 +1678,7 @@ CSS: [public/css/components/confirm-dialog.css](public/css/components/confirm-di
 ```html
 <div class="danger-zone">
   <div class="danger-zone-title">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
     <span x-text="$app.t('…')"></span>
   </div>
   <!-- mehrere Aktionen: je eine .danger-zone-section (Trennlinie kommt automatisch) -->
@@ -1787,7 +1787,7 @@ Kein Skeleton ohne Shimmer-Animation. CSS-File-Referenzen: [entity-list.css](pub
 ```html
 <div class="card-toolbar">
   <button type="button" class="btn-compact">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#plus"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
     <span x-text="$app.t('xxx.new')"></span>
   </button>
   <div class="filter-bar filter-bar--inline">…</div>
@@ -1815,7 +1815,7 @@ Kein Skeleton ohne Shimmer-Animation. CSS-File-Referenzen: [entity-list.css](pub
     <input class="filter-search-input" type="text" :placeholder="$app.t('common.search')" x-model="filterText">
     <button type="button" class="search-clear--icon" x-show="filterText" @click="filterText=''"
             :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=636#x"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
     </button>
   </span>
   <span class="filter-count" x-text="filteredItems.length + ' / ' + items.length"></span>
@@ -3143,7 +3143,7 @@ Position: absolute innerhalb `.card`, `background: var(--color-surface) / 0.7` m
   <button type="button" class="primary card-empty-cta"
           @click="$app.alleAktualisieren()"
           :disabled="$app.alleAktualisierenLoading || !$app.selectedBookId">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
     <span x-text="$app.t('header.updateAll')"></span>
   </button>
 </div>

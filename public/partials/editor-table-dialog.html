@@ -16,7 +16,7 @@
             x-text="$app.t(tableEditing ? 'editor.table.titleEdit' : 'editor.table.titleNew')"></span>
       <button type="button" class="icon-btn icon-btn--ghost" @click="closeTableDialog()"
               :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
     </div>
 
@@ -58,7 +58,7 @@
                               @click="tableRemoveCol(c)"
                               :data-tip="$app.t('editor.table.removeCol')"
                               :aria-label="$app.t('editor.table.removeCol')">
-                        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+                        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
                       </button>
                     </div>
                   </th>
@@ -87,7 +87,7 @@
                             @click="tableRemoveRow(r)"
                             :data-tip="$app.t('editor.table.removeRow')"
                             :aria-label="$app.t('editor.table.removeRow')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
                     </button>
                   </th>
                   <template x-for="(cell, c) in row" :key="'c' + c">

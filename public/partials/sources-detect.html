@@ -6,10 +6,10 @@
      Fund wird erst zur Quelle, wenn der Autor ihn uebernimmt. -->
 <div class="sources-detect" x-show="srcDetectOpen" x-cloak>
   <div class="sources-detect-head">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#search"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>
     <span class="sources-detect-title" x-text="$app.t('sources.detect.title')"></span>
     <button type="button" class="icon-btn icon-btn--ghost" @click="closeSourceDetect()"
-            :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+            :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
   </div>
 
   <p class="muted-msg muted-msg--sm" x-text="$app.t('sources.detect.hint')"></p>
@@ -20,7 +20,7 @@
          x-effect="options = srcDetectChapterOptions()"></div>
     <button type="button" class="btn-compact sources-detect-start" @click="runSourceDetect()"
             :disabled="srcDetectRunning || sourcesBusy">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#scan"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
       <span x-text="srcDetectRunning ? $app.t('sources.detect.running') : $app.t('sources.detect.start')"></span>
     </button>
   </div>
@@ -78,18 +78,18 @@
         <span class="sources-detect-actions">
           <button type="button" class="btn-compact" x-show="!v.existing_source_id"
                   @click="adoptDetected(v)" :disabled="sourcesBusy">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#plus"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
             <span x-text="$app.t('sources.detect.adopt')"></span>
           </button>
           <!-- Liegt schon im Pool, aber in einer anderen Arbeit: nur zuordnen,
                nicht neu anlegen (sonst Dublette in der Bibliothek). -->
           <button type="button" class="btn-compact" x-show="v.existing_source_id && !v.existing_linked" x-cloak
                   @click="linkDetected(v)" :disabled="sourcesBusy">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#book-open"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg>
             <span x-text="$app.t('sources.detect.link')"></span>
           </button>
           <button type="button" class="icon-btn icon-btn--ghost" @click="dismissDetected(v)"
-                  :data-tip="$app.t('sources.detect.dismiss')" :aria-label="$app.t('sources.detect.dismiss')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+                  :data-tip="$app.t('sources.detect.dismiss')" :aria-label="$app.t('sources.detect.dismiss')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
         </span>
       </li>
     </template>
@@ -112,7 +112,7 @@
                   x-text="$app.t('sources.detect.runCount', { n: run.found_count, verified: run.verified_count })"></span>
           </button>
           <button type="button" class="icon-btn icon-btn--ghost" @click="deleteDetectRun(run)"
-                  :data-tip="$app.t('sources.detect.deleteRun')" :aria-label="$app.t('sources.detect.deleteRun')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#trash"/></svg></button>
+                  :data-tip="$app.t('sources.detect.deleteRun')" :aria-label="$app.t('sources.detect.deleteRun')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
         </li>
       </template>
     </ul>

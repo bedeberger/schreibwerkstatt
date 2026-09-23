@@ -29,11 +29,11 @@
                  :placeholder="$app.t('recherche.field.urlLabel')" :aria-label="$app.t('recherche.field.urlLabel')"
                  data-spellcheck="spelling">
           <button type="button" class="icon-btn" @click="removeUrlRow(draft, ui)"
-                  :data-tip="$app.t('recherche.field.urlRemove')" :aria-label="$app.t('recherche.field.urlRemove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                  :data-tip="$app.t('recherche.field.urlRemove')" :aria-label="$app.t('recherche.field.urlRemove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
         </div>
       </template>
       <button type="button" class="btn-compact recherche-url-add" @click="addUrlRow(draft)">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
         <span x-text="$app.t('recherche.field.urlAdd')"></span>
       </button>
     </div>

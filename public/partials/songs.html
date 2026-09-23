@@ -25,7 +25,7 @@
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
             :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
@@ -45,7 +45,7 @@
   <div x-show="$store.catalog.songs.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
       <input type="text" x-model="$store.catalogUi.songsFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <button type="button" class="search-clear--icon" x-show="$store.catalogUi.songsFilters.suche" @click="$store.catalogUi.songsFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="$store.catalogUi.songsFilters.suche" @click="$store.catalogUi.songsFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$store.catalogUi.songsFilters.figurId"

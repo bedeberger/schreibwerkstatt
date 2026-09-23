@@ -4,30 +4,30 @@
     <div class="card-actions">
       <button type="button" class="icon-btn icon-btn--ghost" @click="loadPages({ source: 'manual' })"
               :data-tip="t('sidebar.loadPages')" :aria-label="t('sidebar.loadPages')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost" @click="toggleBookOrganizerCard()" :disabled="!$store.nav.selectedBookId"
               :class="{ 'is-active': showBookOrganizerCard }"
               :data-tip="t('tile.bookOrganizer.title')" :aria-label="t('tile.bookOrganizer')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#list-tree"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#list-tree"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost" @click="toggleBookEditorCard()" :disabled="!$store.nav.pages.length"
               :class="{ 'is-active': showBookEditorCard }"
               :data-tip="t('tile.bookEditor.title')" :aria-label="t('tile.bookEditor')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scroll"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#scroll"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost" @click="batchCheck()" :disabled="!$store.nav.pages.length"
               :data-tip="t('sidebar.checkAllTitle')" :aria-label="t('sidebar.checkAll')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#spell-check"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#spell-check"/></svg>
       </button>
     </div>
   </div>
   <!-- Suche + Expand/Collapse -->
   <div class="search-wrap sidebar-search-wrap">
     <span class="search-affix">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#search"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>
       <input type="text" x-model.debounce.200ms="pageSearch" @keydown="onPageSearchKeydown($event)" :placeholder="t('sidebar.searchPage')" :aria-label="t('sidebar.searchPage')" :data-tip="withHotkey(t('sidebar.searchPageTitle'), 'treeSearch')" class="page-search">
-      <button type="button" class="search-clear--icon" x-show="pageSearch" @click="pageSearch=''" :aria-label="t('search.clear')" :data-tip="t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="pageSearch" @click="pageSearch=''" :aria-label="t('search.clear')" :data-tip="t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </span>
     <div class="btn-group sidebar-action-group">
       <button type="button" class="icon-btn"
@@ -37,7 +37,7 @@
               :data-tip="sidebarMode === 'calendar' ? t('sidebar.modeToggle.tree') : t('sidebar.modeToggle.calendar')"
               :aria-label="sidebarMode === 'calendar' ? t('sidebar.modeToggle.tree') : t('sidebar.modeToggle.calendar')">
         <svg class="icon" aria-hidden="true">
-          <use :href="sidebarMode === 'calendar' ? '/icons.svg?v=690#list' : '/icons.svg?v=690#calendar'"/>
+          <use :href="sidebarMode === 'calendar' ? '/icons.svg#list' : '/icons.svg#calendar'"/>
         </svg>
       </button>
       <button type="button" class="icon-btn"
@@ -45,13 +45,13 @@
               @click="setAllChaptersOpen(true)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.expandAll')"
-              :aria-label="t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-down"/></svg></button>
+              :aria-label="t('sidebar.expandAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"/></svg></button>
       <button type="button" class="icon-btn"
               x-show="sidebarMode !== 'calendar'"
               @click="setAllChaptersOpen(false)"
               :disabled="!!pageSearch"
               :data-tip="t('sidebar.collapseAll')"
-              :aria-label="t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-up"/></svg></button>
+              :aria-label="t('sidebar.collapseAll')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg></button>
     </div>
   </div>
 

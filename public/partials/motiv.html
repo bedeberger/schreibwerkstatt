@@ -26,18 +26,18 @@
                 @click="runBrainstorm()" :disabled="brainstorming"
                 :data-tip="$app.t('motiv.brainstorm.run')" :aria-label="$app.t('motiv.brainstorm.run')">
           <span x-show="brainstorming" class="spinner"></span>
-          <svg x-show="!brainstorming" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
+          <svg x-show="!brainstorming" class="icon" aria-hidden="true"><use href="/icons.svg#lightbulb"/></svg>
         </button>
         <button type="button" class="icon-btn icon-btn--ghost"
                 @click="runBrainstorm(true)" :disabled="brainstorming"
                 :data-tip="$app.t('motiv.brainstorm.runFresh')" :aria-label="$app.t('motiv.brainstorm.runFresh')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#zap"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#zap"/></svg>
         </button>
         <button type="button" class="icon-btn icon-btn--ghost"
                 @click="runScan()" :disabled="scanning || !motifs.length"
                 :data-tip="$app.t('motiv.scan.run')" :aria-label="$app.t('motiv.scan.run')">
           <span x-show="scanning" class="spinner"></span>
-          <svg x-show="!scanning" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#search"/></svg>
+          <svg x-show="!scanning" class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>
         </button>
         <!-- Ansichts-Steuerung des Graphen: nur in der Konstellation. Im
              Verlaufsband und in den Befunden gibt es nichts anzuordnen — ein
@@ -54,7 +54,7 @@
         <span class="action-group" x-show="motivView === 'graph'">
           <button type="button" class="icon-btn icon-btn--ghost" @click="resetLayout()"
                   :data-tip="$app.t('motiv.graph.resetLayout')" :aria-label="$app.t('motiv.graph.resetLayout')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#undo"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#undo"/></svg>
           </button>
         </span>
         <span class="action-sep" aria-hidden="true"></span>
@@ -63,7 +63,7 @@
                 :aria-pressed="motivFullscreen"
                 @click="toggleMotivFullscreen()"
                 :aria-label="motivFullscreen ? $app.t('motiv.fullscreenExit.tip') : $app.t('motiv.fullscreen.tip')"
-                :data-tip="motivFullscreen ? $app.t('motiv.fullscreenExit.tip') : $app.t('motiv.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="motivFullscreen ? '/icons.svg?v=693#minimize-2' : '/icons.svg?v=693#maximize-2'"/></svg></button>
+                :data-tip="motivFullscreen ? $app.t('motiv.fullscreenExit.tip') : $app.t('motiv.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="motivFullscreen ? '/icons.svg#minimize-2' : '/icons.svg#maximize-2'"/></svg></button>
       </div>
     </div>
   </div>
@@ -129,7 +129,7 @@
   <!-- Scan-Status: warnt, wenn die semantische Erkennung aus ist (nur wörtliche
        Trigger), sonst bietet sie Embeddings-Refresh für frische Fundstellen. -->
   <div class="motiv-hint motiv-hint--warn" x-show="!semanticActive()" x-cloak>
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
     <span x-text="$app.t('motiv.hint.semanticOff')"></span>
   </div>
   <div class="motiv-hint motiv-hint--action" x-show="semanticActive() && embedIndexStale" x-cloak>
@@ -151,15 +151,15 @@
     <div class="motiv-graph-controls" role="group" :aria-label="$app.t('motiv.graph.controls')">
       <button type="button" class="icon-btn icon-btn--ghost" @click="zoomGraph(1.3)"
               :data-tip="$app.t('graph.zoomIn')" :aria-label="$app.t('graph.zoomIn')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost" @click="zoomGraph(0.77)"
               :data-tip="$app.t('graph.zoomOut')" :aria-label="$app.t('graph.zoomOut')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#minus"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#minus"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost" @click="fitGraph()"
               :data-tip="$app.t('motiv.graph.fit')" :aria-label="$app.t('motiv.graph.fit')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scan"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
       </button>
     </div>
     <!-- Hover-Detail-Tooltip (absolut über dem Graph, positioniert in graph.js) -->
@@ -194,7 +194,7 @@
         <button type="button" class="history-item-delete"
                 @click.stop="deleteBrainstormRun(r.id)"
                 :data-tip="$app.t('common.deleteEntry')"
-                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+                :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
       </div>
     </template>
   </div>
@@ -207,7 +207,7 @@
       <h4 class="motiv-panel-heading" x-text="$app.t('motiv.brainstorm.title')"></h4>
       <button type="button" class="icon-btn icon-btn--ghost" @click="_clearSuggestionPanel()"
               :data-tip="$app.t('motiv.brainstorm.closePanel')" :aria-label="$app.t('motiv.brainstorm.closePanel')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
     </div>
     <div class="motiv-suggestion-list">
@@ -227,7 +227,7 @@
             <button type="button" class="btn-compact" @click="adoptSuggestion(s)" x-text="$app.t('motiv.brainstorm.adopt')"></button>
             <button type="button" class="icon-btn icon-btn--ghost" @click="dismissSuggestion(s)"
                     :data-tip="$app.t('motiv.brainstorm.dismiss')" :aria-label="$app.t('motiv.brainstorm.dismiss')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
             </button>
           </div>
         </div>

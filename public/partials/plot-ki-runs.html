@@ -40,7 +40,7 @@
   <div class="plot-consistency-head">
     <span class="bewertung-section-title" x-text="$app.t('plot.consistency.title')"></span>
     <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="dismissConsistency()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
     </button>
   </div>
   <p class="plot-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult && consistencyResult.fazit"></p>
@@ -89,7 +89,7 @@
       <button type="button" class="history-item-delete"
               @click.stop="deleteConsistencyRun(r.id)"
               :data-tip="$app.t('common.deleteEntry')"
-              :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+              :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
     </div>
   </template>
 </div>
@@ -111,7 +111,7 @@
       <button type="button" class="history-item-delete"
               @click.stop="deleteBrainstormRun(r.id)"
               :data-tip="$app.t('common.deleteEntry')"
-              :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+              :aria-label="$app.t('common.deleteEntry')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
     </div>
   </template>
 </div>

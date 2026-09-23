@@ -102,7 +102,7 @@
           <button type="button" class="icon-btn icon-btn--ghost icon-btn--success"
                   :disabled="busy || !editName.trim()" @click="saveDraft()"
                   :data-tip="$app.t('werkstatt.action.save')" :aria-label="$app.t('werkstatt.action.save')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#check"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
           </button>
           <span class="action-overflow" @click.outside="werkstattMenuOpen = false" @keydown.escape.window="werkstattMenuOpen = false">
             <button type="button" class="icon-btn icon-btn--ghost"
@@ -110,19 +110,19 @@
                     @click="werkstattMenuOpen = !werkstattMenuOpen"
                     aria-haspopup="menu" :aria-expanded="werkstattMenuOpen"
                     :data-tip="$app.t('editor.btn.moreActions')" :aria-label="$app.t('editor.btn.moreActions')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#more-horizontal"/></svg>
             </button>
             <div class="context-menu context-menu--dropdown" x-show="werkstattMenuOpen" x-cloak role="menu">
               <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                       :disabled="busy || brainstormLoading || !selectedKnotenId"
                       @click="runBrainstorm(); werkstattMenuOpen = false">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#lightbulb"/></svg>
                 <span x-text="$app.t('werkstatt.action.brainstorm')"></span>
               </button>
               <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                       :disabled="busy || consistencyLoading"
                       @click="runConsistency(); werkstattMenuOpen = false">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#spell-check"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#spell-check"/></svg>
                 <span x-text="$app.t('werkstatt.action.consistency')"></span>
               </button>
               <div class="context-menu-sep" role="separator"></div>
@@ -133,19 +133,19 @@
               <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                       x-show="!selectedDraft()?.source_figure_id"
                       :disabled="busy" @click="startLinkFigure(); werkstattMenuOpen = false">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#users"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#users"/></svg>
                 <span x-text="$app.t('werkstatt.action.linkFigure')"></span>
               </button>
               <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem"
                       x-show="selectedDraft()?.source_figure_id"
                       :disabled="busy" @click="runLinkFigure(null); werkstattMenuOpen = false">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#unlink"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#unlink"/></svg>
                 <span x-text="$app.t('werkstatt.action.unlinkFigure')"></span>
               </button>
               <div class="context-menu-sep" role="separator"></div>
               <button type="button" class="context-menu-item context-menu-item--icon context-menu-item--danger" role="menuitem"
                       :disabled="busy" @click="requestDelete(); werkstattMenuOpen = false">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
                 <span x-text="$app.t('werkstatt.action.delete')"></span>
               </button>
             </div>
@@ -224,23 +224,23 @@
                     class="icon-btn"
                     :data-tip="$app.t('graph.zoomIn')"
                     :aria-label="$app.t('graph.zoomIn')"
-                    @click="_jm && _jm.view && _jm.view.zoom_in()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg></button>
+                    @click="_jm && _jm.view && _jm.view.zoom_in()"><svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg></button>
             <button type="button"
                     class="icon-btn"
                     :data-tip="$app.t('graph.zoomOut')"
                     :aria-label="$app.t('graph.zoomOut')"
-                    @click="_jm && _jm.view && _jm.view.zoom_out()"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#minus"/></svg></button>
+                    @click="_jm && _jm.view && _jm.view.zoom_out()"><svg class="icon" aria-hidden="true"><use href="/icons.svg#minus"/></svg></button>
             <button type="button"
                     class="icon-btn"
                     :data-tip="$app.t('graph.reset')"
                     :aria-label="$app.t('graph.reset')"
-                    @click="_jm && _jm.view && _jm.view.set_zoom(1)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#scan"/></svg></button>
+                    @click="_jm && _jm.view && _jm.view.set_zoom(1)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg></button>
             <button type="button"
                     class="icon-btn"
                     :aria-pressed="mindmapFullscreen"
                     :aria-label="mindmapFullscreen ? $app.t('werkstatt.mindmap.fullscreenExit.tip') : $app.t('werkstatt.mindmap.fullscreen.tip')"
                     @click="toggleMindmapFullscreen()"
-                    :data-tip="mindmapFullscreen ? $app.t('werkstatt.mindmap.fullscreenExit.tip') : $app.t('werkstatt.mindmap.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="mindmapFullscreen ? '/icons.svg?v=690#minimize-2' : '/icons.svg?v=690#maximize-2'"/></svg></button>
+                    :data-tip="mindmapFullscreen ? $app.t('werkstatt.mindmap.fullscreenExit.tip') : $app.t('werkstatt.mindmap.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="mindmapFullscreen ? '/icons.svg#minimize-2' : '/icons.svg#maximize-2'"/></svg></button>
           </div>
         </div>
 
@@ -252,25 +252,25 @@
              :style="{ left: contextMenuPos.left + 'px', top: contextMenuPos.top + 'px' }"
              @click.stop>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon" @click="ctxBrainstorm()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#lightbulb"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#lightbulb"/></svg>
             <span x-text="$app.t('werkstatt.action.brainstorm')"></span>
           </button>
           <div class="context-menu-sep" role="separator"></div>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon" @click="ctxRename()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
             <span x-text="$app.t('werkstatt.context.rename')"></span>
           </button>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon" @click="ctxAddChild()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#git-fork"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#git-fork"/></svg>
             <span x-text="$app.t('werkstatt.context.addChild')"></span>
           </button>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon" @click="ctxAddSibling()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
             <span x-text="$app.t('werkstatt.context.addSibling')"></span>
           </button>
           <div class="context-menu-sep" role="separator"></div>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger" @click="ctxDelete()" :disabled="contextMenuNodeId === 'root'">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
             <span x-text="$app.t('werkstatt.context.delete')"></span>
           </button>
         </div>

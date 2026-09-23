@@ -26,7 +26,7 @@
                 :class="{ primary: exportIncludeSubchapters }"
                 :aria-pressed="exportIncludeSubchapters"
                 :data-tip="$app.t('epubExport.includeSubchaptersTip')">
-          <svg class="icon" aria-hidden="true"><use :href="exportIncludeSubchapters ? '/icons.svg?v=690#check' : '/icons.svg?v=690#chevron-down'"/></svg>
+          <svg class="icon" aria-hidden="true"><use :href="exportIncludeSubchapters ? '/icons.svg#check' : '/icons.svg#chevron-down'"/></svg>
           <span x-text="$app.t('epubExport.includeSubchapters')"></span>
         </button>
         <div x-show="exportScope === 'page'" x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
@@ -39,7 +39,7 @@
               :disabled="!$store.nav.selectedBookId"
               :data-tip="!$store.nav.selectedBookId ? $app.t('epubExport.export.noBookHint') : ''"
               @click="exportEpub()">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
         <span x-text="$app.t('epubExport.export')"></span>
       </button>
       <button type="button" data-label-ok
@@ -209,7 +209,7 @@
                 <span x-text="chip.label"></span>
                 <button type="button" class="export-chip-remove"
                         :aria-label="$app.t('common.remove')"
-                        @click="removeUnnumberedChapter(chip.id)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                        @click="removeUnnumberedChapter(chip.id)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
               </span>
             </template>
           </div>

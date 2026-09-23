@@ -74,6 +74,7 @@ class FakeRequest {
     // `redirect`/`signal` reicht der Precache mit — der Test prueft genau das.
     this.redirect = init.redirect ?? 'follow';
     this.signal = init.signal;
+    this.body = init.body;
   }
   get pathname() { return new URL(this.url).pathname; }
 }
@@ -107,7 +108,7 @@ function makeCache(initial = {}) {
 // (handleNavigate) landen dabei als Globals des Contexts und sind aufrufbar,
 // waehrend die `const`-Bindings (SHELL_CACHE, SHELL_PATH) im Scope sichtbar
 // bleiben.
-function loadSw({ cache, fetchImpl, posted = [], updates = [] }) {
+function loadSw({ cache, fetchImpl, posted = [], updates = [], manifest = ['/js/app.js', '/partials/x.html'] }) {
   const caches = {
     async open() { return cache; },
     async keys() { return []; },
@@ -131,7 +132,7 @@ function loadSw({ cache, fetchImpl, posted = [], updates = [] }) {
   sandbox.self = sandbox;
   sandbox.globalThis = sandbox;
   sandbox.self.__SHELL_BUILD = 'testbuild';
-  sandbox.self.__SHELL_MANIFEST = ['/js/app.js', '/partials/x.html'];
+  sandbox.self.__SHELL_MANIFEST = manifest;
   sandbox.self.addEventListener = (type, fn) => { listeners[type] = fn; };
   sandbox.self.clients = { matchAll: async () => [{ postMessage: (m) => posted.push(m) }] };
   sandbox.self.registration = { update: async () => { updates.push(1); } };
@@ -317,6 +318,79 @@ test('Install cacht die markierte Shell unter beiden Schluesseln', async () => {
   assert.equal(cache.store.get('/').body, SHELL_HTML,
     'Navigation fragt "/", der Lookup greift auf SHELL_PATH — beide muessen treffen.');
   assert.ok(cache.store.has('/partials/x.html'), 'der uebrige Satz ist ebenfalls drin');
+});
+
+// --- Precache: Parallelitaet, Retry pro Asset, Install-Meldung --------------
+//
+// Ein gescheiterter Erst-Install laesst die Seite dauerhaft unkontrolliert —
+// ohne jedes sichtbare Signal. Darum: ein Aussetzer darf nicht den ganzen Satz
+// verwerfen, die Last bleibt begrenzt, und ein endgueltiges Scheitern meldet
+// der SW selbst an die Telemetrie.
+
+const shellOr = (fn) => async (req) => (req.pathname === '/'
+  ? new FakeResponse(SHELL_HTML, { headers: SHELL_HEADERS })
+  : fn(req));
+
+test('Precache: ein transienter Fehler kostet EINEN Retry, nicht den ganzen Satz', async () => {
+  const cache = makeCache({});
+  const seen = [];
+  let failedOnce = false;
+  const ctx = loadSw({
+    cache,
+    fetchImpl: shellOr(async (req) => {
+      seen.push(req.pathname);
+      if (req.pathname === '/js/app.js' && !failedOnce) {
+        failedOnce = true;
+        throw new TypeError('Failed to fetch');
+      }
+      return new FakeResponse('asset');
+    }),
+  });
+  await runInstall(ctx);
+  assert.ok(cache.store.has('/js/app.js') && cache.store.has('/partials/x.html'));
+  assert.equal(seen.filter(p => p === '/partials/x.html').length, 1,
+    'das intakte Asset wird nicht erneut geholt');
+  assert.equal(seen.filter(p => p === '/js/app.js').length, 2);
+});
+
+test('Precache: hoechstens PRECACHE_CONCURRENCY Requests gleichzeitig', async () => {
+  const manifest = Array.from({ length: 100 }, (_, i) => `/js/m${i}.js`);
+  let inFlight = 0;
+  let peak = 0;
+  const ctx = loadSw({
+    cache: makeCache({}),
+    manifest,
+    fetchImpl: shellOr(async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise(r => setTimeout(r, 1));
+      inFlight--;
+      return new FakeResponse('asset');
+    }),
+  });
+  await runInstall(ctx);
+  assert.ok(peak <= 16, `Spitze ${peak} > 16 parallele Requests`);
+  assert.ok(peak > 1, 'aber parallel, nicht seriell');
+});
+
+test('Install-Fehler im Precache wird an die Telemetrie gemeldet, Cache bleibt leer', async () => {
+  const cache = makeCache({});
+  const reports = [];
+  const ctx = loadSw({
+    cache,
+    fetchImpl: async (req) => {
+      if (req.pathname === '/telemetry/js-error') { reports.push(JSON.parse(req.body)); return new FakeResponse('{}'); }
+      if (req.pathname === '/') return new FakeResponse(SHELL_HTML, { headers: SHELL_HEADERS });
+      if (req.pathname === '/partials/x.html') return new FakeResponse('down', { status: 502 });
+      return new FakeResponse('asset');
+    },
+  });
+  await assert.rejects(runInstall(ctx));
+  assert.deepEqual(cache.writes, []);
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].kind, 'boot');
+  assert.equal(reports[0].source, '/partials/x.html');
+  assert.match(reports[0].message, /SW-Install gescheitert: .*HTTP 502.*build=testbuild ok=1\/2/);
 });
 
 // --- Verlorene Generation: Netz-Modus + Selbstreparatur ----------------------

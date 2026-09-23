@@ -24,12 +24,12 @@
                   :data-tip="$app.t('recherche.status.label')" x-text="statusLabel(itemStatus(item))"></span>
         <div class="research-item-actions research-dialog__actions" x-data="{ menuCtx: 'detail' }">
           <button type="button" class="btn-compact" x-show="!detailEditing" @click="startEdit(item)" :disabled="busy">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
             <span x-text="$app.t('recherche.edit')"></span>
           </button>
           <!-- @include recherche-item-menu -->
           <button type="button" class="icon-btn icon-btn--ghost" @click="closeDetail()"
-                  :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                  :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
         </div>
       </header>
 
@@ -49,19 +49,19 @@
             <figcaption class="research-dialog__figcaption">
               <a :href="imageUrl(item)" target="_blank" rel="noopener noreferrer" x-text="$app.t('recherche.image.open')"></a>
               <button type="button" class="icon-btn icon-btn--ghost" @click="removeImage(item)" :disabled="busy"
-                      :data-tip="$app.t('recherche.image.remove')" :aria-label="$app.t('recherche.image.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+                      :data-tip="$app.t('recherche.image.remove')" :aria-label="$app.t('recherche.image.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
             </figcaption>
           </figure>
         </template>
 
         <div class="research-dialog__doc" x-show="item.has_doc">
           <a class="research-item-doc" :href="docUrl(item)" target="_blank" rel="noopener noreferrer">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
             <span class="research-item-doc-name" x-text="item.doc_name || $app.t('recherche.doc.fallbackName')"></span>
             <span class="research-item-doc-meta" x-show="item.doc_pages" x-text="$app.t('recherche.doc.pages', { n: item.doc_pages })"></span>
           </a>
           <button type="button" class="icon-btn icon-btn--ghost" @click="removeDoc(item)" :disabled="busy"
-                  :data-tip="$app.t('recherche.doc.remove')" :aria-label="$app.t('recherche.doc.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+                  :data-tip="$app.t('recherche.doc.remove')" :aria-label="$app.t('recherche.doc.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
         </div>
 
         <!-- Interview-Transkription: Aufnahme, Sprecher, Wortlaut. Eigenes
@@ -96,11 +96,11 @@
 
         <div class="research-dialog__foot">
           <button type="button" class="btn-compact" x-show="linkPickerItemId !== item.id" @click="openLinkPicker(item)">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#external-link"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#external-link"/></svg>
             <span x-text="$app.t('recherche.link.add')"></span>
           </button>
           <button type="button" class="btn-compact" @click="suggestLinks(item)" :disabled="busy || suggestItemId === item.id">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#zap"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#zap"/></svg>
             <span x-text="$app.t('recherche.suggest.btn')"></span>
           </button>
         </div>

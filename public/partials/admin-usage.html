@@ -10,7 +10,7 @@
   <div class="card-header">
     <span class="card-title" x-text="$app.t('admin.usage.title')"></span>
     <div class="card-actions">
-      <button type="button" class="icon-btn icon-btn--ghost" @click="adminUsageLoadTab()" :disabled="adminUsageLoading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="adminUsageLoadTab()" :disabled="adminUsageLoading" :data-tip="$app.t('common.refresh')" :aria-label="$app.t('common.refresh')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg></button>
     </div>
   </div>
 
@@ -126,7 +126,7 @@
           <span x-text="email"></span>
           <button type="button" class="admin-usage-filter-chip-remove"
                   :aria-label="$app.t('common.remove')"
-                  @click="adminUsageRemoveFilterUser(email)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                  @click="adminUsageRemoveFilterUser(email)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
         </span>
       </template>
     </div>
@@ -202,7 +202,7 @@
           <span x-text="email"></span>
           <button type="button" class="admin-usage-filter-chip-remove"
                   :aria-label="$app.t('common.remove')"
-                  @click="adminUsageRemoveFilterUser(email)"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                  @click="adminUsageRemoveFilterUser(email)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
         </span>
       </template>
     </div>

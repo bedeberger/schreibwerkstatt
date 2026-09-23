@@ -11,10 +11,10 @@
     </div>
     <div class="card-actions">
       <button type="button" class="icon-btn icon-btn--ghost" @click="startNewChatSession()" :disabled="chatLoading" :data-tip="$app.t('chat.newSessionTitle')" :aria-label="$app.t('chat.newSession')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
       </button>
     </div>
-    <button type="button" class="btn-card-close" @click="$app.toggleChatCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+    <button type="button" class="btn-card-close" @click="$app.toggleChatCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
   </div>
 
   <div class="progress-bar-wrap" x-show="chatProgress > 0 && isChatSessionRunning(chatSessionId)">
@@ -80,7 +80,7 @@
     ></textarea>
     <button type="button" class="chat-send-btn" @click="sendChatMessage()" :disabled="chatLoading || !chatInput.trim()" :aria-label="$app.t('chat.send')">
       <span x-show="chatLoading" class="spinner"></span>
-      <svg x-show="!chatLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
+      <svg x-show="!chatLoading" class="icon" aria-hidden="true"><use href="/icons.svg#arrow-up"/></svg>
     </button>
   </div>
   <div class="chat-input-hint" x-text="$app.t('chat.inputHint')"></div>
@@ -95,7 +95,7 @@
       >
         <div class="chat-session-preview" x-text="(s.title || s.preview || $app.t('chat.previewEmpty')).slice(0, 80)"></div>
         <div class="chat-session-meta"><span x-show="isChatSessionRunning(s.id)" class="spinner chat-session-running" role="status" :aria-label="$app.t('chat.sessionRunning')" :data-tip="$app.t('chat.sessionRunning')"></span><span x-text="$app.formatDate(s.last_message_at)"></span></div>
-        <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+        <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
       </div>
     </template>
   </div>
@@ -113,7 +113,7 @@
     </div>
     <div class="card-actions">
       <button type="button" class="icon-btn icon-btn--ghost" @click="startNewBookChatSession()" :disabled="bookChatLoading" :data-tip="$app.t('chat.newSessionTitle')" :aria-label="$app.t('chat.newSession')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
       </button>
     </div>
   </div>
@@ -168,7 +168,7 @@
                   <button type="button" x-show="(msg.context_info.pages || []).length > 3"
                           class="chat-context-toggle"
                           @click.stop="expanded = !expanded">
-                    <template x-if="expanded"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#chevron-up"/></svg></template>
+                    <template x-if="expanded"><svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg></template>
                     <template x-if="!expanded"><span x-text="'+' + ((msg.context_info.pages || []).length - 3)"></span></template>
                   </button>
                   <template x-if="msg.context_info.totalPages > (msg.context_info.pages || []).length">
@@ -227,7 +227,7 @@
     ></textarea>
     <button type="button" class="chat-send-btn" @click="sendBookChatMessage()" :disabled="bookChatLoading || !bookChatInput.trim()" :aria-label="$app.t('chat.send')">
       <span x-show="bookChatLoading" class="spinner"></span>
-      <svg x-show="!bookChatLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-up"/></svg>
+      <svg x-show="!bookChatLoading" class="icon" aria-hidden="true"><use href="/icons.svg#arrow-up"/></svg>
     </button>
   </div>
   <div class="chat-input-hint" x-text="$app.t('chat.inputHint')"></div>
@@ -242,7 +242,7 @@
       >
         <div class="chat-session-preview" x-text="(s.title || s.preview || $app.t('chat.previewEmpty')).slice(0, 80)"></div>
         <div class="chat-session-meta"><span x-show="isBookChatSessionRunning(s.id)" class="spinner chat-session-running" role="status" :aria-label="$app.t('chat.sessionRunning')" :data-tip="$app.t('chat.sessionRunning')"></span><span x-text="$app.formatDate(s.last_message_at)"></span></div>
-        <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteBookChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+        <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteBookChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
       </div>
     </template>
   </div>

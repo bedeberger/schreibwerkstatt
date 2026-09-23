@@ -15,7 +15,7 @@
       <div class="card-subline"
            x-text="$app.ideenScope === 'chapter' ? $app.t('ideen.chatNoteChapter') : $app.t('ideen.chatNote')"></div>
     </div>
-    <button type="button" class="btn-card-close" @click="$app.showIdeenCard = false" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+    <button type="button" class="btn-card-close" @click="$app.showIdeenCard = false" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
   </div>
 
   <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>
@@ -74,7 +74,7 @@
                 :data-tip="$app.t('ideen.actions')"
                 :aria-label="$app.t('ideen.actions')"
                 :aria-expanded="menuOpenId === idee.id"
-                aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg></button>
+                aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg#more-horizontal"/></svg></button>
             </div>
             <template x-if="editingId !== idee.id">
               <div class="idee-content" :class="movingId === idee.id ? 'idee-content--moving' : ''" x-text="idee.content"></div>
@@ -119,7 +119,7 @@
                       x-show="ideeStatus(menuOpenIdee()) !== target"
                       @click.stop="setIdeeStatus(menuOpenIdee(), target); closeMenu()"
                       :disabled="busy">
-                <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=693#' + (target === 'offen' ? 'undo' : target === 'erledigt' ? 'check' : target === 'verworfen' ? 'minus' : 'play')"/></svg>
+                <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + (target === 'offen' ? 'undo' : target === 'erledigt' ? 'check' : target === 'verworfen' ? 'minus' : 'play')"/></svg>
                 <span x-text="$app.t('ideen.setStatus', { status: statusLabel(target) })"></span>
               </button>
             </template>
@@ -127,13 +127,13 @@
             <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                     @click.stop="openLinkPicker($event, menuOpenIdee()); closeMenu()"
                     :disabled="busy">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#external-link"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#external-link"/></svg>
               <span x-text="$app.t('ideen.link.add')"></span>
             </button>
             <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                     @click.stop="startEditIdee(menuOpenIdee()); closeMenu()"
                     :disabled="busy">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
               <span x-text="$app.t('ideen.edit')"></span>
             </button>
             <!-- Verschieben nur, solange die Idee offen ist: eine abgeschlossene
@@ -143,14 +143,14 @@
                     x-show="isOpenIdee(menuOpenIdee())"
                     @click.stop="startMoveIdee(menuOpenIdee()); closeMenu()"
                     :disabled="busy">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#move-horizontal"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#move-horizontal"/></svg>
               <span x-text="$app.t('ideen.move')"></span>
             </button>
             <div class="context-menu-sep" role="separator"></div>
             <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger"
                     @click.stop="deleteIdee(menuOpenIdee()); closeMenu()"
                     :disabled="busy">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
               <span x-text="$app.t('ideen.delete')"></span>
             </button>
           </div>
@@ -177,7 +177,7 @@
                 :data-tip="$app.t('ideen.actions')"
                 :aria-label="$app.t('ideen.actions')"
                 :aria-expanded="menuOpenId === idee.id"
-                aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg></button>
+                aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg#more-horizontal"/></svg></button>
             </div>
             <div class="idee-content" x-text="idee.content"></div>
             <!-- @include ideen-link-chips -->

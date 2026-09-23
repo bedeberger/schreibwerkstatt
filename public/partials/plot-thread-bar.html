@@ -21,7 +21,7 @@
   </template>
   <button type="button" class="plot-thread-add-btn" x-show="!addingThread"
           @click="addingThread = true; $nextTick(() => $root.querySelector('.plot-thread-add-input')?.focus())">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#plus"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
     <span x-text="$app.t('plot.thread.add')"></span>
   </button>
 

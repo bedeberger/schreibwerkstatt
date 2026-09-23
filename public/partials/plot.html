@@ -22,16 +22,16 @@
         <!-- Undo/Redo (max 10 Schritte, book/plot/history.js) -->
         <button type="button" class="icon-btn icon-btn--ghost" @click="plotHistoryUndo()"
                 :disabled="!_undoStack.length || busy"
-                :data-tip="$app.withHotkey($app.t('plot.history.undoTip'), 'undo')" :aria-label="$app.t('plot.history.undo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#undo"/></svg></button>
+                :data-tip="$app.withHotkey($app.t('plot.history.undoTip'), 'undo')" :aria-label="$app.t('plot.history.undo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#undo"/></svg></button>
         <button type="button" class="icon-btn icon-btn--ghost" @click="plotHistoryRedo()"
                 :disabled="!_redoStack.length || busy"
-                :data-tip="$app.withHotkey($app.t('plot.history.redoTip'), 'redo')" :aria-label="$app.t('plot.history.redo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#redo"/></svg></button>
+                :data-tip="$app.withHotkey($app.t('plot.history.redoTip'), 'redo')" :aria-label="$app.t('plot.history.redo')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#redo"/></svg></button>
         <button type="button" class="icon-btn icon-btn--ghost"
                 @click="runConsistency()"
                 :disabled="consistencyLoading || !beats.length"
                 :data-tip="$app.t('plot.consistency.run')" :aria-label="$app.t('plot.consistency.run')">
           <span x-show="consistencyLoading" class="spinner"></span>
-          <svg x-show="!consistencyLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+          <svg x-show="!consistencyLoading" class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
         </button>
         <!-- Beat-Verankerung: findet je Beat die Fundstellen im Buchtext (Ist-Index
              via semantische Suche/FTS, kein callAI) → Drift-Badges auf den Karten.
@@ -43,14 +43,14 @@
                 :data-tip="anchorSemanticActive() ? $app.t('plot.anchor.run') : $app.t('plot.anchor.runLiteral')"
                 :aria-label="$app.t('plot.anchor.run')">
           <span x-show="anchorLoading" class="spinner"></span>
-          <svg x-show="!anchorLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#scan"/></svg>
+          <svg x-show="!anchorLoading" class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
         </button>
         <button type="button" class="icon-btn icon-btn--ghost"
                 :class="{ 'is-active': plotFullscreen }"
                 :aria-pressed="plotFullscreen"
                 @click="togglePlotFullscreen()"
                 :aria-label="plotFullscreen ? $app.t('plot.fullscreenExit.tip') : $app.t('plot.fullscreen.tip')"
-                :data-tip="plotFullscreen ? $app.t('plot.fullscreenExit.tip') : $app.t('plot.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="plotFullscreen ? '/icons.svg?v=693#minimize-2' : '/icons.svg?v=693#maximize-2'"/></svg></button>
+                :data-tip="plotFullscreen ? $app.t('plot.fullscreenExit.tip') : $app.t('plot.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="plotFullscreen ? '/icons.svg#minimize-2' : '/icons.svg#maximize-2'"/></svg></button>
       </div>
     </div>
   </div>
@@ -102,7 +102,7 @@
       <input type="text" class="filter-search-input" x-model.debounce.200ms="plotFilters.text"
              :placeholder="$app.t('plot.filter.searchPlaceholder')"
              :aria-label="$app.t('plot.filter.searchPlaceholder')">
-      <button type="button" class="search-clear--icon" x-show="plotFilters.text" @click="plotFilters.text=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="plotFilters.text" @click="plotFilters.text=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')" x-show="beats.length > 0"
          x-modelable="value" x-model="plotFilters.figurId"

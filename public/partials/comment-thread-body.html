@@ -28,13 +28,13 @@
               @click.stop="toggleCommentResolve(thread.root)"
               :data-tip="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')"
               :aria-label="thread.root.resolved_at ? $app.t('share.comments.reopen') : $app.t('share.comments.resolve')">
-        <svg class="icon" aria-hidden="true" x-show="!thread.root.resolved_at"><use href="/icons.svg?v=693#check"/></svg>
-        <svg class="icon" aria-hidden="true" x-show="thread.root.resolved_at"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+        <svg class="icon" aria-hidden="true" x-show="!thread.root.resolved_at"><use href="/icons.svg#check"/></svg>
+        <svg class="icon" aria-hidden="true" x-show="thread.root.resolved_at"><use href="/icons.svg#rotate-cw"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost comment-rail__del"
               @click.stop="deleteBookComment(thread.root)"
               :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
       </button>
     </span>
   </div>
@@ -54,7 +54,7 @@
       <button type="button" class="icon-btn icon-btn--ghost comment-rail__del comment-rail__reply-del"
               @click="deleteBookComment(r)"
               :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
       </button>
     </div>
     <div class="comment-rail__body" x-text="r.body"></div>

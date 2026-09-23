@@ -18,7 +18,7 @@
                 :disabled="busy || anchorLoading"
                 @click="runFigurAnchor()"
                 :data-tip="arcSemanticActive() ? $app.t('werkstatt.arc.run.tip') : $app.t('werkstatt.arc.run.noSemantic')">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#zap"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#zap"/></svg>
           <span x-text="$app.t('werkstatt.arc.run')"></span>
         </button>
       </div>
@@ -100,7 +100,7 @@
                     })"></span>
               <button type="button" class="btn-close heatmap-detail-close"
                       @click="activeArcDetailKey = null"
-                      :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                      :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
             </div>
             <div class="heatmap-detail-list">
               <p class="muted-msg" x-show="arcDetailLoading" x-text="$app.t('werkstatt.arc.detail.loading')"></p>

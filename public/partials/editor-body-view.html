@@ -12,7 +12,7 @@
       <span class="page-aha__text" x-text="t('page.aha.text')"></span>
       <button type="button" class="page-aha__action" @click="runCheck(); _dismiss()" x-text="t('page.aha.action')"></button>
       <button type="button" class="icon-btn icon-btn--ghost page-aha__close" @click="_dismiss()" :data-tip="t('page.aha.dismiss')" :aria-label="t('page.aha.dismiss')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
     </div>
   </template>
@@ -45,14 +45,14 @@
               x-show="$store.tts.playing && !$store.tts.paused"
               :data-tip="t('tts.skip')" :aria-label="t('tts.skip')"
               @click="skipTtsProof()">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#chevron-last"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-last"/></svg>
       </button>
       <!-- Stoppen (nur wenn aktiv). -->
       <button type="button" class="dock-btn dock-btn--sub tts-dock-btn tts-dock-btn--sub"
               x-show="$store.tts.playing"
               :data-tip="t('tts.stop')" :aria-label="t('tts.stop')"
               @click="stopTtsProof()">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#square"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#square"/></svg>
       </button>
       <!-- Haupttaste: starten (Kopfhoerer) / pausieren / fortsetzen. -->
       <button type="button" class="dock-btn tts-dock-btn"
@@ -61,7 +61,7 @@
               :data-tip="!$store.tts.playing ? t('tts.listen') : ($store.tts.paused ? t('tts.resume') : t('tts.pause'))"
               :aria-label="!$store.tts.playing ? t('tts.listen') : ($store.tts.paused ? t('tts.resume') : t('tts.pause'))"
               @click="toggleTtsProof()">
-        <svg class="icon" aria-hidden="true"><use :href="`/icons.svg?v=694#${!$store.tts.playing ? 'headphones' : ($store.tts.paused ? 'play' : 'pause')}`"/></svg>
+        <svg class="icon" aria-hidden="true"><use :href="`/icons.svg#${!$store.tts.playing ? 'headphones' : ($store.tts.paused ? 'play' : 'pause')}`"/></svg>
       </button>
     </div>
   </template>

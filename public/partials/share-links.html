@@ -8,7 +8,7 @@
     </div>
     <div class="card-actions">
       <span class="card-form-error" x-show="loadError" x-text="loadError"></span>
-      <button type="button" class="btn-card-close" @click="$app.closeShareLinks()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+      <button type="button" class="btn-card-close" @click="$app.closeShareLinks()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </div>
   </div>
 
@@ -191,10 +191,10 @@
 
         <div class="share-row__actions">
           <template x-if="editingToken !== link.token && linkStatus(link) === 'active'">
-            <button type="button" class="icon-btn icon-btn--ghost" @click="startEdit(link)" :data-tip="$app.t('share.edit')" :aria-label="$app.t('share.edit')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pencil"/></svg></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="startEdit(link)" :data-tip="$app.t('share.edit')" :aria-label="$app.t('share.edit')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg></button>
           </template>
           <template x-if="linkStatus(link) === 'active'">
-            <button type="button" class="icon-btn icon-btn--ghost" @click="revokeLink(link.token)" :data-tip="$app.t('share.revoke')" :aria-label="$app.t('share.revoke')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg></button>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="revokeLink(link.token)" :data-tip="$app.t('share.revoke')" :aria-label="$app.t('share.revoke')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
           </template>
         </div>
 

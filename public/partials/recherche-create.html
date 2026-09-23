@@ -18,7 +18,7 @@
       <h2 class="research-dialog__title" x-text="$app.t('recherche.new')"></h2>
       <div class="research-item-actions research-dialog__actions">
         <button type="button" class="icon-btn icon-btn--ghost" @click="closeCreate()"
-                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </div>
     </header>
 
@@ -34,13 +34,13 @@
              Input — ein Alpine-Proxy bricht File.arrayBuffer. -->
         <div class="recherche-attach">
           <label class="btn-compact recherche-attach-btn">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
             <span x-text="$app.t('recherche.field.attach')"></span>
             <input type="file" accept="image/*,application/pdf" x-ref="createFile" @change="onCreateFilePick($event)">
           </label>
           <span class="recherche-attach-name" x-show="draft.fileName" x-text="draft.fileName"></span>
           <button type="button" class="icon-btn" x-show="draft.fileName" @click="clearCreateFile()"
-                  :data-tip="$app.t('recherche.field.attachClear')" :aria-label="$app.t('recherche.field.attachClear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                  :data-tip="$app.t('recherche.field.attachClear')" :aria-label="$app.t('recherche.field.attachClear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
         </div>
       </div>
     </div>

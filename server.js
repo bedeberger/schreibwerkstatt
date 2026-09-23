@@ -15,6 +15,7 @@ const { setSessionFingerprintCookie } = require('./lib/session-fingerprint');
 const { db, cleanupStuckJobRuns, pruneStaleByAge } = require('./db/schema');
 const appUsers = require('./db/app-users');
 const { tryDeviceAuth, extractBearer } = require('./lib/device-auth');
+const { tokenAwareSession } = require('./lib/token-session');
 const { deviceScopeGate } = require('./lib/device-scopes');
 const deviceTokens = require('./db/device-tokens');
 const bookAccess = require('./db/book-access');
@@ -236,7 +237,10 @@ const sessionStore = new SqliteStore({
 // Index auf expire — Store-GC scannt `WHERE datetime('now') > datetime(expire)`.
 db.prepare('CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions(expire)').run();
 
-app.use(session({
+// Token-Requests (Metrics-Scraper, native Clients) laufen an express-session
+// vorbei auf einer In-Memory-Session — sonst eine DB-Zeile pro Request, siehe
+// lib/token-session.js.
+app.use(tokenAwareSession(session({
   store: sessionStore,
   secret: sessionSecret,
   resave: false,
@@ -250,7 +254,7 @@ app.use(session({
     httpOnly: true,
     sameSite: 'lax',
   },
-}));
+})));
 
 if (LOCAL_DEV_MODE) {
   logger.warn('LOCAL_DEV_MODE aktiv – OAuth wird übersprungen, automatische Dev-Session!');
@@ -467,12 +471,11 @@ app.use((req, res, next) => {
   // Token faellt der Guard auf seinen normalen 401/Redirect-Pfad zurueck.
   //
   // Traegt der Request ein swd_-Bearer-Token, hat die Device-Auth IMMER Vorrang —
-  // auch wenn schon ein Session-Cookie existiert. express-session setzt beim
-  // ersten Touch ein Cookie, das der native Client mitsendet; ohne diesen Vorrang
-  // wuerde der Session-Pfad die Device-Auth danach 7 Tage kurzschliessen
-  // (touchTokenUsage-Telemetrie eingefroren, widerrufene Tokens blieben gueltig).
-  // Bei ungueltigem/widerrufenem Token wird ein altes Cookie bewusst ignoriert,
-  // damit der Recheck nicht ausgehebelt wird.
+  // ein mitgeschicktes Session-Cookie zaehlt nicht. Token-Requests laufen darum
+  // auf einer leeren In-Memory-Session (lib/token-session.js); wuerde ein Cookie
+  // die Device-Auth kurzschliessen, fror die touchTokenUsage-Telemetrie ein und
+  // widerrufene Tokens blieben gueltig. Bei ungueltigem/widerrufenem Token geht
+  // es deshalb direkt in 401/Redirect, nie zurueck auf eine Cookie-Session.
   const bearer = extractBearer(req);
   const isDeviceBearer = !!bearer && bearer.startsWith(deviceTokens.TOKEN_PREFIX);
   if (req.session?.user && !isDeviceBearer) return next();

@@ -108,6 +108,23 @@ test('_checkTreeDrift zieht nur bei gemeldeten Aenderungen nach', async () => {
   } finally { globalThis.fetch = prev; }
 });
 
+test('_checkTreeDrift stellt dieselbe Frage nicht zweimal hintereinander', async () => {
+  const urls = [];
+  const prev = globalThis.fetch;
+  globalThis.fetch = async (url) => { urls.push(String(url)); return { ok: true, json: async () => ({ changes: [] }) }; };
+  try {
+    const ctx = ctxWithPages([{ id: 1, updated_at: '2026-09-01T08:00:00.000Z' }]);
+    await ctx._checkTreeDrift('3');
+    await ctx._checkTreeDrift('3');
+    assert.equal(urls.length, 1, 'Boot-Load + erster Geraete-Ping: gleicher Cursor, ein Read.');
+    // Neuer Baum-Stand → neue Frage, auch innerhalb des Fensters.
+    ctx.$store.nav.pages = [{ id: 1, updated_at: '2026-09-02T08:00:00.000Z' }];
+    await ctx._checkTreeDrift('3');
+    assert.equal(urls.length, 2);
+    assert.match(urls[1], /since=2026-09-02/);
+  } finally { globalThis.fetch = prev; }
+});
+
 // ── Meldung → Handlung ─────────────────────────────────────────────────────
 
 function routingCtx(selectedBookId = '3') {

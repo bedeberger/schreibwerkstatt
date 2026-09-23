@@ -502,7 +502,7 @@
             <button type="button" class="today-ring-pop-link internal-link"
                     @click="$store.progress.popoverOpen = false; toggleMyStatsCard()">
               <span x-text="t('todayRing.fullStats')"></span>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#arrow-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-right"/></svg>
             </button>
           </div>
         </span>
@@ -516,7 +516,7 @@
               @click="toggleHelpCard()"
               :data-tip="hasUnreadChangelog($store.shell) ? t('changelog.openHint') : t('help.openHint')"
               :aria-label="hasUnreadChangelog($store.shell) ? t('changelog.openHint') : t('help.openHint')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#circle-help"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#circle-help"/></svg>
       </button>
       <div id="partial-avatar-menu"></div>
     </div>
@@ -795,7 +795,7 @@
       <template x-if="job.status === 'running' && job.progress > 0">
         <span class="job-queue-pill-progress" x-text="job.progress + '%'"></span>
       </template>
-      <button type="button" class="job-queue-cancel-btn" @click.stop="cancelJob(job.id)" :data-tip="t('jobQueue.cancel')" :aria-label="t('jobQueue.cancel')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+      <button type="button" class="job-queue-cancel-btn" @click.stop="cancelJob(job.id)" :data-tip="t('jobQueue.cancel')" :aria-label="t('jobQueue.cancel')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </div>
   </template>
   <button type="button"

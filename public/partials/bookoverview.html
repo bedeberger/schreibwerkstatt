@@ -12,7 +12,7 @@
       <button type="button" class="icon-btn icon-btn--ghost" @click="loadBookOverview($store.nav.selectedBookId)" :disabled="overviewLoading"
               :data-tip="$app.t('overview.refresh')" :aria-label="$app.t('overview.refresh')">
         <span x-show="overviewLoading" class="spinner"></span>
-        <svg x-show="!overviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg?v=693#rotate-cw"/></svg>
+        <svg x-show="!overviewLoading" class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
       </button>
     </div>
   </div>
@@ -24,7 +24,7 @@
   <!-- Fehlerhinweis: mindestens ein Endpoint ist auch nach Retry ausgefallen.
        Verhindert, dass ein leeres Tile als „keine Daten" fehlgedeutet wird. -->
   <div class="overview-notice" x-show="overviewLoadErrors.length > 0" x-cloak role="status">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
     <span class="overview-notice-text" x-text="$app.t('overview.loadError')"></span>
     <button type="button" class="btn-compact" @click="loadBookOverview($store.nav.selectedBookId)" :disabled="overviewLoading" x-text="$app.t('overview.refresh')"></button>
   </div>

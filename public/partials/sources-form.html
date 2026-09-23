@@ -8,7 +8,7 @@
     <span class="sources-form-title"
           x-text="srcEditingId === 'new' ? $app.t('sources.form.newTitle') : $app.t('sources.form.editTitle')"></span>
     <button type="button" class="icon-btn icon-btn--ghost" @click="cancelSourceEdit()"
-            :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+            :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
   </div>
 
   <div class="card-form-grid">
@@ -42,7 +42,7 @@
             </div>
           </template>
           <button type="button" class="btn-compact" @click="addSourcePerson(kind)">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#plus"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
             <span x-text="$app.t('sources.person.add')"></span>
           </button>
           <p class="card-form-hint" x-show="kind === 'authors'" x-text="$app.t('sources.person.hint')"></p>
@@ -143,13 +143,13 @@
           <template x-if="srcDraft.has_doc">
             <div class="sources-doc-attached">
               <button type="button" class="internal-link sources-doc-link" @click="downloadSourceDoc(srcEditingId)">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#file-plus"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
                 <span x-text="srcDraft.doc_name || $app.t('sources.doc.fallbackName')"></span>
               </button>
               <span class="sources-doc-pages" x-show="srcDraft.doc_pages"
                     x-text="$app.t('sources.doc.pages', { n: srcDraft.doc_pages })"></span>
               <button type="button" class="icon-btn icon-btn--ghost" @click="removeSourceDoc()" :disabled="srcDocBusy"
-                      :data-tip="$app.t('sources.doc.remove')" :aria-label="$app.t('sources.doc.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#trash"/></svg></button>
+                      :data-tip="$app.t('sources.doc.remove')" :aria-label="$app.t('sources.doc.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
             </div>
           </template>
           <div class="sources-doc-busy" x-show="srcDocBusy" x-cloak><span class="spinner"></span></div>

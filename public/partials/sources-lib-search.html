@@ -10,7 +10,7 @@
 <div class="sources-lib-search" x-data="collapsible()">
   <div class="sources-lib-search-head">
     <button type="button" class="collapsible-toggle" x-bind="trigger">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#search"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>
       <span x-text="$app.t('sources.libSearch.title')"></span>
       <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
     </button>
@@ -24,7 +24,7 @@
                :placeholder="$app.t('sources.libSearch.placeholder')" :aria-label="$app.t('sources.libSearch.placeholder')"
                :disabled="!$store.config.semanticSearchEnabled">
         <button type="button" class="search-clear--icon" x-show="srcLibQuery" @click="srcLibQuery=''; srcLibHits=[]; srcLibRan=false"
-                :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+                :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </span>
       <button type="button" class="btn-compact" @click="searchSourceLibrary()"
               :disabled="!$store.config.semanticSearchEnabled || srcLibSearching || srcLibQuery.trim().length < 2">
@@ -40,7 +40,7 @@
       <template x-for="h in srcLibHits" :key="h.source_id">
         <li class="sources-lib-hit">
           <button type="button" class="sources-lib-hit-title internal-link" @click="openLibraryHit(h)">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#file-plus"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
             <span x-text="h.title || $app.t('sources.untitled')"></span>
             <span class="sources-lib-hit-citekey" x-show="h.citekey" x-text="h.citekey"></span>
           </button>

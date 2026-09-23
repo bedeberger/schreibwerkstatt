@@ -32,7 +32,7 @@
               :disabled="!!bookExportLoading || !$store.nav.selectedBookId"
               @click="bookExport(fmt)">
         <span x-show="bookExportLoading === fmt" class="spinner"></span>
-        <svg x-show="bookExportLoading !== fmt" class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+        <svg x-show="bookExportLoading !== fmt" class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
         <span x-text="$app.t('book.export.' + fmt)"></span>
       </button>
     </template>
@@ -86,7 +86,7 @@
             :disabled="!!bookExportLoading || !$store.nav.selectedBookId"
             @click="migrateExport()">
       <span x-show="bookExportLoading === 'swbook'" class="spinner"></span>
-      <svg x-show="bookExportLoading !== 'swbook'" class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+      <svg x-show="bookExportLoading !== 'swbook'" class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
       <span x-text="$app.t('book.export.swbook')"></span>
     </button>
   </div>

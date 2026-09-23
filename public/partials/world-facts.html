@@ -19,7 +19,7 @@
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
             :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
@@ -39,7 +39,7 @@
   <div x-show="fakten.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
       <input type="text" x-model="wfFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <button type="button" class="search-clear--icon" x-show="wfFilters.suche" @click="wfFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="wfFilters.suche" @click="wfFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </span>
     <div x-show="wfSeiteListe.length > 0"
          x-data="combobox($app.t('weltfakten.filterKapitel'), $app.t('common.all'))"
@@ -58,7 +58,7 @@
                 :class="{ 'tabs-btn--active': wfFilters.kategorie === k }"
                 :aria-pressed="wfFilters.kategorie === k"
                 @click="wfFilters.kategorie = wfFilters.kategorie === k ? '' : k">
-          <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=636#' + wfKatIcon(k)"/></svg>
+          <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + wfKatIcon(k)"/></svg>
           <span x-text="wfKatLabel(k)"></span>
           <span class="tabs-btn-count" x-text="wfKatCount(k)"></span>
         </button>
@@ -78,7 +78,7 @@
                 :aria-controls="'wf-group-' + g.kategorie">
           <span class="history-chevron" :class="{ open: wfGroupOpen(g.kategorie) }" aria-hidden="true"></span>
           <span class="tag entity-typ-tag weltfakten-kat-tag">
-            <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=636#' + wfKatIcon(g.kategorie)"/></svg>
+            <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + wfKatIcon(g.kategorie)"/></svg>
             <span x-text="wfKatLabel(g.kategorie)"></span>
           </span>
           <span class="weltfakten-group-count" x-text="g.fakten.length"></span>

@@ -49,7 +49,7 @@
 
     <div class="overview-plot-drift" x-show="overviewPlotStats().drift > 0"
          :data-tip="$app.t('overview.plotDriftTip')">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#alert-triangle"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
       <span x-text="$app.t('overview.plotDrift', { n: overviewPlotStats().drift })"></span>
     </div>
   </div>

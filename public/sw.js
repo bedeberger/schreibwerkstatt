@@ -13,7 +13,7 @@
 //  - Kohärenz-kritische Shell-Assets (App-JS + Partials + App-CSS + i18n +
 //    Icon-Sprite): Liste + Content-Hash kommen aus dem generierten
 //    /sw-manifest.js (importScripts). Der Install-Handler precacht diesen Satz
-//    ATOMAR (cache.addAll). Damit hat jede SW-Generation ihren vollständigen,
+//    ATOMAR (precacheWithRetry, all-or-nothing). Damit hat jede SW-Generation ihren vollständigen,
 //    kohärenten Asset-Satz ab Installationszeitpunkt — ein lazy-gefetchtes
 //    Partial oder dynamisch importiertes Modul zieht NIE eine neuere Fassung
 //    vom Netz in eine laufende alte Generation (Skew → ReferenceError auf
@@ -136,13 +136,19 @@ async function isCachedShell(res) {
   catch { return false; }
 }
 
-// Precache mit Backoff-Retry, faktisch all-or-nothing: erst wenn ALLE Antworten
-// da und ok sind, wird geschrieben (kein halb gefüllter Cache). Genau im
-// schlechten Netz (= das Zielszenario) reicht sonst ein transienter Fehler, um
-// ein Update nie zu installieren — darum mehrere Versuche mit wachsender Pause.
-// Bleibt es nach `attempts` beim Fehler, propagiert der letzte Error und der
-// Install scheitert sauber; der alte SW bedient seinen eigenen, kohärenten Satz
-// unverändert weiter.
+// Precache mit begrenzter Parallelität und Retry PRO ASSET, all-or-nothing:
+// erst wenn ALLE Antworten da und ok sind, wird geschrieben (kein halb
+// gefüllter Cache). Bleibt ein Asset nach PRECACHE_ATTEMPTS beim Fehler,
+// bricht der Rest ab und der Install scheitert sauber; der alte SW bedient
+// seinen eigenen, kohärenten Satz unverändert weiter.
+//
+// **Why begrenzt:** der Satz umfasst ~900 Assets. Alle auf einmal gestartet
+// (ein `Promise.all` über den ganzen Satz) liefen beim Erst-Install parallel zu
+// den ~700 Modul-Requests der noch unkontrollierten Seite, und ein einziger
+// transienter Fehler verwarf den ganzen Versuch — drei Versuche, dann still kein
+// SW. Die Seite blieb dauerhaft ohne Controller (jede Navigation revalidiert den
+// ganzen Satz vom Netz, offline geht nichts), nachweisbar nur in der Telemetrie.
+// Retry pro Asset heisst: ein Aussetzer kostet einen Request, nicht 900.
 //
 // Bewusst NICHT `cache.addAll`: das folgt einem Redirect und legt die Antwort
 // unter der ANGEFRAGTEN URL ab. Partials laufen ohne Session in den Auth-Guard
@@ -151,29 +157,72 @@ async function isCachedShell(res) {
 // ausgeliefert werden, bliebe die Generation dauerhaft kaputt. `redirect:'error'`
 // lässt den Fetch stattdessen scheitern: fällt die Session während des Installs
 // aus, schlägt er fehl, statt Müll zu committen.
-async function precacheWithRetry(cache, paths, attempts = 3) {
+const PRECACHE_CONCURRENCY = 16;
+const PRECACHE_ATTEMPTS = 3;
+
+async function fetchForPrecache(p, signal) {
   let lastErr;
-  for (let i = 0; i < attempts; i++) {
-    // Beim ersten Fehlschlag die übrigen Requests dieses Versuchs abbrechen:
-    // ohne das laufen ~800 bereits gestartete Fetches weiter und der nächste
-    // Versuch legt seine ~800 obendrauf — bei fehlender Session (jeder Pfad
-    // scheitert) dauert ein Install so Minuten statt Sekunden.
-    const ctrl = new AbortController();
+  for (let i = 0; i < PRECACHE_ATTEMPTS; i++) {
     try {
-      const fetched = await Promise.all(paths.map(async (p) => {
-        const res = await fetch(new Request(p, { cache: 'reload', redirect: 'error', signal: ctrl.signal }));
-        if (!res || !res.ok) throw new Error(`Precache ${p}: HTTP ${res && res.status}`);
-        return [p, res];
-      }));
-      await Promise.all(fetched.map(([p, res]) => cache.put(p, res)));
-      return;
+      const res = await fetch(new Request(p, { cache: 'reload', redirect: 'error', signal }));
+      if (res && res.ok) return res;
+      lastErr = new Error(`HTTP ${res && res.status}`);
     } catch (err) {
-      ctrl.abort();
       lastErr = err;
-      if (i < attempts - 1) await new Promise(r => setTimeout(r, 500 * (i + 1)));
     }
+    if (signal.aborted) break;
+    if (i < PRECACHE_ATTEMPTS - 1) await new Promise(r => setTimeout(r, 500 * (i + 1)));
   }
-  throw lastErr;
+  const err = new Error(`Precache ${p}: ${lastErr?.name || 'Error'}: ${lastErr?.message || lastErr}`);
+  err.precachePath = p;
+  throw err;
+}
+
+async function precacheWithRetry(cache, paths) {
+  // Beim ersten endgültigen Fehlschlag die übrigen Requests abbrechen: bei
+  // fehlender Session (jeder Pfad scheitert) liefe der Install sonst Minuten.
+  const ctrl = new AbortController();
+  const fetched = new Array(paths.length);
+  let next = 0;
+  let firstErr = null;
+  const worker = async () => {
+    while (!firstErr && next < paths.length) {
+      const idx = next++;
+      try {
+        fetched[idx] = await fetchForPrecache(paths[idx], ctrl.signal);
+      } catch (err) {
+        if (!firstErr) { firstErr = err; ctrl.abort(); }
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(PRECACHE_CONCURRENCY, paths.length) }, worker));
+  if (firstErr) {
+    firstErr.precacheDone = fetched.filter(Boolean).length;
+    firstErr.precacheTotal = paths.length;
+    throw firstErr;
+  }
+  await Promise.all(paths.map((p, i) => cache.put(p, fetched[i])));
+}
+
+// Ein gescheiterter Install hinterlässt nichts Sichtbares: ohne aktiven SW
+// bleibt die Seite einfach unkontrolliert. Darum meldet der SW ihn selbst an
+// dieselbe Telemetrie wie failsafe-reveal.js (kind 'boot'). Nur Precache-
+// Fehler — ein Install ohne Session scheitert absichtlich und hätte ohnehin
+// keine Session für den Report. Best-effort: der Report darf den Install-
+// Fehler nie überdecken.
+async function reportInstallFailure(err) {
+  try {
+    await fetch(new Request('/telemetry/js-error', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        kind: 'boot',
+        message: `SW-Install gescheitert: ${err.message} [build=${SHELL_BUILD} ok=${err.precacheDone}/${err.precacheTotal}]`,
+        source: err.precachePath,
+      }),
+    }));
+  } catch {}
 }
 
 // Vollständigkeits-Marke der Generation: der Install legt sie als LETZTEN
@@ -260,7 +309,12 @@ function startRepair(event) {
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    await fillGeneration();
+    try {
+      await fillGeneration();
+    } catch (err) {
+      if (err?.precachePath) await reportInstallFailure(err);
+      throw err;
+    }
     // Bewusst KEIN skipWaiting hier: der neue SW bleibt `waiting`, bis der
     // User das Update-Banner klickt (applyUpdate → 'skip-waiting'-Message).
     // Sonst übernähme der neue SW eine laufende (Editor-)Seite sofort und
@@ -395,7 +449,7 @@ async function handleShellAsset(req, url, event) {
   if (cached) return cached;
 
   if (MANIFEST_SET.has(url.pathname)) {
-    // Query-versionierte Shell-Assets (z.B. /icons.svg?v=NNN) sind unter ihrem
+    // Shell-Assets mit Query-String (Cache-Buster `?v=`) sind unter ihrem
     // query-losen Pfad precacht. ignoreSearch matcht die precachte Generation,
     // statt bei jedem ?v= einen ungecachten Netz-Fetch zu erzwingen (offline →
     // Icon-Sprite nicht ladbar → alle Icons weg). Die Generation ist trotzdem

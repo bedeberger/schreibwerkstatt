@@ -64,7 +64,7 @@
           <span x-text="chip.label"></span>
           <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
                   @click="toggleBeatDraftFigure(chip.id)">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
           </button>
         </span>
       </template>
@@ -73,7 +73,7 @@
           <span x-text="chip.label"></span>
           <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
                   @click="toggleBeatDraftWerkstattFigure(chip.id)">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
           </button>
         </span>
       </template>
@@ -90,7 +90,7 @@
           <span x-text="chip.label"></span>
           <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
                   @click="toggleBeatDraftMotif(chip.id)">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
           </button>
         </span>
       </template>
@@ -108,7 +108,7 @@
           <span x-text="chip.label"></span>
           <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
                   @click="toggleBeatDraftOrt(chip.id)">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
           </button>
         </span>
       </template>
@@ -135,7 +135,7 @@
             <span x-text="relTypeLabel(rel.typ) + ' → ' + rel.to_titel"></span>
             <button type="button" class="plot-fig-chip-remove" :aria-label="$app.t('common.remove')"
                     @click="deleteBeatRelationById(rel.id)">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
             </button>
           </span>
         </template>
@@ -143,10 +143,10 @@
     </div>
     <div class="plot-beat-edit-actions">
       <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditBeat(beat)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="cancelEditBeat()" :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
       </button>
       <span class="action-sep" aria-hidden="true"></span>
       <!-- Verwerfen ist eine eigene Achse (Flag), kein Status — sofort persistiert. -->
@@ -155,10 +155,10 @@
               @click="toggleBeatVerworfen(beat)"
               :data-tip="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')"
               :aria-label="beat.verworfen ? $app.t('plot.beat.restore') : $app.t('plot.beat.discard')">
-        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=691#' + (beat.verworfen ? 'rotate-ccw' : 'minus')"/></svg>
+        <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + (beat.verworfen ? 'rotate-ccw' : 'minus')"/></svg>
       </button>
       <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger plot-beat-delete" @click="deleteBeat(beat)" :data-tip="$app.t('plot.beat.delete')" :aria-label="$app.t('plot.beat.delete')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
       </button>
     </div>
   </div>

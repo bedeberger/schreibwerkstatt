@@ -36,7 +36,7 @@
              :aria-label="$app.t('common.search')" class="filter-search-input">
       <button type="button" class="search-clear--icon" x-show="figurenAlterFilters.suche"
               @click="figurenAlterFilters.suche = ''" :aria-label="$app.t('search.clear')"
-              :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+              :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figurTyp')"
          x-modelable="value" x-model="figurenAlterFilters.typ"

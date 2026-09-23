@@ -10,7 +10,7 @@
     <span class="card-title" x-text="$app.t('mybooks.title')"></span>
     <button type="button" class="btn-card-close" @click="$app.toggleMyBooksCard()"
             :aria-label="$app.t('common.close')" :data-tip="$app.t('common.close')">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=696#x"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
     </button>
   </div>
 
@@ -78,7 +78,7 @@
                    :placeholder="$app.t('mybooks.search')" x-model="myBooksQuery">
             <button type="button" class="search-clear--icon" x-show="myBooksQuery" @click="myBooksQuery = ''"
                     :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=696#x"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
             </button>
           </span>
           <span class="filter-count" x-text="myBooksFiltered().length + ' / ' + myBooksRows.length"></span>
@@ -175,7 +175,7 @@
                             @click="myBooksTogglePin(row)"
                             :data-tip="row.pinned ? $app.t('mybooks.unpin') : $app.t('mybooks.pin')"
                             :aria-label="row.pinned ? $app.t('mybooks.unpin') : $app.t('mybooks.pin')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=696#pin"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#pin"/></svg>
                     </button>
                     <button type="button" class="icon-btn icon-btn--ghost"
                             :class="{ 'is-active': row.archived }"
@@ -184,7 +184,7 @@
                             @click="myBooksToggleArchive(row)"
                             :data-tip="row.archived ? $app.t('mybooks.unarchive') : $app.t('mybooks.archive')"
                             :aria-label="row.archived ? $app.t('mybooks.unarchive') : $app.t('mybooks.archive')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=696#archive"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#archive"/></svg>
                     </button>
                     <button type="button" class="icon-btn icon-btn--ghost"
                             x-show="myBooksMayFinish(row)"
@@ -194,12 +194,12 @@
                             @click="myBooksToggleFinished(row)"
                             :data-tip="row.is_finished ? $app.t('mybooks.unfinish') : $app.t('mybooks.finish')"
                             :aria-label="row.is_finished ? $app.t('mybooks.unfinish') : $app.t('mybooks.finish')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=696#check"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
                     </button>
                     <button type="button" class="icon-btn icon-btn--ghost"
                             @click="myBooksOpen(row)"
                             :data-tip="$app.t('mybooks.open')" :aria-label="$app.t('mybooks.open')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=696#book-open"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg>
                     </button>
                   </div>
                 </td>

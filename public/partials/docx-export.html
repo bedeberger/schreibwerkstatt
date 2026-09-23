@@ -26,7 +26,7 @@
                 :class="{ primary: exportIncludeSubchapters }"
                 :aria-pressed="exportIncludeSubchapters"
                 :data-tip="$app.t('docxExport.includeSubchaptersTip')">
-          <svg class="icon" aria-hidden="true"><use :href="exportIncludeSubchapters ? '/icons.svg?v=690#check' : '/icons.svg?v=690#chevron-down'"/></svg>
+          <svg class="icon" aria-hidden="true"><use :href="exportIncludeSubchapters ? '/icons.svg#check' : '/icons.svg#chevron-down'"/></svg>
           <span x-text="$app.t('docxExport.includeSubchapters')"></span>
         </button>
         <div x-show="exportScope === 'page'" x-data="combobox({ placeholder: $app.t('export.scope.pickPage'), compact: false })"
@@ -36,7 +36,7 @@
       <button type="button" class="primary" x-show="!exporting"
               :disabled="!$store.nav.selectedBookId || !activeProfile"
               @click="exportDocx()">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
         <span x-text="$app.t('docxExport.export')"></span>
       </button>
       <button type="button" data-label-ok x-show="exporting" @click="cancelExport()">
@@ -58,33 +58,33 @@
          @combobox-change="selectProfile($event.detail)"></div>
     <button type="button" class="export-profile-btn" :data-tip="$app.t('docxExport.newProfile')"
             @click="showCreate = !showCreate">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#plus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile"
             :data-tip="$app.t('docxExport.renameProfile')" @click="beginRename()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#pencil"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile"
             :data-tip="$app.t('docxExport.duplicateProfile')" @click="duplicateProfile()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#copy"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#copy"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile && !activeProfile.is_default"
             :data-tip="$app.t('docxExport.makeDefault')" @click="setDefaultProfile(activeProfileId)">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#check"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile"
             :data-tip="$app.t('docxExport.exportProfile')" @click="exportProfileConfig()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#download"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
     </button>
     <button type="button" class="export-profile-btn"
             :data-tip="$app.t('docxExport.importProfile')" @click="$refs.importInput.click()">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#file-plus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
     </button>
     <input type="file" hidden x-ref="importInput" accept="application/json,.json"
            @change="importProfileConfig($event.target.files[0]); $event.target.value = ''">
     <button type="button" class="export-profile-btn" x-show="profiles.length > 1"
             :data-tip="$app.t('docxExport.deleteProfile')" @click="deleteProfile(activeProfileId)">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
     </button>
   </div>
 

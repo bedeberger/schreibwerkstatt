@@ -133,9 +133,10 @@ export const bookscopeMethods = {
   //     Konkurrenz mehrerer offener Tabs auflöst (zwei Fenster nebeneinander
   //     bleiben beide sichtbar, dort feuert nur `focus`)
   //
-  // Beim Boot NUR aus einem sichtbaren Tab: nach einem Deploy laden alle Tabs
-  // neu (controllerchange → reload), und ein verstecktes Neuladen darf sein Buch
-  // nicht als „zuletzt offen" stempeln — genau daran hing das Zufalls-Verhalten.
+  // NUR aus einem sichtbaren Tab — für jeden Aufrufer, auch `force`: nach einem
+  // Deploy laden alle Tabs neu (controllerchange → reload), und ein verstecktes
+  // Neuladen darf sein Buch nicht als „zuletzt offen" stempeln, weder über den
+  // Boot-Stempel noch über das `selectPage` der Hash-Wiederherstellung.
   //
   // Best-Effort: kein `await` beim Aufrufer, Fehler werden geschluckt. Offline
   // bleibt der lokale Merker die Antwort, und der nächste sichtbare Boot meldet
@@ -143,6 +144,7 @@ export const bookscopeMethods = {
   _touchBookOpened(bookId, { force = false } = {}) {
     const id = String(bookId || '');
     if (!id) return;
+    if (globalThis.document?.hidden) return;
     if (this.$store.session.sessionExpired) return;
     const now = Date.now();
     if (!force && _lastTouch.bookId === id && now - _lastTouch.ts < TOUCH_THROTTLE_MS) return;

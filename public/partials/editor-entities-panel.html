@@ -66,7 +66,7 @@
               </span>
             </div>
             <button type="button" class="entity-popover-close" @click="closePopover()"
-                    :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                    :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
           </div>
 
           <div class="entity-popover-body">
@@ -135,25 +135,25 @@
                     x-show="entityPopover.kind === 'figure'"
                     @click="openFigure(entityPopover.id)">
               <span x-text="$app.t('entities.gotoCard')"></span>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-right"/></svg>
             </button>
             <button type="button" class="entity-popover-link"
                     x-show="entityPopover.kind === 'location'"
                     @click="openLocation(entityPopover.id)">
               <span x-text="$app.t('entities.gotoCard')"></span>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-right"/></svg>
             </button>
             <button type="button" class="entity-popover-link"
                     x-show="entityPopover.kind === 'scene'"
                     @click="openScene(entityPopover.id); closePopover()">
               <span x-text="$app.t('entities.gotoCard')"></span>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-right"/></svg>
             </button>
             <button type="button" class="entity-popover-link"
                     x-show="entityPopover.kind === 'event'"
                     @click="openEvent(entityPopover.data?.figure_id); closePopover()">
               <span x-text="$app.t('entities.gotoCard')"></span>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-right"/></svg>
             </button>
             <!-- Beleg: externer Zeiger (DOI/URL) und der Weg ins
                  Quellenverzeichnis, wo die Quelle gepflegt wird. -->
@@ -162,13 +162,13 @@
                :href="entityPopover.data?.url || '#'"
                target="_blank" rel="noopener noreferrer">
               <span x-text="$app.t('entities.sourceOpenUrl')"></span>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#external-link"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#external-link"/></svg>
             </a>
             <button type="button" class="entity-popover-link"
                     x-show="entityPopover.kind === 'source' && !entityPopover.data?.missing"
                     @click="openSourceInList(entityPopover.data?.srcId)">
               <span x-text="$app.t('entities.sourceGoto')"></span>
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#arrow-right"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-right"/></svg>
             </button>
           </div>
         </div>

@@ -14,12 +14,12 @@
                 :aria-pressed="researchChatOpen"
                 @click="toggleResearchChat()"
                 :aria-label="$app.t('recherche.chat.toggle')"
-                :data-tip="$app.t('recherche.chat.toggle')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#message-square"/></svg></button>
+                :data-tip="$app.t('recherche.chat.toggle')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#message-square"/></svg></button>
         <button type="button" class="icon-btn icon-btn--ghost" :aria-pressed="rechercheFullscreen"
                 @click="toggleRechercheFullscreen()"
                 :aria-label="rechercheFullscreen ? $app.t('recherche.fullscreenExit.tip') : $app.t('recherche.fullscreen.tip')"
-                :data-tip="rechercheFullscreen ? $app.t('recherche.fullscreenExit.tip') : $app.t('recherche.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="rechercheFullscreen ? '/icons.svg?v=693#minimize-2' : '/icons.svg?v=693#maximize-2'"/></svg></button>
-        <button type="button" class="icon-btn icon-btn--ghost" @click="$app.toggleRechercheCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+                :data-tip="rechercheFullscreen ? $app.t('recherche.fullscreenExit.tip') : $app.t('recherche.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="rechercheFullscreen ? '/icons.svg#minimize-2' : '/icons.svg#maximize-2'"/></svg></button>
+        <button type="button" class="icon-btn icon-btn--ghost" @click="$app.toggleRechercheCard()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </div>
     </div>
   </div>
@@ -51,7 +51,7 @@
   <!-- Toolbar: Anlegen + Filter -->
   <div class="card-toolbar">
     <button type="button" class="btn-compact" @click="startCreate()" :disabled="busy">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
       <span x-text="$app.t('recherche.new')"></span>
     </button>
     <div class="filter-bar filter-bar--inline">
@@ -78,7 +78,7 @@
                @input.debounce.400ms="applyFilters()"
                :placeholder="$app.t('recherche.filter.search')"
                :aria-label="$app.t('recherche.filter.search')">
-        <button type="button" class="search-clear--icon" x-show="filterText" @click="filterText=''; applyFilters()" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#x"/></svg></button>
+        <button type="button" class="search-clear--icon" x-show="filterText" @click="filterText=''; applyFilters()" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </span>
       <div x-data="combobox($app.t('recherche.sort.label'))"
            x-modelable="value" x-model="sortBy"
@@ -110,7 +110,7 @@
     <p class="card-empty-text" x-text="$app.t('recherche.empty')"></p>
     <p class="card-empty-hint" x-text="$app.t('recherche.emptyHint')"></p>
     <button type="button" class="primary card-empty-cta" @click="startCreate()" :disabled="busy">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#plus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
       <span x-text="$app.t('recherche.new')"></span>
     </button>
   </div>

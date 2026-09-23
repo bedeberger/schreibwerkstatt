@@ -44,13 +44,13 @@
         <span class="plot-column-count" x-text="filteredBeatsForAct(act.id).length"></span>
         <div class="plot-column-actions">
           <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, -1)" :data-tip="$app.t('plot.act.moveLeft')" :aria-label="$app.t('plot.act.moveLeft')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-left"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-left"/></svg>
           </button>
           <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, 1)" :data-tip="$app.t('plot.act.moveRight')" :aria-label="$app.t('plot.act.moveRight')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-right"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
           </button>
           <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="startEditAct(act)" :data-tip="$app.t('plot.act.rename')" :aria-label="$app.t('plot.act.rename')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#pencil"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
           </button>
           <!-- Archivieren: Akt abgeschlossen (Beats eingearbeitet) → Spalte verlässt
                das Board, bis der Archiv-Schalter sie einblendet. Kein Löschen. -->
@@ -59,10 +59,10 @@
                   @click="toggleActArchive(act)"
                   :data-tip="act.archiviert ? $app.t('plot.act.unarchive') : $app.t('plot.act.archive')"
                   :aria-label="act.archiviert ? $app.t('plot.act.unarchive') : $app.t('plot.act.archive')">
-            <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=691#' + (act.archiviert ? 'rotate-ccw' : 'archive')"/></svg>
+            <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + (act.archiviert ? 'rotate-ccw' : 'archive')"/></svg>
           </button>
           <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger" @click="deleteAct(act)" :data-tip="$app.t('plot.act.delete')" :aria-label="$app.t('plot.act.delete')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
           </button>
         </div>
       </div>
@@ -116,7 +116,7 @@
           </div>
         </template>
         <button type="button" class="plot-add-beat-btn" x-show="addingActId !== act.id && !act.archiviert" @click="startAddBeat(act.id)">
-          <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#plus"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
           <span x-text="$app.t('plot.addBeat')"></span>
         </button>
 
@@ -136,7 +136,7 @@
           <div class="plot-brainstorm-head">
             <span class="entity-meta-label" x-text="$app.t('plot.brainstorm.title')"></span>
             <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="dismissBrainstorm()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
-              <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
             </button>
           </div>
           <template x-for="(v, idx) in (brainstormResult ? brainstormResult.vorschlaege : [])" :key="idx">
@@ -158,7 +158,7 @@
   <div class="plot-column plot-column--add">
     <button type="button" class="plot-add-act-btn" x-show="!addingAct"
             @click="addingAct = true; $nextTick(() => $el.parentElement.querySelector('.plot-new-act-input')?.focus())">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#plus"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
       <span x-text="$app.t('plot.addAct')"></span>
     </button>
     <div class="plot-add-act-form" x-show="addingAct" x-cloak>

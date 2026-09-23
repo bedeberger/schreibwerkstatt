@@ -56,13 +56,13 @@
                 </template>
                 <div class="plot-column-actions">
                   <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, -1)" :data-tip="$app.t('plot.act.moveLeft')" :aria-label="$app.t('plot.act.moveLeft')">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-left"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-left"/></svg>
                   </button>
                   <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, 1)" :data-tip="$app.t('plot.act.moveRight')" :aria-label="$app.t('plot.act.moveRight')">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-right"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-right"/></svg>
                   </button>
                   <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="startEditAct(act)" :data-tip="$app.t('plot.act.rename')" :aria-label="$app.t('plot.act.rename')">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#pencil"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
                   </button>
                   <!-- Archivieren (Pendant zum flachen Board): Akt abgeschlossen →
                        Spalte verlässt das Raster, bis der Archiv-Schalter sie holt. -->
@@ -71,10 +71,10 @@
                           @click="toggleActArchive(act)"
                           :data-tip="act.archiviert ? $app.t('plot.act.unarchive') : $app.t('plot.act.archive')"
                           :aria-label="act.archiviert ? $app.t('plot.act.unarchive') : $app.t('plot.act.archive')">
-                    <svg class="icon" aria-hidden="true"><use :href="'/icons.svg?v=691#' + (act.archiviert ? 'rotate-ccw' : 'archive')"/></svg>
+                    <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + (act.archiviert ? 'rotate-ccw' : 'archive')"/></svg>
                   </button>
                   <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-icon-btn--danger" @click="deleteAct(act)" :data-tip="$app.t('plot.act.delete')" :aria-label="$app.t('plot.act.delete')">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
                   </button>
                 </div>
               </div>
@@ -87,7 +87,7 @@
                 <button type="button" class="plot-add-act-btn plot-add-act-btn--head"
                         @click="startAddAct(row.thread ? row.thread.id : null)"
                         :data-tip="$app.t('plot.addAct')" :aria-label="$app.t('plot.addAct')">
-                  <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#plus"/></svg>
+                  <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
                 </button>
               </template>
               <template x-if="addingActScope === (row.thread ? row.thread.id : null)">
@@ -154,7 +154,7 @@
                           @click.stop="openThreadMenu($event, row.lane.id)"
                           aria-haspopup="menu" :aria-expanded="threadActionsOpenId === row.lane.id"
                           :data-tip="$app.t('plot.thread.actions')" :aria-label="$app.t('plot.thread.actions')">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#more-horizontal"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg#more-horizontal"/></svg>
                   </button>
                 </div>
               </template>
@@ -180,10 +180,10 @@
                        x-modelable="value" x-model="threadDraft.chapter_id"></div>
                   <div class="plot-beat-edit-actions">
                     <button type="button" class="icon-btn icon-btn--ghost icon-btn--success plot-icon-btn" @click="saveEditThread(row.lane.thread)" :disabled="busy" :data-tip="$app.t('common.save')" :aria-label="$app.t('common.save')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#check"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
                     </button>
                     <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="cancelEditThread()" :data-tip="$app.t('common.cancel')" :aria-label="$app.t('common.cancel')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
                     </button>
                   </div>
                 </div>
@@ -227,13 +227,13 @@
                 <div class="plot-swim-cell-foot" x-show="!act.archiviert && addingCell !== (act.id + ':' + (row.lane.id === null ? 'null' : row.lane.id))">
                   <button type="button" class="plot-add-beat-btn plot-add-beat-btn--cell" @click="startAddBeatCell(act.id, row.lane.id)"
                           :data-tip="$app.t('plot.addBeat')" :aria-label="$app.t('plot.addBeat')">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#plus"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
                   </button>
                   <!-- Strang-Brainstorm pro Zelle (nur echte Stränge — Figuren-/Strang-Kontext) -->
                   <button type="button" class="plot-add-beat-btn plot-add-beat-btn--cell" x-show="row.lane.thread"
                           @click="runBrainstorm(act, row.lane.thread)" :disabled="brainstormLoading"
                           :data-tip="$app.t('plot.brainstorm.run')" :aria-label="$app.t('plot.brainstorm.run')">
-                    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#zap"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="/icons.svg#zap"/></svg>
                   </button>
                 </div>
 
@@ -246,7 +246,7 @@
                   <div class="plot-brainstorm-head">
                     <span class="entity-meta-label" x-text="$app.t('plot.brainstorm.title')"></span>
                     <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="dismissBrainstorm()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
-                      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#x"/></svg>
+                      <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg>
                     </button>
                   </div>
                   <template x-for="(v, idx) in (brainstormResult ? brainstormResult.vorschlaege : [])" :key="idx">
@@ -288,30 +288,30 @@
         <div>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                   @click.stop="moveThread(threadMenuLane().thread, -1); closeThreadMenu()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-up"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-up"/></svg>
             <span x-text="$app.t('plot.thread.moveUp')"></span>
           </button>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                   @click.stop="moveThread(threadMenuLane().thread, 1); closeThreadMenu()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#chevron-down"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-down"/></svg>
             <span x-text="$app.t('plot.thread.moveDown')"></span>
           </button>
           <div class="context-menu-sep" role="separator"></div>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                   :class="{ 'context-menu-item--on': threadHasOwnActs(threadMenuLane().id) }"
                   @click.stop="threadHasOwnActs(threadMenuLane().id) ? unforkThreadActs(threadMenuLane().thread) : forkThreadActs(threadMenuLane().thread); closeThreadMenu()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#git-fork"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#git-fork"/></svg>
             <span x-text="threadHasOwnActs(threadMenuLane().id) ? $app.t('plot.thread.sharedActs') : $app.t('plot.thread.ownActs')"></span>
           </button>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon"
                   @click.stop="startEditThread(threadMenuLane().thread); closeThreadMenu()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#pencil"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
             <span x-text="$app.t('plot.thread.rename')"></span>
           </button>
           <div class="context-menu-sep" role="separator"></div>
           <button type="button" role="menuitem" class="context-menu-item context-menu-item--icon context-menu-item--danger"
                   @click.stop="deleteThread(threadMenuLane().thread); closeThreadMenu()">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#trash"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
             <span x-text="$app.t('plot.thread.delete')"></span>
           </button>
         </div>

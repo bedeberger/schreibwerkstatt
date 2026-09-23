@@ -5,14 +5,14 @@
      darum wortgleich teilbar; `menuOpenId` ist die geteilte Karten-SSoT.
      Erwartet einen Vorfahren mit `position: relative` (.research-item-actions)
      — .context-menu--dropdown positioniert absolut. -->
-<button type="button" class="icon-btn" @click.stop="menuOpenId = (menuOpenId === menuCtx + ':' + item.id ? null : menuCtx + ':' + item.id)" :disabled="busy" :aria-label="$app.t('recherche.actions')" aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#more-horizontal"/></svg></button>
+<button type="button" class="icon-btn" @click.stop="menuOpenId = (menuOpenId === menuCtx + ':' + item.id ? null : menuCtx + ':' + item.id)" :disabled="busy" :aria-label="$app.t('recherche.actions')" aria-haspopup="menu"><svg class="icon" aria-hidden="true"><use href="/icons.svg#more-horizontal"/></svg></button>
 <div class="context-menu context-menu--dropdown" x-show="menuOpenId === menuCtx + ':' + item.id" x-cloak @click.outside="menuOpenId = null" @keydown.escape.window="menuOpenId = null" role="menu">
   <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" @click="menuOpenId = null; openLinkPicker(item)">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#external-link"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#external-link"/></svg>
     <span x-text="$app.t('recherche.link.add')"></span>
   </button>
   <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" @click="suggestLinks(item)" :disabled="busy || suggestItemId === item.id">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#zap"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#zap"/></svg>
     <span x-text="$app.t('recherche.suggest.btn')"></span>
   </button>
   <!-- Einarbeitungs-Status: der tastaturerreichbare Weg auf die Achse, die im
@@ -29,44 +29,44 @@
             :class="{ 'context-menu-item--on': itemStatus(item) === st }"
             :aria-checked="itemStatus(item) === st"
             @click="setItemStatus(item, st)" :disabled="busy">
-      <svg class="icon" aria-hidden="true"><use :href="itemStatus(item) === st ? '/icons.svg?v=693#check' : '/icons.svg?v=693#circle'"/></svg>
+      <svg class="icon" aria-hidden="true"><use :href="itemStatus(item) === st ? '/icons.svg#check' : '/icons.svg#circle'"/></svg>
       <span x-text="statusLabel(st)"></span>
     </button>
   </template>
 
   <div class="context-menu-sep" role="separator"></div>
   <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" @click="togglePin(item)">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#pin"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#pin"/></svg>
     <span x-text="item.pinned ? $app.t('recherche.unpin') : $app.t('recherche.pin')"></span>
   </button>
   <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" @click="toggleArchive(item)">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#archive"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#archive"/></svg>
     <span x-text="item.archived ? $app.t('recherche.unarchive') : $app.t('recherche.archive')"></span>
   </button>
   <div class="context-menu-sep" role="separator"></div>
   <label class="context-menu-item context-menu-item--icon research-menu-upload" role="menuitem">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#image"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#image"/></svg>
     <span x-text="$app.t('recherche.image.upload')"></span>
     <input type="file" accept="image/*" @change="onImagePick(item, $event); menuOpenId = null">
   </label>
   <label class="context-menu-item context-menu-item--icon research-menu-upload" role="menuitem">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#file-plus"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
     <span x-text="$app.t('recherche.doc.upload')"></span>
     <input type="file" accept="application/pdf" @change="onDocPick(item, $event); menuOpenId = null">
   </label>
   <!-- Bild und PDF haengen unabhaengig voneinander am Fundstueck und werden
        darum einzeln entfernt (das Fundstueck selbst bleibt). -->
   <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="item.has_image" @click="removeImage(item)">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
     <span x-text="$app.t('recherche.image.remove')"></span>
   </button>
   <button type="button" class="context-menu-item context-menu-item--icon" role="menuitem" x-show="item.has_doc" @click="removeDoc(item)">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
     <span x-text="$app.t('recherche.doc.remove')"></span>
   </button>
   <div class="context-menu-sep" role="separator"></div>
   <button type="button" class="context-menu-item context-menu-item--icon context-menu-item--danger" role="menuitem" @click="deleteItem(item)">
-    <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=693#trash"/></svg>
+    <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
     <span x-text="$app.t('recherche.delete')"></span>
   </button>
 </div>

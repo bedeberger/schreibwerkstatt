@@ -4,16 +4,16 @@
      Methoden in public/js/sources/manage.js, gespreadet in `sourcesCard`. -->
   <div class="sources-picker" x-show="srcPickerOpen" x-cloak>
     <div class="sources-picker-head">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#book-open"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg>
       <span class="sources-picker-title" x-text="$app.t('sources.picker.title')"></span>
       <span class="filter-search-wrap sources-picker-search">
         <input type="text" class="filter-search-input" x-model="srcPoolFilter"
                :placeholder="$app.t('sources.picker.search')" :aria-label="$app.t('sources.picker.search')">
         <button type="button" class="search-clear--icon" x-show="srcPoolFilter" @click="srcPoolFilter = ''"
-                :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+                :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </span>
       <button type="button" class="icon-btn icon-btn--ghost" @click="closeSourcePicker()"
-              :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#x"/></svg></button>
+              :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </div>
     <div class="muted-msg muted-msg--sm" x-show="srcPoolLoading" x-text="$app.t('sources.picker.loading')"></div>
     <p class="card-form-error" x-show="srcPoolError" x-cloak x-text="srcPoolError"></p>
@@ -35,7 +35,7 @@
             </span>
           </span>
           <button type="button" class="btn-compact" @click="addSourceFromLibrary(p)" :disabled="sourcesBusy">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=694#plus"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
             <span x-text="$app.t('sources.picker.add')"></span>
           </button>
         </li>

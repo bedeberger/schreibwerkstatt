@@ -26,7 +26,7 @@
     <button type="button" class="primary card-empty-cta"
             @click="$app.alleAktualisieren()"
             :disabled="$store.jobs.alleAktualisierenLoading || !$store.nav.selectedBookId">
-      <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=691#rotate-cw"/></svg>
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#rotate-cw"/></svg>
       <span x-text="$app.t('header.updateAll')"></span>
     </button>
   </div>
@@ -58,7 +58,7 @@
   <div x-show="$store.catalog.orte.length > 0" class="filter-bar">
     <span class="filter-search-wrap">
       <input type="text" x-model="$store.catalogUi.orteFilters.suche" :placeholder="$app.t('common.search')" :aria-label="$app.t('common.search')" class="filter-search-input">
-      <button type="button" class="search-clear--icon" x-show="$store.catalogUi.orteFilters.suche" @click="$store.catalogUi.orteFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#x"/></svg></button>
+      <button type="button" class="search-clear--icon" x-show="$store.catalogUi.orteFilters.suche" @click="$store.catalogUi.orteFilters.suche=''" :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </span>
     <div x-data="catalogFilter('figur')"
          x-modelable="value" x-model="$store.catalogUi.orteFilters.figurId"
@@ -90,7 +90,7 @@
           <button type="button" x-show="o.stale" class="icon-btn danger entity-row-delete"
                   @click.stop="$app.deleteStaleOrt(o)"
                   :aria-label="$app.t('common.delete')" :data-tip="$app.t('entity.deleteStale')">
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
           </button>
           <span x-show="o.land" class="tag ort-land-tag" x-text="landLabel(o.land)"></span>
           <span x-show="o.stimmung" class="ort-stimmung" x-text="o.stimmung"></span>
@@ -172,7 +172,7 @@
               <button type="button" x-show="o.stale" class="icon-btn danger entity-row-delete"
                       @click.stop="$app.deleteStaleOrt(o)"
                       :aria-label="$app.t('common.delete')" :data-tip="$app.t('entity.deleteStale')">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#trash"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
               </button>
             </td>
             <td><span x-show="o.land" class="tag ort-land-tag" x-text="landLabel(o.land)"></span></td>
@@ -219,20 +219,20 @@
               :disabled="_geoUndoStack.length === 0"
               @click="undoGeoMove()"
               :data-tip="$app.t('orte.map.undoTip')" :aria-label="$app.t('orte.map.undo')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#undo"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#undo"/></svg>
       </button>
       <button type="button" class="icon-btn"
               :disabled="_geoRedoStack.length === 0"
               @click="redoGeoMove()"
               :data-tip="$app.t('orte.map.redoTip')" :aria-label="$app.t('orte.map.redo')">
-        <svg class="icon" aria-hidden="true"><use href="/icons.svg?v=690#redo"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#redo"/></svg>
       </button>
       <button type="button" class="icon-btn"
               :aria-pressed="geoLocked"
               @click="toggleGeoLock()"
               :data-tip="$app.t(geoLocked ? 'orte.map.unlockTip' : 'orte.map.lockTip')"
               :aria-label="$app.t(geoLocked ? 'orte.map.unlock' : 'orte.map.lock')">
-        <svg class="icon" aria-hidden="true"><use :href="(geoLocked ? '/icons.svg?v=690#lock' : '/icons.svg?v=690#lock-open')"/></svg>
+        <svg class="icon" aria-hidden="true"><use :href="(geoLocked ? '/icons.svg#lock' : '/icons.svg#lock-open')"/></svg>
       </button>
     </div>
     <div x-ref="orteMapEl" class="ort-map" role="application" :aria-label="$app.t('orte.map.tab')"></div>
