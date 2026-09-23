@@ -93,7 +93,7 @@ async function runMotifConsistencyJob(jobId, bookId, userEmail) {
     if (!graph.motifs.length) throw i18nError('job.error.motivKatalogLeer');
 
     // Kapitel in echter Buchorganizer-Reihenfolge (ueber die Content-Store-Facade).
-    const { chaptersFlat } = await loadOrderedBookContents(bookId, null);
+    const { chaptersFlat } = await loadOrderedBookContents(bookId);
     const kapitel = (chaptersFlat || []).map(c => ({ id: c.id, name: c.name }));
 
     // Ist der Index ueberhaupt befuellt? Ungescannt heisst ungeprueft, nicht

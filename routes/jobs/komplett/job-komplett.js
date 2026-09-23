@@ -60,7 +60,7 @@ const { COST_LABEL, relabel } = require('./cost-labels');
 // Katalog + Normalisierung: lib/komplett-scope.js. Fehlt er, läuft alles (Nacht-Cron).
 // ACHTUNG Positions-Reihenfolge: `provider` (Slot 6) wird vom Nacht-Cron gesetzt —
 // opts MUSS dahinter stehen, sonst landet das Options-Objekt im Provider-Slot.
-async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userToken, provider = undefined, opts = {}) {
+async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, provider = undefined, opts = {}) {
   // Lauf-Umfang: normalisiert, damit ein Aufrufer ohne `scope` (Nacht-Cron, Tests)
   // unverändert den vollständigen Lauf bekommt.
   const scope = normalizeKomplettScope(opts.scope);
@@ -144,7 +144,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
 
     // ── Seiten laden ──────────────────────────────────────────────────────────
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const { chMap, chNameToId, pages } = await loadOrderedBookContents(bookId, userToken)
+    const { chMap, chNameToId, pages } = await loadOrderedBookContents(bookId)
       .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
@@ -154,7 +154,7 @@ async function runKomplettAnalyseJob(jobId, bookId, bookName, userEmail, userTok
         statusText: 'job.phase.readingPages',
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, total), total },
       });
-    }, userToken, jobAbortControllers.get(jobId)?.signal);
+    }, jobAbortControllers.get(jobId)?.signal);
 
     const idMaps = {
       chNameToId,
@@ -576,7 +576,7 @@ async function runKomplettAnalyseAll() {
       }
       const label = `Nacht · ${book.name}`;
       const jobId = createJob('komplett-analyse', book.id, email, label);
-      enqueueJob(jobId, () => runKomplettAnalyseJob(jobId, book.id, book.name, email, null, cronProvider));
+      enqueueJob(jobId, () => runKomplettAnalyseJob(jobId, book.id, book.name, email, cronProvider));
       queued++;
     }
   }

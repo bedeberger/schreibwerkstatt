@@ -51,9 +51,9 @@ function _researchText(r) {
 }
 
 // Alle indexierbaren Entitäten eines Buches laden → { page:[{id,text}], ... }.
-async function _collectEntities(bookId, userToken, signal) {
-  const { chMap, pages } = await loadOrderedBookContents(bookId, userToken);
-  const pageContents = await loadPageContents(pages, chMap, 1, null, userToken, signal);
+async function _collectEntities(bookId, signal) {
+  const { chMap, pages } = await loadOrderedBookContents(bookId);
+  const pageContents = await loadPageContents(pages, chMap, 1, null, signal);
   const pageItems = pageContents.map(p => ({ id: p.id, text: p.text }));
 
   const sceneRows = db.prepare('SELECT id, titel, kommentar FROM figure_scenes WHERE book_id = ?').all(bookId);
@@ -68,7 +68,7 @@ async function _collectEntities(bookId, userToken, signal) {
   return { page: pageItems, scene: sceneItems, figure: figItems, research: resItems };
 }
 
-async function runEmbedIndexJob(jobId, bookId, userEmail, userToken) {
+async function runEmbedIndexJob(jobId, bookId, userEmail) {
   const logger = makeJobLogger(jobId);
   try {
     if (!embed.isEnabled()) throw i18nError('job.error.embedDisabled');
@@ -79,7 +79,7 @@ async function runEmbedIndexJob(jobId, bookId, userEmail, userToken) {
     };
 
     updateJob(jobId, { statusText: 'job.phase.embedCollect', progress: 5 });
-    const entities = await _collectEntities(bookId, userToken, signal());
+    const entities = await _collectEntities(bookId, signal());
 
     // Pro Entität die Soll-Chunks bestimmen und gegen den Delta-Cache abgleichen.
     // pending[]: { kind, id, ix, text, hash } — die neu zu embettenden Chunks.
@@ -188,7 +188,7 @@ function enqueueEmbedIndexJob(bookId, userEmail = null) {
   const existing = findActiveJobId('embed-index', bookId, userEmail);
   if (existing) return existing;
   const jobId = createJob('embed-index', bookId, userEmail, 'job.label.embedIndex', null, bookId);
-  enqueueJob(jobId, () => runEmbedIndexJob(jobId, bookId, userEmail, null));
+  enqueueJob(jobId, () => runEmbedIndexJob(jobId, bookId, userEmail));
   return jobId;
 }
 
@@ -203,7 +203,7 @@ async function reindexAllBooks() {
   for (const { id: bookId } of books) {
     if (findActiveJobId('embed-index', bookId, null)) { skipped++; continue; }
     const jobId = createJob('embed-index', bookId, null, 'job.label.embedIndex', null, bookId);
-    enqueueJob(jobId, () => runEmbedIndexJob(jobId, bookId, null, null));
+    enqueueJob(jobId, () => runEmbedIndexJob(jobId, bookId, null));
     enqueued++;
   }
   logger.info(`Embedding-Reindex (Cron): ${enqueued} Buch/Bücher eingereiht, ${skipped} übersprungen (Job läuft bereits).`);
@@ -221,7 +221,7 @@ embedIndexRouter.post('/embed-index', jsonBody, (req, res) => {
   const existing = findActiveJobId('embed-index', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const jobId = createJob('embed-index', book_id, userEmail, 'job.label.embedIndex', null, book_id);
-  enqueueJob(jobId, () => runEmbedIndexJob(jobId, book_id, userEmail, null));
+  enqueueJob(jobId, () => runEmbedIndexJob(jobId, book_id, userEmail));
   res.json({ jobId });
 });
 

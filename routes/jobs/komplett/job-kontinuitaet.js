@@ -25,7 +25,7 @@ const { komplettMaxTokens } = require('./phases');
 const { buildAnachronismusData, verifyKontinuitaetProbleme, _komplettAiOverrides } = require('./job-shared');
 const { COST_LABEL, costTier } = require('./cost-labels');
 
-async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken, provider = undefined) {
+async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, provider = undefined) {
   const bookIdInt = parseInt(bookId);
   const email = userEmail || null;
   const log = makeJobLogger(jobId);
@@ -49,7 +49,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
     if (cp) log.info(`Checkpoint gefunden (${cp.nextGi} Kapitel fertig).`);
 
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const { chMap, chNameToId, pages } = await loadOrderedBookContents(bookId, userToken)
+    const { chMap, chNameToId, pages } = await loadOrderedBookContents(bookId)
       .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
@@ -82,7 +82,7 @@ async function runKontinuitaetJob(jobId, bookId, bookName, userEmail, userToken,
         statusText: 'job.phase.readingPages',
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, total), total },
       });
-    }, userToken, jobAbortControllers.get(jobId)?.signal);
+    }, jobAbortControllers.get(jobId)?.signal);
 
     // Buchtext-Preprocessing nur Cloud-Klasse (siehe runKomplettAnalyseJob).
     if (providerClass(effectiveProvider) === 'cloud') {

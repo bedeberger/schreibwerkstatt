@@ -66,8 +66,8 @@ function resolveExtractSinglePassLimit(singlePassLimit, extractCapChars) {
 // Reihenfolge (depth-first). Ersetzt parallele listChapters+listPages-Pfade,
 // die bucket-lokale pages.position interpretieren (Cross-Chapter-Order kaputt)
 // und Sub-Kapitel als Geschwister flachen.
-async function loadOrderedBookContents(bookId, userToken, { includeExcluded = false } = {}) {
-  const tree = await contentStore.bookTree(bookId, userToken);
+async function loadOrderedBookContents(bookId, { includeExcluded = false } = {}) {
+  const tree = await contentStore.bookTree(bookId);
   const chMap = {};        // id → "Vorfahre › … › Kapitel"
   const chNameToId = {};   // raw chapter_name UND voller Pfad → id (AI-Output toleranter Lookup)
   const chaptersFlat = []; // [{ id, name, parent_id, path }] depth-first
@@ -97,7 +97,7 @@ async function loadOrderedBookContents(bookId, userToken, { includeExcluded = fa
   return { chMap, chNameToId, chaptersFlat, pages };
 }
 
-async function loadPageContents(pages, chMap, minLength, onBatch, userToken, signal = null) {
+async function loadPageContents(pages, chMap, minLength, onBatch, signal = null) {
   // Vor-Filter via preview_text aus dem pages-Cache: wenn ein gespeicherter
   // Preview kürzer als minLength ist, ist auch der Volltext zu kurz und wir
   // sparen den BookStack-Roundtrip (oft 100+ leere Stub-Pages pro Buch).
@@ -127,7 +127,7 @@ async function loadPageContents(pages, chMap, minLength, onBatch, userToken, sig
       filteredPages = pages;
     }
   }
-  return contentStore.loadPagesBatch(filteredPages, userToken, {
+  return contentStore.loadPagesBatch(filteredPages, null, {
     batchSize: BATCH_SIZE,
     onBatch,
     signal,

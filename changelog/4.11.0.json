@@ -1,0 +1,26 @@
+{
+  "version": "4.11.0",
+  "date": "2026-09-23",
+  "entries": [
+    {
+      "kind": "verbessert",
+      "de": "Das Lektorat einer Seite oder eines ganzen Buchs ist auf den neuen Claude-Modellen deutlich schneller und günstiger. Denkt die KI gerade nach, steht das in der Statuszeile, statt dass der Fortschritt stehen bleibt.",
+      "en": "Proofreading a page or a whole book is much faster and cheaper on the new Claude models. While the AI is thinking, the status line says so instead of the progress appearing stuck."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Admin-Einstellungen, Bereich Claude: neues Feld «Reasoning-Effort (Lektorat)». Damit wählen Admins zwischen schnellem und gründlicherem Lektorat.",
+      "en": "Admin settings, Claude section: new field \"Reasoning effort (proofreading)\". Admins use it to choose between faster and more thorough proofreading."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Der Buch-Chat antwortet bei Büchern mit vielen analysierten Figuren schneller und verursacht weniger Kosten.",
+      "en": "The book chat answers faster and costs less for books with many analysed characters."
+    },
+    {
+      "kind": "behoben",
+      "de": "In Admin-Usage blieb ein Reiter manchmal leer, wenn man schnell zwischen Reitern wechselte oder einen Reiter direkt per Link öffnete.",
+      "en": "In admin usage, a tab sometimes stayed empty when switching tabs quickly or opening a tab directly via a link."
+    }
+  ]
+}

@@ -15,7 +15,7 @@ const { generateSessionTitle } = require('../chat-title');
 const { recordChatLedgerForMessage } = require('../../../db/cost-ledger');
 const { _parseChatResponse, figurenBlockChars } = require('./shared');
 
-async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userToken) {
+async function runChatJob(jobId, sessionId, userMsgId, message, userEmail) {
   const logger = makeJobLogger(jobId);
   const { buildChatSystemPrompt, SCHEMA_CHAT } = await getPrompts(userEmail);
   const aiCfg = getContextConfigFor(resolveProvider({ userEmail }));
@@ -35,7 +35,7 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail, userT
     let pageUpdatedAt = null;
     if (session.page_id && session.page_id > 0) {
       try {
-        const pd = await contentStore.loadPage(session.page_id, userToken);
+        const pd = await contentStore.loadPage(session.page_id);
         pageText = htmlToText(pd.html || '');
         pageUpdatedAt = pd.updated_at || null;
       } catch (e) {

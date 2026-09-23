@@ -26,12 +26,12 @@ const { sessionEmail } = require('../../../lib/acl');
 
 const finetuneExportRouter = express.Router();
 
-async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToken, opts) {
+async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, opts) {
   const logger = makeJobLogger(jobId);
   try {
     logger.info(`Start: «${bookName}» types=${Object.entries(opts.types).filter(([,v]) => v).map(([k]) => k).join(',')}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)
+    const { chMap, pages } = await loadOrderedBookContents(bookId)
       .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
     const pageContents = await loadPageContents(pages, chMap, 30, (i, total) => {
@@ -40,7 +40,7 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
         statusText: 'job.phase.readingPages',
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, total), total },
       });
-    }, userToken, jobAbortControllers.get(jobId)?.signal);
+    }, jobAbortControllers.get(jobId)?.signal);
 
     updateJob(jobId, { progress: 45, statusText: 'finetune.phase.loadMetadata' });
 
@@ -106,7 +106,7 @@ async function runFinetuneExportJob(jobId, bookId, bookName, userEmail, userToke
 
     const ctx = {
       jobId, logger,
-      bookId, bookIdInt, bookName, userEmail, userToken,
+      bookId, bookIdInt, bookName, userEmail,
       opts: optsNorm,
       langIsEn, displayName, unifiedSys,
       counts, samples,
@@ -219,13 +219,12 @@ finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
     return res.status(400).json({ error_code: 'FINETUNE_NO_TYPES' });
   }
   const userEmail = sessionEmail(req);
-  const userToken = null;
   const existing = findActiveJobId('finetune-export', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.finetuneExportBook' : 'job.label.finetuneExport';
   const labelParams = book_name ? { name: book_name } : null;
   const jobId = createJob('finetune-export', book_id, userEmail, label, labelParams);
-  enqueueJob(jobId, () => runFinetuneExportJob(jobId, book_id, book_name || '', userEmail, userToken, opts));
+  enqueueJob(jobId, () => runFinetuneExportJob(jobId, book_id, book_name || '', userEmail, opts));
   res.json({ jobId });
 });
 

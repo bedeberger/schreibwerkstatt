@@ -101,7 +101,7 @@ function _normalizeResult(raw, regelnCount, vok) {
 /**
  * @param {number|null} onlyPageId  nur diese Seite prüfen (sonst das ganze Buch)
  */
-async function runStrukturJob(jobId, bookId, userEmail, userToken, onlyPageId = null) {
+async function runStrukturJob(jobId, bookId, userEmail, onlyPageId = null) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts(userEmail);
   const {
@@ -121,7 +121,7 @@ async function runStrukturJob(jobId, bookId, userEmail, userToken, onlyPageId = 
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     const bookSettings = getBookSettings(bookId, userEmail);
-    const allPages = await contentStore.listPages(bookId, userToken)
+    const allPages = await contentStore.listPages(bookId)
       .catch(e => { throw contentHttpError(e); });
     const pages = onlyPageId
       ? allPages.filter(p => String(p.id) === String(onlyPageId))
@@ -129,7 +129,7 @@ async function runStrukturJob(jobId, bookId, userEmail, userToken, onlyPageId = 
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
     const chapterNameById = {};
-    for (const ch of await contentStore.listChapters(bookId, userToken).catch(() => [])) {
+    for (const ch of await contentStore.listChapters(bookId).catch(() => [])) {
       chapterNameById[String(ch.id)] = ch.name;
     }
 
@@ -143,7 +143,7 @@ async function runStrukturJob(jobId, bookId, userEmail, userToken, onlyPageId = 
       const def = textsorteDef(ts);
       if (!def) { ohneTextsorte++; continue; }
 
-      const pd = await contentStore.loadPage(p.id, userToken).catch(() => null);
+      const pd = await contentStore.loadPage(p.id).catch(() => null);
       if (!pd) continue;
       const text = htmlToTextForPrompt(pd.html || '');
       if (text.length < MIN_CHARS) { zuKurz++; continue; }
@@ -220,7 +220,7 @@ strukturRouter.post('/struktur-check', jsonBody, (req, res) => {
   if (existing) return res.json({ jobId: existing, existing: true });
   const jobId = createJob('struktur-check', book_id, userEmail,
     'job.label.strukturCheck', null, entityId);
-  enqueueJob(jobId, () => runStrukturJob(jobId, book_id, userEmail, null, page_id || null));
+  enqueueJob(jobId, () => runStrukturJob(jobId, book_id, userEmail, page_id || null));
   res.json({ jobId });
 });
 

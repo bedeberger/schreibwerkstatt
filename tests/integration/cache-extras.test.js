@@ -46,7 +46,7 @@ test('Lektorat-Cache: identischer Re-Run trifft lektorat_cache → 0 AI-Calls', 
 
   const jobId1 = ctx.shared.createJob('check', BOOK_ID, 'tester@test.dev', 'job.label.checkPage', null, PAGE_ID);
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.lektorat.runCheckJob(jobId1, PAGE_ID, BOOK_ID, 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.lektorat.runCheckJob(jobId1, PAGE_ID, BOOK_ID, 'tester@test.dev'),
   );
   const job1 = await waitForJob(ctx.shared, jobId1);
   assert.equal(job1.status, 'done', `expected done, got ${job1.status}: ${job1.error || ''}`);
@@ -60,7 +60,7 @@ test('Lektorat-Cache: identischer Re-Run trifft lektorat_cache → 0 AI-Calls', 
   // 2. Run, gleiche Seite, gleicher updated_at → HIT.
   const jobId2 = ctx.shared.createJob('check', BOOK_ID, 'tester@test.dev', 'job.label.checkPage', null, PAGE_ID);
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.lektorat.runCheckJob(jobId2, PAGE_ID, BOOK_ID, 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.lektorat.runCheckJob(jobId2, PAGE_ID, BOOK_ID, 'tester@test.dev'),
   );
   const job2 = await waitForJob(ctx.shared, jobId2);
   assert.equal(job2.status, 'done');
@@ -84,7 +84,7 @@ test('Lektorat-Cache: updated_at-Wechsel invalidiert Cache', async () => {
 
   const jobId1 = ctx.shared.createJob('check', BOOK_ID, 'tester@test.dev', 'job.label.checkPage', null, PAGE_ID);
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.lektorat.runCheckJob(jobId1, PAGE_ID, BOOK_ID, 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.lektorat.runCheckJob(jobId1, PAGE_ID, BOOK_ID, 'tester@test.dev'),
   );
   await waitForJob(ctx.shared, jobId1);
   assert.equal(ctx.mockAi.log.length, 1);
@@ -98,7 +98,7 @@ test('Lektorat-Cache: updated_at-Wechsel invalidiert Cache', async () => {
 
   const jobId2 = ctx.shared.createJob('check', BOOK_ID, 'tester@test.dev', 'job.label.checkPage', null, PAGE_ID);
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.lektorat.runCheckJob(jobId2, PAGE_ID, BOOK_ID, 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.lektorat.runCheckJob(jobId2, PAGE_ID, BOOK_ID, 'tester@test.dev'),
   );
   await waitForJob(ctx.shared, jobId2);
   assert.equal(ctx.mockAi.log.length, 2, 'updated_at-Wechsel → MISS, 2 Calls insgesamt');
@@ -129,7 +129,7 @@ test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () =>
 
   const jobId1 = ctx.shared.createJob('batch-check', BOOK_ID, 'tester@test.dev', 'job.label.batchCheck');
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.lektorat.runBatchCheckJob(jobId1, BOOK_ID, 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.lektorat.runBatchCheckJob(jobId1, BOOK_ID, 'tester@test.dev'),
   );
   const job1 = await waitForJob(ctx.shared, jobId1, { timeoutMs: 8000 });
   assert.equal(job1.status, 'done');
@@ -158,7 +158,7 @@ test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () =>
 
   const jobId2 = ctx.shared.createJob('batch-check', BOOK_ID, 'tester@test.dev', 'job.label.batchCheck');
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.lektorat.runBatchCheckJob(jobId2, BOOK_ID, 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.lektorat.runBatchCheckJob(jobId2, BOOK_ID, 'tester@test.dev'),
   );
   const job2 = await waitForJob(ctx.shared, jobId2, { timeoutMs: 8000 });
   assert.equal(job2.status, 'done');

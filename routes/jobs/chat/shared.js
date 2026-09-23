@@ -121,12 +121,10 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
   ).run(session.id, message.trim(), now, clientMsgId);
   db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(now, session.id);
 
-  const userToken = null;
-
   const { key: label, params: labelParams } = labelFn(session);
   const jobId = createJob(jobType, session.book_id || 0, userEmail, label, labelParams, session_id);
   db.prepare('UPDATE chat_messages SET job_id = ? WHERE id = ?').run(jobId, userMsgResult.lastInsertRowid);
-  enqueueJob(jobId, () => runFn(jobId, session_id, userMsgResult.lastInsertRowid, message.trim(), userEmail, userToken));
+  enqueueJob(jobId, () => runFn(jobId, session_id, userMsgResult.lastInsertRowid, message.trim(), userEmail));
   res.json({ jobId });
 }
 

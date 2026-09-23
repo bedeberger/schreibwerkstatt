@@ -8,9 +8,6 @@ const { htmlToPlainText } = require('../../../lib/html-text');
 
 async function validateFinalAnswerCitations(zitate, ctx) {
   if (!Array.isArray(zitate) || !zitate.length) return [];
-  if (!ctx?.userToken) {
-    return zitate.map(z => ({ ...z, valid: false, reason: 'no_user_token' }));
-  }
   const cache = new Map(); // page_id → plain text
   const out = [];
   for (const z of zitate) {
@@ -33,7 +30,7 @@ async function validateFinalAnswerCitations(zitate, ctx) {
     let text = cache.get(pageId);
     if (text == null) {
       try {
-        const pd = await contentStore.loadPage(pageId, ctx.userToken);
+        const pd = await contentStore.loadPage(pageId);
         text = htmlToPlainText(pd.html || '');
         cache.set(pageId, text);
       } catch (e) {

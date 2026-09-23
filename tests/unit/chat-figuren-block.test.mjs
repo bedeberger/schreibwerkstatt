@@ -73,6 +73,15 @@ test('auch die Stammdaten werden gekappt — und die Kappung offengelegt', () =>
   assert.ok(JSON.parse(blk.text.slice(blk.text.indexOf('['))).length === blk.shown, 'Rest bleibt gültiges JSON');
 });
 
+test('detailTools liefert nie Volldossiers, auch wenn sie ins Budget passten', () => {
+  const list = [figur(1, 2), figur(2, 2)];
+  const blk = buildFigurenBlock(list, { maxChars: 100000, detailTools: true });
+  assert.equal(blk.mode, 'stamm');
+  assert.equal(blk.shown, 2);
+  assert.ok(!blk.text.includes('"szenen":['), 'Detaillisten holt get_figure_profile');
+  assert.match(blk.text, /get_figure_profile/);
+});
+
 test('detailTools nennt die Nachlade-Werkzeuge nur im agentischen Pfad', () => {
   const list = Array.from({ length: 40 }, (_, i) => figur(i, 3));
   const mitTools = buildFigurenBlock(list, { maxChars: 6000, detailTools: true });

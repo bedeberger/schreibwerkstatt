@@ -130,8 +130,8 @@ async function runFigurAlterJob(jobId, bookId, userEmail, { force = false } = {}
     `).all(bookId, userEmail || '');
     if (!figuren.length) throw i18nError('job.error.figurAlterNoFiguren');
 
-    const { chMap, pages } = await loadOrderedBookContents(bookId, null);
-    const pageContents = await loadPageContents(pages, chMap, 1, null, null, signal());
+    const { chMap, pages } = await loadOrderedBookContents(bookId);
+    const pageContents = await loadPageContents(pages, chMap, 1, null, signal());
     if (!pageContents.some(p => p.text)) throw i18nError('job.error.figurAlterNoText');
 
     // Delta-Skip: derselbe Buchstand + derselbe Figurenstamm ergeben dasselbe

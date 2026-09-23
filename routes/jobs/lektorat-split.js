@@ -8,6 +8,8 @@
 
 const { aiCall, i18nError, updateJob } = require('./shared');
 const appSettings = require('../../lib/app-settings');
+const { setContext } = require('../../lib/log-context');
+const { _claudeUsesAdaptiveThinking } = require('../../lib/ai');
 const { consensusFindings, mergePasses } = require('../../lib/lektorat-consolidate');
 
 // Ob der Split gefahren wird (fokussierte Einzel-Pässe statt einem grossen Kombi-Call).
@@ -26,6 +28,40 @@ function objektivRuns() {
 function consensusThreshold() {
   const n = parseInt(appSettings.get('ai.lektorat_consensus_threshold'), 10);
   return Number.isFinite(n) && n > 0 ? n : 2;
+}
+
+// Effort fuer das Lektorat (`ai.claude.effort.lektorat`) als Job-Bag binden — nur bei
+// Claude und nur auf Modellen mit adaptivem Denken. Dort waehlt die API ohne Feld
+// 'high', und das Modell denkt pro Pass Zehntausende Tokens stumm (Minuten ohne
+// Stream-Text, Output-Kosten ein Vielfaches). Sonnet 4.6 und aelter denken nicht;
+// ein Effort dort kuerzte die sichtbare Antwort, darum bleibt deren Lauf unberuehrt.
+// Rueckgabe: Suffix fuer die cacheVersion (`:e=<effort>`) oder '' — Caches ohne
+// Effort (Sonnet 4.6) behalten so ihre bisherige Version.
+function applyLektoratEffort(effectiveProvider, model, logger) {
+  if (effectiveProvider !== 'claude' || !_claudeUsesAdaptiveThinking(model)) return '';
+  const effort = String(appSettings.get('ai.claude.effort.lektorat') || '').trim().toLowerCase();
+  if (!effort) return '';
+  setContext({ aiJob: { provider: 'claude', effort } });
+  logger.info(`Lektorat-Effort (${model}): ${effort}.`);
+  return `:e=${effort}`;
+}
+
+// Statuszeile des Einzel-Lektorats. „KI denkt nach …", solange mindestens ein
+// Teil-Call in seinem Thinking-Block steckt (adaptives Denken streamt bis zum ersten
+// Text nur Pings, der Balken steht so lange still), sonst „X von Y fertig" bzw.
+// „KI analysiert …". Parallele Calls beenden out-of-order → reine Zählung.
+function _statusLine(jobId, total) {
+  const thinking = new Set();
+  let done = 0;
+  const render = () => {
+    if (thinking.size) updateJob(jobId, { statusText: 'job.phase.aiThinking' });
+    else if (done > 0) updateJob(jobId, { statusText: 'job.phase.lektoratPasses', statusParams: { done, total } });
+    else updateJob(jobId, { statusText: 'job.phase.aiAnalyzing' });
+  };
+  return {
+    onThinking: (callId, on) => { if (on) thinking.add(callId); else thinking.delete(callId); render(); },
+    passDone: () => { done++; render(); },
+  };
 }
 
 // Kern-KI-Schritt des Lektorats. Split AN (Cloud/Claude): fokussierter Objektiv-Pass
@@ -53,6 +89,10 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   // sonst bietet die Grammar Typen an, die der Prompt verbietet.
   const kombiSchema = buildLektoratSchema({ buchtyp, textsorte });
 
+  const trackPasses = fromPct != null && toPct != null;
+  const status = trackPasses ? _statusLine(jobId, split ? K + 1 : 1) : null;
+  if (status) tok.onThinking = status.onThinking;
+
   if (!split) {
     const prompt = single ? buildLektoratPrompt(text, promptOpts) : buildBatchLektoratPrompt(text, promptOpts);
     const result = await aiCall(jobId, tok, prompt, system, fromPct, toPct, 5000, 0.2, null, undefined, kombiSchema);
@@ -66,7 +106,6 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   // steuert der Job den Balken per Seiten-Zähler – dann weder Range noch Teil-Call-
   // Zähler setzen (der würde sonst die Seiten-Statuszeile überschreiben).
   const total = K + 1;
-  const trackPasses = fromPct != null && toPct != null;
   if (trackPasses) {
     tok.progressRange = { from: fromPct, to: toPct, total };
     tok.progressParts = new Map();
@@ -74,12 +113,8 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   // Status-Zeile: nach jedem fertigen Teil-Call hochzählen (parallele Calls beenden
   // out-of-order → reine „X von Y fertig"-Zählung, kein Pass-Name). Gibt r durch,
   // damit die Ergebnisse der aiCalls unverändert weiterverwendet werden.
-  let doneCalls = 0;
   const tick = (r) => {
-    if (trackPasses) {
-      doneCalls++;
-      updateJob(jobId, { statusText: 'job.phase.lektoratPasses', statusParams: { done: doneCalls, total } });
-    }
+    status?.passDone();
     return r;
   };
   const objektivOpts = {
@@ -132,4 +167,4 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   return { fehler, szenen: stilResult.szenen, stilanalyse: stilResult.stilanalyse, fazit: stilResult.fazit };
 }
 
-module.exports = { lektoratAnalyze, objektivRuns, splitEnabled };
+module.exports = { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratEffort };

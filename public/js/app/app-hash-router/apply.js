@@ -157,11 +157,13 @@ export const hashApplyMethods = {
         } else if (sub === 'settings') {
           if (!this.showAdminSettingsCard) await this.toggleAdminSettingsCard();
         } else if (sub === 'usage') {
-          if (!this.showAdminUsageCard) await this.toggleAdminUsageCard();
+          // Tab VOR dem Oeffnen setzen: `adminUsageEnter` laedt beim Oeffnen den
+          // aktuellen Tab — sonst holte es zuerst den alten Tab umsonst.
           const tab = parts[2];
           const valid = ['users', 'jobs', 'chat', 'summary', 'features', 'time', 'billing'];
           if (tab && valid.includes(tab)) this.adminUsageTab = tab;
           else if (!tab) this.adminUsageTab = 'users';
+          if (!this.showAdminUsageCard) await this.toggleAdminUsageCard();
         } else if (sub === 'categories') {
           if (!this.showAdminCategoriesCard) await this.toggleAdminCategoriesCard();
         } else if (sub === 'books') {

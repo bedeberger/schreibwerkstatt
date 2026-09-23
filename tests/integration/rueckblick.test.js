@@ -48,7 +48,7 @@ test('Single-Pass: ein Monat → 1 AI-Call, Ergebnis + Cache-Zeile', async () =>
 
   const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-03' }, `${BOOK_ID}:2024-03`);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-03'));
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', '2024-03'));
   const job = await waitForJob(ctx.shared, jobId);
 
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -82,7 +82,7 @@ test('History: identischer Re-Run (Cache-HIT) dedupliziert, neues Ergebnis schre
   for (let i = 0; i < 2; i++) {
     const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-09' }, `${BOOK_ID}:2024-09_${i}`);
     ctx.shared.enqueueJob(jobId, () =>
-      ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-09'));
+      ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', '2024-09'));
     const job = await waitForJob(ctx.shared, jobId);
     assert.equal(job.status, 'done');
     assert.equal(job.result.fromCache, i === 1, `Lauf ${i}: fromCache=${i === 1}`);
@@ -98,7 +98,7 @@ test('History: identischer Re-Run (Cache-HIT) dedupliziert, neues Ergebnis schre
   ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse('Ein bewegter Monat.'));
   const jobId3 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-09' }, `${BOOK_ID}:2024-09_c`);
   ctx.shared.enqueueJob(jobId3, () =>
-    ctx.rueckblick.runRueckblickJob(jobId3, BOOK_ID, 'tester@test.dev', null, '2024-09'));
+    ctx.rueckblick.runRueckblickJob(jobId3, BOOK_ID, 'tester@test.dev', '2024-09'));
   const job3 = await waitForJob(ctx.shared, jobId3);
   assert.equal(job3.status, 'done');
   assert.equal(job3.result.fromCache, false, 'neuer Eintrag → Cache-MISS');
@@ -118,7 +118,7 @@ test('Zeitraum-Filter: nur Einträge des gewählten Monats', async () => {
 
   const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-03' }, `${BOOK_ID}:2024-03`);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-03'));
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', '2024-03'));
   const job = await waitForJob(ctx.shared, jobId);
 
   assert.equal(job.status, 'done');
@@ -136,7 +136,7 @@ test('Map-Reduce: Jahr über mehrere große Monate → Monats-Calls + Reduce', a
 
   const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024' }, `${BOOK_ID}:2024`);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024'));
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', '2024'));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
 
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -154,7 +154,7 @@ test('Map-Reduce: ein einzelner überlanger Monat wird größenbasiert gechunkt'
 
   const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-03' }, `${BOOK_ID}:2024-03`);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-03'));
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', '2024-03'));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
 
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -179,7 +179,7 @@ test('entry_count: Snapshot beim Insert, Touch nach reinem Lösch-Vorgang', asyn
 
   const jobId1 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-10' }, `${BOOK_ID}:2024-10_a`);
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.rueckblick.runRueckblickJob(jobId1, BOOK_ID, 'tester@test.dev', null, '2024-10'));
+    ctx.rueckblick.runRueckblickJob(jobId1, BOOK_ID, 'tester@test.dev', '2024-10'));
   await waitForJob(ctx.shared, jobId1);
   assert.equal(latest().entry_count, 3, 'Insert speichert Eintrags-Snapshot');
   assert.equal(histCount(), 1);
@@ -190,7 +190,7 @@ test('entry_count: Snapshot beim Insert, Touch nach reinem Lösch-Vorgang', asyn
   ctx.dbSchema.db.prepare('DELETE FROM pages WHERE page_id = ?').run(BOOK_ID * 100 + 2);
   const jobId2 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-10' }, `${BOOK_ID}:2024-10_b`);
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.rueckblick.runRueckblickJob(jobId2, BOOK_ID, 'tester@test.dev', null, '2024-10'));
+    ctx.rueckblick.runRueckblickJob(jobId2, BOOK_ID, 'tester@test.dev', '2024-10'));
   const job2 = await waitForJob(ctx.shared, jobId2);
   assert.equal(job2.status, 'done');
   assert.equal(job2.result.fromCache, false, 'gelöschter Eintrag → Cache-MISS');
@@ -205,14 +205,14 @@ test('Cache-HIT: identischer 2. Lauf → 0 AI-Calls', async () => {
 
   const jobId1 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-05' }, `${BOOK_ID}:2024-05`);
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.rueckblick.runRueckblickJob(jobId1, BOOK_ID, 'tester@test.dev', null, '2024-05'));
+    ctx.rueckblick.runRueckblickJob(jobId1, BOOK_ID, 'tester@test.dev', '2024-05'));
   const job1 = await waitForJob(ctx.shared, jobId1);
   assert.equal(job1.status, 'done');
   assert.equal(ctx.mockAi.log.length, 1);
 
   const jobId2 = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-05' }, `${BOOK_ID}:2024-05_b`);
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.rueckblick.runRueckblickJob(jobId2, BOOK_ID, 'tester@test.dev', null, '2024-05'));
+    ctx.rueckblick.runRueckblickJob(jobId2, BOOK_ID, 'tester@test.dev', '2024-05'));
   const job2 = await waitForJob(ctx.shared, jobId2);
   assert.equal(job2.status, 'done');
   assert.equal(job2.result.rueckblick.zusammenfassung, 'Ein ruhiger Monat.');
@@ -225,7 +225,7 @@ test('Leerer Zeitraum → result.empty, kein AI-Call', async () => {
 
   const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-08' }, `${BOOK_ID}:2024-08`);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-08'));
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', '2024-08'));
   const job = await waitForJob(ctx.shared, jobId);
 
   assert.equal(job.status, 'done');
@@ -240,7 +240,7 @@ test('Pflichtfeld zusammenfassung fehlt → failJob', async () => {
 
   const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-06' }, `${BOOK_ID}:2024-06`);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-06'));
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', '2024-06'));
   const job = await waitForJob(ctx.shared, jobId);
 
   assert.equal(job.status, 'error');
@@ -255,7 +255,7 @@ test('kein content-store-Write: Buchinhalt bleibt unverändert', async () => {
   ctx.mockAi.on((e) => e.schemaKeys.includes('zusammenfassung'), rueckblickResponse());
   const jobId = ctx.shared.createJob('rueckblick', BOOK_ID, 'tester@test.dev', 'job.label.rueckblick', { zeitraum: '2024-07' }, `${BOOK_ID}:2024-07`);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', null, '2024-07'));
+    ctx.rueckblick.runRueckblickJob(jobId, BOOK_ID, 'tester@test.dev', '2024-07'));
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'done');
 

@@ -171,7 +171,7 @@ test('Komplettanalyse: AI-Events landen mit strukturierten Feldern + Subtyp in f
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -266,7 +266,7 @@ test('Komplettanalyse: figure_events ORDER BY platziert Unknown-Bucket ans Ende'
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);

@@ -51,7 +51,7 @@ function _bestand(pageId, felder) {
   return out;
 }
 
-async function runHeadlineJob(jobId, bookId, pageId, userEmail, userToken, felder, anzahl) {
+async function runHeadlineJob(jobId, bookId, pageId, userEmail, felder, anzahl) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts(userEmail);
   const { buildHeadlineVariantsPrompt, buildHeadlineVariantsSchema } = prompts;
@@ -59,7 +59,7 @@ async function runHeadlineJob(jobId, bookId, pageId, userEmail, userToken, felde
 
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 5 });
-    const pd = await contentStore.loadPage(pageId, userToken)
+    const pd = await contentStore.loadPage(pageId)
       .catch(e => { throw contentHttpError(e); });
     const text = htmlToTextForPrompt(pd?.html || '');
     if (text.length < MIN_CHARS) {
@@ -125,7 +125,7 @@ headlineRouter.post('/headline-variants', jsonBody, (req, res) => {
   if (existing) return res.json({ jobId: existing, existing: true });
   const jobId = createJob('headline-variants', book_id, userEmail,
     'job.label.headlineVariants', null, entityId);
-  enqueueJob(jobId, () => runHeadlineJob(jobId, book_id, page_id, userEmail, null, felder, anzahl));
+  enqueueJob(jobId, () => runHeadlineJob(jobId, book_id, page_id, userEmail, felder, anzahl));
   res.json({ jobId });
 });
 

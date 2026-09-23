@@ -58,8 +58,12 @@ export function buildFigurenBlock(figuren, opts = {}) {
   const maxChars = Number(opts.maxChars) > 0 ? Number(opts.maxChars) : FIGUREN_BLOCK_DEFAULT_MAX_CHARS;
   const withTools = opts.detailTools === true;
 
-  const voll = JSON.stringify(list, null, 2);
-  if (voll.length <= maxChars) {
+  // Mit Detail-Werkzeugen (agentischer Buch-Chat) nie die Volldossiers: Szenen,
+  // Schauplätze, Beziehungen und Lebensereignisse aller Figuren stünden sonst in
+  // jeder Iteration im Prompt, obwohl eine Frage meist eine Figur betrifft — die
+  // holt `get_figure_profile` gezielt.
+  const voll = withTools ? null : JSON.stringify(list, null, 2);
+  if (voll && voll.length <= maxChars) {
     const text = [FIGUREN_HEAD, voll].join('\n');
     return { text, mode: 'voll', shown: list.length, total: list.length, chars: text.length };
   }

@@ -40,7 +40,7 @@ const runResearchChatJob = makeAgenticChatJob({
     WHERE cs.id = ? AND cs.user_email = ? AND cs.kind = 'research'
   `).get(parseInt(sessionId), userEmail),
 
-  async prepare({ session, userEmail, userToken, aiCfg, logger, jobSignal }) {
+  async prepare({ session, userEmail, aiCfg, logger, jobSignal }) {
     const { buildResearchChatAgentSystemPrompt, buildResearchChatTools, RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts(userEmail);
     const itemCount = db.prepare('SELECT COUNT(*) AS n FROM research_items WHERE book_id = ? AND archived = 0').get(session.book_id)?.n || 0;
     const { SYSTEM_BOOK_CHAT } = await getBookPrompts(session.book_id, userEmail);
@@ -80,7 +80,7 @@ const runResearchChatJob = makeAgenticChatJob({
       toolResultCap: null,   // kein Cap — Recherche-Tool-Results sind klein und truncieren würde Fundstücke verstümmeln
       forceFinalInstruction: RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION,
       ctx: {
-        bookId: session.book_id, sessionId: session.id, userEmail, userToken,
+        bookId: session.book_id, sessionId: session.id, userEmail,
         jobSignal, logger,
         proposals: [], // propose_research_item sammelt hier; nach dem Loop in context_info
       },

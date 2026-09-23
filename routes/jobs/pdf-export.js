@@ -53,7 +53,7 @@ function _scheduleResultCleanup(jobId) {
   t.unref?.();
 }
 
-async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target = 'interior', snapshotId = null, userEmail, userToken }) {
+async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target = 'interior', snapshotId = null, userEmail }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
 
@@ -78,7 +78,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       if (!bundle.groups.length) throw i18nError('job.error.snapshotCorrupt');
       frozenPub = snapshotPublication(snap.publication_json);
     } else {
-      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters });
     }
     const { book, chapter, page, groups } = bundle;
     const snapDetail = snapshotId ? `, fassungId=${snapshotId}` : '';
@@ -169,7 +169,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       const meta = {};
       buffer = await renderPdfBuffer({
         book, groups, profile,
-        coverBuf, authorImageBuf, token: userToken, lang: bookLang,
+        coverBuf, authorImageBuf, lang: bookLang,
         scope, chapter, page, meta, bibliography,
       });
       lowResImages = Array.isArray(meta.dpiWarnings) ? meta.dpiWarnings.length : 0;
@@ -275,7 +275,6 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
 
 router.post('/pdf-export', jsonBody, async (req, res) => {
   const userEmail = sessionEmail(req);
-  const userToken = null;
 
   // Fassungs-Export: snapshotId gesetzt → immer ganzes Buch, Innenteil.
   const snapshotId = toIntId(req.body?.snapshot_id || req.body?.snapshotId);
@@ -335,7 +334,7 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('pdf-export', bookId, userEmail, 'job.label.pdfExportProfile', { profile: profile.name }, dedupId);
-  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target, snapshotId, userEmail, userToken }));
+  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target, snapshotId, userEmail }));
   res.status(202).json({ jobId });
 });
 

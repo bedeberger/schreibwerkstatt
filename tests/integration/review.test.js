@@ -76,7 +76,7 @@ test('Buch-Review Single-Pass: 1 Kapitel → 1 AI-Call, book_reviews-Zeile', asy
 
   const jobId = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.review.runReviewJob(jobId, BOOK_ID, 'Mein Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.review.runReviewJob(jobId, BOOK_ID, 'Mein Buch', 'tester@test.dev'),
   );
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -116,7 +116,7 @@ test('Buch-Review Multi-Pass: 3 Kapitel → 3 Analysen + 1 Final = 4 Calls', asy
 
   const jobId = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.review.runReviewJob(jobId, BOOK_ID, 'Multi', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.review.runReviewJob(jobId, BOOK_ID, 'Multi', 'tester@test.dev'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -143,7 +143,7 @@ test('Buch-Review: fehlt gesamtnote → failJob', async () => {
 
   const jobId = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.review.runReviewJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.review.runReviewJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev'),
   );
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'error');
@@ -166,7 +166,7 @@ test('Buch-Review Cache: Single-Pass-Rerun trifft book_review_cache → 0 AI-Cal
   // Erster Run → schreibt Cache.
   const jobId1 = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.review.runReviewJob(jobId1, BOOK_ID, 'Mein Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.review.runReviewJob(jobId1, BOOK_ID, 'Mein Buch', 'tester@test.dev'),
   );
   const job1 = await waitForJob(ctx.shared, jobId1);
   assert.equal(job1.status, 'done');
@@ -180,7 +180,7 @@ test('Buch-Review Cache: Single-Pass-Rerun trifft book_review_cache → 0 AI-Cal
   // Zweiter Run identische Inputs → Cache-HIT.
   const jobId2 = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.review.runReviewJob(jobId2, BOOK_ID, 'Mein Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.review.runReviewJob(jobId2, BOOK_ID, 'Mein Buch', 'tester@test.dev'),
   );
   const job2 = await waitForJob(ctx.shared, jobId2);
   assert.equal(job2.status, 'done');
@@ -210,7 +210,7 @@ test('Buch-Review Cache: Multi-Pass — geänderte Seite invalidiert nur 1 Kapit
   // 1. Run → 3 Analysen + 1 Final.
   const jobId1 = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.review.runReviewJob(jobId1, BOOK_ID, 'Multi', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.review.runReviewJob(jobId1, BOOK_ID, 'Multi', 'tester@test.dev'),
   );
   const job1 = await waitForJob(ctx.shared, jobId1, { timeoutMs: 8000 });
   assert.equal(job1.status, 'done');
@@ -237,7 +237,7 @@ test('Buch-Review Cache: Multi-Pass — geänderte Seite invalidiert nur 1 Kapit
 
   const jobId2 = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.review.runReviewJob(jobId2, BOOK_ID, 'Multi', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.review.runReviewJob(jobId2, BOOK_ID, 'Multi', 'tester@test.dev'),
   );
   const job2 = await waitForJob(ctx.shared, jobId2, { timeoutMs: 8000 });
   assert.equal(job2.status, 'done');
@@ -251,7 +251,7 @@ test('Buch-Review: leeres Buch → result.empty', async () => {
 
   const jobId = ctx.shared.createJob('review', BOOK_ID, 'tester@test.dev', 'job.label.review');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.review.runReviewJob(jobId, BOOK_ID, 'Leer', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.review.runReviewJob(jobId, BOOK_ID, 'Leer', 'tester@test.dev'),
   );
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'done');
@@ -286,7 +286,7 @@ test('Kapitel-Review: 1 Kapitel → 1 AI-Call, chapter_reviews-Zeile', async () 
 
   const jobId = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'Kap A', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'Kap A', 'Buch', 'tester@test.dev'),
   );
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -327,7 +327,7 @@ test('Kapitel-Review: ausgeschlossenes Kapitel bleibt direkt bewertbar', async (
 
   const jobId = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'Kap Excl', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'Kap Excl', 'Buch', 'tester@test.dev'),
   );
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -360,7 +360,7 @@ test('Kapitel-Review Cache: Rerun trifft chapter_macro_review_cache → 0 AI-Cal
   // Erster Run → schreibt Cache.
   const jobId1 = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.kapitel.runChapterReviewJob(jobId1, BOOK_ID, CHAPTER_ID, 'Kap A', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.kapitel.runChapterReviewJob(jobId1, BOOK_ID, CHAPTER_ID, 'Kap A', 'Buch', 'tester@test.dev'),
   );
   const job1 = await waitForJob(ctx.shared, jobId1);
   assert.equal(job1.status, 'done');
@@ -374,7 +374,7 @@ test('Kapitel-Review Cache: Rerun trifft chapter_macro_review_cache → 0 AI-Cal
   // Zweiter Run → Cache-HIT.
   const jobId2 = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.kapitel.runChapterReviewJob(jobId2, BOOK_ID, CHAPTER_ID, 'Kap A', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.kapitel.runChapterReviewJob(jobId2, BOOK_ID, CHAPTER_ID, 'Kap A', 'Buch', 'tester@test.dev'),
   );
   const job2 = await waitForJob(ctx.shared, jobId2);
   assert.equal(job2.status, 'done');
@@ -400,7 +400,7 @@ test('Kapitel-Review: leeres Kapitel → result.empty, kein AI-Call', async () =
 
   const jobId = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'Kap leer', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'Kap leer', 'Buch', 'tester@test.dev'),
   );
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'done');
@@ -421,7 +421,7 @@ test('Kapitel-Review: AI ohne gesamtnote → failJob', async () => {
 
   const jobId = ctx.shared.createJob('chapter-review', BOOK_ID, 'tester@test.dev', 'job.label.chapterReview', null, CHAPTER_ID);
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'K', 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }),
+    ctx.kapitel.runChapterReviewJob(jobId, BOOK_ID, CHAPTER_ID, 'K', 'Buch', 'tester@test.dev'),
   );
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'error');

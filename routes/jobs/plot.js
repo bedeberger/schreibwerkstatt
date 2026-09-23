@@ -227,7 +227,7 @@ function _werkstattFigurenContext(bookId, userEmail) {
 // Kapitel-Kontext zu unterschlagen).
 async function _kapitelContext(bookId) {
   try {
-    const { chaptersFlat } = await loadOrderedBookContents(bookId, null);
+    const { chaptersFlat } = await loadOrderedBookContents(bookId);
     return (chaptersFlat || []).map(c => c.name);
   } catch (e) {
     throw _plotContextError('kapitel', e);

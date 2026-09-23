@@ -19,6 +19,7 @@
         <div x-data="settingField({ k: 'ai.claude.model', label: 'admin.settings.label.model', ph: 'claude-sonnet-4-6', models: 'claude' })"></div>
         <div x-data="settingField({ k: 'ai.claude.context_window', type: 'num', label: 'admin.settings.label.contextWindow', num: { integer: true, min: 8000, max: 2000000 }, help: 'admin.settings.help.contextWindow' })"></div>
         <div x-data="settingField({ k: 'ai.claude.max_tokens_out', type: 'num', label: 'admin.settings.label.maxTokensOut', num: { integer: true, min: 1024, max: 200000 }, help: 'admin.settings.help.maxTokensOut' })"></div>
+        <div x-data="settingField({ k: 'ai.claude.effort.lektorat', label: 'admin.settings.label.aiClaudeEffortLektorat', ph: 'medium', help: 'admin.settings.help.lektoratEffort' })"></div>
 
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.komplettTitle')"></span></h4>
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.claude.komplettIntro')"></small>

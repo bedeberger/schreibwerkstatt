@@ -32,7 +32,7 @@ function _sigHash(obj) {
 const kapitelRouter = express.Router();
 
 // ── Job: Kapitel-Review (Makrobewertung eines einzelnen Kapitels) ────────────
-async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookName, userEmail, userToken, { includeSubchapters = false } = {}) {
+async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookName, userEmail, { includeSubchapters = false } = {}) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts(userEmail);
   const {
@@ -71,7 +71,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
     // includeExcluded: ausgeschlossene Kapitel sind direkt in der Kapitel-
     // bewertung bewertbar (anders als Buch-/Komplettanalyse) — der Filter unten
     // beschränkt ohnehin auf die angeforderten chapterIds.
-    const { chMap, pages: allPages } = await loadOrderedBookContents(bookId, userToken, { includeExcluded: true })
+    const { chMap, pages: allPages } = await loadOrderedBookContents(bookId, { includeExcluded: true })
       .catch(e => { throw contentHttpError(e); });
     const pages = allPages.filter(p => chapterIds.has(String(p.chapter_id || '')));
 
@@ -171,7 +171,7 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
       // Index-Map gegen Reorder durch Promise.allSettled.
       const batch = pages.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async p => {
-        const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw contentHttpError(e); });
+        const pd = await contentStore.loadPage(p.id).catch(e => { throw contentHttpError(e); });
         const text = htmlToText(pd.html).trim();
         if (!text) return null;
         return { title: p.name, text, chapterId: p.chapter_id || null };
@@ -304,7 +304,6 @@ kapitelRouter.post('/chapter-review', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = sessionEmail(req);
-  const userToken = null;
   // Dedup auf Kapitel-Ebene – parallele Reviews unterschiedlicher Kapitel sind ok.
   const existing = findActiveJobId('chapter-review', chapter_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
@@ -312,7 +311,7 @@ kapitelRouter.post('/chapter-review', jsonBody, (req, res) => {
   const labelParams = chapter_name ? { name: chapter_name } : null;
   const jobId = createJob('chapter-review', book_id, userEmail, label, labelParams, chapter_id);
   enqueueJob(jobId, () => runChapterReviewJob(
-    jobId, book_id, chapter_id, chapter_name || '', book_name || '', userEmail, userToken,
+    jobId, book_id, chapter_id, chapter_name || '', book_name || '', userEmail,
     { includeSubchapters },
   ));
   res.json({ jobId });

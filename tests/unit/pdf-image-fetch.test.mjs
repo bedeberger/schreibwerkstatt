@@ -71,7 +71,7 @@ for (const [label, url] of BLOCKED) {
   test(`SSRF: ${label} wird nicht abgerufen`, async () => {
     const f = stubFetch(() => okResponse(PNG_1x1));
     try {
-      assert.equal(await _fetchImage(url, null, undefined), null);
+      assert.equal(await _fetchImage(url, undefined), null);
       assert.equal(f.calls.length, 0, 'fetch darf gar nicht losgehen');
     } finally { f.restore(); }
   });
@@ -84,7 +84,7 @@ test('SSRF: Redirect auf eine interne Adresse wird beim zweiten Hop gestoppt', a
     url.includes('example.test') ? redirectResponse('http://127.0.0.1/secret') : okResponse(PNG_1x1)
   );
   try {
-    assert.equal(await _fetchImage('http://example.test/pic.png', null, undefined), null);
+    assert.equal(await _fetchImage('http://example.test/pic.png', undefined), null);
     assert.equal(f.calls.length, 1, 'nur der erste Hop darf laufen');
   } finally { f.restore(); }
 });
@@ -94,7 +94,7 @@ test('SSRF: Redirects werden manuell verfolgt (nicht von fetch)', async () => {
     url.endsWith('/a.png') ? redirectResponse('https://cdn.example.test/b.png') : okResponse(PNG_1x1)
   );
   try {
-    const out = await _fetchImage('https://example.test/a.png', null, undefined);
+    const out = await _fetchImage('https://example.test/a.png', undefined);
     assert.ok(out?.buffer, 'oeffentlicher Redirect bleibt erlaubt');
     assert.equal(f.calls.length, 2);
     for (const c of f.calls) {
@@ -108,7 +108,7 @@ test('SSRF: Redirect-Kette endet nach dem Deckel statt endlos zu laufen', async 
   let n = 0;
   const f = stubFetch(() => redirectResponse(`https://example.test/hop${++n}.png`));
   try {
-    assert.equal(await _fetchImage('https://example.test/start.png', null, undefined), null);
+    assert.equal(await _fetchImage('https://example.test/start.png', undefined), null);
     assert.ok(f.calls.length <= 5, `zu viele Hops: ${f.calls.length}`);
   } finally { f.restore(); }
 });
@@ -123,7 +123,7 @@ test('Deckel: angekuendigte Ueberlaenge (content-length) bricht vor dem Lesen ab
     return res;
   });
   try {
-    assert.equal(await _fetchImage('https://example.test/huge.png', null, undefined), null);
+    assert.equal(await _fetchImage('https://example.test/huge.png', undefined), null);
     assert.equal(read, false, 'Body darf nicht mehr gelesen werden');
   } finally { f.restore(); }
 });
@@ -143,7 +143,7 @@ test('Deckel: gestreamte Ueberlaenge bricht mitten im Body ab', async () => {
     },
   }));
   try {
-    assert.equal(await _fetchImage('https://example.test/stream.png', null, undefined), null);
+    assert.equal(await _fetchImage('https://example.test/stream.png', undefined), null);
     assert.ok(yielded <= MAX_REMOTE_BYTES / chunk.length + 1, `Stream zu lange gelesen: ${yielded}`);
   } finally { f.restore(); }
 });
@@ -153,7 +153,7 @@ test('Deckel: gestreamte Ueberlaenge bricht mitten im Body ab', async () => {
 test('oeffentliches Bild wird geholt und normalisiert', async () => {
   const f = stubFetch(() => okResponse(PNG_1x1, { 'content-length': String(PNG_1x1.length) }));
   try {
-    const out = await _fetchImage('https://example.test/pic.png', null, undefined);
+    const out = await _fetchImage('https://example.test/pic.png', undefined);
     assert.equal(out.width, 4);
     assert.equal(out.height, 4);
     assert.ok(out.buffer.length > 0);
@@ -166,14 +166,14 @@ test('oeffentliches Bild wird geholt und normalisiert', async () => {
 test('nicht-OK-Antwort liefert null (kein Abbruch des Exports)', async () => {
   const f = stubFetch(() => ({ ok: false, status: 404, headers: { get: () => null } }));
   try {
-    assert.equal(await _fetchImage('https://example.test/missing.png', null, undefined), null);
+    assert.equal(await _fetchImage('https://example.test/missing.png', undefined), null);
   } finally { f.restore(); }
 });
 
 test('data:-URI laeuft weiter ohne Netz (Fassungs-Export)', async () => {
   const f = stubFetch(() => { throw new Error('darf nicht fetchen'); });
   try {
-    const out = await _fetchImage(`data:image/png;base64,${PNG_1x1.toString('base64')}`, null, undefined);
+    const out = await _fetchImage(`data:image/png;base64,${PNG_1x1.toString('base64')}`, undefined);
     assert.equal(out.width, 4);
     assert.equal(f.calls.length, 0);
   } finally { f.restore(); }
@@ -183,9 +183,9 @@ test('geblockte URL wird im imageCache als null gemerkt (kein Zweitversuch)', as
   const cache = new Map();
   const f = stubFetch(() => okResponse(PNG_1x1));
   try {
-    await _fetchImage('http://10.1.2.3/x.png', null, cache);
+    await _fetchImage('http://10.1.2.3/x.png', cache);
     assert.equal(cache.get('http://10.1.2.3/x.png'), null);
-    await _fetchImage('http://10.1.2.3/x.png', null, cache);
+    await _fetchImage('http://10.1.2.3/x.png', cache);
     assert.equal(f.calls.length, 0);
   } finally { f.restore(); }
 });

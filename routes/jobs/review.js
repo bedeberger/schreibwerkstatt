@@ -49,7 +49,7 @@ function buildBookReviewPagesSig(pageContents, { bookName, optionsSig, cacheVers
 const reviewRouter = express.Router();
 
 // ── Job: Buchbewertung ────────────────────────────────────────────────────────
-async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
+async function runReviewJob(jobId, bookId, bookName, userEmail) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts(userEmail);
   const {
@@ -90,7 +90,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
   let optionsSig = _sigHash({ schwerpunkt: reviewSchwerpunkt, komplettContext, motivContext, narrative, stilprofil: bookSettings?.stilprofil || '' });
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)
+    const { chMap, pages } = await loadOrderedBookContents(bookId)
       .catch(e => { throw contentHttpError(e); });
 
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
@@ -102,7 +102,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail, userToken) {
         statusText: 'job.phase.readingPages',
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, total), total },
       });
-    }, userToken, jobAbortControllers.get(jobId)?.signal);
+    }, jobAbortControllers.get(jobId)?.signal);
 
     // Ist-Befunde des Struktur-Checks (nur journalistische Bücher; sonst null).
     // Erst hier ladbar, weil der Scope über die geladene Seitenliste läuft — und
@@ -257,13 +257,12 @@ reviewRouter.post('/review', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = sessionEmail(req);
-  const userToken = null;
   const existing = findActiveJobId('review', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.reviewBook' : 'job.label.review';
   const labelParams = book_name ? { name: book_name } : null;
   const jobId = createJob('review', book_id, userEmail, label, labelParams);
-  enqueueJob(jobId, () => runReviewJob(jobId, book_id, book_name || '', userEmail, userToken));
+  enqueueJob(jobId, () => runReviewJob(jobId, book_id, book_name || '', userEmail));
   res.json({ jobId });
 });
 

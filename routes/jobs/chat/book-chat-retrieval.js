@@ -26,13 +26,13 @@ const { i18nError } = require('../shared');
 // dem Index, es werden KEINE Seiten-Volltexte geladen. Gibt null zurück, wenn kein Index
 // existiert bzw. die Anfrage keine Treffer liefert (Caller fällt dann auf Keyword-Scoring
 // über alle Seiten zurück). Wirft nur bei Abort/Backend-Fehler.
-async function selectPassagesSemantic(bookId, query, budgetChars, signal, userToken) {
+async function selectPassagesSemantic(bookId, query, budgetChars, signal) {
   const topK = parseInt(appSettings.get('jobs.book_chat.rag_top_k'), 10) || 40;
   const hits = await semanticQuery(bookId, query, { kinds: ['page'], topK, signal });
   if (!hits.length) return null;
 
   let pages;
-  try { pages = await contentStore.listPages(bookId, userToken); }
+  try { pages = await contentStore.listPages(bookId); }
   catch (e) {
     if (e?.status) throw i18nError('job.error.contentStorePageList', { status: e.status });
     throw e;

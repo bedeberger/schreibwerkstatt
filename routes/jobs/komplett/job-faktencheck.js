@@ -109,7 +109,7 @@ async function _judgeOneFact(tok, userPrompt, systemPrompt, signal) {
   return text;
 }
 
-async function runFaktencheckJob(jobId, bookId, bookName, userEmail, userToken, provider = undefined) {
+async function runFaktencheckJob(jobId, bookId, bookName, userEmail, provider = undefined) {
   const bookIdInt = parseInt(bookId);
   const email = userEmail || null;
   const log = makeJobLogger(jobId);

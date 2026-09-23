@@ -48,7 +48,7 @@ function _resolveAuthor(bookId) {
   return '';
 }
 
-async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, snapshotId = null, userEmail, userToken }) {
+async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, snapshotId = null, userEmail }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
   try {
@@ -69,7 +69,7 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, sn
       if (!bundle.groups.length) throw i18nError('job.error.snapshotCorrupt');
       frozenPub = snapshotPublication(snap.publication_json);
     } else {
-      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters });
     }
     const { book } = bundle;
 
@@ -208,7 +208,7 @@ router.post('/epub-export', jsonBody, async (req, res) => {
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('epub-export', bookId, userEmail, 'job.label.epubExport', {}, dedupId);
-  enqueueJob(jobId, () => runEpubExportJob(jobId, { scope, entityId, includeSubchapters, snapshotId, userEmail, userToken: null }));
+  enqueueJob(jobId, () => runEpubExportJob(jobId, { scope, entityId, includeSubchapters, snapshotId, userEmail }));
   res.status(202).json({ jobId });
 });
 

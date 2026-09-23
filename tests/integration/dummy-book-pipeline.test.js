@@ -23,7 +23,6 @@ test.beforeEach(() => {
 });
 
 const USER = 'tester@test.dev';
-const TOKEN = { id: 'tok', pw: 'pw' };
 
 test('Dummy-Buch: Fixture-Loader liefert deterministische IDs', () => {
   const fix = dummy.buildDummyBookFixture(102);
@@ -45,7 +44,7 @@ test('Dummy-Buch Komplettanalyse Single-Pass → done, 5 Figuren, 4 Orte, Kontin
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, USER, 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, fix.meta.title, USER, TOKEN, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, fix.meta.title, USER, 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
@@ -80,7 +79,7 @@ test('Dummy-Buch Standalone-Kontinuitätscheck → 2 Probleme', async () => {
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, USER, 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, fix.meta.title, USER, TOKEN, 'claude'),
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, fix.meta.title, USER, 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });

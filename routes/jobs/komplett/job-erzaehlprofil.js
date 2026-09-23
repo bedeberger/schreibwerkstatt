@@ -18,7 +18,7 @@ const { runErzaehlprofil } = require('./phases');
 const { _komplettAiOverrides } = require('./job-shared');
 const { providerClass } = require('../../../lib/ai');
 
-async function runErzaehlprofilJob(jobId, bookId, bookName, userEmail, userToken, provider = undefined) {
+async function runErzaehlprofilJob(jobId, bookId, bookName, userEmail, provider = undefined) {
   const bookIdInt = parseInt(bookId);
   const email = userEmail || null;
   const log = makeJobLogger(jobId);
@@ -40,7 +40,7 @@ async function runErzaehlprofilJob(jobId, bookId, bookName, userEmail, userToken
 
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const { chMap, chNameToId, pages } = await loadOrderedBookContents(bookId, userToken)
+    const { chMap, chNameToId, pages } = await loadOrderedBookContents(bookId)
       .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
@@ -57,7 +57,7 @@ async function runErzaehlprofilJob(jobId, bookId, bookName, userEmail, userToken
         statusText: 'job.phase.readingPages',
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, total), total },
       });
-    }, userToken, jobAbortControllers.get(jobId)?.signal);
+    }, jobAbortControllers.get(jobId)?.signal);
 
     // Buchtext-Preprocessing nur Cloud-Klasse (identisch zu job-komplett/-kontinuitaet).
     if (providerClass(effectiveProvider) === 'cloud') {

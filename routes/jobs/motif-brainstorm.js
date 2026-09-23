@@ -51,8 +51,8 @@ async function runMotifBrainstormJob(jobId, bookId, userEmail, { force = false }
     if (force) motifsDb.deleteBrainstormCache(bookId, userEmail);
 
     updateJob(jobId, { statusText: 'job.phase.motivBrainstormCollect', progress: 8 });
-    const { chMap, pages } = await loadOrderedBookContents(bookId, null);
-    const pageContents = await loadPageContents(pages, chMap, 1, null, null, signal());
+    const { chMap, pages } = await loadOrderedBookContents(bookId);
+    const pageContents = await loadPageContents(pages, chMap, 1, null, signal());
     if (!pageContents.some(p => p.text)) throw i18nError('job.error.motivNoText');
 
     const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);

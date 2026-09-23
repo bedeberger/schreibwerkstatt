@@ -22,7 +22,7 @@
 //   buildContextInfo({ toolLog, iter, webSearches, webResults, ctx }) → object,
 //   buildCompletePayload?({ base, ctx }) → object (default: base),
 //   buildSummary({ session, sessionId, toolLog, iter, webSearches, ctx }) → string,
-//   fallbackJob?(jobId, sessionId, userMsgId, message, userEmail, userToken),
+//   fallbackJob?(jobId, sessionId, userMsgId, message, userEmail),
 //     optional: uebernimmt den Job, wenn der Provider kein Tool-Protokoll spricht
 //     (Fehler-Code AI_TOOLS_UNSUPPORTED). Der Buch-Chat haengt hier seinen
 //     klassischen Pfad ein — ein Endpunkt, der Function-Calling ablehnt, kostet
@@ -75,7 +75,7 @@ function buildAgenticHistory(sessionId, tailMessages = 10) {
 }
 
 function makeAgenticChatJob(config) {
-  return async function runAgenticChatJob(jobId, sessionId, userMsgId, message, userEmail, userToken) {
+  return async function runAgenticChatJob(jobId, sessionId, userMsgId, message, userEmail) {
     const logger = makeJobLogger(jobId);
     const provider = config.resolveProvider(userEmail, logger);
     const aiCfg = getContextConfigFor(provider);
@@ -88,7 +88,7 @@ function makeAgenticChatJob(config) {
       logger.info(`Start (${config.startLabel}): «${session.book_name || '-'}» session=${sessionId}, msg-len=${message.length}`);
 
       const jobSignal = jobAbortControllers.get(jobId)?.signal;
-      const prep = await config.prepare({ session, userEmail, userToken, aiCfg, logger, jobSignal, message });
+      const prep = await config.prepare({ session, userEmail, aiCfg, logger, jobSignal, message });
       const { systemPrompt, tools, maxToolIter, tokenBudget, forceFinalInstruction, ctx } = prep;
       const toolResultCap = prep.toolResultCap ?? Infinity;
 
@@ -271,7 +271,7 @@ function makeAgenticChatJob(config) {
       // jedem Schreibpfad (Assistant-Nachricht, Ledger, Session-Titel).
       if (e?.code === 'AI_TOOLS_UNSUPPORTED' && config.fallbackJob && e.name !== 'AbortError') {
         logger.warn(`${config.errLabel}: Tool-Use nicht verfuegbar (${e.message}) – Rueckfall auf den klassischen Pfad.`);
-        return config.fallbackJob(jobId, sessionId, userMsgId, message, userEmail, userToken);
+        return config.fallbackJob(jobId, sessionId, userMsgId, message, userEmail);
       }
       if (e.name !== 'AbortError') logger.error(`${config.errLabel}-Fehler: ${e.message}`, { stack: e.stack });
       failJob(jobId, e);

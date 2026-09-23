@@ -47,7 +47,7 @@ test('Kontinuität single-pass: 1 Kapitel, 1 Seite, AI liefert 1 Problem', async
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId);
@@ -90,7 +90,7 @@ test('Kontinuität single-pass: erfundenes Beleg-Zitat wird verworfen, echtes bl
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId);
@@ -105,7 +105,7 @@ test('Kontinuität: leeres Buch → result.empty', async () => {
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Leeres Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Leeres Buch', 'tester@test.dev', 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId);
@@ -126,7 +126,7 @@ test('Kontinuität: AI ohne zusammenfassung → failJob', async () => {
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId);

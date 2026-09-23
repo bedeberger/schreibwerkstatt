@@ -157,7 +157,7 @@ async function runSourceDetectJob(jobId, bookId, userEmail, { chapterId = null }
     const signal = () => jobAbortControllers.get(jobId)?.signal;
 
     updateJob(jobId, { statusText: 'job.phase.sourceDetectCollect', progress: 5 });
-    const { chMap, chaptersFlat, pages } = await loadOrderedBookContents(bookId, null);
+    const { chMap, chaptersFlat, pages } = await loadOrderedBookContents(bookId);
 
     // Kapitel-Scope schliesst Unterkapitel ein — dieselbe Lesart wie beim
     // Kapitel-Review; ein Kapitel ohne seine Unterkapitel ist kein Kapitel.
@@ -175,7 +175,7 @@ async function runSourceDetectJob(jobId, bookId, userEmail, { chapterId = null }
       if (!scopePages.length) throw i18nError('job.error.sourceDetectNoChapterText');
     }
 
-    const pageContents = await loadPageContents(scopePages, chMap, 1, null, null, signal());
+    const pageContents = await loadPageContents(scopePages, chMap, 1, null, signal());
     if (!pageContents.some(p => p.text)) throw i18nError('job.error.sourceDetectNoText');
 
     // Bibliothek des Users: liefert die „nicht erneut melden"-Liste fuer den

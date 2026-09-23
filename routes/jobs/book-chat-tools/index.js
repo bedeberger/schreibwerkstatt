@@ -1,7 +1,7 @@
 'use strict';
 // Facade fuer Buch-Chat-Tools. Buendelt Submodule zu einem TOOLS-Dispatcher.
 // Jede Tool-Funktion nimmt (input, ctx) und gibt ein JSON-serialisierbares Objekt zurueck.
-// ctx = { bookId, userEmail, userToken, jobSignal, logger }
+// ctx = { bookId, userEmail, jobSignal, logger }
 // Uebersicht aller Tools + Vertrag: docs/buchchat-tools.md
 
 const { _truncateResult } = require('./shared');

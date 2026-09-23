@@ -142,7 +142,7 @@ test('Komplettanalyse Single-Pass: 1 Kapitel, P1 + P8 → done', async () => {
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
@@ -224,7 +224,7 @@ test('Komplettanalyse Single-Pass: Erzählprofil-Phase persistiert POV/Intensit�
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'));
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', 'claude'));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
 
@@ -272,7 +272,7 @@ test('Komplettanalyse Single-Pass: Completeness-Pass ergänzt übersehene Figure
   try {
     const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
     ctx.shared.enqueueJob(jobId, () =>
-      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', 'claude'),
     );
     const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
     assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -325,7 +325,7 @@ test('Komplettanalyse Single-Pass: Fakten-Pass (C) scheitert → Job ok, Warnung
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Testbuch', 'tester@test.dev', 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
@@ -359,7 +359,7 @@ test('Komplettanalyse: leeres Buch → result.empty, kein AI-Call', async () => 
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Leer', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Leer', 'tester@test.dev', 'claude'),
   );
 
   const job = await waitForJob(ctx.shared, jobId);
@@ -448,7 +448,7 @@ test('Komplettanalyse Multi-Pass: 3 Kapitel → 3 P1-Chunks + Konsol-Calls', asy
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -494,7 +494,7 @@ test('Komplettanalyse Delta-Cache: Touch einer Seite → nur dieser Chunk re-ext
   // Run 1: full pipeline.
   const jobId1 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   await waitForJob(ctx.shared, jobId1, { timeoutMs: 10000 });
   const run1Calls = ctx.mockAi.log.length;
@@ -531,7 +531,7 @@ test('Komplettanalyse Delta-Cache: Touch einer Seite → nur dieser Chunk re-ext
   // Run 2: only chunk for page 3001 should re-extract.
   const jobId2 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId2, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId2, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   await waitForJob(ctx.shared, jobId2, { timeoutMs: 10000 });
   const run2Calls = ctx.mockAi.log.length - run1Calls;
@@ -567,7 +567,7 @@ test('Komplettanalyse Delta-Cache: Kapitel umbenannt → nur dessen Chunk re-ext
   // Run 1: füllt den chapter_extract_cache für alle 3 Chunks.
   const jobId1 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   await waitForJob(ctx.shared, jobId1, { timeoutMs: 10000 });
   const run1Calls = ctx.mockAi.log.length;
@@ -591,7 +591,7 @@ test('Komplettanalyse Delta-Cache: Kapitel umbenannt → nur dessen Chunk re-ext
   // im Chunk-pages_sig → MISS), die anderen zwei kommen aus dem Cache.
   const jobId2 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId2, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId2, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   await waitForJob(ctx.shared, jobId2, { timeoutMs: 10000 });
   const run2Calls = ctx.mockAi.log.length - run1Calls;
@@ -674,7 +674,7 @@ test('Komplettanalyse Checkpoint-Recovery: p1_full_done → überspringt Phase 1
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -718,7 +718,7 @@ test('Komplettanalyse Checkpoint-Invalid: altes Format → ignoriert, voller Lau
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done');
@@ -758,7 +758,7 @@ test('Komplettanalyse: Cache-Hit Phase 1 → nur P8 ruft AI', async () => {
   // Run 1: populates cache (A1 + B + C + E + A2 + P8 = 6 calls; Completeness aus).
   const jobId1 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId1, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId1, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   await waitForJob(ctx.shared, jobId1, { timeoutMs: 8000 });
   assert.equal(ctx.mockAi.log.length, 6, 'run 1: 6 AI calls (A1+B+C+E+A2+P8)');
@@ -769,7 +769,7 @@ test('Komplettanalyse: Cache-Hit Phase 1 → nur P8 ruft AI', async () => {
   const callsBeforeRun2 = ctx.mockAi.log.length;
   const jobId2 = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId2, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId2, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId2, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job2 = await waitForJob(ctx.shared, jobId2, { timeoutMs: 8000 });
   assert.equal(job2.status, 'done');
@@ -829,7 +829,7 @@ test('Komplettanalyse Phase 2 Soziogramm: >=4 Figuren → Refine-Call überschre
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -891,7 +891,7 @@ test('Komplettanalyse Phase 3 Orte-Konsolidierung: Konsol-Output dedupliziert di
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -937,7 +937,7 @@ test('Komplettanalyse Phase 3 Orte-Konsolidierung trunkiert → Job ok, Warnung,
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done (graceful fallback), got ${job.status}: ${job.error || ''}`);
@@ -985,7 +985,7 @@ test('Komplettanalyse Phase 3 Orte-Fallback: kapitelweise wiederverwendete loc_i
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done (kein UNIQUE-Crash), got ${job.status}: ${job.error || ''}`);
@@ -1030,7 +1030,7 @@ test('Komplettanalyse Phase 3 Songs-Konsolidierung trunkiert → Job ok, Fallbac
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done (graceful fallback, kein UNIQUE-Crash), got ${job.status}: ${job.error || ''}`);
@@ -1071,7 +1071,7 @@ test('Komplettanalyse Songs: figuren_namen wird gegen kanonische Figur aufgelös
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -1114,7 +1114,7 @@ test('Komplettanalyse Orte: figuren_namen wird gegen kanonische Figur aufgelöst
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -1178,7 +1178,7 @@ test('Komplettanalyse Phase 6 Zeitstrahl >=5 Events: Konsol-Call läuft, persist
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -1201,7 +1201,7 @@ test('Komplettanalyse Phase 6 Zeitstrahl <5 Events: Direkt-Speichern ohne KI-Cal
   // Bewusst KEIN isZeitstrahl-Handler: ein Call würde mit "no handler matched" werfen.
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 10000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -1237,7 +1237,7 @@ test('Komplettanalyse F2: Coverage-Self-Audit schreibt Score + fehlende Namen in
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done');
@@ -1271,7 +1271,7 @@ test('Komplettanalyse F4: buildAttributeContradictions findet Jahres-Konflikt ei
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done');
@@ -1303,7 +1303,7 @@ test('Komplettanalyse #4: figure_batch_size=1 → E + A2 batchen, Katalog korrek
   try {
     const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, 'tester@test.dev', 'job.label.komplett');
     ctx.shared.enqueueJob(jobId, () =>
-      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'));
+      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'));
     const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
     assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
     assert.equal(job.result.figCount, 2);
@@ -1341,7 +1341,7 @@ test('Komplettanalyse #8: Remap-Rescue ordnet unauflösbaren Szenen-Namen dem Ka
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'));
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, 'claude'));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
 
@@ -1386,7 +1386,7 @@ test('Komplettanalyse #3: Szenen-Backfill ergänzt Szenen für ein szenenloses K
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'));
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, 'claude'));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
   assert.equal(job.result.szenenCount, 1, 'Backfill ergänzt die fehlende Szene');
@@ -1422,7 +1422,7 @@ test('Komplettanalyse #2: Coverage-Feedback zieht eine vom Audit gemeldete fehle
   try {
     const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
     ctx.shared.enqueueJob(jobId, () =>
-      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'));
+      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, 'claude'));
     const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
     assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
     assert.equal(job.result.figCount, 3, 'Coverage-Feedback ergänzt die fehlende Figur Clara');
@@ -1451,7 +1451,7 @@ test('Komplettanalyse Teil-Lauf: Umfang ohne «kontinuitaet» überspringt P8 un
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude',
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, 'claude',
       { scope: { kontinuitaet: false } }));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
 
@@ -1500,7 +1500,7 @@ test('Komplettanalyse Teil-Lauf: abgewählte Katalog-Schritte lassen den Bestand
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude',
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, 'claude',
       { scope: { orte: false, szenen: false, songs: false, ereignisse: false, beziehungen: false, kontinuitaet: false, erzaehlprofil: false, coverage: false } }));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
 
@@ -1537,7 +1537,7 @@ test('Komplettanalyse Voll-Lauf schreibt den Konsolidierungs-Checkpoint (Gegenpr
 
   const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'));
+    ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, 'claude'));
   const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
 
   assert.equal(job.status, 'done', `expected done, got ${job.status}: ${job.error || ''}`);
@@ -1589,7 +1589,7 @@ test('Komplettanalyse: Figur ohne KI-`kapitel` erbt ihr Kapitel aus der Szene', 
   const run = async (n) => {
     const jobId = ctx.shared.createJob('komplett-analyse', BOOK_ID, email, 'job.label.komplett');
     ctx.shared.enqueueJob(jobId, () =>
-      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, { id: 'tok', pw: 'pw' }, 'claude'));
+      ctx.komplett.runKomplettAnalyseJob(jobId, BOOK_ID, 'Buch', email, 'claude'));
     const job = await waitForJob(ctx.shared, jobId, { timeoutMs: 8000 });
     assert.equal(job.status, 'done', `Lauf ${n}: expected done, got ${job.status}: ${job.error || ''}`);
   };

@@ -327,7 +327,20 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
   // Kalibrierung läuft ungedrosselt – sie ist einmalig und braucht die erste tokIn-Meldung.
   // Finale Werte werden nach callAI-Ende ohnehin explizit gesetzt.
   let lastUpdateMs = 0;
-  const onProgress = ({ chars, tokIn }) => {
+  // Denk-Phase (adaptives Thinking, nur Claude): der Provider meldet den Beginn eines
+  // Thinking-Blocks, das Ende ist der erste Text. Weitergereicht an den optionalen
+  // Hook `tok.onThinking(callId, on)` — der Job entscheidet selbst, ob und wie er die
+  // Phase anzeigt; ohne Hook bleibt die Statuszeile unberührt. Ungedrosselt: zwei
+  // Übergänge pro Call.
+  let thinkingNow = false;
+  const setThinking = (on) => {
+    if (thinkingNow === on) return;
+    thinkingNow = on;
+    tok.onThinking?.(callId, on);
+  };
+  const onProgress = ({ chars, tokIn, thinking }) => {
+    if (thinking) setThinking(true);
+    else if (thinkingNow && chars > 0) setThinking(false);
     if (!calibrated && tokIn > 0) {
       dynExpectedChars = Math.max(expectedChars, Math.round(tokIn * 4 * outputRatio));
       calibrated = true;
@@ -391,7 +404,13 @@ async function aiCall(jobId, tok, prompt, system, fromPct, toPct, expectedChars 
     estTokIn: estimatePromptTokens([prompt, system], aiCfg.charsPerToken),
   });
   const signal = jobAbortControllers.get(jobId)?.signal;
-  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, cacheCreation1hIn = 0, genDurationMs } = await callAI(prompt, system, onProgress, maxTokensOverride, signal, effProvider, jsonSchema, tier);
+  let aiRes;
+  try {
+    aiRes = await callAI(prompt, system, onProgress, maxTokensOverride, signal, effProvider, jsonSchema, tier);
+  } finally {
+    setThinking(false);
+  }
+  const { text, truncated, tokensIn, tokensOut, cacheReadIn = 0, cacheCreationIn = 0, cacheCreation1hIn = 0, genDurationMs } = aiRes;
   tok.inflight?.delete(callId);
   tok.in += tokensIn;
   tok.out += tokensOut;

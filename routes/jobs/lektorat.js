@@ -43,7 +43,7 @@ const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl
 const { resolvePageBookId } = require('../../lib/content-ownership');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider, effectiveProviderClass } = require('../../lib/ai');
-const { lektoratAnalyze, objektivRuns, splitEnabled } = require('./lektorat-split');
+const { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratEffort } = require('./lektorat-split');
 
 // Lokale Provider (ollama/llama) bekommen einen deutlich abgespeckten Lektorat-Prompt:
 // kein Vorseiten-Kontext (BookStack-Roundtrip gespart), keine Figuren-Beziehungen,
@@ -208,7 +208,7 @@ function validateLektoratFehler(fehler, locale, validTypen) {
 const lektoratRouter = express.Router();
 
 // ── Job: Seiten-Lektorat ──────────────────────────────────────────────────────
-async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
+async function runCheckJob(jobId, pageId, bookId, userEmail) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts(userEmail);
   const { PROMPTS_VERSION } = prompts;
@@ -216,12 +216,12 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
   const locale = bookId ? getBookLocale(bookId, userEmail) : 'de-CH';
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
   const effectiveProvider = resolveProvider({ userEmail });
-  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
+  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}${applyLektoratEffort(effectiveProvider, _modelName(effectiveProvider), logger)}`;
   try {
     logger.info(`Start: Seite #${pageId}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPageContent', progress: 5 });
 
-    const pd = await contentStore.loadPage(pageId, userToken).catch(e => { throw contentHttpError(e); });
+    const pd = await contentStore.loadPage(pageId).catch(e => { throw contentHttpError(e); });
 
     const html = pd.html;
     // Absatz-erhaltende Variante statt des kompakten `htmlToText`:
@@ -266,10 +266,10 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
     let previousExcerpt = null;
     if (bookId && !local) {
       try {
-        const allPages = await contentStore.listPages(bookId, userToken);
+        const allPages = await contentStore.listPages(bookId);
         const prev = findPreviousPage(allPages, pageId, pd.chapter_id);
         if (prev) {
-          const prevPd = await contentStore.loadPage(prev.id, userToken);
+          const prevPd = await contentStore.loadPage(prev.id);
           previousExcerpt = lastParagraph(htmlToTextForPrompt(prevPd.html));
         }
       } catch (e) {
@@ -379,12 +379,12 @@ async function runCheckJob(jobId, pageId, bookId, userEmail, userToken) {
 }
 
 // ── Job: Batch-Lektorat ───────────────────────────────────────────────────────
-async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
+async function runBatchCheckJob(jobId, bookId, userEmail) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts(userEmail);
   const { PROMPTS_VERSION } = prompts;
   const effectiveProvider = resolveProvider({ userEmail });
-  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
+  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}${applyLektoratEffort(effectiveProvider, _modelName(effectiveProvider), logger)}`;
   const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: batchStopwords, ERKLAERUNG_RULE: batchErklaerungRule, KORREKTUR_REGELN: batchKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = getBookLocale(bookId, userEmail);
   const langCode = (locale || 'de-CH').split('-')[0];
@@ -395,7 +395,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
   const local = _isLocalProvider(userEmail);
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const pages = await contentStore.listPages(bookId, userToken).catch(e => { throw contentHttpError(e); });
+    const pages = await contentStore.listPages(bookId).catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
     logger.info(`Start: ${pages.length} Seiten`);
 
@@ -422,7 +422,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
     const processPage = async (p, i) => {
       if (jobAbortControllers.get(jobId)?.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       try {
-        const pd = await contentStore.loadPage(p.id, userToken).catch(e => { throw contentHttpError(e); });
+        const pd = await contentStore.loadPage(p.id).catch(e => { throw contentHttpError(e); });
         const text = htmlToTextForPrompt(pd.html).trim();
         if (!text) return;
 
@@ -442,7 +442,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail, userToken) {
               previousExcerpt = lastParaCache.get(prev.id);
             } else {
               try {
-                const prevPd = await contentStore.loadPage(prev.id, userToken);
+                const prevPd = await contentStore.loadPage(prev.id);
                 previousExcerpt = lastParagraph(htmlToTextForPrompt(prevPd.html));
                 lastParaCache.set(prev.id, previousExcerpt);
               } catch (_) { /* Vorseite fehlschlägt → kein Kontext, nicht kritisch */ }
@@ -574,13 +574,12 @@ lektoratRouter.post('/check', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'lektor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = sessionEmail(req);
-  const userToken = null;
   const existing = findActiveJobId('check', page_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = 'job.label.checkPage';
   const labelParams = { name: page_name || `#${page_id}` };
   const jobId = createJob('check', book_id || 0, userEmail, label, labelParams, page_id);
-  enqueueJob(jobId, () => runCheckJob(jobId, page_id, book_id || null, userEmail, userToken));
+  enqueueJob(jobId, () => runCheckJob(jobId, page_id, book_id || null, userEmail));
   res.json({ jobId });
 });
 
@@ -592,13 +591,12 @@ lektoratRouter.post('/batch-check', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'lektor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = sessionEmail(req);
-  const userToken = null;
   const existing = findActiveJobId('batch-check', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.batchCheckBook' : 'job.label.batchCheck';
   const labelParams = book_name ? { name: book_name } : null;
   const jobId = createJob('batch-check', book_id, userEmail, label, labelParams);
-  enqueueJob(jobId, () => runBatchCheckJob(jobId, book_id, userEmail, userToken));
+  enqueueJob(jobId, () => runBatchCheckJob(jobId, book_id, userEmail));
   res.json({ jobId });
 });
 

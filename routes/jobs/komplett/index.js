@@ -34,7 +34,6 @@ komplettRouter.post('/komplett-analyse', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = sessionEmail(req);
-  const userToken = null;
   const existing = findActiveJobId('komplett-analyse', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   // Lauf-Umfang (Teil-Lauf): welche Schritte dieser Lauf neu berechnet. Katalog +
@@ -58,7 +57,7 @@ komplettRouter.post('/komplett-analyse', jsonBody, (req, res) => {
   const labelParams = book_name ? { name: book_name } : null;
   const jobId = createJob('komplett-analyse', book_id, userEmail, label, labelParams);
   // provider bleibt undefined (Slot 6) — den setzt nur der Nacht-Cron; opts folgt dahinter.
-  enqueueJob(jobId, () => runKomplettAnalyseJob(jobId, book_id, book_name || '', userEmail, userToken,
+  enqueueJob(jobId, () => runKomplettAnalyseJob(jobId, book_id, book_name || '', userEmail,
     undefined, { scope }));
   res.json({ jobId });
 });
@@ -76,13 +75,12 @@ komplettRouter.post('/kontinuitaet', jsonBody, (req, res) => {
   // Dieselbe Entscheidung wie `/config` komplett.continuity und das Ueberspringen der
   // Phase im Job; dieser Guard erzwingt sie serverseitig (Defense-in-depth).
   if (effectiveProviderClass({ userEmail }) !== 'cloud') return res.status(400).json({ error_code: 'CONTINUITY_PROVIDER_UNSUPPORTED' });
-  const userToken = null;
   const existing = findActiveJobId('kontinuitaet', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.kontinuitaetBook' : 'job.label.kontinuitaet';
   const labelParams = book_name ? { name: book_name } : null;
   const jobId = createJob('kontinuitaet', book_id, userEmail, label, labelParams);
-  enqueueJob(jobId, () => runKontinuitaetJob(jobId, book_id, book_name || '', userEmail, userToken));
+  enqueueJob(jobId, () => runKontinuitaetJob(jobId, book_id, book_name || '', userEmail));
   res.json({ jobId });
 });
 
@@ -123,13 +121,12 @@ komplettRouter.post('/faktencheck', jsonBody, (req, res) => {
   if (resolveProvider({ userEmail }) !== 'claude') return res.status(400).json({ error_code: 'FACTCHECK_CLAUDE_ONLY' });
   if (appSettings.get('ai.komplett.factcheck') === false) return res.status(400).json({ error_code: 'FACTCHECK_DISABLED' });
   if (!getBookSettings(book_id, userEmail)?.weltfakten_real_pruefen) return res.status(400).json({ error_code: 'FACTCHECK_NOT_ENABLED_FOR_BOOK' });
-  const userToken = null;
   const existing = findActiveJobId('faktencheck', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.faktencheckBook' : 'job.label.faktencheck';
   const labelParams = book_name ? { name: book_name } : null;
   const jobId = createJob('faktencheck', book_id, userEmail, label, labelParams);
-  enqueueJob(jobId, () => runFaktencheckJob(jobId, book_id, book_name || '', userEmail, userToken));
+  enqueueJob(jobId, () => runFaktencheckJob(jobId, book_id, book_name || '', userEmail));
   res.json({ jobId });
 });
 
@@ -146,13 +143,12 @@ komplettRouter.post('/erzaehlprofil', jsonBody, (req, res) => {
   // Erzählprofil braucht die Cloud-Klasse (Single-Pass). Serverseitiger Guard analog
   // Kontinuität (Defense-in-depth), gleiche Entscheidung wie `/config`.
   if (effectiveProviderClass({ userEmail }) !== 'cloud') return res.status(400).json({ error_code: 'NARRATIVE_PROFILE_PROVIDER_UNSUPPORTED' });
-  const userToken = null;
   const existing = findActiveJobId('erzaehlprofil', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const label = book_name ? 'job.label.erzaehlprofilBook' : 'job.label.erzaehlprofil';
   const labelParams = book_name ? { name: book_name } : null;
   const jobId = createJob('erzaehlprofil', book_id, userEmail, label, labelParams);
-  enqueueJob(jobId, () => runErzaehlprofilJob(jobId, book_id, book_name || '', userEmail, userToken));
+  enqueueJob(jobId, () => runErzaehlprofilJob(jobId, book_id, book_name || '', userEmail));
   res.json({ jobId });
 });
 

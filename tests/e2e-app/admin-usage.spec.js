@@ -33,6 +33,52 @@ test('Abrechnung ohne Admin-Key: Hinweis statt Tabellen', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('Deep-Link #admin/usage/billing laedt den Abrechnungs-Tab', async ({ page }) => {
+  // Der Hash-Router oeffnet die Karte ZUERST und setzt den Tab danach —
+  // der Tab-Watcher muss dann selbst laden, sonst bleibt das Pane leer.
+  const errors = collectErrors(page);
+  await bootApp(page);
+  const billingReq = page.waitForRequest(r => new URL(r.url()).pathname === '/admin/usage/billing');
+  await page.evaluate(() => { location.hash = '#admin/usage/billing'; });
+  await billingReq;
+  const pane = page.locator('[x-show="adminUsageTab === \'billing\'"]');
+  await expect(pane).toBeVisible();
+  await expect(pane.locator('p.muted-msg').first()).toContainText(/Admin-Key|admin key/);
+  expect(errors).toEqual([]);
+});
+
+// Jeder Tab einzeln: laedt beim Oeffnen zuerst ein anderer Tab, darf der
+// Load des richtigen nicht verpuffen.
+for (const [tab, path] of [
+  ['jobs', '/admin/usage/jobs'], ['chat', '/admin/usage/chat'], ['summary', '/admin/usage/summary'],
+  ['features', '/admin/usage/features'], ['time', '/admin/usage/time'],
+]) {
+  test(`Deep-Link #admin/usage/${tab} laedt den Tab`, async ({ page }) => {
+    await bootApp(page);
+    const req = page.waitForRequest(r => new URL(r.url()).pathname === path);
+    await page.evaluate(h => { location.hash = h; }, `#admin/usage/${tab}`);
+    await req;
+  });
+}
+
+test('Schneller Tab-Wechsel: neuer Tab laedt, waehrend der vorige noch laeuft', async ({ page }) => {
+  await bootApp(page);
+  // Users-Load kuenstlich haengen lassen, bis der Jobs-Tab angeklickt ist.
+  let releaseUsers;
+  const usersHeld = new Promise(r => { releaseUsers = r; });
+  await page.route(u => new URL(u).pathname === '/admin/usage/users', async route => {
+    await usersHeld;
+    await route.continue();
+  });
+  const jobsReq = page.waitForRequest(r => new URL(r.url()).pathname === '/admin/usage/jobs');
+  await page.evaluate(() => { location.hash = '#admin/usage'; });
+  await expect(page.locator('.card--admin-usage')).toBeVisible();
+  await page.evaluate(() => { window.__app.adminUsageTab = 'jobs'; });
+  await jobsReq;
+  releaseUsers();
+  await expect(page.locator('.card--admin-usage [x-show="adminUsageLoading"]')).toBeHidden();
+});
+
 test('Abrechnung mit Daten: KPIs, Modell- und Tagestabelle, Abweichung markiert', async ({ page }) => {
   const errors = collectErrors(page);
   await bootApp(page);

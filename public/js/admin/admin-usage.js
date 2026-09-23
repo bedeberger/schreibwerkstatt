@@ -62,10 +62,9 @@ export const adminUsageMethods = {
     return localIsoDate().slice(0, 7) + '-01';
   },
 
-  async adminUsageSelectTab(tab) {
-    if (this.adminUsageTab === tab) return;
+  // Laden uebernimmt der `adminUsageTab`-Watcher in admin-usage-card.js.
+  adminUsageSelectTab(tab) {
     this.adminUsageTab = tab;
-    await this.adminUsageLoadTab();
   },
 
   // Options-Liste fuer den User-Filter-Combobox in Jobs/Chat-Tabs.
@@ -133,15 +132,34 @@ export const adminUsageMethods = {
     return r.json();
   },
 
-  // ── Tab: Users (Liste + Budget-Edit) ───────────────────────────────────────
-  async adminUsageLoadUsers() {
-    if (this.adminUsageLoading) return;
+  // Rahmen fuer jeden Tab-Load. Pro Tab zaehlt eine Sequenz mit: kommt eine
+  // Antwort an, nachdem fuer DENSELBEN Tab schon ein neuerer Load gestartet
+  // wurde (Filter/Datum/Seite geaendert), wird sie verworfen. Loads
+  // verschiedener Tabs blockieren sich nicht — eine gemeinsame Sperre liess den
+  // Load des neuen Tabs verpuffen, solange der vorige noch lief (schneller
+  // Tab-Klick, Deep-Link). `adminUsageLoading` bleibt true, bis alle fertig sind.
+  async _adminUsageRun(tab, fetchFn, applyFn) {
+    const seq = (this._adminUsageSeq[tab] || 0) + 1;
+    this._adminUsageSeq[tab] = seq;
+    this._adminUsagePending++;
     this.adminUsageLoading = true;
     try {
-      const [data, breakdown] = await Promise.all([
-        this._adminUsageFetch('/admin/usage/users'),
-        this._adminUsageFetch('/admin/usage/breakdown'),
-      ]);
+      const data = await fetchFn();
+      if (seq === this._adminUsageSeq[tab]) applyFn(data);
+    } catch (e) {
+      if (seq === this._adminUsageSeq[tab]) this.adminUsageError = e.message;
+    } finally {
+      this._adminUsagePending--;
+      this.adminUsageLoading = this._adminUsagePending > 0;
+    }
+  },
+
+  // ── Tab: Users (Liste + Budget-Edit) ───────────────────────────────────────
+  async adminUsageLoadUsers() {
+    await this._adminUsageRun('users', () => Promise.all([
+      this._adminUsageFetch('/admin/usage/users'),
+      this._adminUsageFetch('/admin/usage/breakdown'),
+    ]), ([data, breakdown]) => {
       this.adminUsageBreakdown = (breakdown.rows || []).map(r => ({ ...r, email: r.email || '' }));
       this.adminUsageUsersList = (data.users || []).map(u => ({
         ...u,
@@ -150,8 +168,7 @@ export const adminUsageMethods = {
         _saving: false,
         _savedAt: 0,
       }));
-    } catch (e) { this.adminUsageError = e.message; }
-    finally { this.adminUsageLoading = false; }
+    });
   },
 
   // ── Users-Tab: Kosten je User x Job-Typ ───────────────────────────────────
@@ -246,52 +263,39 @@ export const adminUsageMethods = {
 
   // ── Tab: Jobs ──────────────────────────────────────────────────────────────
   async adminUsageLoadJobs() {
-    if (this.adminUsageLoading) return;
-    this.adminUsageLoading = true;
     this._adminUsageEnsureUsers();
-    try {
-      const qs = new URLSearchParams();
-      for (const email of (this.adminUsageFilterUsers || [])) {
-        if (email) qs.append('user', email);
-      }
-      qs.set('limit', '50');
-      qs.set('offset', String(this.adminUsageJobsOffset || 0));
-      const data = await this._adminUsageFetch(`/admin/usage/jobs?${qs.toString()}`);
+    const qs = new URLSearchParams();
+    for (const email of (this.adminUsageFilterUsers || [])) {
+      if (email) qs.append('user', email);
+    }
+    qs.set('limit', '50');
+    qs.set('offset', String(this.adminUsageJobsOffset || 0));
+    await this._adminUsageRun('jobs', () => this._adminUsageFetch(`/admin/usage/jobs?${qs.toString()}`), (data) => {
       this.adminUsageJobsList = data.rows || [];
       this.adminUsageJobsTotal = data.total || 0;
-    } catch (e) { this.adminUsageError = e.message; }
-    finally { this.adminUsageLoading = false; }
+    });
   },
 
   // ── Tab: Chat ──────────────────────────────────────────────────────────────
   async adminUsageLoadChat() {
-    if (this.adminUsageLoading) return;
-    this.adminUsageLoading = true;
     this._adminUsageEnsureUsers();
-    try {
-      const qs = new URLSearchParams();
-      for (const email of (this.adminUsageFilterUsers || [])) {
-        if (email) qs.append('user', email);
-      }
-      qs.set('limit', '50');
-      qs.set('offset', String(this.adminUsageChatOffset || 0));
-      const data = await this._adminUsageFetch(`/admin/usage/chat?${qs.toString()}`);
+    const qs = new URLSearchParams();
+    for (const email of (this.adminUsageFilterUsers || [])) {
+      if (email) qs.append('user', email);
+    }
+    qs.set('limit', '50');
+    qs.set('offset', String(this.adminUsageChatOffset || 0));
+    await this._adminUsageRun('chat', () => this._adminUsageFetch(`/admin/usage/chat?${qs.toString()}`), (data) => {
       this.adminUsageChatList = data.rows || [];
       this.adminUsageChatTotal = data.total || 0;
-    } catch (e) { this.adminUsageError = e.message; }
-    finally { this.adminUsageLoading = false; }
+    });
   },
 
   // ── Tab: Abrechnung (Anthropic Cost-Report vs. Ledger) ─────────────────────
   async adminUsageLoadBilling() {
-    this.adminUsageLoading = true;
-    try {
-      this.adminUsageBilling = await this._adminUsageFetch('/admin/usage/billing');
-    } catch (e) {
-      this.adminUsageError = e.message;
-    } finally {
-      this.adminUsageLoading = false;
-    }
+    await this._adminUsageRun('billing', () => this._adminUsageFetch('/admin/usage/billing'), (data) => {
+      this.adminUsageBilling = data;
+    });
   },
 
   async adminUsageBillingSync() {
@@ -352,17 +356,9 @@ export const adminUsageMethods = {
 
   // ── Tab: Summary (mit Charts) ──────────────────────────────────────────────
   async adminUsageLoadSummary() {
-    // Fetch nur, wenn nicht schon ein Load laeuft. Das Chart-Rendering haengt
-    // NICHT am Loading-Guard: bei schnellem Tab-Wechsel hin/zurueck muessen die
-    // Charts aus dem Cache neu gezeichnet werden, auch waehrend ein frueherer
-    // Fetch noch laeuft (sonst bleibt das Summary-Pane leer).
-    if (!this.adminUsageLoading) {
-      this.adminUsageLoading = true;
-      try {
-        this.adminUsageSummary = await this._adminUsageFetch('/admin/usage/summary');
-      } catch (e) { this.adminUsageError = e.message; }
-      finally { this.adminUsageLoading = false; }
-    }
+    await this._adminUsageRun('summary', () => this._adminUsageFetch('/admin/usage/summary'), (data) => {
+      this.adminUsageSummary = data;
+    });
     if (this.adminUsageSummary) {
       this.$nextTick(() => this._adminUsageRenderCharts(this.adminUsageSummary));
     }
@@ -450,27 +446,19 @@ export const adminUsageMethods = {
 
   // ── Tab: Features ──────────────────────────────────────────────────────────
   async adminUsageLoadFeatures() {
-    if (this.adminUsageLoading) return;
-    this.adminUsageLoading = true;
-    try {
-      const data = await this._adminUsageFetch('/admin/usage/features');
+    await this._adminUsageRun('features', () => this._adminUsageFetch('/admin/usage/features'), (data) => {
       this.adminUsageFeatureItems  = data.items  || [];
       this.adminUsageFeatureTotals = data.totals || [];
-    } catch (e) { this.adminUsageError = e.message; }
-    finally { this.adminUsageLoading = false; }
+    });
   },
 
   // ── Tab: Zeit ──────────────────────────────────────────────────────────────
   async adminUsageLoadTime() {
-    if (this.adminUsageLoading) return;
-    this.adminUsageLoading = true;
-    try {
-      const data = await this._adminUsageFetch('/admin/usage/time');
+    await this._adminUsageRun('time', () => this._adminUsageFetch('/admin/usage/time'), (data) => {
       this.adminUsageTimeItems = data.items || [];
       this.adminUsageTimeSeries = [];
       this.adminUsageTimeSeriesKey = '';
-    } catch (e) { this.adminUsageError = e.message; }
-    finally { this.adminUsageLoading = false; }
+    });
   },
 
   async adminUsageLoadTimeSeries(row) {

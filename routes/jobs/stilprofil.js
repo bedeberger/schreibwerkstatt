@@ -36,7 +36,7 @@ function sampleForStyle(pageContents, budget) {
   return { pages: selected, total, sampled: true };
 }
 
-async function runStilprofilJob(jobId, bookId, userEmail, userToken) {
+async function runStilprofilJob(jobId, bookId, userEmail) {
   const logger = makeJobLogger(jobId);
   const prompts = await getPrompts(userEmail);
   const { buildStilprofilPrompt, SCHEMA_STILPROFIL } = prompts;
@@ -50,7 +50,7 @@ async function runStilprofilJob(jobId, bookId, userEmail, userToken) {
     logger.info(`Start: Stilprofil Buch #${bookId}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
 
-    const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)
+    const { chMap, pages } = await loadOrderedBookContents(bookId)
       .catch(e => { throw contentHttpError(e); });
     if (!pages.length) { completeJob(jobId, { empty: true }); return; }
 
@@ -60,7 +60,7 @@ async function runStilprofilJob(jobId, bookId, userEmail, userToken) {
         statusText: 'job.phase.readingPages',
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, total), total },
       });
-    }, userToken);
+    });
     if (!pageContents.length) { completeJob(jobId, { empty: true }); return; }
 
     const { pages: sampledPages, total, sampled } = sampleForStyle(pageContents, singlePassLimit);
@@ -99,11 +99,10 @@ stilprofilRouter.post('/stilprofil', jsonBody, (req, res) => {
   try { requireBookAccess(req, book_id, 'editor'); }
   catch (e) { if (sendACLError(res, e)) return; throw e; }
   const userEmail = sessionEmail(req);
-  const userToken = null;
   const existing = findActiveJobId('stilprofil', String(book_id), userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const jobId = createJob('stilprofil', book_id, userEmail, 'job.label.stilprofil', {}, String(book_id));
-  enqueueJob(jobId, () => runStilprofilJob(jobId, book_id, userEmail, userToken));
+  enqueueJob(jobId, () => runStilprofilJob(jobId, book_id, userEmail));
   res.json({ jobId });
 });
 

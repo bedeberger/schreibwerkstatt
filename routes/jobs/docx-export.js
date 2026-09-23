@@ -49,7 +49,7 @@ function _resolveAuthor(bookId) {
   return '';
 }
 
-async function runDocxExportJob(jobId, { scope, entityId, profileId, includeSubchapters, snapshotId = null, userEmail, userToken }) {
+async function runDocxExportJob(jobId, { scope, entityId, profileId, includeSubchapters, snapshotId = null, userEmail }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
   try {
@@ -72,7 +72,7 @@ async function runDocxExportJob(jobId, { scope, entityId, profileId, includeSubc
       bundle = snapshotToBundle(content, { bookId: entityId });
       if (!bundle.groups.length) throw i18nError('job.error.snapshotCorrupt');
     } else {
-      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters }, userToken);
+      bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters });
     }
     const { book } = bundle;
 
@@ -169,7 +169,7 @@ router.post('/docx-export', jsonBody, async (req, res) => {
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('docx-export', bookId, userEmail, 'job.label.docxExport', { profile: profile.name }, dedupId);
-  enqueueJob(jobId, () => runDocxExportJob(jobId, { scope, entityId, profileId, includeSubchapters, snapshotId, userEmail, userToken: null }));
+  enqueueJob(jobId, () => runDocxExportJob(jobId, { scope, entityId, profileId, includeSubchapters, snapshotId, userEmail }));
   res.status(202).json({ jobId });
 });
 

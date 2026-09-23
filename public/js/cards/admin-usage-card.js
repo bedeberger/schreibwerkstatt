@@ -14,6 +14,10 @@ export function registerAdminUsageCard() {
     get adminUsageTab() { return window.__app?.adminUsageTab ?? 'users'; },
     set adminUsageTab(v) { if (window.__app) window.__app.adminUsageTab = v; },
     adminUsageLoading: false,
+    // Buchhaltung fuer `_adminUsageRun`: letzte Load-Sequenz je Tab + Zahl
+    // laufender Loads.
+    _adminUsageSeq: {},
+    _adminUsagePending: 0,
     adminUsageError: '',
     adminUsageFrom: '',
     adminUsageTo: '',
@@ -70,10 +74,15 @@ export function registerAdminUsageCard() {
         if (!visible) { this._adminUsageDestroyCharts(); return; }
         await this.adminUsageEnter();
       });
+      // Tab-Wechsel laedt hier, nicht im Klick-Handler: der Hash-Router setzt
+      // `adminUsageTab` erst NACH dem Oeffnen der Karte (Deep-Link
+      // #admin/usage/billing, Back/Forward) — `adminUsageEnter` hat da schon den
+      // alten Tab geladen, der neue bliebe sonst leer.
       // Summary-Charts beim Verlassen des Tabs zerstoeren (Klick UND Hash-Router),
       // damit Chart.js' ResizeObserver nicht auf dem versteckten Canvas crasht.
       this.$watch(() => this.adminUsageTab, (tab, prev) => {
         if (prev === 'summary' && tab !== 'summary') this._adminUsageDestroyCharts();
+        if (window.__app.showAdminUsageCard) this.adminUsageLoadTab();
       });
       this.$watch(() => this.adminUsageFrom, () => { if (window.__app.showAdminUsageCard) this.adminUsageLoadTab(); });
       this.$watch(() => this.adminUsageTo,   () => { if (window.__app.showAdminUsageCard) this.adminUsageLoadTab(); });

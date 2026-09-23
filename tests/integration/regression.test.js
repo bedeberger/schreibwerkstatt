@@ -32,7 +32,7 @@ test('truncated: callAI gibt truncated=true → Job → error (kein partial in D
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
   const job = await waitForJob(ctx.shared, jobId);
   assert.equal(job.status, 'error', `expected error, got ${job.status}`);
@@ -64,7 +64,7 @@ test('AbortError: cancel während Job-Lauf → status cancelled', async () => {
 
   const jobId = ctx.shared.createJob('kontinuitaet', BOOK_ID, 'tester@test.dev', 'job.label.kontinuitaet');
   ctx.shared.enqueueJob(jobId, () =>
-    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', { id: 'tok', pw: 'pw' }, 'claude'),
+    ctx.komplett.runKontinuitaetJob(jobId, BOOK_ID, 'Buch', 'tester@test.dev', 'claude'),
   );
 
   // Mark as cancelled before AI returns.

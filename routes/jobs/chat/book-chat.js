@@ -97,7 +97,7 @@ function _applyBookChatAiOverrides(effectiveProvider, logger) {
   return overrides;
 }
 
-async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, userToken) {
+async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail) {
   const logger = makeJobLogger(jobId);
   const { buildBookChatSystemPrompt, SCHEMA_BOOK_CHAT } = await getPrompts(userEmail);
   const effectiveProvider = resolveProvider({ userEmail });
@@ -153,7 +153,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
     if (embed.isEnabled()) {
       updateJob(jobId, { statusText: 'job.phase.selectingPages', progress: 20 });
       try {
-        const sem = await selectPassagesSemantic(session.book_id, message, TEXT_CHAR_BUDGET, jobSignal, userToken);
+        const sem = await selectPassagesSemantic(session.book_id, message, TEXT_CHAR_BUDGET, jobSignal);
         if (sem) {
           ({ selectedPages, usedChars, totalPages } = sem);
           retrievalMode = 'semantic';
@@ -174,7 +174,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
       } else {
         updateJob(jobId, { statusText: 'job.phase.pageListLoading', progress: 8 });
         let pages;
-        try { pages = await contentStore.listPages(session.book_id, userToken); }
+        try { pages = await contentStore.listPages(session.book_id); }
         catch (e) {
           if (e?.status) throw i18nError('job.error.contentStorePageList', { status: e.status });
           throw e;
@@ -192,7 +192,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, u
           const batch = pages.slice(i, i + BATCH);
           const results = await Promise.allSettled(batch.map(async p => {
             try {
-              const pd = await contentStore.loadPage(p.id, userToken);
+              const pd = await contentStore.loadPage(p.id);
               const text = htmlToText(pd.html || '').trim();
               return text ? { name: p.name, id: p.id, slug: p.slug, book_slug: p.book_slug, text } : null;
             } catch { return null; }
@@ -437,6 +437,12 @@ function _agentWeltContext(bookId, userEmail, logger) {
   }
 }
 
+// Absolute Deckel der zwei buch-stabilen Prompt-Blöcke im agentischen Pfad
+// (~12k bzw. ~6k Tokens). Was darüber hinausgeht, weist der jeweilige Block als
+// gekappt aus und verweist aufs Detail-Werkzeug.
+const AGENT_FIGUREN_MAX_CHARS    = 48000;
+const AGENT_WELTFAKTEN_MAX_CHARS = 24000;
+
 // Agentischer Buch-Chat: ruft Tools aus routes/jobs/book-chat-tools.js auf, um
 // Fragen über den gesamten Buchindex zu beantworten, statt alle Seiten vorab zu
 // laden. Loop/Persistenz kommen aus makeAgenticChatJob (siehe agentic-chat.js);
@@ -458,7 +464,7 @@ const runBookChatJobAgent = makeAgenticChatJob({
     WHERE cs.id = ? AND cs.user_email = ?
   `).get(parseInt(sessionId), userEmail),
 
-  async prepare({ session, userEmail, userToken, aiCfg, logger, jobSignal, message }) {
+  async prepare({ session, userEmail, aiCfg, logger, jobSignal, message }) {
     const { buildBookChatAgentSystemPrompt, BOOK_CHAT_TOOLS, BOOK_CHAT_SLIM_TOOL_NAMES, BOOK_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts(userEmail);
     const figuren = getFiguren(session.book_id, userEmail);
     const review  = getLatestReview(session.book_id, userEmail);
@@ -484,11 +490,15 @@ const runBookChatJobAgent = makeAgenticChatJob({
       && (t.name !== 'generate_image' || imgOn) && (t.name !== 'search_similar' || embOn));
     // Der Prompt darf nur empfehlen, was tatsaechlich angeboten wird — sonst
     // verbrennt das Modell Runden an Werkzeugen, die es nicht hat.
-    const figurenMaxChars = figurenBlockChars(aiCfg);
+    // Figuren- und Welt-Fakten-Block: absolut gedeckelt, nicht nur relativ zum
+    // Kontextfenster. Auf einem 1M-Fenster griffen die relativen Deckel nie, und
+    // ein ausanalysiertes Buch trug so über 200k Zeichen Dossier in JEDE Iteration.
+    // Der Agent hat für beides Detail-Werkzeuge (get_figure_profile, list_world_facts).
+    const figurenMaxChars = Math.min(figurenBlockChars(aiCfg), AGENT_FIGUREN_MAX_CHARS);
     // Welt-Fakten: kurze, schon verdichtete Buchaussagen — Stufe 1 der Kosten-Leiter.
     // Buch-stabil, darum im gecachten Block 1 und nicht im Erst-Kontext.
     const welt = _agentWeltContext(session.book_id, userEmail, logger);
-    const weltfaktenMaxChars = weltfaktenBlockChars(aiCfg);
+    const weltfaktenMaxChars = Math.min(weltfaktenBlockChars(aiCfg), AGENT_WELTFAKTEN_MAX_CHARS);
     const systemPrompt = buildBookChatAgentSystemPrompt(
       session.book_name || '', figuren, review, bookChatSys, maxToolIter,
       {
@@ -509,7 +519,7 @@ const runBookChatJobAgent = makeAgenticChatJob({
       toolResultCap: _toolResultCapChars(maxToolIter, aiCfg),
       forceFinalInstruction: BOOK_CHAT_FORCE_FINAL_INSTRUCTION,
       ctx: {
-        bookId: session.book_id, sessionId: session.id, userEmail, userToken,
+        bookId: session.book_id, sessionId: session.id, userEmail,
         jobSignal, logger,
         // Welcher Werkzeugsatz lief — landet in context_info (Kosten-Diagnose:
         // ein Slim-Lauf beantwortet manche Frage nicht, das muss sichtbar sein).
@@ -562,11 +572,11 @@ const runBookChatJobAgent = makeAgenticChatJob({
 });
 
 // Dispatcher: wählt zwischen Agent-Pfad und klassischem Pfad.
-function runBookChatJobDispatch(jobId, sessionId, userMsgId, message, userEmail, userToken) {
+function runBookChatJobDispatch(jobId, sessionId, userMsgId, message, userEmail) {
   if (_bookChatUseAgent(userEmail)) {
-    return runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEmail, userToken);
+    return runBookChatJobAgent(jobId, sessionId, userMsgId, message, userEmail);
   }
-  return runBookChatJob(jobId, sessionId, userMsgId, message, userEmail, userToken);
+  return runBookChatJob(jobId, sessionId, userMsgId, message, userEmail);
 }
 
 module.exports = { runBookChatJob, runBookChatJobAgent, runBookChatJobDispatch };

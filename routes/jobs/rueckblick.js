@@ -58,7 +58,7 @@ function _chunkGroups(entries, z, perChunkLimit) {
 }
 
 // ── Job: Tagebuch-Rückblick ─────────────────────────────────────────────────────
-async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
+async function runRueckblickJob(jobId, bookId, userEmail, zeitraum) {
   const logger = makeJobLogger(jobId);
   const z = _parseZeitraum(zeitraum);
   const bookIdInt = parseInt(bookId);
@@ -110,7 +110,7 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
     } catch (e) { logger.warn(`Vorblick-Kontext übersprungen: ${e.message}`); }
 
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
-    const { chMap, pages } = await loadOrderedBookContents(bookId, userToken)
+    const { chMap, pages } = await loadOrderedBookContents(bookId)
       .catch(e => { throw contentHttpError(e); });
 
     // Vorfilter auf den Zeitraum anhand des Seitennamens (Datum) — spart das Laden
@@ -126,7 +126,7 @@ async function runRueckblickJob(jobId, bookId, userEmail, userToken, zeitraum) {
         statusText: 'job.phase.readingPages',
         statusParams: { from: i + 1, to: Math.min(i + BATCH_SIZE, total), total },
       });
-    }, userToken, jobAbortControllers.get(jobId)?.signal);
+    }, jobAbortControllers.get(jobId)?.signal);
 
     if (!pageContents.length) { completeJob(jobId, { empty: true, zeitraum }); return; }
 
@@ -238,7 +238,7 @@ rueckblickRouter.post('/rueckblick', jsonBody, (req, res) => {
   const existing = findActiveJobId('rueckblick', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
   const jobId = createJob('rueckblick', book_id, userEmail, 'job.label.rueckblick', { zeitraum }, dedupId);
-  enqueueJob(jobId, () => runRueckblickJob(jobId, book_id, userEmail, null, zeitraum));
+  enqueueJob(jobId, () => runRueckblickJob(jobId, book_id, userEmail, zeitraum));
   res.json({ jobId });
 });
 
