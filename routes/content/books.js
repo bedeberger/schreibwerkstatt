@@ -8,6 +8,7 @@ const bookPresence = require('../../db/book-presence');
 const pagePresence = require('../../db/page-presence');
 const appUsersDevices = require('../../db/app-users-devices');
 const pageDeletions = require('../../db/page-deletions');
+const pageChanges = require('../../db/page-changes');
 const bookAccess = require('../../db/book-access');
 const bookShelf = require('../../db/book-shelf');
 const { db } = require('../../db/connection');
@@ -124,69 +125,12 @@ function register(router) {
     if (!sinceRaw) return res.json({ now: nowIso, changes: [] });
     const since = !Number.isNaN(Date.parse(sinceRaw)) ? sinceRaw : nowIso;
     const reqDeviceId = (req.query?.device_id || '').toString();
-    const hasDevice = _validDeviceId(reqDeviceId);
-    let updates = [];
-    let deletions = [];
+    let merged;
     try {
-      // Mit device_id: nur ausfiltern, wenn der Edit von DIESEM Geraet stammt —
-      // also gleiche E-Mail UND (device == mein Geraet ODER device unbekannt/NULL,
-      // z.B. Server-/Job-Write, der weiter wie eigener Edit gilt). Fremde User und
-      // eigene Edits von anderen Geraeten (non-NULL, abweichende device_id) bleiben.
-      const selfFilter = hasDevice
-        ? `AND NOT (p.last_editor_email = ?
-                    AND (p.last_editor_device_id IS NULL OR p.last_editor_device_id = ?))`
-        : `AND (? IS NULL OR p.last_editor_email <> ?)`;
-      const selfArgs = hasDevice ? [email, reqDeviceId] : [email, email];
-      updates = db.prepare(`
-        SELECT p.page_id, p.page_name, p.chapter_id,
-               p.updated_at AS changed_at, p.last_editor_email,
-               u.display_name AS last_editor_name,
-               d.label        AS last_editor_device_label
-          FROM pages p
-          LEFT JOIN app_users         u ON u.email = p.last_editor_email
-          -- Geraete-Label nur fuer die EIGENEN Geraete des Anfragers (gleicher
-          -- Join-Scope wie loadPage) — fremde Geraetenamen leaken nicht.
-          LEFT JOIN app_users_devices d ON d.device_id = p.last_editor_device_id
-                                        AND d.user_email = ?
-         WHERE p.book_id = ?
-           AND p.updated_at > ?
-           AND p.last_editor_email IS NOT NULL
-           ${selfFilter}
-         ORDER BY p.updated_at ASC
-         LIMIT 200
-      `).all(email, req.bookId, since, ...selfArgs);
-
-      const delSelfFilter = hasDevice
-        ? `AND NOT (deleted_by_email = ? AND (page_deletions.device_id IS NULL OR page_deletions.device_id = ?))`
-        : `AND (? IS NULL OR deleted_by_email <> ?)`;
-      const delSelfArgs = hasDevice ? [email, reqDeviceId] : [email, email];
-      deletions = db.prepare(`
-        SELECT page_id, page_name, deleted_at AS changed_at, deleted_by_email AS last_editor_email,
-               u.display_name AS last_editor_name,
-               d.label        AS last_editor_device_label
-          FROM page_deletions
-          LEFT JOIN app_users         u ON u.email = deleted_by_email
-          LEFT JOIN app_users_devices d ON d.device_id = page_deletions.device_id
-                                        AND d.user_email = ?
-         WHERE book_id = ?
-           AND deleted_at > ?
-           ${delSelfFilter}
-         ORDER BY deleted_at ASC
-         LIMIT 200
-      `).all(email, req.bookId, since, ...delSelfArgs);
+      merged = pageChanges.listBookChanges(req.bookId, email, since, _validDeviceId(reqDeviceId) ? reqDeviceId : null);
     } catch (e) {
       return _fail(res, e, 'GET /content/books/:id/changes');
     }
-
-    const merged = [
-      ...updates.map(r => ({ ...r, kind: 'update' })),
-      ...deletions.map(r => ({ ...r, kind: 'delete' })),
-    ].sort((a, b) => {
-      const at = a.changed_at || '';
-      const bt = b.changed_at || '';
-      if (at !== bt) return at.localeCompare(bt);
-      return (a.kind === 'delete' ? 1 : 0) - (b.kind === 'delete' ? 1 : 0);
-    }).slice(0, 200);
 
     res.json({
       now: nowIso,

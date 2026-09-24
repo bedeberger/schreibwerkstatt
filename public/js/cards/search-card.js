@@ -5,6 +5,7 @@
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { formatRelativeShort } from '../utils.js';
+import { startPoll } from './job-helpers.js';
 
 const DEBOUNCE_MS = 220;
 const DEFAULT_KINDS = ['page', 'chapter'];
@@ -312,28 +313,24 @@ export function registerSearchCard() {
     },
 
     _pollIndex(jobId) {
-      const tick = async () => {
-        try {
-          const r = await fetch('/jobs/' + encodeURIComponent(jobId), { credentials: 'same-origin' });
-          const j = await r.json().catch(() => ({}));
-          if (j.status === 'done') {
-            this.indexing = false;
-            this.indexStatus = j.detail || (window.__app?.t?.('search.semantic.indexDone') || 'Fertig');
-            this.loadIndexStatus();
-            return;
-          }
-          if (j.status === 'error' || j.status === 'cancelled') {
-            this.indexing = false;
-            this.indexStatus = window.__app?.t?.('search.semantic.indexError') || 'Fehler';
-            return;
-          }
-          this.indexStatus = `${j.progress || 0}%`;
-          this._indexPollTimer = setTimeout(tick, 1200);
-        } catch {
-          this._indexPollTimer = setTimeout(tick, 2000);
-        }
-      };
-      tick();
+      startPoll(this, {
+        timerProp: '_indexPollTimer',
+        jobId,
+        intervalMs: 1200,
+        onProgress: (j) => { this.indexStatus = `${j.progress || 0}%`; },
+        onDone: () => {
+          this.indexing = false;
+          this.indexStatus = window.__app?.t?.('search.semantic.indexDone') || 'Fertig';
+          this.loadIndexStatus();
+        },
+        onError: () => this._indexFailed(),
+        onNotFound: () => this._indexFailed(),
+      });
+    },
+
+    _indexFailed() {
+      this.indexing = false;
+      this.indexStatus = window.__app?.t?.('search.semantic.indexError') || 'Fehler';
     },
 
     hitKindLabel(kind) {

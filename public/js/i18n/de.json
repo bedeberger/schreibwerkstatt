@@ -4116,7 +4116,6 @@
   "profile.extensionApp.zipHint": "Alternativ als ZIP — für Chromium-Browser ohne Store-Zugang oder zum Testen einer Vorabversion (entpacken, dann unter chrome://extensions «Entpackte Erweiterung laden»).",
   "profile.extensionApp.version": "Version",
   "profile.extensionApp.download": "ZIP herunterladen",
-  "profile.appVersion": "App-Version",
   "profile.deleteAccount.title": "Konto löschen",
   "profile.deleteAccount.text": "Löscht dieses Konto samt allen Büchern, die dir gehören — mit Kapiteln, Seiten, Fassungen, Analysen und geteilten Links, auch für Mitarbeitende. Bücher, an denen du nur beteiligt bist, bleiben ihren Besitzern; du verlierst lediglich den Zugriff darauf. Der Vorgang ist sofort und nicht rückgängig zu machen.",
   "profile.deleteAccount.button": "Konto löschen",

@@ -68,6 +68,7 @@ const CONFIG_PATH = '/config';
 const NEVER_CACHE_PREFIXES = [
   '/auth/',
   '/jobs',
+  '/events',
   '/history',
   '/figures',
   '/locations',

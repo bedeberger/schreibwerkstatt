@@ -2,6 +2,11 @@ import { fmtTok, fetchJson } from '../utils.js';
 import { startPoll as _startPollFn, runningJobStatus as _runningJobStatusFn } from '../cards/job-helpers.js';
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { EVT } from '../events.js';
+import { startEventStream, jobStreamOpen, onJobQueueStream } from '../event-stream.js';
+
+// Bei offenem Job-Stream kommt die Queue-Liste per Push; der 5-s-Poll läuft
+// dann nur noch jeden n-ten Tick als Sicherheitsnetz (alle 30 s).
+const QUEUE_STREAM_SAFETY_TICKS = 6;
 
 // Job-Typ → EXCLUSIVE_CARDS-Key: Klick auf die Job-Pill im Footer springt zur
 // Karte, die den Output des Jobs anzeigt. Nur Typen mit sinnvollem Karten-Ziel.
@@ -219,15 +224,23 @@ export const appJobsCoreMethods = {
     if (!this._jobQueueIdsLastSeen) this._jobQueueIdsLastSeen = new Map();
     this._jobQueueFailures = 0;
     const poll = () => this._pollJobQueue();
+    let skipped = 0;
+    const tick = () => {
+      if (jobStreamOpen() && ++skipped < QUEUE_STREAM_SAFETY_TICKS) return;
+      skipped = 0;
+      poll();
+    };
     poll();
-    this.$store.jobs._jobQueueTimer = setInterval(poll, 5000);
+    this.$store.jobs._jobQueueTimer = setInterval(tick, 5000);
+    onJobQueueStream((items) => this._applyJobQueue(items));
+    startEventStream();
     // Wakeup: Tab kommt aus Background. Counter resetten, sofort frisch pollen
     // (löscht den Banner, falls er fälschlich angezeigt wurde) und Polling
     // wieder starten, falls es nach 5 Fehlern eingestellt war.
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
       this._jobQueueFailures = 0;
-      if (!this.$store.jobs._jobQueueTimer) this.$store.jobs._jobQueueTimer = setInterval(poll, 5000);
+      if (!this.$store.jobs._jobQueueTimer) this.$store.jobs._jobQueueTimer = setInterval(tick, 5000);
       poll();
     }, this._abortCtrl?.signal ? { signal: this._abortCtrl.signal } : false);
     // Sofort-Refresh: Feature-Module dispatchen `job:enqueued` nach POST,
@@ -235,13 +248,17 @@ export const appJobsCoreMethods = {
     window.addEventListener(EVT.JOB_ENQUEUED, () => poll());
   },
 
+  // Gemeinsamer Abnehmer für Poll-Antwort und Stream-Event `queue`.
+  _applyJobQueue(items) {
+    this._detectFinishedJobs(items);
+    this.$store.jobs.jobQueueItems = items;
+    this._jobQueueFailures = 0;
+    if (this.$store.session.serverOffline) this.$store.session.serverOffline = false;
+  },
+
   async _pollJobQueue() {
     try {
-      const items = await fetchJson('/jobs/queue');
-      this._detectFinishedJobs(items);
-      this.$store.jobs.jobQueueItems = items;
-      this._jobQueueFailures = 0;
-      if (this.$store.session.serverOffline) this.$store.session.serverOffline = false;
+      this._applyJobQueue(await fetchJson('/jobs/queue'));
     } catch (e) {
       // Ein Setzer schlägt fehl, wenn der Server down ist oder die Session
       // abgelaufen ist – kein Grund für dauerndes Poll-Spam. Nach 2 Fehlern

@@ -17,12 +17,13 @@
 // Endpoint: GET /search/sources-semantic (user-skopiert, kein book_id).
 
 import { fetchJson } from '../utils.js';
+import { startPoll } from '../cards/job-helpers.js';
 import { checkPdfFile, uploadPdf } from '../upload-pdf.js';
 
 // Index-Job-Polling nach dem Upload: der Job läuft über die ganze Bibliothek
 // und braucht bei einem frischen Werk je nach Backend Sekunden bis Minuten.
 const INDEX_POLL_MS = 3000;
-const INDEX_POLL_MAX = 100; // ~5 min, dann gibt die Karte die Anzeige auf
+const INDEX_POLL_MAX_MS = 5 * 60_000; // danach gibt die Karte die Anzeige auf
 
 export const sourcesDocMethods = {
   // ── Quellen-Dokument (Upload/Download/Löschen) ───────────────────────────
@@ -109,19 +110,20 @@ export const sourcesDocMethods = {
   _pollSourceIndexJob(jobId) {
     this._stopSourceIndexPoll();
     this.srcDocIndexing = true;
-    let ticks = 0;
-    this._srcIndexTimer = setInterval(async () => {
-      if (++ticks > INDEX_POLL_MAX) { this._stopSourceIndexPoll(); return; }
-      try {
-        const j = await fetchJson(`/jobs/${jobId}`);
-        if (j?.status === 'done' || j?.status === 'error' || j?.status === 'cancelled') {
-          this._stopSourceIndexPoll();
-          if (j.status === 'done') await this._refreshSourceDocMeta();
-        }
-      } catch {
-        this._stopSourceIndexPoll(); // Job weg / Session abgelaufen — nicht endlos weiterfragen
-      }
-    }, INDEX_POLL_MS);
+    const deadline = Date.now() + INDEX_POLL_MAX_MS;
+    startPoll(this, {
+      timerProp: '_srcIndexTimer',
+      jobId,
+      intervalMs: INDEX_POLL_MS,
+      onProgress: () => { if (Date.now() > deadline) this._stopSourceIndexPoll(); },
+      onDone: async () => {
+        this._stopSourceIndexPoll();
+        await this._refreshSourceDocMeta();
+      },
+      onError: () => this._stopSourceIndexPoll(),
+      // Job weg (Server-Neustart) — nicht endlos weiterfragen.
+      onNotFound: () => this._stopSourceIndexPoll(),
+    });
   },
 
   _stopSourceIndexPoll() {

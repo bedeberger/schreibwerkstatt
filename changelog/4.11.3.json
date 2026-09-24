@@ -1,0 +1,21 @@
+{
+  "version": "4.11.3",
+  "date": "2026-09-24",
+  "entries": [
+    {
+      "kind": "verbessert",
+      "de": "Laufende KI-Analysen melden ihren Fortschritt jetzt ohne Verzögerung. Auch Änderungen und Anwesenheit von Mitschreibenden im selben Buch erscheinen praktisch sofort.",
+      "en": "Running AI analyses now report their progress without delay. Changes and presence of co-authors in the same book also appear almost instantly."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Avatar-Menü: Die App-Version steht jetzt ganz unten im Menü. Ein Klick darauf öffnet direkt die Neuigkeiten in der Hilfe.",
+      "en": "Avatar menu: the app version now appears at the bottom of the menu. Clicking it opens What's new in the help directly."
+    },
+    {
+      "kind": "behoben",
+      "de": "Seitenansicht: Beim schnellen Wechsel zwischen Seiten blieb manchmal der graue Lade-Platzhalter neben dem bereits geladenen Text stehen.",
+      "en": "Page view: when switching quickly between pages, the grey loading placeholder sometimes stayed visible next to the already loaded text."
+    }
+  ]
+}

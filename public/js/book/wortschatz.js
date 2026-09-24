@@ -8,6 +8,7 @@
 // lib/page-index.js.
 
 import { formatNumber, localeTag, tzOpts } from '../utils.js';
+import { startPoll } from '../cards/job-helpers.js';
 
 // Kein `get x()` in diesem gespreadeten Modul — Spread würde Getter beim Mount
 // mit falschem `this` auslösen. Reine Getter leben inline im Karten-Literal.
@@ -53,28 +54,23 @@ export const wortschatzMethods = {
   },
 
   _pollWortschatz(jobId) {
-    const tick = async () => {
-      try {
-        const r = await fetch('/jobs/' + encodeURIComponent(jobId), { credentials: 'same-origin' });
-        const j = await r.json().catch(() => ({}));
-        if (j.status === 'done') {
-          this.wortschatzLoading = false;
-          this.wortschatzStatus = '';
-          await this.loadWortschatz();
-          return;
-        }
-        if (j.status === 'error' || j.status === 'cancelled') {
-          this.wortschatzLoading = false;
-          this.wortschatzStatus = window.__app?.t?.('wortschatz.error') || 'Fehler';
-          return;
-        }
-        this.wortschatzProgress = j.progress || 0;
-        this._wortschatzPollTimer = setTimeout(tick, 1000);
-      } catch {
-        this._wortschatzPollTimer = setTimeout(tick, 2000);
-      }
+    const failed = () => {
+      this.wortschatzLoading = false;
+      this.wortschatzStatus = window.__app?.t?.('wortschatz.error') || 'Fehler';
     };
-    tick();
+    startPoll(this, {
+      timerProp: '_wortschatzPollTimer',
+      jobId,
+      intervalMs: 1000,
+      progressProp: 'wortschatzProgress',
+      onDone: async () => {
+        this.wortschatzLoading = false;
+        this.wortschatzStatus = '';
+        await this.loadWortschatz();
+      },
+      onError: failed,
+      onNotFound: failed,
+    });
   },
 
   // ── Formatierung ──────────────────────────────────────────────────────────

@@ -69,10 +69,22 @@ export function registerHelpCard() {
       // Wer einen Neu-Punkt sieht und auf „?" klickt, meint die Neuigkeiten —
       // nicht den Funktionsueberblick, den er schon kennt.
       if (hasUnreadChangelog(window.Alpine.store('shell'))) this.helpTab = 'changelog';
+      // Expliziter Reiter-Wunsch (z.B. Versionszeile im Avatar-Menü) schlägt
+      // die Heuristik; der Watcher deckt die bereits offene Karte ab.
+      this._consumeHelpTabRequest();
+      this.$watch('$store.shell.helpTabRequest', () => this._consumeHelpTabRequest());
       // Mount und Reiter-Wahl liegen im selben Tick; das Laden haengt darum am
       // Watcher statt an einem zweiten Aufruf hier.
       this.$watch('helpTab', (v) => { if (v === 'changelog') this.onChangelogTab(); });
       if (this.helpTab === 'changelog') this.onChangelogTab();
+    },
+
+    _consumeHelpTabRequest() {
+      const shell = window.Alpine.store('shell');
+      const tab = shell?.helpTabRequest;
+      if (!tab) return;
+      shell.helpTabRequest = '';
+      this.helpTab = tab;
     },
 
     /** Kontext wie in der Palette: Buch, Rolle, Buchtyp, Modell-Klasse. */

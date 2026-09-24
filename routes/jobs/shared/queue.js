@@ -4,6 +4,7 @@ const { runWithContext } = require('../../../lib/log-context');
 const { startJobRun } = require('../../../db/schema');
 const appSettings = require('../../../lib/app-settings');
 const { jobs, runningJobs, jobQueue, jobDedupKey } = require('./state');
+const { emitJobChange, emitQueueShift } = require('./events');
 
 // Maximale Anzahl gleichzeitig laufender Jobs (über alle User).
 function _maxConcurrent() {
@@ -25,6 +26,8 @@ function drainQueue() {
     activeCount++;
     job.status = 'running';
     job.startedAt = new Date().toISOString();
+    emitJobChange(job);
+    emitQueueShift();
     const ctx = { job: job.type, user: job.userEmail || null, book: job.bookId, jobId };
     runWithContext(ctx, () => {
       try { startJobRun(jobId); } catch (e) { logger.error(`startJobRun: ${e.message}`); }
@@ -39,6 +42,7 @@ function drainQueue() {
 
 function enqueueJob(jobId, fn) {
   jobQueue.push({ jobId, fn });
+  emitJobChange(jobs.get(jobId));
   drainQueue();
 }
 

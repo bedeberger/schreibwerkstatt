@@ -308,6 +308,24 @@
   color: var(--color-muted);
 }
 
+.avatar-menu-version {
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  padding: var(--space-2xs) var(--space-10) var(--space-2xs);
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-size: var(--font-size-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-subtle);
+  cursor: pointer;
+}
+.avatar-menu-version:hover {
+  color: var(--color-muted);
+  text-decoration: underline;
+}
+
 .avatar-menu-provider {
   display: flex;
   align-items: center;

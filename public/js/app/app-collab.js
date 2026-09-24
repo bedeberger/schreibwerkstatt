@@ -1,7 +1,7 @@
 // Collaboration-Polling: erkennt Saves anderer User am offenen Buch und
-// hinterlaesst Tree-Marker bzw. Toast. Cheap-Pfad ohne SSE/WS — eigener
-// 5s-Tick, parallel zum Job-Queue-Poll. Nutzt GET /content/books/:id/changes.
-//
+// hinterlaesst Tree-Marker bzw. Toast. Nutzt GET /content/books/:id/changes.
+// Der Event-Stream stoesst die Reads sofort an (app-collab-stream.js); die
+// Timer hier sind dann nur noch Sicherheitsnetz.
 // Reaktionen:
 //   - Aktuell offene Seite, kein Edit-Mode → silent Refetch + Toast
 //   - Aktuell offene Seite + editMode + dirty → kein Refetch, `editConflict`-Banner
@@ -37,11 +37,13 @@ export const appCollabMethods = {
     // Multi-Device-Erkennung (eigenes Zweit-Geraet → voller Poll). `_loadBookRole`
     // ruft uns nach dem ACL-Read erneut auf, sobald `bookSharedFlags` gesetzt ist.
     this._startBookDevicePing(id);
+    this._attachCollabStream(id);
     // Geteiltes Buch: voller Poll sofort, ohne auf den Geraete-Ping zu warten.
     if (this.bookSharedFlags[id] === true) this._ensureFullCollabPoll(id);
   },
 
   _stopCollabPoll() {
+    this._detachCollabStream();
     this._stopBookDevicePing();
     this._stopFullCollabPoll();
     // Echtes Teardown (Buchwechsel/Access-Lost): auch den Editor-Heartbeat
@@ -57,8 +59,8 @@ export const appCollabMethods = {
     // Erster Tick holt sich den Server-Stempel als Baseline — sonst wuerden
     // historische Edits beim Buchwechsel als „neu" gemeldet.
     this.$store.collab._collabSince = null;
-    const tick = () => this._collabPollOnce(bookId);
-    tick();
+    const tick = () => { if (!this._collabStreamCovers(bookId, 'poll')) this._collabPollOnce(bookId); };
+    this._collabPollOnce(bookId);
     this.$store.collab._collabPollTimer = setInterval(tick, COLLAB_POLL_MS);
   },
 
@@ -84,8 +86,8 @@ export const appCollabMethods = {
     this._stopBookDevicePing();
     if (!bookId) return;
     this.$store.collab._bookDevicePingBookId = String(bookId);
-    const tick = () => this._sendBookDevicePing(bookId);
-    tick();
+    const tick = () => { if (!this._collabStreamCovers(bookId, 'ping')) this._sendBookDevicePing(bookId); };
+    this._sendBookDevicePing(bookId);
     this.$store.collab._bookDevicePingTimer = setInterval(tick, BOOK_DEVICE_PING_MS);
   },
 
@@ -103,6 +105,7 @@ export const appCollabMethods = {
 
   async _sendBookDevicePing(bookId) {
     if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
+    this._markCollabSent('ping');
     let data;
     try {
       const r = await fetch('/content/books/' + bookId + '/device-ping', {
@@ -183,6 +186,7 @@ export const appCollabMethods = {
   async _collabPollOnce(bookId) {
     if (document.hidden) return;
     if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
+    this._markCollabSent('poll');
     // Beide Reads parallel: /changes (Diff seit since) + /presence (Live-Heartbeat).
     await Promise.all([
       this._collabFetchChanges(bookId),
@@ -457,6 +461,7 @@ export const appCollabMethods = {
     this._pingDevicePresenceNow();
     if (this.$store.collab._presencePingTimer) clearInterval(this.$store.collab._presencePingTimer);
     this.$store.collab._presencePingTimer = setInterval(() => {
+      if (this._collabStreamCovers(this.$store.nav.selectedBookId, 'presence')) return;
       if (this.$store.collab._presencePingPageId) this._sendPresencePing(this.$store.collab._presencePingPageId);
     }, 30 * 1000);
   },
@@ -473,6 +478,7 @@ export const appCollabMethods = {
 
   _sendPresencePing(pageId) {
     if (!pageId) return;
+    this._markCollabSent('presence');
     try {
       fetch('/content/pages/' + pageId + '/presence', {
         method: 'POST',

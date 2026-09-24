@@ -2,9 +2,14 @@
 // auch direkt von Karten verwendet.
 
 import { escHtml, fmtTok } from '../utils.js';
+import { jobStreamOpen, onJobStream } from '../event-stream.js';
 
-// Footer-Sync: Der Job-Queue-Footer pollt `/jobs/queue` nur alle 5 s, der
-// per-Job-Poller `/jobs/:id` alle 2 s. Bei langen Jobs mit vielen schnellen
+// Bei offenem Job-Stream ersetzt der Push die Poll-Ticks; nur jeder n-te Tick
+// läuft als Sicherheitsnetz (bei 2 s: alle 30 s).
+const STREAM_SAFETY_TICKS = 15;
+
+// Footer-Sync: Ohne offenen Job-Stream pollt der Job-Queue-Footer `/jobs/queue`
+// nur alle 5 s, der per-Job-Poller `/jobs/:id` alle 2 s. Bei langen Jobs mit vielen schnellen
 // Progress-Updates (z.B. Komplettanalyse über viele kleine Chunks) driften
 // obere Progressbar und Footer dadurch sichtbar auseinander. Beide lesen
 // serverseitig dasselbe Job-Objekt — wir patchen darum den passenden
@@ -43,12 +48,14 @@ export function startPoll(ctx, config) {
   // überspringt überlappende Ticks, `done` macht den Terminal-Handler einmalig.
   let busy = false;
   let done = false;
+  let unsubscribe = null;
   const stop = () => {
     clearInterval(ctx[config.timerProp]);
     ctx[config.timerProp] = null;
+    unsubscribe?.();
     if (config.lsKey) localStorage.removeItem(config.lsKey);
   };
-  ctx[config.timerProp] = setInterval(async () => {
+  const tick = async () => {
     if (busy || done) return;
     busy = true;
     try {
@@ -81,7 +88,31 @@ export function startPoll(ctx, config) {
       else await config.onDone?.(job);
     } catch (e) { console.error('[poll ' + config.timerProp + ']', e); }
     finally { busy = false; }
+  };
+  let skipped = 0;
+  const timer = setInterval(() => {
+    if (jobStreamOpen() && ++skipped < STREAM_SAFETY_TICKS) return;
+    skipped = 0;
+    tick();
   }, config.intervalMs || 2000);
+  ctx[config.timerProp] = timer;
+  // Push-Pfad: Fortschritt direkt aus dem Stream-Snapshot (ohne `result`);
+  // Terminal-Status und Reconnect (`null`) laufen über einen normalen Tick, der
+  // das Ergebnis holt — so bleibt der Terminal-Pfad oben der einzige.
+  unsubscribe = onJobStream(config.jobId, (snap) => {
+    // Neuer startPoll auf demselben timerProp hat diesen Poller abgelöst.
+    if (ctx[config.timerProp] !== timer) { unsubscribe(); return; }
+    if (done) return;
+    if (!snap || (snap.status !== 'running' && snap.status !== 'queued')) { tick(); return; }
+    if (config.progressProp) (config.progressTarget || ctx)[config.progressProp] = snap.progress || 0;
+    syncJobQueueItem(snap);
+    config.onProgress?.(snap);
+  });
+  // Ein Job, der vor dem Abonnieren schon fertig war (Cache-Treffer, schneller
+  // Export), schickt kein Event mehr — der Sofort-Tick holt ihn ab. Ohne ihn
+  // wartete der Poller bei offenem Stream bis zum Sicherheits-Tick. Ohne Stream
+  // übernimmt das der reguläre erste Tick.
+  if (jobStreamOpen()) tick();
 }
 
 // Baut das Status-HTML für einen laufenden Job. `translate` ist die i18n-Funktion

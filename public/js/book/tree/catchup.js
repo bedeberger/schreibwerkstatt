@@ -120,14 +120,16 @@ export const treeCatchUpMethods = {
   // vollen Polls, der dafuer seinen eigenen Cursor fuehrt. Hier geht es nur um
   // die Frage, ob der Baum nachgezogen werden muss. Sie ist selbstbegrenzend:
   // nach dem Nachzug steht `_treeSince()` hinter der Aenderung.
-  async _checkTreeDrift(bookId) {
+  // `force`: ein Anstoss des Event-Streams meldet eine NEUE Aenderung — die
+  // Dedup-Regel (gleiche Frage, gleicher Cursor) greift dann nicht.
+  async _checkTreeDrift(bookId, { force = false } = {}) {
     if (!bookId || String(bookId) !== String(this.$store.nav.selectedBookId)) return;
     const since = this._treeSince();
     if (!since) return;
     const key = `${bookId}|${since}`;
     const now = Date.now();
     const last = this._lastDriftProbe;
-    if (last?.key === key && now - last.ts < DRIFT_PROBE_DEDUP_MS) return;
+    if (!force && last?.key === key && now - last.ts < DRIFT_PROBE_DEDUP_MS) return;
     this._lastDriftProbe = { key, ts: now };
     const params = new URLSearchParams({ since, device_id: getDeviceId() });
     try {

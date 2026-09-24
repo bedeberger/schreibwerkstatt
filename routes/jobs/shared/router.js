@@ -2,7 +2,8 @@
 const express = require('express');
 const { db } = require('../../../db/schema');
 const { toIntId, inClause } = require('../../../lib/validate');
-const { jobs, jobQueue } = require('./state');
+const { jobs } = require('./state');
+const { jobView, queueItems } = require('./serialize');
 const { sessionEmail } = require('../../../lib/acl');
 const {
   cancelJob, findActiveJobId, fmtTok, fmtDuration,
@@ -15,37 +16,7 @@ const {
 const sharedRouter = express.Router();
 
 sharedRouter.get('/queue', (req, res) => {
-  const userEmail = sessionEmail(req);
-  const result = [];
-  for (const [, job] of jobs) {
-    if (job.userEmail !== userEmail) continue;
-    if (job.status !== 'queued' && job.status !== 'running') continue;
-    let statusText = job.statusText;
-    let statusParams = job.statusParams;
-    if (job.status === 'queued') {
-      const pos = jobQueue.findIndex(e => e.jobId === job.id) + 1;
-      statusText = pos > 0 ? 'job.queuedPos' : 'job.queued';
-      statusParams = pos > 0 ? { pos } : null;
-    }
-    result.push({
-      id: job.id,
-      type: job.type,
-      bookId: job.bookId,
-      dedupId: job.dedupId,
-      label: job.label || job.type,
-      labelParams: job.labelParams || null,
-      status: job.status,
-      progress: job.progress,
-      statusText,
-      statusParams,
-      tokensIn: job.tokensIn || 0,
-      tokensOut: job.tokensOut || 0,
-      maxTokensOut: job.maxTokensOut || 0,
-      tokensPerSec: job.tokensPerSec || 0,
-      canCancel: true,
-    });
-  }
-  res.json(result);
+  res.json(queueItems(sessionEmail(req)));
 });
 
 sharedRouter.get('/stats', (req, res) => {
@@ -167,28 +138,7 @@ sharedRouter.delete('/:id', (req, res) => {
 sharedRouter.get('/:id', (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error_code: 'JOB_NOT_FOUND' });
-  let statusText = job.statusText;
-  let statusParams = job.statusParams;
-  if (job.status === 'queued') {
-    const pos = jobQueue.findIndex(e => e.jobId === job.id) + 1;
-    statusText = pos > 0 ? 'job.queuedPos' : 'job.queued';
-    statusParams = pos > 0 ? { pos } : null;
-  }
-  res.json({
-    id: job.id, type: job.type, status: job.status,
-    bookId: job.bookId, dedupId: job.dedupId,
-    progress: job.progress, statusText, statusParams,
-    label: job.label, labelParams: job.labelParams,
-    tokensIn: job.tokensIn, tokensOut: job.tokensOut,
-    // tokensIn ist cache-inklusiv (lib/ai/claude.js) und im agentischen Tool-Loop
-    // über alle Provider-Calls aufsummiert — ohne den Cache-Anteil ist die Zahl
-    // im Live-Status nicht einzuordnen.
-    cacheReadIn: job.cacheReadIn || 0,
-    maxTokensOut: job.maxTokensOut,
-    tokensPerSec: job.tokensPerSec,
-    result: job.result, error: job.error, errorParams: job.errorParams,
-    passMode: job.passMode ?? null,
-  });
+  res.json(jobView(job));
 });
 
 module.exports = { sharedRouter };

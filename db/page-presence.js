@@ -9,6 +9,7 @@
 
 const { db } = require('./connection');
 const { NOW_ISO_SQL } = require('./now');
+const { emitBookPresence } = require('../lib/book-events');
 
 // Stale-Grenze: doppelter Ping-Interval + Puffer fuer Netz-Hickups. 90s ist
 // konservativ — wer 90s lang nicht gepingt hat, hat den Tab geschlossen oder
@@ -26,21 +27,49 @@ const _stmtUpsert = db.prepare(`
   DO UPDATE SET last_ping_at = ${NOW_ISO_SQL}
 `);
 
+const _stmtGet = db.prepare(`
+  SELECT last_ping_at FROM page_presence
+   WHERE page_id = ? AND user_email = ? AND device_id = ?
+`);
+
+// Presence-Anstoss an den Event-Stream nur, wenn die Row neu ist (oder nach
+// Stale-Luecke zurueckkommt) — „X editiert hier" erscheint dann sofort bei den
+// anderen. Der 30-s-Heartbeat feuert nichts.
 function ping(pageId, userEmail, bookId, deviceId) {
   if (!pageId || !userEmail || !bookId || !deviceId) return false;
+  const prev = _stmtGet.get(pageId, userEmail, deviceId);
   _stmtUpsert.run(pageId, userEmail, deviceId, bookId);
+  if (!prev || prev.last_ping_at <= _staleCutoffIso()) emitBookPresence(bookId, userEmail, deviceId);
   return true;
+}
+
+const _stmtTouchDevice = db.prepare(`
+  UPDATE page_presence SET last_ping_at = ${NOW_ISO_SQL}
+   WHERE book_id = ? AND user_email = ? AND device_id = ?
+     AND last_ping_at > ?
+`);
+
+// Haelt die (noch frischen) Edit-Rows eines Geraets im Buch am Leben, ohne neue
+// anzulegen. Konsument ist der Heartbeat des Event-Streams: solange die
+// Verbindung steht, bleibt „X editiert hier" sichtbar, auch wenn der Browser
+// seinen eigenen Heartbeat aussetzt. Eine schon stale Row wird nicht
+// wiederbelebt — die ist bewusst abgelaufen.
+function touchDevice(bookId, userEmail, deviceId) {
+  if (!bookId || !userEmail || !deviceId) return 0;
+  return _stmtTouchDevice.run(bookId, userEmail, deviceId, _staleCutoffIso()).changes;
 }
 
 const _stmtRemove = db.prepare(`
   DELETE FROM page_presence
    WHERE page_id = ? AND user_email = ? AND device_id = ?
+   RETURNING book_id
 `);
 
 function leave(pageId, userEmail, deviceId) {
   if (!pageId || !userEmail || !deviceId) return false;
-  const r = _stmtRemove.run(pageId, userEmail, deviceId);
-  return r.changes > 0;
+  const rows = _stmtRemove.all(pageId, userEmail, deviceId);
+  for (const r of rows) emitBookPresence(r.book_id, userEmail, deviceId);
+  return rows.length > 0;
 }
 
 const _stmtListForBook = db.prepare(`
@@ -79,5 +108,5 @@ function listForPage(pageId) {
 
 module.exports = {
   STALE_AFTER_MS,
-  ping, leave, listForBook, listForPage,
+  ping, touchDevice, leave, listForBook, listForPage,
 };

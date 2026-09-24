@@ -80,14 +80,21 @@
 
 <!-- Lade-Skelett: solange der Seiteninhalt lädt und noch nichts gerendert ist,
      zeigt ein Prosa-Schimmer statt einer blanken Fläche (langsames Netz / kalter
-     SW-Cache). Verschwindet, sobald `renderedPageHtml` gesetzt ist. -->
-<div class="page-content-skeleton"
-     x-show="!editMode && currentPage && pageContentLoading && !pageLoadError && !renderedPageHtml"
-     x-cloak aria-hidden="true">
-  <template x-for="i in 8" :key="i">
-    <div class="page-content-skeleton__line"></div>
-  </template>
-</div>
+     SW-Cache). Verschwindet, sobald `renderedPageHtml` gesetzt ist.
+     `x-if` statt `x-show`: x-show blendet über requestAnimationFrame ein und
+     aus, und ein Hide, das während eines noch ausstehenden Hides der
+     #editor-card fällt (Seitenwechsel: resetPage → showEditorCard false → true),
+     läuft VOR dem eigenen, früher angestossenen Show — das Skelett bliebe neben
+     dem geladenen Text stehen, sobald der Load schneller als ein Frame ist.
+     x-if fügt synchron ein und entfernt synchron. Gegated:
+     tests/e2e-app/notebook-page-skeleton.spec.js. -->
+<template x-if="!editMode && currentPage && pageContentLoading && !pageLoadError && !renderedPageHtml">
+  <div class="page-content-skeleton" aria-hidden="true">
+    <template x-for="i in 8" :key="i">
+      <div class="page-content-skeleton__line"></div>
+    </template>
+  </div>
+</template>
 
 <div class="page-empty-state"
      x-show="!editMode && currentPage && currentPageEmpty && !pageLoadError && originalHtml !== null"

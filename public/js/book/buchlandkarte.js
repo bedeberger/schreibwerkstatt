@@ -22,6 +22,7 @@
 
 import { loadChart } from '../lazy-libs.js';
 import { BOOK_COLORS } from '../cards/my-stats-chart-methods.js';
+import { startPoll } from '../cards/job-helpers.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -127,31 +128,26 @@ export const buchlandkarteMethods = {
   },
 
   _pollBookMap(jobId) {
-    const tick = async () => {
-      try {
-        const r = await fetch('/jobs/' + encodeURIComponent(jobId), { credentials: 'same-origin' });
-        const j = await r.json().catch(() => ({}));
-        if (j.status === 'done') {
-          this.bookMapLoading = false;
-          this.bookMapProgress = 100;
-          this.bookMapResult = j.result || { pages: [], chapters: [], outliers: [] };
-          this.bookMapStatus = '';
-          // Canvas existiert erst, wenn das Ergebnis-Template gerendert ist.
-          this.$nextTick(() => this.renderBookMap());
-          return;
-        }
-        if (j.status === 'error' || j.status === 'cancelled') {
-          this.bookMapLoading = false;
-          this.bookMapStatus = window.__app?.t?.('buchlandkarte.error') || 'Fehler';
-          return;
-        }
-        this.bookMapProgress = j.progress || 0;
-        this._bookMapPollTimer = setTimeout(tick, 1000);
-      } catch {
-        this._bookMapPollTimer = setTimeout(tick, 2000);
-      }
+    const failed = () => {
+      this.bookMapLoading = false;
+      this.bookMapStatus = window.__app?.t?.('buchlandkarte.error') || 'Fehler';
     };
-    tick();
+    startPoll(this, {
+      timerProp: '_bookMapPollTimer',
+      jobId,
+      intervalMs: 1000,
+      progressProp: 'bookMapProgress',
+      onDone: (j) => {
+        this.bookMapLoading = false;
+        this.bookMapProgress = 100;
+        this.bookMapResult = j.result || { pages: [], chapters: [], outliers: [] };
+        this.bookMapStatus = '';
+        // Canvas existiert erst, wenn das Ergebnis-Template gerendert ist.
+        this.$nextTick(() => this.renderBookMap());
+      },
+      onError: failed,
+      onNotFound: failed,
+    });
   },
 
   // ── Zeichnen ──────────────────────────────────────────────────────────────

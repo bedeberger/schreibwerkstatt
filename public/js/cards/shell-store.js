@@ -27,7 +27,9 @@
 //                   Basis für tzOpts() + alle Date-Display-Formatter.
 //   appName         — App-Name (/config → app_settings.app.name); <title>, Header,
 //                   Locale-Platzhalter `{appName}`.
-//   appVersion      — App-Version (/config → VERSION); Anzeige in den UserSettings.
+//   appVersion      — App-Version (/config → VERSION); Anzeige am Fuss des Avatar-Menüs.
+//   helpTabRequest  — Einmal-Signal: gewünschter Reiter der Hilfe-Karte beim
+//                   nächsten Öffnen ('' = keiner); die Karte konsumiert + leert es.
 //   changelogLatest — neueste Version mit Release-Notizen (/config → changelog/).
 //   changelogSeen   — vom User zuletzt quittierter Changelog-Stand ('' = nie).
 //                   changelogLatest > changelogSeen ⇒ Neu-Punkt am Hilfe-Knopf.
@@ -46,6 +48,7 @@ export function registerShellStore() {
     appTimezone: 'Europe/Zurich',
     appName: 'Schreibwerkstatt',
     appVersion: '',
+    helpTabRequest: '',
     changelogLatest: '',
     changelogSeen: '',
     isMac: false,

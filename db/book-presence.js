@@ -13,6 +13,7 @@
 
 const { db } = require('./connection');
 const { NOW_ISO_SQL } = require('./now');
+const { emitBookPresence } = require('../lib/book-events');
 
 // Gleiche Stale-Grenze wie page_presence (doppelter Ping-Interval + Puffer).
 const STALE_AFTER_MS = 90 * 1000;
@@ -28,12 +29,39 @@ const _stmtUpsert = db.prepare(`
   DO UPDATE SET page_id = excluded.page_id, last_ping_at = ${NOW_ISO_SQL}
 `);
 
+const _stmtGet = db.prepare(`
+  SELECT page_id, last_ping_at FROM book_presence
+   WHERE book_id = ? AND user_email = ? AND device_id = ?
+`);
+
 // pageId nullable: das Geraet kann das Buch ohne offene Seite anzeigen
 // (z.B. Buch-Overview).
+// Presence-Anstoss an den Event-Stream nur bei Zustandswechsel — Geraet neu (oder
+// nach Stale-Luecke zurueck) bzw. Seitenwechsel, weil beides die Geraete-Zaehler
+// der anderen aendert. Ein blosser Heartbeat feuert nichts.
 function ping(bookId, userEmail, deviceId, pageId = null) {
   if (!bookId || !userEmail || !deviceId) return false;
+  const prev = _stmtGet.get(bookId, userEmail, deviceId);
   _stmtUpsert.run(bookId, userEmail, deviceId, pageId || null);
+  const changed = !prev
+    || prev.last_ping_at <= _staleCutoffIso()
+    || (prev.page_id || null) !== (pageId || null);
+  if (changed) emitBookPresence(bookId, userEmail, deviceId);
   return true;
+}
+
+const _stmtTouch = db.prepare(`
+  UPDATE book_presence SET last_ping_at = ${NOW_ISO_SQL}
+   WHERE book_id = ? AND user_email = ? AND device_id = ?
+`);
+
+// Lebenszeichen ohne Zustandswechsel: haelt eine bestehende Row frisch, legt
+// keine an und laesst page_id stehen. Konsument ist der Heartbeat des
+// Event-Streams — eine offene Verbindung heisst „Geraet ist da", der Browser
+// muss dafuer nicht selbst pingen.
+function touch(bookId, userEmail, deviceId) {
+  if (!bookId || !userEmail || !deviceId) return false;
+  return _stmtTouch.run(bookId, userEmail, deviceId).changes > 0;
 }
 
 const _stmtRemove = db.prepare(`
@@ -44,6 +72,7 @@ const _stmtRemove = db.prepare(`
 function leave(bookId, userEmail, deviceId) {
   if (!bookId || !userEmail || !deviceId) return false;
   const r = _stmtRemove.run(bookId, userEmail, deviceId);
+  if (r.changes > 0) emitBookPresence(bookId, userEmail, deviceId);
   return r.changes > 0;
 }
 
@@ -84,5 +113,5 @@ function countSelfDevicesInBook(bookId, userEmail) {
 
 module.exports = {
   STALE_AFTER_MS,
-  ping, leave, countSelfDevicesOnPage, countSelfDevicesInBook,
+  ping, touch, leave, countSelfDevicesOnPage, countSelfDevicesInBook,
 };

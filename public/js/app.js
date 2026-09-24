@@ -33,6 +33,7 @@ import { appChromeMethods } from './app/app-chrome.js';
 import { appKomplettMethods } from './app/app-komplett.js';
 import { appJobsCoreMethods } from './app/app-jobs-core.js';
 import { appCollabMethods } from './app/app-collab.js';
+import { appCollabStreamMethods } from './app/app-collab-stream.js';
 import { appOutboxMethods } from './app/app-outbox.js';
 import { appViewMethods } from './app/app-view.js';
 import { appNavigationMethods } from './app/app-navigation.js';
@@ -318,6 +319,7 @@ document.addEventListener('alpine:init', () => {
     ...appKomplettMethods,
     ...appJobsCoreMethods,
     ...appCollabMethods,
+    ...appCollabStreamMethods,
     ...appOutboxMethods,
     ...appViewMethods,
     ...appNavigationMethods,

@@ -6,6 +6,7 @@ const { MAX_TOKENS_OUT, resolveProvider } = require('../../../lib/ai');
 const appSettings = require('../../../lib/app-settings');
 const { jobs, runningJobs, jobAbortControllers, jobQueue, jobKey, jobDedupKey } = require('./state');
 const { _scheduleJobCleanup } = require('./queue');
+const { emitJobChange, emitQueueShift } = require('./events');
 const { _modelName } = require('./model');
 const jobLogBuffer = require('../../../lib/job-log-buffer');
 
@@ -146,6 +147,7 @@ function updateJob(id, updates) {
   } else {
     Object.assign(job, updates);
   }
+  emitJobChange(job);
 }
 
 function completeJob(id, result, tokensPerSec = null, detail = null) {
@@ -171,6 +173,7 @@ function completeJob(id, result, tokensPerSec = null, detail = null) {
   jobAbortControllers.delete(id);
   _scheduleJobCleanup(id);
   jobLogBuffer.clear(id);
+  emitJobChange(job, true);
   if (job.userEmail) {
     const notify = require('../../../lib/notify');
     notify.maybeNotifyBudgetOverrun(job.userEmail)
@@ -206,6 +209,7 @@ function failJob(id, err) {
   jobAbortControllers.delete(id);
   _scheduleJobCleanup(id);
   jobLogBuffer.clear(id);
+  emitJobChange(job, true);
   if (!isCancelled) {
     const notify = require('../../../lib/notify');
     const httpStatus = (err && typeof err.status === 'number') ? err.status : null;
@@ -238,6 +242,8 @@ function cancelJob(id, userEmail) {
     jobAbortControllers.delete(id);
     _scheduleJobCleanup(id);
     jobLogBuffer.clear(id);
+    emitJobChange(job, true);
+    emitQueueShift();
     logger.info('Aus Warteschlange entfernt und abgebrochen.', _jobLogCtx(job));
     return true;
   }

@@ -568,6 +568,7 @@ app.use('/geocode', require('./routes/geocode'));
 app.use('/tiles', require('./routes/tiles'));
 app.use('/songs', songsRouter);
 app.use('/jobs', jobsRouter);
+app.use('/events', require('./routes/events'));
 app.use('/chat', chatRouter);
 app.use('/ideen', ideenRouter);
 app.use('/research', researchRouter);

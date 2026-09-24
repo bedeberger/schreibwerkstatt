@@ -4,6 +4,8 @@
 // Job (POST /jobs/redundancy); diese Methoden triggern ihn, pollen und rendern
 // die Paar-Liste. Gespreadet in cards/redundanz-card.js.
 
+import { startPoll } from '../cards/job-helpers.js';
+
 // Fallback-Bänder (bge-m3-Cosinus), falls /config noch nicht geladen ist. Die
 // massgeblichen Werte stehen in Alpine.store('config').redundancyThresholds
 // (App-Settings redundancy.*, im Admin-Semantik-Tab modellabhängig justierbar).
@@ -66,29 +68,24 @@ export const redundanzMethods = {
   },
 
   _pollRedundanz(jobId) {
-    const tick = async () => {
-      try {
-        const r = await fetch('/jobs/' + encodeURIComponent(jobId), { credentials: 'same-origin' });
-        const j = await r.json().catch(() => ({}));
-        if (j.status === 'done') {
-          this.redundanzLoading = false;
-          this.redundanzProgress = 100;
-          this.redundanzResult = j.result || { pairs: [] };
-          this.redundanzStatus = '';
-          return;
-        }
-        if (j.status === 'error' || j.status === 'cancelled') {
-          this.redundanzLoading = false;
-          this.redundanzStatus = window.__app?.t?.('redundanz.error') || 'Fehler';
-          return;
-        }
-        this.redundanzProgress = j.progress || 0;
-        this._redundanzPollTimer = setTimeout(tick, 1000);
-      } catch {
-        this._redundanzPollTimer = setTimeout(tick, 2000);
-      }
+    const failed = () => {
+      this.redundanzLoading = false;
+      this.redundanzStatus = window.__app?.t?.('redundanz.error') || 'Fehler';
     };
-    tick();
+    startPoll(this, {
+      timerProp: '_redundanzPollTimer',
+      jobId,
+      intervalMs: 1000,
+      progressProp: 'redundanzProgress',
+      onDone: (j) => {
+        this.redundanzLoading = false;
+        this.redundanzProgress = 100;
+        this.redundanzResult = j.result || { pairs: [] };
+        this.redundanzStatus = '';
+      },
+      onError: failed,
+      onNotFound: failed,
+    });
   },
 
   // Aktuellen Seitennamen zur page_id aus dem Nav-Store auflösen (drift-frei,

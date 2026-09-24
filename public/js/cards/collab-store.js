@@ -35,6 +35,11 @@
 //                         { user_email, user_display_name, expires_at, reason } | null.
 //   _bookAccessLostFor  — Re-Entry-Guard für _handleBookAccessLost (changes +
 //                         presence feuern parallel und liefern beide 403).
+//   _streamOff          — Abmelde-Funktion des Buch-Kanals (event-stream.js).
+//   _lastSent           — { poll, ping, presence }: Zeitpunkt des letzten
+//                         Collab-Poll-Ticks / Geräte-Pings / Edit-Heartbeats.
+//                         Bei offenem Buch-Stream überspringen die Timer ihre
+//                         Ticks bis zum Sicherheitsabstand (app-collab-stream.js).
 
 export function registerCollabStore() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -55,5 +60,7 @@ export function registerCollabStore() {
     _lockHeartbeatTimer: null,
     foreignEditLock: null,
     _bookAccessLostFor: null,
+    _streamOff: null,
+    _lastSent: { poll: 0, ping: 0, presence: 0 },
   });
 }

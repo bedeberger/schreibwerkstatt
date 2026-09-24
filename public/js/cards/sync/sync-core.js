@@ -1,4 +1,14 @@
 import { EVT } from '../../events.js';
+import { startPoll } from '../job-helpers.js';
+
+// Push-Poller pro Seite: `_pushTimers[pageId]` hält ein Halter-Objekt, in dessen
+// `timer` startPoll seinen Handle schreibt. Stoppen = Intervall räumen UND
+// `timer` nullen — daran erkennt startPoll, dass sein Stream-Abo erledigt ist.
+function stopPushPoller(holder) {
+  if (!holder) return;
+  clearInterval(holder.timer);
+  holder.timer = null;
+}
 // Sync-Core — gemeinsame Logik für externe Buch-Sync-Provider (WordPress-Blog,
 // HubSpot-Blog, künftige Provider). `createSyncCard(spec)` liefert ein
 // Alpine.data-Objekt mit Links-Loading, Per-Page-Status, Push-Job-Trigger,
@@ -69,7 +79,7 @@ export function createSyncCard(spec) {
         window[globalWindowKey] = this;
         this._onPagesLoaded = () => this.loadLinks();
         this._onBookChanged = () => {
-          for (const t of Object.values(this._pushTimers)) clearInterval(t);
+          for (const h of Object.values(this._pushTimers)) stopPushPoller(h);
           this._pushTimers = {};
           this.connected = false;
           this.providerMeta = {};
@@ -98,7 +108,7 @@ export function createSyncCard(spec) {
       },
 
       destroy() {
-        for (const t of Object.values(this._pushTimers)) clearInterval(t);
+        for (const h of Object.values(this._pushTimers)) stopPushPoller(h);
         this._pushTimers = {};
         window.removeEventListener(EVT.PAGES_LOADED, this._onPagesLoaded);
         window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
@@ -186,24 +196,24 @@ export function createSyncCard(spec) {
       },
 
       _pollPush(pageId, jobId) {
-        const tick = async () => {
-          try {
-            const resp = await fetch('/jobs/' + jobId);
-            if (resp.status === 404) { this._clearPushBusy(pageId); return; }
-            if (!resp.ok) return;
-            const job = await resp.json();
+        stopPushPoller(this._pushTimers[pageId]);
+        const holder = { timer: null };
+        startPoll(holder, {
+          timerProp: 'timer',
+          jobId,
+          intervalMs: 1000,
+          onProgress: (job) => {
             this.pushProgress = { ...this.pushProgress, [pageId]: job.progress || 0 };
-            if (job.status === 'running' || job.status === 'queued') return;
+          },
+          onDone: (job) => {
             this._clearPushBusy(pageId);
-            if (job.status !== 'error' && job.status !== 'cancelled') {
-              this._applyPushRenames(job);
-              this.loadLinks();
-            }
-          } catch (e) { /* swallow; nächster Tick versucht erneut */ }
-        };
-        if (this._pushTimers[pageId]) clearInterval(this._pushTimers[pageId]);
-        this._pushTimers = { ...this._pushTimers, [pageId]: setInterval(tick, 1000) };
-        tick();
+            this._applyPushRenames(job);
+            this.loadLinks();
+          },
+          onError: () => this._clearPushBusy(pageId),
+          onNotFound: () => this._clearPushBusy(pageId),
+        });
+        this._pushTimers = { ...this._pushTimers, [pageId]: holder };
       },
 
       // Push-Create kann den lokalen page_name prägen (z.B. WordPress-Datum-
@@ -229,7 +239,7 @@ export function createSyncCard(spec) {
 
       _clearPushBusy(pageId) {
         if (this._pushTimers[pageId]) {
-          clearInterval(this._pushTimers[pageId]);
+          stopPushPoller(this._pushTimers[pageId]);
           const t = { ...this._pushTimers }; delete t[pageId]; this._pushTimers = t;
         }
         const b = { ...this.pushBusy }; delete b[pageId]; this.pushBusy = b;
