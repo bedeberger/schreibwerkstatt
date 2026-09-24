@@ -107,12 +107,12 @@ test('Soll-Brücken + Scoping-Validatoren + Graph-Payload', () => {
   const m = motifs.createMotif(BOOK, USER, { name: 'Flut' });
 
   // Validatoren: fig_id (TEXT) → INTEGER; Fremd-IDs werden verworfen.
-  assert.deepEqual(motifs.resolveFigureIds(BOOK, ['F-WATER', 'F-NOPE']), [figIntId]);
+  assert.deepEqual(motifs.resolveFigureIds(BOOK, USER, ['F-WATER', 'F-NOPE']), [figIntId]);
   assert.deepEqual(motifs.validBeatIds(BOOK, USER, [beat.id, 999999]), [beat.id]);
   assert.deepEqual(motifs.validChapterIds(BOOK, [chId, 999999]), [chId]);
   assert.deepEqual(motifs.validPageIds(BOOK, [pgId, 999999]), [pgId]);
 
-  motifs.setMotifFigures(m.id, motifs.resolveFigureIds(BOOK, ['F-WATER']));
+  motifs.setMotifFigures(m.id, motifs.resolveFigureIds(BOOK, USER, ['F-WATER']));
   motifs.setMotifBeats(m.id, [beat.id]);
   motifs.setMotifChapters(m.id, [chId]);
   motifs.setMotifPages(m.id, [pgId]);

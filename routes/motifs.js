@@ -386,7 +386,7 @@ router.put('/:id/links', jsonBody, (req, res) => {
   const b = motif.book_id;
   const userEmail = motif.user_email;
   if (req.body?.figures !== undefined) {
-    motifsDb.setMotifFigures(motif.id, motifsDb.resolveFigureIds(b, req.body.figures));
+    motifsDb.setMotifFigures(motif.id, motifsDb.resolveFigureIds(b, userEmail, req.body.figures));
   }
   if (req.body?.draftFigures !== undefined) {
     motifsDb.setMotifDraftFigures(motif.id, motifsDb.validDraftFigureIds(b, userEmail, req.body.draftFigures));

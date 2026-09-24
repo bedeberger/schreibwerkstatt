@@ -1,0 +1,11 @@
+{
+  "version": "4.11.2",
+  "date": "2026-09-24",
+  "entries": [
+    {
+      "kind": "behoben",
+      "de": "Motiv-Werkstatt: Wurde einem Motiv eine Figur zugeordnet, erschien in geteilten Büchern manchmal eine andere Figur gleichen Kürzels. Jetzt wird immer die Figur aus Ihrer eigenen Figurenliste verknüpft.",
+      "en": "Motif workshop: when a character was linked to a motif in shared books, a different character with the same short ID sometimes appeared. Now the character from your own character list is always linked."
+    }
+  ]
+}

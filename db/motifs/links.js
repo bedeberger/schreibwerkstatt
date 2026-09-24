@@ -74,17 +74,20 @@ const _stmtBridgePages = db.prepare(`
 // ── Scoping-Validatoren (Soll-Link-Targets aufs Buch beschränken) ──────────
 // Verhindert Cross-Book-Leaks (FK allein liesse ein Motiv aus Buch A auf eine
 // Seite aus Buch B zeigen). Figuren nach aussen als TEXT-fig_id → INTEGER id.
+// Der Figuren-Katalog ist pro (Buch, User) skopiert und `fig_id` nur darin
+// eindeutig — ohne `user_email` träfe `fig_1` die gleichnamige ID eines anderen
+// Katalogs im selben Buch (wortgleich zu db/plot.js#resolveFigureIds).
 
-const _stmtFigByFigId = db.prepare('SELECT id FROM figures WHERE book_id = ? AND fig_id = ?');
-const _stmtFigById = db.prepare('SELECT id FROM figures WHERE book_id = ? AND id = ?');
-function resolveFigureIds(bookId, figIds) {
+const _stmtFigByFigId = db.prepare('SELECT id FROM figures WHERE book_id = ? AND user_email = ? AND fig_id = ?');
+const _stmtFigById = db.prepare('SELECT id FROM figures WHERE book_id = ? AND user_email = ? AND id = ?');
+function resolveFigureIds(bookId, userEmail, figIds) {
   const bid = parseInt(bookId);
   const out = [];
   for (const raw of figIds || []) {
     if (raw == null) continue;
     // Erst als TEXT-fig_id versuchen, dann als INTEGER-id (Frontend schickt fig_id).
-    let row = _stmtFigByFigId.get(bid, String(raw));
-    if (!row && /^\d+$/.test(String(raw))) row = _stmtFigById.get(bid, parseInt(raw));
+    let row = _stmtFigByFigId.get(bid, userEmail, String(raw));
+    if (!row && /^\d+$/.test(String(raw))) row = _stmtFigById.get(bid, userEmail, parseInt(raw));
     if (row) out.push(row.id);
   }
   return [...new Set(out)];
