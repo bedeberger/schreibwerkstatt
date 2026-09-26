@@ -13,6 +13,7 @@ import { fetchJson } from '../utils.js';
 import { EVT } from '../events.js';
 import { IDEA_LINK_KINDS } from './ideen-shared.js';
 import { computePopoverPos, refinePopoverPos } from '../popover-anchor.js';
+import { attachDismiss, detachDismiss } from '../cards/dismiss.js';
 
 // Ziel-Art → Hash-View der Gegenseite. Recherche-Fundstueck und Plot-Beat
 // tragen einen Deep-Link-Permalink (`#…/recherche/<id>`, `#…/plot/<id>`); die
@@ -94,15 +95,11 @@ export const ideenLinkMethods = {
   // beim Rollen in der Options-Liste der Combobox und schloesse den Picker
   // mitten in der Auswahl.
   _attachLinkPickerListeners() {
-    if (this._linkPickerCloseHandler) return;
-    this._linkPickerCloseHandler = () => this.cancelLinkPicker();
-    window.addEventListener('resize', this._linkPickerCloseHandler);
+    this._linkPickerCloseHandler ??= attachDismiss(() => this.cancelLinkPicker(), { scroll: false });
   },
 
   _detachLinkPickerListeners() {
-    if (!this._linkPickerCloseHandler) return;
-    window.removeEventListener('resize', this._linkPickerCloseHandler);
-    this._linkPickerCloseHandler = null;
+    detachDismiss(this, '_linkPickerCloseHandler');
   },
 
   async confirmLinkPicker() {

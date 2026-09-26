@@ -1,6 +1,7 @@
 import { EVT } from '../events.js';
 import { contentRepo } from '../repo/content.js';
 import { localIsoDate } from '../utils.js';
+import { attachDismiss, detachDismiss } from '../cards/dismiss.js';
 // Pagetree-Rechtsklick-Menü. Aktionen pro Node-Typ:
 //   page    → Öffnen, Editieren (Notebook), Teilen, Exportieren, Neues Kapitel,
 //             Löschen (danger)
@@ -68,16 +69,11 @@ export const treeContextMenuMethods = {
     // seinem Ziel mit. Beim Scrollen (im Tree oder in der Seite) stuende es
     // sonst ueber einem fremden Eintrag und wuerde dessen Aktionen suggerieren.
     // Gleiches Argument fuer Resize.
-    if (!this._pageTreeMenuDismissHandler) {
-      this._pageTreeMenuDismissHandler = () => this._hidePagetreeContextMenu();
-      window.addEventListener('scroll', this._pageTreeMenuDismissHandler, { capture: true, passive: true });
-      window.addEventListener('resize', this._pageTreeMenuDismissHandler);
-      // Ein Buchwechsel oder Tree-Reload macht `pageTreeMenuTarget` ungueltig:
-      // die ID zeigt danach auf eine Seite, die es in diesem Buch nicht gibt.
-      window.addEventListener(EVT.BOOK_CHANGED, this._pageTreeMenuDismissHandler);
-      window.addEventListener(EVT.PAGES_LOADED, this._pageTreeMenuDismissHandler);
-      window.addEventListener(EVT.VIEW_RESET, this._pageTreeMenuDismissHandler);
-    }
+    // Ein Buchwechsel oder Tree-Reload macht `pageTreeMenuTarget` ungueltig:
+    // die ID zeigt danach auf eine Seite, die es in diesem Buch nicht gibt.
+    this._pageTreeMenuDismissHandler ??= attachDismiss(() => this._hidePagetreeContextMenu(), {
+      events: [EVT.BOOK_CHANGED, EVT.PAGES_LOADED, EVT.VIEW_RESET],
+    });
   },
 
   _clampPagetreeMenuPos(x, y, w, h) {
@@ -143,14 +139,7 @@ export const treeContextMenuMethods = {
       document.removeEventListener('keydown', this._pageTreeMenuKeyHandler);
       this._pageTreeMenuKeyHandler = null;
     }
-    if (this._pageTreeMenuDismissHandler) {
-      window.removeEventListener('scroll', this._pageTreeMenuDismissHandler, { capture: true });
-      window.removeEventListener('resize', this._pageTreeMenuDismissHandler);
-      window.removeEventListener(EVT.BOOK_CHANGED, this._pageTreeMenuDismissHandler);
-      window.removeEventListener(EVT.PAGES_LOADED, this._pageTreeMenuDismissHandler);
-      window.removeEventListener(EVT.VIEW_RESET, this._pageTreeMenuDismissHandler);
-      this._pageTreeMenuDismissHandler = null;
-    }
+    detachDismiss(this, '_pageTreeMenuDismissHandler');
     // Fokus zurueck auf den Baum-Eintrag, von dem aus geoeffnet wurde — aber nur,
     // wenn er noch im Dokument haengt (nach „Loeschen" ist er weg) und der Fokus
     // noch im Menue steht (eine Folgeaktion wie selectPage darf ihn behalten).

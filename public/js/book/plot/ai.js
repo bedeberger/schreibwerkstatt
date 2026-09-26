@@ -7,6 +7,7 @@ import { startPoll, runningJobStatus } from '../../cards/job-helpers.js';
 import { toggleWrapFullscreen } from '../../fullscreen.js';
 import { normTitle } from './constants.js';
 import { EVT } from '../../events.js';
+import { attachDismiss, detachDismiss } from '../../cards/dismiss.js';
 
 export const aiMethods = {
   // ── KI: Brainstorm ──────────────────────────────────────────────────────
@@ -433,17 +434,11 @@ export const aiMethods = {
   },
 
   _attachOccPopoverListeners() {
-    if (this._occPopoverCloseHandler) return;
-    this._occPopoverCloseHandler = () => this.closeBeatOccPopover();
-    window.addEventListener('scroll', this._occPopoverCloseHandler, true);
-    window.addEventListener('resize', this._occPopoverCloseHandler);
+    this._occPopoverCloseHandler ??= attachDismiss(() => this.closeBeatOccPopover());
   },
 
   _detachOccPopoverListeners() {
-    if (!this._occPopoverCloseHandler) return;
-    window.removeEventListener('scroll', this._occPopoverCloseHandler, true);
-    window.removeEventListener('resize', this._occPopoverCloseHandler);
-    this._occPopoverCloseHandler = null;
+    detachDismiss(this, '_occPopoverCloseHandler');
   },
 
   // Aus dem Popover an eine konkrete Fundstelle springen. Verlässt die Plot-Karte
