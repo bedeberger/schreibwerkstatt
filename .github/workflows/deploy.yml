@@ -72,10 +72,11 @@ jobs:
           done < <(find server.js logger.js lib routes db public/js scripts tools -type f \( -name '*.js' -o -name '*.mjs' \) 2>/dev/null)
           exit $fail
 
-      # Faengt benutzte-aber-nicht-importierte Symbole in public/js (entsteht beim
-      # Aufteilen von Modulen). Der Syntax-Check oben sieht das nicht — die Datei
-      # ist ja syntaktisch gueltig; im Browser knallt es erst zur Laufzeit.
-      - name: Import-Gate (public/js — fehlende Imports)
+      # Faengt benutzte-aber-nicht-importierte Symbole und Zugriffe auf fehlende
+      # Exporte in public/js und im Server-Teil (entsteht beim Aufteilen von
+      # Modulen). Der Syntax-Check oben sieht das nicht — die Datei ist ja
+      # syntaktisch gueltig; es knallt erst zur Laufzeit.
+      - name: Import-Gate (fehlende Imports/Exporte)
         run: npm run test:imports
 
       - name: Prompt-Config validieren
