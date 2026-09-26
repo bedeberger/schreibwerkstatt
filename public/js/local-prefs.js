@@ -15,9 +15,6 @@ function safeGet(key) {
 function safeSet(key, value) {
   try { localStorage.setItem(key, value); } catch {}
 }
-function safeRemove(key) {
-  try { localStorage.removeItem(key); } catch {}
-}
 
 // Startbuch-Rückfall. Die WAHRHEIT dazu ist serverseitig
 // (`book_shelf.last_opened_at`, ein Zeitstempel pro Buch und User) — dieser
@@ -60,11 +57,6 @@ export function getLastPageId(email, bookId) {
 export function setLastPageId(email, bookId, pageId) {
   if (!bookId || !pageId) return;
   safeSet(lastPageKey(email, bookId), String(pageId));
-}
-
-export function clearLastPageId(email, bookId) {
-  if (!bookId) return;
-  safeRemove(lastPageKey(email, bookId));
 }
 
 export function getFilters(email, bookId, scope) {

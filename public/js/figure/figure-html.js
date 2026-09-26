@@ -44,7 +44,6 @@
 
 import { escHtml } from '../utils/escape.js';
 
-export const FIGURE_SEL = 'figure';
 export const FIGURE_CAPTION_SEL = 'figcaption';
 
 // Der Bildnachweis braucht — anders als das `<figure>` selbst — einen Marker:
