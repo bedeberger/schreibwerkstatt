@@ -59,7 +59,7 @@ export function registerFolderImportCard() {
 
     destroy() {
       this._lifecycle?.destroy();
-      if (this._pollTimer) clearInterval(this._pollTimer);
+      if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
     },
 
     reset() {

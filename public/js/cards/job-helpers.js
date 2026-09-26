@@ -49,33 +49,53 @@ export function startPoll(ctx, config) {
   let busy = false;
   let done = false;
   let unsubscribe = null;
-  const stop = () => {
-    clearInterval(ctx[config.timerProp]);
-    ctx[config.timerProp] = null;
+  let timer = null;
+  // Eigener Handle statt `ctx[timerProp]`: räumt jemand von aussen ab
+  // (Buchwechsel via card-lifecycle timerKeys) oder hat ein Nachfolge-Poller
+  // denselben timerProp übernommen, darf ein noch fliegender Tick weder
+  // onProgress/onDone ausführen (Ergebnis des alten Buchs in der neuen Karte)
+  // noch den Handle/lsKey des Nachfolgers wegräumen.
+  const owned = () => ctx[config.timerProp] === timer;
+  const detach = () => {
+    done = true;
+    clearInterval(timer);
     unsubscribe?.();
+  };
+  const stop = () => {
+    const mine = owned();
+    detach();
+    if (!mine) return;
+    ctx[config.timerProp] = null;
     if (config.lsKey) localStorage.removeItem(config.lsKey);
   };
+  // true = dieser Poller ist abgelöst/abgeräumt → still aussteigen.
+  const stale = () => {
+    if (done) return true;
+    if (owned()) return false;
+    detach();
+    return true;
+  };
   const tick = async () => {
-    if (busy || done) return;
+    if (busy || stale()) return;
     busy = true;
     try {
       const resp = await fetch('/jobs/' + config.jobId);
-      if (done) return;
+      if (stale()) return;
       if (resp.status === 404) {
-        done = true; stop();
+        stop();
         config.onNotFound?.();
         return;
       }
       if (!resp.ok) return;
       const job = await resp.json();
-      if (done) return;
+      if (stale()) return;
       if (config.progressProp) (config.progressTarget || ctx)[config.progressProp] = job.progress || 0;
       if (job.status === 'running' || job.status === 'queued') {
         syncJobQueueItem(job);
         config.onProgress?.(job);
         return;
       }
-      done = true; stop();
+      stop();
       // Race-freier Toast: sobald dieser per-Card-Poller den Terminal-Status
       // sieht, toasten — unabhängig vom 5-s-Queue-Diff (der schnelle Jobs
       // verpassen kann). `_maybeShowJobToast` dedupt via Job-ID gegen den
@@ -90,7 +110,7 @@ export function startPoll(ctx, config) {
     finally { busy = false; }
   };
   let skipped = 0;
-  const timer = setInterval(() => {
+  timer = setInterval(() => {
     if (jobStreamOpen() && ++skipped < STREAM_SAFETY_TICKS) return;
     skipped = 0;
     tick();
@@ -100,9 +120,9 @@ export function startPoll(ctx, config) {
   // Terminal-Status und Reconnect (`null`) laufen über einen normalen Tick, der
   // das Ergebnis holt — so bleibt der Terminal-Pfad oben der einzige.
   unsubscribe = onJobStream(config.jobId, (snap) => {
-    // Neuer startPoll auf demselben timerProp hat diesen Poller abgelöst.
-    if (ctx[config.timerProp] !== timer) { unsubscribe(); return; }
-    if (done) return;
+    // Neuer startPoll auf demselben timerProp hat diesen Poller abgelöst
+    // oder der Timer wurde von aussen abgeräumt.
+    if (stale()) return;
     if (!snap || (snap.status !== 'running' && snap.status !== 'queued')) { tick(); return; }
     if (config.progressProp) (config.progressTarget || ctx)[config.progressProp] = snap.progress || 0;
     syncJobQueueItem(snap);
