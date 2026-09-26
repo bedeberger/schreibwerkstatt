@@ -5,9 +5,10 @@ import test from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require = createRequire(import.meta.url);
-process.env.DB_PATH = path.join('/tmp', `rev-client-label-${process.pid}-${Date.now()}.db`);
+useTmpDb('rev-client-label');
 
 require('../../db/connection');
 require('../../db/migrations');

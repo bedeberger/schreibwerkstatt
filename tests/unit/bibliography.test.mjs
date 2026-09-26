@@ -9,8 +9,9 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
-process.env.DB_PATH = path.join('/tmp', `bibliography-test-${process.pid}-${Date.now()}.db`);
+useTmpDb('bibliography');
 
 // db/schema.js re-exportiert per Spread — cjs-module-lexer erkennt daraus keine
 // Named Exports, darum ueber den Default-Export.

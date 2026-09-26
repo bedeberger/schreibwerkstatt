@@ -10,8 +10,8 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
-const tmpDb = path.join(os.tmpdir(), `public-register-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('public-register');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-for-crypto-derive';
 delete process.env.LOCAL_DEV_MODE;
 
@@ -34,10 +34,6 @@ const port = server.address().port;
 test.before(() => { rateLimit._resetAll(); });
 test.after(() => {
   server.close();
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
 });
 
 function _req(method, urlPath, { body = null } = {}) {

@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
-const tmpDb = path.join(os.tmpdir(), `mailer-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const tmpDb = useTmpDb('mailer');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-for-crypto';
 
 await import('../../db/migrations.js');
@@ -29,13 +29,6 @@ function clearSmtp() {
   for (const k of SMTP_KEYS) appSettings.remove(k, { updatedBy: 'test' });
   mailer._setTestTransportFactory(null);
 }
-
-test.after(() => {
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
-});
 
 test('listTemplates: invite + test sind enthalten', () => {
   const names = listTemplates();

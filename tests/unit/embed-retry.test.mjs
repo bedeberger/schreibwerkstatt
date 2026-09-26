@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 // Temp-DB, damit das Require von app-settings nicht die Dev-DB anfasst.
-process.env.DB_PATH = path.join(os.tmpdir(), `sw-embed-retry-${process.pid}.db`);
+useTmpDb('embed-retry');
 
 const require = createRequire(import.meta.url);
 const { _withRetry, _stripLoneSurrogates } = require('../../lib/embed.js');

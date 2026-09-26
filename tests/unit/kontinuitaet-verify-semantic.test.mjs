@@ -11,11 +11,11 @@ import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require_ = createRequire(import.meta.url);
 
-const dir = mkdtempSync(join(tmpdir(), 'kont-verify-'));
-process.env.DB_PATH = join(dir, 'test.db');
+useTmpDb('kont-verify');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test';
 require_('../../db/connection');
 require_('../../db/migrations').runMigrations();

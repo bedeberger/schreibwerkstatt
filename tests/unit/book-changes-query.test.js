@@ -13,9 +13,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'book-changes-'));
-const dbFile = path.join(tmpDir, `fresh-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = dbFile;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const dbFile = useTmpDb('book-changes');
 
 function freshRequire(rel) {
   const abs = require.resolve(path.join(__dirname, '..', '..', rel));
@@ -26,11 +25,6 @@ function freshRequire(rel) {
 freshRequire('db/connection');
 freshRequire('db/migrations');
 const { db } = freshRequire('db/connection');
-
-test.after(() => {
-  try { db.close(); } catch { /* noop */ }
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
-});
 
 const SELF_FILTER_DEV = 'AND NOT (deleted_by_email = ? AND (page_deletions.device_id IS NULL OR page_deletions.device_id = ?))';
 const SELF_FILTER_LEGACY = 'AND (? IS NULL OR deleted_by_email <> ?)';

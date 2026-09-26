@@ -11,18 +11,13 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `time-tracking-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('time-tracking');
 delete process.env.ADMIN_EMAIL;
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
 const tt = require('../../db/time-tracking');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  for (const s of ['', '-wal', '-shm']) { try { fs.unlinkSync(tmpDb + s); } catch {} }
-});
 
 const EMAIL = 'tester@test.dev';
 const BOOK = 4242;

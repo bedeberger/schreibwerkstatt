@@ -12,7 +12,8 @@ const path = require('node:path');
 const os = require('node:os');
 
 // Temp-DB, damit das Laden von lektorat.js (→ db/schema.js) keine Live-DB anfasst.
-process.env.DB_PATH = path.join(os.tmpdir(), `schreibwerkstatt-lektorat-dedup-${process.pid}-${Date.now()}.db`);
+const { useTmpDb } = require('./_helpers/tmp-db');
+useTmpDb('lektorat-dedup');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 require('../../db/migrations');
 

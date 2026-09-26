@@ -12,8 +12,8 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `motif-fig-resolve-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('motif-fig-resolve');
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
@@ -50,4 +50,3 @@ test('INTEGER-Fallback bleibt im Katalog des Users', () => {
   assert.deepEqual(motifsDb.resolveFigureIds(1, A, ['10']), []);
 });
 
-test.after(() => { try { fs.unlinkSync(tmpDb); } catch { /* egal */ } });

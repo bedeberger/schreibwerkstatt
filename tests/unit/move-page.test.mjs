@@ -9,20 +9,15 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require = createRequire(import.meta.url);
-const tmpDb = path.join(os.tmpdir(), `move-page-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const tmpDb = useTmpDb('move-page');
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
 const contentStore = require('../../lib/content-store');
 const bookOrder = require('../../db/book-order');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  for (const ext of ['', '-wal', '-shm']) { try { fs.unlinkSync(tmpDb + ext); } catch {} }
-});
 
 const now = new Date().toISOString();
 function seedBook(id, name) {

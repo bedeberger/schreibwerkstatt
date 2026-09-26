@@ -8,7 +8,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
-process.env.DB_PATH = path.join('/tmp', `share-views-stats-${process.pid}-${Date.now()}.db`);
+const { useTmpDb } = require('./_helpers/tmp-db');
+useTmpDb('share-views-stats');
 
 const { db } = require('../../db/connection');
 const schema = require('../../db/schema');

@@ -14,8 +14,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
-const tmp = path.join('/tmp', `book-shelf-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('book-shelf');
 
 const { db } = require('../../db/connection');
 const schema = require('../../db/schema');

@@ -9,20 +9,13 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `pragma-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('pragma');
 // Dieser Sentinel prüft die PRODUKTIONS-PRAGMAs. Den Test-Fast-Path (DB_FSYNC=off,
 // gesetzt in den npm-Test-Scripts) hier ausschalten, damit synchronous=NORMAL greift.
 delete process.env.DB_FSYNC;
 
 const { db } = require('../../db/connection');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
-});
 
 test('PRAGMA journal_mode = WAL', () => {
   assert.equal(db.pragma('journal_mode', { simple: true }), 'wal');

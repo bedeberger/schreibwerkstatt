@@ -16,13 +16,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
 const require = createRequire(import.meta.url);
 
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sw-headhead-'));
-process.env.DB_PATH = path.join(TMP, 'test.db');
+useTmpDb('headhead');
 
 // Schema VOR allem anderen: db/headline.js praepariert seine Statements beim
 // Modul-Load, und lib/headline-render.js zieht es herein.

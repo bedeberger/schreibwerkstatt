@@ -3,8 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
-const tmp = path.join('/tmp', `hubspot-db-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('hubspot-db');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-1234567890abcdef';
 
 const schema = require('../../db/schema');

@@ -17,9 +17,8 @@ const os = require('node:os');
 
 // Vor require auf eigene Temp-DB zeigen, sonst öffnet db/connection.js die
 // Produktions-DB (oder die Default-./schreibwerkstatt.db im Repo-Root).
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fk-smoke-'));
-const dbFile = path.join(tmpDir, `fresh-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = dbFile;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const dbFile = useTmpDb('fk-smoke');
 
 // Module-Cache räumen, falls vorheriger Test die DB-Pfade schon geladen hat.
 function freshRequire(rel) {
@@ -32,11 +31,6 @@ function freshRequire(rel) {
 freshRequire('db/connection');
 freshRequire('db/migrations');
 const { db } = freshRequire('db/connection');
-
-test.after(() => {
-  try { db.close(); } catch { /* noop */ }
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
-});
 
 test('foreign_key_check liefert null Treffer nach allen Migrationen', () => {
   const violations = db.pragma('foreign_key_check');

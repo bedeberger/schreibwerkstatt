@@ -8,8 +8,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
-process.env.DB_PATH = path.join('/tmp', `pdf-anchordir-test-${process.pid}-${Date.now()}.db`);
+useTmpDb('pdf-anchordir');
 // Migrationen VOR pdf-render (font_cache-Statements beim Modul-Load).
 // CJS ueber dynamic import: die benannten Exporte haengen am default-Namespace.
 const schemaMod = await import('../../db/schema.js');

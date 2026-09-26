@@ -8,8 +8,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
-process.env.DB_PATH = path.join('/tmp', `pdfx-render-test-${process.pid}-${Date.now()}.db`);
+useTmpDb('pdfx-render');
 // Migrationen MÜSSEN vor pdf-render laufen, weil font-fetch beim Modul-Load
 // Prepared-Statements auf `font_cache` anlegt. Schema-Import zuerst.
 await import('../../db/schema.js');

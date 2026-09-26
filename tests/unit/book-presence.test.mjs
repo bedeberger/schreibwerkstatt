@@ -7,11 +7,11 @@ import assert from 'node:assert/strict';
 import os from 'os';
 import path from 'path';
 import { createRequire } from 'module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require = createRequire(import.meta.url);
 
-const tmpDb = path.join(os.tmpdir(), `book-presence-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const tmpDb = useTmpDb('book-presence');
 delete process.env.ADMIN_EMAIL;
 
 require('../../db/migrations');
@@ -19,14 +19,6 @@ const { db } = require('../../db/connection');
 const appUsers = require('../../db/app-users');
 const appUsersDevices = require('../../db/app-users-devices');
 const bookPresence = require('../../db/book-presence');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  const fs = require('fs');
-  for (const ext of ['', '-wal', '-shm']) {
-    try { fs.unlinkSync(tmpDb + ext); } catch {}
-  }
-});
 
 const DID1 = '11111111-1111-4111-8111-111111111111';
 const DID2 = '22222222-2222-4222-8222-222222222222';

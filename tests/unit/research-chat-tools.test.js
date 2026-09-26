@@ -11,8 +11,8 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const os = require('node:os');
 
-const tmpDb = path.join(os.tmpdir(), `schreibwerkstatt-rct-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('rct');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
 require('../../db/migrations');

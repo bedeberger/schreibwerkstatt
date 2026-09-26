@@ -18,8 +18,8 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `app-users-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('app-users');
 // Bewusst KEIN ADMIN_EMAIL bei Mig-Lauf — ensureAdminFromEnv testen wir separat.
 delete process.env.ADMIN_EMAIL;
 
@@ -33,13 +33,6 @@ const appUsers = require('../../db/app-users');
 // fuellen und einen erneuten Backfill nachstellen — oder einfacher: wir testen
 // nur die laufenden Helper. Bestands-Backfill aus pre-107 ist Migrations-
 // Eigenleistung; hier verifizieren wir, dass es laeuft ohne Daten-Drift.
-
-test.after(() => {
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
-});
 
 test('schema_version >= 129', () => {
   const v = db.prepare('SELECT version FROM schema_version').get().version;

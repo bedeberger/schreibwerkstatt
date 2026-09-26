@@ -5,11 +5,11 @@ import assert from 'node:assert/strict';
 import os from 'os';
 import path from 'path';
 import { createRequire } from 'module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require = createRequire(import.meta.url);
 
-const tmpDb = path.join(os.tmpdir(), `page-presence-mdev-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const tmpDb = useTmpDb('page-presence-mdev');
 delete process.env.ADMIN_EMAIL;
 
 require('../../db/migrations');
@@ -17,14 +17,6 @@ const { db } = require('../../db/connection');
 const appUsers = require('../../db/app-users');
 const appUsersDevices = require('../../db/app-users-devices');
 const pagePresence = require('../../db/page-presence');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  const fs = require('fs');
-  for (const ext of ['', '-wal', '-shm']) {
-    try { fs.unlinkSync(tmpDb + ext); } catch {}
-  }
-});
 
 function seed() {
   appUsers.createUser({ email: 'alice@x.ch', displayName: 'Alice' });

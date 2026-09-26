@@ -5,11 +5,11 @@ import assert from 'node:assert/strict';
 import os from 'os';
 import path from 'path';
 import { createRequire } from 'module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require = createRequire(import.meta.url);
 
-const tmpDb = path.join(os.tmpdir(), `admin-usage-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const tmpDb = useTmpDb('admin-usage');
 delete process.env.ADMIN_EMAIL;
 
 require('../../db/migrations');

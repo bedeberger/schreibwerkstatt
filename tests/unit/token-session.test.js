@@ -5,8 +5,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const tmp = path.join('/tmp', `token-session-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('token-session');
 
 require('../../db/schema');
 const express = require('express');

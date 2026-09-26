@@ -9,8 +9,8 @@ const assert = require('node:assert');
 const path = require('node:path');
 
 // Eigene Test-DB pro Lauf (Suites laufen mit --test-concurrency parallel).
-const tmp = path.join('/tmp', `sources-db-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('sources-db');
 
 const schema = require('../../db/schema');
 const { db } = require('../../db/connection');

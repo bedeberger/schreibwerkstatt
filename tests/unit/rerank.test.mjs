@@ -5,9 +5,10 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 // Temp-DB, damit das Require von app-settings (via rerank.js) die Dev-DB nicht anfasst.
-process.env.DB_PATH = path.join(os.tmpdir(), `sw-rerank-${process.pid}.db`);
+useTmpDb('rerank');
 
 const require = createRequire(import.meta.url);
 const { _parseRerankResponse, _withRetry } = require('../../lib/rerank.js');

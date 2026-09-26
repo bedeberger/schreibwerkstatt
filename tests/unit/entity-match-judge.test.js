@@ -16,19 +16,14 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `entity-judge-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('entity-judge');
 delete process.env.ADMIN_EMAIL;
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
 const appSettings = require('../../lib/app-settings');
 const { judgeEntityPairs, isJudgeEnabled, JUDGE_PAIR_CAP } = require('../../routes/jobs/komplett/entity-reconcile');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  for (const s of ['', '-wal', '-shm']) { try { fs.unlinkSync(tmpDb + s); } catch {} }
-});
 
 // Minimaler ctx: nur was judgeEntityPairs anfasst.
 function makeCtx({ answer, throwErr = null, provider = 'claude' } = {}) {

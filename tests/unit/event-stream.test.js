@@ -20,8 +20,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const http = require('node:http');
 
-const tmpDb = path.join(os.tmpdir(), `schreibwerkstatt-eventstream-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('eventstream');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 require('../../db/migrations');
 
@@ -63,7 +63,6 @@ test.before(async () => {
 test.after(() => {
   server.closeAllConnections?.();
   server.close();
-  for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm']) { try { fs.unlinkSync(f); } catch {} }
 });
 
 // Öffnet einen Stream und sammelt geparste Events.

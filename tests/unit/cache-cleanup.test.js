@@ -11,8 +11,8 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `cache-cleanup-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('cache-cleanup');
 
 const { db } = require('../../db/connection');
 
@@ -84,13 +84,6 @@ const SEED_STMTS = [
 for (const stmt of SEED_STMTS) db.prepare(stmt).run();
 
 const { runCacheCleanup, POLICIES } = require('../../lib/cache-cleanup');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
-});
 
 const summary = runCacheCleanup();
 

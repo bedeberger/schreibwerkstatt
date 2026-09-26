@@ -8,8 +8,8 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `anthropic-billing-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('anthropic-billing');
 delete process.env.ANTHROPIC_ADMIN_KEY;
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-anthropic-billing';
 
@@ -17,11 +17,6 @@ require('../../db/migrations');
 const { db } = require('../../db/connection');
 const appSettings = require('../../lib/app-settings');
 const billing = require('../../lib/anthropic-billing');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm']) { try { fs.unlinkSync(f); } catch {} }
-});
 
 function _res(status, body) {
   const bytes = new TextEncoder().encode(JSON.stringify(body));

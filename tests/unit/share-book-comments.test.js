@@ -8,7 +8,8 @@ const assert = require('node:assert');
 const path = require('node:path');
 
 // Eigene Test-DB pro Lauf (Statement-Cache-Kollision bei paralleler Suite).
-process.env.DB_PATH = path.join('/tmp', `share-book-comments-${process.pid}-${Date.now()}.db`);
+const { useTmpDb } = require('./_helpers/tmp-db');
+useTmpDb('share-book-comments');
 
 const schema = require('../../db/schema');
 const appUsers = require('../../db/app-users');

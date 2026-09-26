@@ -22,8 +22,11 @@ import {
 } from '../../public/js/diagram/mermaid-html.js';
 import { TTS_SKIP_BLOCK_SEL, isTtsSkippedBlock } from '../../public/js/tts-segment.js';
 import { htmlToPlainText } from '../../public/js/html-text.js';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// Der Prompt-Pfad-Test unten laedt db/schema.js — Wegwerf-DB statt Dev-/CI-DB.
+useTmpDb('mermaid-drift');
 
 function root(html) {
   const { document } = parseHTML(`<!doctype html><html><body><div id="r">${html}</div></body></html>`);
@@ -141,8 +144,6 @@ test('der KI-Prompt-Pfad schneidet Diagramme genauso aus wie die Textstatistik',
   // aber denselben Ausschnitt machen. Was sie durchlaesst, kostet Input-Tokens
   // in jedem Job, landet im Embedding-Index (via loadPageContents) und wird vom
   // Lektorat als Prosa gelesen — siehe docs/diagramme.md, Invariante 7.
-  process.env.DB_PATH = process.env.DB_PATH
-    || resolve('/tmp', `mermaid-drift-${process.pid}-${Date.now()}.db`);
   process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
   await import('../../db/schema.js');
   const mod = await import('../../routes/jobs/shared/ai.js');

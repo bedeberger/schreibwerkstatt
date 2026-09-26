@@ -6,8 +6,8 @@ const fs = require('node:fs');
 
 // Eigene Test-DB pro Lauf, sonst kollidiert das Test-Statement-Cache mit
 // anderen Test-Suites, die parallel laufen (--test-concurrency=4).
-const tmp = path.join('/tmp', `draft-figures-db-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('draft-figures-db');
 
 const schema = require('../../db/schema');
 const { db } = require('../../db/connection');
@@ -195,13 +195,6 @@ test('listImportableFigures: gleiche Namen dedupliziert, importierte fallen raus
     name: 'Tom', mindmap: sampleMindmap('Tom'), sourceFigureId: soloId,
   });
   assert.deepEqual(schema.listImportableFigures(2052, user).map(r => r.name), ['Mia']);
-});
-
-test.after(() => {
-  try { fs.unlinkSync(tmp); } catch {}
-  try { fs.unlinkSync(tmp + '-journal'); } catch {}
-  try { fs.unlinkSync(tmp + '-wal'); } catch {}
-  try { fs.unlinkSync(tmp + '-shm'); } catch {}
 });
 
 test('_withRootName: Wurzel-Topic folgt dem Figurnamen, Rest bleibt unberuehrt', () => {

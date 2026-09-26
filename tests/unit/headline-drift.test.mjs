@@ -20,13 +20,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
 const require = createRequire(import.meta.url);
 
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sw-headline-'));
-process.env.DB_PATH = path.join(TMP, 'test.db');
+useTmpDb('headline');
 
 const ch = await import(pathToFileURL(path.join(ROOT, 'public/js/headline/channels.js')).href);
 const {
@@ -239,11 +239,6 @@ test('Löschen der Seite nimmt Titel und Varianten mit (CASCADE)', () => {
   db.prepare('DELETE FROM pages WHERE page_id = ?').run(pageId);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM page_headline WHERE page_id = ?').get(pageId).n, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM page_headline_variants WHERE page_id = ?').get(pageId).n, 0);
-});
-
-test.after(() => {
-  try { db.close(); } catch { /* egal */ }
-  fs.rmSync(TMP, { recursive: true, force: true });
 });
 
 test('alle vier geleert: Platzhalter behaelt den Zeitpunkt, Leser sehen keinen Titelapparat', () => {

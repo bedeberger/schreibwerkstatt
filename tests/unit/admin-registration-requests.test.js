@@ -9,8 +9,8 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
-const tmpDb = path.join(os.tmpdir(), `admin-reg-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('admin-reg');
 delete process.env.ADMIN_EMAIL;
 
 require('../../db/migrations');
@@ -38,10 +38,6 @@ const port = server.address().port;
 
 test.after(() => {
   server.close();
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
 });
 
 // Seed: admin + pending requests

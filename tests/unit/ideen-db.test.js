@@ -18,8 +18,8 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `ideen-db-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('ideen-db');
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
@@ -234,4 +234,3 @@ test('Loeschen: die Seite nimmt ihre Ideen mit (CASCADE, kein CHECK-Bruch)', () 
   assert.equal(ideenDb.listBoardIdeen(1, A).length, 0);
 });
 
-test.after(() => { try { fs.unlinkSync(tmpDb); } catch { /* egal */ } });

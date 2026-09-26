@@ -10,19 +10,12 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `page-ages-cross-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('page-ages-cross');
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
 const appUsers = require('../../db/app-users');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
-});
 
 // Selbe Query wie in routes/history.js#/page-ages/:book_id — Drift-Schutz.
 function pageAgesQuery(bookId) {

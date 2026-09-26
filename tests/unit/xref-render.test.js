@@ -5,7 +5,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
-process.env.DB_PATH = path.join('/tmp', `xref-render-test-${process.pid}-${Date.now()}.db`);
+const { useTmpDb } = require('./_helpers/tmp-db');
+useTmpDb('xref-render');
 
 const schema = require('../../db/schema');
 const { db } = require('../../db/schema');

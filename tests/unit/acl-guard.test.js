@@ -8,8 +8,8 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `acl-guard-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('acl-guard');
 delete process.env.ADMIN_EMAIL;
 
 require('../../db/migrations');
@@ -18,13 +18,6 @@ const appUsers = require('../../db/app-users');
 const bookAccess = require('../../db/book-access');
 const { runWithContext } = require('../../lib/log-context');
 const acl = require('../../lib/acl');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
-});
 
 function _setup() {
   appUsers.createUser({ email: 'alice@x.ch' });

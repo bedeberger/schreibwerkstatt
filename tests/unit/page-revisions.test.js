@@ -4,8 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
-const tmp = path.join('/tmp', `page-revisions-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('page-revisions');
 
 const { db } = require('../../db/connection');
 require('../../db/migrations');

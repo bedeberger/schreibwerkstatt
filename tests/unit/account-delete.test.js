@@ -22,8 +22,8 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
-const tmpDb = path.join(os.tmpdir(), `account-delete-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('account-delete');
 delete process.env.ADMIN_EMAIL;
 delete process.env.DEMO_EMAIL;
 delete process.env.DEMO_PASSWORD;
@@ -63,10 +63,6 @@ const port = server.address().port;
 
 test.after(() => {
   server.close();
-  try { db.close(); } catch {}
-  for (const suffix of ['', '-wal', '-shm']) {
-    try { fs.unlinkSync(tmpDb + suffix); } catch {}
-  }
 });
 
 function _request(method, urlPath, { user = null, bearer = null, body = null } = {}) {

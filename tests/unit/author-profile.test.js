@@ -15,8 +15,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
-const tmp = path.join('/tmp', `author-profile-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('author-profile');
 
 const { computeAuthorProfile, authorProfileBasisSig, renderAuthorProfileMeasurement,
         AUTHOR_PROFILE_THRESHOLDS: T } = require('../../lib/author-profile');

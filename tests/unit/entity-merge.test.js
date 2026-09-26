@@ -13,18 +13,13 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `entity-merge-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('entity-merge');
 delete process.env.ADMIN_EMAIL;
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
 const { mergeFigures, mergeLocations, mergeScenes } = require('../../db/entity-merge');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  for (const s of ['', '-wal', '-shm']) { try { fs.unlinkSync(tmpDb + s); } catch {} }
-});
 
 const USER = 'autor@x.ch';
 const OTHER = 'fremd@x.ch';

@@ -12,8 +12,8 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
-const tmpDb = path.join(os.tmpdir(), `model-list-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('model-list');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-for-crypto-derive';
 
 require('../../db/migrations');
@@ -41,8 +41,6 @@ const stubUrl = () => `http://127.0.0.1:${stub.address().port}`;
 
 test.after(() => {
   stub.close();
-  try { db.close(); } catch {}
-  for (const suffix of ['', '-wal', '-shm']) { try { fs.unlinkSync(tmpDb + suffix); } catch {} }
 });
 
 test('parseModels: OpenAI-Schema (data[].id), sortiert + dedupliziert', () => {

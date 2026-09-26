@@ -7,19 +7,13 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'p6-cats-'));
-const dbFile = path.join(tmpDir, `p6-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = dbFile;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const dbFile = useTmpDb('p6-cats');
 
 const { db } = require('../../db/connection');
 require('../../db/migrations');
 const { upsertBookByName } = require('../../db/books');
 const categories = require('../../db/book-categories');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-});
 
 test('categories: create + list + slug-uniqueness', () => {
   const a = categories.create({ name: 'Roman', createdBy: 'admin@x' });

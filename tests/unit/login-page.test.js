@@ -12,8 +12,8 @@ const fs = require('fs');
 const http = require('http');
 const express = require('express');
 
-const tmpDb = path.join(os.tmpdir(), `login-page-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('login-page');
 process.env.SESSION_SECRET = 'a'.repeat(32); // crypto-Master fuer encrypted app_settings
 process.env.ADMIN_EMAIL = 'admin@example.com';
 process.env.ADMIN_PASSWORD = 's3cret';
@@ -48,10 +48,6 @@ const port = server.address().port;
 test.beforeEach(() => rl._resetAll());
 test.after(() => {
   server.close();
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
   delete process.env.ADMIN_EMAIL;
   delete process.env.ADMIN_PASSWORD;
   delete process.env.DEMO_EMAIL;

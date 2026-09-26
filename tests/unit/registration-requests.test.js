@@ -9,19 +9,12 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const tmpDb = path.join(os.tmpdir(), `reg-req-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('reg-req');
 
 require('../../db/migrations');
 const { db } = require('../../db/connection');
 const regRequests = require('../../db/registration-requests');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
-});
 
 test('createRequest legt pending-Row an', () => {
   const r = regRequests.createRequest({ email: 'alice@example.com', displayName: 'Alice', message: 'hi', ip: '1.2.3.4', userAgent: 'ua' });

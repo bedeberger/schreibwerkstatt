@@ -12,8 +12,8 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 // Eigene Test-DB pro Lauf (Statement-Cache-Kollision bei paralleler Suite).
-const tmp = path.join('/tmp', `demo-foreign-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('demo-foreign');
 
 const { db } = require('../../db/schema'); // Connection + Migrationen
 const appUsers = require('../../db/app-users');

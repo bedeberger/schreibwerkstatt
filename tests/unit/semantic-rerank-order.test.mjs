@@ -7,8 +7,9 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
-process.env.DB_PATH = path.join(os.tmpdir(), `sw-rerankorder-${process.pid}.db`);
+useTmpDb('rerankorder');
 
 const require = createRequire(import.meta.url);
 const rerank = require('../../lib/rerank.js');

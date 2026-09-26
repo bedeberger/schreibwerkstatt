@@ -6,8 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
-process.env.DB_PATH = path.join('/tmp', `pdf-toc-wrap-${process.pid}-${Date.now()}.db`);
+useTmpDb('pdf-toc-wrap');
 await import('../../db/schema.js');
 const { _wrapTocLines } = await import('../../lib/pdf-render/pages.js');
 

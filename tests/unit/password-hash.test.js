@@ -13,20 +13,13 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-const tmpDb = path.join(os.tmpdir(), `password-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('password');
 process.env.SESSION_SECRET = 'a'.repeat(32);
 
 const password = require('../../lib/password');
 const appSettings = require('../../lib/app-settings');
 const { db } = require('../../db/connection');
-
-test.after(() => {
-  try { db.close(); } catch {}
-  for (const suffix of ['', '-wal', '-shm']) {
-    try { fs.unlinkSync(tmpDb + suffix); } catch {}
-  }
-});
 
 test('hashPassword: scrypt-Format mit Parametern im String', async () => {
   const h = await password.hashPassword('correct horse battery staple');

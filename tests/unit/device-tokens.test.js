@@ -4,8 +4,8 @@ const assert = require('node:assert');
 const path = require('node:path');
 
 // Eigene Test-DB pro Lauf (Statement-Cache-Kollision bei paralleler Suite).
-const tmp = path.join('/tmp', `device-tokens-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmp;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmp = useTmpDb('device-tokens');
 
 require('../../db/schema'); // triggert Connection + Migrationen (inkl. Mig 188)
 const appUsers = require('../../db/app-users');

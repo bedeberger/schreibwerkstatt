@@ -13,8 +13,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 
 // Test-DB in tmpfs, damit kein schreibwerkstatt.db angefasst wird.
-const tmpDb = path.join(os.tmpdir(), `schreibwerkstatt-test-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = tmpDb;
+const { useTmpDb } = require('./_helpers/tmp-db');
+const tmpDb = useTmpDb('test');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 // Kein API_PROVIDER → defaults auf claude (kein Netzwerk – wir stubben callAI ohnehin).
 
@@ -42,13 +42,6 @@ const seedUser = db.prepare(`INSERT OR IGNORE INTO app_users (email) VALUES (?)`
 for (const email of ['u@x', 'u1@x', 'u2@x', 'u3@x', 'u4@x', 'u5@x', 'alice@x', 'bob@x']) {
   seedUser.run(email);
 }
-
-test.after(() => {
-  // Schreibgeschütztes Locking durch better-sqlite3 → Datei am Ende abräumen.
-  try { fs.unlinkSync(tmpDb); } catch {}
-  try { fs.unlinkSync(tmpDb + '-wal'); } catch {}
-  try { fs.unlinkSync(tmpDb + '-shm'); } catch {}
-});
 
 // ── aiCall: truncated → throw vor parseJSON ─────────────────────────────────
 test('aiCall: truncated=true wirft i18nError VOR parseJSON', async () => {

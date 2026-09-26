@@ -6,9 +6,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require = createRequire(import.meta.url);
-process.env.DB_PATH = path.join('/tmp', `plot-db-test-${process.pid}-${Date.now()}.db`);
+useTmpDb('plot-db');
 
 const schema = require('../../db/schema');
 const appUsers = require('../../db/app-users');

@@ -5,11 +5,12 @@ import test from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require = createRequire(import.meta.url);
 
 // Frische Test-DB pro Lauf (parallel-isoliert), bevor db/schema geladen wird.
-process.env.DB_PATH = path.join('/tmp', `save-fakten-test-${process.pid}-${Date.now()}.db`);
+useTmpDb('save-fakten');
 const schema = require('../../db/schema');
 const db = schema.db;
 

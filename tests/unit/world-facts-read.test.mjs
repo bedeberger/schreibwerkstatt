@@ -9,9 +9,10 @@ import test from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
 const require = createRequire(import.meta.url);
-process.env.DB_PATH = path.join('/tmp', `wf-read-test-${process.pid}-${Date.now()}.db`);
+useTmpDb('wf-read');
 const schema = require('../../db/schema');
 const db = schema.db;
 

@@ -4,7 +4,7 @@ Vier Suiten, sequenziell via `npm test`. Erstmaliges Setup: `npx playwright inst
 
 | Suite | Runner | Pfad | Befehl | Charakter |
 |-------|--------|------|--------|-----------|
-| Unit | `node --test` | [tests/unit/](../tests/unit/) | `npm run test:unit` | Pure, parallelisiert (concurrency 4), kein Browser |
+| Unit | `node --test` | [tests/unit/](../tests/unit/) | `npm run test:unit` | Parallelisiert (concurrency 4), kein Browser; DB-Tests je File auf eigener Wegwerf-SQLite |
 | Integration | `node --test` | [tests/integration/](../tests/integration/) | `npm run test:integration` | Parallelisiert (concurrency 4), Mock-AI, Content-Store gegen Test-SQLite |
 | E2E | Playwright | [tests/e2e/](../tests/e2e/) | `npm run test:e2e` | Chromium gegen `tests/server.js` mit Fixture-Harness |
 | Smoke | Playwright | [tests/e2e-app/](../tests/e2e-app/) | `npm run test:smoke` | Chromium gegen die **echte** App (`node server.js`, `LOCAL_DEV_MODE`) |
@@ -13,7 +13,7 @@ Vier Suiten, sequenziell via `npm test`. Erstmaliges Setup: `npx playwright inst
 
 **Unit:**
 - Pure Funktionen, Validatoren, Renderer, Schema-Builder, Prompt-Builder.
-- Single-Module-Logik ohne IO und ohne DB.
+- Single-Module-Logik, auch gegen die DB (einzelnes `db/`-Modul, Route-Handler mit Mini-Express) — dann über den Wegwerf-DB-Helper (siehe „Unit: Test-DB"). Kein Mock-AI, keine Job-Pipeline.
 - Beispiele: [ai.test.js](../tests/unit/ai.test.js) (JSON-Parse-Fallback), [escape-xss.test.mjs](../tests/unit/escape-xss.test.mjs), [validate.test.js](../tests/unit/validate.test.js), [palette-fuzzy.test.mjs](../tests/unit/palette-fuzzy.test.mjs).
 
 **Integration:**
@@ -56,6 +56,17 @@ test('parseJSON repairs unescaped quotes', () => {
 ```
 
 Frontend-Module (Alpine, ESM): `.mjs` + `import`. Beispiel: [hash-router.test.mjs](../tests/unit/hash-router.test.mjs) baut DOM-Stub via `globalThis.document = …`.
+
+## Unit: Test-DB
+
+Unit-Tests, die ein DB-Modul laden, holen ihre Wegwerf-SQLite **ausschliesslich** über [tests/unit/_helpers/tmp-db.js](../tests/unit/_helpers/tmp-db.js) — auf Modul-Ebene, vor dem ersten `require` von `db/…`:
+
+```js
+const { useTmpDb } = require('./_helpers/tmp-db');   // ESM: import { useTmpDb } from './_helpers/tmp-db.js';
+const tmpDb = useTmpDb('sources-db');
+```
+
+Der Helper setzt `DB_PATH` auf eine eindeutige Datei (bevorzugt `/dev/shm`, Override `TEST_TMPDIR`) und registriert einen `after()`-Hook, der die Connection schliesst und Datei + `-wal`/`-shm`/`-journal` löscht (zusätzlich ein `exit`-Handler als Netz). **Kein** eigenes `process.env.DB_PATH = path.join('/tmp', …)` — ohne Aufräumen bleibt pro Lauf und File eine DB samt WAL in `/tmp` liegen. Ausnahme: Files, die pro Test eine frische DB in einer Factory aufsetzen (`mkdtempSync` + `teardown`), räumen selbst ab.
 
 ## Integration: Mock-AI
 
@@ -132,7 +143,7 @@ Die folgenden Bereiche haben die kritischsten Tests; bei Aenderungen dort vor Co
 **Unit** (`tests/unit/*.test.{js,mjs}`, `node --test`) — decken ab:
 - JSON-Fallback-Kette ([ai.test.js](../tests/unit/ai.test.js)), Stil-/Figuren-Metriken ([page-index.test.js](../tests/unit/page-index.test.js)), Prompts-Build ([prompts.test.mjs](../tests/unit/prompts.test.mjs)), XSS-Escape-Invariante ([escape-xss.test.mjs](../tests/unit/escape-xss.test.mjs)), Request-Validierung ([validate.test.js](../tests/unit/validate.test.js)), Job-Reconnect-Events ([job-reconnect.test.mjs](../tests/unit/job-reconnect.test.mjs)), Hash-Router ([hash-router.test.mjs](../tests/unit/hash-router.test.mjs)), Card-Exklusivität ([card-exclusivity.test.mjs](../tests/unit/card-exclusivity.test.mjs)), Editor-Focus-Granularität ([editor-focus.test.mjs](../tests/unit/editor-focus.test.mjs), [focus-granularity.test.mjs](../tests/unit/focus-granularity.test.mjs)), Szenen-Filter ([szenen-filter.test.mjs](../tests/unit/szenen-filter.test.mjs)), Ideen-Prompt + Schema ([ideen-prompt.test.mjs](../tests/unit/ideen-prompt.test.mjs), [ideen-schema.test.js](../tests/unit/ideen-schema.test.js)), Shared-Jobs-Helper ([shared-jobs.test.js](../tests/unit/shared-jobs.test.js)), HTML-Cleaner ([html-clean.test.js](../tests/unit/html-clean.test.js)), Page-Stats-Normalisierung ([page-stats-normalization.test.mjs](../tests/unit/page-stats-normalization.test.mjs)), Stale-Write-Schutz ([job-result-staleness.test.mjs](../tests/unit/job-result-staleness.test.mjs)), Lektorat-Apply-Skip-Gründe ([lektorat-apply-guard.test.mjs](../tests/unit/lektorat-apply-guard.test.mjs)), PDF-Export ([pdf-export-db.test.js](../tests/unit/pdf-export-db.test.js), [pdf-export-defaults.test.js](../tests/unit/pdf-export-defaults.test.js), [pdf-html-walker.test.mjs](../tests/unit/pdf-html-walker.test.mjs), [pdf-render.test.mjs](../tests/unit/pdf-render.test.mjs)), Palette-Fuzzy ([palette-fuzzy.test.mjs](../tests/unit/palette-fuzzy.test.mjs)), Streak-Heatmap ([streak-heatmap.test.mjs](../tests/unit/streak-heatmap.test.mjs)), Local-Date ([local-date.test.mjs](../tests/unit/local-date.test.mjs), [local-date-server.test.js](../tests/unit/local-date-server.test.js)), Book-Overview-Load ([book-overview-load.test.mjs](../tests/unit/book-overview-load.test.mjs)), Buchorganizer-Kern ([book-organizer.test.mjs](../tests/unit/book-organizer.test.mjs): Snapshot-Rebuild aus `nav.tree`, Depth-First-Mirror-Ordnung, Struktur-Helper, Kapitel-Längenverteilung).
 
-**Integration** (`tests/integration/*.test.js`, `node --test`, sequenziell mit Mock-AI):
+**Integration** (`tests/integration/*.test.js`, `node --test --test-concurrency=4`, Mock-AI, eigene Wegwerf-DB pro File):
 - [tests/integration/komplett.test.js](../tests/integration/komplett.test.js) – Komplettanalyse-Pipeline (Vollextraktion, Konsolidierung, Block 2).
 - [tests/integration/kontinuitaet.test.js](../tests/integration/kontinuitaet.test.js) – Standalone-Kontinuitätscheck.
 - [tests/integration/review.test.js](../tests/integration/review.test.js) – Buch-Review-Job.

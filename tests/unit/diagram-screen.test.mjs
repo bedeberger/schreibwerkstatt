@@ -8,8 +8,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { useTmpDb } from './_helpers/tmp-db.js';
 
-process.env.DB_PATH = path.join('/tmp', `diagram-screen-${process.pid}-${Date.now()}.db`);
+useTmpDb('diagram-screen');
 // Kein Chromium in diesem Test: was nicht im Cache liegt, ist "nicht renderbar".
 process.env.MERMAID_RENDER_DISABLED = '1';
 
