@@ -8,6 +8,30 @@ export const lifecycleMethods = {
   },
 
 
+  // Speicherziel beim Save-Start festhalten: Seite, Name und die Basis für
+  // einen Draft (originalHtml + updated_at der Seite, auf der editiert wurde).
+  _pinSaveTarget(html) {
+    const app = editorHost();
+    return {
+      pageId: app.currentPage.id,
+      pageName: app.currentPage.name,
+      baseHtml: app.originalHtml,
+      baseUpdatedAt: app.currentPage.updated_at,
+      html,
+    };
+  },
+
+  // Save über einen Seitenwechsel abgebrochen, bevor der PUT lief: die Arbeit
+  // als Draft der gepinnten Seite sichern — der pendingDraft-Banner bietet sie
+  // beim nächsten Besuch wieder an.
+  _keepPinnedDraft(pin) {
+    this._keepAsDraft({
+      pageId: pin.pageId, html: pin.html, statusKey: null,
+      base: pin.baseHtml, baseUpdatedAt: pin.baseUpdatedAt,
+    });
+  },
+
+
   // Gemeinsame Nachbereitung nach jedem erfolgreichen Page-Save. Aufrufer:
   // saveEdit + quickSave + submitConflictResolution, jeweils im Haupt- und im
   // 409-Re-Merge-Pfad. Übernimmt den frischen Server-Stand, spiegelt Findings/
@@ -292,26 +316,35 @@ export const lifecycleMethods = {
     // eigenen Schreibvorgang.
     app.editSaving = true;
     const source = app.focusActive ? 'focus' : 'main';
+    // Seite beim Save-Start pinnen (siehe _stillEditing): nach jedem `await`
+    // kann ein Seitenwechsel `app.currentPage` bereits auf die nächste Seite
+    // gesetzt haben.
+    const pin = this._pinSaveTarget(newHtml);
     try {
       const origText = htmlToText(app.originalHtml || '').trim();
       if (origText.length > 50 && newText.length < origText.length * 0.2) {
         const okShort = await app.appConfirm({
           message: app.t('edit.shorterConfirm', { newLen: newText.length, oldLen: origText.length }),
         });
+        if (!this._stillEditing(pin.pageId)) { this._keepPinnedDraft(pin); return; }
         if (!okShort) return;
       }
 
-      const pre = await this._resolveConflictBeforeSave({ localHtml: newHtml, source, silent: false });
+      const pre = await this._resolveConflictBeforeSave({
+        localHtml: newHtml, source, silent: false, pageId: pin.pageId, expectedAt: pin.baseUpdatedAt,
+      });
+      if (pre.stale) { this._keepPinnedDraft(pin); return; }
       if (!pre.proceed) return;
 
       app.setStatus(app.t('edit.saving'), true);
       try {
-        const saved = await savePage(app.currentPage.id, {
+        const saved = await savePage(pin.pageId, {
           html: pre.saveHtml,
-          pageName: app.currentPage.name,
+          pageName: pin.pageName,
           source,
           expectedUpdatedAt: pre.expectedAt,
         });
+        if (!this._stillEditing(pin.pageId)) { clearDraft(pin.pageId); return; }
         this._applySaveSuccess(saved, pre.saveHtml);
         // Kein extra setStatus vor dem Teardown — Save-Indicator in der Subline
         // zeigt schon "gespeichert HH:MM"; doppelte Notification wäre redundant.
@@ -324,27 +357,33 @@ export const lifecycleMethods = {
       } catch (e) {
         if (isPageConflict(e)) {
           // Race: zwischen Pre-Check und PUT hat anderer User geschrieben.
+          if (!this._stillEditing(pin.pageId)) { this._keepPinnedDraft(pin); return; }
           const retry = await this._retryAfterConflict({
-            localHtml: newHtml, source, pageId: app.currentPage.id,
-            pageName: app.currentPage.name, tag: 'saveEdit',
+            localHtml: newHtml, source, pageId: pin.pageId,
+            pageName: pin.pageName, tag: 'saveEdit',
           });
+          if (retry?.stale) { this._keepPinnedDraft(pin); return; }
           if (retry?.conflict) return;
           if (retry) {
+            if (!this._stillEditing(pin.pageId)) { clearDraft(pin.pageId); return; }
             this._applySaveSuccess(retry.saved, retry.html);
             app.setStatus(app.t('edit.conflict.merged.silent'), false, 3000);
             return;
           }
           this._keepAsDraft({
-            pageId: app.currentPage.id, html: newHtml, banner: readConflictBody(e),
+            pageId: pin.pageId, html: newHtml, banner: readConflictBody(e),
+            base: pin.baseHtml, baseUpdatedAt: pin.baseUpdatedAt,
           });
           return;
         }
         console.error('[saveEdit]', e);
         // Netzwerkfehler → Draft behalten, Offline-Modus aktivieren, Auto-Retry.
         this._keepAsDraft({
-          pageId: app.currentPage.id, html: newHtml,
+          pageId: pin.pageId, html: newHtml,
           statusKey: navigator.onLine ? null : 'edit.offlineSaved',
+          base: pin.baseHtml, baseUpdatedAt: pin.baseUpdatedAt,
         });
+        if (!this._stillEditing(pin.pageId)) return;
         if (navigator.onLine) app.setStatus(app.t('edit.saveFailed', { msg: e.message }), false, 8000);
       }
     } finally {
@@ -391,19 +430,25 @@ export const lifecycleMethods = {
     // absetzen.
     app.editSaving = true;
     const source = app.focusActive ? 'focus' : 'main';
+    // Seite pinnen (siehe saveEdit). Der Draft oben ist schon geschrieben —
+    // ein Abbruch nach Seitenwechsel lässt ihn einfach stehen.
+    const pin = this._pinSaveTarget(newHtml);
     try {
       // Silent-Path: Auto-Save darf keinen Modal triggern (Pflicht-Invariante #9).
       // Bei Cross-User-Konflikt versucht der Block-Merge still zusammenzuführen;
       // nur echte Block-Kollisionen öffnen das Auflösungs-Banner (auch im
       // Fokusmodus sichtbar). Ohne Merge bleibt der editConflict-Hinweis.
-      const pre = await this._resolveConflictBeforeSave({ localHtml: newHtml, source, silent: true });
+      const pre = await this._resolveConflictBeforeSave({
+        localHtml: newHtml, source, silent: true, pageId: pin.pageId, expectedAt: pin.baseUpdatedAt,
+      });
       if (!pre.proceed) return;
-      const saved = await savePage(app.currentPage.id, {
+      const saved = await savePage(pin.pageId, {
         html: pre.saveHtml,
-        pageName: app.currentPage.name,
+        pageName: pin.pageName,
         source,
         expectedUpdatedAt: pre.expectedAt,
       });
+      if (!this._stillEditing(pin.pageId)) { clearDraft(pin.pageId); return; }
       this._applySaveSuccess(saved, pre.saveHtml);
       // Kein setStatus — Save-Indicator in der Subline zeigt schon
       // "gespeichert HH:MM"; doppelte Notification wäre redundant.
@@ -413,23 +458,29 @@ export const lifecycleMethods = {
         // Race nach Pre-Check: anderer User war im selben Tick schneller.
         // Block-Merge gegen den frischen Remote-Stand; nur Block-Kollisionen
         // öffnen das Banner. Quiet-Pfad, kein Modal.
+        if (!this._stillEditing(pin.pageId)) return;
         const retry = await this._retryAfterConflict({
-          localHtml: newHtml, source, pageId: app.currentPage.id,
-          pageName: app.currentPage.name, tag: 'quickSave',
+          localHtml: newHtml, source, pageId: pin.pageId,
+          pageName: pin.pageName, tag: 'quickSave',
         });
-        if (retry?.conflict) return;
+        if (retry?.stale || retry?.conflict) return;
         if (retry) {
+          if (!this._stillEditing(pin.pageId)) { clearDraft(pin.pageId); return; }
           this._applySaveSuccess(retry.saved, retry.html);
           return;
         }
         const banner = readConflictBody(e);
         this._keepAsDraft({
-          pageId: app.currentPage.id, html: newHtml, banner, statusKey: null,
+          pageId: pin.pageId, html: newHtml, banner, statusKey: null,
+          base: pin.baseHtml, baseUpdatedAt: pin.baseUpdatedAt,
         });
-        app.setStatus(this._conflictHintText(banner), false, 8000);
+        if (this._stillEditing(pin.pageId)) app.setStatus(this._conflictHintText(banner), false, 8000);
         return;
       }
       console.error('[quickSave]', e);
+      // Draft liegt seit dem Save-Start; Offline-Flag/Status nur für die Seite,
+      // die noch offen ist.
+      if (!this._stillEditing(pin.pageId)) return;
       app.saveOffline = true;
       // navigator.onLine ist hier nur noch Hinweis fuer die Wortwahl, kein Gate:
       // bei echtem Offline die freundlichere Meldung, sonst generischer Retry-Hinweis.

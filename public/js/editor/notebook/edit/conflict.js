@@ -33,9 +33,20 @@ export const conflictMethods = {
   // aufzulösen ist: lokale Fassung als Draft sichern, Offline-/Konflikt-Banner
   // setzen, Status melden. Draft zuerst (Pflicht-Invariante #5) — die Arbeit
   // darf nicht am Banner hängen.
-  _keepAsDraft({ pageId, html, banner = null, statusKey = 'edit.conflict.kept', statusMs = 8000 }) {
+  //
+  // Ist die Seite inzwischen gewechselt (Save lief über einen Seitenwechsel),
+  // gehört nur der Draft noch zu `pageId`: Basis kommt dann aus `base`/
+  // `baseUpdatedAt` des Aufrufers, und Banner/Status/Offline-Flag der jetzt
+  // offenen Seite bleiben unberührt.
+  _keepAsDraft({ pageId, html, banner = null, statusKey = 'edit.conflict.kept', statusMs = 8000, base, baseUpdatedAt }) {
     const app = editorHost();
-    const draftOk = writeDraft(pageId, html, app.originalHtml, app.currentPage?.updated_at);
+    const onPage = app.currentPage?.id === pageId;
+    const draftOk = writeDraft(
+      pageId, html,
+      base !== undefined ? base : app.originalHtml,
+      baseUpdatedAt !== undefined ? baseUpdatedAt : app.currentPage?.updated_at,
+    );
+    if (!onPage) return;
     app.draftPersistFailed = !draftOk;
     if (draftOk) app.lastDraftSavedAt = Date.now();
     app.saveOffline = true;
@@ -54,16 +65,24 @@ export const conflictMethods = {
   // Rückgabe:
   //   { proceed: true, saveHtml, expectedAt, merged? } — Aufrufer speichert saveHtml
   //   { proceed: false } — abgebrochen (Banner/Auflösungs-Modal offen, Draft gesichert)
-  async _resolveConflictBeforeSave({ localHtml, source, silent }) {
+  //
+  // `pageId`/`expectedAt` pinnt der Aufrufer beim Save-Start. Nach jedem `await`
+  // prüft der Pfad, ob die Edit-Session noch auf dieser Seite steht — sonst
+  // `{ proceed: false, stale: true }`, und nichts (Banner, Merge ins Live-DOM,
+  // Modal) wirkt auf die inzwischen offene Seite.
+  async _resolveConflictBeforeSave({ localHtml, source, silent, pageId, expectedAt }) {
     const app = editorHost();
-    const expectedAt = app.currentPage.updated_at;
-    const conflict = await this._checkPageConflict(app.currentPage.id, expectedAt);
+    if (pageId == null) pageId = app.currentPage.id;
+    if (expectedAt === undefined) expectedAt = app.currentPage.updated_at;
+    const conflict = await this._checkPageConflict(pageId, expectedAt);
+    if (!this._stillEditing(pageId)) return { proceed: false, stale: true };
     if (!conflict) return { proceed: true, saveHtml: localHtml, expectedAt };
 
     const merge = await this._attemptBlockMerge({
-      localHtml, source,
+      localHtml, source, pageId,
       remoteHtml: conflict.remoteHtml, remoteUpdatedAt: conflict.remoteUpdatedAt,
     });
+    if (merge?.stale) return { proceed: false, stale: true };
     if (merge?.conflict) return { proceed: false }; // Auflösungs-Modal offen
     if (merge?.merged) {
       // Stiller Auto-Merge: nicht-kollidierende Block-Edits zusammengeführt.
@@ -86,8 +105,9 @@ export const conflictMethods = {
       confirmLabel: app.t('edit.conflict.saveAnyway'),
       danger: true,
     });
+    if (!this._stillEditing(pageId)) return { proceed: false, stale: true };
     if (!okOverwrite) {
-      this._keepAsDraft({ pageId: app.currentPage.id, html: localHtml, statusKey: 'edit.conflict.kept', statusMs: 6000 });
+      this._keepAsDraft({ pageId, html: localHtml, statusKey: 'edit.conflict.kept', statusMs: 6000 });
       return { proceed: false };
     }
     if (FEATURE_BLOCK_MERGE) trackMerge('fallback_overwrite');
@@ -106,6 +126,7 @@ export const conflictMethods = {
   // Rückgabe:
   //   { saved, html } — erfolgreich nachgespeichert
   //   { conflict: true } — Auflösungs-Modal offen, Aufrufer bricht ab
+  //   { stale: true } — Seite inzwischen gewechselt, Aufrufer sichert nur den Draft
   //   null — kein Merge möglich → Aufrufer macht den _keepAsDraft-Fallback
   async _retryAfterConflict({ localHtml, source, pageId, pageName, tag }) {
     const app = editorHost();
@@ -113,7 +134,8 @@ export const conflictMethods = {
     // `submitConflictResolution` bricht bei gesetztem `editSaving` früh ab,
     // der User käme aus dem Modal nicht heraus.
     app.editSaving = false;
-    const merge = await this._attemptBlockMerge({ localHtml, source });
+    const merge = await this._attemptBlockMerge({ localHtml, source, pageId });
+    if (merge?.stale) return { stale: true };
     if (merge?.conflict) return { conflict: true };
     if (!merge?.merged) return null;
     try {
@@ -133,6 +155,16 @@ export const conflictMethods = {
   // Funktion direkt, statt über die Root-Trampoline in diese Karte zu greifen.
   _checkPageConflict(pageId, expectedUpdatedAt) {
     return checkPageConflict(pageId, expectedUpdatedAt);
+  },
+
+
+  // Steht die Edit-Session noch auf `pageId`? Save-Pfade pinnen die Seite beim
+  // Start und prüfen das nach jedem `await` — ein Seitenwechsel mitten im Save
+  // darf HTML von Seite A nicht in Seite B mergen, speichern oder als deren
+  // Draft ablegen.
+  _stillEditing(pageId) {
+    const app = editorHost();
+    return !!app?.editMode && app.currentPage?.id === pageId;
   },
 
 
@@ -193,17 +225,22 @@ export const conflictMethods = {
   // Rückgabe:
   //   { merged:true, saveHtml, expectedAt } — kollisionsfrei, Aufrufer speichert saveHtml.
   //   { conflict:true } — Auflösungs-Banner geöffnet, Aufrufer bricht ab.
+  //   { stale:true } — Seite während des Remote-Reads gewechselt.
   //   null — kein Merge (Flag off / leere Base / Read-Fehler) → klassischer Pfad.
-  async _attemptBlockMerge({ localHtml, source, remoteHtml = null, remoteUpdatedAt = null }) {
+  async _attemptBlockMerge({ localHtml, source, pageId, remoteHtml = null, remoteUpdatedAt = null }) {
     const app = editorHost();
     if (!FEATURE_BLOCK_MERGE || !app.currentPage) return null;
+    if (pageId == null) pageId = app.currentPage.id;
     if (remoteHtml === null || remoteUpdatedAt === null) {
       try {
-        const remote = await contentRepo.loadPage(app.currentPage.id, { fresh: true });
+        const remote = await contentRepo.loadPage(pageId, { fresh: true });
         remoteHtml = remote?.html || '';
         remoteUpdatedAt = remote?.updated_at || null;
       } catch { return null; }
     }
+    // Base (originalHtml), Live-DOM und Auflösungs-Banner gehören der offenen
+    // Seite — nach einem Wechsel wäre der Merge gegen die falsche Base gerechnet.
+    if (app.currentPage?.id !== pageId) return { stale: true };
     if (!remoteUpdatedAt) return null;
     const m = this._computeBlockMerge(localHtml, remoteHtml);
     if (!m) return null;
@@ -215,7 +252,7 @@ export const conflictMethods = {
     }
     // Draft sichern, aber ohne Status-Zeile — das Auflösungs-Modal ist der
     // sichtbare Hinweis, ein zweiter Toast daneben wäre Rauschen.
-    this._keepAsDraft({ pageId: app.currentPage.id, html: localHtml, statusKey: null });
+    this._keepAsDraft({ pageId, html: localHtml, statusKey: null });
     this._openConflictResolution({ merged: m.merged, conflicts: m.conflicts, source, remoteUpdatedAt });
     return { conflict: true };
   },
