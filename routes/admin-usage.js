@@ -13,6 +13,7 @@ const billing = require('../lib/anthropic-billing');
 const appUsers = require('../db/app-users');
 const { requireAdmin } = require('../lib/admin-mw');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -23,7 +24,7 @@ function _clientIp(req) {
 
 function _auditView(req, kind, meta = {}) {
   try {
-    appUsers.recordAuditEvent(req.session.user.email, 'usage-viewed', {
+    appUsers.recordAuditEvent(sessionEmail(req), 'usage-viewed', {
       ip: _clientIp(req),
       userAgent: req.headers['user-agent'] || null,
       meta: { kind, ...meta },

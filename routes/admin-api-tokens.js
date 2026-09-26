@@ -7,18 +7,19 @@ const express = require('express');
 const { requireAdmin } = require('../lib/admin-mw');
 const apiTokens = require('../db/api-tokens');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 router.use(requireAdmin);
 
 router.get('/', (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const items = apiTokens.listApiTokens(email);
   res.json({ tokens: items });
 });
 
 router.post('/', express.json(), (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const body = req.body || {};
   const name = (body.display_name || '').trim();
   if (!name) return res.status(400).json({ error_code: 'DISPLAY_NAME_REQUIRED' });
@@ -52,7 +53,7 @@ router.post('/', express.json(), (req, res) => {
 });
 
 router.post('/:id/revoke', (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const ok = apiTokens.revokeApiToken(id, email);
@@ -62,7 +63,7 @@ router.post('/:id/revoke', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const ok = apiTokens.deleteApiToken(id, email);

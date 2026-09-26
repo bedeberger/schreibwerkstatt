@@ -20,6 +20,7 @@ const zlib = require('zlib');
 const { requireAdmin } = require('../lib/admin-mw');
 const dbBackup = require('../lib/db-backup');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -61,7 +62,7 @@ router.get('/download', (req, res) => {
   gz.on('error', (e) => { logger.error(`admin-backup gzip: ${e.message}`); cleanup(); res.destroy(); });
   res.on('close', cleanup);
   read.pipe(gz).pipe(res);
-  logger.info(`[admin-backup] Download durch ${req.session.user.email}`);
+  logger.info(`[admin-backup] Download durch ${sessionEmail(req)}`);
 });
 
 router.post('/restore', rawBackupBody, (req, res) => {
@@ -70,7 +71,7 @@ router.post('/restore', rawBackupBody, (req, res) => {
   }
   try {
     const info = dbBackup.stageRestore(req.body);
-    logger.warn(`[admin-backup] Restore vorbereitet durch ${req.session.user.email} (Schema ${info.schemaVersion}, ${info.bytes} Bytes)`);
+    logger.warn(`[admin-backup] Restore vorbereitet durch ${sessionEmail(req)} (Schema ${info.schemaVersion}, ${info.bytes} Bytes)`);
     res.json({ ok: true, ...info });
   } catch (e) {
     logger.error(`[admin-backup] Restore-Staging fehlgeschlagen: ${e.code || ''} ${e.message}`);
@@ -82,7 +83,7 @@ router.post('/restart', (req, res) => {
   if (!dbBackup.hasPendingRestore()) {
     return res.status(409).json({ error_code: 'NO_PENDING_RESTORE' });
   }
-  logger.warn(`[admin-backup] Neustart angefordert durch ${req.session.user.email} — beende Prozess zum Anwenden des Restores.`);
+  logger.warn(`[admin-backup] Neustart angefordert durch ${sessionEmail(req)} — beende Prozess zum Anwenden des Restores.`);
   res.json({ ok: true });
   // Kurze Verzoegerung, damit die Antwort raus ist. Exit != 0 triggert den
   // systemd-Neustart (Restart=on-failure der deployten Unit).

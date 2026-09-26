@@ -15,6 +15,7 @@ const appSettings = require('../lib/app-settings');
 const { requireAdmin } = require('../lib/admin-mw');
 const { VALID_PROVIDERS, contextSafetyMargin } = require('../lib/ai');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -96,8 +97,8 @@ router.post('/', express.json(), (req, res) => {
   const bad = _validate(body);
   if (bad) return res.status(400).json(bad);
   try {
-    const profile = aiProfiles.createProfile(body, req.session.user.email);
-    logger.info(`KI-Profil angelegt: ${profile.name} (${profile.provider})`, { user: req.session.user.email });
+    const profile = aiProfiles.createProfile(body, sessionEmail(req));
+    logger.info(`KI-Profil angelegt: ${profile.name} (${profile.provider})`, { user: sessionEmail(req) });
     res.json({ profile });
   } catch (e) {
     res.status(400).json({ error_code: 'PROFILE_INVALID', detail: e.message });
@@ -117,7 +118,7 @@ router.put('/:id', express.json(), (req, res) => {
   if (bad) return res.status(400).json(bad);
   try {
     const profile = aiProfiles.updateProfile(id, body);
-    logger.info(`KI-Profil geaendert: ${profile.name} (${profile.provider})`, { user: req.session.user.email });
+    logger.info(`KI-Profil geaendert: ${profile.name} (${profile.provider})`, { user: sessionEmail(req) });
     res.json({ profile });
   } catch (e) {
     res.status(400).json({ error_code: 'PROFILE_INVALID', detail: e.message });
@@ -132,7 +133,7 @@ router.delete('/:id', (req, res) => {
   const existing = aiProfiles.getProfile(id);
   if (!existing) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
   const { deleted, detachedUsers } = aiProfiles.deleteProfile(id);
-  logger.info(`KI-Profil geloescht: ${existing.name} (${detachedUsers} User abgehaengt)`, { user: req.session.user.email });
+  logger.info(`KI-Profil geloescht: ${existing.name} (${detachedUsers} User abgehaengt)`, { user: sessionEmail(req) });
   res.json({ ok: deleted, detachedUsers });
 });
 

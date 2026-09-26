@@ -11,6 +11,7 @@ const { requireAdmin } = require('../lib/admin-mw');
 const { setContext } = require('../lib/log-context');
 const appUsers = require('../db/app-users');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 const FAILS_DIR = path.join(__dirname, '..', 'ai_parse_fails');
 // Cap fuer den Content-Read — Dumps sind i.d.R. < 1 MB, aber lokale Modelle
@@ -90,7 +91,7 @@ router.delete('/file', async (req, res) => {
     return res.status(404).json({ error_code: 'FILE_NOT_FOUND' });
   }
   try {
-    appUsers.recordAuditEvent(req.session.user.email, 'admin.parse_fails.delete', {
+    appUsers.recordAuditEvent(sessionEmail(req), 'admin.parse_fails.delete', {
       ip: _clientIp(req),
       userAgent: req.headers['user-agent'] || null,
       meta: { file: path.basename(fp) },
@@ -116,7 +117,7 @@ router.delete('/', async (req, res) => {
     try { await fsp.unlink(path.join(FAILS_DIR, name)); deleted++; } catch { /* race */ }
   }
   try {
-    appUsers.recordAuditEvent(req.session.user.email, 'admin.parse_fails.clear', {
+    appUsers.recordAuditEvent(sessionEmail(req), 'admin.parse_fails.clear', {
       ip: _clientIp(req),
       userAgent: req.headers['user-agent'] || null,
       meta: { deleted },

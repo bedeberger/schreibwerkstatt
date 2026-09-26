@@ -181,7 +181,7 @@ router.get('/auth/logout', (req, res) => {
   if (process.env.LOCAL_DEV_MODE === 'true') {
     return res.redirect('/');
   }
-  const email = req.session.user?.email;
+  const email = sessionEmail(req);
   const loginAt = req.session.loginAt;
   const lang = bodyLang(req);
   if (email) {
