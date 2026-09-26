@@ -23,8 +23,9 @@ const PORT = 8766;
 const DB_FF = './tests/.tmp/smoke-firefox.db';
 const PORT_FF = 8767;
 
+// `mkdir -p`: tests/.tmp/ ist gitignored und fehlt in jedem frischen Checkout (CI).
 const serve = (db, port) =>
-  `rm -f ${db} ${db}-wal ${db}-shm && DB_PATH=${db} LOCAL_DEV_MODE=true LOCAL_DEV_SEED=true PORT=${port} SESSION_SECRET=smoke-secret-do-not-use-in-prod node server.js`;
+  `mkdir -p ./tests/.tmp && rm -f ${db} ${db}-wal ${db}-shm && DB_PATH=${db} LOCAL_DEV_MODE=true LOCAL_DEV_SEED=true PORT=${port} SESSION_SECRET=smoke-secret-do-not-use-in-prod node server.js`;
 
 module.exports = {
   testDir: './tests/e2e-app',
