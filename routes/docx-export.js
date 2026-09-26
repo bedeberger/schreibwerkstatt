@@ -20,7 +20,6 @@ const jsonBody = express.json({ limit: '256kb' });
 const NAME_MAX = 80;
 const PROFILE_MAX = 20;
 
-function _user(req) { return sessionEmail(req); }
 
 function _ownedOr404(profile, userEmail) {
   if (!profile) return { error_code: 'PROFILE_NOT_FOUND', status: 404 };
@@ -30,20 +29,20 @@ function _ownedOr404(profile, userEmail) {
 
 // Profile sind user-scoped (bookId=0 → user_default). `?book=X` wird ignoriert.
 router.get('/profiles', (req, res) => {
-  res.json({ profiles: listProfiles(0, _user(req)) });
+  res.json({ profiles: listProfiles(0, sessionEmail(req)) });
 });
 
 router.get('/profiles/:id', (req, res) => {
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getProfile(id);
-  const err = _ownedOr404(profile, _user(req));
+  const err = _ownedOr404(profile, sessionEmail(req));
   if (err) return res.status(err.status).json({ error_code: err.error_code });
   res.json(profile);
 });
 
 router.post('/profiles', jsonBody, (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const { name, config, clone_from } = req.body || {};
   const safeName = String(name || '').trim().slice(0, NAME_MAX);
   if (!safeName) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
@@ -76,7 +75,7 @@ router.post('/profiles', jsonBody, (req, res) => {
 });
 
 router.put('/profiles/:id', jsonBody, (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getProfile(id);
@@ -102,14 +101,14 @@ router.delete('/profiles/:id', (req, res) => {
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getProfile(id);
-  const err = _ownedOr404(profile, _user(req));
+  const err = _ownedOr404(profile, sessionEmail(req));
   if (err) return res.status(err.status).json({ error_code: err.error_code });
   deleteProfile(id);
   res.json({ ok: true });
 });
 
 router.post('/profiles/:id/default', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getProfile(id);

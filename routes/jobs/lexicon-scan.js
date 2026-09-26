@@ -207,5 +207,5 @@ lexiconScanRouter.post('/lexicon-scan', jsonBody, (req, res) => {
 
 module.exports = {
   lexiconScanRouter, runLexiconScanJob, scanAllBooks,
-  computeContentSig, REF_TERM_LIMIT, REF_MIN_COUNT, _buildFreqJson,
+  computeContentSig,
 };

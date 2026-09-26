@@ -13,7 +13,7 @@ const {
   jobs, createJob, enqueueJob, jobAbortControllers,
   updateJob, completeJob, failJob, makeJobLogger,
   findActiveJobId,
-  i18nError,
+  i18nError, emptyScopeError,
   jsonBody,
 } = require('./shared');
 const { getPdfExportProfile, getPdfExportProfileBackCover, getPdfExportProfileSpineImage, getBookSettings } = require('../../db/schema');
@@ -265,9 +265,8 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       failJob(jobId, e);
       return;
     }
-    if (e?.code === 'BOOK_EMPTY')    { failJob(jobId, i18nError('job.error.bookEmpty'));    return; }
-    if (e?.code === 'CHAPTER_EMPTY') { failJob(jobId, i18nError('job.error.chapterEmpty')); return; }
-    if (e?.code === 'PAGE_EMPTY')    { failJob(jobId, i18nError('job.error.pageEmpty'));    return; }
+    const empty = emptyScopeError(e);
+    if (empty) { failJob(jobId, empty); return; }
     log.error(`pdf-export job ${jobId}: ${e.message}`);
     failJob(jobId, e);
   }

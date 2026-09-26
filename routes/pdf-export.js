@@ -27,7 +27,6 @@ const rawCoverBody = express.raw({ type: ['image/*', 'application/octet-stream']
 const NAME_MAX = 80;
 const PROFILE_MAX_PER_SCOPE = 20;
 
-function _user(req) { return sessionEmail(req); }
 
 function _ownedOr404(profile, userEmail) {
   if (!profile) return { error_code: 'PROFILE_NOT_FOUND', status: 404 };
@@ -40,13 +39,13 @@ function _ownedOr404(profile, userEmail) {
 // (rückwärtskompatibel — Frontend kann den Param weiter mitschicken). Listing
 // liefert immer alle Profile des Users.
 router.get('/profiles', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const profiles = listPdfExportProfiles(0, userEmail);
   res.json({ profiles });
 });
 
 router.get('/profiles/:id', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -56,7 +55,7 @@ router.get('/profiles/:id', (req, res) => {
 });
 
 router.post('/profiles', jsonBody, (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const { name, config, clone_from } = req.body || {};
   const safeName = String(name || '').trim().slice(0, NAME_MAX);
   if (!safeName) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
@@ -90,7 +89,7 @@ router.post('/profiles', jsonBody, (req, res) => {
 });
 
 router.put('/profiles/:id', jsonBody, (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -125,7 +124,7 @@ router.put('/profiles/:id', jsonBody, (req, res) => {
 });
 
 router.delete('/profiles/:id', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -136,7 +135,7 @@ router.delete('/profiles/:id', (req, res) => {
 });
 
 router.post('/profiles/:id/default', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -154,7 +153,7 @@ router.post('/profiles/:id/default', (req, res) => {
 // ── Umschlag-Rückseitenbild (separates Cover-PDF, Phase 4) ───────────────────
 // Identische sharp-Härtung wie Cover (prepareCover).
 router.post('/profiles/:id/back-cover', rawCoverBody, async (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -176,7 +175,7 @@ router.post('/profiles/:id/back-cover', rawCoverBody, async (req, res) => {
 });
 
 router.delete('/profiles/:id/back-cover', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -187,7 +186,7 @@ router.delete('/profiles/:id/back-cover', (req, res) => {
 });
 
 router.get('/profiles/:id/back-cover', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -204,7 +203,7 @@ router.get('/profiles/:id/back-cover', (req, res) => {
 // Identische sharp-Härtung wie Cover (prepareCover). Erlaubt ein durchgehendes
 // Motiv als Front/Rücken/Rückseite-Panels.
 router.post('/profiles/:id/spine-image', rawCoverBody, async (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -226,7 +225,7 @@ router.post('/profiles/:id/spine-image', rawCoverBody, async (req, res) => {
 });
 
 router.delete('/profiles/:id/spine-image', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);
@@ -237,7 +236,7 @@ router.delete('/profiles/:id/spine-image', (req, res) => {
 });
 
 router.get('/profiles/:id/spine-image', (req, res) => {
-  const userEmail = _user(req);
+  const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const profile = getPdfExportProfile(id);

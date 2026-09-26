@@ -216,4 +216,4 @@ async function runFaktencheckJob(jobId, bookId, bookName, userEmail, provider = 
   }
 }
 
-module.exports = { runFaktencheckJob, buildFactCheckCandidates, _judgeOneFact, _narrativeYearSpan, FACTCHECK_CATEGORIES, _FACTCHECK_CANDIDATE_CAP };
+module.exports = { runFaktencheckJob, buildFactCheckCandidates, _judgeOneFact, _FACTCHECK_CANDIDATE_CAP };

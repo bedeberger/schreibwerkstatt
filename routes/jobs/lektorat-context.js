@@ -81,5 +81,5 @@ function dropNeighbourFindings(fehler, pageText, excerpts) {
 
 module.exports = {
   NEIGHBOUR_EXCERPT_CHARS, lastParagraph, firstParagraph,
-  findNeighbourPage, findPreviousPage, findNextPage, dropNeighbourFindings,
+  findPreviousPage, findNextPage, dropNeighbourFindings,
 };

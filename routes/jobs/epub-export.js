@@ -11,7 +11,7 @@ const express = require('express');
 const {
   jobs, createJob, enqueueJob, jobAbortControllers,
   updateJob, completeJob, failJob, makeJobLogger,
-  findActiveJobId, i18nError, jsonBody,
+  findActiveJobId, i18nError, emptyScopeError, jsonBody,
 } = require('./shared');
 const { getBookSettings } = require('../../db/schema');
 const { getOwnerEmail } = require('../../db/book-access');
@@ -156,9 +156,8 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, sn
     });
   } catch (e) {
     if (e?.name === 'AbortError' || e?.message === 'job.cancelled') { failJob(jobId, e); return; }
-    if (e?.code === 'BOOK_EMPTY')    { failJob(jobId, i18nError('job.error.bookEmpty'));    return; }
-    if (e?.code === 'CHAPTER_EMPTY') { failJob(jobId, i18nError('job.error.chapterEmpty')); return; }
-    if (e?.code === 'PAGE_EMPTY')    { failJob(jobId, i18nError('job.error.pageEmpty'));    return; }
+    const empty = emptyScopeError(e);
+    if (empty) { failJob(jobId, empty); return; }
     log.error(`epub-export job ${jobId}: ${e.message}`);
     failJob(jobId, e);
   }

@@ -333,4 +333,4 @@ router.post('/manuscript-import', rawDocBody, async (req, res) => {
   res.status(202).json({ jobId });
 });
 
-module.exports = { manuscriptImportRouter: router, runManuscriptImportJob, manuscriptBuffers };
+module.exports = { manuscriptImportRouter: router, runManuscriptImportJob };

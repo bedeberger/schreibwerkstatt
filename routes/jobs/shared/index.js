@@ -54,6 +54,7 @@ module.exports = {
   fmtTok: jobsMod.fmtTok,
   i18nError: jobsMod.i18nError,
   contentHttpError: jobsMod.contentHttpError,
+  emptyScopeError: jobsMod.emptyScopeError,
 
   _modelName: model._modelName,
   settledAll: ai.settledAll,
