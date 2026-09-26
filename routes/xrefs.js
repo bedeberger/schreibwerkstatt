@@ -84,10 +84,10 @@ router.get('/backlinks', (req, res) => {
 
   const kind = String(req.query.kind || '');
   if (kind !== 'chapter' && kind !== 'figure') {
-    return res.status(400).json({ error: 'kind muss chapter oder figure sein' });
+    return res.status(400).json({ error_code: 'INVALID_KIND' });
   }
   const target = String(req.query.target || '').trim();
-  if (!target) return res.status(400).json({ error: 'target fehlt' });
+  if (!target) return res.status(400).json({ error_code: 'TARGET_REQUIRED' });
 
   res.json(listXrefBacklinks(kind, target));
 });

@@ -68,7 +68,7 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
   const enabled = appSettings.get('stt.enabled') === true;
   const host = String(appSettings.get('stt.host') || '').replace(/\/+$/, '').replace(/\/v1$/i, '');
   if (!enabled || !host) {
-    return res.status(404).json({ error: 'stt_disabled' });
+    return res.status(404).json({ error_code: 'STT_DISABLED', error: 'stt_disabled' });
   }
 
   const bookId = toIntId(req.query.bookId);
@@ -81,17 +81,17 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
 
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
     log.warn(`reject no-audio ${ctx}`);
-    return res.status(400).json({ error: 'stt_no_audio' });
+    return res.status(400).json({ error_code: 'STT_NO_AUDIO', error: 'stt_no_audio' });
   }
   if (req.body.length > AUDIO_MAX) {
     log.warn(`reject too-large ${ctx} max=${AUDIO_MAX}`);
-    return res.status(413).json({ error: 'stt_audio_too_large', max: AUDIO_MAX });
+    return res.status(413).json({ error_code: 'STT_AUDIO_TOO_LARGE', error: 'stt_audio_too_large', max: AUDIO_MAX });
   }
 
   const ext = MIME_EXT[mime];
   if (!ext) {
     log.warn(`reject unsupported-mime ${ctx}`);
-    return res.status(415).json({ error: 'stt_unsupported_audio' });
+    return res.status(415).json({ error_code: 'STT_UNSUPPORTED_AUDIO', error: 'stt_unsupported_audio' });
   }
 
   // Book ist SSoT fuer Locale: bookId vorhanden -> getBookLocale gewinnt.
@@ -130,7 +130,7 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
     });
     if (!upstream.ok) {
       log.warn(`upstream ${upstream.status} ${ctx} latency=${Date.now() - t0}ms`);
-      return res.status(502).json({ error: 'stt_upstream', upstream_status: upstream.status });
+      return res.status(502).json({ error_code: 'STT_UPSTREAM', error: 'stt_upstream', upstream_status: upstream.status });
     }
     const json = await upstream.json().catch(() => null);
     const text = typeof json?.text === 'string' ? json.text : '';
@@ -141,7 +141,9 @@ router.post('/transcribe', rawAudioBody, async (req, res) => {
   } catch (err) {
     const isAbort = err && (err.name === 'AbortError' || err.code === 'ABORT_ERR');
     log.warn(`fetch ${isAbort ? 'TIMEOUT' : err.message} ${ctx} latency=${Date.now() - t0}ms`);
-    return res.status(isAbort ? 408 : 502).json({ error: isAbort ? 'stt_timeout' : 'stt_upstream' });
+    return res.status(isAbort ? 408 : 502).json(isAbort
+      ? { error_code: 'STT_TIMEOUT', error: 'stt_timeout' }
+      : { error_code: 'STT_UPSTREAM', error: 'stt_upstream' });
   } finally {
     clearTimeout(timer);
   }

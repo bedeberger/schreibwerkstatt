@@ -48,7 +48,7 @@ Admin-UI: [public/partials/admin-settings.html](../public/partials/admin-setting
 
 `POST /languagetool/check` `{ text, language?, bookId?, pageId? }`:
 
-- **Disabled-Fall:** `!enabled || !url` → `404 { error: 'languagetool_disabled' }`. Frontend behandelt als „Feature aus", kein Retry.
+- **Disabled-Fall:** `!enabled || !url` → `404 { error_code: 'LANGUAGETOOL_DISABLED', error: 'languagetool_disabled' }` (jede Fehlerantwort trägt `error_code` in Grossschreibung, `error` bleibt für ausgelieferte Clients daneben). Frontend behandelt als „Feature aus", kein Retry.
 - **Locale-SSoT:** wenn `bookId` mitgesendet → `getBookLocale(bookId)` aus [db/schema.js](../db/schema.js) gewinnt. `body.language` nur Fallback (Aufrufe ohne Buchscope).
 - **Body-Cap:** `TEXT_MAX = 500_000` Zeichen, JSON-Body 600 KB. Übergross → `413 { error: 'text_too_large' }`.
 - **Cache-Lookup:** Wenn `pageId` gesetzt, `ltCache.getCached({ pageId, contentHash, lang, picky })` — Hit liefert `{ matches, cached: true }`. Vor der Antwort läuft `dict.filterMatches` erneut über das gecachte Array (idempotent — Cached sind bereits gefilterte Matches, ein zweiter Lauf entfernt nur, was seit dem Cache-Write ins Dict gewandert ist; deckt den Edge-Case ab, dass `_purgeCacheForWord` die Seite verfehlt, weil `body_html` beim Add noch den ungespeicherten Stand hatte).

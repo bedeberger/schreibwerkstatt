@@ -61,7 +61,7 @@ router.post('/speak', express.json({ limit: tts.TEXT_MAX + 2048 }), async (req, 
       return res.status(err.status).json(body);
     }
     log.warn(`unexpected ${err?.message} ${ctx}`);
-    return res.status(502).json({ error: 'tts_upstream' });
+    return res.status(502).json({ error_code: 'TTS_UPSTREAM', error: 'tts_upstream' });
   }
 });
 

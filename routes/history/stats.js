@@ -208,12 +208,12 @@ function register(router) {
   router.get('/style-samples/:book_id', (req, res) => {
     const bucket = String(req.query.bucket || '');
     if (!isSampleBucket(bucket)) {
-      return res.status(400).json({ error: 'Unbekannter Beispiel-Eimer.', error_code: 'INVALID_SAMPLE_BUCKET' });
+      return res.status(400).json({ error_code: 'INVALID_SAMPLE_BUCKET' });
     }
     const raw = String(req.query.chapter || '');
     const chapterId = (raw === UNCAT || raw === '') ? null : toIntId(raw);
     if (raw && raw !== UNCAT && !chapterId) {
-      return res.status(400).json({ error: 'Ungueltige Kapitel-ID.', error_code: 'INVALID_CHAPTER_ID' });
+      return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
     }
     const rows = loadStyleSamples(req.bookId, chapterId);
     res.json({

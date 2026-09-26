@@ -34,14 +34,14 @@ router.post('/check', express.json({ limit: '600kb' }), async (req, res) => {
   const enabled = appSettings.get('languagetool.enabled') === true;
   const url = String(appSettings.get('languagetool.url') || '').replace(/\/$/, '').replace(/\/v2$/i, '');
   if (!enabled || !url) {
-    return res.status(404).json({ error: 'languagetool_disabled' });
+    return res.status(404).json({ error_code: 'LANGUAGETOOL_DISABLED', error: 'languagetool_disabled' });
   }
 
   const body = req.body || {};
   const text = typeof body.text === 'string' ? body.text : '';
   if (!text) return res.json({ matches: [] });
   if (text.length > TEXT_MAX) {
-    return res.status(413).json({ error: 'text_too_large', max: TEXT_MAX });
+    return res.status(413).json({ error_code: 'TEXT_TOO_LARGE', error: 'text_too_large', max: TEXT_MAX });
   }
 
   const bookId = toIntId(body.bookId);
@@ -135,10 +135,12 @@ router.post('/check', express.json({ limit: '600kb' }), async (req, res) => {
     const isAbort = err && (err.name === 'AbortError' || err.code === 'ABORT_ERR');
     if (err && err.upstreamStatus) {
       log.warn(`upstream ${err.upstreamStatus} latency=${Date.now() - t0}ms`);
-      return res.status(502).json({ error: 'languagetool_upstream', upstream_status: err.upstreamStatus });
+      return res.status(502).json({ error_code: 'LANGUAGETOOL_UPSTREAM', error: 'languagetool_upstream', upstream_status: err.upstreamStatus });
     }
     log.warn(`fetch ${isAbort ? 'TIMEOUT' : err.message} latency=${Date.now() - t0}ms`);
-    return res.status(isAbort ? 408 : 502).json({ error: isAbort ? 'languagetool_timeout' : 'languagetool_fetch_failed' });
+    return res.status(isAbort ? 408 : 502).json(isAbort
+      ? { error_code: 'LANGUAGETOOL_TIMEOUT', error: 'languagetool_timeout' }
+      : { error_code: 'LANGUAGETOOL_FETCH_FAILED', error: 'languagetool_fetch_failed' });
   } finally {
     clearTimeout(timer);
   }
