@@ -4,6 +4,7 @@
 
 import { fetchJson, formatNumber, heatmapCellVars, minMaxBy, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
+import { isSelectedBook } from '../cards/book-guard.js';
 
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -80,19 +81,26 @@ export const fehlerHeatmapMethods = {
   },
 
   async loadFehlerHeatmap() {
-    if (!Alpine.store('nav').selectedBookId) return;
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId) return;
+    // Nur die jüngste Anfrage darf schreiben: Modus-Wechsel und Buchwechsel
+    // können eine ältere, langsamere Antwort überholen lassen.
+    const seq = ++this._fehlerHeatmapSeq;
+    const current = () => seq === this._fehlerHeatmapSeq && isSelectedBook(bookId);
     this.fehlerHeatmapLoading = true;
     this.fehlerHeatmapStatus = '';
     this._memos = {};
     try {
       const mode = MODES.includes(this.fehlerHeatmapMode) ? this.fehlerHeatmapMode : 'open';
-      const data = await fetchJson(`/history/fehler-heatmap/${Alpine.store('nav').selectedBookId}?mode=${mode}`);
+      const data = await fetchJson(`/history/fehler-heatmap/${bookId}?mode=${mode}`);
+      if (!current()) return;
       this.fehlerHeatmapData = data;
     } catch (e) {
+      if (!current()) return;
       console.error('[loadFehlerHeatmap]', e);
       this.fehlerHeatmapStatus = window.__app.t('common.errorColon') + (e.message || '');
     } finally {
-      this.fehlerHeatmapLoading = false;
+      if (seq === this._fehlerHeatmapSeq) this.fehlerHeatmapLoading = false;
     }
   },
 
@@ -108,11 +116,14 @@ export const fehlerHeatmapMethods = {
 
   // ── Fehlerdichte-Trend über die Fassungen ─────────────────────────────────
   async loadFehlerTrend() {
-    if (!Alpine.store('nav').selectedBookId) return;
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId) return;
     try {
-      const data = await fetchJson(`/history/fehler-trend/${Alpine.store('nav').selectedBookId}`);
+      const data = await fetchJson(`/history/fehler-trend/${bookId}`);
+      if (!isSelectedBook(bookId)) return;
       this.fehlerTrendData = data?.versions || [];
     } catch (e) {
+      if (!isSelectedBook(bookId)) return;
       console.error('[loadFehlerTrend]', e);
       this.fehlerTrendData = [];
     }

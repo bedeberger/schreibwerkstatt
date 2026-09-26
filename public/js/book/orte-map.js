@@ -14,6 +14,7 @@ import { fetchJson, escHtml } from '../utils.js';
 import { loadLeaflet } from '../lazy-libs.js';
 import { countryLabel } from '../country-codes.js';
 import { startPoll } from '../cards/job-helpers.js';
+import { isSelectedBook } from '../cards/book-guard.js';
 
 // Fallback-Tile-URL, falls /config noch nicht geladen ist ($store.config.mapTiles
 // liefert die konfigurierte URL — self-hosted Tile-Server via app_settings
@@ -28,10 +29,12 @@ export const orteMapMethods = {
     if (!id) { this.orteRealEnabled = false; return; }
     try {
       const s = await fetchJson('/booksettings/' + id);
+      if (!isSelectedBook(id)) return;
       this.orteRealEnabled = !!s?.orte_real;
       this._geoLang = s?.language || 'de';
       this._bookLand = s?.schauplatz_land || null;
     } catch {
+      if (!isSelectedBook(id)) return;
       this.orteRealEnabled = false;
     }
     if (!this.orteRealEnabled && this.viewMode === 'map') this.viewMode = 'list';

@@ -10,6 +10,7 @@ import { DIAGRAM_SEL } from '../diagram/mermaid-html.js';
 import { contentRepo } from '../repo/content.js';
 import { tRaw } from '../i18n.js';
 import { _sanitizeFigur } from './figuren.js';
+import { isSelectedBook } from '../cards/book-guard.js';
 
 // Pauschale Diagrammhöhe, solange nichts zu messen ist (mermaid rendert
 // asynchron nach dem ersten Höhen-Update). Grob ein mittleres Flowchart —
@@ -317,10 +318,18 @@ export const pageViewMethods = {
       this.chapterFigures = [];
       return;
     }
+    // Buch- und Seitenwechsel während des Fetches: die Antwort gehört dann zu
+    // einem anderen Kapitel und darf die Figurenleiste der neuen Seite nicht
+    // überschreiben (deren eigener Load läuft schon).
+    const bookId = this.$store.nav.selectedBookId;
+    const pageId = this.currentPage.id;
+    const stillCurrent = () => isSelectedBook(bookId) && this.currentPage?.id === pageId;
     try {
-      const data = await fetchJson(`/figures/chapter/${this.$store.nav.selectedBookId}/${this.currentPage.chapter_id}`);
+      const data = await fetchJson(`/figures/chapter/${bookId}/${this.currentPage.chapter_id}`);
+      if (!stillCurrent()) return;
       this.chapterFigures = (data?.figuren || []).map(_sanitizeFigur);
     } catch (e) {
+      if (!stillCurrent()) return;
       console.error('[loadChapterFigures]', e);
       this.chapterFigures = [];
     }

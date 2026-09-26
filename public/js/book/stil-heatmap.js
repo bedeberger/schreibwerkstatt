@@ -11,6 +11,7 @@
 // Das Template liest darum ausschliesslich fertige Eigenschaften.
 
 import { fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy, tzOpts } from '../utils.js';
+import { isSelectedBook } from '../cards/book-guard.js';
 
 // Metrik-Schlüssel → i18n-Label. Reihenfolge = Spaltenreihenfolge in der Heatmap.
 // sampleBucket: Eimer im Drilldown-Endpunkt (/history/style-samples) bzw.
@@ -129,10 +130,12 @@ export const stilMethods = {
     this.stilLoading = true;
     try {
       const data = await fetchJson('/history/style-stats/' + bookId);
+      if (!isSelectedBook(bookId)) return;
       this.stilData = data;
       this.activeStilDetailKey = null;
       this.stilDetail = null;
     } catch (e) {
+      if (!isSelectedBook(bookId)) return;
       console.error('[loadStilStats]', e);
       this.stilStatus = window.__app.t('common.errorColon') + (e.message || '');
     } finally {
@@ -144,12 +147,15 @@ export const stilMethods = {
     if (this.stilSyncing) return;
     this.stilSyncing = true;
     this.stilStatus = `<span class="spinner"></span>${window.__app.t('stil.computing')}`;
+    const bookId = Alpine.store('nav').selectedBookId;
     try {
-      const result = await fetchJson('/sync/book/' + Alpine.store('nav').selectedBookId, { method: 'POST' });
+      const result = await fetchJson('/sync/book/' + bookId, { method: 'POST' });
       if (result.error) throw new Error(result.error);
-      await this.loadStilStats(Alpine.store('nav').selectedBookId);
+      if (!isSelectedBook(bookId)) { this.stilStatus = ''; return; }
+      await this.loadStilStats(bookId);
       this.stilStatus = '';
     } catch (e) {
+      if (!isSelectedBook(bookId)) { this.stilStatus = ''; return; }
       this.stilStatus = window.__app.t('common.errorColon') + (e.message || '');
     } finally {
       this.stilSyncing = false;

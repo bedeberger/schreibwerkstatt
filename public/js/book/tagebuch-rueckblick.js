@@ -6,6 +6,7 @@
 
 import { tzOpts, fetchJson } from '../utils.js';
 import { quartileLevelFor, currentMonthKey } from './ymheatmap.js';
+import { isSelectedBook } from '../cards/book-guard.js';
 
 // Tagebuch-Seitennamen sind 'YYYY-MM-DD'. Hier rein clientseitig per Regex
 // (kein Bedarf am vollen lib/datum-parse-Fallback).
@@ -194,8 +195,11 @@ export const tagebuchRueckblickMethods = {
     const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.rueckblickHistory = []; this.rbHistoryLoaded = true; return; }
     try {
-      this.rueckblickHistory = await fetchJson('/history/rueckblick/' + bookId);
+      const list = await fetchJson('/history/rueckblick/' + bookId);
+      if (!isSelectedBook(bookId)) return;
+      this.rueckblickHistory = list;
     } catch (e) {
+      if (!isSelectedBook(bookId)) return;
       console.error('[loadRueckblickHistory]', e);
       this.rueckblickHistory = [];
     } finally {

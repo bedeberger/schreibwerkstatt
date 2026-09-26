@@ -10,6 +10,7 @@
 import { sendJson } from '../utils/net.js';
 import { fetchJson } from '../utils.js';
 import { startPoll } from '../cards/job-helpers.js';
+import { isSelectedBook } from '../cards/book-guard.js';
 import {
   TEXTSORTEN, TEXTSORTE_KEYS, textsorte as textsorteDef,
   // Schwere-Reihenfolge des Befunds: schlechteste zuerst, damit oben steht, was
@@ -39,6 +40,7 @@ export const strukturMethods = {
     this.strukturLoadError = false;
     try {
       const data = await fetchJson(`/textsorte/${bookId}`);
+      if (!isSelectedBook(bookId)) return;
       this.strukturBookTextsorte = data.book_textsorte || '';
       this.strukturPageMap = data.pages || {};
       const byPage = {};
@@ -46,7 +48,7 @@ export const strukturMethods = {
       this.strukturChecks = byPage;
       this._memos = {};
     } catch {
-      this.strukturLoadError = true;
+      if (isSelectedBook(bookId)) this.strukturLoadError = true;
     }
   },
 

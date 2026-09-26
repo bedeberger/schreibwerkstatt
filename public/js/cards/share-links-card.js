@@ -9,6 +9,7 @@ import { setupCardLifecycle } from './card-lifecycle.js';
 import { fetchJson, tzOpts } from '../utils.js';
 import { copyText } from '../copy-button.js';
 import { EVT } from '../events.js';
+import { isSelectedBook } from './book-guard.js';
 
 export function registerShareLinksCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -159,6 +160,7 @@ export function registerShareLinksCard() {
       try {
         rows = await fetchJson(`/share/api/links?book_id=${encodeURIComponent(bookId)}`);
       } catch { return; }
+      if (!isSelectedBook(bookId)) return;
       if (!Array.isArray(rows)) return;
       const byToken = new Map(this.links.map(l => [l.token, l]));
       const sameSet = rows.length === this.links.length && rows.every(r => byToken.has(r.token));

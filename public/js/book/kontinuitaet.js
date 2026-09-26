@@ -4,6 +4,7 @@
 
 import { fetchJson } from '../utils.js';
 import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
+import { isSelectedBook } from '../cards/book-guard.js';
 
 export const kontinuitaetMethods = {
   // ── Weltfakten-Faktencheck ──────────────────────────────────────────────────
@@ -58,8 +59,10 @@ export const kontinuitaetMethods = {
   },
 
   async _loadKontinuitaetHistory() {
+    const bookId = Alpine.store('nav').selectedBookId;
     try {
-      const data = await fetchJson('/jobs/kontinuitaet/' + Alpine.store('nav').selectedBookId);
+      const data = await fetchJson('/jobs/kontinuitaet/' + bookId);
+      if (!isSelectedBook(bookId)) return;
       this._memos = {};
       this.kontinuitaetResult = data;
     } catch (e) {
