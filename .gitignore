@@ -7,9 +7,8 @@ node_modules/
 schreibwerkstatt-history.json
 schreibwerkstatt.db
 schreibwerkstatt.db-*
-schreibwerkstatt.log
-schreibwerkstatt.log.*
-schreibwerkstatt*.log
+# Winston-Log inkl. Rotationen (schreibwerkstatt1.log …)
+schreibwerkstatt*.log*
 ai_parse_fails/
 .DS_Store
 __pycache__/
