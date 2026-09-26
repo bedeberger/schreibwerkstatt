@@ -101,7 +101,7 @@ const CATEGORIES = [
     ],
     allow: {
       'lib/export-builders/docx.js': 898,
-      'lib/page-index.js': 694,
+      'lib/page-index.js': 686,
       'lib/content-store/backends/localdb.js': 635,
       'routes/jobs/komplett/phases/extraktion.js': 932,
       'routes/jobs/book-chat-tools/tools-catalog.js': 738,

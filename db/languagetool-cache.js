@@ -25,9 +25,6 @@ const _stmtUpsert = db.prepare(
      matches_json = excluded.matches_json,
      created_at = excluded.created_at`
 );
-const _stmtPurgeForPage = db.prepare(
-  `DELETE FROM page_languagetool_cache WHERE page_id = ?`
-);
 const _stmtPageExists = db.prepare(
   `SELECT 1 FROM pages WHERE page_id = ? LIMIT 1`
 );
@@ -56,9 +53,4 @@ function setCached({ pageId, contentHash, lang, picky, matches }) {
   _stmtUpsert.run(pageId, contentHash, lang, picky ? 1 : 0, json);
 }
 
-function purgeForPage(pageId) {
-  if (!pageId) return 0;
-  return _stmtPurgeForPage.run(pageId).changes;
-}
-
-module.exports = { hashText, getCached, setCached, purgeForPage };
+module.exports = { hashText, getCached, setCached };

@@ -188,19 +188,7 @@ function listXrefBacklinks(kind, target) {
   return [];
 }
 
-const _stmtCountBookLinks = db.prepare(`
-  SELECT COUNT(*) AS n
-    FROM xref_links l
-    JOIN pages p ON p.page_id = l.page_id
-   WHERE p.book_id = ?
-`);
-
-/** Wie viele Verweise traegt das Buch — fuer Kennzahlen/Karten-Badge. */
-function countBookXrefs(bookId) {
-  return _stmtCountBookLinks.get(parseInt(bookId))?.n || 0;
-}
 
 module.exports = {
   replacePageAnchors, listBookAnchors,
-  replacePageXrefs, listPageXrefs, listXrefBacklinks, countBookXrefs,
-};
+  replacePageXrefs, listPageXrefs, listXrefBacklinks, };

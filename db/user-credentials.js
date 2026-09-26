@@ -44,9 +44,6 @@ const _stmtUpsert = db.prepare(`
 
 const _stmtDelete = db.prepare('DELETE FROM user_credentials WHERE user_email = ?');
 
-const _stmtClearMustChange = db.prepare(`
-  UPDATE user_credentials SET must_change = 0, updated_at = ${NOW_ISO_SQL} WHERE user_email = ?
-`);
 
 /** Hash-Zeile oder null. Der Aufrufer prueft mit lib/password.verifyPassword. */
 function getCredential(email) {
@@ -77,12 +74,6 @@ function deleteCredential(email) {
   const e = _norm(email);
   if (!e) return;
   _stmtDelete.run(e);
-}
-
-function clearMustChange(email) {
-  const e = _norm(email);
-  if (!e) return;
-  _stmtClearMustChange.run(e);
 }
 
 /** Konten mit gesetztem Passwort — fuer die Admin-Liste (eine Abfrage statt N). */
@@ -163,7 +154,6 @@ function purgeTokens() {
 }
 
 module.exports = {
-  getCredential, hasPassword, setPassword, deleteCredential, clearMustChange,
-  listEmailsWithPassword,
+  getCredential, hasPassword, setPassword, deleteCredential, listEmailsWithPassword,
   createToken, findValidToken, consumeToken, revokeOpenTokens, purgeTokens,
 };
