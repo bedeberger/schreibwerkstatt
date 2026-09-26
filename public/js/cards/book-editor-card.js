@@ -145,8 +145,12 @@ export function registerBookEditorCard() {
         name: 'bookEditor',
         showFlag: 'showBookEditorCard',
         timerKeys: [],
-        resetState: sessionState,
         load: () => this._load(Alpine.store('nav').selectedBookId),
+        // Eigene Reset-Pfade statt `resetState`: ein sofortiges `blocks = []`
+        // verwürfe ungespeicherte Blöcke im Autosave-Fenster (siehe
+        // _resetSession).
+        onBookChanged: () => this._resetSession({ reload: true }),
+        onViewReset: () => this._resetSession({ reload: false }),
       });
 
       // Vertikale Verankerung der Kommentar-Karten: Observer für Stream-Reflow +
@@ -190,12 +194,51 @@ export function registerBookEditorCard() {
     destroy() {
       this._autosave?.clearAll();
       this._savedFlash?.clearAll();
+      if (this._findRecomputeTimer) { clearTimeout(this._findRecomputeTimer); this._findRecomputeTimer = null; }
       this._teardownOutlineObserver();
       if (this._commentRecomputeRaf) { cancelAnimationFrame(this._commentRecomputeRaf); this._commentRecomputeRaf = null; }
       this._teardownCommentLayout();
       this._clearCommentHL();
       clearHighlights();
       this._lifecycle?.destroy();
+    },
+
+    // ── Buch-/Ansichtswechsel ──────────────────────────────────────────────
+    // `book:changed` / `view:reset`: erst die ungespeicherten Blöcke des alten
+    // Buchs speichern, DANN den Session-State verwerfen. Die Save-Queue arbeitet
+    // auf den Block-Objekten; ein vorgezogenes `blocks = []` liesse
+    // `_blockById` null liefern und die Änderungen im Autosave-Fenster gingen
+    // still verloren. Gesichert wird über den Snapshot der Block-Objekte, nicht
+    // über `saveQueue`-IDs — ein paralleles `_load` darf `blocks` inzwischen
+    // ersetzt haben.
+    async _resetSession({ reload }) {
+      const token = ++this._loadToken;   // überholt ein laufendes _load
+      this._autosave.clearAll();
+      const dirty = this.blocks.filter(b => b.kind === 'page' && b.dirty);
+      if (dirty.length) {
+        if (this._queueRun) { try { await this._queueRun; } catch { /* Fehler steht am Block */ } }
+        for (const b of dirty) {
+          if (b.dirty && !b.saving) await this._saveBlock(b);
+        }
+        const lost = dirty.filter(b => b.dirty).length;
+        if (lost > 0) {
+          const app = window.__app;
+          app?.setStatus?.(app.t('bookEditor.unsavedOnSwitch', { n: lost }), true, 8000);
+        }
+      }
+      // Neuerer Wechsel während des Speicherns: der räumt selbst ab.
+      if (token !== this._loadToken) return;
+      this._autosave.clearAll();
+      this._savedFlash.clearAll();
+      if (this._findRecomputeTimer) { clearTimeout(this._findRecomputeTimer); this._findRecomputeTimer = null; }
+      this._teardownOutlineObserver();
+      clearHighlights();
+      this._clearCommentHL();
+      Object.assign(this, sessionState());
+      if (!reload) return;
+      if (!window.__app?.showBookEditorCard) return;
+      const bookId = Alpine.store('nav').selectedBookId;
+      if (bookId) await this._load(bookId);
     },
 
     // ── Laden ──────────────────────────────────────────────────────────────

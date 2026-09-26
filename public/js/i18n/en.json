@@ -6293,5 +6293,6 @@
   "admin.usage.breakdown.matrixTitle": "Matrix: user × job type",
   "admin.usage.breakdown.matrixHint": "Costs from the ledger (price at the time of the call). Columns: the six most expensive job types in the period, the rest under “Other”. Click a user for the full breakdown.",
   "admin.usage.breakdown.other": "Other",
-  "admin.usage.breakdown.total": "Total"
+  "admin.usage.breakdown.total": "Total",
+  "bookEditor.unsavedOnSwitch": "{n} page(s) could not be saved before switching."
 }
