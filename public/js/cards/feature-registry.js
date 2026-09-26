@@ -340,10 +340,6 @@ export function featureByKey(key) {
   return BY_KEY.get(key) || null;
 }
 
-export function allFeatures() {
-  return ALL;
-}
-
 // Default-Set für neuen User ohne Tracking-Daten.
 export const DEFAULT_RECENT_KEYS = ['review', 'figuren', 'bookchat'];
 

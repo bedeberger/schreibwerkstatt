@@ -387,7 +387,3 @@ export function parseQuery(raw) {
   if (provider) return { mode: 'provider', provider, q: trimmed.slice(1).trimStart() };
   return { mode: 'all', q: trimmed };
 }
-
-export function providerByKey(key) {
-  return PROVIDERS.find(p => p.key === key) || null;
-}
