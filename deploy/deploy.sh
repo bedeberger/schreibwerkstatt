@@ -12,7 +12,7 @@
 # werden — und die Demo faellt beim ersten vergessenen Nachzug still aus.
 # Werte muessen zur Installation passen; der Workflow setzt sie explizit.
 
-set -e
+set -euo pipefail
 
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
@@ -22,6 +22,9 @@ case "$FLAVOUR" in
     INSTALL_DIR="${SW_INSTALL_DIR:-/opt/schreibwerkstatt}"
     SERVICE="${SW_SERVICE:-schreibwerkstatt}"
     OWNER="${SW_OWNER:-github-runner}"
+    # Muss zu Environment=PORT in deploy/schreibwerkstatt.service passen —
+    # nur fuer den Health-Check unten, die Unit setzt den Port selbst.
+    PORT="${SW_PORT:-3737}"
     ;;
   demo)
     INSTALL_DIR="${SW_INSTALL_DIR:-/opt/schreibwerkstatt-demo}"
@@ -72,6 +75,10 @@ RSYNC_EXCLUDES=(
   --exclude='.env' --exclude='node_modules' --exclude='.git'
   --exclude='schreibwerkstatt.db' --exclude='schreibwerkstatt.db-wal' --exclude='schreibwerkstatt.db-shm'
   --exclude='schreibwerkstatt.log*' --exclude='backup' --exclude='backups' --exclude='ai_parse_fails'
+  # Marker von deploy/apply-migrations.sh (liegt in $INSTALL_DIR, nicht im Repo).
+  # Ohne Exclude loescht --delete ihn bei jedem Deploy, und jede Einmal-Migration
+  # (veraPDF, Ghostscript, EPUBCheck …) liefe beim naechsten Deploy erneut.
+  --exclude='.deploy-migrations-applied'
 )
 
 # Demo-Instanz: der Golden-Snapshot und die beiden Marker liegen IM
@@ -150,7 +157,7 @@ fi
 # Nicht-fatal wie veraPDF/Ghostscript: ein fehlgeschlagener Browser-Download
 # darf keinen Deploy verlieren.
 PW_BIN="$INSTALL_DIR/node_modules/.bin/playwright"
-APP_HOME="$(getent passwd "$OWNER" | cut -d: -f6)"
+APP_HOME="$(getent passwd "$OWNER" | cut -d: -f6 || true)"
 PW_PROBE="require('playwright').chromium.launch({args:['--no-sandbox','--disable-dev-shm-usage']}).then(b=>b.close())"
 # node/npx liegen je nach Host nicht in /usr/bin (nvm). `su` setzt PATH neu,
 # also das Verzeichnis des hier laufenden node explizit mitgeben — sonst meldet
@@ -220,11 +227,27 @@ else
   systemctl start "$SERVICE"
 fi
 
-sleep 1
-if systemctl is-active --quiet "$SERVICE"; then
-  echo "✓ $(date '+%Y-%m-%d %H:%M:%S') – deployed & running"
+# Health-Check: der Prozess muss HTTP beantworten, nicht nur "active" sein.
+# `systemctl is-active` ist direkt nach dem Restart auch fuer einen Prozess
+# gruen, der eine Sekunde spaeter beim Boot (Migration, fehlende Dependency)
+# abstuerzt — Restart=always macht daraus sonst eine stille Crash-Schleife.
+# /config ohne Session antwortet 401 (Auth-Guard), sobald Express steht; das
+# ist derselbe Vertrag wie scripts/boot-smoke.js in der CI. Timeout
+# grosszuegig, weil DB-Migrationen beim Boot laufen.
+HEALTH_URL="http://127.0.0.1:${PORT}/config"
+HEALTH_TIMEOUT="${SW_HEALTH_TIMEOUT:-30}"
+health_code=000
+for _ in $(seq 1 "$HEALTH_TIMEOUT"); do
+  health_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$HEALTH_URL" || true)
+  [ "$health_code" = "401" ] && break
+  sleep 1
+done
+
+if [ "$health_code" = "401" ] && systemctl is-active --quiet "$SERVICE"; then
+  echo "✓ $(date '+%Y-%m-%d %H:%M:%S') – deployed & running ($HEALTH_URL → 401)"
 else
-  echo "✗ Service konnte nicht gestartet werden:"
-  journalctl -u "$SERVICE" -n 20 --no-pager
+  echo "✗ Service antwortet nicht wie erwartet: $HEALTH_URL → HTTP $health_code nach ${HEALTH_TIMEOUT}s (erwartet 401)"
+  systemctl status "$SERVICE" --no-pager || true
+  journalctl -u "$SERVICE" -n 40 --no-pager || true
   exit 1
 fi

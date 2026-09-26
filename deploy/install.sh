@@ -3,7 +3,7 @@
 # Läuft auf dem LXC wo writing.david-berger.ch läuft
 # Usage: bash install.sh
 
-set -e
+set -euo pipefail
 
 INSTALL_DIR="/opt/schreibwerkstatt"
 SERVICE="schreibwerkstatt"

@@ -46,7 +46,7 @@
 # 3738 statt 3737. TLS ist Pflicht — Apples App Transport Security laesst einen
 # nativen Client sonst nicht gegen den Server sprechen.
 
-set -e
+set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/schreibwerkstatt-demo}"
 SERVICE="${SERVICE:-schreibwerkstatt-demo}"
@@ -96,7 +96,7 @@ print_credentials() {
     exit 1
   fi
   # shellcheck disable=SC1090
-  set -a; . "$ENV_FILE"; set +a
+  set -a +u; . "$ENV_FILE"; set +a -u
   local url="${APP_PUBLIC_URL:-https://<domain>}"
   cat <<EOF
 

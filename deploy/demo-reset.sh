@@ -30,7 +30,7 @@
 # Ein versehentlicher Aufruf gegen /opt/schreibwerkstatt bricht dadurch ab,
 # statt die Produktionsdatenbank zu ueberschreiben.
 
-set -e
+set -euo pipefail
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
 MODE="${1:-}"
@@ -45,10 +45,12 @@ case "$MODE" in
 esac
 
 if [ -f "$ENV_FILE" ]; then
-  set -a
+  # nounset beim Sourcen aus: ein Wert mit `$` (Passwort, Secret) wuerde
+  # sonst als ungesetzte Variable den ganzen Lauf abbrechen.
+  set -a +u
   # shellcheck disable=SC1090
   . "$ENV_FILE"
-  set +a
+  set +a -u
 else
   echo "✗ .env nicht gefunden: $ENV_FILE"
   exit 1

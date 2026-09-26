@@ -4,7 +4,7 @@
 # Marker: $INSTALL_DIR/.deploy-migrations-applied (eine Zeile pro Lauf: "NNN <ISO-Timestamp>").
 # Migration-Script bekommt $INSTALL_DIR als $1. Exit 0 = ok, sonst Abbruch.
 
-set -e
+set -euo pipefail
 
 INSTALL_DIR="${1:-/opt/schreibwerkstatt}"
 MIGRATIONS_DIR="$INSTALL_DIR/deploy/migrations"

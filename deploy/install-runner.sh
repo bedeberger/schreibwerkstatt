@@ -33,7 +33,7 @@
 # eigenen Runner-User an und stellt den Workflow-Step auf `sudo bash
 # deploy/deploy.sh` um (plus passende sudoers-Regel).
 
-set -e
+set -euo pipefail
 
 RUNNER_DIR="${RUNNER_DIR:-/opt/actions-runner}"
 LABEL="demo"

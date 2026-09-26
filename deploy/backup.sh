@@ -9,15 +9,17 @@
 #   bash backup.sh                 # nutzt /opt/schreibwerkstatt/.env falls vorhanden
 #   bash backup.sh /pfad/zur/.env  # alternative .env
 
-set -e
+set -euo pipefail
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
 ENV_FILE="${1:-/opt/schreibwerkstatt/.env}"
 if [ -f "$ENV_FILE" ]; then
-  set -a
+  # nounset beim Sourcen aus: ein Wert mit `$` (Passwort, Secret) wuerde
+  # sonst als ungesetzte Variable den ganzen Lauf abbrechen.
+  set -a +u
   # shellcheck disable=SC1090
   . "$ENV_FILE"
-  set +a
+  set +a -u
 fi
 
 BACKUP_DIR="${BACKUP_DIR:-/opt/schreibwerkstatt/backup}"
