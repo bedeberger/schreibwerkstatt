@@ -144,12 +144,10 @@ export function makeChatMethods(cfg) {
       timerProp: p.pollTimer,
       ...(p.progress ? { progressProp: p.progress } : {}),
       jobId,
-      lsKey: cfg.lsKeyFn ? cfg.lsKeyFn(sessionId) : null,
       onProgress: (job) => {
         if (stale()) return;
         // Den Fortschritt traegt in diesem Fall die Zeile in der Historie.
         if (!viewing()) { setElsewhereStatus.call(this); return; }
-        if (cfg.onPollProgress) { cfg.onPollProgress.call(this, job); return; }
         this[p.status] = this._runningJobStatus(job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut, job.progress, job.tokensPerSec, job.statusParams, job.cacheReadIn);
       },
       onNotFound: async () => {
@@ -322,7 +320,6 @@ export function makeChatMethods(cfg) {
       // Seite (oder nichts). Der Job läuft serverseitig weiter und erscheint
       // beim nächsten Öffnen der Session über /jobs/active.
       if (gen(this) !== g) return;
-      if (cfg.lsKeyFn && jobId) localStorage.setItem(cfg.lsKeyFn(sessionId), jobId);
       if (jobId) startPollLocal.call(this, jobId, sessionId);
       else { this[p.loading] = false; this.$nextTick(() => scrollToBottom.call(this)); }
       // Ab jetzt steht das Gespräch in der Historie: die User-Nachricht ist
@@ -345,17 +342,16 @@ export function makeChatMethods(cfg) {
     }
   };
 
-  m[`start${L}Poll`]      = function (jobId) { return startPollLocal.call(this, jobId); };
-
   // Laeuft der Job dieser Karte für genau dieses Gespräch? Alle Ladeanzeigen
   // (Progressbar, Skelett, Lauf-Punkt in der Historie) fragen danach statt nach
   // `loading` allein — das ist karten-global und sagt nur, DASS etwas läuft.
   m[`is${L}SessionRunning`] = function (id) {
     return !!this[p.loading] && id != null && this[p.runningSessionId] === id;
   };
-  m[`_scroll${L}ToBottom`] = function () { scrollToBottom.call(this); };
   // Server-persistierte Fallback-Nachrichten werden als `__i18n:key__` gespeichert
   // und beim Rendern in die aktuelle Locale aufgelöst (siehe CLAUDE.md, i18n-Regel).
+  // Tool-Call-Zusammenfassung eines agentischen Turns (Buch-/Recherche-Chat).
+  m._toolSummary = function (toolCalls, opts) { return toolSummary(toolCalls, opts); };
   m._renderChatMarkdown    = function (text) {
     const match = /^__i18n:([a-zA-Z0-9_.-]+)__$/.exec(text || '');
     return renderChatMarkdown(match ? window.__app.t(match[1]) : text);
@@ -395,8 +391,8 @@ export function makeChatMethods(cfg) {
     ].join(' · ');
   };
 
-  // Status-HTML für laufende Jobs — wird von onPollProgress-Callbacks der
-  // konkreten Chats genutzt (sie rufen this._runningJobStatus).
+  // Status-HTML für laufende Jobs — Fortschrittszeile aller drei Chats
+  // (startPollLocal#onProgress).
   // cacheReadIn (optional): Cache-Anteil der bisher gezählten Input-Tokens; im
   // agentischen Tool-Loop wächst tokensIn pro Iteration um den ganzen Präfix.
   m._runningJobStatus = function (statusText, tokIn, tokOut, maxTokOut, progress, tokPerSec, statusParams, cacheReadIn) {
