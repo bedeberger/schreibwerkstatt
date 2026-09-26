@@ -114,11 +114,13 @@ test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () =>
       { id: 2031, book_id: BOOK_ID, chapter_id: 2030, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' },
       { id: 2032, book_id: BOOK_ID, chapter_id: 2030, name: 'S 2', updated_at: '2026-05-01T10:00:00Z' },
       { id: 2033, book_id: BOOK_ID, chapter_id: 2030, name: 'S 3', updated_at: '2026-05-01T10:00:00Z' },
+      { id: 2034, book_id: BOOK_ID, chapter_id: 2030, name: 'S 4', updated_at: '2026-05-01T10:00:00Z' },
     ],
     pageBodies: {
       2031: '<p>Seite eins inhaltsreich.</p>',
       2032: '<p>Seite zwei inhaltsreich.</p>',
       2033: '<p>Seite drei inhaltsreich.</p>',
+      2034: '<p>Seite vier inhaltsreich.</p>',
     },
   });
 
@@ -133,7 +135,7 @@ test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () =>
   );
   const job1 = await waitForJob(ctx.shared, jobId1, { timeoutMs: 8000 });
   assert.equal(job1.status, 'done');
-  assert.equal(ctx.mockAi.log.length, 3, '1. Batch = 3 Seiten-Calls');
+  assert.equal(ctx.mockAi.log.length, 4, '1. Batch = 4 Seiten-Calls');
 
   // Eine Seite ändert sich.
   ctx.dbSeed.setBook({
@@ -142,11 +144,13 @@ test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () =>
       { id: 2031, book_id: BOOK_ID, chapter_id: 2030, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' },
       { id: 2032, book_id: BOOK_ID, chapter_id: 2030, name: 'S 2', updated_at: '2026-05-03T12:00:00Z' },
       { id: 2033, book_id: BOOK_ID, chapter_id: 2030, name: 'S 3', updated_at: '2026-05-01T10:00:00Z' },
+      { id: 2034, book_id: BOOK_ID, chapter_id: 2030, name: 'S 4', updated_at: '2026-05-01T10:00:00Z' },
     ],
     pageBodies: {
       2031: '<p>Seite eins inhaltsreich.</p>',
       2032: '<p>Seite zwei NEU.</p>',
       2033: '<p>Seite drei inhaltsreich.</p>',
+      2034: '<p>Seite vier inhaltsreich.</p>',
     },
   });
 
@@ -162,9 +166,10 @@ test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () =>
   );
   const job2 = await waitForJob(ctx.shared, jobId2, { timeoutMs: 8000 });
   assert.equal(job2.status, 'done');
-  // Seite 2032 ändert sich → MISS. Seite 2033 hat 2032 als Vorseite →
-  // previousExcerpt-Wechsel → ebenfalls MISS. Seite 2031 bleibt HIT.
-  assert.equal(ctx.mockAi.log.length, 2, '2. Batch = 2 Calls (geänderte Seite + Nachfolger via previousExcerpt)');
+  // Seite 2032 ändert sich → MISS. Ihre Nachbarn sehen sie als Auszug:
+  // 2031 als Folgeseite (nextExcerpt), 2033 als Vorseite (previousExcerpt) →
+  // beide MISS. Seite 2034 bleibt HIT.
+  assert.equal(ctx.mockAi.log.length, 3, '2. Batch = 3 Calls (geänderte Seite + beide Nachbarn via Auszug)');
 });
 
 // ── Synonym-Cache ────────────────────────────────────────────────────────────
