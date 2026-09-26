@@ -36,9 +36,10 @@ router.get('/:book_id/contents', async (req, res) => {
     }
     const flatMetas = [...solos, ...inChapters];
 
-    const details = await contentStore.loadPagesBatch(flatMetas, req, { batchSize: 15 });
+    const details = await contentStore.loadPagesBatch(flatMetas, req, { onError: () => null });
 
-    // Reihenfolge erhalten: loadPagesBatch garantiert keine Ordnung (Promise.allSettled).
+    // loadPagesBatch liefert in Meta-Reihenfolge und laesst fehlende Seiten aus;
+    // die Zuordnung per id haelt die Meta-Felder (_chapterName) am Detail.
     // Feldliste bewusst schmal — bei einem grossen Buch geht jedes zusätzliche
     // Feld mal Seitenzahl über die Leitung. Konsumenten: Bucheditor
     // (public/js/cards/book-editor-card.js) und der Fassungen-Reader als
