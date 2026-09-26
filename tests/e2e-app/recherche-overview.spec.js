@@ -6,7 +6,7 @@
 // und der Dialog haengt am nativen <dialog>/Top-Layer-Verhalten, das kein Harness
 // nachstellt. Der Smoke oeffnet die Karte, prueft aber kein Verhalten. Nichts
 // gestubbt: Anlegen, Bild-Upload und Klicks laufen ueber die echten Routen.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 // Text, der den Listen-Cap in JEDER Spaltenbreite ueberschreitet.
@@ -17,10 +17,6 @@ const PNG_8PX_B64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVR4nGM4oaGBFTEMLQkAgl1GAWqNFmsAAAAASUVORK5CYII=';
 
 test('recherche: Liste zeigt Anriss, Detailansicht zeigt Volltext und bleibt verknuepfbar', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -120,8 +116,6 @@ test('recherche: Liste zeigt Anriss, Detailansicht zeigt Volltext und bleibt ver
   await page.evaluate(async (ids) => {
     for (const id of ids) await fetch(`/research/${id}`, { method: 'DELETE' });
   }, [made.long, made.img]);
-
-  expect(errors, `Konsolenfehler:\n${errors.join('\n')}`).toEqual([]);
 });
 
 // Anlegen laeuft im gleichen Dialog-Rahmen wie Bearbeiten und aus DEMSELBEN
@@ -129,10 +123,6 @@ test('recherche: Liste zeigt Anriss, Detailansicht zeigt Volltext und bleibt ver
 // eigentliche Drift-Schranke: baut jemand das Anlegen-Formular wieder als eigene
 // Kopie, weichen die Signaturen ab und dieser Test wird rot.
 test('recherche: Anlegen im Modal — gleiche Felder wie im Bearbeiten-Modus', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
   await page.evaluate((id) => { location.hash = `#book/${id}/recherche`; }, bookId);
@@ -180,6 +170,4 @@ test('recherche: Anlegen im Modal — gleiche Felder wie im Bearbeiten-Modus', a
     const rows = await fetch(`/research?book_id=${id}`).then(r => r.json());
     for (const r of rows) await fetch(`/research/${r.id}`, { method: 'DELETE' });
   }, bookId);
-
-  expect(errors, `Konsolenfehler:\n${errors.join('\n')}`).toEqual([]);
 });

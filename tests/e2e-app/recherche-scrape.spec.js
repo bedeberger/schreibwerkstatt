@@ -13,20 +13,15 @@
 // abgewiesen — und genau das ist die Kette, die hier gemessen werden soll:
 // Klick → Route → Guard → `error_code` → lokalisierte Meldung in der Karte.
 // Die Extraktion selbst deckt tests/unit/url-scrape.test.mjs ab.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 test('recherche: Link lesen ist verdrahtet und meldet ein geblocktes Ziel', async ({ page }) => {
-  const errors = [];
-  // Der abgewiesene Abruf ist der Testgegenstand, und Chromium protokolliert
-  // JEDE nicht-2xx-Antwort als Konsolenfehler. Nur diese eine Zeile wird
-  // ausgenommen — Alpine-Expression-Fehler und pageerror bleiben fatal, sie
-  // sind der Grund, warum diese Spec in der App-Suite steht.
-  const EXPECTED = /Failed to load resource.*400/;
-  page.on('console', (m) => {
-    if (m.type() === 'error' && !EXPECTED.test(m.text())) errors.push(m.text());
-  });
-  page.on('pageerror', (e) => errors.push(String(e)));
+  // Der abgewiesene Abruf (400) ist der Testgegenstand; Chromium protokolliert
+  // ihn als "Failed to load resource" — das deckt die Default-Allowlist des
+  // Console-Guards ab. Alpine-Expression-Fehler und pageerror bleiben fatal
+  // (Auto-Fixture aus tests/e2e/_helpers/fixtures.js), sie sind der Grund,
+  // warum diese Spec in der App-Suite steht.
 
   await bootApp(page);
   const bookId = await selectSeededBook(page);
@@ -71,6 +66,4 @@ test('recherche: Link lesen ist verdrahtet und meldet ein geblocktes Ziel', asyn
   const mine = after.find(i => i.id === item.id);
   expect(mine.title).toBe('Aus der Android-App geteilt');
   expect(mine.body ?? null).toBe(null);
-
-  expect(errors, `Konsolenfehler:\n${errors.join('\n')}`).toEqual([]);
 });

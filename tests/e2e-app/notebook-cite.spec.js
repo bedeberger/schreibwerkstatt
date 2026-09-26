@@ -32,7 +32,7 @@
 //   - Jeder Test arbeitet auf einer eigenen Seite (`pageIdx`): die Smoke-DB
 //     lebt über den ganzen Lauf, sonst stapeln sich die Belege übereinander.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const EDIT_SEL = '#editor-card .page-content-view--editing';

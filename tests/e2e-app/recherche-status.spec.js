@@ -7,16 +7,12 @@
 // danach neu gebunden), dem echten `PATCH /research/:id` (der Status ist ein
 // CHECK-gegatetes Spaltenfeld, kein Client-Zustand) und dem Shell-CSS (dass die
 // Spalten nebeneinander stehen, ist eine Layout-Aussage). Nichts gestubbt.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const COLUMNS = ['offen', 'in_arbeit', 'eingearbeitet', 'verworfen'];
 
 test('recherche: Status-Board sortiert in Spalten, das Aktionsmenue verschiebt, die Liste zeigt dieselbe Stufe', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -129,6 +125,4 @@ test('recherche: Status-Board sortiert in Spalten, das Aktionsmenue verschiebt, 
   await page.evaluate(async (ids) => {
     for (const id of ids) await fetch(`/research/${id}`, { method: 'DELETE' });
   }, [made.withPlace, made.noPlace]);
-
-  expect(errors, errors.join('\n')).toEqual([]);
 });

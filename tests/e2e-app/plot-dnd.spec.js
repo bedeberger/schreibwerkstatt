@@ -1,13 +1,9 @@
 // Verifiziert die SortableJS-Beat-DnD der Plot-Werkstatt end-to-end gegen die echte
 // App (Smoke-Layer): Board per API seeden, Beat per Drag umsortieren, persistierte
 // sort_order prüfen. Deckt den Drag-Pfad ab, den der reine Card-Open-Smoke nicht testet.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 
 test('plot: Beat per SortableJS-Drag umsortieren persistiert', async ({ page }) => {
-  const errors = [];
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', e => errors.push(String(e)));
-
   await page.goto('/');
   await page.waitForFunction(() => window.__app && window.Alpine.store('nav').selectedBookId);
   const bookId = await page.evaluate(() => window.Alpine.store('nav').selectedBookId);
@@ -81,5 +77,4 @@ test('plot: Beat per SortableJS-Drag umsortieren persistiert', async ({ page }) 
       .sort((a, b) => a.sort_order - b.sort_order).map(b => b.id);
   }, { bookId, actId: ids.actId });
   expect(order).toEqual([ids.b2, ids.b3, ids.b1]);
-  expect(errors).toEqual([]);
 });

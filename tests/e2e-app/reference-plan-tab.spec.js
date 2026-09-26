@@ -13,7 +13,7 @@
 //   4. Klick setzt `#book/:id/plot/<beatId>` und öffnet das Beat-Board.
 //   5. Nichts davon erzeugt einen unbehandelten Alpine-/Library-Fehler.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const REF = '#reference-card';
@@ -42,10 +42,6 @@ async function openPlanTab(page, pageIdx) {
 const rowByTitle = (page, title) => page.locator(`${REF} .reference-row`, { hasText: title });
 
 test('Referenz-Slot: Plan-Tab zeigt die Beats des Kapitels und springt aufs Board', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -79,6 +75,4 @@ test('Referenz-Slot: Plan-Tab zeigt die Beats des Kapitels und springt aufs Boar
   await rowByTitle(page, TITLE_B).click();
   await expect(page).toHaveURL(new RegExp(`#book/${bookId}/plot/${beatB.id}$`));
   await page.waitForFunction(() => window.__app.showPlotCard === true, null, { timeout: 15000 });
-
-  expect(errors).toEqual([]);   // Invariante 5
 });

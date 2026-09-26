@@ -13,14 +13,10 @@
 // false-branches pruefte, waere von der lokalen .env abhaengig und darum nicht
 // tragfaehig. Wir setzen den Store-Wert explizit auf true, um die
 // Frontend-Invariante isoliert zu testen.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 test('recherche-chat: Toggle schaltet das Panel, Eingabefeld + Close arbeiten nach Render-Refactoring', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
   await page.evaluate((id) => { location.hash = `#book/${id}/recherche`; }, bookId);
@@ -55,6 +51,4 @@ test('recherche-chat: Toggle schaltet das Panel, Eingabefeld + Close arbeiten na
   // des Panels — die feature-eigene `.research-chat-head` gibt es nicht mehr.
   await page.locator('#recherche-card .research-chat .card-section-head .icon-btn[aria-label]').last().click();
   await expect(page.locator('#recherche-card .research-chat')).toBeHidden();
-
-  expect(errors, `Konsolenfehler:\n${errors.join('\n')}`).toEqual([]);
 });

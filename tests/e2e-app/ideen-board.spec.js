@@ -6,7 +6,7 @@
 // Stufe ist ein CHECK-gegatetes Spaltenfeld) und dem Grid-CSS der Shell (dass
 // eine Bahn ueber alle Spalten auf einer Linie liegt, ist eine Layout-Aussage).
 // Nichts gestubbt.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const COLUMNS = ['offen', 'in_arbeit', 'erledigt', 'verworfen'];
@@ -35,10 +35,6 @@ test.afterAll(async ({ browser }) => {
 });
 
 test('ideen-board: Bahnen aus dem Baum, Stufen-Spalten, Filter blendet aus und sagt es', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -118,15 +114,9 @@ test('ideen-board: Bahnen aus dem Baum, Stufen-Spalten, Filter blendet aus und s
   await page.locator('.combobox-option', { hasText: 'Kapitel' }).first().click();
   await expect(card.locator(`[data-idee-lane="page:${made.pageId}"]`).first()).toBeVisible();
   await expect(card.locator(`[data-idee-card-id="${made.c}"]`)).toHaveCount(1);
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 });
 
 test('ideen-board: Verknuepfung ist beidseitig — Chip an der Idee, Plakette am Beat', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -169,8 +159,6 @@ test('ideen-board: Verknuepfung ist beidseitig — Chip an der Idee, Plakette am
   const plaque = page.locator(`[data-beat-id="${made.beatId}"] .idee-backlink-chip`).first();
   await expect(plaque).toBeVisible();
   await expect(plaque).toContainText('Beat hier tatsächlich einlösen');
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 });
 
 // Geometrie-Test, darum hier und nicht im Fixture-Harness: der Picker wird nach
@@ -179,10 +167,6 @@ test('ideen-board: Verknuepfung ist beidseitig — Chip an der Idee, Plakette am
 // Shell-CSS — ein Harness saehe ihn „offen" und merkte nicht, dass er ausserhalb
 // des Sichtfelds steht. Genau das war der Bug: der Klick sah wirkungslos aus.
 test('ideen-board: Verknuepfungs-Picker oeffnet AM Knopf und schreibt die Kante', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -246,8 +230,6 @@ test('ideen-board: Verknuepfungs-Picker oeffnet AM Knopf und schreibt die Kante'
   await expect(popover).toBeHidden();
   const chip = card.locator('.idee-link-chip--beat');
   await expect(chip).toContainText('Wendepunkt am Fluss');
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 });
 
 // Drag-Geometrie, darum hier und nicht im Fixture-Harness: was der Zeiger
@@ -256,10 +238,6 @@ test('ideen-board: Verknuepfungs-Picker oeffnet AM Knopf und schreibt die Kante'
 // Karten-Akzent. Ein Harness saehe die Statusaenderung und merkte nicht, dass
 // der Klon der Maus hinterherlerpt oder konturlos bleibt.
 test('ideen-board: Drag-Klon haengt am Zeiger und traegt die Karte in die Spalte', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -343,8 +321,6 @@ test('ideen-board: Drag-Klon haengt am Zeiger und traegt die Karte in die Spalte
   // Kein Drag-Rest: der Klon ist weg, die Drop-Zonen sind wieder normal.
   await expect(page.locator('body > .idee-board-card--dragging')).toHaveCount(0);
   await expect(page.locator('body.ideen-dnd-active')).toHaveCount(0);
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 });
 
 test('ideen-board: Kapitel und Bahnen klappen — und der Stand ueberlebt den Reload', async ({ page }) => {
@@ -352,9 +328,6 @@ test('ideen-board: Kapitel und Bahnen klappen — und der Stand ueberlebt den Re
   // reinen Rechnung — der Bahnen-Reihenfolge aus `$store.nav.tree`, dem
   // localStorage-Filter-Scope (pro Buch, ueber den Reload hinweg) und daran,
   // dass die Drop-Zonen nach dem Zuklappen neu angebunden werden.
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
 
   await bootApp(page);
   const bookId = await selectSeededBook(page);
@@ -410,6 +383,4 @@ test('ideen-board: Kapitel und Bahnen klappen — und der Stand ueberlebt den Re
   // Die Bahn bleibt stehen und zaehlt, was sie verbirgt.
   await expect(pageRow.locator(`[data-idee-lane="page:${made.pageId}"]`).first()).toBeAttached();
   await expect(pageRow.locator('.ideen-board-folded').first()).toBeVisible();
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 });

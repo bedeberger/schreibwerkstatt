@@ -15,7 +15,7 @@
 // Mutationsprobe: gibt man `.plot-tension-body` das vertikale Padding zurueck
 // (`padding: var(--space-sm) 0 var(--space-2xs)` ohne `display: flow-root`),
 // bleibt `minNonZero` bei 10px stehen (8px + 2px) und der Test faellt.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp } = require('./_helpers/app');
 
 // Genug Beats mit Intensitaet, dass der Bogen ueberhaupt rendert (>= 2 Punkte).
@@ -42,10 +42,6 @@ test.afterAll(async ({ browser }) => {
 });
 
 test('plot: Spannungsbogen klappt ohne Sprung bis auf Hoehe 0 zu und wieder auf', async ({ page }) => {
-  const errors = [];
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', e => errors.push(String(e)));
-
   await bootApp(page);
   bookId = await page.evaluate(() => window.Alpine.store('nav').selectedBookId);
 
@@ -127,6 +123,4 @@ test('plot: Spannungsbogen klappt ohne Sprung bis auf Hoehe 0 zu und wieder auf'
   // 4) Ruhelayout unveraendert: der Abstand wanderte vom Panel-Padding an die
   //    Kinder — sichtbar darf sich dabei nichts verschoben haben.
   expect(rec.after).toEqual(rec.before);
-
-  expect(errors).toEqual([]);
 });

@@ -4,15 +4,8 @@
 // tabellen. Der Report wird im zweiten Fall direkt in den Scope gesetzt — die
 // Rechnung selbst deckt tests/unit/anthropic-billing.test.js ab.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp } = require('./_helpers/app');
-
-function collectErrors(page) {
-  const errors = [];
-  page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  return errors;
-}
 
 async function openBillingTab(page) {
   await page.evaluate(async () => {
@@ -25,18 +18,15 @@ async function openBillingTab(page) {
 }
 
 test('Abrechnung ohne Admin-Key: Hinweis statt Tabellen', async ({ page }) => {
-  const errors = collectErrors(page);
   await bootApp(page);
   const pane = await openBillingTab(page);
   await expect(pane.locator('p.muted-msg').first()).toContainText(/Admin-Key|admin key/);
   await expect(pane.locator('table')).toHaveCount(0);
-  expect(errors).toEqual([]);
 });
 
 test('Deep-Link #admin/usage/billing laedt den Abrechnungs-Tab', async ({ page }) => {
   // Der Hash-Router oeffnet die Karte ZUERST und setzt den Tab danach —
   // der Tab-Watcher muss dann selbst laden, sonst bleibt das Pane leer.
-  const errors = collectErrors(page);
   await bootApp(page);
   const billingReq = page.waitForRequest(r => new URL(r.url()).pathname === '/admin/usage/billing');
   await page.evaluate(() => { location.hash = '#admin/usage/billing'; });
@@ -44,7 +34,6 @@ test('Deep-Link #admin/usage/billing laedt den Abrechnungs-Tab', async ({ page }
   const pane = page.locator('[x-show="adminUsageTab === \'billing\'"]');
   await expect(pane).toBeVisible();
   await expect(pane.locator('p.muted-msg').first()).toContainText(/Admin-Key|admin key/);
-  expect(errors).toEqual([]);
 });
 
 // Jeder Tab einzeln: laedt beim Oeffnen zuerst ein anderer Tab, darf der
@@ -80,7 +69,6 @@ test('Schneller Tab-Wechsel: neuer Tab laedt, waehrend der vorige noch laeuft', 
 });
 
 test('Abrechnung mit Daten: KPIs, Modell- und Tagestabelle, Abweichung markiert', async ({ page }) => {
-  const errors = collectErrors(page);
   await bootApp(page);
   const pane = await openBillingTab(page);
   await page.evaluate(() => {
@@ -106,7 +94,6 @@ test('Abrechnung mit Daten: KPIs, Modell- und Tagestabelle, Abweichung markiert'
   await expect(pane.locator('.admin-usage-diff--off').first()).toBeVisible();
   await expect(pane.locator('table').nth(1)).toContainText(/nicht abgerufen|not fetched/);
   await expect(pane.locator('.admin-usage-billing-ws li')).toHaveCount(2);
-  expect(errors).toEqual([]);
 });
 
 // Users-Tab: Aufschluesselung je User x Job-Typ + Matrix (admin-usage-breakdown.html).
@@ -121,7 +108,6 @@ async function openUsersTab(page) {
 }
 
 test('Users-Tab: Matrix + Aufschluesselung pro User', async ({ page }) => {
-  const errors = collectErrors(page);
   await bootApp(page);
   const pane = await openUsersTab(page);
   await page.evaluate(() => {
@@ -143,7 +129,6 @@ test('Users-Tab: Matrix + Aufschluesselung pro User', async ({ page }) => {
   await expect(detail.locator('tbody tr')).toHaveCount(2);
   await expect(detail).toContainText(/Buch-Chat|Book chat/);
   await expect(detail).toContainText('80 %');
-  expect(errors).toEqual([]);
 });
 
 test('Schalter „Admins einbeziehen“ steuert includeAdmins im Request', async ({ page }) => {

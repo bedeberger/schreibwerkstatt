@@ -12,7 +12,7 @@
 // Kein Stub: der Merge braucht kein Modell (rein relationale Arbeit), also laeuft
 // alles echt — Figuren anlegen ueber PUT /figures/:book_id, Merge ueber
 // POST /figures/:book_id/merge, Kontrolle ueber GET /figures/:book_id.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const CARD = '.card--settings';
@@ -55,10 +55,6 @@ function figurenNames(page, bookId) {
 }
 
 test('merge-panel: Kandidaten laden, Figuren zusammenfuehren, Quelle verschwindet', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
   const seeded = await seedTwoFiguren(page, bookId);
@@ -128,8 +124,6 @@ test('merge-panel: Kandidaten laden, Figuren zusammenfuehren, Quelle verschwinde
   });
   expect(state.sel).toEqual({ source: '', target: '' });
   expect(state.names).not.toContain(SRC_NAME);
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 
   // Bestand wiederherstellen: die Ziel-Figur ueberlebt den Merge per Definition und
   // wuerde im geteilten Wegwerf-Buch sonst mit jedem Lauf mitwachsen. Der PUT

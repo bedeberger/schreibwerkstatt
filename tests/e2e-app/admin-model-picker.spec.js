@@ -10,7 +10,7 @@
 // POST /admin/settings/models (Dev-Session ist Admin).
 
 const http = require('http');
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp } = require('./_helpers/app');
 
 let stub, stubUrl;

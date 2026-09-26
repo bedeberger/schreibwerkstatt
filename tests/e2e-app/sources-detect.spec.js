@@ -9,7 +9,7 @@
 // Der JOB selbst wird gestubbt (page.route): sein Verhalten ist in
 // tests/integration/source-detect*.test.js abgedeckt, und die App-Suite hat kein
 // Modell. Alles danach — Rendern, Uebernehmen, Historie — laeuft echt.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const JOB_ID = 'stub-source-detect';
@@ -48,10 +48,6 @@ const RUN_ROW = {
 };
 
 test('quellen-erkennung: Panel, Funde, Uebernehmen, Lauf-Historie', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   // Job + Historie stubben. Bewusst eng gefasste Muster statt `**/jobs/**`:
   // die App pollt im Hintergrund `/jobs/queue` und `/jobs/active`, und die
   // sollen unangetastet echt bleiben.
@@ -134,6 +130,4 @@ test('quellen-erkennung: Panel, Funde, Uebernehmen, Lauf-Historie', async ({ pag
   await expect(items).toHaveCount(0);
   await runBtn.click();
   await expect(items).toHaveCount(2);
-
-  expect(errors, `Konsolenfehler:\n${errors.join('\n')}`).toEqual([]);
 });

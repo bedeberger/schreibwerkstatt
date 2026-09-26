@@ -8,7 +8,7 @@
 // Warum nötig: `:disabled="opt.disabled"` mit undefined sperrt in Alpine JEDE
 // Option (Boolean-Attr wird bei undefined nicht entfernt) — ein Bug, der ohne
 // echten Klick unsichtbar bleibt.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 
 async function bootApp(page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });

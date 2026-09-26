@@ -13,7 +13,7 @@
 //
 // Konsequenz fuer neuen Code: `container-type` gehoert auf einen Wrapper, in dem
 // kein Popover aufgeht — nicht auf die Karten-Wurzel.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 // Karten mit Query-Container, die eine Combobox/einen Entity-Picker tragen.

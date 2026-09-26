@@ -4,14 +4,10 @@
 // Karten-Registry (EXCLUSIVE_CARDS/Hash), echter /sources-API, sortableTable,
 // typabhaengigem Formular und dem eigenen /citation-Schreibpfad der
 // Bucheinstellungen. Der Smoke deckt davon nur „oeffnet ohne Konsolenfehler" ab.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 test('quellen: anlegen, filtern, bearbeiten, archivieren, loeschen, Fundstellen + Zitierstil', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -176,6 +172,4 @@ test('quellen: anlegen, filtern, bearbeiten, archivieren, loeschen, Fundstellen 
     const s = await fetch(`/booksettings/${id}`).then(r => r.json());
     return s.citation_style === 'numeric' && s.bibliography_enabled === 1;
   });
-
-  expect(errors).toEqual([]);
 });

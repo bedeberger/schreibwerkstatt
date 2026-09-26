@@ -8,7 +8,7 @@
 // Beide Faelle sind mutationsgeprueft: ohne `x-trap`-Attribut faellt Test 1
 // (kein aria-hidden, Fokus verlaesst das Overlay), ohne `x-collapse` im
 // panel-Spread faellt Test 2 (Hoehe springt in einem Frame auf den Endwert).
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 // ── x-trap: Palette ────────────────────────────────────────────────────────

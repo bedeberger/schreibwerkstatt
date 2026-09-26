@@ -7,7 +7,7 @@
 // zeichnet die ¶ gemessen auf der richtigen Zeile. Siehe
 // public/css/page/page-view.css + public/js/editor/notebook/format-marks.js.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 
 const EDIT_SEL = '#editor-card .page-content-view--editing';
 

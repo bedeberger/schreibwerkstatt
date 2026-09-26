@@ -15,7 +15,7 @@
 // Lebensereignisse schreibt nur die Komplettanalyse (`updateFigurenEvents`),
 // nicht `PUT /figures`. Darum wird die Katalog-Antwort abgefangen und um genau
 // diese Ereignisse ergaenzt; Figuren, Karte, Auswahl und Matrix laufen echt.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const CARD = '.card--figuren';
@@ -55,10 +55,6 @@ async function seedFiguren(page, bookId) {
 }
 
 test('lebenslauf: Phasen-Matrix richtet nach Alter aus, Spalten sind waehlbar', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
   const seeded = await seedFiguren(page, bookId);
@@ -135,8 +131,6 @@ test('lebenslauf: Phasen-Matrix richtet nach Alter aus, Spalten sind waehlbar', 
   await expect(table.locator('.figur-cv-phase-name')).toHaveText([
     'Geburt', 'Schulkind', 'Jugend',
   ]); // Emils Kleinkind-Zeile faellt mit ihm weg
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 
   // Bestand wiederherstellen (geteiltes Wegwerf-Buch).
   await page.unroute(`**/figures/${bookId}`);

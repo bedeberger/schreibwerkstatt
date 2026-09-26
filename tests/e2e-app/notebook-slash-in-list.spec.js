@@ -28,7 +28,7 @@
 //      dort ist ein Block IM Wrapper gewollt.
 //   6. Kein Tastendruck/Transform erzeugt ein `style`-Attribut.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const EDIT_SEL = '#editor-card .page-content-view--editing';

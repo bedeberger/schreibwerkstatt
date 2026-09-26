@@ -18,7 +18,7 @@
 // Konventionen wie notebook-diagram.spec.js: Inhalt wird ANGEHÄNGT, und jeder
 // Test arbeitet auf einer eigenen Seite — die Smoke-DB lebt über den ganzen Lauf.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const EDIT_SEL = '#editor-card .page-content-view--editing';

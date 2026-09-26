@@ -13,7 +13,7 @@
 //   3. Der Klick trifft genau den angeklickten Kasten, nicht seine Nachbarn
 //   4. `updated_at` wird mitgezogen, sodass der Folgeklick keinen 409 baut
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const EDIT_SEL = '#editor-card .page-content-view--editing';

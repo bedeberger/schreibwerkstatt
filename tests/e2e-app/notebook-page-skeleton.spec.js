@@ -12,7 +12,7 @@
 // (auf dem iPad aus dem SW-Cache). Lokal ist der Load langsamer; deshalb wird
 // requestAnimationFrame künstlich verzögert, bis das Fenster sicher offen ist.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const SKELETON = '#editor-card .page-content-skeleton';

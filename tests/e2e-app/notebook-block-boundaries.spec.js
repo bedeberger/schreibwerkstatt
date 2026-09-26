@@ -23,7 +23,7 @@
 //   4. Merges INNERHALB eines Wrappers bleiben beim Default (die sind sauber).
 //   5. Über die Wrapper-Grenze verschwindet kein Block spurlos.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const EDIT_SEL = '#editor-card .page-content-view--editing';

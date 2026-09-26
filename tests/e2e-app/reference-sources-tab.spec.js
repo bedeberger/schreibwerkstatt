@@ -17,7 +17,7 @@
 //      und fokussiert die Zeile.
 //   5. Nichts davon erzeugt einen unbehandelten Alpine-/Library-Fehler.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const REF = '#reference-card';
@@ -81,10 +81,6 @@ function rowByTitle(page, title) {
 }
 
 test('Referenz-Slot: Quellen-Tab zeigt Belege der Seite und verlinkt ins Quellenverzeichnis', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -121,6 +117,4 @@ test('Referenz-Slot: Quellen-Tab zeigt Belege der Seite und verlinkt ins Quellen
   await expect(page).toHaveURL(new RegExp(`#book/${bookId}/quellen/${srcB}$`));
   await page.waitForFunction(() => window.__app.showSourcesCard === true, null, { timeout: 15000 });
   await expect(page.locator(`#sources-card tr[data-source-id="${srcB}"]`)).toBeVisible({ timeout: 15000 });
-
-  expect(errors).toEqual([]);   // Invariante 5
 });

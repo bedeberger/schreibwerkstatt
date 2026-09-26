@@ -18,7 +18,7 @@
 //      (verstösst gegen die „Styles nur in public/css"-Regel) und kein Block
 //      verschwindet spurlos.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const EDIT_SEL = '#editor-card .page-content-view--editing';

@@ -11,14 +11,10 @@
 //
 // Nichts gestubbt: Fundstueck anlegen, Klick, Uebernahme und Quellenliste laufen
 // ueber die echten Routen.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 test('recherche: ein einzelner Link wird zur Quelle', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -68,6 +64,4 @@ test('recherche: ein einzelner Link wird zur Quelle', async ({ page }) => {
 
   // Das Fundstueck bleibt unangetastet — die Notiz ist nicht der Nachweis.
   await expect(rows).toHaveCount(2);
-
-  expect(errors, `Konsolenfehler:\n${errors.join('\n')}`).toEqual([]);
 });

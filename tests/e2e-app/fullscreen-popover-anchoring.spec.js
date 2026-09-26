@@ -9,7 +9,7 @@
 //
 // Geprueft wird die Verankerung, nicht die Sichtbarkeit: die Knoten existieren
 // dauerhaft (x-show + x-cloak), ihr Inhalt braucht Fundstellen/Straenge/Graph.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 // Pro Karte: Toggle, Karten-Selektor und die darin erwarteten Popover.

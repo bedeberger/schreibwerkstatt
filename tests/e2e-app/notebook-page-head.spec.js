@@ -17,7 +17,7 @@
 //   6. Das Zeichen-Lineal färbt sich, validiert aber nichts (zu lang wird
 //      gespeichert).
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const HEAD = '#editor-card .page-head';

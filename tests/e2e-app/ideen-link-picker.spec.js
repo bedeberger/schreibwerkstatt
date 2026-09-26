@@ -9,7 +9,7 @@
 // Hier haengt das Popover ausserdem an einem Menue-Eintrag, der selbst schon nach
 // <body> teleportiert ist und im selben Klick geschlossen wird — ob das Rect
 // davor noch gelesen wird, sieht man nur an der laufenden App.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 // Die Pendenz wird wieder abgeraeumt: die Ideen-Karte zeigt SEITEN-Ideen, und
@@ -29,10 +29,6 @@ test.afterAll(async ({ browser }) => {
 });
 
 test('ideen-karte: Verknuepfungs-Picker oeffnet am Menue-Eintrag, nicht im Kartenkopf', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
 
@@ -86,6 +82,4 @@ test('ideen-karte: Verknuepfungs-Picker oeffnet am Menue-Eintrag, nicht im Karte
   // Escape verwirft: der Picker ist ein Popover, kein Karten-Abschnitt.
   await page.keyboard.press('Escape');
   await expect(popover).toBeHidden();
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 });

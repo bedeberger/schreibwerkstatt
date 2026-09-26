@@ -10,7 +10,7 @@
 // Timer werden vor dem Save angehalten (der Poll-Timer-Slot bleibt belegt,
 // damit die Glue den Voll-Poll-Zweig nimmt). Ohne Stream käme die Änderung nie an.
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const OTHER_DEVICE = '9d0c3f4e-2b1a-4c5d-8e7f-0a1b2c3d4e5f';

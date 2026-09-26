@@ -13,7 +13,7 @@
 // nicht erzeugbar. Darum wird die EINE Leseroute abgefangen (`page.route`) und
 // mit einer realistischen Antwort bedient; alles andere (Figuren, Karte, Filter,
 // Sortierung, Aufklappen) laeuft echt.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const CARD = '.card--figuren';
@@ -39,10 +39,6 @@ async function seedFiguren(page, bookId) {
 }
 
 test('alterstabelle: Reiter rendert, Filter greifen, Belege klappen auf', async ({ page }) => {
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-
   await bootApp(page);
   const bookId = await selectSeededBook(page);
   const seeded = await seedFiguren(page, bookId);
@@ -130,8 +126,6 @@ test('alterstabelle: Reiter rendert, Filter greifen, Belege klappen auf', async 
   // Suche schraenkt weiter ein.
   await card.locator('.figur-alter .filter-search-input').fill(B_NAME);
   await expect(table.locator('tbody', { hasText: A_NAME })).toHaveCount(0);
-
-  expect(errors, `Konsolenfehler: ${errors.join(' | ')}`).toEqual([]);
 
   // Bestand wiederherstellen (geteiltes Wegwerf-Buch).
   await page.evaluate(async ({ id, before }) => {

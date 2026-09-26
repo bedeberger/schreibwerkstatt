@@ -4,7 +4,7 @@
 // das nachgeladene Vendor-CSS und seine Position in der Kaskade, die SVG-Linien
 // von jsMind gegen das Theme-Token und die Kopplung Namensfeld ↔ Wurzel-Knoten
 // ueber den echten Alpine-Scope. Der Smoke oeffnet die Karte nur leer.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../e2e/_helpers/fixtures');
 const { bootApp, selectSeededBook } = require('./_helpers/app');
 
 const CARD = '.card--werkstatt';
