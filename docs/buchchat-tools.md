@@ -1,10 +1,10 @@
 # Buch-Chat Tools (Agentic Mode)
 
-Tool-Inventar für den Agentic Buch-Chat. Claude ruft pro Iteration Tools auf, deren Resultate als neue `user`-Turns im Loop landen. Schema-Definitionen (Anthropic-Tool-Format) für das Modell: [public/js/prompts/chat.js#BOOK_CHAT_TOOLS](../public/js/prompts/chat.js#L174). Implementierungen: [routes/jobs/book-chat-tools.js](../routes/jobs/book-chat-tools.js). Dispatcher: [routes/jobs/chat.js#runBookChatJobAgent](../routes/jobs/chat.js#L439).
+Tool-Inventar für den Agentic Buch-Chat. Claude ruft pro Iteration Tools auf, deren Resultate als neue `user`-Turns im Loop landen. Schema-Definitionen (Anthropic-Tool-Format) für das Modell: [public/js/prompts/chat.js#BOOK_CHAT_TOOLS](../public/js/prompts/chat.js#L174). Implementierungen: [routes/jobs/book-chat-tools/](../routes/jobs/book-chat-tools/) (ein `tools-<bereich>.js` je Domäne, `TOOLS`-Map in [index.js](../routes/jobs/book-chat-tools/index.js)); ihre Abfragen auf `pages`/`chapters`/`books` in [db/book-chat/](../db/book-chat/) (ein Modul je Bereich: `analysis`, `catalog`, `figures`, `text`, `timeline`). Dispatcher: [routes/jobs/chat.js#runBookChatJobAgent](../routes/jobs/chat.js#L439).
 
 ## Vertrag
 
-Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder async). Dispatcher: `executeTool(name, input, ctx)` aus `book-chat-tools.js`.
+Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder async). Dispatcher: `executeTool(name, input, ctx)` aus [book-chat-tools/index.js](../routes/jobs/book-chat-tools/index.js).
 
 `ctx` (gebaut in [chat.js#L460](../routes/jobs/chat.js#L460)):
 - `bookId` — aus `chat_sessions.book_id` der aktiven Session.
@@ -16,7 +16,7 @@ Jede Tool-Funktion: `(input, ctx) → JSON-serialisierbares Objekt` (sync oder a
 
 ## Truncation (zwei Stufen)
 
-1. `_truncateResult(obj)` in [book-chat-tools.js#L27](../routes/jobs/book-chat-tools.js#L27): `JSON.stringify(obj).length > MAX_RESULT_CHARS` → falls `obj.results[]` vorhanden, auf 10 Einträge kürzen + `truncated: true` + `total_results`; sonst hart auf `MAX_RESULT_CHARS − 100` Zeichen.
+1. `_truncateResult(obj)` in [book-chat-tools/shared.js](../routes/jobs/book-chat-tools/shared.js): `JSON.stringify(obj).length > MAX_RESULT_CHARS` → falls `obj.results[]` vorhanden, auf 10 Einträge kürzen + `truncated: true` + `total_results`; sonst hart auf `MAX_RESULT_CHARS − 100` Zeichen.
 2. `TOOL_RESULT_CAP_CHARS` in [chat.js#L429](../routes/jobs/chat.js#L429): zweiter Schnitt direkt vor Übergabe an das Modell.
 
 `MAX_RESULT_CHARS = max(4000, INPUT_BUDGET_CHARS / 36)` — skaliert mit `MODEL_CONTEXT`. Listen-Limits (`MAX_SEARCH_RESULTS = 30`, `MAX_PAGES_PER_FETCH = 20`) bleiben fix (UI-Ergonomie).
@@ -160,12 +160,13 @@ Der agentische Loop ruft `callAIWithTools` → bei Claude `_callClaudeWithToolsA
 
 ## Neues Tool hinzufügen
 
-1. Implementierung in [book-chat-tools.js](../routes/jobs/book-chat-tools.js): `function tool_<name>(input, ctx) { ... return obj; }`. Read-Only, deterministisch, kein KI-Call.
-2. In der `TOOLS`-Map ([book-chat-tools.js#L1472](../routes/jobs/book-chat-tools.js#L1472)) registrieren.
-3. Schema in [chat.js#BOOK_CHAT_TOOLS](../public/js/prompts/chat.js#L174) ergänzen: `name`, `description` (kostet Input-Tokens — knapp halten, aber **Beispiele** für „wann nutzt das Modell mich" reinpacken), `input_schema`. Property-Descriptions geben Default-/Max-Werte an, damit das Modell sie nicht aus Resultaten zurückrechnen muss.
-4. Result-Shape so wählen, dass `_truncateResult` greift, wenn nötig: `{ results: [...] }` mit `> 5` Items aktiviert den Listen-Kürzungs-Pfad mit `truncated`-Flag.
-5. Bei Content-Store-/DB-Reads `userEmail`-Scope nicht vergessen — alle user-scoped Daten (Reviews, Ideen, Werkstatt, Lektorat-Checks) sind pro User isoliert.
-6. `jobSignal` ist im Loop bereits überwacht; lange Reads sollten ihn dennoch konsultieren wenn praktikabel.
+1. Implementierung im passenden `tools-<bereich>.js` unter [routes/jobs/book-chat-tools/](../routes/jobs/book-chat-tools/): `function tool_<name>(input, ctx) { ... return obj; }`. Read-Only, deterministisch, kein KI-Call.
+2. In der `TOOLS`-Map ([book-chat-tools/index.js](../routes/jobs/book-chat-tools/index.js)) registrieren.
+3. **Kein SQL auf `pages`/`chapters`/`books` im Tool-Modul** — auch kein blosser Namens-JOIN (Root-CLAUDE.md „Content-Store-Facade als einziger Eintrittspunkt"). Die Abfrage gehört als benannte Funktion ins Bereichsmodul unter [db/book-chat/](../db/book-chat/) (statische Statements einmal auf Modulebene vorbereitet, optionale Filter und IN-Listen baut die Funktion); vorhandene Lookups zuerst wiederverwenden ([db/content-names.js](../db/content-names.js), [db/books.js](../db/books.js)#`getBookName`). Seitentext lädt das Tool über `contentStore.loadPage`. Gegated durch [tests/unit/book-chat-tools-content-sql.test.mjs](../tests/unit/book-chat-tools-content-sql.test.mjs).
+4. Schema in [chat.js#BOOK_CHAT_TOOLS](../public/js/prompts/chat.js#L174) ergänzen: `name`, `description` (kostet Input-Tokens — knapp halten, aber **Beispiele** für „wann nutzt das Modell mich" reinpacken), `input_schema`. Property-Descriptions geben Default-/Max-Werte an, damit das Modell sie nicht aus Resultaten zurückrechnen muss.
+5. Result-Shape so wählen, dass `_truncateResult` greift, wenn nötig: `{ results: [...] }` mit `> 5` Items aktiviert den Listen-Kürzungs-Pfad mit `truncated`-Flag.
+6. Bei Content-Store-/DB-Reads `userEmail`-Scope nicht vergessen — alle user-scoped Daten (Reviews, Ideen, Werkstatt, Lektorat-Checks) sind pro User isoliert.
+7. `jobSignal` ist im Loop bereits überwacht; lange Reads sollten ihn dennoch konsultieren wenn praktikabel.
 
 ## Frontend
 
