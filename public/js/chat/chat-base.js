@@ -221,9 +221,6 @@ export function makeChatMethods(cfg) {
   // Wird beim $watch(showXxxCard) aufgerufen, wenn die Karte geöffnet wird.
   async function onVisible() {
     if (!cfg.canOpen(this)) return;
-    const root = window.__app;
-    root._checkDoneBeforeChat = root.checkDone;
-    root.checkDone = false;
     await loadSessions.call(this);
     if (this[p.sessions].length === 0) {
       await startNewSession.call(this);

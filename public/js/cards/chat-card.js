@@ -34,6 +34,15 @@ export function registerChatCard() {
         showFlag: 'showChatCard',
         timerKeys: ['_chatPollTimer'],
         onShow: async () => {
+          // Seiten-Chat verbirgt die Lektorat-Findings, solange er offen ist;
+          // toggleChatCard/toggleIdeenCard stellen checkDone aus dem Snapshot
+          // wieder her. Nur hier: Buch- und Recherche-Chat liegen nicht neben
+          // dem Editor und fassen den Lektorat-State nicht an.
+          const root = window.__app;
+          if (root?.currentPage) {
+            root._checkDoneBeforeChat = root.checkDone;
+            root.checkDone = false;
+          }
           await this._onVisibleChat();
           this.$nextTick(() => {
             const ta = this.$el?.querySelector('.chat-input');

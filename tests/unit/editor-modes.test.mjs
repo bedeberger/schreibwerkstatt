@@ -125,12 +125,17 @@ test('I4: resetPage hält Reset-Reihenfolge: focus → autosave → chat → edi
     'editMode=false vor checkDone=false (Lektorat-State zuletzt)');
 });
 
-// ── I5: chat-base#onVisible Snapshot-Reihenfolge ────────────────────────────
-test('I5: chat-base#onVisible snapshotet checkDone bevor es auf false geht', () => {
-  const src = read('public/js/chat/chat-base.js');
-  const m = src.match(/async function onVisible\s*\(\)\s*\{[\s\S]*?\n  \}/);
-  assert.ok(m, 'onVisible gefunden');
+// ── I5: Seiten-Chat-onShow Snapshot-Reihenfolge ─────────────────────────────
+// Nur der Seiten-Chat (chat-card.js) verbirgt die Findings; die geteilte
+// chat-base.js fasst checkDone nicht an (Buch-/Recherche-Chat liegen nicht
+// neben dem Editor).
+test('I5: chat-card#onShow snapshotet checkDone bevor es auf false geht', () => {
+  const src = read('public/js/cards/chat-card.js');
+  const m = src.match(/onShow:\s*async\s*\(\)\s*=>\s*\{[\s\S]*?\n        \}/);
+  assert.ok(m, 'onShow gefunden');
   const body = m[0];
+  assert.doesNotMatch(read('public/js/chat/chat-base.js'), /checkDone/,
+    'chat-base.js (alle drei Chats) darf den Lektorat-State nicht anfassen');
 
   const pSnapshot = body.search(/root\._checkDoneBeforeChat\s*=\s*root\.checkDone/);
   const pClear    = body.search(/root\.checkDone\s*=\s*false/);
