@@ -20,6 +20,20 @@ import { mergeBlocks, mergedToHtml } from '../editor/shared/block-merge.js';
 import { contentRepo } from '../repo/content.js';
 import { EVT } from '../events.js';
 
+// Zählt die Flush-Ergebnisse ({pageId → 'ok'|'conflict'|'skip'}) für die
+// Rückmeldung. `reported` merkt sich bereits gemeldete Konflikt-Seiten und wird
+// mitgeführt: eine gelöste (ok) Seite fällt heraus, damit ein späterer neuer
+// Konflikt derselben Seite wieder gemeldet wird.
+export function summarizeOutboxResults(results, reported) {
+  let synced = 0;
+  let newConflicts = 0;
+  for (const [pageId, status] of results) {
+    if (status === 'ok') { synced++; reported.delete(pageId); }
+    else if (status === 'conflict' && !reported.has(pageId)) { newConflicts++; reported.add(pageId); }
+  }
+  return { synced, newConflicts };
+}
+
 export const appOutboxMethods = {
   // Einmalig im Root-init() aufgerufen (mit dem AbortController-Signal). Hängt
   // die Reconnect-Trigger an und stellt den Pending-Zähler initial.
@@ -65,25 +79,48 @@ export const appOutboxMethods = {
     const ids = listDraftPageIds();
     if (!ids.length) { this._refreshPendingSyncCount(); return; }
     this._outboxFlushing = true;
+    const results = new Map();
     try {
       const openId = (this.editMode && this.currentPage?.id) ? Number(this.currentPage.id) : null;
       for (const pageId of ids) {
         if (pageId === openId) continue; // aktive Edit-Seite: eigener Retry-Pfad (autosave.js)
         const status = await this._flushOneDraft(pageId);
         if (status === 'offline') break; // Netz wieder weg → Rest später
+        results.set(pageId, status);
       }
     } finally {
       this._outboxFlushing = false;
       this._refreshPendingSyncCount();
     }
+    this._reportOutboxResults(results);
   },
 
-  // Ein Draft. Rückgabe: 'ok' | 'conflict' | 'offline' | 'skip'.
+  // Rückmeldung nach dem Flush: synchronisierte Seiten + neu liegengebliebene
+  // Konflikte als ein Toast. Konflikte, die schon gemeldet wurden, nicht bei
+  // jedem Fokus-Trigger erneut (sie bleiben als Draft liegen, bis der User die
+  // Seite öffnet). 'skip' bleibt stumm — Poison-Drafts/Fremd-Buch.
+  _reportOutboxResults(results) {
+    if (!this._outboxReportedConflicts) this._outboxReportedConflicts = new Set();
+    const { synced, newConflicts } = summarizeOutboxResults(results, this._outboxReportedConflicts);
+    if (!synced && !newConflicts) return;
+    const parts = [];
+    if (synced) parts.push(this.t('offline.syncDone', { n: synced }));
+    if (newConflicts) parts.push(this.t('offline.syncConflicts', { n: newConflicts }));
+    this._showJobToast?.({
+      message: parts.join(' '),
+      severity: newConflicts ? 'err' : 'ok',
+      jobType: 'outbox',
+      bookId: null,
+    });
+  },
+
+  // Ein Draft. Rückgabe: 'ok' | 'conflict' | 'offline' | 'skip' | 'empty'
+  // (leerer Draft verworfen, zählt nicht als synchronisiert).
   // 'offline' bricht die Schleife ab (Netz weg), 'skip'/'conflict' lassen den
   // Draft liegen, aber flushen die übrigen weiter.
   async _flushOneDraft(pageId) {
     const draft = readDraft(pageId);
-    if (!draft || !draft.html) { clearDraft(pageId); return 'ok'; }
+    if (!draft || !draft.html) { clearDraft(pageId); return 'empty'; }
     // Race-Schutz: hat der User diese Seite inzwischen (während des async-Flushs)
     // zum Editieren geöffnet, gehört sie dem Live-Editor (autosave.js) — headless
     // nicht dazwischenfunken, sonst clearen wir den Draft unter seinen Füssen weg.
