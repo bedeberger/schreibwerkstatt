@@ -246,7 +246,7 @@ CREATE INDEX IF NOT EXISTS idx_drama_speeches_fig  ON drama_speeches(figure_id);
 - **Paste-Spec** (der Test, der heute fehlschlägt): Szene markieren → Cut → Paste → alle Klassen erhalten
 
 **Manuell**
-- Sieben Ausgabewege einmal von Hand ziehen. **Keine Formalie:** [lib/export-builders/epub.js](../../lib/export-builders/epub.js) enthält heute schon **keine** `poem`-Regel — Gedichte verlieren dort ihre Formatierung, und es ist niemandem aufgefallen. Der `paragraph`-Fallback ist gnädig (kein Datenverlust, nur Formatverlust) und deshalb unauffällig.
+- Sieben Ausgabewege einmal von Hand ziehen. **Keine Formalie:** beim Gedicht (`div.poem`) fehlten lange unbemerkt die EPUB-CSS-Regel und in fünf Ausgabewegen die Strophengrenzen — ein Formatverlust ohne Datenverlust fällt niemandem auf. Muster für den Test: [tests/unit/export-builders/poem.test.mjs](../../tests/unit/export-builders/poem.test.mjs) (ein Block durch alle Builder).
 - Seed-Skript `scripts/seed-dramatik.js` nach dem Muster von `scripts/seed-journalismus.js`
 
 ## Edge-Cases

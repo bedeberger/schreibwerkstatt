@@ -276,7 +276,7 @@ Konfiguration: `ai.claude.admin_api_key` (Admin-Key `sk-ant-admin01-…`, ENV `A
 
 ## Provider-Unterschiede in Prompts
 
-`_isLocal`-Flag aus [public/js/prompts/state.js](../public/js/prompts/state.js) wird in `configurePrompts` gesetzt. Lokale Modelle bekommen abgespeckte Prompts (kein POV-/Tempus-Block, keine Figuren-Beziehungen, kein Vorseiten-Kontext) — sparen Tokens, weil lokale Kontextfenster meist 32-128K statt 200K sind.
+`_isLocal`-Flag aus [public/js/prompts/state.js](../public/js/prompts/state.js) wird in `configurePrompts` gesetzt. Lokale Modelle bekommen abgespeckte Prompts (kein POV-/Tempus-Block, keine Figuren-Beziehungen, kein Nachbarseiten-Kontext) — sparen Tokens, weil lokale Kontextfenster meist 32-128K statt 200K sind.
 
 Schemas werden per `_rebuildLektoratSchema()`/`_rebuildKomplettSchemas()` provider-spezifisch neu gebaut **vor** `configureLocales`.
 
@@ -298,7 +298,7 @@ Die Klassen-Entscheidung ist SSoT in `providerClass(provider)` ([lib/ai/config.j
 
 Konsumenten der Klasse (nicht des Provider-Namens):
 - **Prompt-Variante** — `promptVariantFor` in [lib/prompts-loader.js](../lib/prompts-loader.js) (volle Cloud-Prompts inkl. `JSON_ONLY` vs. Slim-Prompts).
-- **Lektorat-Kontext + Split** — `_isLocalProvider` in [routes/jobs/lektorat.js](../routes/jobs/lektorat.js): Klasse `cloud` lädt Vorseiten-Kontext/Figuren-Beziehungen/POV-Block wieder und lässt den fokussierten Objektiv/Stil-Split zu (sofern `ai.lektorat_split` aktiv).
+- **Lektorat-Kontext + Split** — `_isLocalProvider` in [routes/jobs/lektorat.js](../routes/jobs/lektorat.js): Klasse `cloud` lädt Nachbarseiten-Kontext (letzter Absatz der Vorseite, erster der Folgeseite — reiner Lesekontext, Findings daraus verwirft [lektorat-context.js](../routes/jobs/lektorat-context.js)#`dropNeighbourFindings`)/Figuren-Beziehungen/POV-Block wieder und lässt den fokussierten Objektiv/Stil-Split zu (sofern `ai.lektorat_split` aktiv).
 - **Call-Serialisierung** — `settledAll` in [routes/jobs/shared/ai.js](../routes/jobs/shared/ai.js): Klasse `cloud` fährt parallel statt seriell; die Obergrenze bleibt die `max_parallel`-Semaphore.
 - **Komplettanalyse-Strategie** — die Pipeline entscheidet durchgehend an der Klasse (`isCloudModel` in [job-komplett.js](../routes/jobs/komplett/job-komplett.js), `providerClass(effectiveProvider)` in den Phasen): kombinierter Extraktions-Pass statt Pass-A/B-Split, Single-Pass für Kontinuität und Erzählprofil, Completeness-Gap-Pässe, Coverage-Feedback + Self-Audit, Szenen-Backfill, Alias-Cluster, Entity-Reconcile-Judge, Soziogramm-Refine, Attribut-Check, Verify-Filter, Remap-Rescue und das Buchtext-Preprocessing.
 - **Kontinuität + Erzählprofil auf allen drei Schichten** — `/config` (`komplett.continuity`/`narrativeProfile`, [routes/proxies.js](../routes/proxies.js)), Karten-Gate (`requiresCloudModel` in [feature-registry.js](../public/js/cards/feature-registry.js), gelesen aus `$store.config.effectiveProviderClass`) und Route-Guard (`400 CONTINUITY_PROVIDER_UNSUPPORTED` / `NARRATIVE_PROFILE_PROVIDER_UNSUPPORTED` in [routes/jobs/komplett/index.js](../routes/jobs/komplett/index.js)) stellen **dieselbe** Frage. Weichen sie auseinander, ist die Karte sichtbar und der Knopf antwortet 400.

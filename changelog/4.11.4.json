@@ -1,0 +1,21 @@
+{
+  "version": "4.11.4",
+  "date": "2026-09-26",
+  "entries": [
+    {
+      "kind": "verbessert",
+      "de": "Lektorat: Die Prüfung liest jetzt auch den Anfang der folgenden Seite mit und beurteilt Übergänge besser. Vorschläge betreffen nur noch Text der geprüften Seite selbst.",
+      "en": "Proofreading: the check now also reads the start of the following page and judges transitions better. Suggestions only ever concern text on the page being checked."
+    },
+    {
+      "kind": "behoben",
+      "de": "Export: Gedichte behalten in PDF, Word, EPUB, Markdown, Text und Substack ihre Strophen-Abstände und sind eingerückt. Vorher liefen die Strophen ohne Abstand ineinander.",
+      "en": "Export: poems keep their stanza breaks and indentation in PDF, Word, EPUB, Markdown, text and Substack. Previously the stanzas ran into each other without spacing."
+    },
+    {
+      "kind": "behoben",
+      "de": "Text-Export: Absätze einer Seite stehen wieder getrennt untereinander, statt zu einer einzigen langen Zeile zusammenzufallen.",
+      "en": "Text export: the paragraphs of a page are separated again instead of collapsing into one long line."
+    }
+  ]
+}

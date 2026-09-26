@@ -77,6 +77,7 @@ function _buildLektoratPromptBody(text, textLabel, {
   buchtyp = null,
   textsorte = null,
   previousExcerpt = null,
+  nextExcerpt = null,
   hatBelege = false,
   langCode = 'de',
   mode = 'full',
@@ -172,10 +173,21 @@ function _buildLektoratPromptBody(text, textLabel, {
   // Zeiger auf die Quelle.
   const belegBlock = hatBelege ? `\n${_buildBelegBlock(langCode)}\n` : '';
 
-  // Vorseiten-Absatz dient Tempus-/Perspektiv-Übergang – lokal nicht geprüft.
-  const previousBlock = (_isLocal || !previousExcerpt)
-    ? ''
-    : `\nLetzter Absatz der vorherigen Seite (NUR als Übergangskontext für Tempus-/Perspektiv-/Pronomen-Prüfung – NICHT bewerten, nicht in «fehler» aufnehmen):\n"""\n${previousExcerpt}\n"""\n`;
+  // Nachbarseiten-Auszüge: reiner Lesekontext für Übergänge und die Stil-/
+  // Szenenbewertung – lokal gedroppt (kleine Modelle prüfen solche Fragmente
+  // trotz Verbot mit). Der Server verwirft zusätzlich Findings, deren «original»
+  // nur in einem Auszug steht (routes/jobs/lektorat-context.js#dropNeighbourFindings).
+  const fortsetzung = !nextExcerpt
+    ? 'z.B. ob der Seitenanfang sauber an das Vorherige anschliesst.'
+    : fach
+    ? 'z.B. ob ein Gedankengang auf der nächsten Seite weitergeht. Einen Abschnitt, der erkennbar fortgesetzt wird, nicht als unvollständig oder abgebrochen bewerten.'
+    : 'z.B. ob eine Szene auf der nächsten Seite weitergeht oder ein scheinbar abrupter Schluss bewusst offen bleibt. Eine Szene, die erkennbar fortgesetzt wird, nicht als unvollständig oder abgebrochen bewerten.';
+  const nachbarBlock = (_isLocal || (!previousExcerpt && !nextExcerpt)) ? '' : `
+<nachbarkontext>
+Die folgenden Auszüge gehören NICHT zur geprüften Seite. Sie zeigen nur, wie der Text ${[previousExcerpt && 'davor endet', nextExcerpt && 'danach weitergeht'].filter(Boolean).join(' und ')} – als Lesekontext für Übergänge (Tempus, Perspektive, Pronomen, Anschluss) und für «stilanalyse»${fach ? '' : '/«szenen»'}: ${fortsetzung}
+PFLICHT: Nichts aus diesen Auszügen bewerten oder in «fehler» aufnehmen – jedes «original» stammt ausschliesslich aus <originaltext>. Den Inhalt der Auszüge in «stilanalyse»/«fazit» nicht nacherzählen.
+${previousExcerpt ? `<vorherige_seite label="Letzter Absatz der vorherigen Seite">\n${previousExcerpt}\n</vorherige_seite>\n` : ''}${nextExcerpt ? `<naechste_seite label="Erster Absatz der nächsten Seite">\n${nextExcerpt}\n</naechste_seite>\n` : ''}</nachbarkontext>
+`;
 
   // Typ-Enum des Laufs. Der lokale Modus reduziert zusätzlich (kein show_vs_tell,
   // passiv, perspektivbruch, tempuswechsel – diese Typen verlangen nuanciertes
@@ -429,7 +441,7 @@ ${journal ? _buildJournalStilBlock(typen) : fach ? _buildFachStilBlock(typen) : 
 ${fach ? _buildFachWiederholungBlock(stopwords) : _buildWiederholungBlock(stopwords)}
 ${aktiv('schwaches_verb') ? _buildSchwacheVerbenBlock() : ''}
 ${_buildFuellwortBlock()}
-${spezialBlocks}${figurenBlock}${beziehungenBlock}${orteBlock}${motivBlock}${belegBlock}${previousBlock}
+${spezialBlocks}${figurenBlock}${beziehungenBlock}${orteBlock}${motivBlock}${belegBlock}${nachbarBlock}
 ${selbstkontrollBlock}
 <originaltext label="${textLabel.replace(/:\s*$/, '')}">
 ${text}

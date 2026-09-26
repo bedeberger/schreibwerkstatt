@@ -188,3 +188,25 @@ test('Schema-Enum und Prompt-Enum tragen dasselbe Typ-Set', () => {
     assert.deepEqual(schemaTypen, promptTypen, `${buchtyp}: Grammar und Prompt-Text weichen ab`);
   }
 });
+
+// Nachbarseiten-Kontext: Cloud bekommt Vor- und Folgeseite als abgegrenzten
+// Lesekontext mit Pruef-Verbot; lokal faellt der Block ganz weg.
+test('Nachbarkontext: Cloud rahmt Vor- und Folgeseite als nicht zu pruefen', () => {
+  prompts.configurePrompts(cfg, 'claude');
+  const p = prompts.buildStilLektoratPrompt(SAMPLE, {
+    langCode: 'de', previousExcerpt: 'VORHER-AUSZUG', nextExcerpt: 'NACHHER-AUSZUG',
+  });
+  assert.ok(p.includes('<nachbarkontext>'));
+  assert.ok(p.includes('<vorherige_seite') && p.includes('VORHER-AUSZUG'));
+  assert.ok(p.includes('<naechste_seite') && p.includes('NACHHER-AUSZUG'));
+  assert.ok(p.includes('ausschliesslich aus <originaltext>'), 'Pruef-Verbot fehlt');
+  assert.ok(p.indexOf('</nachbarkontext>') < p.lastIndexOf('<originaltext label'), 'Kontext muss vor dem Originaltext stehen');
+});
+
+test('Nachbarkontext: ohne Auszuege kein Block, lokal nie', () => {
+  prompts.configurePrompts(cfg, 'claude');
+  assert.ok(!prompts.buildLektoratPrompt(SAMPLE, { langCode: 'de' }).includes('<nachbarkontext>'));
+  prompts.configurePrompts(cfg, 'ollama');
+  const local = prompts.buildLektoratPrompt(SAMPLE, { langCode: 'de', previousExcerpt: 'a', nextExcerpt: 'b' });
+  assert.ok(!local.includes('<nachbarkontext>'));
+});

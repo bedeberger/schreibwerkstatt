@@ -44,9 +44,12 @@ const { resolvePageBookId } = require('../../lib/content-ownership');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider, effectiveProviderClass } = require('../../lib/ai');
 const { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratEffort } = require('./lektorat-split');
+const {
+  lastParagraph, firstParagraph, findPreviousPage, findNextPage, dropNeighbourFindings,
+} = require('./lektorat-context');
 
 // Lokale Provider (ollama/llama) bekommen einen deutlich abgespeckten Lektorat-Prompt:
-// kein Vorseiten-Kontext (BookStack-Roundtrip gespart), keine Figuren-Beziehungen,
+// kein Nachbarseiten-Kontext (Seiten-Roundtrips gespart), keine Figuren-Beziehungen,
 // kein POV-/Tempus-Block. Alle Einsparungen auch in public/js/prompts.js (_isLocal).
 // Klassen-SSoT: lib/ai/config.js#effectiveProviderClass (openai-compat flippt via
 // Cloud-Schalter auf 'cloud'). Am EFFEKTIVEN Provider dieses Users (KI-Profil vor
@@ -55,41 +58,6 @@ const { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratEffort } = req
 const _isLocalProvider = (userEmail) => effectiveProviderClass(
   userEmail === undefined ? {} : { userEmail }
 ) === 'local';
-
-// Letzten Absatz eines Texts extrahieren (max. maxChars Zeichen). Dient als
-// Übergangskontext für den Lektorat-Prompt, damit Tempus-/Perspektivwechsel
-// am Seitenanfang korrekt bewertet werden.
-function lastParagraph(text, maxChars = 600) {
-  const clean = (text || '').trim();
-  if (!clean) return null;
-  const paragraphs = clean.split(/\n{2,}|(?<=[.!?…])\s{2,}/).map(p => p.trim()).filter(Boolean);
-  const last = paragraphs.length ? paragraphs[paragraphs.length - 1] : clean;
-  if (last.length <= maxChars) return last;
-  const tail = last.slice(-maxChars);
-  const firstSentenceStart = tail.search(/[A-ZÄÖÜ]/);
-  return firstSentenceStart > 0 ? tail.slice(firstSentenceStart) : tail;
-}
-
-// Gibt die Seite zurück, die unmittelbar vor `currentPageId` liegt – bevorzugt
-// im selben Kapitel (BookStack-Priorität), sonst die vorhergehende Seite im Buch.
-function findPreviousPage(pages, currentPageId, currentChapterId) {
-  if (!Array.isArray(pages) || !pages.length) return null;
-  const sameChapter = currentChapterId
-    ? pages.filter(p => String(p.chapter_id || '') === String(currentChapterId))
-    : pages;
-  const pool = (sameChapter.length > 0 ? sameChapter : pages)
-    .slice()
-    .sort((a, b) => (a.position || 0) - (b.position || 0));
-  const idx = pool.findIndex(p => String(p.id) === String(currentPageId));
-  if (idx > 0) return pool[idx - 1];
-  // Fallback: falls die aktuelle Seite nicht in der Liste ist, letzte Seite vor ihr im Buch nehmen
-  if (idx === -1 && currentChapterId && sameChapter.length === 0) {
-    const allSorted = pages.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
-    const i2 = allSorted.findIndex(p => String(p.id) === String(currentPageId));
-    return i2 > 0 ? allSorted[i2 - 1] : null;
-  }
-  return null;
-}
 
 // Erklärungs-Phrasen die darauf hindeuten, dass der Eintrag kein echter Fehler ist.
 // Sprach-agnostisches letztes Sicherheitsnetz: Lokale Modelle (Ollama/Llama)
@@ -153,14 +121,18 @@ function stylisticCap() {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_STYLISTIC_CAP;
 }
 
-// Vollständige Nachbearbeitung eines rohen fehler-Arrays: validieren → dedupen →
-// stilistischen Cap anwenden. Einziger Chokepoint für alle vier Aufruf-Stellen
-// (fresh/cached × Einzel/Batch), damit die Pipeline nicht auseinanderdriftet.
+// Vollständige Nachbearbeitung eines rohen fehler-Arrays: validieren →
+// Nachbarseiten-Findings verwerfen → dedupen → stilistischen Cap anwenden.
+// Einziger Chokepoint für alle vier Aufruf-Stellen (fresh/cached ×
+// Einzel/Batch), damit die Pipeline nicht auseinanderdriftet.
 // `validTypen` ist das Typ-Set des Buchtyp-Profils (siehe _validTypen) – Findings
 // mit profilfremdem Typ werden verworfen. Greift auch auf dem Cache-Pfad: eine
 // Buchtyp-Umstellung soll narrativ geprägte Alt-Findings nicht durchlassen.
-function finalizeFehler(fehler, locale, validTypen) {
-  return capStylisticFehler(dedupFehler(validateLektoratFehler(fehler, locale, validTypen)), stylisticCap());
+// `neighbour` = { text, excerpts } der Seite und ihrer Kontext-Auszüge.
+function finalizeFehler(fehler, locale, validTypen, neighbour = null) {
+  const valid = validateLektoratFehler(fehler, locale, validTypen);
+  const own = neighbour ? dropNeighbourFindings(valid, neighbour.text, neighbour.excerpts) : valid;
+  return capStylisticFehler(dedupFehler(own), stylisticCap());
 }
 
 // Erlaubte Fehlertypen für dieses Buch. SSoT ist das Buchtyp-Profil in
@@ -255,27 +227,29 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
       : null;
     const chapterName = chapterRow?.chapter_name || null;
 
-    // Vorseite ermitteln (letzter Absatz als Übergangskontext). Nur Buch-Seiten aus BookStack
-    // ziehen – pages-Listing ist paginiert, aber typischerweise günstig (Metadaten).
-    // Lokale Provider: komplett überspringen – wird für _isLocal im Prompt nicht verwendet
-    // (dient nur Tempus-/Perspektiv-Prüfung, die lokal aus dem typ-Enum gedroppt ist).
-    // `htmlToTextForPrompt` ist hier Pflicht, nicht Geschmack: `lastParagraph`
-    // splittet auf `\n{2,}` – aus der einzeiligen Variante kann es keinen Absatz
-    // schneiden und liefert stattdessen die letzten 600 Zeichen der Vorseite.
+    // Nachbarseiten ermitteln (letzter Absatz der Vorseite, erster der Folgeseite
+    // als Lesekontext). Lokale Provider: komplett überspringen – der Block wird
+    // für _isLocal im Prompt ohnehin gedroppt.
+    // `htmlToTextForPrompt` ist hier Pflicht, nicht Geschmack: die Absatz-Helfer
+    // splitten auf `\n{2,}` – aus der einzeiligen Variante können sie keinen
+    // Absatz schneiden und liefern stattdessen 600 Zeichen Rohtext.
     // Gleiche Wahl wie im Batch-Pfad (runBatchCheckJob).
     let previousExcerpt = null;
+    let nextExcerpt = null;
     if (bookId && !local) {
       try {
         const allPages = await contentStore.listPages(bookId);
         const prev = findPreviousPage(allPages, pageId, pd.chapter_id);
-        if (prev) {
-          const prevPd = await contentStore.loadPage(prev.id);
-          previousExcerpt = lastParagraph(htmlToTextForPrompt(prevPd.html));
-        }
+        const next = findNextPage(allPages, pageId, pd.chapter_id);
+        const loadText = async (p) => (p ? htmlToTextForPrompt((await contentStore.loadPage(p.id)).html) : null);
+        const [prevText, nextText] = await Promise.all([loadText(prev), loadText(next)]);
+        previousExcerpt = prevText ? lastParagraph(prevText) : null;
+        nextExcerpt = nextText ? firstParagraph(nextText) : null;
       } catch (e) {
-        logger.warn(`Vorseiten-Kontext konnte nicht geladen werden (page=${pageId}): ${e.message}`);
+        logger.warn(`Nachbarseiten-Kontext konnte nicht geladen werden (page=${pageId}): ${e.message}`);
       }
     }
+    const neighbour = { text, excerpts: [previousExcerpt, nextExcerpt] };
 
     const tok = { in: 0, out: 0, ms: 0 };
     updateJob(jobId, { statusText: 'job.phase.aiAnalyzing', progress: 10 });
@@ -296,7 +270,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
       ts: pageTextsorte,
       sw: lektoratStopwords, er: lektoratErklaerungRule, kr: lektoratKorrekturRegeln,
       stp: bookSettings?.stilprofil || '',
-      pe: previousExcerpt, cn: chapterName, pn: pd.name, cv: cacheVersion, lc: langCode,
+      pe: previousExcerpt, ne: nextExcerpt, cn: chapterName, pn: pd.name, cv: cacheVersion, lc: langCode,
       bl: hatBelege,
     }) : null;
     const cached = ctxSig ? loadLektoratCache(bookId, userEmail, pageId, ctxSig, effectiveProvider) : null;
@@ -311,7 +285,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
       // das tote `kontext`-Feld oder 1:1-Vorschläge (== Original) enthalten.
       // validateLektoratFehler strippt `kontext` und filtert 1:1 mit.
       if (Array.isArray(result?.fehler)) {
-        result.fehler = finalizeFehler(result.fehler, locale, validTypen);
+        result.fehler = finalizeFehler(result.fehler, locale, validTypen, neighbour);
       }
     } else {
       result = await lektoratAnalyze({
@@ -326,12 +300,12 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
           pageName: pd.name, chapterName,
           ...narrativeLabels(bookSettings),
           textsorte: pageTextsorte,
-          previousExcerpt,
+          previousExcerpt, nextExcerpt,
           langCode,
         },
       });
 
-      result.fehler = finalizeFehler(result.fehler, locale, validTypen);
+      result.fehler = finalizeFehler(result.fehler, locale, validTypen, neighbour);
 
       if (ctxSig) saveLektoratCache(bookId, userEmail, pageId, ctxSig, result, effectiveProvider);
     }
@@ -415,9 +389,20 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
     const model = _modelName(effectiveProvider);
     let done = 0, totalErrors = 0;
 
-    // Letzten-Absatz-Cache pro page_id, damit die Vorseiten-Extraktion im Batch
-    // nicht dieselbe Seite zweimal von BookStack holt.
-    const lastParaCache = new Map();
+    // Absatz-Cache pro page_id ({ first, last }), damit die Nachbarseiten-Extraktion
+    // im Batch nicht dieselbe Seite mehrfach lädt. Seiten, die der Batch selbst
+    // prüft, tragen sich beim Prüfen ein.
+    const paraCache = new Map();
+    const neighbourParas = async (page) => {
+      if (!page) return null;
+      if (paraCache.has(page.id)) return paraCache.get(page.id);
+      try {
+        const t = htmlToTextForPrompt((await contentStore.loadPage(page.id)).html);
+        const paras = { first: firstParagraph(t), last: lastParagraph(t) };
+        paraCache.set(page.id, paras);
+        return paras;
+      } catch (_) { return null; /* Nachbarseite fehlschlägt → kein Kontext, nicht kritisch */ }
+    };
 
     const processPage = async (p, i) => {
       if (jobAbortControllers.get(jobId)?.signal.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -432,24 +417,20 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
         const batchMotive      = local ? [] : getPageMotifs(bookId, pd.chapter_id, p.id, userEmail);
         const batchHatBelege   = _pageHasCitations(p.id);
 
-        // Lokale Provider: Vorseiten-Kontext wird im Prompt nicht verwendet – kompletter
-        // Block überspringen, spart einen BookStack-Fetch pro Seite.
+        // Lokale Provider: Nachbarseiten-Kontext wird im Prompt nicht verwendet –
+        // kompletter Block überspringen, spart zwei Seiten-Loads pro Seite.
         let previousExcerpt = null;
+        let nextExcerpt = null;
         if (!local) {
-          const prev = findPreviousPage(pages, p.id, pd.chapter_id);
-          if (prev) {
-            if (lastParaCache.has(prev.id)) {
-              previousExcerpt = lastParaCache.get(prev.id);
-            } else {
-              try {
-                const prevPd = await contentStore.loadPage(prev.id);
-                previousExcerpt = lastParagraph(htmlToTextForPrompt(prevPd.html));
-                lastParaCache.set(prev.id, previousExcerpt);
-              } catch (_) { /* Vorseite fehlschlägt → kein Kontext, nicht kritisch */ }
-            }
-          }
-          lastParaCache.set(p.id, lastParagraph(text));
+          paraCache.set(p.id, { first: firstParagraph(text), last: lastParagraph(text) });
+          const [prevParas, nextParas] = await Promise.all([
+            neighbourParas(findPreviousPage(pages, p.id, pd.chapter_id)),
+            neighbourParas(findNextPage(pages, p.id, pd.chapter_id)),
+          ]);
+          previousExcerpt = prevParas?.last || null;
+          nextExcerpt = nextParas?.first || null;
         }
+        const neighbour = { text, excerpts: [previousExcerpt, nextExcerpt] };
 
         const chapterName = pd.chapter_id ? (chapterNameById[String(pd.chapter_id)] || null) : null;
         // Textsorte ist SEITEN-, nicht buchweit — darum hier je Seite aufloesen
@@ -469,7 +450,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
           bt: bookSettings?.buchtyp || null,
           sw: batchStopwords, er: batchErklaerungRule, kr: batchKorrekturRegeln,
           stp: bookSettings?.stilprofil || '',
-          pe: previousExcerpt, cn: chapterName, pn: p.name, cv: cacheVersion, lc: langCode,
+          pe: previousExcerpt, ne: nextExcerpt, cn: chapterName, pn: p.name, cv: cacheVersion, lc: langCode,
           bl: batchHatBelege,
         });
         const cached = loadLektoratCache(bookId, userEmail, p.id, ctxSig, effectiveProvider);
@@ -480,7 +461,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
           result = cached;
           // Re-Validate (strippt `kontext`, filtert 1:1) + Dedup auf Cached-Path.
           if (Array.isArray(result?.fehler)) {
-            result.fehler = finalizeFehler(result.fehler, locale, validTypen);
+            result.fehler = finalizeFehler(result.fehler, locale, validTypen, neighbour);
           }
         } else {
           // Bei Pool>1 sind feinere Pct-Ranges pro Item nicht sinnvoll
@@ -503,12 +484,12 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
               chapterName,
               ...narrativeLabels(bookSettings),
               textsorte: pageTextsorte,
-              previousExcerpt,
+              previousExcerpt, nextExcerpt,
               langCode,
             },
           });
 
-          result.fehler = finalizeFehler(result.fehler, locale, validTypen);
+          result.fehler = finalizeFehler(result.fehler, locale, validTypen, neighbour);
           saveLektoratCache(bookId, userEmail, p.id, ctxSig, result, effectiveProvider);
         }
         const fehler = result.fehler || [];
