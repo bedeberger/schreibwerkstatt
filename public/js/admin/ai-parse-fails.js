@@ -2,7 +2,7 @@
 // gespreaded. Root-Zugriffe via window.__app. Liest aus
 // /admin/parse-fails/{files,file} + DELETE.
 
-import { tzOpts, localeTag, fetchJson, sendJson } from '../utils.js';
+import { tzOpts, localeTag, fetchJson, sendJson, fmtBytes } from '../utils.js';
 import { tFetchErrorRaw } from '../i18n.js';
 
 export const adminParseFailsMethods = {
@@ -98,9 +98,6 @@ export const adminParseFailsMethods = {
   },
 
   parseFailsFmtSize(bytes) {
-    const n = Number(bytes) || 0;
-    if (n < 1024) return n + ' B';
-    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
-    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    return fmtBytes(Number(bytes) || 0, Alpine.store('shell').uiLocale);
   },
 };

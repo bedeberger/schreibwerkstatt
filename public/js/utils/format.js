@@ -43,6 +43,19 @@ export function numberFormat(uiLocale, opts = {}) {
   return nf;
 }
 
+// Dateigrösse locale-formatiert mit binärer Einheit (1024er-Stufen): „512 B",
+// „1,5 KB" / „1.5 KB", „12,3 MB". Bytes ganzzahlig, darüber eine Nachkomma-
+// stelle. Null/NaN → „—".
+const _BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
+export function fmtBytes(n, uiLocale) {
+  const v = Number(n);
+  if (n == null || n === '' || !Number.isFinite(v)) return '—';
+  let x = Math.max(0, v);
+  let i = 0;
+  while (x >= 1024 && i < _BYTE_UNITS.length - 1) { x /= 1024; i++; }
+  return `${numberFormat(uiLocale, { maximumFractionDigits: i === 0 ? 0 : 1 }).format(x)} ${_BYTE_UNITS[i]}`;
+}
+
 // Klassische Normseite (DIN): 30 Zeilen × ~50 Zeichen ≈ 1500 Zeichen.
 // Sekundäre Umfangs-Kennzahl neben Zeichen/Wörter.
 export const CHARS_PER_NORMSEITE = 1500;

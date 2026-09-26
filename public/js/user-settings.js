@@ -2,7 +2,7 @@
 // Methoden werden in Alpine.data('userSettingsCard') gespreadet;
 // Root-Zugriffe via window.__app.
 
-import { fetchJson, sendJson, numberFormat, localeTag, configureLocaleRegion } from './utils.js';
+import { fetchJson, sendJson, fmtBytes, localeTag, configureLocaleRegion } from './utils.js';
 import { tFetchErrorRaw } from './i18n.js';
 
 // Protokollwert von DELETE /me/account. Bewusst NICHT lokalisiert und bewusst
@@ -244,11 +244,10 @@ export const userSettingsMethods = {
     }
   },
 
-  /** Download-Größe der Store-App in MB, locale-formatiert. */
-  macReleaseSizeMb() {
+  /** Download-Grösse mit Einheit, locale-formatiert ('' ohne Grösse). */
+  macReleaseSizeLabel() {
     const bytes = this.macRelease?.sizeBytes || 0;
-    if (!bytes) return '';
-    return numberFormat(Alpine.store('shell').uiLocale, { maximumFractionDigits: 1 }).format(bytes / 1048576);
+    return bytes ? fmtBytes(bytes, Alpine.store('shell').uiLocale) : '';
   },
 
   /** Dezent erkennen, ob der Besucher auf macOS ist (nur für einen Hinweis). */
@@ -269,11 +268,10 @@ export const userSettingsMethods = {
     }
   },
 
-  /** Dateigröße des .apk in MB, locale-formatiert. */
-  androidReleaseSizeMb() {
+  /** Download-Grösse mit Einheit, locale-formatiert ('' ohne Grösse). */
+  androidReleaseSizeLabel() {
     const bytes = this.androidRelease?.apk?.sizeBytes || 0;
-    if (!bytes) return '';
-    return numberFormat(Alpine.store('shell').uiLocale, { maximumFractionDigits: 1 }).format(bytes / 1048576);
+    return bytes ? fmtBytes(bytes, Alpine.store('shell').uiLocale) : '';
   },
 
   /** Dezent erkennen, ob der Besucher auf Android ist (nur für einen Hinweis). */
@@ -299,10 +297,9 @@ export const userSettingsMethods = {
     }
   },
 
-  /** Dateigröße des .zip in MB, locale-formatiert. */
-  extensionReleaseSizeMb() {
+  /** Download-Grösse mit Einheit, locale-formatiert ('' ohne Grösse). */
+  extensionReleaseSizeLabel() {
     const bytes = this.extensionRelease?.zip?.sizeBytes || 0;
-    if (!bytes) return '';
-    return numberFormat(Alpine.store('shell').uiLocale, { maximumFractionDigits: 1 }).format(bytes / 1048576);
+    return bytes ? fmtBytes(bytes, Alpine.store('shell').uiLocale) : '';
   },
 };

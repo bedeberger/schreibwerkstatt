@@ -1,16 +1,8 @@
 // Admin-Karte: Buecher-Uebersicht + Owner-Zuweisung fuer ownerless Buecher.
 // Methoden werden in Alpine.data('adminBooksCard') gespreadet.
 
-import { fetchJson, sendJson, charsToNormseiten, formatNumber, localeTag } from '../utils.js';
+import { fetchJson, sendJson, charsToNormseiten, formatNumber, fmtBytes } from '../utils.js';
 import { tFetchErrorRaw } from '../i18n.js';
-
-function _fmtBytes(n, uiLocale) {
-  const v = Number(n) || 0;
-  const tag = localeTag(uiLocale);
-  if (v < 1024) return `${v.toLocaleString(tag)} B`;
-  if (v < 1024 * 1024) return `${(v / 1024).toLocaleString(tag, { maximumFractionDigits: 1 })} KB`;
-  return `${(v / (1024 * 1024)).toLocaleString(tag, { maximumFractionDigits: 2 })} MB`;
-}
 
 export const adminBooksMethods = {
   async loadAll() {
@@ -50,7 +42,7 @@ export const adminBooksMethods = {
   },
 
   fmtBytes(n) {
-    return _fmtBytes(n, Alpine.store('shell').uiLocale);
+    return fmtBytes(Number(n) || 0, Alpine.store('shell').uiLocale);
   },
 
   async assignOwner(book) {

@@ -3,7 +3,7 @@
 // konsistenten SQLite-Snapshots) + Restore (Upload → Validierung → Neustart,
 // beim Boot wird die DB geswappt). Backend: routes/admin-backup.js.
 
-import { localeTag, fetchJson } from '../utils.js';
+import { fmtBytes, fetchJson } from '../utils.js';
 import { tFetchErrorRaw } from '../i18n.js';
 
 export const adminBackupMethods = {
@@ -101,12 +101,7 @@ export const adminBackupMethods = {
 
   // ── Format / Labels ──────────────────────────────────────────────────────
   backupFmtBytes(n) {
-    if (n == null || Number.isNaN(n)) return '—';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let v = n, i = 0;
-    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-    const loc = localeTag(Alpine.store('shell').uiLocale);
-    return `${v.toLocaleString(loc, { maximumFractionDigits: i === 0 ? 0 : 1 })} ${units[i]}`;
+    return fmtBytes(n, Alpine.store('shell').uiLocale);
   },
 
   _backupErrLabel(code) {
