@@ -20,8 +20,7 @@ const { FORMATS } = require('../lib/export-builders');
 const { buildExportMeta, sendExportBuffer } = require('../lib/export-send');
 const { buildExportFilename } = require('../lib/filenames');
 const { toIntId } = require('../lib/validate');
-const { setContext } = require('../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
+const { guardBook, sessionEmail } = require('../lib/acl');
 const bookOrder = require('../db/book-order');
 const snapshots = require('../db/book-snapshots');
 const pagePresence = require('../db/page-presence');
@@ -221,9 +220,7 @@ async function captureSnapshot(bookId, req, { label = null, description = null, 
 router.get('/:bookId', (req, res) => {
   const bookId = toIntId(req.params.bookId);
   if (!bookId) return res.status(400).json({ error_code: 'ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   try {
     return res.json({ snapshots: snapshots.listSnapshots(bookId) });
@@ -242,9 +239,7 @@ router.get('/:bookId', (req, res) => {
 router.get('/:bookId/drift', async (req, res) => {
   const bookId = toIntId(req.params.bookId);
   if (!bookId) return res.status(400).json({ error_code: 'ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   const baseline = snapshots.getLatestSnapshot(bookId);
   if (!baseline) return res.json({ hasBaseline: false });
@@ -293,9 +288,7 @@ router.get('/:bookId/:id', (req, res) => {
   const bookId = toIntId(req.params.bookId);
   const id = toIntId(req.params.id);
   if (!bookId || !id) return res.status(400).json({ error_code: 'ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   const row = snapshots.getSnapshot(bookId, id);
   if (!row) return res.status(404).json({ error_code: 'NOT_FOUND' });
@@ -332,9 +325,7 @@ router.get('/:bookId/:id/export/:fmt', async (req, res) => {
   const id = toIntId(req.params.id);
   const fmt = String(req.params.fmt || '').toLowerCase();
   if (!bookId || !id) return res.status(400).json({ error_code: 'ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   // PDF laeuft ausschliesslich ueber den Job-Pfad (Custom-Profile) — hier nicht.
   const spec = fmt === 'pdf' ? null : FORMATS[fmt];
@@ -393,9 +384,7 @@ router.get('/:bookId/:id/export/:fmt', async (req, res) => {
 router.post('/:bookId', express.json({ limit: '1mb' }), async (req, res) => {
   const bookId = toIntId(req.params.bookId);
   if (!bookId) return res.status(400).json({ error_code: 'ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'editor')) return;
 
   const label = _clip(req.body?.label, LABEL_MAX);
   const description = _clip(req.body?.description, DESC_MAX);
@@ -447,9 +436,7 @@ router.post('/:bookId/:id/restore', express.json({ limit: '1mb' }), async (req, 
   const bookId = toIntId(req.params.bookId);
   const id = toIntId(req.params.id);
   if (!bookId || !id) return res.status(400).json({ error_code: 'ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'editor')) return;
 
   // Ziel-Fassung laden + zu Op-Liste planen.
   const row = snapshots.getSnapshot(bookId, id);
@@ -605,9 +592,7 @@ router.post('/:bookId/:id/publish', express.json({ limit: '4kb' }), (req, res) =
   const bookId = toIntId(req.params.bookId);
   const id = toIntId(req.params.id);
   if (!bookId || !id) return res.status(400).json({ error_code: 'ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'editor')) return;
 
   const published = !!req.body?.published;
   try {
@@ -630,9 +615,7 @@ router.delete('/:bookId/:id', (req, res) => {
   const bookId = toIntId(req.params.bookId);
   const id = toIntId(req.params.id);
   if (!bookId || !id) return res.status(400).json({ error_code: 'ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'editor')) return;
 
   const force = req.query.force === '1' || req.query.force === 'true';
   const row = snapshots.getSnapshot(bookId, id);

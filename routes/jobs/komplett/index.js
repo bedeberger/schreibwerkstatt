@@ -14,8 +14,7 @@ const { getBookSettings } = require('../../../db/schema');
 const { toIntId } = require('../../../lib/validate');
 const { resolveProvider, effectiveProviderClass } = require('../../../lib/ai');
 const appSettings = require('../../../lib/app-settings');
-const { setContext } = require('../../../lib/log-context');
-const { aclParamGuard, requireBookAccess, sendACLError, sessionEmail } = require('../../../lib/acl');
+const { guardBook, aclParamGuard, sessionEmail } = require('../../../lib/acl');
 const { jsonBody, createJob, enqueueJob, findActiveJobId } = require('../shared');
 const { runKomplettAnalyseJob, runKontinuitaetJob, runErzaehlprofilJob, runFaktencheckJob, runKomplettAnalyseAll } = require('./job');
 const { normalizeKomplettScope } = require('../../../lib/komplett-scope');
@@ -30,9 +29,7 @@ komplettRouter.post('/komplett-analyse', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const userEmail = sessionEmail(req);
   const existing = findActiveJobId('komplett-analyse', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
@@ -66,9 +63,7 @@ komplettRouter.post('/kontinuitaet', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const userEmail = sessionEmail(req);
   // Kontinuitätsprüfung braucht die Cloud-KLASSE (Single-Pass, Verify-Filter,
   // Attribut-Check setzen ein faehiges Modell voraus — keine Anthropic-API-Faehigkeit).
@@ -99,9 +94,7 @@ komplettRouter.post('/kontinuitaet/issue/:issue_id/resolved', jsonBody, (req, re
   if (!issueId) return res.status(400).json({ error_code: 'INVALID_ISSUE_ID' });
   const bookId = getContinuityIssueBookId(issueId);
   if (!bookId) return res.status(404).json({ error_code: 'ISSUE_NOT_FOUND' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'editor')) return;
   const resolved = !!req.body?.resolved;
   setContinuityIssueResolved(issueId, resolved);
   res.json({ ok: true, resolved });
@@ -114,9 +107,7 @@ komplettRouter.post('/faktencheck', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const userEmail = sessionEmail(req);
   if (resolveProvider({ userEmail }) !== 'claude') return res.status(400).json({ error_code: 'FACTCHECK_CLAUDE_ONLY' });
   if (appSettings.get('ai.komplett.factcheck') === false) return res.status(400).json({ error_code: 'FACTCHECK_DISABLED' });
@@ -136,9 +127,7 @@ komplettRouter.post('/erzaehlprofil', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const userEmail = sessionEmail(req);
   // Erzählprofil braucht die Cloud-Klasse (Single-Pass). Serverseitiger Guard analog
   // Kontinuität (Defense-in-depth), gleiche Entscheidung wie `/config`.

@@ -10,7 +10,6 @@ const {
   jsonBody,
 } = require('../shared');
 const { buildExportFilename } = require('../../../lib/filenames');
-const { setContext } = require('../../../lib/log-context');
 const { loadFinetuneData } = require('./data-loader');
 const { finalizeFinetuneSamples } = require('./finalize');
 const { finetuneResultStore } = require('./lib/store');
@@ -22,7 +21,7 @@ const { buildDialogSamples } = require('./samples/dialog');
 const { buildCorrectionSamples } = require('./samples/correction');
 const { buildAuthorChatSamples } = require('./samples/author-chat');
 const { buildAiAugmentSamples } = require('./samples/ai-augment');
-const { sessionEmail } = require('../../../lib/acl');
+const { guardBook, sessionEmail } = require('../../../lib/acl');
 
 const finetuneExportRouter = express.Router();
 
@@ -180,10 +179,7 @@ finetuneExportRouter.post('/finetune-export', jsonBody, (req, res) => {
           max_seq_tokens, emit_text, fulltext, max_full_chars, truncate_long, bias_boost,
           max_type_share, ai } = req.body || {};
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  const { requireBookAccess, sendACLError } = require('../../../lib/acl');
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const aiOpts = {
     reversePrompts:        !!(ai && ai.reverse_prompts),
     factQA:                !!(ai && ai.fact_qa),

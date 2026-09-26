@@ -17,8 +17,7 @@
 
 const express = require('express');
 const { toIntId } = require('../lib/validate');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
-const { setContext } = require('../lib/log-context');
+const { guardBook, sessionEmail } = require('../lib/acl');
 const bookAccess = require('../db/book-access');
 const searchIndex = require('../lib/search');
 const semanticChunks = require('../db/semantic-chunks');
@@ -54,9 +53,7 @@ router.get('/', (req, res) => {
   if (req.query.book_id && !bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
 
   if (bookId) {
-    setContext({ book: bookId });
-    try { requireBookAccess(req, bookId, 'viewer'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'viewer')) return;
   }
 
   const kinds = _parseKinds(req.query.kind);
@@ -133,9 +130,7 @@ router.get('/semantic', async (req, res) => {
 
   const bookId = toIntId(req.query.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   const rawKinds = _parseKinds(req.query.kind).filter(k => SEMANTIC_KINDS.includes(k));
   const kinds = rawKinds.length ? rawKinds : SEMANTIC_KINDS;
@@ -176,9 +171,7 @@ router.get('/semantic/status', (req, res) => {
 
   const bookId = toIntId(req.query.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   const { model } = embed.getConfig();
   try {

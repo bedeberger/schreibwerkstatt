@@ -15,7 +15,7 @@ const { db } = require('../../db/connection');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { resolvePageBookId } = require('../../lib/content-ownership');
-const { aclParamGuard, requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, aclParamGuard, sessionEmail } = require('../../lib/acl');
 const { localIsoDaysAgo } = require('../../lib/local-date');
 const logger = require('../../logger');
 const { jsonBody, NAME_MAX, _validDeviceId, _fail } = require('./shared');
@@ -346,9 +346,7 @@ function register(router) {
     const count = req.query?.count;
     if (query.length < 2) return res.json({ hits: [] });
     if (bookId) {
-      setContext({ book: bookId });
-      try { requireBookAccess(req, bookId, 'viewer'); }
-      catch (e) { if (sendACLError(res, e)) return; throw e; }
+      if (!guardBook(req, res, bookId, 'viewer')) return;
     }
     const email = sessionEmail(req);
     const allowedIds = new Set(bookAccess.listBookIdsForUser(email).map(r => r.book_id));

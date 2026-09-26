@@ -28,8 +28,7 @@ const embed = require('../../lib/embed');
 const semanticChunks = require('../../db/semantic-chunks');
 const { preparePoints, project2d, chapterStats, outliers } = require('../../lib/book-map');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const bookMapRouter = express.Router();
 
@@ -120,9 +119,7 @@ async function runBookMapJob(jobId, bookId) {
 bookMapRouter.post('/book-map', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'lektor')) return;
   if (!embed.isEnabled()) return res.status(400).json({ error_code: 'EMBED_DISABLED' });
   const userEmail = sessionEmail(req);
   const existing = findActiveJobId('book-map', book_id, userEmail);

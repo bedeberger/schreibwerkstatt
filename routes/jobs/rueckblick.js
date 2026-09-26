@@ -22,8 +22,7 @@ const {
 const { parseZeitraum: _parseZeitraum, entryDate: _entryDate, matchesZeitraum: _matchesZeitraum, previousZeitraum: _previousZeitraum } = require('./rueckblick-dates');
 const crypto = require('crypto');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const rueckblickRouter = express.Router();
 
@@ -228,10 +227,7 @@ rueckblickRouter.post('/rueckblick', jsonBody, (req, res) => {
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   const zeitraum = String(req.body?.zeitraum || '').trim();
   if (!_parseZeitraum(zeitraum)) return res.status(400).json({ error_code: 'ZEITRAUM_REQUIRED' });
-  setContext({ book: book_id });
-  const { requireBookAccess, sendACLError } = require('../../lib/acl');
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const userEmail = sessionEmail(req);
   // dedupId mischt den Zeitraum ein, damit Monat ≠ Jahr nicht gegeneinander dedupen.
   const dedupId = `${book_id}:${zeitraum}`;

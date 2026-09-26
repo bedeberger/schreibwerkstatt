@@ -5,9 +5,8 @@
 
 const express = require('express');
 const logger = require('../../logger');
-const { setContext } = require('../../lib/log-context');
 const { resolvePageBookId, resolveChapterBookId } = require('../../lib/content-ownership');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const deviceTokens = require('../../db/device-tokens');
 
 const jsonBody = express.json({ limit: '10mb' });
@@ -43,17 +42,13 @@ function _deviceTokenLabel(req) {
 function _guardPage(req, res, pageId, minRole) {
   const bookId = resolvePageBookId(pageId);
   if (!bookId) { res.status(404).json({ error_code: 'PAGE_NOT_FOUND' }); return null; }
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, minRole); return bookId; }
-  catch (e) { sendACLError(res, e); return null; }
+  return guardBook(req, res, bookId, minRole) ? bookId : null;
 }
 
 function _guardChapter(req, res, chapterId, minRole) {
   const bookId = resolveChapterBookId(chapterId);
   if (!bookId) { res.status(404).json({ error_code: 'CHAPTER_NOT_FOUND' }); return null; }
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, minRole); return bookId; }
-  catch (e) { sendACLError(res, e); return null; }
+  return guardBook(req, res, bookId, minRole) ? bookId : null;
 }
 
 function _fail(res, e, opName) {

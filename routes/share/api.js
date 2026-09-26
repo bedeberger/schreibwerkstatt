@@ -6,7 +6,7 @@
 
 const contentStore = require('../../lib/content-store');
 const shareLinks = require('../../db/share-links');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const { setContext } = require('../../lib/log-context');
 const notify = require('../../lib/notify');
 const logger = require('../../logger');
@@ -22,7 +22,7 @@ function requireSession(req, res, next) {
 
 function register(router) {
   router.get('/api/links', requireSession, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const bookId = parseInt(req.query.book_id, 10);
     try {
       const rows = bookId
@@ -43,7 +43,7 @@ function register(router) {
   // einmal pro Buch und nur wenn überhaupt verankerte Kommentare vorliegen);
   // nicht-verankerte Kommentare lassen sich keiner Seite zuordnen und zählen nicht.
   router.get('/api/page-comment-counts', requireSession, async (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const bookId = parseInt(req.query.book_id, 10);
     if (!Number.isInteger(bookId) || bookId <= 0) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
     setContext({ book: bookId });
@@ -78,7 +78,7 @@ function register(router) {
   // enthalten in: einem Page-Share auf sie selbst, einem Chapter-Share auf ihr
   // Kapitel (Direkt-Children, analog Reader-Render) und jedem Buch-Share des Buchs.
   router.get('/api/page-link-counts', requireSession, async (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const bookId = parseInt(req.query.book_id, 10);
     if (!Number.isInteger(bookId) || bookId <= 0) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
     setContext({ book: bookId });
@@ -112,7 +112,7 @@ function register(router) {
   // per Anker (data-bid/quote) auf die aktuell gerenderte Seite. Jede Zeile trägt
   // share_token → Reply/Resolve/Delete nutzen die bestehenden Owner-Endpoints.
   router.get('/api/book-comments/:book_id', requireSession, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const bookId = parseInt(req.params.book_id, 10);
     if (!Number.isInteger(bookId) || bookId <= 0) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
     setContext({ book: bookId });
@@ -127,7 +127,7 @@ function register(router) {
   });
 
   router.post('/api/links', requireSession, jsonBody, async (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const { kind, page_id, chapter_id, book_id, intro, expires_at, show_toc } = req.body || {};
     if (kind !== 'page' && kind !== 'chapter' && kind !== 'book') return res.status(400).json({ error_code: 'INVALID_KIND' });
     if (kind === 'page' && !Number.isInteger(parseInt(page_id, 10))) return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
@@ -162,12 +162,7 @@ function register(router) {
       return res.status(404).json({ error_code: 'TARGET_NOT_FOUND' });
     }
 
-    try {
-      requireBookAccess(req, bookId, 'editor');
-    } catch (e) {
-      const ack = sendACLError(res, e); if (ack) return; throw e;
-    }
-    setContext({ book: bookId });
+    if (!guardBook(req, res, bookId, 'editor')) return;
 
     try {
       const created = shareLinks.createShareLink({
@@ -190,7 +185,7 @@ function register(router) {
   });
 
   router.patch('/api/links/:token', requireSession, jsonBody, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const token = String(req.params.token || '');
     const link = shareLinks.getShareLinkByToken(token);
     if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
@@ -222,7 +217,7 @@ function register(router) {
   });
 
   router.delete('/api/links/:token', requireSession, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const token = String(req.params.token || '');
     const link = shareLinks.getShareLinkByToken(token);
     if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
@@ -239,7 +234,7 @@ function register(router) {
   });
 
   router.get('/api/links/:token/comments', requireSession, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const token = String(req.params.token || '');
     const link = shareLinks.getShareLinkByToken(token);
     if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
@@ -257,7 +252,7 @@ function register(router) {
   // Kapitel-Drop-off eines Links (Autor): pro Kapitel Ø-Lesetiefe + Anzahl der
   // Aufrufe, die es erreicht haben. Nur bei Buch-/Kapitel-Shares gefüllt.
   router.get('/api/links/:token/read-depth', requireSession, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const token = String(req.params.token || '');
     const link = shareLinks.getShareLinkByToken(token);
     if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
@@ -272,7 +267,7 @@ function register(router) {
 
   // Gesamt-Fazits eines Links (Autor): Sternewertung + Freitext pro Leser.
   router.get('/api/links/:token/feedback', requireSession, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const token = String(req.params.token || '');
     const link = shareLinks.getShareLinkByToken(token);
     if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
@@ -290,7 +285,7 @@ function register(router) {
   // Chapter-Share = Block in den Kapitel-Seiten suchen (Anker speichert keine
   // page_id).
   router.get('/api/links/:token/locate', requireSession, async (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const token = String(req.params.token || '');
     const link = shareLinks.getShareLinkByToken(token);
     if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
@@ -311,7 +306,7 @@ function register(router) {
 
   // Owner antwortet auf einen Root-Kommentar (Thread bidirektional).
   router.post('/api/links/:token/comments', requireSession, jsonBody, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const token = String(req.params.token || '');
     const link = shareLinks.getShareLinkByToken(token);
     if (!link || link.owner_email !== ownerEmail) return res.status(404).json({ error_code: 'NOT_FOUND' });
@@ -340,7 +335,7 @@ function register(router) {
 
   // Owner markiert einen Root-Thread als erledigt / oeffnet ihn wieder.
   router.patch('/api/comments/:id/resolve', requireSession, jsonBody, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
     const resolved = req.body?.resolved !== false;
@@ -355,7 +350,7 @@ function register(router) {
   });
 
   router.delete('/api/comments/:id', requireSession, (req, res) => {
-    const ownerEmail = req.session.user.email;
+    const ownerEmail = sessionEmail(req);
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
     try {

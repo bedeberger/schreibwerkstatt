@@ -16,7 +16,7 @@ const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const synonymeRouter = express.Router();
 
@@ -90,9 +90,7 @@ synonymeRouter.post('/synonym', jsonBody, (req, res) => {
   if (!satz || typeof satz !== 'string' || !satz.trim()) return res.status(400).json({ error_code: 'SATZ_REQUIRED' });
   if (book_id) setContext({ book: book_id });
   if (book_id) {
-    const { requireBookAccess, sendACLError } = require('../../lib/acl');
-    try { requireBookAccess(req, book_id, 'lektor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, book_id, 'lektor')) return;
   }
   const userEmail = sessionEmail(req);
   const entityKey = `${book_id || 0}|${wort.trim().toLowerCase()}|${satz.trim().slice(0, 60)}`;

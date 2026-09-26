@@ -20,8 +20,7 @@ const {
 const { geocode } = require('../../lib/geocode');
 const { NOW_ISO_SQL } = require('../../db/now');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const geocodeRouter = express.Router();
 const MAX_ITEMS = 200;
@@ -231,12 +230,7 @@ geocodeRouter.post('/geocode-resolve', jsonBody, (req, res) => {
     .filter(it => it.id && it.name)
     .slice(0, MAX_ITEMS);
   if (!items.length) return res.status(400).json({ error_code: 'ITEMS_REQUIRED' });
-  setContext({ book: book_id });
-  {
-    const { requireBookAccess, sendACLError } = require('../../lib/acl');
-    try { requireBookAccess(req, book_id, 'lektor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
-  }
+  if (!guardBook(req, res, book_id, 'lektor')) return;
   const userEmail = sessionEmail(req);
   const entityKey = `${book_id}|${items.map(i => i.id).sort().join(',')}`;
   const existing = findActiveJobId('geocode-resolve', entityKey, userEmail);

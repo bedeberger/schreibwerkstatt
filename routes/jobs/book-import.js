@@ -209,7 +209,7 @@ const rawZipBody = express.raw({
 
 router.post('/book-import', rawZipBody, async (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'UNAUTHENTICATED' });
+  if (!userEmail) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
 
   if (!req.body || !Buffer.isBuffer(req.body) || req.body.length === 0) {
     return res.status(400).json({ error_code: 'EMPTY_BODY' });

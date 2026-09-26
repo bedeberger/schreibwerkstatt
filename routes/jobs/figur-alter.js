@@ -42,8 +42,7 @@ const {
 const embed = require('../../lib/embed');
 const { semanticQuery } = require('../../lib/semantic-retrieval');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 // Deckel pro Figur. Mehr Stellen heisst nicht mehr Erkenntnis: das Alter einer
 // Figur haengt an einer Handvoll Saetzen, und die Auswahl verteilt sich bewusst
@@ -371,12 +370,9 @@ const figurAlterRouter = express.Router();
 figurAlterRouter.post('/figur-alter', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
   // 'editor': das Ergebnis ist ein Analyse-Index am Buch, kein Lesevorgang.
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
 
   const existing = findActiveJobId('figur-alter', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });

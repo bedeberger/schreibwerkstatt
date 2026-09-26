@@ -11,8 +11,7 @@ const {
   tps, createJob, enqueueJob, findActiveJobId, jsonBody, _modelName,
 } = require('./shared');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const { getContextConfigFor, resolveProvider } = require('../../lib/ai');
 const { db } = require('../../db/connection');
 const plotDb = require('../../db/plot');
@@ -540,12 +539,8 @@ plotRouter.post('/plot-brainstorm', jsonBody, (req, res) => {
   const actId = toIntId(req.body?.act_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!actId)  return res.status(400).json({ error_code: 'ACT_ID_REQUIRED' });
+  if (!guardBook(req, res, bookId, 'editor')) return;
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'UNAUTHORIZED' });
-
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
 
   const act = plotDb.getAct(actId);
   if (!act || act.book_id !== bookId || act.user_email !== userEmail) {
@@ -566,12 +561,8 @@ plotRouter.post('/plot-brainstorm', jsonBody, (req, res) => {
 plotRouter.post('/plot-consistency', jsonBody, (req, res) => {
   const bookId = toIntId(req.body?.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  if (!guardBook(req, res, bookId, 'editor')) return;
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'UNAUTHORIZED' });
-
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
 
   const existing = findActiveJobId('plot-consistency', bookId, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });

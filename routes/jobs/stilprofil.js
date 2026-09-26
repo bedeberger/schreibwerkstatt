@@ -13,8 +13,7 @@ const {
 const { BATCH_SIZE } = require('./shared/loader');
 const { resolveProvider } = require('../../lib/ai');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const stilprofilRouter = express.Router();
 
@@ -94,10 +93,7 @@ async function runStilprofilJob(jobId, bookId, userEmail) {
 stilprofilRouter.post('/stilprofil', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  const { requireBookAccess, sendACLError } = require('../../lib/acl');
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const userEmail = sessionEmail(req);
   const existing = findActiveJobId('stilprofil', String(book_id), userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });

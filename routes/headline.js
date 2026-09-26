@@ -11,7 +11,7 @@
 // gespeichert.
 
 const express = require('express');
-const { aclParamGuard, requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
+const { guardBook, aclParamGuard, sessionEmail } = require('../lib/acl');
 const {
   HEADLINE_FIELDS, isValidHeadlineField,
   getHeadline, listBookHeadlines, setHeadline,
@@ -91,9 +91,7 @@ router.delete('/variants/:id', (req, res) => {
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const v = getVariant(id);
   if (!v) return res.status(404).json({ error_code: 'VARIANT_NOT_FOUND' });
-  setContext({ book: v.book_id });
-  try { requireBookAccess(req, v.book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, v.book_id, 'editor')) return;
   deleteVariant(id);
   res.json({ ok: true, page_id: v.page_id, varianten: listVariants(v.page_id) });
 });
@@ -104,9 +102,7 @@ router.post('/variants/:id/promote', (req, res) => {
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
   const v = getVariant(id);
   if (!v) return res.status(404).json({ error_code: 'VARIANT_NOT_FOUND' });
-  setContext({ book: v.book_id });
-  try { requireBookAccess(req, v.book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, v.book_id, 'editor')) return;
   const row = promoteVariant(id, sessionEmail(req));
   res.json({ ok: true, page_id: v.page_id, headline: row, varianten: listVariants(v.page_id) });
 });

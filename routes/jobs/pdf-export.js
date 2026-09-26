@@ -37,7 +37,7 @@ const { resolveSlug } = require('../../lib/export-builders/shared');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const logger = require('../../logger');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const router = express.Router();
 
@@ -324,9 +324,7 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
 
   // PDF-Export: viewer reicht (Export gilt fuer alle Rollen).
   if (bookId) {
-    const { requireBookAccess, sendACLError } = require('../../lib/acl');
-    try { requireBookAccess(req, bookId, 'viewer'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'viewer')) return;
   }
 
   const dedupId = `${target}:${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}`;

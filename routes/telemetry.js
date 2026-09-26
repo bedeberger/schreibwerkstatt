@@ -28,7 +28,7 @@ const ALLOWED_EVENTS = new Set([
 const RESOLVE_CHOICES = ['local', 'remote', 'both'];
 
 router.post('/merge', jsonBody, (req, res) => {
-  if (!sessionEmail(req)) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!sessionEmail(req)) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
   const event = (req.body?.event || '').toString();
   if (!ALLOWED_EVENTS.has(event)) {
     return res.status(400).json({ error_code: 'INVALID_EVENT' });
@@ -55,13 +55,13 @@ router.post('/merge', jsonBody, (req, res) => {
 // (Mount nach Auth-Guard). Felder werden in db/js-errors.js gekappt; hier nur
 // Pflichtfeld + Enum pruefen. Best-effort: DB-Fehler werden geschluckt.
 router.post('/js-error', jsonBody, (req, res) => {
-  if (!sessionEmail(req)) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!sessionEmail(req)) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
   const message = (req.body?.message || '').toString().trim();
   if (!message) return res.status(400).json({ error_code: 'NO_MESSAGE' });
   const kind = JS_ERROR_KINDS.has(req.body?.kind) ? req.body.kind : 'error';
   try {
     insertJsError({
-      user_email: req.session.user.email,
+      user_email: sessionEmail(req),
       kind,
       message,
       stack: req.body?.stack ?? null,
@@ -87,7 +87,7 @@ router.post('/js-error', jsonBody, (req, res) => {
 const TTS_LOG_MAX = 500;
 router.post('/tts-log', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!userEmail) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
   const msg = (req.body?.msg || '').toString().trim().slice(0, TTS_LOG_MAX);
   if (!msg) return res.status(400).json({ error_code: 'NO_MESSAGE' });
   const level = req.body?.level === 'warn' ? 'warn' : 'info';

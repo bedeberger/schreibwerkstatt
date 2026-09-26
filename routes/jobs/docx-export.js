@@ -28,7 +28,7 @@ const { buildExportFilename } = require('../../lib/filenames');
 const { resolveSlug } = require('../../lib/export-builders/shared');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const router = express.Router();
 const VALID_SCOPES = new Set(['book', 'chapter', 'page']);
@@ -159,9 +159,7 @@ router.post('/docx-export', jsonBody, async (req, res) => {
   if (bookId) setContext({ book: bookId });
 
   if (bookId) {
-    const { requireBookAccess, sendACLError } = require('../../lib/acl');
-    try { requireBookAccess(req, bookId, 'viewer'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'viewer')) return;
   }
 
   const dedupId = `${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}`;

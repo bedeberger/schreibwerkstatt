@@ -29,8 +29,8 @@ const authProviders = require('./auth/providers');
 const mailer = require('../lib/mailer');
 const { buildInviteUrl } = require('../lib/invite-url');
 const { requireAdmin } = require('../lib/admin-mw');
-const { setContext } = require('../lib/log-context');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 // Cooldown zwischen Reminder-Mails. Schuetzt den Empfaenger vor Spam, falls
 // der Admin ungeduldig wird. Klick-Tracking gibt dem Admin sonst keinen
@@ -103,7 +103,7 @@ function _passwordTarget(req, res) {
 router.post('/:email/password', express.json(), async (req, res) => {
   const user = _passwordTarget(req, res);
   if (!user) return;
-  const actor = req.session.user.email;
+  const actor = sessionEmail(req);
   const pw = (req.body || {}).password;
   const policyError = password.validatePassword(pw);
   if (policyError) {
@@ -127,7 +127,7 @@ router.post('/:email/password', express.json(), async (req, res) => {
 router.post('/:email/password-link', express.json(), async (req, res) => {
   const user = _passwordTarget(req, res);
   if (!user) return;
-  const actor = req.session.user.email;
+  const actor = sessionEmail(req);
   const purpose = creds.hasPassword(user.email) ? 'reset' : 'set';
   const local = authProviders.getProvider('local');
   let result;
@@ -154,7 +154,7 @@ router.post('/:email/password-link', express.json(), async (req, res) => {
 router.delete('/:email/password', (req, res) => {
   const user = _passwordTarget(req, res);
   if (!user) return;
-  const actor = req.session.user.email;
+  const actor = sessionEmail(req);
   if (user.email === actor.toLowerCase()) {
     return res.status(400).json({ error_code: 'CANNOT_REMOVE_OWN_PASSWORD' });
   }
@@ -179,7 +179,7 @@ router.post('/invite', express.json(), async (req, res) => {
   const { email, role = 'user' } = req.body || {};
   if (!email) return res.status(400).json({ error_code: 'EMAIL_REQUIRED' });
   if (role !== 'admin' && role !== 'user') return res.status(400).json({ error_code: 'ROLE_INVALID' });
-  const invitedBy = req.session.user.email;
+  const invitedBy = sessionEmail(req);
   let invite;
   try {
     invite = appUsers.createInvite({ email, globalRole: role, invitedBy });
@@ -234,7 +234,7 @@ router.post('/invites/:id/remind', express.json(), async (req, res) => {
     }
   }
   const inviteUrl = buildInviteUrl(inv.invite_token);
-  const actor = req.session.user.email;
+  const actor = sessionEmail(req);
   let mail = { sent: false, reason: 'not-attempted' };
   try {
     mail = await mailer.send({
@@ -259,7 +259,7 @@ router.delete('/invites/:id', (req, res) => {
   const inv = appUsers.findInviteById(id);
   if (!inv) return res.status(404).json({ error_code: 'INVITE_NOT_FOUND' });
   appUsers.revokeInvite(id);
-  logger.info(`Invite widerrufen: ${inv.email} (id=${id})`, { user: req.session.user.email });
+  logger.info(`Invite widerrufen: ${inv.email} (id=${id})`, { user: sessionEmail(req) });
   res.json({ ok: true });
 });
 
@@ -272,7 +272,7 @@ router.put('/:email', express.json(), (req, res) => {
   const { global_role, status, can_invite_users, monthly_budget_usd, budget_mode, ai_profile_id } = req.body || {};
   const ip = _clientIp(req);
   const userAgent = req.headers['user-agent'] || null;
-  const actor = req.session.user.email;
+  const actor = sessionEmail(req);
 
   if (global_role !== undefined) {
     if (global_role !== 'admin' && global_role !== 'user') {
@@ -346,14 +346,14 @@ router.delete('/:email', (req, res) => {
   const user = appUsers.getUser(target);
   if (!user) return res.status(404).json({ error_code: 'USER_NOT_FOUND' });
   // Selbst-Loeschung blockieren — sonst lockt sich Admin selbst aus.
-  if (target === req.session.user.email.toLowerCase()) {
+  if (target === sessionEmail(req).toLowerCase()) {
     return res.status(400).json({ error_code: 'CANNOT_DELETE_SELF' });
   }
   appUsers.softDeleteUser(target);
   appUsers.recordAuditEvent(target, 'deleted', {
     ip: _clientIp(req),
     userAgent: req.headers['user-agent'] || null,
-    meta: { by: req.session.user.email },
+    meta: { by: sessionEmail(req) },
   });
   res.json({ ok: true });
 });

@@ -27,7 +27,7 @@ const {
 } = require('../../lib/import-parsers/manuscript-split');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const bookAccess = require('../../db/book-access');
 const { getBookLocale } = require('../../db/schema');
 const { db } = require('../../db/connection');
@@ -309,9 +309,7 @@ router.post('/manuscript-import', rawDocBody, async (req, res) => {
   if (!guarded) return;
 
   if (mode === 'merge') {
-    setContext({ book: bookId });
-    try { requireBookAccess(req, bookId, 'editor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'editor')) return;
   }
 
   const dedupKey = mode === 'merge' ? `merge:${bookId}` : `new:${bookName}`;
