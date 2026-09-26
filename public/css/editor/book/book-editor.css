@@ -578,14 +578,6 @@
   /* ── Vollbild: ganze Karte nimmt den Viewport; Outline, Stream und (falls
        aktiv) Kommentar-Leiste verbreitern sich, um den Platz zu nutzen.
        Outline scrollt sticky mit. Distraktionsfreies Schreiben am ganzen Buch. */
-  .card--bookeditor:fullscreen {
-    position: fixed;
-    inset: 0;
-    background: var(--color-surface);
-    padding: var(--space-lg);
-    z-index: var(--z-overlay);
-    overflow-y: auto;
-  }
   .card--bookeditor:fullscreen .book-editor-layout {
     grid-template-columns: 360px minmax(0, 1fr);
   }

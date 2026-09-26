@@ -1430,6 +1430,8 @@ CSS: [public/css/layout/utilities.css](public/css/layout/utilities.css). `overfl
 
 **CSS:** [public/css/components/sortable-table.css](public/css/components/sortable-table.css). Chevron-Pfeile via CSS-Triangles (currentColor → theme-faehig). Inaktive Spalte zeigt doppeltes Pfeil-Paar gedimmt, aktive Richtung voll opaque.
 
+**Grundform der Tabelle:** `.data-table` ([components/data-table.css](public/css/components/data-table.css)) — volle Breite, Zeilen-Trennlinie, Caps-Kopfzeile, Chevron-Platz an `th.sortable-th`. Eine neue Listen-Tabelle nimmt `class="data-table"` (+ Feature-Klasse nur für Abweichungen wie Zahlen-Spalten oder Breakpoints), statt th/td-Regeln zu kopieren.
+
 **JS:** [public/js/sortable-table.js](public/js/sortable-table.js). Reine Pure-Funktion `sortRows(rows, key, dir, typeHint)` ist exportiert fuer Unit-Tests (siehe [tests/unit/sortable-table.test.mjs](tests/unit/sortable-table.test.mjs)).
 
 **Wann nicht:** Server-Pagination oder Server-Sort noetig (z.B. Admin-Logs mit > 10k Rows) → eigene Route + Cursor-Pagination; `sortableTable` kann den Server-Result-Slice nicht ueber alle Seiten sortieren. Presence-Matrizen ([bookoverview-figpresence.html](public/partials/bookoverview-figpresence.html), [bookoverview-ortpresence.html](public/partials/bookoverview-ortpresence.html)) und Heatmap-Tabellen (`.heatmap-table`) sind ebenfalls ausgenommen — feste Spalten/Zeilen-Semantik, kein Row-Sort sinnvoll. **Ebenfalls ausgenommen: Tabellen, deren Achse eine Chronologie IST** — der Figuren-Lebenslauf (Zeilen = Lebensphasen) und das Autorenprofil ([autorenprofil.html](public/partials/autorenprofil.html), Spalten = Bücher in Werk-Reihenfolge). Nach einer Kennzahl umsortiert ist die Entwicklung zerschnitten, und genau sie ist die Aussage der Tabelle.
@@ -2938,6 +2940,9 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 | [components/kapitel-badges.css](public/css/components/kapitel-badges.css) | `.kapitel-badges` / `.kapitel-badge` (+ `--primary`/`--secondary`/`--more`) — die Kapitel-Plakette an einer Entitätszeile. Geteilt von Figuren, Orten, Szenen, Songs, Kontinuität, Plot-Beats, Weltfakten und der Quellen-Erkennung; darum Komponente und nicht Feature-Datei. |
 | [components/graph-tooltip.css](public/css/components/graph-tooltip.css) | `.graph-tooltip` (+ `.visible`, `strong`/`em`/`p`-Zeilen) — Hover-Detailkarte über einem vis-network-Canvas. Geteilt von Figuren-Graph (`#figur-tooltip`) und Motiv-Konstellation (`#motiv-tooltip`); positioniert wird in [public/js/graph-kit/tooltip.js](public/js/graph-kit/tooltip.js). Nicht `[data-tip]` — die Karte hängt an einem Canvas-Knoten, nicht an einem DOM-Element. Siehe „Graph-Tooltip (vis-network)". |
 | [components/sortable-table.css](public/css/components/sortable-table.css) | `.sortable-th` + `--asc`/`--desc`-Modifier für die `sortableTable`-Alpine-Komponente. |
+| [components/data-table.css](public/css/components/data-table.css) | `.data-table` — Grundform der Listen-/Verwaltungs-Tabelle (volle Breite, Zeilen-Trennlinie, Caps-Kopfzeile, `th.sortable-th`-Platz für den Chevron). Konsumenten: Admin-Karten (Nutzung, User, Bücher/Kategorien/Geräte, KI-Profile); die Feature-Klasse daneben trägt nur Abweichungen. Siehe „Sortierbare Tabelle“. |
+| [components/board-column.css](public/css/components/board-column.css) | `.board-col-title` + `.board-col-count` — Titel und Zähler-Plakette im Kopf einer Board-Spalte. Geteilt von Plot-Beat-Board, Ideen-Board und Recherche-Status-Board; die Spalten selbst bleiben feature-eigen. |
+| [components/fullscreen-shell.css](public/css/components/fullscreen-shell.css) | `.fullscreen-shell:fullscreen` — Vollbild-Hülle (Viewport, deckende Fläche, eigener Scroll) für Elemente, die `fullscreen.js` auf Native-Vollbild setzt: `.card--plot`, `.card--recherche`, `.card--bookeditor`, `.card--motiv`, `.werkstatt-detail`. Die Feature-Datei ergänzt nur, was sich am Inhalt ändert. |
 | [components/year-month-heatmap.css](public/css/components/year-month-heatmap.css) | `.ymheat-*` — geteiltes Jahr×Monat-Raster (Jahre als Zeilen, 12 Monate als Spalten), Zell-Level 0..4 aus `var(--ymheat-accent)`, `--has`-Eckmarker, `--current`-Innenring, `--active`-Auswahlring. Self-containing (`container-type`). Konsumenten: Rückblick-Karte + Buch-Übersicht. Siehe „Jahr×Monat-Heatmap". |
 | [components/toggle-switch.css](public/css/components/toggle-switch.css) | `.toggle-switch` (Track/Thumb/Label) für das `toggleSwitch`-Primitive — eckiger Boolean-Schalter, Ersatz für `.checkbox-row`. |
 | [components/file-drop.css](public/css/components/file-drop.css) | Generischer Baseline-Style (`cursor: pointer`) für das `fileDrop`-Primitive; Visuals + `is-drag`-Tönung beim Konsumenten. |
@@ -3215,7 +3220,7 @@ Wenn die Karte zusätzlich Inline-Inputs braucht (z.B. „Neue Figur — Name ei
 ```html
 <div class="plot-board">                         <!-- flex, horizontal scroll; Mobile: column-stack -->
   <div class="plot-column" :style="{ '--col-accent': actAccent(act) }">
-    <div class="plot-column-header">…Swatch + Titel + .plot-column-count + .plot-column-actions (.plot-icon-btn)…</div>
+    <div class="plot-column-header">…Swatch + Titel (.board-col-title) + .board-col-count + .plot-column-actions (.plot-icon-btn)…</div>
     <div class="plot-dist-bar plot-dist-bar--mini">…Status-Verteilung dieses Akts…</div>
     <div class="plot-column-body">
       <!-- SortableJS-Container: NUR x-for-Anker + Beat-Karten (data-plot-cell). -->

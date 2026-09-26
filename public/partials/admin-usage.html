@@ -46,7 +46,7 @@
   <!-- ── Users-Tab ─────────────────────────────────────────────────────── -->
   <div x-show="adminUsageTab === 'users'" class="admin-usage-pane">
     <div class="table-scroll" x-show="adminUsageUsersList.length">
-    <table class="admin-usage-table"
+    <table class="data-table"
            x-data="sortableTable({
              rows: () => adminUsageUsersList,
              defaultKey: 'usd',
@@ -131,7 +131,7 @@
       </template>
     </div>
     <div class="table-scroll" x-show="adminUsageJobsList.length">
-    <table class="admin-usage-table"
+    <table class="data-table"
            x-data="sortableTable({
              rows: () => adminUsageJobsList,
              defaultKey: 'queuedAt',
@@ -207,7 +207,7 @@
       </template>
     </div>
     <div class="table-scroll" x-show="adminUsageChatList.length">
-    <table class="admin-usage-table"
+    <table class="data-table"
            x-data="sortableTable({
              rows: () => adminUsageChatList,
              defaultKey: 'createdAt',
@@ -309,7 +309,7 @@
   <div x-show="adminUsageTab === 'features'" class="admin-usage-pane">
     <h3 x-text="$app.t('admin.usage.feature.totals')"></h3>
     <div class="table-scroll" x-show="adminUsageFeatureTotals.length">
-    <table class="admin-usage-table"
+    <table class="data-table"
            x-data="sortableTable({
              rows: () => adminUsageFeatureTotals,
              defaultKey: 'count',
@@ -338,7 +338,7 @@
 
     <h3 class="admin-usage-h3--spaced" x-text="$app.t('admin.usage.feature.byUser')"></h3>
     <div class="table-scroll" x-show="adminUsageFeatureItems.length">
-    <table class="admin-usage-table"
+    <table class="data-table"
            x-data="sortableTable({
              rows: () => adminUsageFeatureItems,
              defaultKey: 'lastUsed',
@@ -375,7 +375,7 @@
   <!-- ── Zeit-Tab ──────────────────────────────────────────────────────── -->
   <div x-show="adminUsageTab === 'time'" class="admin-usage-pane">
     <div class="table-scroll" x-show="adminUsageTimeItems.length">
-    <table class="admin-usage-table"
+    <table class="data-table"
            x-data="sortableTable({
              rows: () => adminUsageTimeItems,
              defaultKey: 'totalSeconds',
@@ -419,7 +419,7 @@
 
     <div class="admin-usage-series" x-show="adminUsageTimeSeries.length">
       <div class="table-scroll">
-      <table class="admin-usage-table"
+      <table class="data-table"
              x-data="sortableTable({
                rows: () => adminUsageTimeSeries,
                defaultKey: 'date',

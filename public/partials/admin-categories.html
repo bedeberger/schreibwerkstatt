@@ -33,7 +33,7 @@
 
       <p class="muted-msg muted-msg--sm" x-show="categories.length === 0" x-text="$app.t('categories.empty')"></p>
       <div class="table-scroll" x-show="categories.length">
-      <table class="admin-pool-table"
+      <table class="data-table admin-pool-table"
              x-data="sortableTable({
                rows: () => categories,
                defaultKey: 'name',

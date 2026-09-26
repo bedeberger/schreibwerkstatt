@@ -96,8 +96,8 @@
         <div class="ideen-board-head-lane" x-text="$app.t('ideenBoard.laneColumn')"></div>
         <template x-for="st in statuses()" :key="st">
           <div class="ideen-board-head-col" :class="'ideen-board-head-col--' + st">
-            <span class="ideen-board-col-title" x-text="statusLabel(st)"></span>
-            <span class="ideen-board-col-count" x-text="statusTotal(st)"></span>
+            <span class="board-col-title" x-text="statusLabel(st)"></span>
+            <span class="board-col-count" x-text="statusTotal(st)"></span>
           </div>
         </template>
       </div>

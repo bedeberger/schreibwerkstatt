@@ -31,7 +31,7 @@
           </div>
         </div>
         <template x-if="editingActId !== act.id">
-          <span class="plot-column-title" @dblclick="startEditAct(act)" x-text="act.name"></span>
+          <span class="board-col-title plot-column-title" @dblclick="startEditAct(act)" x-text="act.name"></span>
         </template>
         <span class="badge badge-neutral" x-show="act.archiviert" x-cloak
               x-text="$app.t('plot.act.archivedBadge')"></span>
@@ -41,7 +41,7 @@
                  @keydown.enter="saveEditAct(act)" @keydown.escape="cancelEditAct()"
                  @blur="onActBlur(act, $event)">
         </template>
-        <span class="plot-column-count" x-text="filteredBeatsForAct(act.id).length"></span>
+        <span class="board-col-count" x-text="filteredBeatsForAct(act.id).length"></span>
         <div class="plot-column-actions">
           <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, -1)" :data-tip="$app.t('plot.act.moveLeft')" :aria-label="$app.t('plot.act.moveLeft')">
             <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-left"/></svg>

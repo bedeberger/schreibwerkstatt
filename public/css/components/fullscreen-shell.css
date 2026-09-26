@@ -1,0 +1,14 @@
+@layer components {
+/* Vollbild-Hülle einer Karte bzw. eines Detail-Panes (public/js/fullscreen.js):
+   das Element nimmt den ganzen Viewport, scrollt selbst und bekommt eine
+   deckende Fläche. Die Feature-Datei ergänzt nur, was sich im Vollbild am
+   INHALT ändert (Spaltenbreiten, Graph-Höhe, Flex-Richtung). */
+.fullscreen-shell:fullscreen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-surface);
+  padding: var(--space-lg);
+  z-index: var(--z-overlay);
+  overflow-y: auto;
+}
+}

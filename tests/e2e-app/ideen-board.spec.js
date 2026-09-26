@@ -105,7 +105,7 @@ test('ideen-board: Bahnen aus dem Baum, Stufen-Spalten, Filter blendet aus und s
   await expect(card.locator(`[data-idee-card-id="${made.b}"]`)).toHaveCount(0);
   await expect(card.locator('.filter-count')).toContainText('1');
   // Die Spalte zeigt trotzdem ihre Zahl: sie misst den GESAMTEN Bestand.
-  await expect(card.locator('.ideen-board-head-col--verworfen .ideen-board-col-count')).toHaveText('1');
+  await expect(card.locator('.ideen-board-head-col--verworfen .board-col-count')).toHaveText('1');
 
   // Einblenden bringt sie zurueck — sie war nie weg.
   await card.locator('.filter-toggle input[type="checkbox"]').check();

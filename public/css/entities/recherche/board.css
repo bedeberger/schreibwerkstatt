@@ -448,14 +448,6 @@ textarea.recherche-input { resize: vertical; min-height: 2.75rem; }
 /* ── Vollbild: ganze Karte nimmt den Viewport; die Liste bleibt einspaltig,
      aber zentriert mit lesbarer Maximalbreite (distraktionsfreier Lesemodus,
      keine über den ganzen Monitor gezogenen Karten). */
-.card--recherche:fullscreen {
-  position: fixed;
-  inset: 0;
-  background: var(--color-surface);
-  padding: var(--space-lg);
-  z-index: var(--z-overlay);
-  overflow-y: auto;
-}
 .card--recherche:fullscreen .recherche-list {
   max-width: 56rem;
   margin-inline: auto;

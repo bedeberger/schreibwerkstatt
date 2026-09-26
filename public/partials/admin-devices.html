@@ -30,7 +30,7 @@
   <div x-show="devicesError" class="error-msg" x-text="devicesError"></div>
 
   <div class="table-scroll" x-show="devicesList.length">
-    <table class="admin-pool-table"
+    <table class="data-table admin-pool-table"
            x-data="sortableTable({
              rows: () => devicesList,
              defaultKey: 'last_used_at',

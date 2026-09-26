@@ -1,0 +1,23 @@
+@layer components {
+/* Kopfzeile einer Board-Spalte (Plot-Beat-Board, Ideen-Board, Recherche-
+   Status-Board): Spaltentitel + Zähler-Plakette. Die Spalten selbst bleiben
+   feature-eigen (Flex-Spalten vs. Grid-Bahnen), nur Titel und Zähler sind
+   dieselbe Erscheinung. */
+.board-col-title {
+  flex: 1 1 auto;
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.board-col-count {
+  flex: 0 0 auto;
+  font-size: var(--font-size-micro);
+  color: var(--color-muted);
+  background: var(--color-tag-bg);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-xs);
+  min-width: 1.4em;
+  text-align: center;
+}
+}

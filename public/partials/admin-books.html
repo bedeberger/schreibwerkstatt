@@ -17,7 +17,7 @@
       <p class="muted-msg muted-msg--sm" x-show="ownerlessBooks().length === 0" x-text="$app.t('admin.books.ownerlessEmpty')"></p>
 
       <div class="table-scroll" x-show="ownerlessBooks().length">
-      <table class="admin-pool-table"
+      <table class="data-table admin-pool-table"
              x-data="sortableTable({
                rows: () => ownerlessBooks(),
                defaultKey: 'book_id',
@@ -81,7 +81,7 @@
       <p class="muted-msg muted-msg--sm" x-show="ownedBooks().length === 0" x-text="$app.t('admin.books.ownedEmpty')"></p>
 
       <div class="table-scroll" x-show="ownedBooks().length">
-      <table class="admin-pool-table"
+      <table class="data-table admin-pool-table"
              x-data="sortableTable({
                rows: () => ownedBooks(),
                defaultKey: 'book_id',

@@ -297,31 +297,7 @@
 }
 
 /* ── KI-Profile (Provider-Tab, Sub-Tab `profiles`) ───────────────────────────
-   Eigene Klassen statt Wiederverwendung der .admin-users-*-Regeln: die leben in
-   admin-users.css und gehoeren zur User-Karte — ein Zugriff darauf von hier waere
-   eine Kopplung ueber Kartengrenzen hinweg. */
-.admin-profiles-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-sm);
-}
-
-.admin-profiles-table th,
-.admin-profiles-table td {
-  text-align: left;
-  padding: var(--space-md) var(--space-sm);
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
-}
-
-.admin-profiles-table th {
-  font-weight: var(--fw-semibold);
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
+   Tabelle: .data-table (components/data-table.css). */
 .admin-profiles-actions {
   text-align: right;
   white-space: nowrap;
