@@ -3,6 +3,13 @@
 
 const { db } = require('../../../db/schema');
 const { _truncateResult, _findFigure } = require('./shared');
+const {
+  listPronounCountsWithChapters,
+  listFigureMentionsWithPages,
+  listFigureAppearancesWithChapters,
+  listFigureEventsWithPlaces,
+  listFigureScenesWithPlaces,
+} = require('../../../db/book-chat/figures');
 
 // ── count_pronouns ────────────────────────────────────────────────────────────
 
@@ -40,13 +47,7 @@ function tool_count_pronouns(input, ctx) {
   }
 
   // Pro Kapitel aggregieren
-  const rows = db.prepare(`
-    SELECT p.chapter_id, c.chapter_name, ps.pronoun_counts
-    FROM page_stats ps
-    JOIN pages p      ON p.page_id = ps.page_id
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE ps.book_id = ? AND ps.pronoun_counts IS NOT NULL
-  `).all(ctx.bookId);
+  const rows = listPronounCountsWithChapters(ctx.bookId);
   const byChapter = new Map();
   for (const r of rows) {
     const key = r.chapter_id ?? 0;
@@ -73,14 +74,7 @@ function tool_get_figure_mentions(input, ctx) {
     return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
   }
 
-  const mentions = db.prepare(`
-    SELECT p.page_id, p.page_name, p.chapter_id, c.chapter_name, pfm.count, pfm.first_offset
-    FROM page_figure_mentions pfm
-    JOIN pages p      ON p.page_id = pfm.page_id
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE pfm.figure_id = ? AND p.book_id = ?
-    ORDER BY c.position, p.position, p.page_id
-  `).all(figRow.id, ctx.bookId);
+  const mentions = listFigureMentionsWithPages(figRow.id, ctx.bookId);
 
   if (!mentions.length) {
     return {
@@ -199,36 +193,11 @@ function tool_get_figure_profile(input, ctx) {
 
   const tags = db.prepare('SELECT tag FROM figure_tags WHERE figure_id = ?').all(figRow.id).map(t => t.tag);
 
-  const appearances = db.prepare(`
-    SELECT fa.chapter_id, c.chapter_name, fa.haeufigkeit
-    FROM figure_appearances fa
-    LEFT JOIN chapters c ON c.chapter_id = fa.chapter_id
-    WHERE fa.figure_id = ?
-    ORDER BY c.position
-  `).all(figRow.id);
+  const appearances = listFigureAppearancesWithChapters(figRow.id);
 
-  const events = db.prepare(`
-    SELECT fe.datum, fe.ereignis, fe.bedeutung, fe.typ,
-           fe.chapter_id, c.chapter_name,
-           fe.page_id, p.page_name
-    FROM figure_events fe
-    LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
-    LEFT JOIN pages    p ON p.page_id    = fe.page_id
-    WHERE fe.figure_id = ?
-    ORDER BY fe.sort_order, fe.datum
-  `).all(figRow.id);
+  const events = listFigureEventsWithPlaces(figRow.id);
 
-  const scenes = db.prepare(`
-    SELECT fs.id, fs.titel, fs.wertung, fs.kommentar,
-           fs.chapter_id, c.chapter_name,
-           fs.page_id, p.page_name
-    FROM figure_scenes fs
-    JOIN scene_figures sf ON sf.scene_id = fs.id
-    LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
-    LEFT JOIN pages    p ON p.page_id    = fs.page_id
-    WHERE sf.figure_id = ? AND fs.book_id = ? AND fs.user_email IS ?
-    ORDER BY fs.sort_order
-  `).all(figRow.id, ctx.bookId, userEmail);
+  const scenes = listFigureScenesWithPlaces(figRow.id, ctx.bookId, userEmail);
 
   const relations = db.prepare(`
     SELECT ff.fig_id AS from_fig_id, ff.name AS from_name,
