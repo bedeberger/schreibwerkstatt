@@ -2328,6 +2328,7 @@ CSS: [public/css/editor/focus-mode.css](public/css/editor/focus-mode.css). Inlin
 
 **Klassen** (CSS in [public/css/page/page-list.css](public/css/page/page-list.css)):
 - `.presence-pip` — Basis-Initialen-Bubble. Pro-User-Hue via `--avatar-hue`-Custom-Prop (Setter im Konsumenten-Markup).
+- Farbe aller Initialen-Pips (`.presence-pip`, `.user-chip__avatar`, `.comment-rail__avatar`, `.book-share-avatar`): `hsl(var(--avatar-hue, 220) var(--avatar-bg-sl))` / `--avatar-fg-sl` / `--avatar-border-sl` — Sättigung+Helligkeit je Theme aus [tokens/colors.css](public/css/tokens/colors.css) (Share-Reader: [share/theme.css](public/css/share/theme.css)). Kein eigener Dark-Block im Konsumenten: das Theme hängt an `data-theme`, nicht an `prefers-color-scheme`.
 - `.presence-pip--self` — Eigener User, anderes Gerät. Gestrichelte Border + opacity 0.85.
 
 **Markup:**

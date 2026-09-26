@@ -32,6 +32,11 @@
   --share-radius-sm: 4px;
   --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   --share-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.16);
+  /* Initialen-Pips der Kommentar-Leiste (components/comment-rail.css) —
+     gespiegelt aus tokens/colors.css (--avatar-*-sl, Farbton pro Element). */
+  --avatar-bg-sl: 60% 88%;
+  --avatar-fg-sl: 60% 28%;
+  --avatar-border-sl: 60% 50%;
   color-scheme: light;
 
   /* Brücke auf den geteilten Manuskript-Stream-Look
@@ -76,6 +81,8 @@ html[data-theme="dark"] {
   --share-hover: rgba(255, 255, 255, 0.06);
   --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   --share-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55);
+  --avatar-bg-sl: 40% 22%;
+  --avatar-fg-sl: 70% 78%;
   --diagram-theme-light: none;
   --diagram-theme-dark: inline;
   color-scheme: dark;
@@ -96,6 +103,8 @@ html[data-theme="dark"] {
     --share-hover: rgba(255, 255, 255, 0.06);
     --share-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
     --share-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55);
+    --avatar-bg-sl: 40% 22%;
+    --avatar-fg-sl: 70% 78%;
     --diagram-theme-light: none;
     --diagram-theme-dark: inline;
     color-scheme: dark;
