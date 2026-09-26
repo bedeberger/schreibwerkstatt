@@ -72,38 +72,38 @@
          x-modelable="value" x-model="activeProfileId"
          x-effect="options = profiles.map(p => ({ value: p.id, label: p.name + (p.is_default ? ' ★' : '') }))"
          @combobox-change="selectProfile($event.detail)"></div>
-    <button type="button" class="export-profile-btn" :data-tip="$app.t('pdfExport.newProfile')"
+    <button type="button" class="export-profile-btn" :data-tip="$app.t('pdfExport.newProfile')" :aria-label="$app.t('pdfExport.newProfile')"
             @click="_showCreate = !_showCreate">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
     </button>
-    <button type="button" class="export-profile-btn" :data-tip="$app.t('pdfExport.templateProfile')"
+    <button type="button" class="export-profile-btn" :data-tip="$app.t('pdfExport.templateProfile')" :aria-label="$app.t('pdfExport.templateProfile')"
             @click="_showTemplate = !_showTemplate">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile"
-            :data-tip="$app.t('pdfExport.renameProfile')" @click="beginRename()">
+            :data-tip="$app.t('pdfExport.renameProfile')" :aria-label="$app.t('pdfExport.renameProfile')" @click="beginRename()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile"
-            :data-tip="$app.t('pdfExport.duplicateProfile')" @click="duplicateProfile()">
+            :data-tip="$app.t('pdfExport.duplicateProfile')" :aria-label="$app.t('pdfExport.duplicateProfile')" @click="duplicateProfile()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#copy"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile && !activeProfile.is_default"
-            :data-tip="$app.t('pdfExport.makeDefault')" @click="setDefault(activeProfileId)">
+            :data-tip="$app.t('pdfExport.makeDefault')" :aria-label="$app.t('pdfExport.makeDefault')" @click="setDefault(activeProfileId)">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile"
-            :data-tip="$app.t('pdfExport.exportProfile')" @click="exportProfileConfig()">
+            :data-tip="$app.t('pdfExport.exportProfile')" :aria-label="$app.t('pdfExport.exportProfile')" @click="exportProfileConfig()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
     </button>
     <button type="button" class="export-profile-btn"
-            :data-tip="$app.t('pdfExport.importProfile')" @click="$refs.importInput.click()">
+            :data-tip="$app.t('pdfExport.importProfile')" :aria-label="$app.t('pdfExport.importProfile')" @click="$refs.importInput.click()">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
     </button>
     <input type="file" hidden x-ref="importInput" accept="application/json,.json"
            @change="importProfileConfig($event.target.files[0]); $event.target.value = ''">
     <button type="button" class="export-profile-btn" x-show="profiles.length > 1"
-            :data-tip="$app.t('pdfExport.deleteProfile')" @click="deleteProfile(activeProfileId)">
+            :data-tip="$app.t('pdfExport.deleteProfile')" :aria-label="$app.t('pdfExport.deleteProfile')" @click="deleteProfile(activeProfileId)">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
     </button>
   </div>

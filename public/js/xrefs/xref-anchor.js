@@ -33,9 +33,6 @@
 export const FIGURE_ANCHOR_SEL = 'figure[data-bid]';
 export const TABLE_ANCHOR_SEL = 'table[data-bid]';
 
-// Anker-Typen, die IM HTML leben (Kapitel brauchen keinen — siehe oben).
-export const ANCHOR_KINDS = ['figure', 'table'];
-
 /** Legenden-/Beschriftungstext eines Ankers als Klartext, auf eine Zeile
  *  normalisiert. Dient nur der Anzeige im Ziel-Picker und als Fallback-Text — die
  *  Wahrheit bleibt das HTML der Seite.
@@ -45,15 +42,6 @@ function _caption(el, sel) {
   const cap = typeof el.querySelector === 'function' ? el.querySelector(sel) : null;
   if (!cap) return '';
   return String(cap.textContent || '').replace(/\s+/g, ' ').trim();
-}
-
-/** Alle Abbildungs-Anker unter `root` in Dokumentordnung.
- *  Liefert `[{ kind: 'figure', bid, caption, ord }]`; `ord` ist die Position
- *  innerhalb DIESER Seite. Die buchweite Nummer entsteht erst beim Rendern
- *  (public/js/xrefs/xref-number.js) — sie haengt an Kapitel und Leserichtung,
- *  also an Wissen, das eine einzelne Seite nicht hat. */
-export function collectFigureAnchors(root) {
-  return collectAnchors(root).filter(a => a.kind === 'figure');
 }
 
 /** Alle Anker unter `root` in Dokumentordnung, ueber ALLE Typen.

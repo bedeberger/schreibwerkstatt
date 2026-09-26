@@ -63,23 +63,6 @@
   padding-bottom: var(--space-xs);
   background: var(--color-surface);
 }
-.research-status-column-title {
-  flex: 1 1 auto;
-  font-weight: var(--fw-semibold);
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-  overflow-wrap: anywhere;
-}
-.research-status-column-count {
-  flex: 0 0 auto;
-  font-size: var(--font-size-micro);
-  color: var(--color-muted);
-  background: var(--color-tag-bg);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-xs);
-  min-width: 1.4em;
-  text-align: center;
-}
 
 /* SortableJS-Container. Waechst ueber die Karten hinaus und fuellt die Spalte,
    damit die ganze Flaeche unter den Karten Drop-Ziel ist. */

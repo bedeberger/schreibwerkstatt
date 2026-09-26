@@ -42,11 +42,11 @@ test('escHtml: ampersand wird zuerst escaped (verhindert double-encode)', () => 
   assert.equal(escHtml('<&>'), '&lt;&amp;&gt;');
 });
 
-test('escHtml: leere/null Werte → leerer String, kein Crash', () => {
+test('escHtml: null/undefined → leerer String, kein Crash; 0 bleibt sichtbar', () => {
   assert.equal(escHtml(null), '');
   assert.equal(escHtml(undefined), '');
   assert.equal(escHtml(''), '');
-  assert.equal(escHtml(0), ''); // 0 ist falsy – aktueller Vertrag liefert ''
+  assert.equal(escHtml(0), '0'); // 0 ist ein Wert (Zähler, Seitenzahl) — nur null/undefined werden leer
 });
 
 test('escPreserveStrong: erlaubt <strong> aber escapt alles andere', () => {
@@ -138,4 +138,9 @@ test('renderChatMarkdown: Fenced Code-Block bleibt unzerstückelt + escaped', ()
   assert.match(out, /<pre class="chat-pre"><code>/);
   assert.match(out, /&quot;a&quot;/, 'Code-Inhalt muss escaped sein');
   assert.ok(!out.includes('<br>{'), 'Code-Block darf nicht in <br>-Fragmente zerfallen');
+});
+
+test('escPreserveStrong: 0 bleibt sichtbar', () => {
+  assert.equal(escPreserveStrong(0), '0');
+  assert.equal(escPreserveStrong(null), '');
 });

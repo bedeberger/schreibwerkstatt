@@ -3,7 +3,7 @@
 // Ersetzt `<input type="number">` + `x-model.number`. Native `type=number`
 // versteckt Tausendertrennzeichen und akzeptiert je nach Browser-Locale nur
 // einen Decimal-Separator. Diese Komponente normalisiert:
-//   - Anzeige: toLocaleString(uiLocale → de-CH / en-US) mit Tausenderseparator
+//   - Anzeige: toLocaleString(localeTag(uiLocale) — Sprache + Default-Region) mit Tausenderseparator
 //   - Eingabe: akzeptiert Apostroph/Spaces als Tausender (werden gestrippt)
 //                und sowohl `.` als auch `,` als Decimal-Separator
 //
@@ -25,6 +25,8 @@
 //   integer   true → step=1, Dezimal=0, inputmode=numeric.
 //   grouping  Default true. false = ohne Tausenderseparator.
 
+
+import { localeTag } from './utils/format.js';
 // ── Pure helpers (unit-testbar) ─────────────────────────────────────────────
 
 export function inferDecimals(cfg) {
@@ -33,10 +35,6 @@ export function inferDecimals(cfg) {
   const s = String(cfg.step ?? 1);
   const dot = s.indexOf('.');
   return dot >= 0 ? s.length - dot - 1 : 0;
-}
-
-export function localeTagFromUi(uiLocale) {
-  return uiLocale === 'en' ? 'en-US' : 'de-CH';
 }
 
 export function formatNum(n, opts) {
@@ -100,7 +98,7 @@ export function registerNumInput() {
 
     _decimals() { return inferDecimals(this._cfg); },
     _isInteger() { return this._decimals() === 0; },
-    _localeTag() { return localeTagFromUi(Alpine.store('shell')?.uiLocale); },
+    _localeTag() { return localeTag(Alpine.store('shell')?.uiLocale); },
 
     _fmt(n) {
       return formatNum(n, {

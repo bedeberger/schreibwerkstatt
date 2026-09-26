@@ -220,6 +220,10 @@ export const appJobsCoreMethods = {
   },
 
   _startJobQueuePoll() {
+    // Beide Fenster-Listener hängen am Root-AbortController (app-init.js#init
+    // legt ihn vor diesem Aufruf an): destroy() bzw. ein Re-Init räumt sie ab,
+    // statt bei jedem Init ein weiteres Paar zu stapeln.
+    const signal = this._abortCtrl.signal;
     if (this.$store.jobs._jobQueueTimer) clearInterval(this.$store.jobs._jobQueueTimer);
     if (!this._jobQueueIdsLastSeen) this._jobQueueIdsLastSeen = new Map();
     this._jobQueueFailures = 0;
@@ -242,10 +246,10 @@ export const appJobsCoreMethods = {
       this._jobQueueFailures = 0;
       if (!this.$store.jobs._jobQueueTimer) this.$store.jobs._jobQueueTimer = setInterval(tick, 5000);
       poll();
-    }, this._abortCtrl?.signal ? { signal: this._abortCtrl.signal } : false);
+    }, { signal });
     // Sofort-Refresh: Feature-Module dispatchen `job:enqueued` nach POST,
     // damit der Footer den frischen Job nicht erst nach bis zu 5s sieht.
-    window.addEventListener(EVT.JOB_ENQUEUED, () => poll());
+    window.addEventListener(EVT.JOB_ENQUEUED, () => poll(), { signal });
   },
 
   // Gemeinsamer Abnehmer für Poll-Antwort und Stream-Event `queue`.

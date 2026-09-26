@@ -58,7 +58,6 @@ const ALLOW = {
   'css/components/icon-btn.css': 1,
   'css/editor/book/book-editor.css': 2,
   'css/editor/notebook/page-head.css': 2,
-  'css/entities/figuren-graph.css': 1,
   'css/entities/figuren.css': 1,
   'css/entities/ideen.css': 1,
   'css/entities/szenen.css': 4,

@@ -40,12 +40,6 @@ export function sourceHaystack(s) {
     .filter(Boolean).join(' ').toLowerCase();
 }
 
-/** Trifft der Suchbegriff diese Quelle? Leerer Begriff trifft immer. */
-export function matchesSourceQuery(s, query) {
-  const q = String(query || '').trim().toLowerCase();
-  return q ? sourceHaystack(s).includes(q) : true;
-}
-
 /** Quellenliste nach Freitext filtern (leerer Begriff → unveränderte Liste). */
 export function filterSources(list, query) {
   const q = String(query || '').trim().toLowerCase();

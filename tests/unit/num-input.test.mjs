@@ -4,12 +4,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   inferDecimals,
-  localeTagFromUi,
   formatNum,
   formatNumRaw,
   parseNum,
   clampNum,
 } from '../../public/js/num-input.js';
+import { localeTag, configureLocaleRegion, numberFormat } from '../../public/js/utils/format.js';
 
 // ── inferDecimals ────────────────────────────────────────────────────────────
 
@@ -32,16 +32,35 @@ test('inferDecimals: default step=undefined → 0', () => {
   assert.equal(inferDecimals({}), 0);
 });
 
-// ── localeTagFromUi ──────────────────────────────────────────────────────────
+// ── localeTag (utils/format.js, SSoT auch für numInput) ─────────────────────
 
-test('localeTagFromUi: en → en-US', () => {
-  assert.equal(localeTagFromUi('en'), 'en-US');
+test('localeTag: ohne Region en → en-US, de → de-CH, undefined → de-CH', () => {
+  configureLocaleRegion('');
+  assert.equal(localeTag('en'), 'en-US');
+  assert.equal(localeTag('de'), 'de-CH');
+  assert.equal(localeTag(undefined), 'de-CH');
 });
-test('localeTagFromUi: de → de-CH', () => {
-  assert.equal(localeTagFromUi('de'), 'de-CH');
+test('localeTag: Default-Region des Users gewinnt', () => {
+  try {
+    configureLocaleRegion('DE');
+    assert.equal(localeTag('de'), 'de-DE');
+    configureLocaleRegion('gb');
+    assert.equal(localeTag('en'), 'en-GB');
+    configureLocaleRegion('Nonsense');
+    assert.equal(localeTag('en'), 'en-US', 'ungültige Region fällt auf die Sprach-Default');
+  } finally {
+    configureLocaleRegion('');
+  }
 });
-test('localeTagFromUi: undefined → de-CH (fallback)', () => {
-  assert.equal(localeTagFromUi(undefined), 'de-CH');
+test('numberFormat: Region-Wechsel greift trotz Formatter-Cache', () => {
+  try {
+    configureLocaleRegion('DE');
+    assert.equal(numberFormat('de').format(10000), '10.000');
+    configureLocaleRegion('CH');
+    assert.match(numberFormat('de').format(10000), /^10['’]000$/);
+  } finally {
+    configureLocaleRegion('');
+  }
 });
 
 // ── formatNum ────────────────────────────────────────────────────────────────

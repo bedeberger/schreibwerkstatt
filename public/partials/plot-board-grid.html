@@ -44,7 +44,7 @@
                   </div>
                 </div>
                 <template x-if="editingActId !== act.id">
-                  <span class="plot-column-title" @dblclick="startEditAct(act)" x-text="act.name"></span>
+                  <span class="board-col-title plot-column-title" @dblclick="startEditAct(act)" x-text="act.name"></span>
                 </template>
                 <span class="badge badge-neutral" x-show="act.archiviert" x-cloak
                       x-text="$app.t('plot.act.archivedBadge')"></span>

@@ -91,7 +91,7 @@ test('recherche: Status-Board sortiert in Spalten, das Aktionsmenue verschiebt, 
   await expect(cell('eingearbeitet').locator(`[data-research-card-id="${made.withPlace}"]`)).toBeVisible();
   await expect(cell('offen').locator(`[data-research-card-id="${made.withPlace}"]`)).toHaveCount(0);
   // Spaltenzaehler zaehlt mit.
-  await expect(board.locator('.research-status-column--eingearbeitet .research-status-column-count')).toHaveText('1');
+  await expect(board.locator('.research-status-column--eingearbeitet .board-col-count')).toHaveText('1');
 
   // Verknuepftes Kapitel steht als Sprungziel auf der Karte, kein Befund.
   const moved = cell('eingearbeitet').locator(`[data-research-card-id="${made.withPlace}"]`);

@@ -354,12 +354,6 @@
 /* ── Vollbild: ganze Karte nimmt den Viewport, Graph füllt den Resthöhenraum
      unter Header/Toolbar (Panel behält seine Spalte). ───────────────────── */
 .card--motiv:fullscreen {
-  position: fixed;
-  inset: 0;
-  background: var(--color-surface);
-  padding: var(--space-lg);
-  z-index: var(--z-overlay);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }

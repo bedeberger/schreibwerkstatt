@@ -56,9 +56,9 @@
   margin-left: var(--space-xs);
   font-size: var(--font-size-micro);
   font-weight: var(--fw-semibold);
-  background: hsl(var(--avatar-hue, 220) 60% 88%);
-  color: hsl(var(--avatar-hue, 220) 60% 28%);
-  border: 1px solid hsl(var(--avatar-hue, 220) 60% 50%);
+  background: hsl(var(--avatar-hue, 220) var(--avatar-bg-sl));
+  color: hsl(var(--avatar-hue, 220) var(--avatar-fg-sl));
+  border: 1px solid hsl(var(--avatar-hue, 220) var(--avatar-border-sl));
   border-radius: var(--radius-sm);
   line-height: 1;
 }
@@ -68,13 +68,6 @@
 .presence-pip--self {
   border-style: dashed;
   opacity: 0.85;
-}
-@media (prefers-color-scheme: dark) {
-  .presence-pip {
-    background: hsl(var(--avatar-hue, 220) 40% 22%);
-    color: hsl(var(--avatar-hue, 220) 70% 78%);
-    border-color: hsl(var(--avatar-hue, 220) 60% 50%);
-  }
 }
 
 .page-name {

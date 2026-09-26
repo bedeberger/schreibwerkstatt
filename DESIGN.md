@@ -718,7 +718,6 @@ Neue Aktionen erweitern diese Tabelle und das Sprite (siehe [Icon-System](#icon-
 **Klassen** (Basis in [public/css/components/icon-btn.css](public/css/components/icon-btn.css), Overlay-Modifier in [public/css/entities/figur-werkstatt.css](public/css/entities/figur-werkstatt.css)):
 - `.icon-btn` — quadratischer Icon-Button (28px min, `--radius-sm`, `--border-thin` solid `--color-border`, `--color-muted` Text, Hover-Tint via `--color-surface`). Innenliegendes `<svg.icon>` zentriert sich automatisch (`line-height: 1`).
 - `.icon-btn--ghost` — Ghost-Variante: `display: inline-flex` zentriert, 28×28 fix, transparent (Rahmen + Fläche), `font-size-base`. Hover/`.is-active`/`[aria-pressed="true"]` blenden `--color-surface`-Fläche + `--color-border`-Rahmen ein; `:disabled` → `opacity: 0.3`. Feature-Marker (`.plot-icon-btn` o.ä.) setzen darauf nur ihre Deltas (Grösse, Hover-Tint, Icon-Grösse).
-- `.icon-btn--reset` — Legacy-Override für mehrzeichige Glyphen; mit SVG-Icons nicht mehr nötig (kann beim nächsten Refactor entfernt werden).
 - `.icon-btn[aria-pressed="true"]` — aktiver Toggle (Fullscreen ein): `--color-history-active-bg` Hintergrund, `--color-primary` Border + Text. Greift automatisch — Konsument setzt nur `:aria-pressed`.
 - `.stt-dock-btn.is-recording[aria-pressed="true"]` — Recording-State der STT-Diktat-Taste (Notebook-Editor): roter Akzent aus den Fehler-Tokens (`--color-err-border` für Rand/Füllung, `--color-err-text` für die Schrift) + pulsierender `box-shadow` via `@keyframes sttRecPulse` (1.4s; das Abschalten bei `prefers-reduced-motion` kommt aus [components/floating-dock.css](public/css/components/floating-dock.css)). `.is-pending` = `opacity: 0.6` während getUserMedia läuft. Übersteuert den generischen `aria-pressed`-Highlight. Grundform der Taste: `.dock-btn`; CSS des Zustands in [public/css/page/stt-dock.css](public/css/page/stt-dock.css). Verwendung nur Notebook-STT.
 - `.tts-dock` / `.tts-dock-btn` / `.tts-status` — Proof-Listening-Vorlese-Dock (Notebook-Editor), schwebend unten **links** im Edit-Feld (Schwester zum `.stt-dock` unten rechts; gleiche sticky/floating-Mechanik, gespiegelte Ecke → nie kollidierend). `.tts-dock-btn` ist der runde Haupttaster (Kopfhörer→Pause→Play), `.tts-dock-btn--sub` die kleineren Skip/Stop-Taster, `.tts-status` die Fortschritts-Pille. `.tts-dock-btn.is-reading[aria-pressed="true"]` = akzentfarbener Puls via `@keyframes ttsReadPulse` (1.8s, `prefers-reduced-motion` aus). CSS in [public/css/page/tts-dock.css](public/css/page/tts-dock.css). Der gerade vorgelesene Satz wird via `::highlight(tts-sentence)` (CSS Custom Highlight, keine DOM-Mutation) akzentfarben markiert.
@@ -1430,6 +1429,8 @@ CSS: [public/css/layout/utilities.css](public/css/layout/utilities.css). `overfl
 - Spalten ohne Sortier-Sinn (Action-Buttons, ungeordnete Render-Spalten wie „Status mit Badge" wenn Sort darueber nichts bringt): `<th>` ohne `sortable-th` lassen.
 
 **CSS:** [public/css/components/sortable-table.css](public/css/components/sortable-table.css). Chevron-Pfeile via CSS-Triangles (currentColor → theme-faehig). Inaktive Spalte zeigt doppeltes Pfeil-Paar gedimmt, aktive Richtung voll opaque.
+
+**Grundform der Tabelle:** `.data-table` ([components/data-table.css](public/css/components/data-table.css)) — volle Breite, Zeilen-Trennlinie, Caps-Kopfzeile, Chevron-Platz an `th.sortable-th`. Eine neue Listen-Tabelle nimmt `class="data-table"` (+ Feature-Klasse nur für Abweichungen wie Zahlen-Spalten oder Breakpoints), statt th/td-Regeln zu kopieren.
 
 **JS:** [public/js/sortable-table.js](public/js/sortable-table.js). Reine Pure-Funktion `sortRows(rows, key, dir, typeHint)` ist exportiert fuer Unit-Tests (siehe [tests/unit/sortable-table.test.mjs](tests/unit/sortable-table.test.mjs)).
 
@@ -2328,6 +2329,7 @@ CSS: [public/css/editor/focus-mode.css](public/css/editor/focus-mode.css). Inlin
 
 **Klassen** (CSS in [public/css/page/page-list.css](public/css/page/page-list.css)):
 - `.presence-pip` — Basis-Initialen-Bubble. Pro-User-Hue via `--avatar-hue`-Custom-Prop (Setter im Konsumenten-Markup).
+- Farbe aller Initialen-Pips (`.presence-pip`, `.user-chip__avatar`, `.comment-rail__avatar`, `.book-share-avatar`): `hsl(var(--avatar-hue, 220) var(--avatar-bg-sl))` / `--avatar-fg-sl` / `--avatar-border-sl` — Sättigung+Helligkeit je Theme aus [tokens/colors.css](public/css/tokens/colors.css) (Share-Reader: [share/theme.css](public/css/share/theme.css)). Kein eigener Dark-Block im Konsumenten: das Theme hängt an `data-theme`, nicht an `prefers-color-scheme`.
 - `.presence-pip--self` — Eigener User, anderes Gerät. Gestrichelte Border + opacity 0.85.
 
 **Markup:**
@@ -2938,6 +2940,9 @@ Struktur: 8 thematische Subfolder unter [public/css/](public/css/) + Root-Solit�
 | [components/kapitel-badges.css](public/css/components/kapitel-badges.css) | `.kapitel-badges` / `.kapitel-badge` (+ `--primary`/`--secondary`/`--more`) — die Kapitel-Plakette an einer Entitätszeile. Geteilt von Figuren, Orten, Szenen, Songs, Kontinuität, Plot-Beats, Weltfakten und der Quellen-Erkennung; darum Komponente und nicht Feature-Datei. |
 | [components/graph-tooltip.css](public/css/components/graph-tooltip.css) | `.graph-tooltip` (+ `.visible`, `strong`/`em`/`p`-Zeilen) — Hover-Detailkarte über einem vis-network-Canvas. Geteilt von Figuren-Graph (`#figur-tooltip`) und Motiv-Konstellation (`#motiv-tooltip`); positioniert wird in [public/js/graph-kit/tooltip.js](public/js/graph-kit/tooltip.js). Nicht `[data-tip]` — die Karte hängt an einem Canvas-Knoten, nicht an einem DOM-Element. Siehe „Graph-Tooltip (vis-network)". |
 | [components/sortable-table.css](public/css/components/sortable-table.css) | `.sortable-th` + `--asc`/`--desc`-Modifier für die `sortableTable`-Alpine-Komponente. |
+| [components/data-table.css](public/css/components/data-table.css) | `.data-table` — Grundform der Listen-/Verwaltungs-Tabelle (volle Breite, Zeilen-Trennlinie, Caps-Kopfzeile, `th.sortable-th`-Platz für den Chevron). Konsumenten: Admin-Karten (Nutzung, User, Bücher/Kategorien/Geräte, KI-Profile); die Feature-Klasse daneben trägt nur Abweichungen. Siehe „Sortierbare Tabelle“. |
+| [components/board-column.css](public/css/components/board-column.css) | `.board-col-title` + `.board-col-count` — Titel und Zähler-Plakette im Kopf einer Board-Spalte. Geteilt von Plot-Beat-Board, Ideen-Board und Recherche-Status-Board; die Spalten selbst bleiben feature-eigen. |
+| [components/fullscreen-shell.css](public/css/components/fullscreen-shell.css) | `.fullscreen-shell:fullscreen` — Vollbild-Hülle (Viewport, deckende Fläche, eigener Scroll) für Elemente, die `fullscreen.js` auf Native-Vollbild setzt: `.card--plot`, `.card--recherche`, `.card--bookeditor`, `.card--motiv`, `.werkstatt-detail`. Die Feature-Datei ergänzt nur, was sich am Inhalt ändert. |
 | [components/year-month-heatmap.css](public/css/components/year-month-heatmap.css) | `.ymheat-*` — geteiltes Jahr×Monat-Raster (Jahre als Zeilen, 12 Monate als Spalten), Zell-Level 0..4 aus `var(--ymheat-accent)`, `--has`-Eckmarker, `--current`-Innenring, `--active`-Auswahlring. Self-containing (`container-type`). Konsumenten: Rückblick-Karte + Buch-Übersicht. Siehe „Jahr×Monat-Heatmap". |
 | [components/toggle-switch.css](public/css/components/toggle-switch.css) | `.toggle-switch` (Track/Thumb/Label) für das `toggleSwitch`-Primitive — eckiger Boolean-Schalter, Ersatz für `.checkbox-row`. |
 | [components/file-drop.css](public/css/components/file-drop.css) | Generischer Baseline-Style (`cursor: pointer`) für das `fileDrop`-Primitive; Visuals + `is-drag`-Tönung beim Konsumenten. |
@@ -3215,7 +3220,7 @@ Wenn die Karte zusätzlich Inline-Inputs braucht (z.B. „Neue Figur — Name ei
 ```html
 <div class="plot-board">                         <!-- flex, horizontal scroll; Mobile: column-stack -->
   <div class="plot-column" :style="{ '--col-accent': actAccent(act) }">
-    <div class="plot-column-header">…Swatch + Titel + .plot-column-count + .plot-column-actions (.plot-icon-btn)…</div>
+    <div class="plot-column-header">…Swatch + Titel (.board-col-title) + .board-col-count + .plot-column-actions (.plot-icon-btn)…</div>
     <div class="plot-dist-bar plot-dist-bar--mini">…Status-Verteilung dieses Akts…</div>
     <div class="plot-column-body">
       <!-- SortableJS-Container: NUR x-for-Anker + Beat-Karten (data-plot-cell). -->

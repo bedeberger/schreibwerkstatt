@@ -327,6 +327,16 @@
   /* Mix-Rezepte (figpal) */
   --figpal-bg-mix:     18%;
   --figpal-text-mix:   75%;
+
+  /* Initialen-Pips (Presence, User-Chip, Kommentar-Leiste, Buch-Freigaben):
+     Sättigung + Helligkeit je Theme, der Farbton kommt pro Element als
+     --avatar-hue (userAvatarHue(email)). Bewusst KEIN fertiges hsl() als
+     Token: ein var() in einer Custom-Property wird am deklarierenden Element
+     (:root) aufgelöst — das Element-eigene --avatar-hue käme nie an.
+     Konsum: `hsl(var(--avatar-hue, 220) var(--avatar-bg-sl))`. */
+  --avatar-bg-sl:     60% 88%;
+  --avatar-fg-sl:     60% 28%;
+  --avatar-border-sl: 60% 50%;
 }
 
 /* === Dark-Theme Overrides === */
@@ -519,4 +529,7 @@
 
   --figpal-bg-mix:     30%;
   --figpal-text-mix:   72%;
+
+  --avatar-bg-sl:     40% 22%;
+  --avatar-fg-sl:     70% 78%;
 }

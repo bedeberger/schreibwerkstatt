@@ -49,7 +49,7 @@
 
       <h4 class="admin-usage-billing-subheading" x-text="$app.t('admin.usage.billing.byModel')"></h4>
       <div class="table-scroll" x-show="adminUsageBilling.models.length">
-      <table class="admin-usage-table"
+      <table class="data-table"
              x-data="sortableTable({
                rows: () => adminUsageBilling?.models || [],
                defaultKey: 'billedUsd',
@@ -85,7 +85,7 @@
 
       <h4 class="admin-usage-billing-subheading" x-text="$app.t('admin.usage.billing.byDay')"></h4>
       <div class="table-scroll" x-show="adminUsageBilling.days.length">
-      <table class="admin-usage-table"
+      <table class="data-table"
              x-data="sortableTable({
                rows: () => adminUsageBilling?.days || [],
                defaultKey: 'day',

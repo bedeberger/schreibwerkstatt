@@ -155,7 +155,6 @@
 }
 .lektorat-tip--visible { display: flex; }
 .lektorat-tip .badge { align-self: flex-start; }
-.lektorat-tip-korrektur { font-weight: var(--fw-bold); color: var(--color-mark-ins-text); }
 .lektorat-tip-erkl { color: var(--color-subtle); }
 
 }

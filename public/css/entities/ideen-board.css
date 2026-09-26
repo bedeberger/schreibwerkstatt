@@ -108,23 +108,6 @@
   align-items: center;
   gap: var(--space-xs);
 }
-.ideen-board-col-title {
-  flex: 1 1 auto;
-  font-weight: var(--fw-semibold);
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-  overflow-wrap: anywhere;
-}
-.ideen-board-col-count {
-  flex: 0 0 auto;
-  font-size: var(--font-size-micro);
-  color: var(--color-muted);
-  background: var(--color-tag-bg);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-xs);
-  min-width: 1.4em;
-  text-align: center;
-}
 
 /* Stufen-Farben: offen neutral, in Arbeit warnend-warm, erledigt ok, verworfen
    zurueckgenommen. Semantische Tokens, keine Hex-Werte — dieselbe Zuordnung wie

@@ -121,16 +121,10 @@
   font-size: var(--font-size-micro, 10px);
   font-weight: var(--fw-semibold, 600);
   line-height: 1;
-  background: hsl(var(--avatar-hue, 220) 60% 88%);
-  color: hsl(var(--avatar-hue, 220) 60% 28%);
-  border: 1px solid hsl(var(--avatar-hue, 220) 60% 50%);
+  background: hsl(var(--avatar-hue, 220) var(--avatar-bg-sl));
+  color: hsl(var(--avatar-hue, 220) var(--avatar-fg-sl));
+  border: 1px solid hsl(var(--avatar-hue, 220) var(--avatar-border-sl));
   border-radius: var(--cr-radius-sm, var(--radius-sm, 0));
-}
-@media (prefers-color-scheme: dark) {
-  .comment-rail__avatar {
-    background: hsl(var(--avatar-hue, 220) 40% 22%);
-    color: hsl(var(--avatar-hue, 220) 70% 78%);
-  }
 }
 .comment-rail__author { font-weight: var(--fw-semibold, 600); color: var(--cr-text, var(--color-text)); }
 .comment-rail__time { color: var(--cr-muted, var(--color-muted)); }

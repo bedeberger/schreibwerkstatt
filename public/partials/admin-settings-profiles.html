@@ -8,7 +8,7 @@
         <div x-show="adminProfilesError" class="error-msg" x-text="adminProfilesError"></div>
 
         <div class="table-scroll" x-show="adminProfilesList.length && !adminProfilesEditing">
-          <table class="admin-profiles-table"
+          <table class="data-table"
                  x-data="sortableTable({
                    rows: () => adminProfilesList,
                    defaultKey: 'name',

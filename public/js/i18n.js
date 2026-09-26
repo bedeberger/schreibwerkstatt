@@ -8,12 +8,11 @@
 // Key-Konvention: 'bereich.feld' (z.B. 'header.logout', 'profile.title').
 // Platzhalter: {name} → Parameter-Map: t('foo', { name: 'Anna' }).
 
-import { formatLastRun as _formatLastRunImpl } from './utils.js';
+import { formatLastRun as _formatLastRunImpl, localeTag } from './utils.js';
 
 const FALLBACK_LOCALE = 'de';
 const SUPPORTED_LOCALES = ['de', 'en'];
 
-let _locale = FALLBACK_LOCALE;
 let _messages = {};
 let _fallback = null;
 
@@ -27,7 +26,6 @@ async function _load(locale) {
 export async function configureI18n(locale) {
   if (!SUPPORTED_LOCALES.includes(locale)) locale = FALLBACK_LOCALE;
   if (!_fallback) _fallback = await _load(FALLBACK_LOCALE);
-  _locale = locale;
   if (locale === FALLBACK_LOCALE) {
     _messages = _fallback;
   } else {
@@ -35,9 +33,6 @@ export async function configureI18n(locale) {
     catch (e) { console.error('[i18n]', e.message, '– Fallback auf de.'); _messages = _fallback; }
   }
 }
-
-/** Aktuell aktive Locale. */
-export function getLocale() { return _locale; }
 
 /** Liste der unterstützten Locales. */
 export function getSupportedLocales() { return SUPPORTED_LOCALES.slice(); }
@@ -74,12 +69,25 @@ export function tFetchError(err) {
   return tRaw('common.unknownError');
 }
 
+/** Fehlertext für einen geworfenen `fetchJson`/`sendJson`-Fehler (utils/net.js):
+ *  übersetzter `error_code` (`error.CODE` samt `params`), ohne Übersetzung der
+ *  rohe Code, ohne Code die Error-Message. */
+export function tFetchErrorRaw(err) {
+  const code = err?.code;
+  if (code) {
+    const key = 'error.' + code;
+    const msg = tRaw(key, err.body?.params || {});
+    return msg === key ? code : msg;
+  }
+  return err?.message || tRaw('common.unknownError');
+}
+
 // Alpine-Methoden: `t` referenziert `this.$store.shell.uiLocale`, damit Alpine bei Sprachwechsel re-evaluiert.
 // `this?.` ist Pflicht: Wird die Methode aus einem Scope aufgerufen, in dem Alpine
 // den Receiver verliert (z. B. via `window.__app.t()` aus einer x-effect-Expression
 // einer spät hydratisierten Combobox), wäre `this` undefined und der reine
 // Reaktivitäts-Touch würde die ganze Alpine-Effect-Kette crashen. Übersetzung
-// fällt dann auf die globale `_locale` zurück (tRaw), statt die Karte zu killen.
+// fällt dann auf die geladenen Modul-Messages zurück (tRaw), statt die Karte zu killen.
 export const i18nMethods = {
   t(key, params) {
     void this?.$store?.shell?.uiLocale;
@@ -104,8 +112,7 @@ export const i18nMethods = {
     if (locale === this.$store.shell.uiLocale) return;
     await configureI18n(locale);
     this.$store.shell.uiLocale = locale;
-    const region = this.$store.shell.defaultRegion || (locale === 'en' ? 'US' : 'CH');
-    document.documentElement.setAttribute('lang', `${locale}-${region}`);
+    document.documentElement.setAttribute('lang', localeTag(locale));
     fetch('/me/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

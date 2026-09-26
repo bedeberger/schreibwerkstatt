@@ -31,10 +31,6 @@
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
-.icon-btn--reset {
-  font-size: var(--font-size-sm);
-}
-
 /* Ghost-Variante: zentriert, weiche Flächenfüllung im Ruhezustand (Chip-Optik
    für Kontrast ohne Rahmen-Rauschen in dichten Clustern). Der Hintergrund ist
    ein halbtransparenter Overlay über --color-text: dunkelt jede Unterlage

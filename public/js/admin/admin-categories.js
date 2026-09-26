@@ -1,7 +1,8 @@
 // Admin-Karte fuer den Kategorien-Pool. CRUD-Methoden werden in
 // Alpine.data('adminCategoriesCard') gespreadet.
 
-import { fetchJson } from '../utils.js';
+import { fetchJson, sendJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
 
 export const adminCategoriesMethods = {
   async loadAll() {
@@ -11,7 +12,7 @@ export const adminCategoriesMethods = {
       const c = await fetchJson('/local/categories');
       this.categories = c.categories || [];
     } catch (e) {
-      this.error = e.message;
+      this.error = tFetchErrorRaw(e);
     } finally {
       this.loading = false;
     }
@@ -22,17 +23,11 @@ export const adminCategoriesMethods = {
     if (!name) return;
     this.busy = true;
     try {
-      const r = await fetch('/local/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+      await sendJson('/local/categories', 'POST', { name });
       this.newCategoryName = '';
       await this.loadAll();
     } catch (e) {
-      this.error = e.message;
+      this.error = tFetchErrorRaw(e);
     } finally {
       this.busy = false;
     }
@@ -42,16 +37,10 @@ export const adminCategoriesMethods = {
     const next = window.prompt(window.__app.t('admin.cat.renamePrompt'), cat.name);
     if (!next || next.trim() === cat.name) return;
     try {
-      const r = await fetch(`/local/categories/${cat.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: next.trim() }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+      await sendJson(`/local/categories/${cat.id}`, 'PUT', { name: next.trim() });
       await this.loadAll();
     } catch (e) {
-      this.error = e.message;
+      this.error = tFetchErrorRaw(e);
     }
   },
 
@@ -62,12 +51,10 @@ export const adminCategoriesMethods = {
       danger: true,
     })) return;
     try {
-      const r = await fetch(`/local/categories/${cat.id}`, { method: 'DELETE' });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+      await sendJson(`/local/categories/${cat.id}`, 'DELETE');
       await this.loadAll();
     } catch (e) {
-      this.error = e.message;
+      this.error = tFetchErrorRaw(e);
     }
   },
 

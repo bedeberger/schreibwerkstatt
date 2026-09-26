@@ -234,28 +234,6 @@
   opacity: 0.85;
 }
 
-.admin-settings-sweep {
-  display: grid;
-  gap: var(--space-md);
-  padding: var(--space-lg);
-  margin-top: var(--space-lg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-tag-bg);
-}
-
-.admin-settings-sweep h4 {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--color-text);
-}
-
-.admin-settings-sweep p {
-  margin: 0;
-  font-size: var(--font-size-sm);
-}
-
 /* API-Tab: Token-Liste, Plain-Token-Reveal, Scrape-Snippets */
 .admin-api-tokens-table {
   width: 100%;
@@ -319,31 +297,7 @@
 }
 
 /* ── KI-Profile (Provider-Tab, Sub-Tab `profiles`) ───────────────────────────
-   Eigene Klassen statt Wiederverwendung der .admin-users-*-Regeln: die leben in
-   admin-users.css und gehoeren zur User-Karte — ein Zugriff darauf von hier waere
-   eine Kopplung ueber Kartengrenzen hinweg. */
-.admin-profiles-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-sm);
-}
-
-.admin-profiles-table th,
-.admin-profiles-table td {
-  text-align: left;
-  padding: var(--space-md) var(--space-sm);
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
-}
-
-.admin-profiles-table th {
-  font-weight: var(--fw-semibold);
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
+   Tabelle: .data-table (components/data-table.css). */
 .admin-profiles-actions {
   text-align: right;
   white-space: nowrap;
@@ -388,8 +342,7 @@
     flex-shrink: 0;
     padding: var(--space-sm) var(--space-md);
   }
-  .admin-settings-subsection,
-  .admin-settings-sweep {
+  .admin-settings-subsection {
     padding: var(--space-md);
   }
   .admin-settings-actions { flex-wrap: wrap; }

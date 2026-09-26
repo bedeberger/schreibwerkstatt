@@ -4,7 +4,8 @@
 // Buchtitel.
 
 import { loadChart } from '../lazy-libs.js';
-import { localIsoDate, tzOpts } from '../utils.js';
+import { localIsoDate, tzOpts, localeTag, fetchJson, sendJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
 
 function _fmt(n, locale, opts) {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
@@ -38,7 +39,7 @@ export const adminUsageMethods = {
   adminUsageInt(n)   { return _int(n,   this._adminUsageLocale()); },
   adminUsageHhmm(seconds) { return _hhmm(seconds); },
   _adminUsageLocale() {
-    return (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
+    return localeTag(Alpine.store('shell').uiLocale);
   },
   // Job-Typ-String (DB-Wert aus job_runs.type) → übersetztes Label. Fallback: roher Typ.
   _adminUsageTypeLabel(type) {
@@ -124,12 +125,7 @@ export const adminUsageMethods = {
   async _adminUsageFetch(path) {
     const qs = this._adminUsageQuery();
     const url = path + (qs ? (path.includes('?') ? '&' : '?') + qs : '');
-    const r = await fetch(url, { credentials: 'same-origin' });
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      throw new Error(j.error_code || `HTTP ${r.status}`);
-    }
-    return r.json();
+    return fetchJson(url);
   },
 
   // Rahmen fuer jeden Tab-Load. Pro Tab zaehlt eine Sequenz mit: kommt eine
@@ -147,7 +143,7 @@ export const adminUsageMethods = {
       const data = await fetchFn();
       if (seq === this._adminUsageSeq[tab]) applyFn(data);
     } catch (e) {
-      if (seq === this._adminUsageSeq[tab]) this.adminUsageError = e.message;
+      if (seq === this._adminUsageSeq[tab]) this.adminUsageError = tFetchErrorRaw(e);
     } finally {
       this._adminUsagePending--;
       this.adminUsageLoading = this._adminUsagePending > 0;
@@ -245,19 +241,12 @@ export const adminUsageMethods = {
     try {
       const usd = (row._draftBudget === '' || row._draftBudget == null) ? null : Number(row._draftBudget);
       const body = { monthly_budget_usd: usd, budget_mode: row._draftMode };
-      const r = await fetch(`/admin/users/${encodeURIComponent(row.email)}`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(body),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      const j = await sendJson(`/admin/users/${encodeURIComponent(row.email)}`, 'PUT', body);
       row.monthlyBudgetUsd = j.user.monthly_budget_usd;
       row.budgetMode = j.user.budget_mode || 'none';
       row.overrun = !!(row.monthlyBudgetUsd && row.budgetMode !== 'none' && row.usd >= row.monthlyBudgetUsd);
       row._savedAt = Date.now();
-    } catch (e) { this.adminUsageError = e.message; }
+    } catch (e) { this.adminUsageError = tFetchErrorRaw(e); }
     finally { row._saving = false; }
   },
 
@@ -302,10 +291,10 @@ export const adminUsageMethods = {
     this.adminUsageBillingSyncing = true;
     this.adminUsageError = '';
     try {
-      const r = await fetch('/admin/usage/billing/sync', { method: 'POST', credentials: 'same-origin' });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        this.adminUsageError = this.adminUsageBillingErrorText({ code: j.error_code, status: j.status });
+      try {
+        await sendJson('/admin/usage/billing/sync', 'POST');
+      } catch (e) {
+        this.adminUsageError = this.adminUsageBillingErrorText({ code: e.code, status: e.body?.status });
       }
       await this.adminUsageLoadBilling();
     } finally {
@@ -474,6 +463,6 @@ export const adminUsageMethods = {
       );
       this.adminUsageTimeSeries = data.series || [];
       this.adminUsageTimeSeriesKey = key;
-    } catch (e) { this.adminUsageError = e.message; }
+    } catch (e) { this.adminUsageError = tFetchErrorRaw(e); }
   },
 };

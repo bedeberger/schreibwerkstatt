@@ -3,6 +3,9 @@
 // konsistenten SQLite-Snapshots) + Restore (Upload → Validierung → Neustart,
 // beim Boot wird die DB geswappt). Backend: routes/admin-backup.js.
 
+import { fmtBytes, fetchJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
+
 export const adminBackupMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
   async backupEnter() {
@@ -15,11 +18,9 @@ export const adminBackupMethods = {
     this.backupLoading = true;
     this.backupError = '';
     try {
-      const r = await fetch('/admin/backup/info', { credentials: 'same-origin', cache: 'no-store' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      this.backupInfoData = await r.json();
+      this.backupInfoData = await fetchJson('/admin/backup/info', { cache: 'no-store' });
     } catch (e) {
-      this.backupError = e.message;
+      this.backupError = tFetchErrorRaw(e);
     } finally {
       this.backupLoading = false;
     }
@@ -53,17 +54,13 @@ export const adminBackupMethods = {
     this.backupRestoreResult = null;
     try {
       const buf = await this.backupFile.arrayBuffer();
-      const r = await fetch('/admin/backup/restore', {
+      this.backupRestoreResult = await fetchJson('/admin/backup/restore', {
         method: 'POST',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: buf,
       });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(this._backupErrLabel(data.error_code) || data.message || `HTTP ${r.status}`);
-      this.backupRestoreResult = data;
     } catch (e) {
-      this.backupRestoreError = e.message;
+      this.backupRestoreError = this._backupErrLabel(e.code) || e.body?.message || tFetchErrorRaw(e);
     } finally {
       this.backupRestoring = false;
     }
@@ -82,6 +79,7 @@ export const adminBackupMethods = {
     this.backupRestarting = true;
     this.backupRestartTimedOut = false;
     try {
+      // Roher fetch: der Server beendet sich, eine Antwort ist nicht garantiert.
       await fetch('/admin/backup/restart', { method: 'POST', credentials: 'same-origin' });
     } catch { /* Server beendet sich — Fehler erwartet */ }
     this._backupWaitForBoot();
@@ -103,12 +101,7 @@ export const adminBackupMethods = {
 
   // ── Format / Labels ──────────────────────────────────────────────────────
   backupFmtBytes(n) {
-    if (n == null || Number.isNaN(n)) return '—';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let v = n, i = 0;
-    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-    const loc = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
-    return `${v.toLocaleString(loc, { maximumFractionDigits: i === 0 ? 0 : 1 })} ${units[i]}`;
+    return fmtBytes(n, Alpine.store('shell').uiLocale);
   },
 
   _backupErrLabel(code) {

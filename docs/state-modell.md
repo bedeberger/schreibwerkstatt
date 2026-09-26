@@ -37,7 +37,7 @@ Slice-Anzahl und Slice-Namen-Set sind gegen [app-state.js](../public/js/app/app-
 | `cardsState` | **Alle `showXxxCard`-Flags** inkl. Admin-Karten (showAdminUsers/Settings/Usage/Categories/BooksCard), showSongsCard, showKontinuitaetCard, showSearchCard, showKomplettStatus, showAvatarMenu, adminUsageTab — exklusiv via `_closeOtherMainCards(keep)` (siehe Exklusivität über `await`-Grenzen) |
 | `statusState` | status, statusSpinner, `_statusTimer` |
 | `confirmDialogState` | Native-`<dialog>`-Modal-Ersatz für `window.confirm`/prompt (verhindert macOS-Vollbild-Bug) inkl. Input-Mode + Resolver |
-| `lektoratState` | analysisOut, correctedHtml, hasErrors, lektoratFindings, selectedFindings, appliedOriginals, appliedHistoricCorrections, checkDone/Loading/Progress/Status, saveApplying, batchLoading/Progress/Status, lastCheckId, pageHistory, activeHistoryEntryId, Token-Estimates (`tokEsts`, `_tokenEstGen`), pageLastChecked, ideenCounts/chapterIdeenCounts, ideenScope/ideenChapterId/currentChapterIdeenOpenCount, showTokLegend/tokTooltipData/showPageStatusTip, `_statsObserver*` |
+| `lektoratState` | analysisOut, correctedHtml, hasErrors, lektoratFindings, selectedFindings, appliedOriginals, appliedHistoricCorrections, checkDone/Loading/Progress/Status, saveApplying, batchLoading/Progress/Status, lastCheckId, pageHistory, activeHistoryEntryId, Token-Estimates (`tokEsts`, `_tokenEstGen`), pageLastChecked, ideenScope/ideenChapterId/currentChapterIdeenOpenCount, showTokLegend/tokTooltipData/showPageStatusTip, `_statsObserver*` |
 | `bookReviewState` | bookReviewHistory (von tree.js geschrieben, von user-settings beim Reset gelesen → Root) |
 | `kapitelReviewState` | kapitelReviewChapterId (Hash-Router-SSoT) |
 | ~~`tagebuchRueckblickNavState` / `figurWerkstattState` / `plotNavState`~~ | **migriert → `$store.nav`** (Permalink-Spiegel `pendingRueckblickZeitraum/rueckblickEntryId/werkstattDraftId/werkstattDrafts/plotBeatId`, Hash-Router-SSoT); kein Root-Slice mehr |
@@ -56,7 +56,7 @@ Slice-Anzahl und Slice-Namen-Set sind gegen [app-state.js](../public/js/app/app-
 
 `figurenById / orteById / szenenById` (Getter am Root in [public/js/app.js](../public/js/app.js)) sind getter-basierte O(1)-Lookups, die nur bei Referenzwechsel der Quell-Arrays neu gebaut werden. **`loadFiguren` etc. müssen die Arrays reassignen, nie pushen** — sonst rebuildet der Cache nicht. Render-Loops in figuren.html/orte.html/szenen.html nutzen diese Maps statt `.find()`.
 
-Weitere Root-Computeds: `szenenNachKapitel`, `szenenNachSeite`, `orteFiltered`, `szenenFiltered`, `filteredTree`, `selectedBookName`, `selectedBookUrl`, `statusHtml`, `ideenMovePickerOptions()`.
+Weitere Root-Computeds: `szenenNachKapitel`, `szenenNachSeite`, `orteFiltered`, `szenenFiltered`, `filteredTree`, `selectedBookName`, `statusHtml`, `ideenMovePickerOptions()`.
 
 ## Lifecycle
 

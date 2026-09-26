@@ -101,28 +101,6 @@
   .admin-usage-filter label { width: 100%; }
 }
 
-.admin-usage-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-sm);
-}
-
-.admin-usage-table th,
-.admin-usage-table td {
-  text-align: left;
-  padding: var(--space-md) var(--space-sm);
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
-}
-
-.admin-usage-table th {
-  font-weight: var(--fw-semibold);
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
 .admin-usage-row--overrun {
   background: var(--color-warn-bg);
 }

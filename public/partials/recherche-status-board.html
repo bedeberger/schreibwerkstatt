@@ -19,8 +19,8 @@
   <template x-for="st in statuses()" :key="st">
     <div class="research-status-column" :class="'research-status-column--' + st">
       <div class="research-status-column-head">
-        <span class="research-status-column-title" x-text="statusLabel(st)"></span>
-        <span class="research-status-column-count" x-text="itemsForStatus(st).length"></span>
+        <span class="board-col-title" x-text="statusLabel(st)"></span>
+        <span class="board-col-count" x-text="itemsForStatus(st).length"></span>
       </div>
 
       <!-- SortableJS-Container: haelt ausser dem x-for-Anker nur die Karten.

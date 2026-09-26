@@ -2,8 +2,9 @@
 // (manuscript-stream.js). Konsument: Share-SSR (routes/share.js lädt das Modul
 // serverseitig via dynamic import(), Muster wie lib/prompts-loader.js).
 //
-// PURE + ISOMORPH: kein DOM, kein Browser-Import. Lokales escHtml (kein Import
-// aus utils.js — das trägt Browser-Annahmen und würde den Node-Import brechen).
+// PURE + ISOMORPH: kein DOM, kein Browser-Import. escHtml direkt aus
+// utils/escape.js (pure, ohne Importe) — NICHT aus der utils.js-Facade, die
+// trägt Browser-Annahmen und würde den Node-Import brechen.
 //
 // ESCAPING-INVARIANTE: Entry-Namen werden via escHtml escaped; entry.html wird
 // VERBATIM eingefügt (bereits via lib/html-clean.js sanitisiert, trägt data-bid
@@ -12,14 +13,7 @@
 // entry.headBefore/headAfter: fertiges Markup aus lib/headline-render.js, das
 // seine Textwerte dort bereits escaped hat.
 
-function escHtml(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escHtml } from './utils/escape.js';
 
 const DEFAULTS = {
   chapterTag: 'h2',

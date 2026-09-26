@@ -1,15 +1,8 @@
 // Admin-Karte: Buecher-Uebersicht + Owner-Zuweisung fuer ownerless Buecher.
 // Methoden werden in Alpine.data('adminBooksCard') gespreadet.
 
-import { fetchJson, charsToNormseiten, formatNumber, localeTag } from '../utils.js';
-
-function _fmtBytes(n, uiLocale) {
-  const v = Number(n) || 0;
-  const tag = localeTag(uiLocale);
-  if (v < 1024) return `${v.toLocaleString(tag)} B`;
-  if (v < 1024 * 1024) return `${(v / 1024).toLocaleString(tag, { maximumFractionDigits: 1 })} KB`;
-  return `${(v / (1024 * 1024)).toLocaleString(tag, { maximumFractionDigits: 2 })} MB`;
-}
+import { fetchJson, sendJson, charsToNormseiten, formatNumber, fmtBytes } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
 
 export const adminBooksMethods = {
   async loadAll() {
@@ -26,7 +19,7 @@ export const adminBooksMethods = {
       }));
       this.users = (u.users || []).filter(usr => usr.status === 'active');
     } catch (e) {
-      this.error = e.message;
+      this.error = tFetchErrorRaw(e);
     } finally {
       this.loading = false;
     }
@@ -49,7 +42,7 @@ export const adminBooksMethods = {
   },
 
   fmtBytes(n) {
-    return _fmtBytes(n, Alpine.store('shell').uiLocale);
+    return fmtBytes(Number(n) || 0, Alpine.store('shell').uiLocale);
   },
 
   async assignOwner(book) {
@@ -66,16 +59,10 @@ export const adminBooksMethods = {
     this.busy = true;
     this.error = '';
     try {
-      const r = await fetch(`/admin/books/${book.book_id}/assign-owner`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(window.__app.tError(data) || `HTTP ${r.status}`);
+      await sendJson(`/admin/books/${book.book_id}/assign-owner`, 'POST', { email });
       await this.loadAll();
     } catch (e) {
-      this.error = e.message;
+      this.error = tFetchErrorRaw(e);
     } finally {
       this.busy = false;
     }

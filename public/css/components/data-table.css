@@ -1,0 +1,29 @@
+@layer components {
+/* Daten-Tabelle — Grundform für Listen-/Verwaltungs-Tabellen (Admin-Karten).
+   Volle Breite, Trennlinie je Zeile, gesperrte Caps-Kopfzeile. Die Feature-
+   Klasse daneben trägt nur ihre Abweichung (Spalten-Ausrichtung, Breakpoints).
+   Zusammen mit `sortableTable` (components/sortable-table.css): die Chevron-
+   Platzreservierung muss das th-Padding schlagen, darum 0,2,1. */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: var(--space-md) var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.data-table th {
+  font-weight: var(--fw-semibold);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.data-table th.sortable-th {
+  padding-right: calc(var(--space-md) + var(--space-14));
+}
+}

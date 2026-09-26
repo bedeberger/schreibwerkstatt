@@ -25,7 +25,7 @@
           <div>
             <div class="mac-app-meta muted-msg muted-msg--sm">
               <span x-text="$app.t('profile.macApp.version') + ': ' + macRelease.version"></span>
-              <span x-show="macReleaseSizeMb()" x-text="' · ' + macReleaseSizeMb() + ' MB'"></span>
+              <span x-show="macReleaseSizeLabel()" x-text="' · ' + macReleaseSizeLabel()"></span>
               <span x-show="macRelease.publishedAt"
                     x-text="' · ' + new Date(macRelease.publishedAt).toLocaleDateString($store.shell.uiLocale, $app.tzOpts())"></span>
             </div>
@@ -55,7 +55,7 @@
 
         <div class="mac-app-meta muted-msg muted-msg--sm">
           <span x-text="$app.t('profile.androidApp.version') + ': ' + androidRelease.version"></span>
-          <span x-show="androidReleaseSizeMb()" x-text="' · ' + androidReleaseSizeMb() + ' MB'"></span>
+          <span x-show="androidReleaseSizeLabel()" x-text="' · ' + androidReleaseSizeLabel()"></span>
           <span x-show="androidRelease.publishedAt"
                 x-text="' · ' + new Date(androidRelease.publishedAt).toLocaleDateString($store.shell.uiLocale, $app.tzOpts())"></span>
         </div>
@@ -93,7 +93,7 @@
             <p class="muted-msg muted-msg--sm" x-text="$app.t('profile.extensionApp.zipHint')"></p>
             <div class="mac-app-meta muted-msg muted-msg--sm">
               <span x-text="$app.t('profile.extensionApp.version') + ': ' + extensionRelease.version"></span>
-              <span x-show="extensionReleaseSizeMb()" x-text="' · ' + extensionReleaseSizeMb() + ' MB'"></span>
+              <span x-show="extensionReleaseSizeLabel()" x-text="' · ' + extensionReleaseSizeLabel()"></span>
               <span x-show="extensionRelease.publishedAt" x-text="' · ' + new Date(extensionRelease.publishedAt).toLocaleDateString($store.shell.uiLocale, $app.tzOpts())"></span>
             </div>
             <p x-show="extensionRelease.notes" class="mac-app-notes muted-msg muted-msg--sm" x-text="extensionRelease.notes"></p>

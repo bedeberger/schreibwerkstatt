@@ -131,20 +131,6 @@
   font-size: var(--font-size-sm);
   cursor: pointer;
 }
-.book-settings-locale-display {
-  margin: var(--space-sm) 0 0;
-  font-size: var(--font-size-mini);
-  color: var(--color-muted);
-}
-.book-settings-select {
-  font-size: var(--font-size-sm);
-  padding: var(--pad-badge);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  min-width: 220px;
-}
 .book-settings-kontext-wrap {
   display: flex;
   flex-direction: column;
@@ -216,10 +202,6 @@
 
 @media (max-width: 600px) {
   .book-settings-kontext-wrap {
-    width: 100%;
-  }
-  .book-settings-select {
-    min-width: 0;
     width: 100%;
   }
   .book-settings-danger-row {

@@ -14,7 +14,7 @@
               :aria-label="$app.t('common.close')" :data-tip="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </div>
     <div class="table-scroll">
-    <table class="admin-usage-table"
+    <table class="data-table"
            x-data="sortableTable({
              rows: () => adminUsageBreakdownDetail(),
              defaultKey: 'usd',
@@ -63,7 +63,7 @@
     <div x-bind="panel" x-cloak>
       <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.usage.breakdown.matrixHint')"></p>
       <div class="table-scroll">
-      <table class="admin-usage-table"
+      <table class="data-table"
              x-data="sortableTable({
                rows: () => adminUsageMatrix().rows,
                defaultKey: 'total',

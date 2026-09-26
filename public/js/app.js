@@ -1,4 +1,4 @@
-import { escHtml } from './utils.js';
+import { escHtml, localeTag } from './utils.js';
 import { hasUnreadChangelog } from './cards/help-card.js';
 
 import { historyMethods } from './book/history.js';
@@ -211,13 +211,10 @@ document.addEventListener('alpine:init', () => {
     },
 
     get _numLocale() {
-      const region = this.$store.shell.defaultRegion || (this.$store.shell.uiLocale === 'en' ? 'US' : 'CH');
-      const lang = this.$store.shell.uiLocale || 'de';
-      return `${lang}-${region}`;
-    },
-
-    get selectedBookUrl() {
-      return null;
+      // defaultRegion lesen hält den Getter reaktiv auf Region-Wechsel; die
+      // Tag-Bildung selbst ist SSoT in utils/format.js#localeTag.
+      void this.$store.shell.defaultRegion;
+      return localeTag(this.$store.shell.uiLocale);
     },
 
     get filteredTree() {

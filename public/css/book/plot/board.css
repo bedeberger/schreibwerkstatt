@@ -50,14 +50,9 @@
      Restbreite → bleibt lesbar auf einer Zeile), die Icons rutschen auf eine
      eigene Zeile darunter — analog zur Strang-Lane / zum Grid-Akt-Kopf. */
   .plot-column-header .plot-column-actions { flex: 1 0 100%; }
-  .plot-column-title {
-    font-weight: var(--fw-semibold);
-    font-size: var(--font-size-sm);
-    color: var(--color-text);
-    cursor: text;
-    flex: 1 1 auto;
-    overflow-wrap: anywhere;
-  }
+  /* Grundform aus components/board-column.css (.board-col-title); hier nur
+     der Doppelklick-zum-Umbenennen-Hinweis. */
+  .plot-column-title { cursor: text; }
   .plot-column-title-input {
     flex: 1 1 auto;
     font-weight: var(--fw-semibold);
@@ -67,16 +62,6 @@
     border-radius: var(--radius-sm);
     background: var(--color-card-bg);
     color: var(--color-text);
-  }
-  .plot-column-count {
-    flex: 0 0 auto;
-    font-size: var(--font-size-micro);
-    color: var(--color-muted);
-    background: var(--color-tag-bg);
-    border-radius: var(--radius-sm);
-    padding: 0 var(--space-xs);
-    min-width: 1.4em;
-    text-align: center;
   }
   .plot-column-actions {
     display: flex;
@@ -567,14 +552,6 @@
 
   /* ── Vollbild: ganze Karte nimmt den Viewport, Board scrollt horizontal über
        die volle Breite (mehr Platz für alle Akte). Header/Filter bleiben oben. */
-  .card--plot:fullscreen {
-    position: fixed;
-    inset: 0;
-    background: var(--color-surface);
-    padding: var(--space-lg);
-    z-index: var(--z-overlay);
-    overflow-y: auto;
-  }
   /* Akt-Spalten füllen den Viewport fluid auf (wenige Akte → keine Leerfläche,
      keine Scroll); ab ~280px greift der Min, danach Horizontal-Scroll wie sonst.
      max-width hält die Spalten lesbar, wenn nur wenige Akte da sind. Die

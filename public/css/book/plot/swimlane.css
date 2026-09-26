@@ -239,7 +239,6 @@
     font-weight: var(--fw-semibold);
     color: var(--col-accent);
   }
-  .plot-icon-btn--on { color: var(--col-accent); }
 
   /* ── Vollbild: Grid füllt den Viewport fluid auf (Pendant zu .plot-board) ───
      `width: max-content; min-width: 100%` ⇒ effektive Breite = max(Inhalt, 100%):

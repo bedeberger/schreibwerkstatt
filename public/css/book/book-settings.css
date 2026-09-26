@@ -169,19 +169,13 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  background: hsl(var(--avatar-hue, 220) 60% 88%);
-  color: hsl(var(--avatar-hue, 220) 60% 28%);
+  background: hsl(var(--avatar-hue, 220) var(--avatar-bg-sl));
+  color: hsl(var(--avatar-hue, 220) var(--avatar-fg-sl));
   font-size: var(--font-size-xs);
   font-weight: var(--fw-bold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   user-select: none;
-}
-@media (prefers-color-scheme: dark) {
-  .book-share-avatar {
-    background: hsl(var(--avatar-hue, 220) 40% 22%);
-    color: hsl(var(--avatar-hue, 220) 70% 78%);
-  }
 }
 .book-share-row-main {
   display: flex;

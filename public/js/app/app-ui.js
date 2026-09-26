@@ -1,4 +1,4 @@
-import { escPreserveStrong, fetchText, tzOpts, formatRelativeShort, charBadgeLabel } from '../utils.js';
+import { escPreserveStrong, fetchText, tzOpts, formatRelativeShort, charBadgeLabel, localeTag } from '../utils.js';
 import { avatarHue } from '../avatar.js';
 
 // Pure Filter-Logik für die Szenen-Liste. Getrennt von Alpine-Getter, damit
@@ -178,7 +178,7 @@ export const appUiMethods = {
   // ── Datum / Save-Status ─────────────────────────────────────────────────
   formatDate(iso) {
     if (!iso) return '';
-    const tag = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const tag = localeTag(this.$store.shell.uiLocale);
     return new Date(iso).toLocaleString(tag, tzOpts({
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
@@ -230,7 +230,7 @@ export const appUiMethods = {
   _formatSaveTs(ts) {
     if (!ts) return '';
     const d = new Date(ts);
-    const tag = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const tag = localeTag(this.$store.shell.uiLocale);
     const sameDay = d.toDateString() === new Date().toDateString();
     if (sameDay) {
       return d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));

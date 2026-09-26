@@ -8,6 +8,9 @@
 // vorbelegtes Feld waere beim Speichern eine Kopie, die spaeter nicht mehr
 // mitzieht, wenn der Admin die Instanz-Einstellung aendert.
 
+import { fetchJson, sendJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
+
 const EMPTY_PROFILE = {
   id: null, name: '', provider: 'openai-compat', model: '', host: '',
   api_key: '', cloud: '', temperature: '', context_window: '',
@@ -24,12 +27,10 @@ export const adminAiProfilesMethods = {
     this.adminProfilesLoading = true;
     this.adminProfilesError = '';
     try {
-      const r = await fetch('/admin/ai-profiles', { credentials: 'same-origin' });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      const j = await fetchJson('/admin/ai-profiles');
       this.adminProfilesList = j.profiles || [];
     } catch (e) {
-      this.adminProfilesError = e.message;
+      this.adminProfilesError = tFetchErrorRaw(e);
     } finally {
       this.adminProfilesLoading = false;
     }
@@ -80,18 +81,11 @@ export const adminAiProfilesMethods = {
       if (f.id && !String(f.api_key || '').trim()) delete body.api_key;
       delete body.id;
       const url = f.id ? `/admin/ai-profiles/${f.id}` : '/admin/ai-profiles';
-      const r = await fetch(url, {
-        method: f.id ? 'PUT' : 'POST',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(body),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      await sendJson(url, f.id ? 'PUT' : 'POST', body);
       this.adminProfilesEditing = false;
       await this.adminProfilesLoad();
     } catch (e) {
-      this.adminProfilesError = e.message;
+      this.adminProfilesError = tFetchErrorRaw(e);
     } finally {
       this.adminProfilesSaving = false;
     }
@@ -107,14 +101,10 @@ export const adminAiProfilesMethods = {
     if (!confirm(msg || `${profile.name} löschen?`)) return;
     this.adminProfilesError = '';
     try {
-      const r = await fetch(`/admin/ai-profiles/${profile.id}`, {
-        method: 'DELETE', credentials: 'same-origin',
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      await sendJson(`/admin/ai-profiles/${profile.id}`, 'DELETE');
       await this.adminProfilesLoad();
     } catch (e) {
-      this.adminProfilesError = e.message;
+      this.adminProfilesError = tFetchErrorRaw(e);
     }
   },
 

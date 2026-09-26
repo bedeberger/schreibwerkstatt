@@ -2,6 +2,9 @@
 // Root-Zugriffe via window.__app. Liest aus /admin/logs/{tail,search,files,
 // stream,download}.
 
+import { fetchJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
+
 export const adminLogsMethods = {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   async adminLogsEnter() {
@@ -48,9 +51,7 @@ export const adminLogsMethods = {
     this.adminLogsLoading = true;
     this.adminLogsError = '';
     try {
-      const r = await fetch('/admin/logs/tail?lines=500', { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await fetchJson('/admin/logs/tail?lines=500');
       // Server liefert chronologisch (alt → neu). UI zeigt neueste oben.
       const entries = (data.entries || []).reverse();
       this.adminLogsEntries = entries;
@@ -58,7 +59,7 @@ export const adminLogsMethods = {
       this.adminLogsOldestTs = oldest?.ts || null;
       this.adminLogsHasMore = entries.length >= 500;
     } catch (e) {
-      this.adminLogsError = e.message;
+      this.adminLogsError = tFetchErrorRaw(e);
     } finally {
       this.adminLogsLoading = false;
     }
@@ -77,9 +78,7 @@ export const adminLogsMethods = {
       if (f.q)     qs.set('q',     f.q);
       qs.set('limit', '200');
       if (append && this.adminLogsOldestTs) qs.set('before', this.adminLogsOldestTs);
-      const r = await fetch('/admin/logs/search?' + qs.toString(), { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await fetchJson('/admin/logs/search?' + qs.toString());
       // Server liefert neueste zuerst (matched.push war reverse-iter).
       const next = data.entries || [];
       this.adminLogsEntries = append ? this.adminLogsEntries.concat(next) : next;
@@ -87,7 +86,7 @@ export const adminLogsMethods = {
       if (oldest) this.adminLogsOldestTs = oldest.ts;
       this.adminLogsHasMore = !!data.hasMore;
     } catch (e) {
-      this.adminLogsError = e.message;
+      this.adminLogsError = tFetchErrorRaw(e);
     } finally {
       this.adminLogsLoading = false;
     }
@@ -106,9 +105,7 @@ export const adminLogsMethods = {
   // ── Files ──────────────────────────────────────────────────────────────────
   async _adminLogsLoadFiles() {
     try {
-      const r = await fetch('/admin/logs/files', { credentials: 'same-origin' });
-      if (!r.ok) return;
-      const data = await r.json();
+      const data = await fetchJson('/admin/logs/files');
       this.adminLogsFiles = data.files || [];
     } catch { /* noop */ }
   },
