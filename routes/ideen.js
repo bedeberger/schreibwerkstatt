@@ -15,8 +15,7 @@
 
 const express = require('express');
 const { toIntId } = require('../lib/validate');
-const { setContext } = require('../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
+const { guardBook, sessionEmail } = require('../lib/acl');
 const { resolvePageBookId, resolveChapterBookId } = require('../lib/content-ownership');
 const { IDEE_STATUSES, isIdeeStatus, isIdeaLinkKind } = require('../lib/ideen-status');
 const ideenDb = require('../db/ideen');
@@ -28,22 +27,19 @@ const jsonBody = express.json();
 
 const MAX_LEN = 4000;
 
-function _guard(req, res, bookId, minRole) {
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, minRole); return true; }
-  catch (e) { return !sendACLError(res, e); }
-}
-
 // Vorspann fuer die Routen auf einer bestehenden Idee: Login, Besitz und
 // Buch-ACL in einem Zug. Liefert die Besitz-Zeile oder null (Antwort ist raus).
+// Der Login-Check steht hier VOR dem Guard, weil die Besitz-Zeile ueber die
+// E-Mail geladen wird — ohne ihn erschiene „nicht angemeldet" als 404. Er
+// antwortet mit demselben Code wie der Guard.
 function _ownedIdee(req, res) {
   const userEmail = sessionEmail(req);
-  if (!userEmail) { res.status(401).json({ error_code: 'LOGIN_REQ' }); return null; }
+  if (!userEmail) { res.status(401).json({ error_code: 'NOT_LOGGED_IN' }); return null; }
   const id = toIntId(req.params.id);
   if (!id) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
   const row = ideenDb.getIdeeOwned(id, userEmail);
   if (!row) { res.status(404).json({ error_code: 'IDEE_NOT_FOUND' }); return null; }
-  if (!_guard(req, res, row.book_id, 'editor')) return null;
+  if (!guardBook(req, res, row.book_id, 'editor')) return null;
   return { ...row, userEmail };
 }
 
@@ -53,9 +49,8 @@ router.get('/counts', (req, res) => {
   const userEmail = sessionEmail(req);
   const bookId = toIntId(req.query.book_id);
   const kind = req.query.kind === 'chapter' ? 'chapter' : 'page';
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!_guard(req, res, bookId, 'editor')) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   res.json(ideenDb.openIdeenCounts(bookId, userEmail, kind));
 });
 
@@ -69,9 +64,8 @@ router.get('/counts', (req, res) => {
 router.get('/board', (req, res) => {
   const userEmail = sessionEmail(req);
   const bookId = toIntId(req.query.book_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!_guard(req, res, bookId, 'editor')) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   res.json({ statuses: IDEE_STATUSES, ideen: ideenDb.listBoardIdeen(bookId, userEmail) });
 });
 
@@ -79,9 +73,8 @@ router.get('/board', (req, res) => {
 router.get('/link-targets', (req, res) => {
   const userEmail = sessionEmail(req);
   const bookId = toIntId(req.query.book_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
-  if (!_guard(req, res, bookId, 'editor')) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   res.json(ideenDb.listIdeaLinkTargets(bookId, userEmail));
 });
 
@@ -98,10 +91,9 @@ router.get('/links', (req, res) => {
   const userEmail = sessionEmail(req);
   const bookId = toIntId(req.query.book_id);
   const targetKind = req.query.target_kind;
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if (!bookId)    return res.status(400).json({ error_code: 'INVALID_ID' });
   if (!isIdeaLinkKind(targetKind)) return res.status(400).json({ error_code: 'INVALID_LINK_KIND' });
-  if (!_guard(req, res, bookId, 'editor')) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   const map = ideenDb.ideaLinksByTarget(targetKind, bookId, userEmail);
   res.json({ target_kind: targetKind, links: Object.fromEntries(map) });
 });
@@ -112,7 +104,6 @@ router.get('/', (req, res) => {
   const userEmail = sessionEmail(req);
   const pageId = toIntId(req.query.page_id);
   const chapterId = toIntId(req.query.chapter_id);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   if ((!pageId && !chapterId) || (pageId && chapterId)) {
     return res.status(400).json({ error_code: 'INVALID_SCOPE' });
   }
@@ -123,14 +114,13 @@ router.get('/', (req, res) => {
   if (!bookId) {
     return res.status(404).json({ error_code: pageId ? 'PAGE_NOT_FOUND' : 'CHAPTER_NOT_FOUND' });
   }
-  if (!_guard(req, res, bookId, 'editor')) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   res.json(ideenDb.listIdeenForScope(kind, scopeId, userEmail));
 });
 
 // Idee anlegen (XOR page_id / chapter_id).
 router.post('/', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.body?.book_id);
   const pageId = toIntId(req.body?.page_id);
   const chapterId = toIntId(req.body?.chapter_id);
@@ -141,7 +131,7 @@ router.post('/', jsonBody, (req, res) => {
   }
   if (!content)                 return res.status(400).json({ error_code: 'CONTENT_REQ' });
   if (content.length > MAX_LEN) return res.status(400).json({ error_code: 'CONTENT_TOO_LONG' });
-  if (!_guard(req, res, bookId, 'editor')) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
 
   // Cross-Check: page/chapter muss zum Buch gehoeren.
   const ankerBook = pageId ? resolvePageBookId(pageId) : resolveChapterBookId(chapterId);
