@@ -56,13 +56,18 @@ module.exports = {
   ],
   webServer: [
     // DB vor dem Boot loeschen (inkl. -wal/-shm), damit dev-seed greift.
+    // reuseExistingServer: false auch lokal — das `rm -f` laeuft nur beim
+    // Server-Start. Ein wiederverwendeter Rest-Server haelt die vom Vorlauf
+    // vollgeschriebene DB, und die Specs, die exakte Zeilen des gemeinsamen
+    // Seeds zaehlen, scheitern dann an fremdem Zustand. Ist der Port belegt,
+    // bricht Playwright lieber laut ab (Rest-Server beenden: lsof -i :8766).
     // Kein dedizierter Health-Endpoint — in LOCAL_DEV_MODE liefert `/` die SPA
     // (Auth-Guard via Dev-Session gebypasst), reicht als Readiness-Signal.
     {
       command: serve(DB, PORT),
       url: `http://localhost:${PORT}/`,
       timeout: 60000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
     },
@@ -70,7 +75,7 @@ module.exports = {
       command: serve(DB_FF, PORT_FF),
       url: `http://localhost:${PORT_FF}/`,
       timeout: 60000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
     },

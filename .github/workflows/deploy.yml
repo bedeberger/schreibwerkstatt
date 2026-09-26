@@ -60,7 +60,7 @@ jobs:
             echo "$want" > "$stamp"
           fi
 
-      - name: Syntax-Check (node --check auf allen JS-Dateien)
+      - name: Syntax-Check (node --check auf allen JS-/MJS-Dateien)
         run: |
           set -e
           fail=0
@@ -69,7 +69,7 @@ jobs:
               echo "::error file=$f::Syntaxfehler"
               fail=1
             fi
-          done < <(find server.js logger.js lib routes db public/js scripts -type f -name '*.js' 2>/dev/null)
+          done < <(find server.js logger.js lib routes db public/js scripts tools -type f \( -name '*.js' -o -name '*.mjs' \) 2>/dev/null)
           exit $fail
 
       # Faengt benutzte-aber-nicht-importierte Symbole in public/js (entsteht beim
@@ -128,10 +128,6 @@ jobs:
             echo "$hits"
             status=1
           fi
-
-          echo "→ bsGet( für Listen (Pagination-Falle) — nur Warnung"
-          grep -rEn 'bsGet\(.+/(books|pages|chapters|shelves)[^/]*\)' public/js 2>/dev/null \
-            | grep -v 'bsGetAll' || echo "  (keine Treffer)"
 
           exit $status
 
@@ -192,9 +188,60 @@ jobs:
       - name: E2E-Tests ausführen
         run: npx playwright test --reporter=list
 
+  # Echte App (playwright.app.config.js, tests/e2e-app/ inkl. smoke.spec.js):
+  # bootet `node server.js` mit LOCAL_DEV_MODE + Dev-Seed auf Wegwerf-DBs unter
+  # tests/.tmp/ (Ports 8766/8767). Nur diese Schicht faengt Alpine-Expression-
+  # Fehler ueber dem kompletten Template-Baum und die Geometrie-Invarianten, die
+  # am vollen Shell-CSS haengen — das Fixture-Harness oben sieht beides nicht.
+  # Eigener Job statt Step im e2e-Job: ein roter Smoke soll im Checks-Tab als
+  # solcher erkennbar sein. Auf dem einen Self-hosted-Runner laufen die Jobs
+  # ohnehin nacheinander, parallele Port-Kollisionen gibt es dort nicht.
+  #
+  # Nur Chromium: das firefox-Projekt der Config bleibt lokal (`npm run
+  # test:smoke`). Beide webServer-Eintraege booten trotzdem — Playwright startet
+  # sie unabhaengig vom --project-Filter; das kostet nur einen Server-Boot.
+  e2e-app:
+    name: Playwright gegen die echte App (Smoke + App-Specs)
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJson('["self-hosted","prod"]') }}
+    timeout-minutes: 25
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          clean: false
+
+      - name: Workspace putzen (node_modules bewusst ausgenommen)
+        run: git clean -ffdx -e node_modules
+
+      - name: Deps installieren (nur bei geaendertem Lockfile)
+        run: |
+          set -e
+          stamp=node_modules/.ci-lock-sha
+          want=$(sha256sum package-lock.json | cut -d' ' -f1)
+          if [ "$(cat "$stamp" 2>/dev/null)" = "$want" ]; then
+            echo "node_modules aktuell (${want:0:12}) — Install uebersprungen"
+          else
+            npm ci --prefer-offline --no-audit --no-fund
+            echo "$want" > "$stamp"
+          fi
+
+      - name: Browser sicherstellen
+        run: |
+          if [ -d "$HOME/.cache/ms-playwright" ]; then
+            npx playwright install chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: App-Specs ausführen (Chromium)
+        run: npx playwright test --config=playwright.app.config.js --project=chromium --reporter=list
+
   deploy:
     name: Deploy auf Prod-LXC
-    needs: [checks-and-unit, e2e]
+    needs: [checks-and-unit, e2e, e2e-app]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, prod]
     environment: production
@@ -225,7 +272,7 @@ jobs:
   # rsync + systemctl-Rechte, kein Playwright und kein node_modules im Workspace.
   deploy-demo:
     name: Deploy auf Demo-LXC
-    needs: [checks-and-unit, e2e]
+    needs: [checks-and-unit, e2e, e2e-app]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, demo]
     # Kein `environment:` wie bei Prod: die Demo braucht keine Repo-Secrets (ihre
