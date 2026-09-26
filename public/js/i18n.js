@@ -16,6 +16,20 @@ const SUPPORTED_LOCALES = ['de', 'en'];
 let _messages = {};
 let _fallback = null;
 
+// Ein Reload bricht einen laufenden Locale-Fetch der alten Seite ab. Das ist kein
+// Fehler, sondern das Ende dieser Seite — die neue lädt die Locale selbst.
+let _unloading = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => { _unloading = true; });
+  // Firefox bricht den Fetch schon beim Navigationsstart ab, vor `pagehide`.
+  // Wird die Navigation abgebrochen (Dirty-Guard), gibt der Timer das Log frei.
+  window.addEventListener('beforeunload', () => {
+    _unloading = true;
+    setTimeout(() => { _unloading = false; }, 2000);
+  });
+  window.addEventListener('pageshow', () => { _unloading = false; });
+}
+
 async function _load(locale) {
   const r = await fetch(`/js/i18n/${locale}.json`);
   if (!r.ok) throw new Error(`Locale ${locale} nicht verfügbar (${r.status}).`);
@@ -30,7 +44,10 @@ export async function configureI18n(locale) {
     _messages = _fallback;
   } else {
     try { _messages = await _load(locale); }
-    catch (e) { console.error('[i18n]', e.message, '– Fallback auf de.'); _messages = _fallback; }
+    catch (e) {
+      if (!_unloading) console.error('[i18n]', e.message, '– Fallback auf de.');
+      _messages = _fallback;
+    }
   }
 }
 
