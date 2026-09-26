@@ -30,7 +30,6 @@ const { setContext } = require('../../lib/log-context');
 const { guardBook, sessionEmail } = require('../../lib/acl');
 const bookAccess = require('../../db/book-access');
 const { getBookLocale } = require('../../db/schema');
-const { db } = require('../../db/connection');
 const logger = require('../../logger');
 
 const router = express.Router();
@@ -126,8 +125,7 @@ async function runManuscriptImportJob(jobId, { userEmail, mode, bookName, bookId
       );
       effBookId = created.id;
       try {
-        db.prepare('UPDATE books SET owner_email = COALESCE(owner_email, ?) WHERE book_id = ?')
-          .run(userEmail, effBookId);
+        contentStore.setBookOwner(effBookId, userEmail, { onlyIfUnset: true });
         bookAccess.grantAccess(effBookId, userEmail, 'owner', userEmail);
       } catch (gErr) {
         logger.warn(`Auto-Owner-Grant fuer book=${effBookId} fehlgeschlagen: ${gErr.message}`);

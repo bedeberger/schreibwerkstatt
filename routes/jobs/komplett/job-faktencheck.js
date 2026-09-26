@@ -26,6 +26,7 @@ const appSettings = require('../../../lib/app-settings');
 const { setContext } = require('../../../lib/log-context');
 const { makePhaseTimer } = require('./utils');
 const { _komplettAiOverrides } = require('./job-shared');
+const { chapterIdsByName, listWorldFactsWithChapterNames } = require('../../../db/content-names');
 
 // Modellname für den Cost-Ledger / Check-Zeile (parallel zu _modelName in remap.js).
 function _factcheckModelName(provider) {
@@ -69,15 +70,7 @@ function _narrativeYearSpan(bookIdInt, email) {
 function buildFactCheckCandidates(bookIdInt, email) {
   const { weltfakten_real_pruefen } = getBookSettings(bookIdInt, email);
   if (!weltfakten_real_pruefen) return { candidates: [], total: 0 };
-  const rows = db.prepare(`
-    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, c.chapter_name
-      FROM world_facts wf
-      LEFT JOIN world_fact_chapters wfc ON wfc.fact_id = wf.id
-      LEFT JOIN chapters c ON c.chapter_id = wfc.chapter_id
-     WHERE wf.book_id = ? AND wf.user_email IS ?
-       AND wf.kategorie IN (${FACTCHECK_CATEGORIES.map(() => '?').join(',')})
-     ORDER BY wf.sort_order, wf.id
-  `).all(bookIdInt, email, ...FACTCHECK_CATEGORIES);
+  const rows = listWorldFactsWithChapterNames(bookIdInt, email, FACTCHECK_CATEGORIES);
   // Bridge-Zeilen (1 je Kapitel) zu einem Kandidaten je Fakt gruppieren.
   const byId = new Map();
   for (const r of rows) {
@@ -148,10 +141,7 @@ async function runFaktencheckJob(jobId, bookId, bookName, userEmail, provider = 
 
     const spanne = _narrativeYearSpan(bookIdInt, email);
     // Auflösungs-Maps für saveFaktencheckIssues (Kapitel-Namen → chapter_id; figNameToId ungenutzt, da Faktenfehler keine Figuren tragen).
-    const chNameToId = Object.fromEntries(
-      db.prepare('SELECT chapter_name, chapter_id FROM chapters WHERE book_id = ?').all(bookIdInt)
-        .map(r => [r.chapter_name, r.chapter_id])
-    );
+    const chNameToId = chapterIdsByName(bookIdInt);
     const figNameToId = Object.fromEntries(
       db.prepare('SELECT name, fig_id FROM figures WHERE book_id = ? AND user_email IS ?').all(bookIdInt, email)
         .map(r => [r.name, r.fig_id])

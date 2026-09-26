@@ -17,6 +17,7 @@ const { executeResearchTool, entityList } = require('./research-chat-tools');
 const embed = require('../../lib/embed');
 const { makeAgenticChatJob, stripTrailingEmptyJson } = require('./agentic-chat');
 const appSettings = require('../../lib/app-settings');
+const { getSessionWithBookName } = require('../../db/chat-sessions');
 
 function _maxToolIter() {
   return parseInt(appSettings.get('jobs.research_chat.max_tool_iter'), 10) || 6;
@@ -34,11 +35,7 @@ const runResearchChatJob = makeAgenticChatJob({
     if (resolveProvider({ userEmail }) !== 'claude') throw i18nError('job.error.researchChatClaudeOnly');
   },
 
-  loadSession: (sessionId, userEmail) => db.prepare(`
-    SELECT cs.*, b.name AS book_name FROM chat_sessions cs
-    LEFT JOIN books b ON b.book_id = cs.book_id
-    WHERE cs.id = ? AND cs.user_email = ? AND cs.kind = 'research'
-  `).get(parseInt(sessionId), userEmail),
+  loadSession: (sessionId, userEmail) => getSessionWithBookName(parseInt(sessionId), userEmail, 'research'),
 
   async prepare({ session, userEmail, aiCfg, logger, jobSignal }) {
     const { buildResearchChatAgentSystemPrompt, buildResearchChatTools, RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts(userEmail);

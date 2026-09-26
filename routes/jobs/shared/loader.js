@@ -1,10 +1,9 @@
 'use strict';
-const { db } = require('../../../db/schema');
 const { INPUT_BUDGET_CHARS, getContextConfigFor } = require('../../../lib/ai');
 const contentStore = require('../../../lib/content-store');
-const { inClause } = require('../../../lib/validate');
 const { i18nError } = require('./jobs');
 const { htmlToText } = require('./ai');
+const { pagePreviewTexts } = require('../../../db/content-names');
 
 // Multi-Pass-Grenzen skalieren mit dem Input-Budget (context_window − max_tokens_out).
 // SINGLE_PASS_LIMIT: Schwelle, ab der in Chunks zerlegt wird. 70% des Budgets für
@@ -107,12 +106,7 @@ async function loadPageContents(pages, chMap, minLength, onBatch, signal = null)
   let filteredPages = pages;
   if (minLength > 0 && minLength <= 800 && pages.length > 0) {
     try {
-      const ids = pages.map(p => p.id);
-      const { sql, values } = inClause(ids);
-      const rows = db.prepare(
-        `SELECT page_id, preview_text FROM pages WHERE page_id IN ${sql}`
-      ).all(...values);
-      const previewMap = new Map(rows.map(r => [r.page_id, r.preview_text || '']));
+      const previewMap = pagePreviewTexts(pages.map(p => p.id));
       filteredPages = pages.filter(p => {
         const prev = previewMap.get(p.id);
         // Nur skippen wenn Preview existiert UND nachweislich zu kurz.

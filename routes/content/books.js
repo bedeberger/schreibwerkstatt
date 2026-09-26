@@ -371,8 +371,7 @@ function register(router) {
       setContext({ book: created.id });
       // Owner-Grant + books.owner_email setzen (idempotent).
       try {
-        db.prepare(`UPDATE books SET owner_email = COALESCE(owner_email, ?) WHERE book_id = ?`)
-          .run(email, created.id);
+        contentStore.setBookOwner(created.id, email, { onlyIfUnset: true });
         bookAccess.grantAccess(created.id, email, 'owner', email);
       } catch (gErr) {
         logger.warn(`Auto-Owner-Grant fuer book=${created.id} fehlgeschlagen: ${gErr.message}`);

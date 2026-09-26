@@ -332,8 +332,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId, gr
       const created = await contentStore.createBook({ name: bookName, owner_email: userEmail }, { session: { user: { email: userEmail } } });
       effBookId = created.id;
       try {
-        db.prepare(`UPDATE books SET owner_email = COALESCE(owner_email, ?) WHERE book_id = ?`)
-          .run(userEmail, effBookId);
+        contentStore.setBookOwner(effBookId, userEmail, { onlyIfUnset: true });
         bookAccess.grantAccess(effBookId, userEmail, 'owner', userEmail);
       } catch (gErr) {
         logger.warn(`Auto-Owner-Grant fuer book=${effBookId} fehlgeschlagen: ${gErr.message}`);

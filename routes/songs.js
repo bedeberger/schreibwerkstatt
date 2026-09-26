@@ -4,6 +4,7 @@ const { db, saveSongsToDb } = require('../db/schema');
 const { toIntId, inClause } = require('../lib/validate');
 const { aclParamGuard, sessionEmail } = require('../lib/acl');
 const searchIndex = require('../lib/search');
+const { listSongChaptersWithNames } = require('../db/content-names');
 
 const router = express.Router();
 router.param('book_id', aclParamGuard('editor'));
@@ -37,13 +38,7 @@ router.get('/:book_id', (req, res) => {
   const figMap = {};
   for (const sf of sfRows) (figMap[sf.song_id] ??= []).push({ fig_id: sf.fig_id, kontext_typ: sf.kontext_typ });
 
-  const scRows = db.prepare(`
-    SELECT sc.song_id, sc.chapter_id, c.chapter_name, sc.haeufigkeit
-    FROM song_chapters sc
-    LEFT JOIN chapters c ON c.chapter_id = sc.chapter_id
-    WHERE sc.song_id IN ${idSql}
-    ORDER BY sc.haeufigkeit DESC
-  `).all(...idVals);
+  const scRows = listSongChaptersWithNames(songIds);
   const kapMap = {};
   for (const sc of scRows) (kapMap[sc.song_id] ??= []).push({ chapter_id: sc.chapter_id, name: sc.chapter_name, haeufigkeit: sc.haeufigkeit });
 

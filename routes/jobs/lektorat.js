@@ -40,6 +40,7 @@ function _pageHasCitations(pageId) {
 const { toIntId } = require('../../lib/validate');
 const { guardBook, sessionEmail } = require('../../lib/acl');
 const { pageBookGuard } = require('../../lib/page-guard');
+const { listChaptersForBook } = require('../../db/content-names');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider, effectiveProviderClass } = require('../../lib/ai');
 const { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratEffort } = require('./lektorat-split');
@@ -219,12 +220,10 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
     // Klammer-Einschuebe besonders gern weg).
     const hatBelege         = _pageHasCitations(pageId);
 
-    // Kapitelname: zuerst aus lokaler chapters-Tabelle (kein BookStack-Call nötig),
-    // Fallback: null wenn Kapitel fehlt oder Buch noch nicht synchronisiert wurde.
-    const chapterRow = (bookId && pd.chapter_id)
-      ? db.prepare('SELECT chapter_name FROM chapters WHERE book_id = ? AND chapter_id = ?').get(parseInt(bookId), pd.chapter_id)
+    // Kapitelname aus der lokalen chapters-Tabelle; null, wenn das Kapitel fehlt.
+    const chapterName = (bookId && pd.chapter_id)
+      ? (listChaptersForBook(parseInt(bookId)).find(c => c.chapter_id === pd.chapter_id)?.chapter_name || null)
       : null;
-    const chapterName = chapterRow?.chapter_name || null;
 
     // Nachbarseiten ermitteln (letzter Absatz der Vorseite, erster der Folgeseite
     // als Lesekontext). Lokale Provider: komplett überspringen – der Block wird
@@ -363,7 +362,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
   const langCode = (locale || 'de-CH').split('-')[0];
   const bookSettings = getBookSettings(bookId, userEmail);
   // Kapitelname-Cache (chapter_id → name) aus lokaler DB, spart wiederholte Lookups pro Seite.
-  const chapterRows = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(parseInt(bookId));
+  const chapterRows = listChaptersForBook(parseInt(bookId));
   const chapterNameById = Object.fromEntries(chapterRows.map(r => [String(r.chapter_id), r.chapter_name]));
   const local = _isLocalProvider(userEmail);
   try {

@@ -10,7 +10,8 @@
 // Rein kuratierend: nie generativ im Buchtext.
 
 const express = require('express');
-const { db, getBookSettings } = require('../db/schema');
+const { getBookSettings } = require('../db/schema');
+const { listChaptersForBook } = require('../db/content-names');
 const { listBookAnchors, listXrefBacklinks } = require('../db/xrefs');
 const { ensureBookXrefsIndexed } = require('../lib/xref-index');
 const { toIntId } = require('../lib/validate');
@@ -19,24 +20,13 @@ const logger = require('../logger');
 
 const router = express.Router();
 
-// Kapitel in Buch-Leserichtung, mit Elternzeiger fuer die Tiefe. Der Picker
-// zeigt die Hierarchie eingerueckt; die NUMMER steht hier bewusst nicht dabei —
-// sie haengt am Ausgabeweg und entsteht erst beim Rendern
-// (public/js/xrefs/xref-number.js).
-const _stmtChapters = db.prepare(`
-  SELECT chapter_id, chapter_name, parent_chapter_id, position
-    FROM chapters
-   WHERE book_id = ?
-   ORDER BY position
-`);
-
 /** GET /xrefs/targets?book_id=42
  *  Alles, worauf ein Querverweis zeigen kann — in EINER Antwort, damit der
  *  Picker im Editor nicht zwei Quellen zusammenstueckeln muss.
  *  Ab Rolle 'viewer': auch ein Lektor muss Verweise setzen und lesen koennen. */
 router.get('/targets', async (req, res) => {
   const bookId = toIntId(req.query.book_id);
-  if (!bookId) return res.status(400).json({ error: 'book_id fehlt' });
+  if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!guardBook(req, res, bookId, 'viewer')) return;
 
   // Bestandsinhalte nachindizieren, falls noch nie geschehen. Ohne das zeigt der
@@ -46,7 +36,7 @@ router.get('/targets', async (req, res) => {
   try { await ensureBookXrefsIndexed(bookId); }
   catch (e) { logger.warn(`[xref] Nachindizierung fehlgeschlagen (book=${bookId}): ${e.message}`); }
 
-  const chapters = _stmtChapters.all(bookId).map(c => ({
+  const chapters = listChaptersForBook(bookId).map(c => ({
     kind: 'chapter',
     target: String(c.chapter_id),
     title: c.chapter_name || '',
@@ -89,7 +79,7 @@ router.get('/targets', async (req, res) => {
  *  und werden sonst still zu verwaisten Verweisen. */
 router.get('/backlinks', (req, res) => {
   const bookId = toIntId(req.query.book_id);
-  if (!bookId) return res.status(400).json({ error: 'book_id fehlt' });
+  if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!guardBook(req, res, bookId, 'viewer')) return;
 
   const kind = String(req.query.kind || '');

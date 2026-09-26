@@ -127,6 +127,18 @@ function getSessionRow(id, userEmail) {
   return _stmtFull.get(id, userEmail) || null;
 }
 
+// Volle Session-Row + Buchname für die buchweiten Chat-Jobs (Buch-/Recherche-Chat).
+// `kind` optional: gesetzt, filtert die Session-Art mit.
+const _stmtWithBookName = db.prepare(`
+  SELECT cs.*, b.name AS book_name FROM chat_sessions cs
+  LEFT JOIN books b ON b.book_id = cs.book_id
+  WHERE cs.id = ? AND cs.user_email = ? AND (? IS NULL OR cs.kind = ?)
+`);
+
+function getSessionWithBookName(id, userEmail, kind = null) {
+  return _stmtWithBookName.get(id, userEmail, kind, kind) || null;
+}
+
 module.exports = {
   ORPHAN_GRACE_MS,
   deleteEmptyPageSessions,
@@ -138,4 +150,5 @@ module.exports = {
   getOwnedSession,
   getSessionForJob,
   getSessionRow,
+  getSessionWithBookName,
 };

@@ -77,7 +77,7 @@ async function runBookImportJob(jobId, { userEmail }) {
     const bookId = created.id;
     setContext({ book: bookId });
     try {
-      db.prepare('UPDATE books SET owner_email = COALESCE(owner_email, ?) WHERE book_id = ?').run(userEmail, bookId);
+      contentStore.setBookOwner(bookId, userEmail, { onlyIfUnset: true });
       bookAccess.grantAccess(bookId, userEmail, 'owner', userEmail);
     } catch (gErr) {
       logger.warn(`Auto-Owner-Grant fuer book=${bookId} fehlgeschlagen: ${gErr.message}`);

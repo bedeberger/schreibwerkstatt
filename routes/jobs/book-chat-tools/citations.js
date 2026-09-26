@@ -2,7 +2,7 @@
 // Validiert die `zitate`-Liste eines final_answer-Calls gegen den aktuellen
 // Seitentext. Wird vom Loop in chat.js aufgerufen, NICHT als Tool registriert.
 
-const { db } = require('../../../db/schema');
+const { resolvePageBookId } = require('../../../lib/content-ownership');
 const contentStore = require('../../../lib/content-store');
 const { htmlToPlainText } = require('../../../lib/html-text');
 
@@ -20,10 +20,7 @@ async function validateFinalAnswerCitations(zitate, ctx) {
       continue;
     }
     if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    const pageRow = db.prepare(
-      'SELECT page_id, book_id FROM pages WHERE page_id = ?'
-    ).get(pageId);
-    if (!pageRow || pageRow.book_id !== ctx.bookId) {
+    if (resolvePageBookId(pageId) !== ctx.bookId) {
       out.push({ page_id: pageId, valid: false, reason: 'page_not_in_book' });
       continue;
     }

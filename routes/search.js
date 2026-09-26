@@ -25,6 +25,7 @@ const embed = require('../lib/embed');
 const semanticRetrieval = require('../lib/semantic-retrieval');
 const { db } = require('../db/connection');
 const logger = require('../logger');
+const { pageTitle } = require('../db/content-names');
 
 const router = express.Router();
 
@@ -105,7 +106,7 @@ function _resolveSemanticHits(hits) {
   const out = [];
   for (const h of hits) {
     let row = null;
-    if (h.kind === 'page') row = db.prepare('SELECT page_name AS title, book_id FROM pages WHERE page_id = ?').get(h.entity_id);
+    if (h.kind === 'page') row = pageTitle(h.entity_id);
     else if (h.kind === 'scene') row = db.prepare('SELECT titel AS title, book_id FROM figure_scenes WHERE id = ?').get(h.entity_id);
     else if (h.kind === 'figure') row = db.prepare('SELECT name AS title, book_id FROM figures WHERE id = ?').get(h.entity_id);
     // Recherche-Schnipsel haben keinen Pflichttitel — der Dateiname des
