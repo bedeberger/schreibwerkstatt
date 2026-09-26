@@ -25,6 +25,7 @@ import { createTimerBag } from '../editor/shared/timers.js';
 import { renderDiagramsIn, clearRenderedDiagrams } from '../diagram/mermaid-view.js';
 import { stampCaptionNumbers, clearCaptionNumbers } from '../xrefs/caption-preview.js';
 import { EVT } from '../events.js';
+import { tErrorRaw } from '../i18n.js';
 
 // Re-Export für Tests/Konsumenten: die Facade ist der Einstieg.
 export { applySaveOutcome } from './book-editor/save.js';
@@ -274,7 +275,7 @@ export function registerBookEditorCard() {
       } catch (e) {
         if (token !== this._loadToken) return;
         this.loading = false;
-        this.loadError = e.message || 'Load failed';
+        this.loadError = e?.body ? tErrorRaw(e.body) : window.__app?.t?.('bookEditor.loadFailed') || '';
       }
     },
 

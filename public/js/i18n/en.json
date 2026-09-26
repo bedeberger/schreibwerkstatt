@@ -6295,5 +6295,6 @@
   "admin.usage.breakdown.other": "Other",
   "admin.usage.breakdown.total": "Total",
   "bookEditor.unsavedOnSwitch": "{n} page(s) could not be saved before switching.",
-  "common.networkError": "No connection to the server."
+  "common.networkError": "No connection to the server.",
+  "bookEditor.loadFailed": "Could not load the book contents."
 }
