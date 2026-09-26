@@ -5,6 +5,18 @@
 const { db } = require('../../../db/schema');
 const { htmlToPlainText } = require('../../../lib/html-text');
 const { _truncateResult } = require('./shared');
+const { listChaptersForBook } = require('../../../db/content-names');
+const {
+  STIL_METRIC_COLS,
+  getLatestBookReview,
+  listLatestChapterReviews,
+  listLektoratHotspotRows,
+  listLektoratFindingRows,
+  listChapterStilMetrics,
+  listTopFiguresInChapter,
+  listPageStilMetric,
+  listPagesWithBody,
+} = require('../../../db/book-chat/analysis');
 
 // ── get_reviews ──────────────────────────────────────────────────────────────
 
@@ -14,16 +26,7 @@ const BOOK_REVIEW_FAZIT_CHARS = 600;
 
 function _getBookReview(ctx) {
   const userEmail = ctx.userEmail || null;
-  const row = db.prepare(`
-    SELECT br.reviewed_at, br.review_json, br.model, b.name AS book_name,
-           (SELECT MAX(datetime(p.updated_at)) FROM pages p WHERE p.book_id = br.book_id)
-             > datetime(br.reviewed_at) AS stale
-    FROM book_reviews br
-    LEFT JOIN books b ON b.book_id = br.book_id
-    WHERE br.book_id = ? AND br.user_email IS ?
-    ORDER BY br.reviewed_at DESC
-    LIMIT 1
-  `).get(ctx.bookId, userEmail);
+  const row = getLatestBookReview(ctx.bookId, userEmail);
   if (!row) {
     return { scope: 'book', hint: 'Noch keine Buchbewertung vorhanden. Job „Buchbewertung" ausfuehren.' };
   }
@@ -61,27 +64,7 @@ function tool_get_reviews(input, ctx) {
     : 'note_desc';
   const limit = Math.min(100, Math.max(1, Number.isInteger(input?.limit) ? input.limit : CHAPTER_REVIEW_DEFAULT_LIMIT));
 
-  let sql = `
-    SELECT cr.chapter_id, c.chapter_name, c.position AS chapter_position, cr.reviewed_at, cr.review_json, cr.model,
-           (SELECT MAX(datetime(p.updated_at)) FROM pages p
-              WHERE p.chapter_id = cr.chapter_id AND p.book_id = cr.book_id)
-             > datetime(cr.reviewed_at) AS stale
-    FROM chapter_reviews cr
-    JOIN chapters c ON c.chapter_id = cr.chapter_id AND c.book_id = cr.book_id
-    WHERE cr.book_id = ? AND cr.user_email IS ?
-      AND cr.reviewed_at = (
-        SELECT MAX(cr2.reviewed_at) FROM chapter_reviews cr2
-        WHERE cr2.chapter_id = cr.chapter_id
-          AND cr2.book_id = cr.book_id
-          AND cr2.user_email IS ?
-      )
-  `;
-  const params = [ctx.bookId, userEmail, userEmail];
-  if (chapterIdsFilter && chapterIdsFilter.length) {
-    sql += ` AND cr.chapter_id IN (${chapterIdsFilter.map(() => '?').join(',')})`;
-    params.push(...chapterIdsFilter);
-  }
-  const rows = db.prepare(sql).all(...params);
+  const rows = listLatestChapterReviews(ctx.bookId, userEmail, chapterIdsFilter);
 
   const items = [];
   for (const r of rows) {
@@ -114,9 +97,7 @@ function tool_get_reviews(input, ctx) {
   const limited = items.slice(0, limit).map(({ chapter_position, ...rest }) => rest);
   const anyStale = limited.some(i => i.stale);
 
-  const allChapters = db.prepare(
-    'SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ? ORDER BY position'
-  ).all(ctx.bookId);
+  const allChapters = listChaptersForBook(ctx.bookId);
   const reviewedIds = new Set(items.map(i => i.chapter_id));
   const missingReview = allChapters
     .filter(c => !reviewedIds.has(c.chapter_id))
@@ -147,23 +128,7 @@ function tool_get_lektorat_hotspots(input, ctx) {
   const minErrors     = Number.isInteger(input?.min_errors) ? Math.max(0, input.min_errors) : 0;
   const limit = Math.min(100, Math.max(1, Number.isInteger(input?.limit) ? input.limit : HOTSPOTS_DEFAULT_LIMIT));
 
-  let sql = `
-    SELECT pc.page_id, pc.checked_at, pc.error_count, pc.fazit, pc.stilanalyse,
-           p.page_name, p.chapter_id, c.chapter_name
-    FROM page_checks pc
-    JOIN pages    p ON p.page_id    = pc.page_id
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE pc.book_id = ? AND pc.user_email IS ?
-      AND pc.checked_at = (
-        SELECT MAX(pc2.checked_at) FROM page_checks pc2
-        WHERE pc2.page_id = pc.page_id AND pc2.user_email IS ?
-      )
-  `;
-  const params = [ctx.bookId, userEmail, userEmail];
-  if (chapterFilter !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterFilter); }
-  sql += ' ORDER BY pc.error_count DESC, pc.checked_at DESC';
-
-  const rows = db.prepare(sql).all(...params).filter(r => (r.error_count || 0) >= minErrors);
+  const rows = listLektoratHotspotRows(ctx.bookId, userEmail, chapterFilter).filter(r => (r.error_count || 0) >= minErrors);
   if (!rows.length) {
     return {
       hotspots: [],
@@ -234,24 +199,7 @@ function tool_get_lektorat_findings(input, ctx) {
   const limit     = Math.min(FINDINGS_MAX_LIMIT, Math.max(1,
     Number.isInteger(input?.limit) ? input.limit : FINDINGS_DEFAULT_LIMIT));
 
-  let sql = `
-    SELECT pc.page_id, pc.checked_at, pc.errors_json, pc.error_count,
-           p.page_name, p.chapter_id, c.chapter_name
-    FROM page_checks pc
-    JOIN pages    p ON p.page_id    = pc.page_id
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE pc.book_id = ? AND pc.user_email IS ?
-      AND pc.checked_at = (
-        SELECT MAX(pc2.checked_at) FROM page_checks pc2
-        WHERE pc2.page_id = pc.page_id AND pc2.user_email IS ?
-      )
-  `;
-  const params = [ctx.bookId, userEmail, userEmail];
-  if (pageId !== null)         { sql += ' AND pc.page_id = ?';   params.push(pageId); }
-  else if (chapterId !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterId); }
-  sql += ' ORDER BY c.position, p.position, p.page_id';
-
-  const rows = db.prepare(sql).all(...params);
+  const rows = listLektoratFindingRows(ctx.bookId, userEmail, { pageId, chapterId });
   if (!rows.length) {
     return {
       findings: [],
@@ -310,7 +258,6 @@ function tool_get_lektorat_findings(input, ctx) {
 
 // ── get_stil_metrics ──────────────────────────────────────────────────────────
 
-const STIL_METRIC_COLS = ['filler_count', 'passive_count', 'adverb_count', 'sentences', 'dialog_chars', 'avg_sentence_len', 'sentence_len_p90', 'lix', 'flesch_de'];
 const STIL_DEFAULT_LIMIT = 10;
 
 function tool_get_stil_metrics(input, ctx) {
@@ -353,38 +300,8 @@ function tool_get_stil_metrics(input, ctx) {
   if (scope === 'chapter') {
     const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
     const includeFigures = !!input?.include_figures;
-    let sql = `
-      SELECT p.chapter_id, c.chapter_name,
-             COUNT(*) AS pages,
-             SUM(ps.words) AS words, SUM(ps.chars) AS chars,
-             SUM(ps.sentences) AS sentences, SUM(ps.dialog_chars) AS dialog_chars,
-             SUM(ps.filler_count) AS filler_count,
-             SUM(ps.passive_count) AS passive_count,
-             SUM(ps.adverb_count) AS adverb_count,
-             AVG(ps.avg_sentence_len) AS avg_sentence_len,
-             AVG(ps.sentence_len_p90) AS sentence_len_p90,
-             AVG(ps.lix) AS lix, AVG(ps.flesch_de) AS flesch_de
-      FROM page_stats ps
-      JOIN pages p ON p.page_id = ps.page_id
-      LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-      WHERE ps.book_id = ? AND ps.sentences IS NOT NULL
-    `;
-    const params = [ctx.bookId];
-    if (chapterFilter !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterFilter); }
-    sql += ' GROUP BY p.chapter_id, c.chapter_name, c.position ORDER BY c.position';
-    const rows = db.prepare(sql).all(...params);
+    const rows = listChapterStilMetrics(ctx.bookId, chapterFilter);
     if (!rows.length) return { hint: 'Keine Stil-Metriken vorhanden.' };
-
-    const topFigStmt = includeFigures ? db.prepare(`
-      SELECT f.fig_id, f.name, SUM(pfm.count) AS total
-      FROM page_figure_mentions pfm
-      JOIN pages p  ON p.page_id = pfm.page_id
-      JOIN figures f ON f.id = pfm.figure_id
-      WHERE p.chapter_id = ? AND p.book_id = ? AND f.user_email IS ?
-      GROUP BY f.id
-      ORDER BY total DESC
-      LIMIT 5
-    `) : null;
 
     return _truncateResult({
       scope: 'chapter',
@@ -402,7 +319,7 @@ function tool_get_stil_metrics(input, ctx) {
           flesch_de: r.flesch_de != null ? Math.round(r.flesch_de * 10) / 10 : null,
         };
         if (includeFigures) {
-          const top = topFigStmt.all(r.chapter_id, ctx.bookId, ctx.userEmail || null);
+          const top = listTopFiguresInChapter(r.chapter_id, ctx.bookId, ctx.userEmail || null);
           out.top_figuren = top.map(f => ({ fig_id: f.fig_id, name: f.name, mentions: f.total }));
         }
         return out;
@@ -410,17 +327,7 @@ function tool_get_stil_metrics(input, ctx) {
     });
   }
 
-  const sql = `
-    SELECT ps.page_id, p.page_name, p.chapter_id, c.chapter_name,
-           ps.words, ps.${metric} AS metric_value
-    FROM page_stats ps
-    JOIN pages p ON p.page_id = ps.page_id
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE ps.book_id = ? AND ps.${metric} IS NOT NULL
-    ORDER BY ps.${metric} ${order}, ps.page_id
-    LIMIT ?
-  `;
-  const rows = db.prepare(sql).all(ctx.bookId, limit);
+  const rows = listPageStilMetric(ctx.bookId, metric, order, limit);
   return _truncateResult({
     scope: 'page',
     metric,
@@ -491,18 +398,15 @@ function tool_find_repetitions(input, ctx) {
   const minCount = Math.max(2, Number.isInteger(input?.min_count) ? input.min_count : (scope === 'book' ? 5 : 2));
   const limit = Math.min(REPETITIONS_MAX_LIMIT, Math.max(1, Number.isInteger(input?.limit) ? input.limit : REPETITIONS_DEFAULT_LIMIT));
 
-  let sql = 'SELECT page_id, page_name, chapter_id, body_html FROM pages WHERE book_id = ? AND body_html IS NOT NULL';
-  const params = [ctx.bookId];
+  const filter = {};
   if (scope === 'chapter') {
     if (!Number.isInteger(input?.chapter_id)) return { error: 'chapter_id fehlt (scope=chapter)' };
-    sql += ' AND chapter_id = ?';
-    params.push(input.chapter_id);
+    filter.chapterId = input.chapter_id;
   } else if (scope === 'page') {
     if (!Number.isInteger(input?.page_id)) return { error: 'page_id fehlt (scope=page)' };
-    sql += ' AND page_id = ?';
-    params.push(input.page_id);
+    filter.pageId = input.page_id;
   }
-  const pages = db.prepare(sql).all(...params);
+  const pages = listPagesWithBody(ctx.bookId, filter);
   if (!pages.length) {
     return { results: [], hint: 'Keine Seiten mit body_html im gewaehlten Scope. Sync ausfuehren.' };
   }
