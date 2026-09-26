@@ -383,21 +383,21 @@
 
 <a class="skip-link" href="#main-content" x-text="t('a11y.skipToMain')"></a>
 
-<div class="session-banner" x-show="$store.session.sessionExpired" x-cloak>
+<div class="session-banner" role="alert" x-show="$store.session.sessionExpired" x-cloak>
   <span class="session-banner-text" x-text="t('session.expired')"></span>
   <a class="session-banner-btn" :href="'/login?returnTo=' + encodeURIComponent(location.pathname + location.search)" x-text="t('session.relogin')"></a>
 </div>
 
-<div class="session-banner" x-show="$store.session.serverOffline && !$store.session.sessionExpired" x-cloak>
+<div class="session-banner" role="status" x-show="$store.session.serverOffline && !$store.session.sessionExpired" x-cloak>
   <span class="session-banner-text" x-text="t('session.serverOffline')"></span>
   <button type="button" class="session-banner-btn" @click="location.reload()" x-text="t('session.retry')"></button>
 </div>
 
-<div class="session-banner session-banner--offline" x-show="$store.session.isOffline && !$store.session.sessionExpired && !$store.session.serverOffline" x-cloak>
+<div class="session-banner session-banner--offline" role="status" x-show="$store.session.isOffline && !$store.session.sessionExpired && !$store.session.serverOffline" x-cloak>
   <span class="session-banner-text" x-text="$store.session.pendingSyncCount > 0 ? t($store.session.pendingSyncCount === 1 ? 'session.offlinePendingOne' : 'session.offlinePendingMany', { count: $store.session.pendingSyncCount }) : t('session.offlineMode')"></span>
 </div>
 
-<div class="session-banner" x-show="$store.shell.updateAvailable && !$store.session.sessionExpired" x-cloak>
+<div class="session-banner" role="status" x-show="$store.shell.updateAvailable && !$store.session.sessionExpired" x-cloak>
   <span class="session-banner-text" x-text="t('session.updateAvailable')"></span>
   <button type="button" class="session-banner-btn" @click="applyUpdate()" x-text="t('session.applyUpdate')"></button>
 </div>
