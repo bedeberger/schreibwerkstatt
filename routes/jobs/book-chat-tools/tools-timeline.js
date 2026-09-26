@@ -6,6 +6,11 @@
 
 const { db } = require('../../../db/schema');
 const { inClause } = require('../../../lib/validate');
+const {
+  listContinuityIssueChapters,
+  listTimelineEventChapters,
+  listTimelineEventPages,
+} = require('../../../db/book-chat/timeline');
 const { _truncateResult, _findFigure } = require('./shared');
 
 // ── list_continuity_issues ────────────────────────────────────────────────────
@@ -58,13 +63,7 @@ function tool_list_continuity_issues(input, ctx) {
     WHERE cif.issue_id IN ${idSql}
     ORDER BY cif.issue_id, cif.sort_order
   `).all(...idVals);
-  const chRows = db.prepare(`
-    SELECT cic.issue_id, cic.chapter_id, c.chapter_name
-    FROM continuity_issue_chapters cic
-    LEFT JOIN chapters c ON c.chapter_id = cic.chapter_id
-    WHERE cic.issue_id IN ${idSql}
-    ORDER BY cic.issue_id, cic.sort_order
-  `).all(...idVals);
+  const chRows = listContinuityIssueChapters(issueIds);
 
   const figByIssue = new Map();
   for (const r of figRows) {
@@ -139,20 +138,8 @@ function tool_get_timeline(input, ctx) {
   const eventIds = events.map(e => e.id);
   const { sql: idSql, values: idVals } = inClause(eventIds);
 
-  const chRows = db.prepare(`
-    SELECT zec.event_id, zec.chapter_id, c.chapter_name
-    FROM zeitstrahl_event_chapters zec
-    LEFT JOIN chapters c ON c.chapter_id = zec.chapter_id
-    WHERE zec.event_id IN ${idSql}
-    ORDER BY zec.event_id, zec.sort_order
-  `).all(...idVals);
-  const pgRows = db.prepare(`
-    SELECT zep.event_id, zep.page_id, p.page_name
-    FROM zeitstrahl_event_pages zep
-    LEFT JOIN pages p ON p.page_id = zep.page_id
-    WHERE zep.event_id IN ${idSql}
-    ORDER BY zep.event_id, zep.sort_order
-  `).all(...idVals);
+  const chRows = listTimelineEventChapters(eventIds);
+  const pgRows = listTimelineEventPages(eventIds);
   const fgRows = db.prepare(`
     SELECT zef.event_id, f.fig_id, COALESCE(f.name, zef.figur_name) AS name
     FROM zeitstrahl_event_figures zef
