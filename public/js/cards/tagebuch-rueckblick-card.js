@@ -10,6 +10,7 @@
 import { tagebuchRueckblickMethods } from '../book/tagebuch-rueckblick.js';
 import { createCardJobFeature } from './job-feature-card.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { runningJobStatus } from './job-helpers.js';
 
 export function registerTagebuchRueckblickCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -44,7 +45,11 @@ export function registerTagebuchRueckblickCard() {
         this.rueckblickProgress = job.progress || 0;
         this.rueckblickResult = null;
         this.rueckblickEmpty = false;
-        this.rueckblickStatus = `<span class="spinner"></span>${window.__app.t(job.statusText || 'common.analysisRunning', job.statusParams)}`;
+        this.rueckblickStatus = runningJobStatus(
+          (k, p) => window.__app.t(k, p),
+          job.statusText || 'common.analysisRunning', job.tokensIn, job.tokensOut, job.maxTokensOut,
+          job.progress, job.tokensPerSec, job.statusParams,
+        );
         this.startTagebuchRueckblickPoll(d.jobId);
       };
 

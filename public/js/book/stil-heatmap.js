@@ -10,7 +10,7 @@
 // darin die Min/Max-Skala ueber alle Kapitel steckt, wird daraus O(Kapitel^2).
 // Das Template liest darum ausschliesslich fertige Eigenschaften.
 
-import { fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy, tzOpts } from '../utils.js';
+import { escHtml, fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy, tzOpts } from '../utils.js';
 import { isSelectedBook } from '../cards/book-guard.js';
 
 // Metrik-Schlüssel → i18n-Label. Reihenfolge = Spaltenreihenfolge in der Heatmap.
@@ -137,7 +137,7 @@ export const stilMethods = {
     } catch (e) {
       if (!isSelectedBook(bookId)) return;
       console.error('[loadStilStats]', e);
-      this.stilStatus = window.__app.t('common.errorColon') + (e.message || '');
+      this.stilStatus = window.__app.t('common.errorColon') + escHtml(e.message || '');
     } finally {
       this.stilLoading = false;
     }
@@ -156,7 +156,7 @@ export const stilMethods = {
       this.stilStatus = '';
     } catch (e) {
       if (!isSelectedBook(bookId)) { this.stilStatus = ''; return; }
-      this.stilStatus = window.__app.t('common.errorColon') + (e.message || '');
+      this.stilStatus = window.__app.t('common.errorColon') + escHtml(e.message || '');
     } finally {
       this.stilSyncing = false;
     }

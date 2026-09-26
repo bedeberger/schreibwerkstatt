@@ -17,6 +17,7 @@
 import { finetuneExportMethods } from '../book/finetune-export.js';
 import { createCardJobFeature } from './job-feature-card.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { runningJobStatus } from './job-helpers.js';
 
 export function registerFinetuneExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -59,9 +60,11 @@ export function registerFinetuneExportCard() {
         const job = d.job;
         this.finetuneLoading = true;
         this.finetuneProgress = job.progress || 0;
-        this.finetuneStatus = `<span class="spinner"></span>${
-          job.statusText ? window.__app.t(job.statusText, job.statusParams) : window.__app.t('common.analysisRunning')
-        }`;
+        this.finetuneStatus = runningJobStatus(
+          (k, p) => window.__app.t(k, p),
+          job.statusText || 'common.analysisRunning', job.tokensIn, job.tokensOut, job.maxTokensOut,
+          job.progress, job.tokensPerSec, job.statusParams,
+        );
         this.finetuneJobId = d.jobId;
         this.startFinetuneExportPoll(d.jobId);
       };

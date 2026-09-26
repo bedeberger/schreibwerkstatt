@@ -2,7 +2,7 @@
 // Daten kommen live aus /history/fehler-heatmap/:book_id — kein KI-Call, keine Sync-Phase.
 // Methoden werden in Alpine.data('fehlerHeatmapCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson, formatNumber, heatmapCellVars, minMaxBy, tzOpts } from '../utils.js';
+import { escHtml, fetchJson, formatNumber, heatmapCellVars, minMaxBy, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
 import { isSelectedBook } from '../cards/book-guard.js';
 
@@ -98,7 +98,7 @@ export const fehlerHeatmapMethods = {
     } catch (e) {
       if (!current()) return;
       console.error('[loadFehlerHeatmap]', e);
-      this.fehlerHeatmapStatus = window.__app.t('common.errorColon') + (e.message || '');
+      this.fehlerHeatmapStatus = window.__app.t('common.errorColon') + escHtml(e.message || '');
     } finally {
       if (seq === this._fehlerHeatmapSeq) this.fehlerHeatmapLoading = false;
     }

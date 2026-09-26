@@ -1,7 +1,7 @@
 // Buchschreibungsentwicklung – Zeitliniendiagramm.
 // Methoden werden in Alpine.data('bookStatsCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson, tzOpts } from '../utils.js';
+import { escHtml, fetchJson, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
 import {
   computeAvgSummary, metricKind, rollingSeries, rollingWindowForRange, trendSeries,
@@ -157,7 +157,7 @@ export const bookstatsMethods = {
         }
       }
     } catch (e) {
-      this.bookStatsSyncStatus = window.__app.t('common.errorColon') + e.message;
+      this.bookStatsSyncStatus = window.__app.t('common.errorColon') + escHtml(e.message || '');
     } finally {
       this.bookStatsLoading = false;
     }
