@@ -127,6 +127,7 @@ export const researchChatMethods = {
       status: 'researchChatStatus',
       progress: 'researchChatProgress',
       pollTimer: '_researchChatPollTimer',
+      gen: '_researchChatGen',
     },
     scrollElId: 'research-chat-messages',
     activeJobType: 'research-chat',

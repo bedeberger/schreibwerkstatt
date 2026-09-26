@@ -31,6 +31,7 @@ export const bookChatMethods = {
       status: 'bookChatStatus',
       progress: 'bookChatProgress',
       pollTimer: '_bookChatPollTimer',
+      gen: '_bookChatGen',
     },
     scrollElId: 'book-chat-messages',
     activeJobType: 'book-chat',

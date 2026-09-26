@@ -18,6 +18,7 @@ const baseMethods = makeChatMethods({
     status: 'chatStatus',
     progress: 'chatProgress',
     pollTimer: '_chatPollTimer',
+    gen: '_chatGen',
     pendingRefresh: '_chatPendingRefresh',
   },
   scrollElId: 'chat-messages',

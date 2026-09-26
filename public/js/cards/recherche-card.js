@@ -124,6 +124,7 @@ export function registerRechercheCard() {
     researchChatProgress: 0,
     researchChatStatus: '',
     _researchChatPollTimer: null,
+    _researchChatGen: 0,       // Generationszähler des Recherche-Chats (chat-base.js)
 
     // Saving-/Saved-Status der Chat-Speicher-Vorschläge — Card-Level statt auf dem
     // verschachtelten proposal-Objekt, weil Mutationen am x-for-Item-Proxy nach

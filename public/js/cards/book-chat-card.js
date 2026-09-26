@@ -24,6 +24,7 @@ export function registerBookChatCard() {
     bookChatProgress: 0,
     bookChatStatus: '',
     _bookChatPollTimer: null,
+    _bookChatGen: 0,           // Generationszähler gegen späte Responses nach Reset (chat-base.js)
     _lifecycle: null,
 
     init() {

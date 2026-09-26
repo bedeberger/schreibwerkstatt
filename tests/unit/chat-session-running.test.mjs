@@ -36,9 +36,19 @@ globalThis.fetch = async (url, opts) => {
   calls.push({ url: key, method: opts?.method || 'GET' });
   // Der Active-Job-Check läuft bei jedem Session-Load mit; ohne Stub wäre er
   // nur 404-Rauschen im Testlauf.
-  const body = routes.has(key) ? routes.get(key)
+  // Methodenspezifische Route (`'DELETE /chat/session/55'`) vor der URL-Route;
+  // `{ __status, __body }` simuliert eine Fehlerantwort, `{ __wait }` hält die
+  // Antwort bis zum Auflösen des Promises zurück.
+  const mkey = `${opts?.method || 'GET'} ${key}`;
+  let body = routes.has(mkey) ? routes.get(mkey)
+    : routes.has(key) ? routes.get(key)
     : key.startsWith('/jobs/active') ? { jobId: null }
     : null;
+  if (body && body.__wait) { await body.__wait; body = body.__then; }
+  if (body && body.__status) {
+    const b = body.__body || {};
+    return { ok: false, status: body.__status, clone: () => ({ json: async () => b }), json: async () => b };
+  }
   if (body === null) return { ok: false, status: 404, clone: () => ({ json: async () => ({}) }), json: async () => ({}) };
   return { ok: true, status: 200, clone: () => ({ json: async () => body }), json: async () => body };
 };
@@ -187,4 +197,89 @@ test('Job-Ende im selben Gespräch lädt den Server-Stand nach', async () => {
   assert.equal(c.chatMessages.length, 2, 'Antwort ist da');
   assert.equal(c.chatSessions[0].title, 'Titel', 'KI-Titel landet in der Historie');
   assert.equal(c.isChatSessionRunning(100), false);
+});
+
+// ── Löschen ──────────────────────────────────────────────────────────────────
+
+async function startRun(c) {
+  c.chatSessionId = 100;
+  c.chatInput = 'Frage';
+  routes.set('/jobs/chat', { jobId: 'job-1' });
+  routes.set(SESSIONS_URL, [
+    { id: 100, preview: 'Frage', last_message_at: 'b' },
+    { id: 55, preview: 'Alt', last_message_at: 'a' },
+  ]);
+  routes.set('/chat/session/55', { id: 55, messages: [] });
+  await c.sendChatMessage();
+  assert.ok(tick, 'Poller läuft');
+}
+
+test('Löschen der laufenden Session räumt den Lauf-State (Eingabe frei)', async () => {
+  reset();
+  const c = makeCard();
+  await startRun(c);
+  routes.set('DELETE /chat/session/100', { ok: true });
+  routes.set(SESSIONS_URL, [{ id: 55, preview: 'Alt', last_message_at: 'a' }]);
+  await c.deleteChatSession(100);
+  assert.equal(tick, null, 'Poller gestoppt');
+  assert.equal(c.chatLoading, false);
+  assert.equal(c.chatRunningSessionId, null);
+  assert.equal(c.chatSessionId, 55, 'nächstes Gespräch geladen');
+});
+
+test('Löschen einer anderen Session lässt den laufenden Poller stehen', async () => {
+  reset();
+  const c = makeCard();
+  await startRun(c);
+  routes.set('DELETE /chat/session/55', { ok: true });
+  await c.deleteChatSession(55);
+  assert.ok(tick, 'Poller der laufenden Session läuft weiter');
+  assert.equal(c.chatLoading, true);
+  assert.equal(c.chatRunningSessionId, 100);
+  assert.deepEqual(c.chatSessions.map(s => s.id), [100]);
+});
+
+test('Fehlgeschlagenes Löschen (403) nimmt die Session nicht aus der Liste', async () => {
+  reset();
+  const c = makeCard();
+  c.chatSessions = [{ id: 55 }];
+  c.chatSessionId = 55;
+  routes.set('DELETE /chat/session/55', { __status: 403, __body: { error_code: 'FORBIDDEN' } });
+  await c.deleteChatSession(55);
+  assert.deepEqual(c.chatSessions.map(s => s.id), [55]);
+  assert.equal(c.chatSessionId, 55);
+  assert.match(c.chatStatus, /error-msg/);
+});
+
+// ── Reset während laufender Requests ─────────────────────────────────────────
+
+test('Reset während loadSessions: späte Antwort wird verworfen', async () => {
+  reset();
+  const c = makeCard();
+  let release;
+  const wait = new Promise((r) => { release = r; });
+  routes.set(SESSIONS_URL, { __wait: wait, __then: [{ id: 1 }] });
+  const pending = c.loadChatSessions();
+  c.resetChat();
+  release();
+  await pending;
+  assert.deepEqual(c.chatSessions, []);
+});
+
+test('Reset während des Sende-POST: kein Poller, keine Lauf-Anzeige', async () => {
+  reset();
+  const c = makeCard();
+  c.chatSessionId = 100;
+  c.chatInput = 'Frage';
+  let release;
+  const wait = new Promise((r) => { release = r; });
+  routes.set('/jobs/chat', { __wait: wait, __then: { jobId: 'job-1' } });
+  const pending = c.sendChatMessage();
+  await new Promise((r) => setImmediate(r));
+  c.resetChat();
+  release();
+  await pending;
+  assert.equal(tick, null, 'kein Poller nach Reset');
+  assert.equal(c.chatLoading, false);
+  assert.equal(c.chatRunningSessionId, null);
 });

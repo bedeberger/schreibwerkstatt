@@ -25,6 +25,7 @@ export function registerChatCard() {
     chatProgress: 0,
     chatStatus: '',
     _chatPollTimer: null,
+    _chatGen: 0,               // Generationszähler gegen späte Responses nach Reset (chat-base.js)
     _chatPendingRefresh: false,
     _lifecycle: null,
 
