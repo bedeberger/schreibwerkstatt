@@ -137,7 +137,11 @@ sharedRouter.delete('/:id', (req, res) => {
 
 sharedRouter.get('/:id', (req, res) => {
   const job = jobs.get(req.params.id);
-  if (!job) return res.status(404).json({ error_code: 'JOB_NOT_FOUND' });
+  // Fremde Jobs antworten wie unbekannte: die UUID ist kein Berechtigungsnachweis,
+  // und Status/Ergebnis eines Jobs tragen Buchinhalte (Findings, Chat-Antworten).
+  if (!job || (job.userEmail && job.userEmail !== sessionEmail(req))) {
+    return res.status(404).json({ error_code: 'JOB_NOT_FOUND' });
+  }
   res.json(jobView(job));
 });
 

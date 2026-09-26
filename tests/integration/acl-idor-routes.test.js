@@ -10,6 +10,7 @@
 //   - GET  /plot, /ideen/counts — ein Nicht-ACL-Fehler beim Rollen-Lookup darf
 //     nicht als „erlaubt" durchgehen (guardBook statt `return !sendACLError`)
 //   - PATCH/DELETE /share/api/comments/:id — nur der Link-Owner
+//   - GET  /jobs/:id           — fremde Jobs antworten wie unbekannte (404)
 //
 // Fährt die echten Router unter Express hoch; die Fake-Session liefert den User.
 
@@ -46,6 +47,7 @@ function startServer() {
     jobs.use(require('../../routes/jobs/lektorat').lektoratRouter);
     jobs.use(require('../../routes/jobs/chat').chatRouter);
     jobs.use(require('../../routes/jobs/rueckblick').rueckblickRouter);
+    jobs.use(require('../../routes/jobs/shared/router').sharedRouter);
     app.use('/jobs', jobs);
     app.use('/chat', require('../../routes/chat'));
     app.use('/usage', require('../../routes/usage'));
@@ -188,6 +190,19 @@ test('POST /jobs/check: eigene Seite → Job im Buch der Seite', async () => {
   assert.equal(job.bookId, String(MY_BOOK));
   assert.equal(job.dedupId, String(MY_PAGE));
   // Job ohne Mock-Handler auslaufen lassen, damit er nicht in den nächsten Test läuft.
+  await waitForJob(ctx.shared, r.json.jobId);
+});
+
+test('GET /jobs/:id: eigener Job lesbar, fremder Job → 404', async () => {
+  const r = await api('POST', '/jobs/check', { page_id: MY_PAGE });
+  assert.equal(r.status, 200);
+  const mine = await api('GET', `/jobs/${r.json.jobId}`);
+  assert.equal(mine.status, 200);
+  sessionUser = OTHER;
+  const foreign = await api('GET', `/jobs/${r.json.jobId}`);
+  assert.equal(foreign.status, 404);
+  assert.equal(foreign.json.error_code, 'JOB_NOT_FOUND');
+  sessionUser = ME;
   await waitForJob(ctx.shared, r.json.jobId);
 });
 
