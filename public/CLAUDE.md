@@ -28,7 +28,7 @@ Gilt zusaetzlich zur Root-[CLAUDE.md](../CLAUDE.md); tiefer liegen [css/CLAUDE.m
   ```
   - `init()` setzt `inputmode`/`autocomplete`/`spellcheck` und hängt Event-Handler an — keine `@input/@blur/@focus` im Konsumenten.
   - Config: `step`, `min`, `max`, optional `decimals` (sonst aus `step` abgeleitet), `integer: true` (Shortcut für step=1+inputmode=numeric), `grouping: false` (Tausender unterdrücken).
-  - Anzeige nutzt `uiLocale` (de→de-CH, en→en-US). Bei Focus rohe Edit-Form ohne Tausender; bei Blur reformatiert + clamped.
+  - Anzeige nutzt `localeTag(uiLocale)` aus [utils/format.js](js/utils/format.js): Sprache + Default-Region des Users (ohne Region de→de-CH, en→en-US). Bei Focus rohe Edit-Form ohne Tausender; bei Blur reformatiert + clamped.
   - Parser akzeptiert sowohl `.` als auch `,` als Decimal — User-Habit-tolerant.
   - **Niemals** `x-model.number` parallel — der Component-State ist bereits Number.
 

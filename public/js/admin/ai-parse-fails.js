@@ -2,7 +2,7 @@
 // gespreaded. Root-Zugriffe via window.__app. Liest aus
 // /admin/parse-fails/{files,file} + DELETE.
 
-import { tzOpts } from '../utils.js';
+import { tzOpts, localeTag } from '../utils.js';
 
 export const adminParseFailsMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ export const adminParseFailsMethods = {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
+    return d.toLocaleString(localeTag(Alpine.store('shell').uiLocale),
       tzOpts({ dateStyle: 'medium', timeStyle: 'medium' }));
   },
 

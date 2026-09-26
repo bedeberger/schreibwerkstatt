@@ -2,7 +2,7 @@
 // destroy() (Teardown). Als Methoden-Modul in die Root gespreadet (app.js);
 // `this` ist zur Laufzeit die fertige Root-Komponente, daher greifen alle
 // gespreadeten Methoden/Getter/State-Felder ganz normal.
-import { fetchJson, configureTokenEstimate, configureAppTimezone } from '../utils.js';
+import { fetchJson, configureTokenEstimate, configureAppTimezone, configureLocaleRegion, localeTag } from '../utils.js';
 import { configurePrompts } from '../prompts.js';
 import { watchFilterScopes } from '../filter-persist.js';
 import { configureI18n, getSupportedLocales } from '../i18n.js';
@@ -183,12 +183,13 @@ export const appInitMethods = {
       const locale = supported.includes(preferred) ? preferred : 'de';
       const region = cfg.userSettings?.default_region || (locale === 'en' ? 'US' : 'CH');
       this.$store.shell.defaultRegion = region;
+      configureLocaleRegion(region);
       if (locale !== this.$store.shell.uiLocale) {
         await configureI18n(locale);
         this.$store.shell.uiLocale = locale;
       }
       this.contentLocale = locale;
-      document.documentElement.setAttribute('lang', `${locale}-${region}`);
+      document.documentElement.setAttribute('lang', localeTag(locale));
       if (cfg.claudeModel) this.$store.config.claudeModel = cfg.claudeModel;
       if (cfg.claudeMaxTokens) this.$store.config.claudeMaxTokens = cfg.claudeMaxTokens;
       if (cfg.apiProvider) this.$store.config.apiProvider = cfg.apiProvider;

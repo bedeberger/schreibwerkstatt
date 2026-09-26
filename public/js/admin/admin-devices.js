@@ -6,7 +6,7 @@
 // gegen das neueste Release der jeweiligen Plattform verglichen (macOS, Android,
 // Chrome-Erweiterung — drei eigene Repos, drei eigene Versionsstraenge).
 
-import { tzOpts } from '../utils.js';
+import { tzOpts, localeTag } from '../utils.js';
 
 export const adminDevicesMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ export const adminDevicesMethods = {
     if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
+    return d.toLocaleString(localeTag(Alpine.store('shell').uiLocale),
       tzOpts({ dateStyle: 'medium', timeStyle: 'short' }));
   },
 

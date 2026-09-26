@@ -2,7 +2,7 @@
 // Methoden werden in Alpine.data('userSettingsCard') gespreadet;
 // Root-Zugriffe via window.__app.
 
-import { fetchJson } from './utils.js';
+import { fetchJson, numberFormat, localeTag, configureLocaleRegion } from './utils.js';
 
 // Protokollwert von DELETE /me/account. Bewusst NICHT lokalisiert und bewusst
 // derselbe String, den der native macOS-Client sendet — der Server kennt genau
@@ -51,7 +51,8 @@ export const userSettingsMethods = {
       window.__app.focusGranularity = this.userSettingsFocusGranularity || 'paragraph';
       const region = this.userSettingsDefaultRegion || (Alpine.store('shell').uiLocale === 'en' ? 'US' : 'CH');
       Alpine.store('shell').defaultRegion = region;
-      document.documentElement.setAttribute('lang', `${Alpine.store('shell').uiLocale || 'de'}-${region}`);
+      configureLocaleRegion(region);
+      document.documentElement.setAttribute('lang', localeTag(Alpine.store('shell').uiLocale));
       this.userSettingsSaved = true;
       if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
       this._savedAtTimer = setTimeout(() => { this.userSettingsSaved = false; this._savedAtTimer = null; }, 2500);
@@ -259,7 +260,7 @@ export const userSettingsMethods = {
   macReleaseSizeMb() {
     const bytes = this.macRelease?.sizeBytes || 0;
     if (!bytes) return '';
-    return (bytes / 1048576).toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
+    return numberFormat(Alpine.store('shell').uiLocale, { maximumFractionDigits: 1 }).format(bytes / 1048576);
   },
 
   /** Dezent erkennen, ob der Besucher auf macOS ist (nur für einen Hinweis). */
@@ -284,7 +285,7 @@ export const userSettingsMethods = {
   androidReleaseSizeMb() {
     const bytes = this.androidRelease?.apk?.sizeBytes || 0;
     if (!bytes) return '';
-    return (bytes / 1048576).toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
+    return numberFormat(Alpine.store('shell').uiLocale, { maximumFractionDigits: 1 }).format(bytes / 1048576);
   },
 
   /** Dezent erkennen, ob der Besucher auf Android ist (nur für einen Hinweis). */
@@ -314,6 +315,6 @@ export const userSettingsMethods = {
   extensionReleaseSizeMb() {
     const bytes = this.extensionRelease?.zip?.sizeBytes || 0;
     if (!bytes) return '';
-    return (bytes / 1048576).toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH', { maximumFractionDigits: 1 });
+    return numberFormat(Alpine.store('shell').uiLocale, { maximumFractionDigits: 1 }).format(bytes / 1048576);
   },
 };

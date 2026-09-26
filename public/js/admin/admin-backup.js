@@ -3,6 +3,8 @@
 // konsistenten SQLite-Snapshots) + Restore (Upload → Validierung → Neustart,
 // beim Boot wird die DB geswappt). Backend: routes/admin-backup.js.
 
+import { localeTag } from '../utils.js';
+
 export const adminBackupMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
   async backupEnter() {
@@ -107,7 +109,7 @@ export const adminBackupMethods = {
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     let v = n, i = 0;
     while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-    const loc = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const loc = localeTag(Alpine.store('shell').uiLocale);
     return `${v.toLocaleString(loc, { maximumFractionDigits: i === 0 ? 0 : 1 })} ${units[i]}`;
   },
 

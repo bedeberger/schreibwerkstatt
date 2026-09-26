@@ -12,9 +12,22 @@ export function configureTokenEstimate(value) {
   if (Number.isFinite(v) && v > 0) CHARS_PER_TOKEN = v;
 }
 
-// Intl-Locale-Tag aus uiLocale (en → en-US, sonst de-CH).
+// Default-Region des Users (Einstellung `default_region`: CH/DE/US/GB). Gesetzt
+// von app-init.js (Boot aus /config) und user-settings.js (Speichern) über
+// configureLocaleRegion; leer = Region aus der Sprache ableiten.
+let _region = '';
+
+export function configureLocaleRegion(region) {
+  const r = String(region || '').trim().toUpperCase();
+  _region = /^[A-Z]{2}$/.test(r) ? r : '';
+}
+
+// Intl-Locale-Tag aus uiLocale + Default-Region: Sprache en → `en`, sonst `de`;
+// Region aus der User-Einstellung, sonst en → US, de → CH. SSoT für jedes
+// Zahlen-/Datums-Display und das `lang`-Attribut am <html>.
 export function localeTag(uiLocale) {
-  return uiLocale === 'en' ? 'en-US' : 'de-CH';
+  const lang = uiLocale === 'en' ? 'en' : 'de';
+  return `${lang}-${_region || (lang === 'en' ? 'US' : 'CH')}`;
 }
 
 // Pro (Locale, Options) gecachter Intl.NumberFormat. `Number#toLocaleString`

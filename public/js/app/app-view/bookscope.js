@@ -1,6 +1,7 @@
 // Teil von appViewMethods (siehe Facade app-view.js).
 import { EVT, EXCLUSIVE_CARDS, FILTER_SCOPES, computeTodayRing, computeWeekBars, computeWritingStreak, fetchJson, fetchJsonRetry, resetFilterScopes, restoreFilterScopes } from './_shared.js';
 import { setLastBookId } from '../../local-prefs.js';
+import { localeTag } from '../../utils.js';
 
 // In-Flight-Handle von `loadDailyProgress`. Modul-Scope statt Store: ein
 // Promise im reaktiven Alpine-Proxy wird beim `await` mit dem Proxy als `this`
@@ -451,7 +452,7 @@ export const bookscopeMethods = {
   // timeZone:'UTC' → der Wochentag folgt exakt dem Kalendertag der iso, ohne
   // dass die Browser-Zeitzone ihn um einen Tag verschiebt.
   headerWeekBarLabel(iso) {
-    const locale = this.$store.shell.uiLocale === 'de' ? 'de-CH' : 'en-US';
+    const locale = localeTag(this.$store.shell.uiLocale);
     try {
       return new Date(iso + 'T12:00:00Z').toLocaleDateString(locale, { weekday: 'narrow', timeZone: 'UTC' });
     } catch { return ''; }

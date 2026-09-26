@@ -8,7 +8,7 @@
 // Key-Konvention: 'bereich.feld' (z.B. 'header.logout', 'profile.title').
 // Platzhalter: {name} → Parameter-Map: t('foo', { name: 'Anna' }).
 
-import { formatLastRun as _formatLastRunImpl } from './utils.js';
+import { formatLastRun as _formatLastRunImpl, localeTag } from './utils.js';
 
 const FALLBACK_LOCALE = 'de';
 const SUPPORTED_LOCALES = ['de', 'en'];
@@ -95,8 +95,7 @@ export const i18nMethods = {
     if (locale === this.$store.shell.uiLocale) return;
     await configureI18n(locale);
     this.$store.shell.uiLocale = locale;
-    const region = this.$store.shell.defaultRegion || (locale === 'en' ? 'US' : 'CH');
-    document.documentElement.setAttribute('lang', `${locale}-${region}`);
+    document.documentElement.setAttribute('lang', localeTag(locale));
     fetch('/me/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

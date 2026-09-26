@@ -4,7 +4,7 @@
 // Buchtitel.
 
 import { loadChart } from '../lazy-libs.js';
-import { localIsoDate, tzOpts } from '../utils.js';
+import { localIsoDate, tzOpts, localeTag } from '../utils.js';
 
 function _fmt(n, locale, opts) {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
@@ -38,7 +38,7 @@ export const adminUsageMethods = {
   adminUsageInt(n)   { return _int(n,   this._adminUsageLocale()); },
   adminUsageHhmm(seconds) { return _hhmm(seconds); },
   _adminUsageLocale() {
-    return (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
+    return localeTag(Alpine.store('shell').uiLocale);
   },
   // Job-Typ-String (DB-Wert aus job_runs.type) → übersetztes Label. Fallback: roher Typ.
   _adminUsageTypeLabel(type) {

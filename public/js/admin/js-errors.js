@@ -1,7 +1,7 @@
 // AdminJsErrorsCard-Methods. Wird im adminJsErrorsCard-Alpine-Scope gespreaded.
 // Root-Zugriffe via window.__app. Liest aus /admin/js-errors/list + DELETE.
 
-import { tzOpts } from '../utils.js';
+import { tzOpts, localeTag } from '../utils.js';
 
 export const adminJsErrorsMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ export const adminJsErrorsMethods = {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
+    return d.toLocaleString(localeTag(Alpine.store('shell').uiLocale),
       tzOpts({ dateStyle: 'medium', timeStyle: 'medium' }));
   },
 
