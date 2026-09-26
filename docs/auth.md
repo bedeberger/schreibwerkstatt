@@ -44,7 +44,7 @@ Dazu: [lib/password.js](../lib/password.js) (scrypt-Hashing), [db/user-credentia
 ## Ein weiteres Verfahren ergänzen
 
 Ein Verfahren ist **eine Datei plus zwei Zeilen**. Weder die Login-Seite noch der
-Auth-Guard in [server.js](../server.js) noch das Admin-UI müssen dafür angefasst werden.
+Auth-Guard in [lib/auth-guard.js](../lib/auth-guard.js) noch das Admin-UI müssen dafür angefasst werden.
 
 1. Modul unter `routes/auth/providers/` anlegen, das den Vertrag erfüllt:
 

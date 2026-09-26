@@ -112,11 +112,28 @@ const CATEGORIES = [
       'db/plot.js': 1011,
     },
   },
+  // Einzeldateien ausserhalb der Verzeichnis-Walks: der Server-Einstieg und der
+  // Service Worker (public/sw.js liegt neben, nicht in public/js/).
+  {
+    label: 'Einstiegs-Modul',
+    files: [join(REPO_ROOT, 'server.js'), join(REPO_ROOT, 'public', 'sw.js')],
+    ext: '.js',
+    cap: 600,
+    allow: {
+      // Der Service Worker laeuft als klassisches Worker-Skript. Ein Split ginge
+      // nur ueber importScripts: jede Teildatei muesste pre-auth ausgeliefert
+      // werden (server.js#PUBLIC_ASSETS) und zaehlte fuer den Byte-Vergleich des
+      // SW-Updates mit — mehr Angriffsflaeche an der heikelsten Stelle des
+      // Caching (docs/caching.md). Ratsche: nur schrumpfen.
+      'public/sw.js': 834,
+    },
+  },
 ];
 
 for (const cat of CATEGORIES) {
   test(`${cat.label}: keine neuen Dateien ueber ${cat.cap} LOC + Altlasten-Ratsche`, () => {
-    const files = cat.dirs ? walkAll(cat.dirs, cat.ext) : walk(cat.dir, cat.ext);
+    const files = cat.files ? cat.files.filter((f) => existsSync(f))
+      : cat.dirs ? walkAll(cat.dirs, cat.ext) : walk(cat.dir, cat.ext);
     const excluded = new Set(cat.exclude || []);
     const violations = [];
     const seen = new Set();
