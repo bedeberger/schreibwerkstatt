@@ -6293,5 +6293,7 @@
   "admin.usage.breakdown.matrixTitle": "Matrix: User × Job-Typ",
   "admin.usage.breakdown.matrixHint": "Kosten aus dem Ledger (Preis zum Zeitpunkt des Aufrufs). Spalten: die sechs teuersten Job-Typen des Zeitraums, der Rest unter „Übrige“. Auf einen User klicken für die volle Aufschlüsselung.",
   "admin.usage.breakdown.other": "Übrige",
-  "admin.usage.breakdown.total": "Total"
+  "admin.usage.breakdown.total": "Total",
+  "share.target.pageFallback": "Seite #{id}",
+  "share.target.chapterFallback": "Kapitel #{id}"
 }

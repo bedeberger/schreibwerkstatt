@@ -194,9 +194,10 @@ export function registerShareLinksCard() {
     },
 
     targetLabel(link) {
-      if (link.kind === 'page') return link.page_name || `Page #${link.page_id}`;
-      if (link.kind === 'book') return link.book_name || window.__app.selectedBookName || window.__app.t('share.target.book');
-      return link.chapter_name || `Chapter #${link.chapter_id}`;
+      const app = window.__app;
+      if (link.kind === 'page') return link.page_name || app.t('share.target.pageFallback', { id: link.page_id });
+      if (link.kind === 'book') return link.book_name || app.selectedBookName || app.t('share.target.book');
+      return link.chapter_name || app.t('share.target.chapterFallback', { id: link.chapter_id });
     },
 
     pageOptions() {

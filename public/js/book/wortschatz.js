@@ -9,6 +9,7 @@
 
 import { formatNumber, localeTag, tzOpts } from '../utils.js';
 import { startPoll } from '../cards/job-helpers.js';
+import { tRaw } from '../i18n.js';
 
 // Kein `get x()` in diesem gespreadeten Modul — Spread würde Getter beim Mount
 // mit falschem `this` auslösen. Reine Getter leben inline im Karten-Literal.
@@ -43,20 +44,20 @@ export const wortschatzMethods = {
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.jobId) {
         this.wortschatzLoading = false;
-        this.wortschatzStatus = window.__app?.t?.('wortschatz.error') || 'Fehler';
+        this.wortschatzStatus = tRaw('wortschatz.error');
         return;
       }
       this._pollWortschatz(j.jobId);
     } catch (e) {
       this.wortschatzLoading = false;
-      this.wortschatzStatus = e.message || 'error';
+      this.wortschatzStatus = tRaw('common.errorColon') + (e.message || '');
     }
   },
 
   _pollWortschatz(jobId) {
     const failed = () => {
       this.wortschatzLoading = false;
-      this.wortschatzStatus = window.__app?.t?.('wortschatz.error') || 'Fehler';
+      this.wortschatzStatus = tRaw('wortschatz.error');
     };
     startPoll(this, {
       timerProp: '_wortschatzPollTimer',

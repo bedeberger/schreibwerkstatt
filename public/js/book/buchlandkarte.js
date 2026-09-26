@@ -23,6 +23,7 @@
 import { loadChart } from '../lazy-libs.js';
 import { BOOK_COLORS } from '../cards/my-stats-chart-methods.js';
 import { startPoll } from '../cards/job-helpers.js';
+import { tRaw } from '../i18n.js';
 
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -115,22 +116,22 @@ export const buchlandkarteMethods = {
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.jobId) {
         this.bookMapLoading = false;
-        this.bookMapStatus = window.__app?.t?.(
+        this.bookMapStatus = tRaw(
           j.error_code === 'EMBED_DISABLED' ? 'buchlandkarte.needBackend' : 'buchlandkarte.error',
-        ) || 'Fehler';
+        );
         return;
       }
       this._pollBookMap(j.jobId);
     } catch (e) {
       this.bookMapLoading = false;
-      this.bookMapStatus = e.message || 'error';
+      this.bookMapStatus = tRaw('common.errorColon') + (e.message || '');
     }
   },
 
   _pollBookMap(jobId) {
     const failed = () => {
       this.bookMapLoading = false;
-      this.bookMapStatus = window.__app?.t?.('buchlandkarte.error') || 'Fehler';
+      this.bookMapStatus = tRaw('buchlandkarte.error');
     };
     startPoll(this, {
       timerProp: '_bookMapPollTimer',

@@ -5,6 +5,7 @@
 // die Paar-Liste. Gespreadet in cards/redundanz-card.js.
 
 import { startPoll } from '../cards/job-helpers.js';
+import { tRaw } from '../i18n.js';
 
 // Fallback-Bänder (bge-m3-Cosinus), falls /config noch nicht geladen ist. Die
 // massgeblichen Werte stehen in Alpine.store('config').redundancyThresholds
@@ -57,20 +58,20 @@ export const redundanzMethods = {
         this.redundanzLoading = false;
         this.redundanzStatus = j.error_code === 'EMBED_DISABLED'
           ? (window.__app?.t?.('redundanz.needBackend') || '')
-          : (window.__app?.t?.('redundanz.error') || 'Fehler');
+          : tRaw('redundanz.error');
         return;
       }
       this._pollRedundanz(j.jobId);
     } catch (e) {
       this.redundanzLoading = false;
-      this.redundanzStatus = e.message || 'error';
+      this.redundanzStatus = tRaw('common.errorColon') + (e.message || '');
     }
   },
 
   _pollRedundanz(jobId) {
     const failed = () => {
       this.redundanzLoading = false;
-      this.redundanzStatus = window.__app?.t?.('redundanz.error') || 'Fehler';
+      this.redundanzStatus = tRaw('redundanz.error');
     };
     startPoll(this, {
       timerProp: '_redundanzPollTimer',
