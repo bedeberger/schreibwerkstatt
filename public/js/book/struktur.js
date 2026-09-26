@@ -17,6 +17,7 @@ import {
   // zu tun ist. Aus der SSoT, nicht hier nachgebaut (prompts/textsorten.js).
   STRUKTUR_URTEIL_RANG, STRUKTUR_STATUS_RANG,
 } from '../prompts/textsorten.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 const LS_KEY = (bookId) => `struktur_job_${bookId}`;
 
@@ -97,20 +98,8 @@ export const strukturMethods = {
     });
   },
 
-  // Cache-Treffer nur, wenn ALLE Deps referenzidentisch zum letzten Lauf sind.
-  // Ein Helper pro Modul, gemeinsamer Speicher `this._memos` (CLAUDE.md
-  // „Memo-Pattern").
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length
-        && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js), gemeinsamer Speicher `this._memos`.
+  ...memoMethods,
 
   /** Regel-Zeilen des offenen Befunds, schlechteste zuerst. */
   strukturDetailRegeln(row) {

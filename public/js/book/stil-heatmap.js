@@ -12,6 +12,7 @@
 
 import { escHtml, fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy, tzOpts } from '../utils.js';
 import { isSelectedBook } from '../cards/book-guard.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 // Metrik-Schlüssel → i18n-Label. Reihenfolge = Spaltenreihenfolge in der Heatmap.
 // sampleBucket: Eimer im Drilldown-Endpunkt (/history/style-samples) bzw.
@@ -88,18 +89,8 @@ export function buildStilRows(chapters, uiLocale) {
 export const stilMethods = {
   get stilMetricDefs() { return STIL_METRICS; },
 
-  // Einziger Memo-Helper der Karte (siehe CLAUDE.md „Memo-Pattern"). Deps werden
-  // flach per === verglichen; `_memos` wird beim Reset der Karte geleert.
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js); `_memos` wird beim Reset der Karte geleert.
+  ...memoMethods,
 
   // Der Server entscheidet, ob nachgerechnet werden muss — er kennt
   // lib/page-index.js#METRICS_VERSION. Das Frontend hält bewusst keine Kopie

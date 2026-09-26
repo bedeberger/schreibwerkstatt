@@ -16,6 +16,7 @@
 // Schreibt nie in den Buchtext.
 
 import { selectScenesForView } from '../editor/notebook/entities.js';
+import { memoMethods } from './card-memo.js';
 
 /** Herkunft einer Zeile im Kontext-Scope: 'page' = haengt an der offenen Seite,
  *  'chapter' = haengt am Kapitel (andere Seite oder ohne Seitenbezug). Jede
@@ -39,16 +40,8 @@ const hasId = (ids, id) =>
 const figKey = (f) => (f?.id == null ? '' : String(f.id));
 
 export const referenceContextMethods = {
-  // ── Memo (ein Helper pro Modul, Array-Deps mit ===) ──────────────────────
-  _memo(key, deps, fn) {
-    const prev = this._memos[key];
-    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
-      return prev.val;
-    }
-    const val = fn();
-    this._memos[key] = { deps, val };
-    return val;
-  },
+  // ── Memo (cards/card-memo.js) ──────────────────────────────────────────────
+  ...memoMethods,
 
   _pageKey() {
     const p = window.__app?.currentPage;

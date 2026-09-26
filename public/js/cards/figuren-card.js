@@ -31,6 +31,7 @@ import { observeThemeChange } from '../graph-kit.js';
 import { formatEventDateParts } from './ereignisse/date.js';
 import { subtypIcon } from './ereignisse/subtyp.js';
 import { typRank } from '../book/figur-typen.js';
+import { memoMethods } from './card-memo.js';
 
 // Pure Filter+Sort der Figurenliste. Aus dem memoized Wrapper extrahiert, damit
 // sie ohne Alpine-Root testbar bleibt. `chapterMap` = Kapitel-Name → Reihenfolge-
@@ -247,19 +248,8 @@ export function registerFigurenCard() {
       this._graphTheme = null;
     },
 
-    // Ein Memo-Helper pro Modul (CLAUDE.md): Cache mit shallow-Array-Deps-
-    // Vergleich (`===`). Cache hit nur wenn ALLE Deps identisch zur letzten
-    // Compute. Reset über this._memos = {} (load-Pfad / book:changed).
-    _memo(key, deps, compute) {
-      const memos = (this._memos ||= {});
-      const hit = memos[key];
-      if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
-        return hit.value;
-      }
-      const value = compute();
-      memos[key] = { deps: [...deps], value };
-      return value;
-    },
+    // Memo-Helper (cards/card-memo.js); Reset über this._memos = {} (load-Pfad / book:changed).
+    ...memoMethods,
 
     // UI-Helper: aus Comboboxen via x-effect mehrfach pro Render gerufen
     // (für _disabled + options). Memo auf Identität der Quell-Daten.

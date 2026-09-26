@@ -3,19 +3,11 @@
 // `this._memo` über den gemeinsamen `this._memos`-Speicher pro Card-Instanz.
 
 import { fetchJson } from '../../utils.js';
+import { memoMethods } from '../../cards/card-memo.js';
 
 export const lifecycleMethods = {
-  // ── Memo-Helper (ein Helper pro Modul, Array-Deps shallow ===) ─────────────
-  _memo(key, deps, fn) {
-    const cache = (this._memos = this._memos || {});
-    const prev = cache[key];
-    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
-      return prev.val;
-    }
-    const val = fn();
-    cache[key] = { deps, val };
-    return val;
-  },
+  // ── Memo-Helper (cards/card-memo.js) ───────────────────────────────────────
+  ...memoMethods,
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   async loadBoard() {

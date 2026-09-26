@@ -8,6 +8,7 @@ import {
 } from '../../sortable-dnd.js';
 import { IDEE_STATUSES, ideeStatus, isOpenIdee } from '../ideen-shared.js';
 import { buildLaneOrder, buildBoard, chapterFilterOptions, statusTotals } from './model.js';
+import { memoMethods } from '../../cards/card-memo.js';
 
 // Key in einer Klapp-Liste umschalten — immer als neue Liste (siehe
 // toggleLaneFold).
@@ -110,18 +111,8 @@ export const ideenBoardActions = {
       : `#book/${bookId}/page/${lane.id}`;
   },
 
-  // Ein Memo-Helfer fuer die ganze Karte (harte Regel „Memo-Pattern: ein Helper
-  // pro Modul"): Array-Deps, shallow verglichen. `this._memos` wird in
-  // loadBoard/resetBoard geleert.
-  _memo(key, deps, fn) {
-    const prev = this._memos[key];
-    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
-      return prev.value;
-    }
-    const value = fn();
-    this._memos[key] = { deps, value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js); `this._memos` wird in loadBoard/resetBoard geleert.
+  ...memoMethods,
 
   // ── Laden ────────────────────────────────────────────────────────────────
   async loadBoard() {

@@ -22,6 +22,7 @@
 import { tzOpts } from '../utils.js';
 import { featureByKey } from './feature-registry.js';
 import { buildHelpSections } from './help-catalog.js';
+import { memoMethods } from './card-memo.js';
 
 /** Semver-Vergleich; ein leerer/ungueltiger Stand gilt als „aelter als alles".
  *  Spiegel von routes/changelog.js#_cmp — die Frage „gibt es Neues?" wird auf
@@ -100,13 +101,7 @@ export function registerHelpCard() {
       };
     },
 
-    _memo(key, deps, fn) {
-      const m = this._memos[key];
-      if (m && m.deps.length === deps.length && m.deps.every((d, i) => d === deps[i])) return m.value;
-      const value = fn();
-      this._memos[key] = { deps, value };
-      return value;
-    },
+    ...memoMethods,
 
     /** Sektionen, gefiltert nach Suchbegriff (Titel + Beschreibung in der
      *  UI-Sprache). Leere Sektionen fallen weg. */

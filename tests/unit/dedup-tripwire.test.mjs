@@ -153,3 +153,27 @@ test('no _memoN variant in modules (Memo-Pattern: ein Helper pro Modul)', () => 
       violations.join('\n  '),
   );
 });
+
+// REGEL 3b: `_memo` wird nicht pro Modul neu geschrieben — Karten spreaden
+// `...memoMethods` aus cards/card-memo.js (eine Implementierung, ein Speicher
+// `this._memos`). Lokale Kopien driften in Feldnamen (value/val), Speicher
+// (`_memos` vs. karten-eigene Maps) und Deps-Kopie vs. -Referenz.
+// Ratschen-Allowlist: bestehende Kopie, die nur verschwinden darf.
+const MEMO_SSOT = 'public/js/cards/card-memo.js';
+const MEMO_LOCAL_ALLOW = new Set(['public/js/cards/book-editor-card.js']);
+
+test('_memo nur in cards/card-memo.js definiert (Konsumenten spreaden memoMethods)', () => {
+  const violations = [];
+  for (const file of walk(JS_DIR, '.js')) {
+    const r = rel(file);
+    if (r === MEMO_SSOT || MEMO_LOCAL_ALLOW.has(r)) continue;
+    const src = readFileSync(file, 'utf8');
+    if (/^\s*_memo\s*(?:\(\s*\w+\s*,|:\s*(?:function|\()|=\s*(?:function|\())/m.test(src)) violations.push(r);
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    'Lokale _memo-Definition — stattdessen `...memoMethods` aus cards/card-memo.js spreaden:\n  ' +
+      violations.join('\n  '),
+  );
+});

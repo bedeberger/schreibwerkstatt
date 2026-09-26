@@ -7,26 +7,15 @@
 import { tzOpts, fetchJson } from '../utils.js';
 import { quartileLevelFor, currentMonthKey } from './ymheatmap.js';
 import { isSelectedBook } from '../cards/book-guard.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 // Tagebuch-Seitennamen sind 'YYYY-MM-DD'. Hier rein clientseitig per Regex
 // (kein Bedarf am vollen lib/datum-parse-Fallback).
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})\b/;
 
 export const tagebuchRueckblickMethods = {
-  // Memo-Helper (CLAUDE.md-Pattern): genau einer pro Modul, Array-Deps shallow ===.
-  // Aggregat-Getter, die mehrfach pro Render laufen (availableZeitraeume via
-  // Combobox-x-effect, filteredRueckblickHistory in x-for + Empty-Check), cachen
-  // darüber. Invalidierung rein über die Deps — kein expliziter Reset nötig.
-  _memo(key, deps, fn) {
-    if (!this._memos) this._memos = {};
-    const prev = this._memos[key];
-    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
-      return prev.val;
-    }
-    const val = fn();
-    this._memos[key] = { deps, val };
-    return val;
-  },
+  // Memo-Helper (cards/card-memo.js) für availableZeitraeume/filteredRueckblickHistory; Invalidierung rein über die Deps.
+  ...memoMethods,
 
   // Liefert die für die Combobox verfügbaren Zeiträume (Jahre + Monate),
   // absteigend (neueste zuerst). Format: [{ value, label }].

@@ -24,6 +24,7 @@ import {
   BASE_SORTABLE_OPTS,
 } from '../../sortable-dnd.js';
 import { STATUSES, PLACE_LINK_KINDS } from './shared.js';
+import { memoMethods } from '../../cards/card-memo.js';
 
 export const rechercheStatusMethods = {
   // ── Ansicht ────────────────────────────────────────────────────────────────
@@ -55,18 +56,8 @@ export const rechercheStatusMethods = {
   },
   itemsForStatus(status) { return this.statusBuckets()[status] || []; },
 
-  // Ein Memo-Helfer fuer die ganze Karte (harte Regel „Memo-Pattern: ein Helper
-  // pro Modul"): Array-Deps, shallow verglichen. `this._memos` wird in
-  // resetRecherche/loadRecherche geleert.
-  _memo(key, deps, fn) {
-    const prev = this._memos[key];
-    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
-      return prev.value;
-    }
-    const value = fn();
-    this._memos[key] = { deps, value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js); `this._memos` wird in resetRecherche/loadRecherche geleert.
+  ...memoMethods,
 
   // Verknuepfungen, die eine Stelle im Buch bezeichnen (Kapitel/Seite) — die
   // Antwort auf „wo ist das eingearbeitet". Read-only auf der Karte: entfernt

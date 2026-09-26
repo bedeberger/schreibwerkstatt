@@ -19,6 +19,7 @@ import {
   SOURCE_TYPES, DEFAULT_SOURCE_TYPE,
   fieldsForType, draftFromSource, draftToPayload, draftHasIdentity, otonBlocking,
 } from './fields.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 const SAVED_FLASH_MS = 2500;
 
@@ -147,17 +148,7 @@ export const sourcesMethods = {
   // Cache hit nur, wenn alle Deps identisch sind. `sources` steht drin, damit
   // ein Reload neu rechnet, die drei Filterwerte, weil sie das Ergebnis formen,
   // und die UI-Locale, weil die Zeilen lokalisierte Typ-Labels backen.
-  _memo(key, deps, compute) {
-    const memos = this._memos;
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length
-        && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  ...memoMethods,
 
   _uiLocale() {
     return window.Alpine?.store('shell')?.uiLocale || 'de';

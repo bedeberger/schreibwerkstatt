@@ -3,16 +3,11 @@
 // abgeleiteten Aggregate memoized. Rein rückwärtsgewandt/planend.
 
 import { fetchJson } from '../../utils.js';
+import { memoMethods } from '../../cards/card-memo.js';
 
 export const lifecycleMethods = {
-  // Ein Memo-Helper pro Modul (Array-Deps, shallow ===). Reset über this._memos = {}.
-  _memo(key, deps, fn) {
-    const prev = this._memos[key];
-    if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) return prev.val;
-    const val = fn();
-    this._memos[key] = { deps, val };
-    return val;
-  },
+  // Memo-Helper (cards/card-memo.js); Reset über this._memos = {}.
+  ...memoMethods,
 
   async loadBoard() {
     const bookId = this.$store.nav.selectedBookId;

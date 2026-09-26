@@ -5,6 +5,7 @@
 import { fetchJson } from '../utils.js';
 import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
 import { isSelectedBook } from '../cards/book-guard.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 export const kontinuitaetMethods = {
   // ── Weltfakten-Faktencheck ──────────────────────────────────────────────────
@@ -70,19 +71,8 @@ export const kontinuitaetMethods = {
     }
   },
 
-  // Ein Memo-Helper pro Modul (CLAUDE.md): Cache mit shallow-Array-Deps-
-  // Vergleich (`===`). Reset ueber this._memos = {} im Lade-/Reset-Pfad
-  // (kontinuitaet-card.js).
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js); Reset über this._memos = {} im Lade-/Reset-Pfad (kontinuitaet-card.js).
+  ...memoMethods,
 
   // Kapitel des Baums als Liste + Id-Index. Memoisiert, weil die Befundliste den
   // Index PRO ZEILE braucht: kontinuitaet.html liest kontinuitaetResolveStelle()

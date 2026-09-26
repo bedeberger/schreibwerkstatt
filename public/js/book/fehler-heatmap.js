@@ -6,6 +6,7 @@ import { escHtml, fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy,
 import { loadChart } from '../lazy-libs.js';
 import { isSelectedBook } from '../cards/book-guard.js';
 import { createChartHolder, cssVar } from '../cards/chart-holder.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 
 // Chart.js-Instanz + Theme-Observer als Modul-State (ausserhalb Alpines Proxy,
@@ -57,18 +58,8 @@ export const fehlerHeatmapMethods = {
   // Beginnt an dieser Spalte ein neues Cluster? (→ Trennlinie)
   fehlerHeatmapIsClusterStart(idx) { return FEHLER_CLUSTER_STARTS.has(idx); },
 
-  // Ein Memo-Helper pro Modul (CLAUDE.md): Cache mit shallow-Array-Deps-
-  // Vergleich (`===`). Reset ueber this._memos = {} im Lade-Pfad.
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js); Reset über this._memos = {} im Lade-Pfad.
+  ...memoMethods,
 
   async loadFehlerHeatmap() {
     const bookId = Alpine.store('nav').selectedBookId;
