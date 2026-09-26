@@ -217,15 +217,6 @@ function markLinkPulled(pageId, { wpModifiedAt, wpStatus = null, wpSlug = null }
   _stmtMarkPulled.run(String(wpModifiedAt || ''), wpStatus, wpSlug, parseInt(pageId, 10));
 }
 
-const _stmtMarkPushed = db.prepare(`
-  UPDATE blog_page_links
-     SET wp_modified_at = ?, wp_status = ?, wp_slug = ?,
-         last_pushed_at = ${NOW_ISO_SQL}, conflict_state = NULL
-   WHERE page_id = ?
-`);
-function markLinkPushed(pageId, { wpModifiedAt, wpStatus = null, wpSlug = null }) {
-  _stmtMarkPushed.run(String(wpModifiedAt || ''), wpStatus, wpSlug, parseInt(pageId, 10));
-}
 
 // Konflikt zugunsten der App geloest: der WP-Stand, den der User im Diff
 // gesehen und verworfen hat, gilt als bekannt (`wp_modified_at`). Sonst saehe der
@@ -270,7 +261,7 @@ module.exports = {
   upsertLink,
   markLinkPulled,
   markConflictResolvedApp,
-  markLinkPushed,
+  
   setConflictState,
   deleteLink,
 };

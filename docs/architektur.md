@@ -68,7 +68,7 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /public/*        → Unauthentifizierte Endpoints (Health, Marketing)
   /                → public/index.html (SPA)
 
-Cron (täglich nachts; Uhrzeit in server.js, TZ aus app.timezone) → syncAllBooks() → page_stats + book_stats_history
+Cron (täglich nachts; Uhrzeit in lib/cron.js, TZ aus app.timezone) → syncAllBooks() → page_stats + book_stats_history
 ```
 
 **Auth:** Alle Routen ausser `/auth/*` sind durch Session-Guard geschützt. HTML-Requests → Redirect auf Login. API-Requests → `401 JSON`.
@@ -81,7 +81,7 @@ Cron (täglich nachts; Uhrzeit in server.js, TZ aus app.timezone) → syncAllBoo
 
 Vollständiges Inventar via `ls`/`find` — hier nur Einstiege und Cluster, damit Drift gegen Datei-Listings nicht jeden Refactor bricht.
 
-- `server.js` — Express-Setup, Auth-Guard, Cron, Route-Mounting.
+- `server.js` — Express-Setup und Route-Mounting. Ausgelagert: `lib/csp.js` (CSP-Header), `lib/auth-guard.js` (Session-/Device-Token-Guard, 401 vs. Login-Redirect), `lib/async-routes.js` (async-Rejections → finaler JSON-Fehler-Handler), `lib/cron.js` (node-cron-Jobs), `lib/startup.js` (Boot-Aufgaben nach `listen`, Sync-Catch-up).
 - `logger.js` — Winston-Config.
 - **`lib/`** — Server-Libs. Highlights:
   - `ai.js` (callAI + Provider-Dispatch + JSON-Fallback), `content-store/` (Pages/Chapters/Books-Facade), `html-clean.js` (Page-HTML-Sanitization, **SSoT** vor jedem DB-Write).

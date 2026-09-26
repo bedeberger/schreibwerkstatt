@@ -71,6 +71,7 @@
         <div x-data="settingField({ k: 'ai.ollama.max_tokens_out', type: 'num', label: 'admin.settings.label.maxTokensOut', num: { integer: true, min: 512, max: 200000 }, help: 'admin.settings.help.maxTokensOut' })"></div>
         <div x-data="settingField({ k: 'ai.ollama.repeat_penalty', type: 'num', label: 'admin.settings.label.repeatPenalty', num: { step: 0.05, decimals: 2, min: 1, max: 2 }, help: 'admin.settings.help.repeatPenalty' })"></div>
         <div x-data="settingField({ k: 'ai.ollama.think', type: 'toggle', label: 'admin.settings.label.aiThink', help: 'admin.settings.help.think' })"></div>
+        <div x-data="settingField({ k: 'ai.ollama.timeout_ms', type: 'num', label: 'admin.settings.label.aiTimeoutMs', num: { integer: true, min: 1000, max: 3600000 }, help: 'admin.settings.help.timeoutMsOllama' })"></div>
       </div>
 
       <div x-show="adminSettingsProviderSubtab === 'openai-compat'" class="admin-settings-subsection">

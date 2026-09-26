@@ -6304,5 +6304,7 @@
   "share.target.chapterFallback": "Chapter #{id}",
   "error.PAGE_NOT_FOUND": "Page not found.",
   "error.CHAPTER_NOT_IN_BOOK": "The chapter does not belong to this book.",
-  "job.warn.factcheckJudgeFailed": "{count} of {checked} world facts remain unchecked (verdict cut off or AI error). Run the fact check again for these."
+  "job.warn.factcheckJudgeFailed": "{count} of {checked} world facts remain unchecked (verdict cut off or AI error). Run the fact check again for these.",
+  "job.error.aiTimeout": "The AI request to {provider} was aborted after {seconds} s without a response (timeout). A retry usually works; for large texts, raise the timeout in the provider settings.",
+  "admin.settings.help.timeoutMsOllama": "Hard timeout per call (milliseconds), covering connection and stream. Without it a stalled Ollama holds the job — and, because calls are serialised, every waiting job — indefinitely. Local models on CPU easily need ten minutes or more for large prompts."
 }

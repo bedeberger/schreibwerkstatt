@@ -6,6 +6,14 @@ require('./migrations');
 const { saveFigurenToDb } = require('./figures');
 
 // Einmalige Migration von lektorat-history.json
+
+function _optionalRequire(id) {
+  try { return require(id); }
+  catch (e) {
+    if (e.code === 'MODULE_NOT_FOUND' && String(e.message).includes(id.replace(/^\.\.?\//, ''))) return null;
+    throw e;
+  }
+}
 function migrateFromJson() {
   const HISTORY_FILE = path.join(__dirname, '..', 'lektorat-history.json');
   if (!fs.existsSync(HISTORY_FILE)) return;
@@ -115,13 +123,11 @@ function pruneStaleBookData(bookId, validPageIds, validChapterIds) {
 
   if (stalePageIds.length === 0 && staleChapterIds.length === 0) return counts;
 
-  // Volltext-Index synchron halten. Lazy-Import, weil pages.js auch
-  // im Stale-Cleanup-Cron-Pfad geladen wird — Search-Failure darf den Prune
-  // nicht abbrechen.
-  let _searchIndex = null;
-  try { _searchIndex = require('../lib/search'); } catch {}
-  let _semanticChunks = null;
-  try { _semanticChunks = require('./semantic-chunks'); } catch {}
+  // Volltext-Index synchron halten. Lazy-Import (Zyklus: lib/search → db).
+  // Nur ein fehlendes Modul wird toleriert — ein Syntax- oder Laufzeitfehler im
+  // Modul selbst muss sichtbar werden, statt den Index still veralten zu lassen.
+  const _searchIndex = _optionalRequire('../lib/search');
+  const _semanticChunks = _optionalRequire('./semantic-chunks');
 
   db.transaction(() => {
     if (stalePageIds.length > 0) {

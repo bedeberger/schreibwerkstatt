@@ -33,8 +33,20 @@ function drainQueue() {
       try { startJobRun(jobId); } catch (e) { logger.error(`startJobRun: ${e.message}`); }
       // Job-Module loggen Start mit eigenem Detail (Pages-Count, Buchname etc.).
       // jobId steht via ALS-Ctx im Tag — kein zentrales Generik-Start nötig.
-      fn()
-        .catch(e => logger.error(`Unkontrollierter Job-Fehler: ${e.message}`))
+      // Promise.resolve().then(fn): auch ein synchroner Throw landet im catch,
+      // sonst bliebe activeCount fuer immer erhoeht. Ein Fehler, der am try des
+      // Job-Moduls vorbeigeht (z.B. `await getPrompts()` davor), wird hier
+      // terminal verbucht — ohne failJob bliebe der Job ewig auf 'running' und
+      // der Dedup-Slot belegt.
+      Promise.resolve().then(fn)
+        .catch(e => {
+          logger.error(`Unkontrollierter Job-Fehler: ${e?.message || e}`);
+          const j = jobs.get(jobId);
+          if (j && (j.status === 'queued' || j.status === 'running')) {
+            try { require('./jobs').failJob(jobId, e instanceof Error ? e : new Error(String(e))); }
+            catch (fe) { logger.error(`failJob nach unkontrolliertem Job-Fehler: ${fe.message}`); }
+          }
+        })
         .finally(() => { activeCount--; drainQueue(); });
     });
   }

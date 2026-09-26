@@ -6304,5 +6304,7 @@
   "share.target.chapterFallback": "Kapitel #{id}",
   "error.PAGE_NOT_FOUND": "Seite nicht gefunden.",
   "error.CHAPTER_NOT_IN_BOOK": "Das Kapitel gehört nicht zu diesem Buch.",
-  "job.warn.factcheckJudgeFailed": "{count} von {checked} Welt-Fakten blieben ungeprüft (Urteil abgeschnitten oder KI-Fehler). Für diese den Faktencheck erneut starten."
+  "job.warn.factcheckJudgeFailed": "{count} von {checked} Welt-Fakten blieben ungeprüft (Urteil abgeschnitten oder KI-Fehler). Für diese den Faktencheck erneut starten.",
+  "job.error.aiTimeout": "Die KI-Anfrage an {provider} wurde nach {seconds} s ohne Antwort abgebrochen (Zeitüberschreitung). Ein erneuter Versuch klappt meist; bei grossen Texten hilft ein höherer Timeout in den Provider-Einstellungen.",
+  "admin.settings.help.timeoutMsOllama": "Hard-Timeout pro Aufruf (Millisekunden), gilt für Verbindungsaufbau und Stream. Ohne ihn hält ein hängendes Ollama den Job — und wegen der Serialisierung jeden wartenden Job — unbegrenzt fest. Lokale Modelle auf CPU brauchen für grosse Prompts leicht zehn Minuten und mehr."
 }

@@ -46,16 +46,5 @@ function getDevice(deviceId) {
   return _stmtGet.get(deviceId) || null;
 }
 
-const _stmtList = db.prepare(`
-  SELECT device_id, user_email, label, user_agent, created_at, last_seen_at
-    FROM app_users_devices
-   WHERE user_email = ?
-   ORDER BY last_seen_at DESC
-`);
 
-function listDevicesForUser(userEmail) {
-  if (!userEmail) return [];
-  return _stmtList.all(userEmail);
-}
-
-module.exports = { upsertDevice, getDevice, listDevicesForUser };
+module.exports = { upsertDevice, getDevice };

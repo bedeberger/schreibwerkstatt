@@ -37,29 +37,7 @@ function getPageImage(id) {
   return _get.get(id);
 }
 
-// Metadaten (ohne BLOB) fuer ACL-/Scope-Checks ohne die Bytes zu laden.
-const _getMeta = db.prepare(`
-  SELECT pi.id, pi.page_id, pi.mime, p.book_id
-  FROM page_images pi
-  JOIN pages p ON p.page_id = pi.page_id
-  WHERE pi.id = ?
-`);
 
-function getPageImageMeta(id) {
-  return _getMeta.get(id);
-}
-
-// Alle Bilder einer Seite (inkl. BLOB) — fuer Export/Snapshot/Migration.
-const _forPage = db.prepare(`
-  SELECT id, page_id, mime, width, height, size, image, created_at
-  FROM page_images
-  WHERE page_id = ?
-  ORDER BY id
-`);
-
-function getImagesForPage(pageId) {
-  return _forPage.all(pageId);
-}
 
 // ── Snapshot-/Migrations-Serialisierung ──────────────────────────────────────
 // Die BLOBs muessen bei Fassungs-Restore und .swbook-Migration mitwandern, sonst
@@ -118,6 +96,5 @@ function restorePageImages(newPageId, html, images) {
 }
 
 module.exports = {
-  insertPageImage, getPageImage, getPageImageMeta, getImagesForPage,
-  collectReferencedImages, restorePageImages,
+  insertPageImage, getPageImage, collectReferencedImages, restorePageImages,
 };

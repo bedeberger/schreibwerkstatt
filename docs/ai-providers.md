@@ -53,6 +53,7 @@ Alle KI-Konfig liegt in der `app_settings`-Tabelle. Admin-PUT via `/admin/settin
 | `ai.ollama.context_window` | 32 000 | – | Per-Provider-Override |
 | `ai.ollama.max_tokens_out` | 16 000 | – | |
 | `ai.ollama.think` | `false` | – | Reasoning an/aus (top-level `think`-Flag); aus spart Output-Token |
+| `ai.ollama.timeout_ms` | 1 800 000 | – | Hard-Timeout pro Call (fetch + Stream); ohne ihn blockiert ein hängendes Ollama wegen des Mutex jeden wartenden Job |
 | `ai.openai-compat.host` | `http://localhost:8080` | `OPENAI_COMPAT_HOST` | OpenAI-kompatibler `/v1/chat/completions`-Endpoint |
 | `ai.openai-compat.model` | `llama3.2` | `OPENAI_COMPAT_MODEL` | |
 | `ai.openai-compat.api_key` | – | `OPENAI_COMPAT_API_KEY` | Optionaler Bearer-Token (encrypted); leer = kein `Authorization`-Header |
@@ -328,13 +329,13 @@ Ollama hat bewusst keinen Override-Satz: dort ist das Modell an das geladene Gew
 
 ### Timeout + Retry: geteilte Mechanik, provider-eigene Auslöser
 
-`combineSignals` / `timeoutError` / `sleep` / `parseRetryAfter` / `retryDelayMs` / `overloadError` liegen einmal in [lib/ai/shared.js](../lib/ai/shared.js) und werden von Claude **und** openai-compat benutzt. Provider-eigen bleibt nur, **welche** Antwort transient ist:
+`combineSignals` / `timeoutError` / `withOverloadRetry` / `parseRetryAfter` / `retryDelayMs` / `overloadError` liegen einmal in [lib/ai/shared.js](../lib/ai/shared.js) und werden von Claude **und** openai-compat benutzt (Ollama nutzt nur den Timeout). Der Timeout deckt fetch **und** jedes `reader.read()` im Stream und endet als `AI_TIMEOUT` mit i18n-Key `job.error.aiTimeout`. Ein Fehler-Chunk im Stream (`{"error":…}`) wirft mit der Server-Meldung, statt still mit leerem Text zu enden. Provider-eigen bleibt nur, **welche** Antwort transient ist:
 
 | Provider | Hard-Timeout | Retry-Versuche | transient |
 |----------|--------------|----------------|-----------|
 | `claude` | `ai.claude.timeout_ms` (600 000) | `ai.claude.retry_max` (3) | 429, 529, `overloaded_error` im Body |
 | `openai-compat` | `ai.openai-compat.timeout_ms` (600 000) | `ai.openai-compat.retry_max` (3) | 408, 429, 500, 502, 503, 504 |
-| `ollama` | — (lokaler Mutex, kein entfernter Endpunkt) | — | — |
+| `ollama` | `ai.ollama.timeout_ms` (1 800 000) | — (lokaler Mutex) | — |
 
 Zwei Regeln gelten für beide: **wiederholt wird nur, was vor dem ersten Delta scheitert** (ein mitten im Stream abgerissener Call hat schon Text emittiert; den fängt `retryOnTransientAi` in [routes/jobs/shared/ai.js](../routes/jobs/shared/ai.js) auf Job-Ebene ab), und `state.timedOut` trennt Timeout von User-Abbruch — beides kommt sonst als `AbortError` an, und ein hängender Endpunkt verschwände als „vom User abgebrochen" statt als retrybares `AI_TIMEOUT`.
 

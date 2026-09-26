@@ -294,3 +294,25 @@ test('localdb: loadPagesBatch laeuft sequentiell ohne Token', async () => {
   assert.equal(out[0].name, 'P1');
   assert.equal(out[1].name, 'P2');
 });
+
+test('localdb: loadPagesBatch liefert in Meta-Reihenfolge, fehlende Seite via onError', async () => {
+  const bookId = _seedBook();
+  const chapterId = _seedChapter(bookId);
+  const p1 = _seedPage(bookId, chapterId, { name: 'A' });
+  const p2 = _seedPage(bookId, chapterId, { name: 'B' });
+  const out = await ctx.contentStore.loadPagesBatch([{ id: p2 }, { id: 999999 }, { id: p1 }], null, {
+    onError: (meta) => ({ id: meta.id, missing: true }),
+  });
+  assert.deepEqual(out.map(p => p.name || (p.missing && 'missing')), ['B', 'missing', 'A']);
+  await assert.rejects(ctx.contentStore.loadPagesBatch([{ id: 999999 }]), (e) => e.code === 'NOT_FOUND');
+  assert.deepEqual(await ctx.contentStore.loadPagesBatch([]), []);
+});
+
+test('localdb: findPagesByBlockIds findet die Seite per data-bid, unbekannt → null', async () => {
+  const bookId = _seedBook();
+  const chapterId = _seedChapter(bookId);
+  const p1 = _seedPage(bookId, chapterId, { name: 'X', html: '<p data-bid="b-111">eins</p>', position: 0 });
+  const p2 = _seedPage(bookId, chapterId, { name: 'Y', html: '<p data-bid="b-222">zwei</p>', position: 1 });
+  const map = ctx.contentStore.findPagesByBlockIds(bookId, ['b-222', 'b-111', 'b-nope']);
+  assert.deepEqual(map, { 'b-222': p2, 'b-111': p1, 'b-nope': null });
+});

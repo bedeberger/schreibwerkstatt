@@ -20,7 +20,7 @@ Browser (auth Owner) → /share/api/links/:token/feedback   → JSON (alle Fazit
 Browser (auth Owner) → /share/api/book-comments/:id  → JSON (alle Threads des Buchs; Kommentar-Leiste der Leseansicht)
 ```
 
-`/share/:token` + `/share/:token/comment` sind die **einzigen** Public-Routen im App-Body. Mount-Reihenfolge in [server.js](../server.js): Share-Router **vor** dem Session-Guard montiert; gleichzeitig steht `/share/api/` in `API_PREFIXES`, damit Owner-Calls 401-JSON statt HTML-Redirect bekommen. Reihenfolge nicht durcheinanderbringen, sonst landet entweder Reader im Login oder Owner-API liefert HTML.
+`/share/:token` + `/share/:token/comment` sind die **einzigen** Public-Routen im App-Body. Mount-Reihenfolge in [server.js](../server.js): Share-Router **vor** dem Session-Guard montiert; Owner-Calls unter `/share/api/` prüfen die Session selbst und bekommen wie jeder Nicht-Navigations-Request 401-JSON ([lib/auth-guard.js](../lib/auth-guard.js)). Reihenfolge nicht durcheinanderbringen, sonst landet der Reader im Login.
 
 ## Datenmodell (Migration 145)
 

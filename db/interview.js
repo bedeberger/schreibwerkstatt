@@ -25,10 +25,6 @@ const _stmtGet = db.prepare(`
          (audio IS NOT NULL) AS has_audio
     FROM interview_transcripts WHERE item_id = ?
 `);
-const _stmtListForBook = db.prepare(`
-  SELECT item_id, status, duration_s, diarisiert, audio_name
-    FROM interview_transcripts WHERE book_id = ?
-`);
 
 /** Kopfdaten ohne den Audio-BLOB. Jede Leseabfrage geht hier durch — der BLOB
  *  wird ausschliesslich von `getAudio` geholt, damit eine Listenabfrage nicht
@@ -37,14 +33,6 @@ function getTranscript(itemId) {
   const r = _stmtGet.get(parseInt(itemId));
   if (!r) return null;
   return { ...r, diarisiert: !!r.diarisiert, has_audio: !!r.has_audio };
-}
-
-function listBookTranscripts(bookId) {
-  const out = {};
-  for (const r of _stmtListForBook.all(parseInt(bookId))) {
-    out[String(r.item_id)] = { ...r, diarisiert: !!r.diarisiert };
-  }
-  return out;
 }
 
 /** Audio-BLOB samt Mime — nur fuer die Ausliefer-Route. */
@@ -205,7 +193,7 @@ function speakerKeys(itemId) {
 
 module.exports = {
   TRANSCRIPT_STATUS,
-  getTranscript, listBookTranscripts, getAudio, createTranscript, setStatus, dropAudio,
+  getTranscript, getAudio, createTranscript, setStatus, dropAudio,
   listSegments, getSegment, replaceSegments,
   listSpeakers, speakerLabels, setSpeaker, speakerKeys,
 };
