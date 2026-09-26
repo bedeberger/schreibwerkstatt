@@ -6,7 +6,8 @@
 // gegen das neueste Release der jeweiligen Plattform verglichen (macOS, Android,
 // Chrome-Erweiterung — drei eigene Repos, drei eigene Versionsstraenge).
 
-import { tzOpts, localeTag } from '../utils.js';
+import { tzOpts, localeTag, fetchJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
 
 export const adminDevicesMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -20,13 +21,11 @@ export const adminDevicesMethods = {
     this.devicesLoading = true;
     this.devicesError = '';
     try {
-      const r = await fetch('/admin/devices', { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await fetchJson('/admin/devices');
       this.devicesList = data.devices || [];
       this.devicesLatestVersions = data.latestVersions || {};
     } catch (e) {
-      this.devicesError = e.message;
+      this.devicesError = tFetchErrorRaw(e);
     } finally {
       this.devicesLoading = false;
     }

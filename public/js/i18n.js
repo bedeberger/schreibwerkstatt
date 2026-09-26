@@ -65,6 +65,19 @@ export function tErrorRaw(response) {
   return tRaw('common.unknownError');
 }
 
+/** Fehlertext für einen geworfenen `fetchJson`/`sendJson`-Fehler (utils/net.js):
+ *  übersetzter `error_code` (`error.CODE` samt `params`), ohne Übersetzung der
+ *  rohe Code, ohne Code die Error-Message. */
+export function tFetchErrorRaw(err) {
+  const code = err?.code;
+  if (code) {
+    const key = 'error.' + code;
+    const msg = tRaw(key, err.body?.params || {});
+    return msg === key ? code : msg;
+  }
+  return err?.message || tRaw('common.unknownError');
+}
+
 // Alpine-Methoden: `t` referenziert `this.$store.shell.uiLocale`, damit Alpine bei Sprachwechsel re-evaluiert.
 // `this?.` ist Pflicht: Wird die Methode aus einem Scope aufgerufen, in dem Alpine
 // den Receiver verliert (z. B. via `window.__app.t()` aus einer x-effect-Expression

@@ -2,7 +2,8 @@
 // Methoden werden in Alpine.data('userSettingsCard') gespreadet;
 // Root-Zugriffe via window.__app.
 
-import { fetchJson, numberFormat, localeTag, configureLocaleRegion } from './utils.js';
+import { fetchJson, sendJson, numberFormat, localeTag, configureLocaleRegion } from './utils.js';
+import { tFetchErrorRaw } from './i18n.js';
 
 // Protokollwert von DELETE /me/account. Bewusst NICHT lokalisiert und bewusst
 // derselbe String, den der native macOS-Client sendet — der Server kennt genau
@@ -32,21 +33,16 @@ export const userSettingsMethods = {
     this.userSettingsSaved  = false;
     this.userSettingsError  = '';
     try {
-      const r = await fetch('/me/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      try {
+        await sendJson('/me/settings', 'PATCH', {
           default_language:  this.userSettingsDefaultLanguage  || null,
           default_region:    this.userSettingsDefaultRegion    || null,
           default_buchtyp:   this.userSettingsDefaultBuchtyp   || null,
           focus_granularity: this.userSettingsFocusGranularity || 'paragraph',
           daily_goal_minutes: Math.max(0, Math.min(1440, Math.round(Number(this.userSettingsDailyGoal) || 0))),
-        }),
-      });
-      if (!r.ok) {
-        let data = null;
-        try { data = await r.json(); } catch (_) {}
-        throw new Error(data ? window.__app.tError(data) : `HTTP ${r.status}`);
+        });
+      } catch (e) {
+        throw new Error(tFetchErrorRaw(e));
       }
       window.__app.focusGranularity = this.userSettingsFocusGranularity || 'paragraph';
       const region = this.userSettingsDefaultRegion || (Alpine.store('shell').uiLocale === 'en' ? 'US' : 'CH');
@@ -127,19 +123,12 @@ export const userSettingsMethods = {
     this.deviceTokensCreating = true;
     this.deviceTokensError = '';
     try {
-      const r = await fetch('/me/device-tokens', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ device_name: name, kind: this.deviceTokensNewKind || 'device' }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(window.__app.tError ? window.__app.tError(j) : (j.error_code || `HTTP ${r.status}`));
+      const j = await sendJson('/me/device-tokens', 'POST', { device_name: name, kind: this.deviceTokensNewKind || 'device' });
       this.deviceTokensJustCreated = j.token;
       this.deviceTokensNewName = '';
       await this.loadDeviceTokens();
     } catch (e) {
-      this.deviceTokensError = e.message;
+      this.deviceTokensError = tFetchErrorRaw(e);
     } finally {
       this.deviceTokensCreating = false;
     }
@@ -148,19 +137,17 @@ export const userSettingsMethods = {
   async deviceTokensRevoke(id) {
     if (!confirm(window.__app.t('profile.devices.confirmRevoke'))) return;
     try {
-      const r = await fetch(`/me/device-tokens/${id}/revoke`, { method: 'POST', credentials: 'same-origin' });
-      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(window.__app.tError(j) || `HTTP ${r.status}`); }
+      await sendJson(`/me/device-tokens/${id}/revoke`, 'POST');
       await this.loadDeviceTokens();
-    } catch (e) { this.deviceTokensError = e.message; }
+    } catch (e) { this.deviceTokensError = tFetchErrorRaw(e); }
   },
 
   async deviceTokensDelete(id) {
     if (!confirm(window.__app.t('profile.devices.confirmDelete'))) return;
     try {
-      const r = await fetch(`/me/device-tokens/${id}`, { method: 'DELETE', credentials: 'same-origin' });
-      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(window.__app.tError(j) || `HTTP ${r.status}`); }
+      await sendJson(`/me/device-tokens/${id}`, 'DELETE');
       await this.loadDeviceTokens();
-    } catch (e) { this.deviceTokensError = e.message; }
+    } catch (e) { this.deviceTokensError = tFetchErrorRaw(e); }
   },
 
   deviceTokensDismissPlain() {
@@ -206,6 +193,7 @@ export const userSettingsMethods = {
 
     this.accountDeleting = true;
     try {
+      // Roher fetch: die Antwort wird tolerant geparst (Session ist danach weg).
       const r = await fetch('/me/account', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },

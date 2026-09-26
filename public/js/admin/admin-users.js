@@ -2,38 +2,30 @@
 // Wird im adminUsersCard-Alpine-Scope gespreaded. Root-Zugriffe ueber
 // `window.__app`, weil Alpine-Magics in JS-Methoden nicht zuverlaessig sind.
 
+import { fetchJson, sendJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
+
 export const adminUsersMethods = {
   async adminUsersLoad() {
     if (this.adminUsersLoading) return;
     this.adminUsersLoading = true;
     this.adminUsersError = '';
     try {
-      const [usersResp, settingResp, profilesResp] = await Promise.all([
-        fetch('/admin/users', { credentials: 'same-origin' }),
-        fetch('/admin/settings/ai.provider', { credentials: 'same-origin' }).catch(() => null),
-        fetch('/admin/ai-profiles', { credentials: 'same-origin' }).catch(() => null),
+      const [data, s, p] = await Promise.all([
+        fetchJson('/admin/users'),
+        fetchJson('/admin/settings/ai.provider').catch(() => null),
+        fetchJson('/admin/ai-profiles').catch(() => null),
       ]);
-      if (!usersResp.ok) {
-        const j = await usersResp.json().catch(() => ({}));
-        throw new Error(j.error_code || `HTTP ${usersResp.status}`);
-      }
-      const data = await usersResp.json();
       this.adminUsersList = data.users || [];
       if (data.auth_method) this.adminUsersAuthMethod = data.auth_method;
-      if (settingResp && settingResp.ok) {
-        const s = await settingResp.json().catch(() => null);
-        const v = s?.setting?.value;
-        if (typeof v === 'string') this.adminUsersGlobalProvider = v;
-      }
+      const v = s?.setting?.value;
+      if (typeof v === 'string') this.adminUsersGlobalProvider = v;
       // Zuweisbare KI-Profile fuer die Combobox je Zeile. Faellt der Call aus,
       // bleibt die Liste leer — die Zeile zeigt dann nur „Global: <provider>",
       // und eine bestehende Zuweisung bleibt unangetastet.
-      if (profilesResp && profilesResp.ok) {
-        const p = await profilesResp.json().catch(() => null);
-        this.adminUsersProfiles = Array.isArray(p?.profiles) ? p.profiles : [];
-      }
+      if (p) this.adminUsersProfiles = Array.isArray(p.profiles) ? p.profiles : [];
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     } finally {
       this.adminUsersLoading = false;
     }
@@ -46,14 +38,7 @@ export const adminUsersMethods = {
     this.adminUsersError = '';
     this.adminUsersInviteResult = null;
     try {
-      const r = await fetch('/admin/users/invite', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ email, role: this.adminUsersInviteRole || 'user' }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      const j = await sendJson('/admin/users/invite', 'POST', { email, role: this.adminUsersInviteRole || 'user' });
       const url = j.inviteUrl
         ? (j.inviteUrl.startsWith('http') ? j.inviteUrl : `${location.origin}${j.inviteUrl}`)
         : `${location.origin}/invite/${j.invite.invite_token}`;
@@ -66,7 +51,7 @@ export const adminUsersMethods = {
       this.adminUsersInviteEmail = '';
       if (this.adminUsersTab === 'invites') await this.adminUsersInvitesLoad();
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     } finally {
       this.adminUsersInviting = false;
     }
@@ -83,19 +68,15 @@ export const adminUsersMethods = {
     this.adminUsersPasswordResult = null;
   },
 
-  async _adminUsersPasswordCall(email, path, opts) {
+  async _adminUsersPasswordCall(email, path, method, body) {
     this.adminUsersPasswordBusy = email;
     this.adminUsersError = '';
     try {
-      const r = await fetch(`/admin/users/${encodeURIComponent(email)}${path}`, {
-        credentials: 'same-origin', ...opts,
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      const j = await sendJson(`/admin/users/${encodeURIComponent(email)}${path}`, method, body);
       await this.adminUsersLoad();
-      return j;
+      return j || {};
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
       return null;
     } finally {
       this.adminUsersPasswordBusy = null;
@@ -106,11 +87,7 @@ export const adminUsersMethods = {
     const email = this.adminUsersPasswordEmail;
     const password = this.adminUsersPasswordValue;
     if (!email || !password) return;
-    const j = await this._adminUsersPasswordCall(email, '/password', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
+    const j = await this._adminUsersPasswordCall(email, '/password', 'POST', { password });
     if (!j) return;
     this.adminUsersPasswordEmail = null;
     this.adminUsersPasswordValue = '';
@@ -118,7 +95,7 @@ export const adminUsersMethods = {
   },
 
   async adminUsersPasswordLink(u) {
-    const j = await this._adminUsersPasswordCall(u.email, '/password-link', { method: 'POST' });
+    const j = await this._adminUsersPasswordCall(u.email, '/password-link', 'POST');
     if (!j) return;
     const url = j.url && !j.url.startsWith('http') ? `${location.origin}${j.url}` : j.url;
     this.adminUsersPasswordResult = { email: u.email, url, expiresAt: j.expiresAt, mail: j.mail || null };
@@ -126,7 +103,7 @@ export const adminUsersMethods = {
 
   async adminUsersPasswordRemove(u) {
     if (!window.confirm(window.__app.t('admin.users.password.removeConfirm', { email: u.email }))) return;
-    await this._adminUsersPasswordCall(u.email, '/password', { method: 'DELETE' });
+    await this._adminUsersPasswordCall(u.email, '/password', 'DELETE');
   },
 
   async adminUsersInvitesLoad() {
@@ -134,15 +111,10 @@ export const adminUsersMethods = {
     this.adminUsersInvitesLoading = true;
     this.adminUsersError = '';
     try {
-      const r = await fetch('/admin/users/invites', { credentials: 'same-origin' });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error_code || `HTTP ${r.status}`);
-      }
-      const j = await r.json();
+      const j = await fetchJson('/admin/users/invites');
       this.adminUsersInvitesList = j.invites || [];
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     } finally {
       this.adminUsersInvitesLoading = false;
     }
@@ -154,22 +126,20 @@ export const adminUsersMethods = {
     this.adminUsersError = '';
     this.adminUsersInvitesResult = null;
     try {
-      const r = await fetch(`/admin/users/invites/${inv.id}/remind`, {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      const j = await r.json();
-      if (!r.ok) {
-        if (j.error_code === 'REMINDER_COOLDOWN') {
-          this.adminUsersInvitesResult = { id: inv.id, cooldown: true, retryAfter: j.retryAfter };
+      let j;
+      try {
+        j = await sendJson(`/admin/users/invites/${inv.id}/remind`, 'POST');
+      } catch (e) {
+        if (e.code === 'REMINDER_COOLDOWN') {
+          this.adminUsersInvitesResult = { id: inv.id, cooldown: true, retryAfter: e.body?.retryAfter };
           return;
         }
-        throw new Error(j.error_code || `HTTP ${r.status}`);
+        throw e;
       }
       this.adminUsersInvitesResult = { id: inv.id, mail: j.mail };
       await this.adminUsersInvitesLoad();
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     } finally {
       this.adminUsersInvitesBusy = null;
     }
@@ -183,17 +153,10 @@ export const adminUsersMethods = {
     this.adminUsersInvitesBusy = inv.id;
     this.adminUsersError = '';
     try {
-      const r = await fetch(`/admin/users/invites/${inv.id}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error_code || `HTTP ${r.status}`);
-      }
+      await sendJson(`/admin/users/invites/${inv.id}`, 'DELETE');
       await this.adminUsersInvitesLoad();
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     } finally {
       this.adminUsersInvitesBusy = null;
     }
@@ -202,18 +165,11 @@ export const adminUsersMethods = {
   async adminUsersUpdate(user, patch) {
     this.adminUsersError = '';
     try {
-      const r = await fetch(`/admin/users/${encodeURIComponent(user.email)}`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(patch),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      const j = await sendJson(`/admin/users/${encodeURIComponent(user.email)}`, 'PUT', patch);
       const idx = this.adminUsersList.findIndex(u => u.email === user.email);
       if (idx >= 0) this.adminUsersList.splice(idx, 1, j.user);
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     }
   },
 
@@ -223,17 +179,10 @@ export const adminUsersMethods = {
     if (!confirm(window.__app?.t?.('admin.users.confirmDelete', { email: user.email }) || `Soft-Delete ${user.email}?`)) return;
     this.adminUsersError = '';
     try {
-      const r = await fetch(`/admin/users/${encodeURIComponent(user.email)}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error_code || `HTTP ${r.status}`);
-      }
+      await sendJson(`/admin/users/${encodeURIComponent(user.email)}`, 'DELETE');
       await this.adminUsersLoad();
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     }
   },
 
@@ -246,14 +195,10 @@ export const adminUsersMethods = {
     this.adminUsersAuditEmail = user.email;
     this.adminUsersAuditEvents = [];
     try {
-      const r = await fetch(`/admin/users/${encodeURIComponent(user.email)}/audit?limit=50`, {
-        credentials: 'same-origin',
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
+      const j = await fetchJson(`/admin/users/${encodeURIComponent(user.email)}/audit?limit=50`);
       this.adminUsersAuditEvents = j.events || [];
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     }
   },
 
@@ -265,17 +210,10 @@ export const adminUsersMethods = {
     this.adminUsersError = '';
     try {
       const status = this.adminUsersRequestsStatus || 'pending';
-      const r = await fetch(`/admin/registration-requests?status=${encodeURIComponent(status)}`, {
-        credentials: 'same-origin',
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error_code || `HTTP ${r.status}`);
-      }
-      const data = await r.json();
+      const data = await fetchJson(`/admin/registration-requests?status=${encodeURIComponent(status)}`);
       this.adminUsersRequestsList = data.items || [];
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     } finally {
       this.adminUsersRequestsLoading = false;
     }
@@ -287,19 +225,12 @@ export const adminUsersMethods = {
     this.adminUsersError = '';
     this.adminUsersRequestsResult = null;
     try {
-      const r = await fetch(`/admin/registration-requests/${req.id}/approve`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ role }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      const j = await sendJson(`/admin/registration-requests/${req.id}/approve`, 'POST', { role });
       this.adminUsersRequestsResult = { id: req.id, inviteUrl: j.inviteUrl, mail: j.mail };
       await this.adminUsersRequestsLoad();
       await this.adminUsersLoad();
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     } finally {
       this.adminUsersRequestsBusy = null;
     }
@@ -315,17 +246,10 @@ export const adminUsersMethods = {
     this.adminUsersRequestsBusy = req.id;
     this.adminUsersError = '';
     try {
-      const r = await fetch(`/admin/registration-requests/${req.id}/deny`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ reason }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      await sendJson(`/admin/registration-requests/${req.id}/deny`, 'POST', { reason });
       await this.adminUsersRequestsLoad();
     } catch (e) {
-      this.adminUsersError = e.message;
+      this.adminUsersError = tFetchErrorRaw(e);
     } finally {
       this.adminUsersRequestsBusy = null;
     }

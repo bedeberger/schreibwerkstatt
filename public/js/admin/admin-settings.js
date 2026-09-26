@@ -1,7 +1,8 @@
 // AdminSettingsCard-Methods.
 
 import { formatNum } from '../num-input.js';
-import { localeTag } from '../utils.js';
+import { localeTag, fetchJson, sendJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
 
 export const adminSettingsMethods = {
   async adminSettingsLoad() {
@@ -9,9 +10,7 @@ export const adminSettingsMethods = {
     this.adminSettingsLoading = true;
     this.adminSettingsError = '';
     try {
-      const r = await fetch('/admin/settings', { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await fetchJson('/admin/settings');
       const map = {};
       for (const s of data.settings) {
         map[s.key] = s;
@@ -25,7 +24,7 @@ export const adminSettingsMethods = {
         this.adminSettingsProviderSubtab = cur;
       }
     } catch (e) {
-      this.adminSettingsError = e.message;
+      this.adminSettingsError = tFetchErrorRaw(e);
     } finally {
       this.adminSettingsLoading = false;
     }
@@ -77,15 +76,10 @@ export const adminSettingsMethods = {
     }
     try {
       for (const d of dirty) {
-        const r = await fetch(`/admin/settings/${encodeURIComponent(d.key)}`, {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ value: d.value }),
-        });
-        if (!r.ok) {
-          const j = await r.json().catch(() => ({}));
-          throw new Error(`${d.key}: ${j.error_code || r.status}`);
+        try {
+          await sendJson(`/admin/settings/${encodeURIComponent(d.key)}`, 'PUT', { value: d.value });
+        } catch (e) {
+          throw new Error(`${d.key}: ${e.code ? tFetchErrorRaw(e) : (e.status || e.message)}`);
         }
       }
       this.adminSettingsSavedCount = dirty.length;
@@ -115,6 +109,8 @@ export const adminSettingsMethods = {
     if (!path) return;
     this.adminSettingsTestResult = { kind, running: true };
     try {
+      // Bewusst roher fetch: die Test-Endpunkte liefern ihr Ergebnis
+      // ({ ok, error, … }) auch mit Fehler-Status als Body — der wird angezeigt.
       const r = await fetch(path, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -145,13 +141,11 @@ export const adminSettingsMethods = {
     this.adminApiTokensLoading = true;
     this.adminApiTokensError = '';
     try {
-      const r = await fetch('/admin/api-tokens', { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await fetchJson('/admin/api-tokens');
       this.adminApiTokensList = Array.isArray(data.tokens) ? data.tokens : [];
       this.adminApiTokensLoaded = true;
     } catch (e) {
-      this.adminApiTokensError = e.message;
+      this.adminApiTokensError = tFetchErrorRaw(e);
     } finally {
       this.adminApiTokensLoading = false;
     }
@@ -168,20 +162,13 @@ export const adminSettingsMethods = {
     try {
       const body = { display_name: name };
       if (this.adminApiTokensNewExpiresAt) body.expires_at = this.adminApiTokensNewExpiresAt;
-      const r = await fetch('/admin/api-tokens', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(body),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error_code || `HTTP ${r.status}`);
+      const j = await sendJson('/admin/api-tokens', 'POST', body);
       this.adminApiTokensJustCreated = j;
       this.adminApiTokensNewName = '';
       this.adminApiTokensNewExpiresAt = '';
       await this.adminApiTokensLoad();
     } catch (e) {
-      this.adminApiTokensError = e.message;
+      this.adminApiTokensError = tFetchErrorRaw(e);
     } finally {
       this.adminApiTokensCreating = false;
     }
@@ -190,32 +177,20 @@ export const adminSettingsMethods = {
   async adminApiTokensRevoke(id) {
     if (!confirm(window.__app.t('admin.settings.api.confirmRevoke'))) return;
     try {
-      const r = await fetch(`/admin/api-tokens/${id}/revoke`, {
-        method: 'POST', credentials: 'same-origin',
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error_code || `HTTP ${r.status}`);
-      }
+      await sendJson(`/admin/api-tokens/${id}/revoke`, 'POST');
       await this.adminApiTokensLoad();
     } catch (e) {
-      this.adminApiTokensError = e.message;
+      this.adminApiTokensError = tFetchErrorRaw(e);
     }
   },
 
   async adminApiTokensDelete(id) {
     if (!confirm(window.__app.t('admin.settings.api.confirmDelete'))) return;
     try {
-      const r = await fetch(`/admin/api-tokens/${id}`, {
-        method: 'DELETE', credentials: 'same-origin',
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error_code || `HTTP ${r.status}`);
-      }
+      await sendJson(`/admin/api-tokens/${id}`, 'DELETE');
       await this.adminApiTokensLoad();
     } catch (e) {
-      this.adminApiTokensError = e.message;
+      this.adminApiTokensError = tFetchErrorRaw(e);
     }
   },
 

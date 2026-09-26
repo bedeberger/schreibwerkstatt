@@ -1,7 +1,8 @@
 // AdminJsErrorsCard-Methods. Wird im adminJsErrorsCard-Alpine-Scope gespreaded.
 // Root-Zugriffe via window.__app. Liest aus /admin/js-errors/list + DELETE.
 
-import { tzOpts, localeTag } from '../utils.js';
+import { tzOpts, localeTag, fetchJson, sendJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
 
 export const adminJsErrorsMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -18,13 +19,11 @@ export const adminJsErrorsMethods = {
     this.jsErrorsLoading = true;
     this.jsErrorsError = '';
     try {
-      const r = await fetch('/admin/js-errors/list', { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await fetchJson('/admin/js-errors/list');
       this.jsErrorsList = data.errors || [];
       this.jsErrorsExpanded = {};
     } catch (e) {
-      this.jsErrorsError = e.message;
+      this.jsErrorsError = tFetchErrorRaw(e);
     } finally {
       this.jsErrorsLoading = false;
     }
@@ -48,13 +47,10 @@ export const adminJsErrorsMethods = {
     });
     if (!ok) return;
     try {
-      const r = await fetch('/admin/js-errors/' + encodeURIComponent(id), {
-        method: 'DELETE', credentials: 'same-origin',
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await sendJson('/admin/js-errors/' + encodeURIComponent(id), 'DELETE');
       await this._jsErrorsLoad();
     } catch (e) {
-      this.jsErrorsError = e.message;
+      this.jsErrorsError = tFetchErrorRaw(e);
     }
   },
 
@@ -66,11 +62,10 @@ export const adminJsErrorsMethods = {
     });
     if (!ok) return;
     try {
-      const r = await fetch('/admin/js-errors', { method: 'DELETE', credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await sendJson('/admin/js-errors', 'DELETE');
       await this._jsErrorsLoad();
     } catch (e) {
-      this.jsErrorsError = e.message;
+      this.jsErrorsError = tFetchErrorRaw(e);
     }
   },
 

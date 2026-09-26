@@ -2,7 +2,8 @@
 // gespreaded. Root-Zugriffe via window.__app. Liest aus
 // /admin/parse-fails/{files,file} + DELETE.
 
-import { tzOpts, localeTag } from '../utils.js';
+import { tzOpts, localeTag, fetchJson, sendJson } from '../utils.js';
+import { tFetchErrorRaw } from '../i18n.js';
 
 export const adminParseFailsMethods = {
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -19,14 +20,12 @@ export const adminParseFailsMethods = {
     this.parseFailsLoading = true;
     this.parseFailsError = '';
     try {
-      const r = await fetch('/admin/parse-fails/files', { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await fetchJson('/admin/parse-fails/files');
       this.parseFailsFiles = data.files || [];
       this.parseFailsContent = {};
       this.parseFailsExpanded = {};
     } catch (e) {
-      this.parseFailsError = e.message;
+      this.parseFailsError = tFetchErrorRaw(e);
     } finally {
       this.parseFailsLoading = false;
     }
@@ -45,15 +44,13 @@ export const adminParseFailsMethods = {
     }
     if (this.parseFailsContent[name] === undefined) {
       try {
-        const r = await fetch('/admin/parse-fails/file?name=' + encodeURIComponent(name), { credentials: 'same-origin' });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = await r.json();
+        const data = await fetchJson('/admin/parse-fails/file?name=' + encodeURIComponent(name));
         const txt = data.truncated
           ? data.content + '\n\n[…' + window.__app.t('admin.parseFails.truncated') + ']'
           : data.content;
         this.parseFailsContent = { ...this.parseFailsContent, [name]: txt };
       } catch (e) {
-        this.parseFailsError = e.message;
+        this.parseFailsError = tFetchErrorRaw(e);
         return;
       }
     }
@@ -69,13 +66,10 @@ export const adminParseFailsMethods = {
     });
     if (!ok) return;
     try {
-      const r = await fetch('/admin/parse-fails/file?name=' + encodeURIComponent(name), {
-        method: 'DELETE', credentials: 'same-origin',
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await sendJson('/admin/parse-fails/file?name=' + encodeURIComponent(name), 'DELETE');
       await this._parseFailsLoadFiles();
     } catch (e) {
-      this.parseFailsError = e.message;
+      this.parseFailsError = tFetchErrorRaw(e);
     }
   },
 
@@ -87,11 +81,10 @@ export const adminParseFailsMethods = {
     });
     if (!ok) return;
     try {
-      const r = await fetch('/admin/parse-fails', { method: 'DELETE', credentials: 'same-origin' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      await sendJson('/admin/parse-fails', 'DELETE');
       await this._parseFailsLoadFiles();
     } catch (e) {
-      this.parseFailsError = e.message;
+      this.parseFailsError = tFetchErrorRaw(e);
     }
   },
 
