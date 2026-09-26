@@ -1,7 +1,7 @@
 'use strict';
 // Revisions-Diff zwischen zwei page_revisions-Eintraegen (Default: letzte zwei).
 
-const { getPageWithChapterName } = require('../../../db/book-chat/revisions');
+const { getPageWithChapter } = require('../../../db/book-chat/text');
 const { htmlToPlainText } = require('../../../lib/html-text');
 const { diffWordsWithSpace } = require('diff');
 const pageRevisions = require('../../../db/page-revisions');
@@ -41,7 +41,7 @@ function tool_diff_page_revisions(input, ctx) {
   const pageId = input?.page_id;
   if (!Number.isInteger(pageId)) return { error: 'page_id fehlt' };
 
-  const pageRow = getPageWithChapterName(pageId);
+  const pageRow = getPageWithChapter(pageId);
   if (!pageRow || pageRow.book_id !== ctx.bookId) {
     return { error: 'Seite nicht im aktuellen Buch.' };
   }

@@ -20,6 +20,15 @@ const {
   _findFigure,
   resolveEntityTitle,
 } = require('./shared');
+const {
+  listPagesForPassageSearch,
+  getPageWithChapter,
+  getChapterInBook,
+  listChapterPages,
+  listPagesForDialogue,
+  listLocationChaptersWithNames,
+} = require('../../../db/book-chat/text');
+const { listFigureMentionsWithPages } = require('../../../db/book-chat/figures');
 
 // ── search_passages ───────────────────────────────────────────────────────────
 
@@ -72,26 +81,11 @@ async function tool_search_passages(input, ctx) {
     }
   }
 
-  const scopeFilters = ['book_id = ?'];
-  const scopeParams  = [ctx.bookId];
-  if (Number.isInteger(input.chapter_id)) {
-    scopeFilters.push('chapter_id = ?');
-    scopeParams.push(input.chapter_id);
-  }
-  if (Number.isInteger(input.page_id)) {
-    scopeFilters.push('page_id = ?');
-    scopeParams.push(input.page_id);
-  }
-  if (candidatePageIds) {
-    scopeFilters.push(`page_id IN (${candidatePageIds.map(() => '?').join(',')})`);
-    scopeParams.push(...candidatePageIds);
-  }
-
-  const pages = db.prepare(`
-    SELECT page_id, page_name, chapter_id, body_html
-    FROM pages
-    WHERE ${scopeFilters.join(' AND ')}
-  `).all(...scopeParams);
+  const pages = listPagesForPassageSearch(ctx.bookId, {
+    chapterId: Number.isInteger(input.chapter_id) ? input.chapter_id : null,
+    pageId:    Number.isInteger(input.page_id)    ? input.page_id    : null,
+    pageIds:   candidatePageIds,
+  });
 
   let orderedPages = pages;
   if (candidatePageIds) {
@@ -189,11 +183,7 @@ async function tool_get_pages(input, ctx) {
     try {
       const pd = await contentStore.loadPage(pageId);
       const text = htmlToText(pd.html || '');
-      const pageRow = db.prepare(`
-        SELECT p.page_name, c.chapter_name FROM pages p
-        LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-        WHERE p.page_id = ?
-      `).get(pageId);
+      const pageRow = getPageWithChapter(pageId);
       const latestCheck = _latestCheckForPage(pageId, ctx.userEmail);
       results.push({
         page_id: pageId,
@@ -220,16 +210,10 @@ async function tool_get_pages(input, ctx) {
 async function tool_get_chapter_text(input, ctx) {
   const chapterId = input?.chapter_id;
   if (!Number.isInteger(chapterId)) return { error: 'chapter_id fehlt' };
-  const chapter = db.prepare(
-    'SELECT chapter_id, chapter_name FROM chapters WHERE chapter_id = ? AND book_id = ?'
-  ).get(chapterId, ctx.bookId);
+  const chapter = getChapterInBook(chapterId, ctx.bookId);
   if (!chapter) return { error: 'Kapitel nicht im aktuellen Buch.' };
 
-  const pageRows = db.prepare(`
-    SELECT page_id, page_name FROM pages
-    WHERE chapter_id = ? AND book_id = ?
-    ORDER BY position, page_id
-  `).all(chapterId, ctx.bookId);
+  const pageRows = listChapterPages(chapterId, ctx.bookId);
   if (!pageRows.length) {
     return {
       chapter_id:   chapter.chapter_id,
@@ -291,12 +275,7 @@ async function tool_quote_passage(input, ctx) {
 
   const contextChars = Math.min(QUOTE_MAX_CONTEXT, Math.max(0, Number.isInteger(input?.context_chars) ? input.context_chars : QUOTE_DEFAULT_CONTEXT));
 
-  const pageRow = db.prepare(`
-    SELECT p.page_id, p.page_name, p.book_id, c.chapter_id, c.chapter_name
-    FROM pages p
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE p.page_id = ?
-  `).get(pageId);
+  const pageRow = getPageWithChapter(pageId);
   if (!pageRow || pageRow.book_id !== ctx.bookId) {
     return { error: 'Seite nicht im aktuellen Buch.' };
   }
@@ -343,12 +322,7 @@ async function tool_quote_match(input, ctx) {
   const contextChars = Math.min(QUOTE_MAX_CONTEXT, Math.max(0,
     Number.isInteger(input?.context_chars) ? input.context_chars : QUOTE_MATCH_DEFAULT_CONTEXT));
 
-  const pageRow = db.prepare(`
-    SELECT p.page_id, p.page_name, p.book_id, c.chapter_id, c.chapter_name
-    FROM pages p
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE p.page_id = ?
-  `).get(pageId);
+  const pageRow = getPageWithChapter(pageId);
   if (!pageRow || pageRow.book_id !== ctx.bookId) {
     return { error: 'Seite nicht im aktuellen Buch.' };
   }
@@ -430,15 +404,10 @@ function tool_get_dialogue(input, ctx) {
     figNames = _figureNamePatterns(figRow).map(n => n.toLowerCase());
   }
 
-  let sql = `SELECT p.page_id, p.page_name, p.chapter_id, p.body_html
-    FROM pages p
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE p.book_id = ? AND p.body_html IS NOT NULL`;
-  const params = [ctx.bookId];
-  if (Number.isInteger(input?.chapter_id)) { sql += ' AND p.chapter_id = ?'; params.push(input.chapter_id); }
-  if (Number.isInteger(input?.page_id))    { sql += ' AND p.page_id    = ?'; params.push(input.page_id); }
-  sql += ' ORDER BY c.position, p.position, p.page_id';
-  const pages = db.prepare(sql).all(...params);
+  const pages = listPagesForDialogue(ctx.bookId, {
+    chapterId: Number.isInteger(input?.chapter_id) ? input.chapter_id : null,
+    pageId:    Number.isInteger(input?.page_id)    ? input.page_id    : null,
+  });
   if (!pages.length) return { results: [], hint: 'Keine Seiten im Scope.' };
 
   const results = [];
@@ -499,14 +468,7 @@ function tool_find_first_last_mention(input, ctx) {
     if (!figRow) {
       return { error: 'Figur nicht gefunden', hint: 'Pruefe die Figurenliste im System-Prompt.' };
     }
-    const mentions = db.prepare(`
-      SELECT p.page_id, p.page_name, p.chapter_id, c.chapter_name, pfm.count, pfm.first_offset
-      FROM page_figure_mentions pfm
-      JOIN pages p      ON p.page_id = pfm.page_id
-      LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-      WHERE pfm.figure_id = ? AND p.book_id = ?
-      ORDER BY c.position, p.position, p.page_id
-    `).all(figRow.id, ctx.bookId);
+    const mentions = listFigureMentionsWithPages(figRow.id, ctx.bookId);
     if (!mentions.length) {
       return {
         fig_id: figRow.fig_id,
@@ -546,13 +508,7 @@ function tool_find_first_last_mention(input, ctx) {
   if (!locRow) {
     return { error: 'Ort nicht gefunden', hint: 'Pruefe loc_id via list_locations.' };
   }
-  const chRows = db.prepare(`
-    SELECT lc.chapter_id, c.chapter_name, lc.haeufigkeit
-    FROM location_chapters lc
-    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
-    WHERE lc.location_id = ?
-    ORDER BY c.position
-  `).all(locRow.id);
+  const chRows = listLocationChaptersWithNames(locRow.id);
   if (!chRows.length) {
     return {
       loc_id: locRow.loc_id,

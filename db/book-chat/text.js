@@ -1,0 +1,105 @@
+'use strict';
+// Seiten-/Kapitel-Abfragen der textfokussierten Buch-Chat-Tools
+// (routes/jobs/book-chat-tools/tools-text.js): Scope-Listen für Passagen- und
+// Dialogsuche, Seiten-/Kapitel-Kopfdaten, Orts-Erwähnungen je Kapitel. Den
+// Seitentext selbst lädt das Tool über die Content-Store-Facade; Handler fassen
+// `pages`/`chapters`/`books` nie selbst an (CLAUDE.md „Content-Store-Facade als
+// einziger Eintrittspunkt"). Optionale Filter werden hier ans SQL gehängt.
+
+const { db } = require('../connection');
+require('../migrations');
+
+/** Seiten mit body_html für search_passages. Filter optional: `chapterId`,
+ *  `pageId`, `pageIds` (FTS-Kandidaten); null = kein Filter. Ohne ORDER BY —
+ *  der Aufrufer sortiert nach FTS-Rang. */
+function listPagesForPassageSearch(bookId, { chapterId = null, pageId = null, pageIds = null } = {}) {
+  const scopeFilters = ['book_id = ?'];
+  const scopeParams  = [bookId];
+  if (chapterId !== null) {
+    scopeFilters.push('chapter_id = ?');
+    scopeParams.push(chapterId);
+  }
+  if (pageId !== null) {
+    scopeFilters.push('page_id = ?');
+    scopeParams.push(pageId);
+  }
+  if (pageIds) {
+    scopeFilters.push(`page_id IN (${pageIds.map(() => '?').join(',')})`);
+    scopeParams.push(...pageIds);
+  }
+  return db.prepare(`
+    SELECT page_id, page_name, chapter_id, body_html
+    FROM pages
+    WHERE ${scopeFilters.join(' AND ')}
+  `).all(...scopeParams);
+}
+
+const _stmtPageWithChapter = db.prepare(`
+    SELECT p.page_id, p.page_name, p.book_id, c.chapter_id, c.chapter_name
+    FROM pages p
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE p.page_id = ?
+  `);
+
+/** `{ page_id, page_name, book_id, chapter_id, chapter_name }` einer Seite oder
+ *  undefined. chapter_* sind NULL, wenn das Kapitel fehlt oder in einem anderen
+ *  Buch liegt. */
+function getPageWithChapter(pageId) {
+  return _stmtPageWithChapter.get(pageId);
+}
+
+const _stmtChapterInBook = db.prepare(
+  'SELECT chapter_id, chapter_name FROM chapters WHERE chapter_id = ? AND book_id = ?'
+);
+
+/** `{ chapter_id, chapter_name }` oder undefined, wenn das Kapitel nicht im Buch liegt. */
+function getChapterInBook(chapterId, bookId) {
+  return _stmtChapterInBook.get(chapterId, bookId);
+}
+
+const _stmtChapterPages = db.prepare(`
+    SELECT page_id, page_name FROM pages
+    WHERE chapter_id = ? AND book_id = ?
+    ORDER BY position, page_id
+  `);
+
+/** Seiten eines Kapitels in Leserichtung (nur ID + Name). */
+function listChapterPages(chapterId, bookId) {
+  return _stmtChapterPages.all(chapterId, bookId);
+}
+
+/** Seiten mit body_html für get_dialogue in Leserichtung, optional auf
+ *  `chapterId` und/oder `pageId` begrenzt. */
+function listPagesForDialogue(bookId, { chapterId = null, pageId = null } = {}) {
+  let sql = `SELECT p.page_id, p.page_name, p.chapter_id, p.body_html
+    FROM pages p
+    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
+    WHERE p.book_id = ? AND p.body_html IS NOT NULL`;
+  const params = [bookId];
+  if (chapterId !== null) { sql += ' AND p.chapter_id = ?'; params.push(chapterId); }
+  if (pageId !== null)    { sql += ' AND p.page_id    = ?'; params.push(pageId); }
+  sql += ' ORDER BY c.position, p.position, p.page_id';
+  return db.prepare(sql).all(...params);
+}
+
+const _stmtLocationChapters = db.prepare(`
+    SELECT lc.chapter_id, c.chapter_name, lc.haeufigkeit
+    FROM location_chapters lc
+    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
+    WHERE lc.location_id = ?
+    ORDER BY c.position
+  `);
+
+/** Kapitel-Erwähnungen eines Orts mit Kapitelname, in Leserichtung. */
+function listLocationChaptersWithNames(locationId) {
+  return _stmtLocationChapters.all(locationId);
+}
+
+module.exports = {
+  listPagesForPassageSearch,
+  getPageWithChapter,
+  getChapterInBook,
+  listChapterPages,
+  listPagesForDialogue,
+  listLocationChaptersWithNames,
+};
