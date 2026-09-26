@@ -29,15 +29,60 @@ if (IS_FRESH_INSTALL) {
 // mit geteiltem DB_PATH). Ohne Lock racen mehrere Worker auf ALTER TABLE und
 // laufen in "duplicate column"-Fehler, weil Pragma-Reads vor dem Write
 // stattfinden. Lock haelt nur den Migrations-Scope, kein Runtime-Block.
+//
+// Der Lock traegt `{ pid, startedAt }`. Ein Prozess, der mitten in der Migration
+// abstuerzt (kill -9, OOM), hinterlaesst die Datei — ohne Besitzer-Pruefung
+// blockierte sie jeden folgenden Boot bis zum Timeout. Darum: gehoert der Lock
+// einem Prozess, den es nicht mehr gibt (`process.kill(pid, 0)` → ESRCH), wird
+// er uebernommen. Ein Lock ohne lesbaren Inhalt (Schreiber gerade zwischen open
+// und write) gilt erst nach STALE_UNREADABLE_MS als verwaist.
+const MIGRATION_LOCK_TIMEOUT_MS = 30000;
+const STALE_UNREADABLE_MS = 10000;
+
+function _pidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return true; }
+  catch (e) { return e.code === 'EPERM'; } // EPERM: existiert, gehoert nur jemand anderem
+}
+
+/** true, wenn der Lock verwaist ist und uebernommen werden darf. */
+function _isStaleLock(lockPath) {
+  let raw, stat;
+  try { raw = fs.readFileSync(lockPath, 'utf8'); stat = fs.statSync(lockPath); }
+  catch (e) { return e.code === 'ENOENT' ? null : false; } // null = schon weg → neu versuchen
+  let info = null;
+  try { info = JSON.parse(raw); } catch { /* unvollstaendig geschrieben */ }
+  if (!info || !Number.isInteger(info.pid)) {
+    return Date.now() - stat.mtimeMs > STALE_UNREADABLE_MS ? raw : false;
+  }
+  return _pidAlive(info.pid) ? false : raw;
+}
+
 function _withMigrationLock(fn) {
   const lockPath = `${DB_FILE}.migration-lock`;
   const start = Date.now();
   let fd;
   while (true) {
-    try { fd = fs.openSync(lockPath, 'wx'); break; }
-    catch (e) {
+    try {
+      fd = fs.openSync(lockPath, 'wx');
+      fs.writeSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+      break;
+    } catch (e) {
       if (e.code !== 'EEXIST') throw e;
-      if (Date.now() - start > 30000) throw new Error(`Migration lock timeout: ${lockPath}`);
+      const stale = _isStaleLock(lockPath);
+      if (stale === null) continue;
+      if (stale !== false) {
+        // Nur entfernen, wenn noch derselbe verwaiste Inhalt drinsteht — sonst hat
+        // ein zweiter Prozess den Lock in der Zwischenzeit schon neu belegt.
+        try {
+          if (fs.readFileSync(lockPath, 'utf8') === stale) {
+            fs.unlinkSync(lockPath);
+            logger.warn(`Migration-Lock verwaist (${stale.slice(0, 120) || 'leer'}) – übernommen.`);
+          }
+        } catch { /* weg oder neu belegt → nächste Runde */ }
+        continue;
+      }
+      if (Date.now() - start > MIGRATION_LOCK_TIMEOUT_MS) throw new Error(`Migration lock timeout: ${lockPath}`);
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
     }
   }
@@ -11876,4 +11921,4 @@ function _runMigrationsLocked() {
 }
 runMigrations();
 
-module.exports = { runMigrations };
+module.exports = { runMigrations, _withMigrationLock, _isStaleLock };
