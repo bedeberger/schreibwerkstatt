@@ -217,10 +217,6 @@ document.addEventListener('alpine:init', () => {
       return localeTag(this.$store.shell.uiLocale);
     },
 
-    get selectedBookUrl() {
-      return null;
-    },
-
     get filteredTree() {
       const tree = this.$store.nav.tree;
       if (!this.pageSearch) {
