@@ -45,6 +45,7 @@ function startServer() {
     const jobs = express.Router();
     jobs.use(require('../../routes/jobs/lektorat').lektoratRouter);
     jobs.use(require('../../routes/jobs/chat').chatRouter);
+    jobs.use(require('../../routes/jobs/rueckblick').rueckblickRouter);
     app.use('/jobs', jobs);
     app.use('/chat', require('../../routes/chat'));
     app.use('/usage', require('../../routes/usage'));
@@ -302,4 +303,25 @@ test('DELETE /share/api/comments/:id: nur der Link-Owner', async () => {
   sessionUser = ME;
   assert.equal((await api('DELETE', `/share/api/comments/${id}`)).status, 200);
   assert.ok(!commentExists(id));
+});
+
+// ── startBookJob (routes/jobs/shared/start-job.js) ─────────────────────────
+
+test('startBookJob: 400 ohne book_id, 403 fremdes Buch, sonst Job mit String-Dedup-ID', async () => {
+  const bad = await api('POST', '/jobs/rueckblick', { zeitraum: '2026' });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.json.error_code, 'BOOK_ID_REQUIRED');
+
+  const before = ctx.shared.jobs.size;
+  const foreign = await api('POST', '/jobs/rueckblick', { book_id: FOREIGN_BOOK, zeitraum: '2026' });
+  assert.equal(foreign.status, 403);
+  assert.equal(ctx.shared.jobs.size, before);
+
+  const ok = await api('POST', '/jobs/rueckblick', { book_id: MY_BOOK, zeitraum: '2026' });
+  assert.equal(ok.status, 200);
+  const job = ctx.shared.jobs.get(ok.json.jobId);
+  assert.equal(job.type, 'rueckblick');
+  assert.equal(job.bookId, String(MY_BOOK));
+  assert.equal(job.dedupId, `${MY_BOOK}:2026`);
+  await waitForJob(ctx.shared, ok.json.jobId);
 });

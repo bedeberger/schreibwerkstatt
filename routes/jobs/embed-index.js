@@ -18,13 +18,12 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
   loadOrderedBookContents, loadPageContents,
+  startBookJob,
 } = require('./shared');
 const embed = require('../../lib/embed');
 const { chunkText, contentHash } = require('../../lib/embed-chunk');
 const semanticChunks = require('../../db/semantic-chunks');
 const contentStore = require('../../lib/content-store');
-const { toIntId } = require('../../lib/validate');
-const { guardBook, sessionEmail } = require('../../lib/acl');
 const logger = require('../../logger');
 
 const embedIndexRouter = express.Router();
@@ -209,17 +208,12 @@ async function reindexAllBooks() {
   return { enqueued, skipped };
 }
 
-embedIndexRouter.post('/embed-index', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  if (!guardBook(req, res, book_id, 'lektor')) return;
-  if (!embed.isEnabled()) return res.status(400).json({ error_code: 'EMBED_DISABLED' });
-  const userEmail = sessionEmail(req);
-  const existing = findActiveJobId('embed-index', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const jobId = createJob('embed-index', book_id, userEmail, 'job.label.embedIndex', null, book_id);
-  enqueueJob(jobId, () => runEmbedIndexJob(jobId, book_id, userEmail));
-  res.json({ jobId });
-});
+embedIndexRouter.post('/embed-index', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'embed-index',
+  minRole: 'lektor',
+  label: 'job.label.embedIndex',
+  precheck: () => (embed.isEnabled() ? null : 'EMBED_DISABLED'),
+  run: (jobId, { bookId, userEmail }) => runEmbedIndexJob(jobId, bookId, userEmail),
+}));
 
 module.exports = { embedIndexRouter, runEmbedIndexJob, reindexAllBooks, enqueueEmbedIndexJob };

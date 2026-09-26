@@ -14,14 +14,13 @@ const express = require('express');
 const {
   makeJobLogger, updateJob, completeJob, failJob,
   createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+  startBookJob,
 } = require('./shared');
 const plotDb = require('../../db/plot');
 const appSettings = require('../../lib/app-settings');
 const embed = require('../../lib/embed');
 const { semanticQuery } = require('../../lib/semantic-retrieval');
 const searchIndex = require('../../lib/search');
-const { toIntId } = require('../../lib/validate');
-const { guardBook, sessionEmail } = require('../../lib/acl');
 const logger = require('../../logger');
 
 const beatAnchorRouter = express.Router();
@@ -145,16 +144,11 @@ async function anchorAllBooks() {
   return { enqueued, skipped };
 }
 
-beatAnchorRouter.post('/beat-anchor', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  if (!guardBook(req, res, book_id, 'editor')) return;
-  const userEmail = sessionEmail(req);
-  const existing = findActiveJobId('beat-anchor', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const jobId = createJob('beat-anchor', book_id, userEmail, 'job.label.beatAnchor', null, book_id);
-  enqueueJob(jobId, () => runBeatAnchorJob(jobId, book_id, userEmail));
-  res.json({ jobId });
-});
+beatAnchorRouter.post('/beat-anchor', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'beat-anchor',
+  minRole: 'editor',
+  label: 'job.label.beatAnchor',
+  run: (jobId, { bookId, userEmail }) => runBeatAnchorJob(jobId, bookId, userEmail),
+}));
 
 module.exports = { beatAnchorRouter, runBeatAnchorJob, anchorAllBooks };

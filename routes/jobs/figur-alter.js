@@ -23,11 +23,11 @@
 const express = require('express');
 const crypto = require('crypto');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
-  createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, jsonBody, jobAbortControllers,
   aiCall, getPrompts, getBookPrompts,
   loadOrderedBookContents, loadPageContents,
   chunkLimitsFor, tps, _modelName,
+  startBookJob,
 } = require('./shared');
 const { resolveProvider } = require('../../lib/ai');
 const { db } = require('../../db/connection');
@@ -41,8 +41,6 @@ const {
 } = require('../../lib/figure-age');
 const embed = require('../../lib/embed');
 const { semanticQuery } = require('../../lib/semantic-retrieval');
-const { toIntId } = require('../../lib/validate');
-const { guardBook, sessionEmail } = require('../../lib/acl');
 
 // Deckel pro Figur. Mehr Stellen heisst nicht mehr Erkenntnis: das Alter einer
 // Figur haengt an einer Handvoll Saetzen, und die Auswahl verteilt sich bewusst
@@ -367,20 +365,10 @@ async function runFigurAlterJob(jobId, bookId, userEmail, { force = false } = {}
 
 const figurAlterRouter = express.Router();
 
-figurAlterRouter.post('/figur-alter', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  // 'editor': das Ergebnis ist ein Analyse-Index am Buch, kein Lesevorgang.
-  if (!guardBook(req, res, book_id, 'editor')) return;
-  const userEmail = sessionEmail(req);
-
-  const existing = findActiveJobId('figur-alter', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-
-  const force = req.body?.force !== false;
-  const jobId = createJob('figur-alter', book_id, userEmail, 'job.label.figurAlter', null, book_id);
-  enqueueJob(jobId, () => runFigurAlterJob(jobId, book_id, userEmail, { force }));
-  res.json({ jobId });
-});
+// 'editor': das Ergebnis ist ein Analyse-Index am Buch, kein Lesevorgang.
+figurAlterRouter.post('/figur-alter', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'figur-alter', minRole: 'editor', label: 'job.label.figurAlter',
+  run: (jobId, { bookId, userEmail }) => runFigurAlterJob(jobId, bookId, userEmail, { force: req.body?.force !== false }),
+}));
 
 module.exports = { figurAlterRouter, runFigurAlterJob };

@@ -44,6 +44,7 @@ module.exports = {
 
   makeJobLogger: jobsMod.makeJobLogger,
   enqueueJob: queue.enqueueJob,
+  startBookJob: require('./start-job').startBookJob,
   createJob: jobsMod.createJob,
   updateJob: jobsMod.updateJob,
   tps: jobsMod.tps,

@@ -16,6 +16,7 @@ const express = require('express');
 const {
   makeJobLogger, updateJob, completeJob, failJob,
   createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+  startBookJob,
 } = require('./shared');
 const draftDb = require('../../db/draft-figures');
 const occDb = require('../../db/draft-figure-occurrences');
@@ -23,8 +24,6 @@ const { extractPsychologie, PSYCHE_KERNE } = require('../../lib/draft-mindmap-ex
 const appSettings = require('../../lib/app-settings');
 const embed = require('../../lib/embed');
 const { semanticQuery } = require('../../lib/semantic-retrieval');
-const { toIntId } = require('../../lib/validate');
-const { guardBook, sessionEmail } = require('../../lib/acl');
 const logger = require('../../logger');
 
 const figurAnchorRouter = express.Router();
@@ -154,16 +153,11 @@ async function anchorAllDraftFigures() {
   return { enqueued, skipped };
 }
 
-figurAnchorRouter.post('/figur-anchor', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  if (!guardBook(req, res, book_id, 'editor')) return;
-  const userEmail = sessionEmail(req);
-  const existing = findActiveJobId('figur-anchor', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const jobId = createJob('figur-anchor', book_id, userEmail, 'job.label.figurAnchor', null, book_id);
-  enqueueJob(jobId, () => runFigurAnchorJob(jobId, book_id, userEmail));
-  res.json({ jobId });
-});
+figurAnchorRouter.post('/figur-anchor', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'figur-anchor',
+  minRole: 'editor',
+  label: 'job.label.figurAnchor',
+  run: (jobId, { bookId, userEmail }) => runFigurAnchorJob(jobId, bookId, userEmail),
+}));
 
 module.exports = { figurAnchorRouter, runFigurAnchorJob, anchorAllDraftFigures };
