@@ -3,38 +3,28 @@
 // Ideen, Buch-Settings, Revisionen). Reines DB-Aggregat, kein BookStack-
 // Roundtrip. Temporal-Tools (Kontinuitaet/Zeitstrahl) liegen in tools-timeline.js.
 
-const { db, getBookSettings, worldFactsScanState } = require('../../../db/schema');
+const { db, getBookSettings, getBookName, worldFactsScanState } = require('../../../db/schema');
 const { inClause } = require('../../../lib/validate');
 const { narrativeLabels } = require('../narrative-labels');
 const pageRevisions = require('../../../db/page-revisions');
 const { _truncateResult, _findFigure } = require('./shared');
-const { isIdeeStatus, isOpenIdeeStatus, normalizeIdeeStatus, openStatusSql } = require('../../../lib/ideen-status');
+const { isIdeeStatus, isOpenIdeeStatus, normalizeIdeeStatus } = require('../../../lib/ideen-status');
+const { listLocationChaptersWithNames } = require('../../../db/book-chat/text');
+const {
+  listChaptersWithStats, listPagesWithStats, getPageHeader, listIdeenWithPlaces,
+  listLocationsWithFirstPage, listLocationChaptersForLocations, getLocationByLocId,
+  findLocationByName, listLocationScenesWithPlaces, listSongsWithFirstPage,
+  listSongChaptersForSongs, listScenesWithPlaces, listFiguresWithMentions,
+  listWorldFactChapterNames,
+} = require('../../../db/book-chat/catalog');
 
 // ── list_chapters ────────────────────────────────────────────────────────────
 
 function tool_list_chapters(_input, ctx) {
-  const chapterRows = db.prepare(`
-    SELECT c.chapter_id, c.chapter_name,
-           COUNT(p.page_id)            AS page_count,
-           COALESCE(SUM(ps.words), 0)  AS words,
-           COALESCE(SUM(ps.chars), 0)  AS chars
-    FROM chapters c
-    LEFT JOIN pages p      ON p.chapter_id = c.chapter_id AND p.book_id = c.book_id
-    LEFT JOIN page_stats ps ON ps.page_id = p.page_id
-    WHERE c.book_id = ?
-    GROUP BY c.chapter_id, c.chapter_name
-    ORDER BY c.position
-  `).all(ctx.bookId);
+  const chapterRows = listChaptersWithStats(ctx.bookId);
 
   // Seiten mit ihren Kapitelzuordnungen laden – inkl. Seiten ohne Kapitel (chapter_id IS NULL)
-  const pageRows = db.prepare(`
-    SELECT p.page_id, p.page_name, p.chapter_id,
-           COALESCE(ps.words, 0) AS words, COALESCE(ps.chars, 0) AS chars
-    FROM pages p
-    LEFT JOIN page_stats ps ON ps.page_id = p.page_id
-    WHERE p.book_id = ?
-    ORDER BY p.position, p.page_id
-  `).all(ctx.bookId);
+  const pageRows = listPagesWithStats(ctx.bookId);
 
   const pagesByChapter = new Map();
   const orphanPages = [];
@@ -109,32 +99,9 @@ function tool_list_ideen(input, ctx) {
   const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
   const limit = Math.min(200, Math.max(1, Number.isInteger(input?.limit) ? input.limit : IDEEN_DEFAULT_LIMIT));
 
-  // Ideen können entweder an einer Seite oder an einem Kapitel hängen (XOR).
-  // `effective_chapter_id` deckt beide Quellen ab: direkt-am-Kapitel-Idee
-  // (i.chapter_id) ODER an einer Seite, die zum Kapitel gehört (p.chapter_id).
-  let sql = `
-    SELECT i.id, i.content, i.status, i.status_at, i.created_at, i.updated_at,
-           i.page_id, p.page_name,
-           COALESCE(i.chapter_id, p.chapter_id) AS effective_chapter_id,
-           COALESCE(cc.chapter_name, cp.chapter_name) AS chapter_name,
-           CASE WHEN i.page_id IS NOT NULL THEN 'page' ELSE 'chapter' END AS scope
-    FROM ideen i
-    LEFT JOIN pages    p  ON p.page_id    = i.page_id
-    LEFT JOIN chapters cc ON cc.chapter_id = i.chapter_id AND cc.book_id = i.book_id
-    LEFT JOIN chapters cp ON cp.chapter_id = p.chapter_id AND cp.book_id = i.book_id
-    WHERE i.book_id = ? AND i.user_email = ?
-  `;
-  const params = [ctx.bookId, userEmail];
-  if (statusFilter) { sql += ' AND i.status = ?'; params.push(statusFilter); }
-  if (offenOnly)    { sql += ` AND ${openStatusSql('i')}`; }
-  if (pageFilter    !== null) { sql += ' AND i.page_id = ?'; params.push(pageFilter); }
-  if (chapterFilter !== null) {
-    sql += ' AND COALESCE(i.chapter_id, p.chapter_id) = ?';
-    params.push(chapterFilter);
-  }
-  sql += ` ORDER BY CASE WHEN ${openStatusSql('i')} THEN 0 ELSE 1 END, i.updated_at DESC, i.id DESC`;
-
-  const rows = db.prepare(sql).all(...params);
+  const rows = listIdeenWithPlaces(ctx.bookId, userEmail, {
+    status: statusFilter, offenOnly, pageId: pageFilter, chapterId: chapterFilter,
+  });
   if (!rows.length) return { ideen: [], total: 0 };
 
   const total = rows.length;
@@ -170,28 +137,7 @@ function tool_list_locations(input, ctx) {
   const userEmail = ctx.userEmail || null;
   const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id : null;
 
-  let sql = `
-    SELECT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
-           l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
-    FROM locations l
-    LEFT JOIN pages p ON p.page_id = l.erste_erwaehnung_page_id
-    WHERE l.book_id = ? AND l.user_email IS ?
-  `;
-  const params = [ctx.bookId, userEmail];
-  if (chapterFilter !== null) {
-    sql = `
-      SELECT DISTINCT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
-             l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
-      FROM locations l
-      LEFT JOIN pages p ON p.page_id = l.erste_erwaehnung_page_id
-      JOIN location_chapters lc ON lc.location_id = l.id
-      WHERE l.book_id = ? AND l.user_email IS ? AND lc.chapter_id = ?
-    `;
-    params.push(chapterFilter);
-  }
-  sql += ' ORDER BY l.sort_order, l.id';
-
-  const rows = db.prepare(sql).all(...params);
+  const rows = listLocationsWithFirstPage(ctx.bookId, userEmail, chapterFilter);
   if (!rows.length) {
     return { locations: [], hint: 'Keine Orte vorhanden. Komplettanalyse ausführen.' };
   }
@@ -199,13 +145,7 @@ function tool_list_locations(input, ctx) {
   const locIds = rows.map(r => r.id);
   const { sql: idSql, values: idVals } = inClause(locIds);
 
-  const chRows = db.prepare(`
-    SELECT lc.location_id, lc.chapter_id, c.chapter_name, lc.haeufigkeit
-    FROM location_chapters lc
-    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
-    WHERE lc.location_id IN ${idSql}
-    ORDER BY lc.location_id, c.position
-  `).all(...idVals);
+  const chRows = listLocationChaptersForLocations(locIds);
   const fgRows = db.prepare(`
     SELECT lf.location_id, f.fig_id, f.name
     FROM location_figures lf
@@ -263,30 +203,9 @@ function tool_list_songs(input, ctx) {
     figFilterId = figRow.id;
   }
 
-  let sql = `
-    SELECT s.id, s.song_uid, s.titel, s.interpret, s.genre, s.kontext_typ,
-           s.beschreibung, s.stimmung, s.erste_erwaehnung,
-           s.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
-    FROM songs s
-    LEFT JOIN pages p ON p.page_id = s.erste_erwaehnung_page_id
-    WHERE s.book_id = ? AND s.user_email = ?
-  `;
-  const params = [ctx.bookId, userEmail];
-  if (chapterFilter !== null) {
-    sql += ' AND s.id IN (SELECT song_id FROM song_chapters WHERE chapter_id = ?)';
-    params.push(chapterFilter);
-  }
-  if (figFilterId !== null) {
-    sql += ' AND s.id IN (SELECT song_id FROM song_figures WHERE figure_id = ?)';
-    params.push(figFilterId);
-  }
-  if (sceneFilter !== null) {
-    sql += ' AND s.id IN (SELECT song_id FROM song_scenes WHERE scene_id = ?)';
-    params.push(sceneFilter);
-  }
-  sql += ' ORDER BY s.sort_order, s.id';
-
-  const rows = db.prepare(sql).all(...params);
+  const rows = listSongsWithFirstPage(ctx.bookId, userEmail, {
+    chapterId: chapterFilter, figureId: figFilterId, sceneId: sceneFilter,
+  });
   if (!rows.length) {
     return { songs: [], total: 0, hint: 'Keine Songs für diesen Filter. Songs werden in der Musikbibliothek bzw. via Komplettanalyse erfasst.' };
   }
@@ -294,13 +213,7 @@ function tool_list_songs(input, ctx) {
   const songIds = rows.map(r => r.id);
   const { sql: idSql, values: idVals } = inClause(songIds);
 
-  const chRows = db.prepare(`
-    SELECT sc.song_id, sc.chapter_id, c.chapter_name, sc.haeufigkeit
-    FROM song_chapters sc
-    LEFT JOIN chapters c ON c.chapter_id = sc.chapter_id
-    WHERE sc.song_id IN ${idSql}
-    ORDER BY sc.haeufigkeit DESC, c.position
-  `).all(...idVals);
+  const chRows = listSongChaptersForSongs(songIds);
   const fgRows = db.prepare(`
     SELECT sf.song_id, f.fig_id, f.name, sf.kontext_typ
     FROM song_figures sf
@@ -360,35 +273,14 @@ function tool_get_location_profile(input, ctx) {
   const userEmail = ctx.userEmail || null;
   let locRow = null;
   if (input?.loc_id) {
-    locRow = db.prepare(`
-      SELECT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
-             l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
-      FROM locations l
-      LEFT JOIN pages p ON p.page_id = l.erste_erwaehnung_page_id
-      WHERE l.book_id = ? AND l.loc_id = ? AND l.user_email IS ?
-    `).get(ctx.bookId, input.loc_id, userEmail);
+    locRow = getLocationByLocId(ctx.bookId, input.loc_id, userEmail);
   }
   if (!locRow && input?.name) {
-    const q = `%${input.name}%`;
-    locRow = db.prepare(`
-      SELECT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
-             l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
-      FROM locations l
-      LEFT JOIN pages p ON p.page_id = l.erste_erwaehnung_page_id
-      WHERE l.book_id = ? AND l.user_email IS ? AND l.name LIKE ?
-      ORDER BY CASE WHEN l.name = ? THEN 0 ELSE 1 END, l.sort_order, l.id
-      LIMIT 1
-    `).get(ctx.bookId, userEmail, q, input.name);
+    locRow = findLocationByName(ctx.bookId, userEmail, input.name);
   }
   if (!locRow) return { error: 'Ort nicht gefunden. Erst list_locations rufen, um loc_id/Name zu ermitteln.' };
 
-  const kapitel = db.prepare(`
-    SELECT lc.chapter_id, c.chapter_name, lc.haeufigkeit
-    FROM location_chapters lc
-    LEFT JOIN chapters c ON c.chapter_id = lc.chapter_id
-    WHERE lc.location_id = ?
-    ORDER BY c.position
-  `).all(locRow.id).map(r => ({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null, haeufigkeit: r.haeufigkeit }));
+  const kapitel = listLocationChaptersWithNames(locRow.id).map(r => ({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null, haeufigkeit: r.haeufigkeit }));
 
   const figuren = db.prepare(`
     SELECT f.fig_id, f.name
@@ -397,16 +289,7 @@ function tool_get_location_profile(input, ctx) {
     WHERE lf.location_id = ?
   `).all(ctx.bookId, userEmail, locRow.id).map(r => ({ fig_id: r.fig_id, name: r.name || null }));
 
-  const szenen = db.prepare(`
-    SELECT fs.id AS scene_id, fs.titel, fs.wertung,
-           fs.chapter_id, c.chapter_name, fs.page_id, p.page_name
-    FROM scene_locations sl
-    JOIN figure_scenes fs ON fs.id = sl.scene_id
-    LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
-    LEFT JOIN pages    p ON p.page_id    = fs.page_id
-    WHERE sl.location_id = ? AND fs.book_id = ? AND fs.user_email IS ?
-    ORDER BY fs.sort_order, fs.id
-  `).all(locRow.id, ctx.bookId, userEmail).map(r => ({
+  const szenen = listLocationScenesWithPlaces(locRow.id, ctx.bookId, userEmail).map(r => ({
     scene_id: r.scene_id, titel: r.titel, wertung: r.wertung || null,
     chapter_id: r.chapter_id, chapter_name: r.chapter_name || null,
     page_id: r.page_id, page_name: r.page_name || null,
@@ -456,29 +339,9 @@ function tool_list_scenes(input, ctx) {
     locFilterId = locRow.id;
   }
 
-  let sql = `
-    SELECT fs.id, fs.titel, fs.wertung, fs.kommentar, fs.sort_order,
-           fs.chapter_id, c.chapter_name,
-           fs.page_id, p.page_name
-    FROM figure_scenes fs
-    LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
-    LEFT JOIN pages    p ON p.page_id    = fs.page_id
-    WHERE fs.book_id = ? AND fs.user_email IS ?
-  `;
-  const params = [ctx.bookId, userEmail];
-  if (chapterFilter !== null) { sql += ' AND fs.chapter_id = ?'; params.push(chapterFilter); }
-  if (pageFilter    !== null) { sql += ' AND fs.page_id = ?';    params.push(pageFilter); }
-  if (figFilterId   !== null) {
-    sql += ' AND fs.id IN (SELECT scene_id FROM scene_figures WHERE figure_id = ?)';
-    params.push(figFilterId);
-  }
-  if (locFilterId !== null) {
-    sql += ' AND fs.id IN (SELECT scene_id FROM scene_locations WHERE location_id = ?)';
-    params.push(locFilterId);
-  }
-  sql += ' ORDER BY fs.sort_order, fs.id';
-
-  const rows = db.prepare(sql).all(...params);
+  const rows = listScenesWithPlaces(ctx.bookId, userEmail, {
+    chapterId: chapterFilter, pageId: pageFilter, figureId: figFilterId, locationId: locFilterId,
+  });
   if (!rows.length) return { scenes: [], total: 0, hint: 'Keine Szenen für diesen Filter.' };
 
   const sceneIds = rows.map(r => r.id);
@@ -551,11 +414,10 @@ const BUCHTYP_LABELS_DE = {
 function tool_get_book_settings(_input, ctx) {
   const userEmail = ctx.userEmail || null;
   const settings = getBookSettings(ctx.bookId, userEmail);
-  const bookRow = db.prepare('SELECT name FROM books WHERE book_id = ?').get(ctx.bookId);
   const labels = narrativeLabels(settings);
   return {
     book_id:                  ctx.bookId,
-    book_name:                bookRow?.name || null,
+    book_name:                getBookName(ctx.bookId) || null,
     language:                 settings.language,
     region:                   settings.region,
     locale:                   `${settings.language}-${settings.region}`,
@@ -581,16 +443,7 @@ function tool_list_figures(input, ctx) {
   const limit = Math.min(Math.max(1, input?.limit || LIST_FIGURES_DEFAULT_LIMIT), LIST_FIGURES_MAX_LIMIT);
   const sort = ['mentions_desc', 'name', 'presence_desc'].includes(input?.sort) ? input.sort : 'mentions_desc';
 
-  const rows = db.prepare(`
-    SELECT f.id, f.fig_id, f.name, f.kurzname, f.typ, f.rolle, f.praesenz,
-           COALESCE(SUM(pfm.count), 0) AS mentions
-    FROM figures f
-    LEFT JOIN page_figure_mentions pfm ON pfm.figure_id = f.id
-    LEFT JOIN pages p ON p.page_id = pfm.page_id AND p.book_id = f.book_id
-    WHERE f.book_id = ? AND f.user_email IS ?
-    GROUP BY f.id
-    ORDER BY f.sort_order, f.id
-  `).all(ctx.bookId, userEmail);
+  const rows = listFiguresWithMentions(ctx.bookId, userEmail);
 
   const PRES_ORDER = { 'haupt': 0, 'protagonist': 0, 'haupt-': 0, 'wichtig': 1, 'neben': 2, 'rand': 3, 'statist': 4 };
   const presKey = (p) => {
@@ -630,12 +483,7 @@ function tool_list_revisions(input, ctx) {
   const pageId = input?.page_id;
   if (!Number.isInteger(pageId)) return { error: 'page_id fehlt' };
 
-  const pageRow = db.prepare(`
-    SELECT p.page_id, p.page_name, p.chapter_id, c.chapter_name, p.book_id
-    FROM pages p
-    LEFT JOIN chapters c ON c.chapter_id = p.chapter_id AND c.book_id = p.book_id
-    WHERE p.page_id = ?
-  `).get(pageId);
+  const pageRow = getPageHeader(pageId);
   if (!pageRow || pageRow.book_id !== ctx.bookId) {
     return { error: 'Seite nicht im aktuellen Buch.' };
   }
@@ -697,14 +545,7 @@ function tool_list_world_facts(input, ctx) {
   }
 
   const factIds = rows.map(r => r.id);
-  const { sql: idSql, values: idVals } = inClause(factIds);
-  const chRows = db.prepare(`
-    SELECT wfc.fact_id, c.chapter_name
-    FROM world_fact_chapters wfc
-    LEFT JOIN chapters c ON c.chapter_id = wfc.chapter_id
-    WHERE wfc.fact_id IN ${idSql}
-    ORDER BY wfc.fact_id, c.position
-  `).all(...idVals);
+  const chRows = listWorldFactChapterNames(factIds);
   const chByFact = new Map();
   for (const r of chRows) {
     if (!chByFact.has(r.fact_id)) chByFact.set(r.fact_id, []);

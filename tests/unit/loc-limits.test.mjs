@@ -104,7 +104,6 @@ const CATEGORIES = [
       'lib/page-index.js': 686,
       'lib/content-store/backends/localdb.js': 635,
       'routes/jobs/komplett/phases/extraktion.js': 932,
-      'routes/jobs/book-chat-tools/tools-catalog.js': 738,
       'routes/snapshots.js': 655,
       'routes/usersettings.js': 641,
       'routes/share/reader.js': 629,
