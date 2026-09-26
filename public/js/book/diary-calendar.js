@@ -7,7 +7,7 @@
 // Page), wir wollen aber nicht pro Render rebuilden.
 
 import { contentRepo } from '../repo/content.js';
-import { fetchJson, localIsoDate, tzOpts } from '../utils.js';
+import { dateTimeFormat, fetchJson, localIsoDate, tzOpts } from '../utils.js';
 import { insertChapterItem } from './tree/load.js';
 import { isSelectedBook } from '../cards/book-guard.js';
 
@@ -137,13 +137,13 @@ export const diaryCalendarMethods = {
   // richtigen Monat im Grid anzeigt).
   diaryCalendarCurrentMonth() {
     if (this.diaryCalendarYearMonth) return this.diaryCalendarYearMonth;
-    const now = new Date();
-    if (!this.diaryHasTodayEntry()) {
-      return { year: now.getFullYear(), month: now.getMonth() + 1 };
-    }
+    // „Heute" in der App-Zeitzone — dieselbe Quelle wie isToday im Grid.
+    const todayIso = localIsoDate();
+    const now = { year: parseInt(todayIso.slice(0, 4), 10), month: parseInt(todayIso.slice(5, 7), 10) };
+    if (!this.diaryHasTodayEntry()) return now;
     const months = this.diaryCalendarMonths();
     if (months[0]) return { year: months[0].year, month: months[0].month };
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    return now;
   },
 
   // 6x7-Grid, jeweils { date:'YYYY-MM-DD', dayNum, inMonth, hasPage, page, isToday }.
@@ -182,20 +182,20 @@ export const diaryCalendarMethods = {
     return this._formatYearMonth(monthEntry.year, monthEntry.month);
   },
 
+  // Kalender-Arithmetik läuft in UTC (Date.UTC); formatiert wird darum ebenfalls
+  // in UTC — sonst rutscht der Tag westlich von UTC auf den Vortag.
   _formatYearMonth(year, month) {
-    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
     const dt = new Date(Date.UTC(year, month - 1, 15));
-    return dt.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+    return dateTimeFormat(this.$store.shell.uiLocale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(dt);
   },
 
   // Wochentags-Header lokalisiert (Mo Di Mi … / Mon Tue Wed …).
   diaryCalendarWeekdayLabels() {
-    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const fmt = dateTimeFormat(this.$store.shell.uiLocale, { weekday: 'short', timeZone: 'UTC' });
     const labels = [];
     // 2024-01-01 ist ein Montag; davon ausgehend 7 Tage.
     for (let i = 0; i < 7; i++) {
-      const dt = new Date(Date.UTC(2024, 0, 1 + i));
-      labels.push(dt.toLocaleDateString(locale, { weekday: 'short' }));
+      labels.push(fmt.format(new Date(Date.UTC(2024, 0, 1 + i))));
     }
     return labels;
   },

@@ -1,7 +1,7 @@
 // Buchschreibungsentwicklung – Zeitliniendiagramm.
 // Methoden werden in Alpine.data('bookStatsCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { escHtml, fetchJson, tzOpts } from '../utils.js';
+import { escHtml, fetchJson, localIsoDaysAgo, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
 import {
   computeAvgSummary, metricKind, rollingSeries, rollingWindowForRange, trendSeries,
@@ -203,9 +203,8 @@ export const bookstatsMethods = {
 
     // Zeitraum-Filter
     if (this.bookStatsRange > 0) {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - this.bookStatsRange);
-      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      // App-TZ-Datum wie die recorded_at-Buckets des Servers (toISOString wäre UTC).
+      const cutoffStr = localIsoDaysAgo(this.bookStatsRange);
       rows = rows.filter(r => r.recorded_at >= cutoffStr);
     }
 
