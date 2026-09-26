@@ -6293,5 +6293,7 @@
   "admin.usage.breakdown.matrixTitle": "Matrix: User × Job-Typ",
   "admin.usage.breakdown.matrixHint": "Kosten aus dem Ledger (Preis zum Zeitpunkt des Aufrufs). Spalten: die sechs teuersten Job-Typen des Zeitraums, der Rest unter „Übrige“. Auf einen User klicken für die volle Aufschlüsselung.",
   "admin.usage.breakdown.other": "Übrige",
-  "admin.usage.breakdown.total": "Total"
+  "admin.usage.breakdown.total": "Total",
+  "job.error.aiTimeout": "Die KI-Anfrage an {provider} wurde nach {seconds} s ohne Antwort abgebrochen (Zeitüberschreitung). Ein erneuter Versuch klappt meist; bei grossen Texten hilft ein höherer Timeout in den Provider-Einstellungen.",
+  "admin.settings.help.timeoutMsOllama": "Hard-Timeout pro Aufruf (Millisekunden), gilt für Verbindungsaufbau und Stream. Ohne ihn hält ein hängendes Ollama den Job — und wegen der Serialisierung jeden wartenden Job — unbegrenzt fest. Lokale Modelle auf CPU brauchen für grosse Prompts leicht zehn Minuten und mehr."
 }
