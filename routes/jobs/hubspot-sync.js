@@ -29,7 +29,7 @@ const { getHeadline } = require('../../db/headline');
 const { leadHtml } = require('../../lib/headline-render');
 const { outgoingTitle } = require('../../lib/blog-title');
 const { resolveYearChapter, seedImportBaseline } = require('../../lib/blog-pull');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 
@@ -368,8 +368,7 @@ async function runHubspotReconcileJob(jobId, bookId, userEmail) {
 }
 
 function _aclEditor(req, res, bookId) {
-  try { requireBookAccess(req, bookId, 'editor'); return true; }
-  catch (e) { if (sendACLError(res, e)) return false; throw e; }
+  return guardBook(req, res, bookId, 'editor');
 }
 
 hubspotSyncRouter.post('/hubspot-import', jsonBody, (req, res) => {

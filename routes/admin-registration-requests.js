@@ -18,6 +18,7 @@ const appSettings = require('../lib/app-settings');
 const mailer = require('../lib/mailer');
 const { buildInviteUrl } = require('../lib/invite-url');
 const { requireAdmin } = require('../lib/admin-mw');
+const { sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -45,7 +46,7 @@ router.post('/:id/approve', express.json(), (req, res) => {
   const { role = 'user' } = req.body || {};
   if (role !== 'admin' && role !== 'user') return res.status(400).json({ error_code: 'ROLE_INVALID' });
 
-  const actor = req.session.user.email;
+  const actor = sessionEmail(req);
   const ip = _clientIp(req);
   const userAgent = req.headers['user-agent'] || null;
 
@@ -95,7 +96,7 @@ router.post('/:id/deny', express.json(), (req, res) => {
   if (reqRow.status !== 'pending') return res.status(409).json({ error_code: 'REQUEST_NOT_PENDING', status: reqRow.status });
 
   const reason = req.body?.reason ? String(req.body.reason).slice(0, 500) : null;
-  const actor = req.session.user.email;
+  const actor = sessionEmail(req);
   const updated = regRequests.denyRequest(id, { reviewer: actor, reason });
   if (!updated) return res.status(409).json({ error_code: 'REQUEST_RACE' });
 
@@ -118,7 +119,7 @@ router.post('/:id/deny', express.json(), (req, res) => {
 router.post('/expire-stale', (req, res) => {
   const days = Number(appSettings.get('auth.registration.expire_days')) || 30;
   const changed = regRequests.expireStale(days);
-  logger.info(`registration-request: ${changed} pending->expired (cutoff=${days}d)`, { user: req.session.user.email });
+  logger.info(`registration-request: ${changed} pending->expired (cutoff=${days}d)`, { user: sessionEmail(req) });
   res.json({ expired: changed, days });
 });
 

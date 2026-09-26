@@ -19,7 +19,7 @@ const { parseImportFile, extOf, SUPPORTED_EXTS } = require('../../lib/import-par
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { resolveProvider } = require('../../lib/ai');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const bookAccess = require('../../db/book-access');
 const { getBookLocale } = require('../../db/schema');
 const { db } = require('../../db/connection');
@@ -332,8 +332,7 @@ async function runFolderImportJob(jobId, { userEmail, mode, bookName, bookId, gr
       const created = await contentStore.createBook({ name: bookName, owner_email: userEmail }, { session: { user: { email: userEmail } } });
       effBookId = created.id;
       try {
-        db.prepare(`UPDATE books SET owner_email = COALESCE(owner_email, ?) WHERE book_id = ?`)
-          .run(userEmail, effBookId);
+        contentStore.setBookOwner(effBookId, userEmail, { onlyIfUnset: true });
         bookAccess.grantAccess(effBookId, userEmail, 'owner', userEmail);
       } catch (gErr) {
         logger.warn(`Auto-Owner-Grant fuer book=${effBookId} fehlgeschlagen: ${gErr.message}`);
@@ -521,7 +520,7 @@ const rawZipBody = express.raw({
 
 router.post('/folder-import', rawZipBody, async (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'UNAUTHENTICATED' });
+  if (!userEmail) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
 
   const mode = (req.query?.mode === 'merge') ? 'merge' : 'new-book';
   const bookName = String(req.query?.book_name || '').trim();
@@ -543,9 +542,7 @@ router.post('/folder-import', rawZipBody, async (req, res) => {
   }
 
   if (mode === 'merge') {
-    setContext({ book: bookId });
-    try { requireBookAccess(req, bookId, 'editor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'editor')) return;
   }
 
   const dedupKey = mode === 'merge' ? `merge:${bookId}` : `new:${bookName}`;

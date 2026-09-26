@@ -11,14 +11,14 @@ const {
   tps, createJob, enqueueJob, findActiveJobId, jsonBody, _modelName,
 } = require('./shared');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const { getContextConfigFor, resolveProvider } = require('../../lib/ai');
 const { db } = require('../../db/connection');
 const plotDb = require('../../db/plot');
 const draftFiguresDb = require('../../db/draft-figures');
 const { extractPsychologie } = require('../../lib/draft-mindmap-extract');
 const { getLatestContinuityCheck, listWorldFacts, worldFactsScanState } = require('../../db/schema');
+const { listFigureEventsWithNames, listScenesWithChapterNames } = require('../../db/content-names');
 
 const plotRouter = express.Router();
 
@@ -96,15 +96,7 @@ function _orteContext(bookId, userEmail) {
 // mit aufgelöster Figur + Kapitel. figure_events/figures sind keine pages/
 // chapters/books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige zur Lesezeit).
 function _zeitstrahlContext(bookId, userEmail) {
-  return _loadCtx('zeitstrahl', () => db.prepare(`
-    SELECT fe.datum, fe.ereignis, fe.typ, f.name AS figur, c.chapter_name AS kapitel
-      FROM figure_events fe
-      JOIN figures f ON f.id = fe.figure_id
-      LEFT JOIN chapters c ON c.chapter_id = fe.chapter_id
-     WHERE f.book_id = ? AND f.user_email = ?
-     ORDER BY fe.sort_order, fe.id
-     LIMIT 300
-  `).all(parseInt(bookId), userEmail).map(e => ({
+  return _loadCtx('zeitstrahl', () => listFigureEventsWithNames(parseInt(bookId), userEmail, 300).map(e => ({
     datum: e.datum || null,
     ereignis: e.ereignis,
     typ: e.typ || null,
@@ -239,14 +231,7 @@ async function _kapitelContext(bookId) {
 // books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige-Wert zur Lesezeit).
 function _szenenContext(bookId, userEmail) {
   return _loadCtx('szenen', () => {
-    const scenes = db.prepare(`
-      SELECT fs.id, fs.titel, c.chapter_name AS kapitel
-        FROM figure_scenes fs
-        LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
-       WHERE fs.book_id = ? AND fs.user_email = ?
-       ORDER BY fs.sort_order, fs.id
-       LIMIT 150
-    `).all(parseInt(bookId), userEmail);
+    const scenes = listScenesWithChapterNames(parseInt(bookId), userEmail, 150);
     if (!scenes.length) return [];
     const figRows = db.prepare(`
       SELECT sf.scene_id, f.name
@@ -540,12 +525,8 @@ plotRouter.post('/plot-brainstorm', jsonBody, (req, res) => {
   const actId = toIntId(req.body?.act_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!actId)  return res.status(400).json({ error_code: 'ACT_ID_REQUIRED' });
+  if (!guardBook(req, res, bookId, 'editor')) return;
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'UNAUTHORIZED' });
-
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
 
   const act = plotDb.getAct(actId);
   if (!act || act.book_id !== bookId || act.user_email !== userEmail) {
@@ -566,12 +547,8 @@ plotRouter.post('/plot-brainstorm', jsonBody, (req, res) => {
 plotRouter.post('/plot-consistency', jsonBody, (req, res) => {
   const bookId = toIntId(req.body?.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  if (!guardBook(req, res, bookId, 'editor')) return;
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'UNAUTHORIZED' });
-
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
 
   const existing = findActiveJobId('plot-consistency', bookId, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });

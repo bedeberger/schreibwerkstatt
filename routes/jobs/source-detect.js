@@ -34,8 +34,8 @@ const { getBookSettings } = require('../../db/schema');
 const { parsePersonName } = require('../../lib/bib-parse');
 const { searchWork } = require('../../lib/source-lookup');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
+const { resolveChapterBookId } = require('../../lib/content-ownership');
 
 // Obergrenze fuer die Register-Abfragen eines Laufs. Zwei oeffentliche, kostenlose
 // Dienste (Crossref/OpenLibrary) mit bis zu zwei Requests pro Kandidat — ein
@@ -342,17 +342,17 @@ const sourceDetectRouter = express.Router();
 sourceDetectRouter.post('/source-detect', jsonBody, (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
   // 'editor' statt 'lektor': das Ergebnis fuehrt zu Schreibzugriffen auf die
   // Buch-Quellenzuordnung (POST /sources), und genau die verlangt /sources auch.
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
 
   const chapterId = req.body?.chapter_id == null || req.body.chapter_id === ''
     ? null : toIntId(req.body.chapter_id);
   if (req.body?.chapter_id && !chapterId) return res.status(400).json({ error_code: 'INVALID_ID' });
+  if (chapterId && resolveChapterBookId(chapterId) !== book_id) {
+    return res.status(400).json({ error_code: 'CHAPTER_NOT_IN_BOOK' });
+  }
 
   const existing = findActiveJobId('source-detect', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
@@ -371,29 +371,26 @@ sourceDetectRouter.post('/source-detect', jsonBody, (req, res) => {
 // Bibliothek-Perspektive („was fehlt MIR noch"), und in einem geteilten Buch
 // waere die Liste eines Co-Autors fuer die anderen nur Rauschen.
 
+// Login-Check VOR dem Guard, weil der Besitz über die E-Mail geprüft wird —
+// ohne ihn erschiene „nicht angemeldet" als 404. Gleicher Code wie der Guard.
 function _runGuard(req, res) {
   const userEmail = sessionEmail(req);
-  if (!userEmail) { res.status(401).json({ error_code: 'LOGIN_REQ' }); return null; }
+  if (!userEmail) { res.status(401).json({ error_code: 'NOT_LOGGED_IN' }); return null; }
   const id = toIntId(req.params.id);
   if (!id) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
   const run = getDetectRun(id);
   // Fremder Lauf → 404 statt 403: die Existenz einer fremden Historie ist
   // nichts, was preisgegeben werden muesste.
   if (!run || run.user_email !== userEmail) { res.status(404).json({ error_code: 'RUN_NOT_FOUND' }); return null; }
-  setContext({ book: run.book_id });
-  try { requireBookAccess(req, run.book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return null; throw e; }
+  if (!guardBook(req, res, run.book_id, 'editor')) return null;
   return { run, userEmail };
 }
 
 sourceDetectRouter.get('/source-detect/runs', (req, res) => {
-  const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.query.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'editor')) return;
+  const userEmail = sessionEmail(req);
   res.json(listDetectRuns(bookId, userEmail));
 });
 

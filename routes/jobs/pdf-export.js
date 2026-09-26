@@ -13,7 +13,7 @@ const {
   jobs, createJob, enqueueJob, jobAbortControllers,
   updateJob, completeJob, failJob, makeJobLogger,
   findActiveJobId,
-  i18nError,
+  i18nError, emptyScopeError,
   jsonBody,
 } = require('./shared');
 const { getPdfExportProfile, getPdfExportProfileBackCover, getPdfExportProfileSpineImage, getBookSettings } = require('../../db/schema');
@@ -37,7 +37,7 @@ const { resolveSlug } = require('../../lib/export-builders/shared');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const logger = require('../../logger');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const router = express.Router();
 
@@ -265,9 +265,8 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       failJob(jobId, e);
       return;
     }
-    if (e?.code === 'BOOK_EMPTY')    { failJob(jobId, i18nError('job.error.bookEmpty'));    return; }
-    if (e?.code === 'CHAPTER_EMPTY') { failJob(jobId, i18nError('job.error.chapterEmpty')); return; }
-    if (e?.code === 'PAGE_EMPTY')    { failJob(jobId, i18nError('job.error.pageEmpty'));    return; }
+    const empty = emptyScopeError(e);
+    if (empty) { failJob(jobId, empty); return; }
     log.error(`pdf-export job ${jobId}: ${e.message}`);
     failJob(jobId, e);
   }
@@ -324,9 +323,7 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
 
   // PDF-Export: viewer reicht (Export gilt fuer alle Rollen).
   if (bookId) {
-    const { requireBookAccess, sendACLError } = require('../../lib/acl');
-    try { requireBookAccess(req, bookId, 'viewer'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'viewer')) return;
   }
 
   const dedupId = `${target}:${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}`;

@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const {
   makeJobLogger, updateJob, completeJob, failJob,
   createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+  startBookJob,
 } = require('./shared');
 const contentStore = require('../../lib/content-store');
 const lexiconDb = require('../../db/lexicon');
@@ -25,9 +26,6 @@ const { analyzeBook, LEXICON_VERSION } = require('../../lib/lexicon');
 const { tokenizeNamesForStopwords } = require('../../lib/page-index');
 const { foldSharpS } = require('../../lib/lexicon/tokenize');
 const { db } = require('../../db/schema');
-const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
 const logger = require('../../logger');
 
 const lexiconScanRouter = express.Router();
@@ -192,24 +190,14 @@ async function scanAllBooks() {
   return { enqueued, skipped };
 }
 
-lexiconScanRouter.post('/lexicon-scan', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-  const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const existing = findActiveJobId('lexicon-scan', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
+lexiconScanRouter.post('/lexicon-scan', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'lexicon-scan', minRole: 'lektor', label: 'job.label.lexiconScan',
   // Manuell ausgelöst heisst: der Autor will jetzt eine Zahl sehen — Delta-Skip
   // wird übersprungen, sonst quittiert der Knopf mit „unverändert" und nichts passiert.
-  const jobId = createJob('lexicon-scan', book_id, userEmail, 'job.label.lexiconScan', null, book_id);
-  enqueueJob(jobId, () => runLexiconScanJob(jobId, book_id, userEmail, { force: true }));
-  res.json({ jobId });
-});
+  run: (jobId, { bookId, userEmail }) => runLexiconScanJob(jobId, bookId, userEmail, { force: true }),
+}));
 
 module.exports = {
   lexiconScanRouter, runLexiconScanJob, scanAllBooks,
-  computeContentSig, REF_TERM_LIMIT, REF_MIN_COUNT, _buildFreqJson,
+  computeContentSig,
 };

@@ -4,6 +4,7 @@
 
 const { db } = require('../../../db/schema');
 const { INPUT_BUDGET_CHARS } = require('../../../lib/ai');
+const { pageTitle } = require('../../../db/content-names');
 
 // Obergrenzen schützen das Token-Budget gegen ausufernde Tool-Calls. Skaliert mit
 // MODEL_CONTEXT, damit User mit grösserem Kontextfenster reichere Tool-Antworten
@@ -41,7 +42,7 @@ function _truncateResult(obj) {
  * Embedding-Index auf. Rückgabe null = Entität gelöscht, Chunk noch im Index.
  */
 function resolveEntityTitle(kind, entityId) {
-  if (kind === 'page')   return db.prepare('SELECT page_name AS t FROM pages WHERE page_id = ?').get(entityId)?.t ?? null;
+  if (kind === 'page')   return pageTitle(entityId)?.title ?? null;
   if (kind === 'scene')  return db.prepare('SELECT titel AS t FROM figure_scenes WHERE id = ?').get(entityId)?.t ?? null;
   if (kind === 'figure') return db.prepare('SELECT name AS t FROM figures WHERE id = ?').get(entityId)?.t ?? null;
   return null;

@@ -22,6 +22,7 @@ const { selectPassagesSemantic, preContextPassages } = require('./book-chat-retr
 const { setContext } = require('../../../lib/log-context');
 const appSettings = require('../../../lib/app-settings');
 const { recordChatLedgerForMessage } = require('../../../db/cost-ledger');
+const { getSessionWithBookName } = require('../../../db/chat-sessions');
 const {
   _parseChatResponse, figurenBlockChars, weltfaktenBlockChars,
   bookPageCache, BOOK_PAGE_CACHE_TTL_MS, BOOK_PAGE_CACHE_MAX,
@@ -106,11 +107,7 @@ async function runBookChatJob(jobId, sessionId, userMsgId, message, userEmail) {
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
-    const session = db.prepare(`
-      SELECT cs.*, b.name AS book_name FROM chat_sessions cs
-      LEFT JOIN books b ON b.book_id = cs.book_id
-      WHERE cs.id = ? AND cs.user_email = ?
-    `).get(parseInt(sessionId), userEmail);
+    const session = getSessionWithBookName(parseInt(sessionId), userEmail);
     if (!session) throw i18nError('job.error.sessionNotFound');
     logger.info(`Start: «${session.book_name || '-'}» session=${sessionId}, msg-len=${message.length}`);
 
@@ -458,11 +455,7 @@ const runBookChatJobAgent = makeAgenticChatJob({
     return effectiveProvider;
   },
 
-  loadSession: (sessionId, userEmail) => db.prepare(`
-    SELECT cs.*, b.name AS book_name FROM chat_sessions cs
-    LEFT JOIN books b ON b.book_id = cs.book_id
-    WHERE cs.id = ? AND cs.user_email = ?
-  `).get(parseInt(sessionId), userEmail),
+  loadSession: (sessionId, userEmail) => getSessionWithBookName(parseInt(sessionId), userEmail),
 
   async prepare({ session, userEmail, aiCfg, logger, jobSignal, message }) {
     const { buildBookChatAgentSystemPrompt, BOOK_CHAT_TOOLS, BOOK_CHAT_SLIM_TOOL_NAMES, BOOK_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts(userEmail);

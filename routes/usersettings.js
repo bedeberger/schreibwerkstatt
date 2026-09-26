@@ -1,7 +1,6 @@
 'use strict';
 const express = require('express');
 const appUsers = require('../db/app-users');
-const { getUser, updateUserSettings } = appUsers;
 const deviceTokens = require('../db/device-tokens');
 const { TOKEN_KINDS, DEFAULT_KIND, scopesForKind } = require('../lib/device-scopes');
 const { db } = require('../db/schema');
@@ -10,6 +9,7 @@ const bookCategories = require('../db/book-categories');
 const { setContext } = require('../lib/log-context');
 const { localIsoDate, localIsoDaysAgo } = require('../lib/local-date');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 const jsonBody = express.json();
@@ -96,8 +96,8 @@ function toResponse(u) {
 
 /** Aktuelles User-Profil samt Einstellungen + app_users-Identity. */
 router.get('/settings', (req, res) => {
-  const email = req.session.user.email;
-  const user = getUser(email);
+  const email = sessionEmail(req);
+  const user = appUsers.getUser(email);
   if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
   res.json(toResponse(user));
 });
@@ -111,9 +111,9 @@ router.get('/settings', (req, res) => {
  * `writing_time` sind Cache-/Aggregat-Tabellen (kein Content-Store-Verstoss).
  */
 router.get('/profile-stats', (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const owned = ownedBooksForStats(email);
-  const goalMin = getUser(email)?.daily_goal_minutes ?? null;
+  const goalMin = appUsers.getUser(email)?.daily_goal_minutes ?? null;
   const empty = { books: 0, chapters: 0, pages: 0, chars: 0, words: 0, unique_words: 0, tok: 0, writing_seconds: 0, lektorat_seconds: 0, today_writing_seconds: 0, daily_goal_minutes: goalMin, by_hour: [], books_detail: [], lektorat: null };
   if (!owned.length) return res.json(empty);
   try {
@@ -274,7 +274,7 @@ router.get('/profile-stats', (req, res) => {
  * seiten-granularen `lektorat_time`) — fuer den zeitraum-gefilterten Aufwands-Split.
  */
 router.get('/profile-stats-history', (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const owned = ownedBooksForStats(email);
   if (!owned.length) return res.json({ history: [], writing: [], lektorat: [], sessions: [] });
   try {
@@ -339,8 +339,8 @@ const FIELD_TO_COLUMN = {
 /** Partielles Update. Nicht übergebene Felder bleiben unverändert;
  *  leerer String oder null setzt das Feld zurück. */
 router.patch('/settings', jsonBody, (req, res) => {
-  const email = req.session.user.email;
-  const existing = getUser(email);
+  const email = sessionEmail(req);
+  const existing = appUsers.getUser(email);
   if (!existing) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
 
   const body = req.body || {};
@@ -375,8 +375,8 @@ router.patch('/settings', jsonBody, (req, res) => {
     merged.daily_goal_minutes = n > 0 ? n : null;
   }
 
-  updateUserSettings(email, merged);
-  res.json({ ok: true, ...toResponse(getUser(email)) });
+  appUsers.updateUserSettings(email, merged);
+  res.json({ ok: true, ...toResponse(appUsers.getUser(email)) });
 });
 
 // ── Onboarding („Erste Schritte") ────────────────────────────────────────────
@@ -412,8 +412,8 @@ function onboardingSteps(email) {
 
 /** Onboarding-State + abgeleiteter Checklisten-Fortschritt des Users. */
 router.get('/onboarding', (req, res) => {
-  const email = req.session.user.email;
-  const user = getUser(email);
+  const email = sessionEmail(req);
+  const user = appUsers.getUser(email);
   if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
   res.json({ state: parseOnboardingState(user), steps: onboardingSteps(email) });
 });
@@ -421,8 +421,8 @@ router.get('/onboarding', (req, res) => {
 /** Persistierten Onboarding-State teilweise aktualisieren
  *  (welcomeDismissed / completed). */
 router.patch('/onboarding', jsonBody, (req, res) => {
-  const email = req.session.user.email;
-  const user = getUser(email);
+  const email = sessionEmail(req);
+  const user = appUsers.getUser(email);
   if (!user) return res.status(404).json({ error_code: 'USER_PROFILE_NOT_FOUND' });
   const cur = parseOnboardingState(user);
   const body = req.body || {};
@@ -436,7 +436,7 @@ router.patch('/onboarding', jsonBody, (req, res) => {
 /** Beispielbuch anlegen (gemeinfreie Prosa, kein KI-Call). Idempotent pro User:
  *  existiert es schon, kommt dessen book_id zurueck (deduplicated=true). */
 router.post('/onboarding/demo-book', async (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   try {
     const { createDemoBook } = require('../lib/demo-book');
     const result = await createDemoBook(email);
@@ -453,7 +453,7 @@ router.post('/onboarding/demo-book', async (req, res) => {
 // duerfen ueber /admin/users/invite mit role='admin' arbeiten, hier zwingend
 // role='user'. Use-Case: Buch-Sharing-Dialog laedt frische Email ein.
 router.post('/invite', jsonBody, (req, res) => {
-  const inviter = req.session.user.email;
+  const inviter = sessionEmail(req);
   const me = appUsers.getUser(inviter);
   if (!me) return res.status(403).json({ error_code: 'NOT_REGISTERED' });
   if (me.status !== 'active') return res.status(403).json({ error_code: 'NOT_ACTIVE' });
@@ -478,7 +478,7 @@ router.post('/invite', jsonBody, (req, res) => {
 
 /** Liste der Device-Tokens des eingeloggten Users (ohne Klartext). */
 router.get('/device-tokens', (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   res.json({ tokens: deviceTokens.listDeviceTokens(email) });
 });
 
@@ -488,7 +488,7 @@ router.get('/device-tokens', (req, res) => {
  *    'capture' — Browser-Erweiterung, darf nur erfassen (Recherche + Quellen)
  *  Antwort enthaelt `plain_token` — wird nie wieder ausgegeben. */
 router.post('/device-tokens', jsonBody, (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   // Device-Tokens duerfen nicht selbst ueber ein Device-Token ausgestellt werden
   // (kein Self-Minting offline): nur echte interaktive Sessions.
   if (req.session.user.via === 'device_token') {
@@ -522,7 +522,7 @@ router.post('/device-tokens', jsonBody, (req, res) => {
 
 /** Device-Token widerrufen (Soft-Revoke, sofort ungueltig). */
 router.post('/device-tokens/:id/revoke', (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ error_code: 'INVALID_ID' });
   // Fixe Demo-Tokens aus ENV sind nicht ueber die UI entziehbar (siehe
@@ -539,7 +539,7 @@ router.post('/device-tokens/:id/revoke', (req, res) => {
 
 /** Device-Token endgueltig loeschen. */
 router.delete('/device-tokens/:id', (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(400).json({ error_code: 'INVALID_ID' });
   if (require('../lib/demo-user').isFixedDemoToken(id)) {
@@ -584,7 +584,7 @@ router.delete('/device-tokens/:id', (req, res) => {
 //                                            OHNE error_code deutet der Client als
 //                                            „Server kennt die Route nicht".
 router.delete('/account', jsonBody, async (req, res) => {
-  const email = req.session.user.email;
+  const email = sessionEmail(req);
   const ip = (req.ip || '').toString() || null;
   const userAgent = req.headers['user-agent'] || null;
 
@@ -592,7 +592,7 @@ router.delete('/account', jsonBody, async (req, res) => {
     return res.status(400).json({ error_code: 'CONFIRM_REQUIRED' });
   }
 
-  const user = getUser(email);
+  const user = appUsers.getUser(email);
   if (!user) return res.status(404).json({ error_code: 'USER_NOT_FOUND' });
 
   // Zwei Konten duerfen sich nicht selbst loeschen, beide aus demselben Grund:

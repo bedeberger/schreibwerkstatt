@@ -481,8 +481,8 @@ function _komplettAiOverrides(effectiveProvider) {
 }
 
 module.exports = {
-  _VERIFY_RADIUS, _verifyExcerpt, verifyKontinuitaetProbleme,
-  buildAnachronismusData, KOMPLETT_DEFAULT_TIMEOUT_MS, _komplettAiOverrides,
+  _verifyExcerpt, verifyKontinuitaetProbleme,
+  buildAnachronismusData, _komplettAiOverrides,
   buildAttributeContradictions, runAttributeContradictionCheck,
   resolveRemapNames,
 };

@@ -72,14 +72,14 @@ function register(router) {
   // lib/tts-synth.js, geteilt mit routes/tts.js).
   router.post('/:token/tts', express.json({ limit: tts.TEXT_MAX + 2048 }), async (req, res) => {
     const token = String(req.params.token || '');
-    if (!TOKEN_RE.test(token)) return res.status(404).json({ error: 'not_found' });
+    if (!TOKEN_RE.test(token)) return res.status(404).json({ error_code: 'NOT_FOUND', error: 'not_found' });
     const link = shareLinks.getShareLinkByToken(token);
-    if (!link || isExpired(link)) return res.status(404).json({ error: 'not_found' });
+    if (!link || isExpired(link)) return res.status(404).json({ error_code: 'NOT_FOUND', error: 'not_found' });
     setContext({ book: link.book_id });
 
     // Feature aus -> 404 (Frontend behandelt als „Vorlesen nicht verfuegbar",
     // der Dock ist ohnehin nur bei enabled im DOM).
-    if (!tts.isEnabled()) return res.status(404).json({ error: 'tts_disabled' });
+    if (!tts.isEnabled()) return res.status(404).json({ error_code: 'TTS_DISABLED', error: 'tts_disabled' });
 
     // Stimme aus der Buch-Locale (SSoT wie im authed Pfad). owner_email ist der
     // Buch-Besitzer — dessen Locale-Override bestimmt die Sprache des Buchs.
@@ -102,7 +102,7 @@ function register(router) {
         return res.status(err.status).json(body);
       }
       logger.warn(`[share/tts] unexpected ${err?.message} token=${token.slice(0, 8)}`);
-      return res.status(502).json({ error: 'tts_upstream' });
+      return res.status(502).json({ error_code: 'TTS_UPSTREAM', error: 'tts_upstream' });
     }
   });
 

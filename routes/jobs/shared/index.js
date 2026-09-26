@@ -44,6 +44,7 @@ module.exports = {
 
   makeJobLogger: jobsMod.makeJobLogger,
   enqueueJob: queue.enqueueJob,
+  startBookJob: require('./start-job').startBookJob,
   createJob: jobsMod.createJob,
   updateJob: jobsMod.updateJob,
   tps: jobsMod.tps,
@@ -54,6 +55,7 @@ module.exports = {
   fmtTok: jobsMod.fmtTok,
   i18nError: jobsMod.i18nError,
   contentHttpError: jobsMod.contentHttpError,
+  emptyScopeError: jobsMod.emptyScopeError,
 
   _modelName: model._modelName,
   settledAll: ai.settledAll,

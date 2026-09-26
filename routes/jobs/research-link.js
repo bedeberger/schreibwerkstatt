@@ -13,7 +13,7 @@ const {
 } = require('./shared');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const researchLinkRouter = express.Router();
 const MAX_CANDIDATES = 200;
@@ -105,9 +105,7 @@ researchLinkRouter.post('/research-link', jsonBody, (req, res) => {
   if (!book_id || !item_id) return res.status(400).json({ error_code: 'INVALID_IDS' });
   setContext({ book: book_id });
   {
-    const { requireBookAccess, sendACLError } = require('../../lib/acl');
-    try { requireBookAccess(req, book_id, 'editor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, book_id, 'editor')) return;
   }
   const userEmail = sessionEmail(req);
   const entityKey = `${book_id}|${item_id}`;

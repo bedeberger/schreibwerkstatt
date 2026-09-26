@@ -30,8 +30,7 @@ const contentStore = require('../../lib/content-store');
 const { getBookSettings } = require('../../db/schema');
 const { effectiveTextsorte, saveStructureCheck, getStructureCheck } = require('../../db/textsorte');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const { pageBookGuard, journalisticBookSettings } = require('../../lib/page-guard');
 const { resolveProvider } = require('../../lib/ai');
 
@@ -206,9 +205,7 @@ strukturRouter.post('/struktur-check', jsonBody, (req, res) => {
     // sich das Buch ableiten liesse.
     book_id = toIntId(req.body?.book_id);
     if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-    setContext({ book: book_id });
-    try { requireBookAccess(req, book_id, 'editor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, book_id, 'editor')) return;
     if (!journalisticBookSettings(req, book_id)) {
       return res.status(400).json({ error_code: 'NOT_JOURNALISTIC_BOOK' });
     }

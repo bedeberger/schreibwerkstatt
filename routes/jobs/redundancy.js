@@ -10,15 +10,12 @@
 
 const express = require('express');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
-  createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, jsonBody, jobAbortControllers,
+  startBookJob,
 } = require('./shared');
 const embed = require('../../lib/embed');
 const semanticChunks = require('../../db/semantic-chunks');
 const { prepare, scanBlock, finalizePairs, findFigureDuplicates } = require('../../lib/redundancy');
-const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
 
 const redundancyRouter = express.Router();
 
@@ -113,20 +110,10 @@ function _clampThreshold(raw) {
   return Math.min(MAX_THRESHOLD, Math.max(MIN_THRESHOLD, t));
 }
 
-redundancyRouter.post('/redundancy', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-  if (!embed.isEnabled()) return res.status(400).json({ error_code: 'EMBED_DISABLED' });
-  const userEmail = sessionEmail(req);
-  const existing = findActiveJobId('redundancy', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const threshold = _clampThreshold(req.body?.threshold);
-  const jobId = createJob('redundancy', book_id, userEmail, 'job.label.redundancy', null, book_id);
-  enqueueJob(jobId, () => runRedundancyJob(jobId, book_id, threshold, userEmail));
-  res.json({ jobId });
-});
+redundancyRouter.post('/redundancy', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'redundancy', minRole: 'lektor', label: 'job.label.redundancy',
+  precheck: () => (embed.isEnabled() ? null : 'EMBED_DISABLED'),
+  run: (jobId, { bookId, userEmail }) => runRedundancyJob(jobId, bookId, _clampThreshold(req.body?.threshold), userEmail),
+}));
 
 module.exports = { redundancyRouter, runRedundancyJob };

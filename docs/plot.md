@@ -44,7 +44,7 @@ plot_threads (id, book_id→books CASCADE, user_email, name, farbe,
 
 ## Routen (CRUD)
 
-Alle unter `/plot` ([routes/plot.js](../routes/plot.js)), ACL via `requireBookAccess(req, bookId, 'editor')`. Akt-/Beat-Mutationen prüfen zusätzlich `user_email`-Owner.
+Alle unter `/plot` ([routes/plot.js](../routes/plot.js)), ACL via `guardBook(req, res, bookId, 'editor')`. Akt-/Beat-Mutationen prüfen zusätzlich `user_email`-Owner.
 
 | Methode | Pfad | Zweck |
 |---------|------|-------|

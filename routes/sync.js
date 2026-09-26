@@ -517,4 +517,4 @@ router.post('/book/:book_id', async (req, res) => {
   }
 });
 
-module.exports = { router, syncAllBooks, syncBook, syncPagesCache };
+module.exports = { router, syncAllBooks, syncBook };

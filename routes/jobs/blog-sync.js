@@ -23,7 +23,7 @@ const {
 const { splitDatePrefix, outgoingTitle } = require('../../lib/blog-title');
 const { assertBlogBook } = require('../../lib/buchtyp');
 const { getHeadline, headlineUpdatedAt } = require('../../db/headline');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { localIsoDate } = require('../../lib/local-date');
@@ -507,8 +507,7 @@ async function runBlogReconcileJob(jobId, bookId, userEmail) {
 }
 
 function _aclEditor(req, res, bookId) {
-  try { requireBookAccess(req, bookId, 'editor'); return true; }
-  catch (e) { if (sendACLError(res, e)) return false; throw e; }
+  return guardBook(req, res, bookId, 'editor');
 }
 
 blogSyncRouter.post('/blog-import', jsonBody, (req, res) => {

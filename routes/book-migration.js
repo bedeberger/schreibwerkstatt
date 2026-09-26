@@ -14,7 +14,7 @@ const { collectExtras } = require('../db/book-migration-data');
 const { slugify } = require('../lib/slug');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
+const { guardBook, sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 
@@ -33,8 +33,7 @@ router.get('/:bookId', async (req, res) => {
 
   // Extra-Bloecke enthalten potenziell personenbezogene Daten (Chats/Lektorat
   // aller Mitarbeitenden) → nur fuer Owner. Reiner Content-Export bleibt viewer.
-  try { requireBookAccess(req, bookId, wantsExtras ? 'owner' : 'viewer'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, wantsExtras ? 'owner' : 'viewer')) return;
 
   let book, tree;
   try {

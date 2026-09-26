@@ -33,7 +33,7 @@ router.post('/', requireAdmin, jsonBody, (req, res) => {
       position,
       createdBy: sessionEmail(req),
     });
-    logger.info(`Kategorie angelegt id=${created.id} name="${created.name}" by=${req.session.user.email}`);
+    logger.info(`Kategorie angelegt id=${created.id} name="${created.name}" by=${sessionEmail(req)}`);
     res.json({ category: created });
   } catch (e) {
     if (/too long/.test(e.message)) {
@@ -69,7 +69,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error_code: 'INVALID_ID' });
   const ok = categories.remove(id);
   if (!ok) return res.status(404).json({ error_code: 'CATEGORY_NOT_FOUND' });
-  logger.info(`Kategorie geloescht id=${id} by=${req.session.user.email}`);
+  logger.info(`Kategorie geloescht id=${id} by=${sessionEmail(req)}`);
   res.json({ ok: true });
 });
 

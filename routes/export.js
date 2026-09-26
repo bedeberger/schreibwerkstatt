@@ -15,7 +15,7 @@ const { buildExportFilename } = require('../lib/filenames');
 const { toIntId } = require('../lib/validate');
 const { setContext } = require('../lib/log-context');
 const { buildExportMeta, sendExportBuffer } = require('../lib/export-send');
-const { sessionEmail } = require('../lib/acl');
+const { guardBook, sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 
@@ -45,9 +45,7 @@ router.get('/:scope/:id/:fmt', async (req, res) => {
   }
   if (bundle.book?.id) setContext({ book: bundle.book.id });
   if (bundle.book?.id) {
-    const { requireBookAccess, sendACLError } = require('../lib/acl');
-    try { requireBookAccess(req, bundle.book.id, 'viewer'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bundle.book.id, 'viewer')) return;
   }
 
   const { pageIdsFromGroups } = require('../lib/bibliography');

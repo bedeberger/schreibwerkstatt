@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const {
-  db, getBookSettings, upsertBookByName,
+  db, getBookSettings,
   loadChapterReviewCache, saveChapterReviewCache,
   loadBookReviewCache, saveBookReviewCache,
 } = require('../../db/schema');
@@ -19,10 +19,10 @@ const { narrativeLabels } = require('./narrative-labels');
 const { loadReviewKomplettContext, loadReviewMotivContext, loadStrukturContext, loadWeltContext } = require('./review-context');
 const { applyQuoteVerification, belegHaystack } = require('../../lib/quote-verify');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
+const contentStore = require('../../lib/content-store');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 // Stabile, kurze Signatur für strukturierte Prompt-Vars (narrative,
 // reviewSchwerpunkt, komplettContext). Identischer Inhalt → identische Sig.
@@ -235,7 +235,6 @@ async function runReviewJob(jobId, bookId, bookName, userEmail) {
     r.profil = profil;
 
     const model = _modelName(appSettings.get('ai.provider') || 'claude');
-    if (bookName) upsertBookByName(parseInt(bookId), bookName);
     db.prepare('INSERT INTO book_reviews (book_id, reviewed_at, review_json, model, user_email) VALUES (?, ?, ?, ?, ?)')
       .run(parseInt(bookId), new Date().toISOString(), JSON.stringify(r), model, userEmail || null);
 
@@ -248,21 +247,25 @@ async function runReviewJob(jobId, bookId, bookName, userEmail) {
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
-reviewRouter.post('/review', jsonBody, (req, res) => {
-  const { book_name } = req.body;
+reviewRouter.post('/review', jsonBody, async (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  const { requireBookAccess, sendACLError } = require('../../lib/acl');
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
+  // Buchname aus dem Content-Store, nicht vom Client: er geht in Prompt und
+  // Cache-Signatur (buildBookReviewPagesSig).
+  let bookName = '';
+  try { bookName = (await contentStore.loadBook(book_id)).name || ''; }
+  catch (e) {
+    if (e?.status === 404) return res.status(404).json({ error_code: 'BOOK_NOT_FOUND' });
+    throw e;
+  }
   const userEmail = sessionEmail(req);
   const existing = findActiveJobId('review', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
-  const label = book_name ? 'job.label.reviewBook' : 'job.label.review';
-  const labelParams = book_name ? { name: book_name } : null;
+  const label = bookName ? 'job.label.reviewBook' : 'job.label.review';
+  const labelParams = bookName ? { name: bookName } : null;
   const jobId = createJob('review', book_id, userEmail, label, labelParams);
-  enqueueJob(jobId, () => runReviewJob(jobId, book_id, book_name || '', userEmail));
+  enqueueJob(jobId, () => runReviewJob(jobId, book_id, bookName, userEmail));
   res.json({ jobId });
 });
 

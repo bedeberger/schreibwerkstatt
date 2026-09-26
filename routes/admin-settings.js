@@ -20,6 +20,7 @@ const appSettings = require('../lib/app-settings');
 const { requireAdmin } = require('../lib/admin-mw');
 const modelList = require('../lib/model-list');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -41,7 +42,7 @@ router.put('/:key', express.json(), (req, res) => {
   const body = req.body || {};
   if (!('value' in body)) return res.status(400).json({ error_code: 'VALUE_REQUIRED' });
   if (!appSettings.isKnownKey(key)) return res.status(400).json({ error_code: 'UNKNOWN_KEY', key });
-  const updatedBy = req.session.user.email;
+  const updatedBy = sessionEmail(req);
   try {
     const stored = appSettings.set(key, body.value, { updatedBy });
     logger.info(`app-settings: ${key} updated`, { user: updatedBy });
@@ -58,7 +59,7 @@ router.put('/:key', express.json(), (req, res) => {
 
 router.delete('/:key', (req, res) => {
   const { key } = req.params;
-  appSettings.remove(key, { updatedBy: req.session.user.email });
+  appSettings.remove(key, { updatedBy: sessionEmail(req) });
   res.json({ ok: true, key, value: appSettings.get(key) });
 });
 
@@ -343,7 +344,7 @@ router.post('/smtp/test-send', express.json(), async (req, res) => {
     locale: 'de',
   });
   if (r.sent) {
-    logger.info(`smtp/test-send: ok to=${to} latency=${r.latencyMs}ms`, { user: req.session.user.email });
+    logger.info(`smtp/test-send: ok to=${to} latency=${r.latencyMs}ms`, { user: sessionEmail(req) });
     return res.json({ ok: true, latency_ms: r.latencyMs });
   }
   return res.json({ ok: false, error: r.reason, missing: r.missing, detail: r.error });

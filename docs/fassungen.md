@@ -20,7 +20,7 @@ Eine Zeile pro Fassung in `book_snapshots` ([db/book-snapshots.js](../db/book-sn
 
 ## Routen ([routes/snapshots.js](../routes/snapshots.js))
 
-Alle book-scoped (`setContext({ book })`), ACL via `requireBookAccess`. Synchroner Pfad (reiner DB-Read/-Write, kein KI-/Netz-Call) — bewusste Ausnahme zur Job-Queue-Regel, analog zum Capture.
+Alle book-scoped (`setContext({ book })`), ACL via `guardBook`. Synchroner Pfad (reiner DB-Read/-Write, kein KI-/Netz-Call) — bewusste Ausnahme zur Job-Queue-Regel, analog zum Capture.
 
 - `GET /snapshots/:bookId` (viewer) — Meta-Liste **ohne** `content_json`/`extras_json` (können MB groß sein), `has_extras` als Flag, DESC nach `created_at`.
 - `GET /snapshots/:bookId/:id` (viewer) — Vollzeile inkl. geparstem `content` + `published_at` + `publication` (Text-Meta ohne Cover/Foto-BLOBs, für den Metadaten-Diff) + `extras_summary` (Zähl-Übersicht). Quelle für Diff, Reader **und** Publikations-Metadaten-Diff.

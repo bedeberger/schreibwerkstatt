@@ -14,15 +14,13 @@ const express = require('express');
 const {
   makeJobLogger, updateJob, completeJob, failJob,
   createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+  startBookJob,
 } = require('./shared');
 const motifsDb = require('../../db/motifs');
 const embed = require('../../lib/embed');
 const { semanticQuery } = require('../../lib/semantic-retrieval');
 const searchIndex = require('../../lib/search');
 const contentStore = require('../../lib/content-store');
-const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
 const logger = require('../../logger');
 
 const motifScanRouter = express.Router();
@@ -157,19 +155,11 @@ async function scanAllBooks() {
   return { enqueued, skipped };
 }
 
-motifScanRouter.post('/motif-scan', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-  const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const existing = findActiveJobId('motif-scan', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const jobId = createJob('motif-scan', book_id, userEmail, 'job.label.motivScan', null, book_id);
-  enqueueJob(jobId, () => runMotifScanJob(jobId, book_id, userEmail));
-  res.json({ jobId });
-});
+motifScanRouter.post('/motif-scan', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'motif-scan',
+  minRole: 'lektor',
+  label: 'job.label.motivScan',
+  run: (jobId, { bookId, userEmail }) => runMotifScanJob(jobId, bookId, userEmail),
+}));
 
 module.exports = { motifScanRouter, runMotifScanJob, scanAllBooks, _triggerQuery, _computeTopK };

@@ -13,8 +13,7 @@ const {
   LEXICON_VERSION, MATTR_WINDOW, MTLD_MIN_TOKENS, HEAPS_MIN_TOKENS, HAPAX_LIMIT,
 } = require('../lib/lexicon');
 const { toIntId } = require('../lib/validate');
-const { setContext } = require('../lib/log-context');
-const { requireBookAccess, sendACLError } = require('../lib/acl');
+const { guardBook } = require('../lib/acl');
 
 const router = express.Router();
 
@@ -26,9 +25,7 @@ const router = express.Router();
 router.get('/:book_id', (req, res) => {
   const bookId = toIntId(req.params.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'viewer')) return;
 
   const stats = lexiconDb.getBookLexicon(bookId);
   const thresholds = {

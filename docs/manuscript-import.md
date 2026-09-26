@@ -64,7 +64,7 @@ Parser sind dieselben wie dort ([lib/import-parsers/dispatch.js](../lib/import-p
 - **Namens-Dedup unter Geschwistern, nicht buchweit.** Zwei gleichnamige Überschriften nebeneinander wären im Organizer nicht unterscheidbar; dieselbe Überschrift in zwei verschiedenen Teilen dagegen schon. Kapitel und Seiten zählen getrennt — eine Seite trägt bewusst den Namen ihres Kapitels, wenn das Dokument keine eigene Seiten-Überschrift hat.
 - **Die verwendete Zuordnung steht im Job-Ergebnis** (`headingMap`) und wird in der Karte angezeigt: sie ist die Erklärung dafür, warum die Gliederung so aussieht, wie sie aussieht.
 - **Vorschau schreibt nie.** Sie ist der einzige Grund, warum ein Fehlgriff bei der Zuordnung keinen Import kostet.
-- **`ACL`:** `merge` verlangt `editor` auf dem Zielbuch (`requireBookAccess`), `new-book` legt an und macht den User zum Owner.
+- **`ACL`:** `merge` verlangt `editor` auf dem Zielbuch (`guardBook`), `new-book` legt an und macht den User zum Owner.
 
 ## Frontend
 

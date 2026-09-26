@@ -14,6 +14,7 @@ const appUsers = require('../db/app-users');
 const logger = require('../logger');
 const { parseLines } = require('../lib/log-parser');
 const { readLinesReverse, listRotatedFiles } = require('../lib/log-reverse-read');
+const { sessionEmail } = require('../lib/acl');
 
 const LOG_FILE = path.join(__dirname, '..', 'schreibwerkstatt.log');
 const MAX_FILES = 4;
@@ -143,7 +144,7 @@ router.get('/download', (req, res) => {
   }
   const file = files[idx];
   try {
-    appUsers.recordAuditEvent(req.session.user.email, 'admin.logs.download', {
+    appUsers.recordAuditEvent(sessionEmail(req), 'admin.logs.download', {
       ip: _clientIp(req),
       userAgent: req.headers['user-agent'] || null,
       meta: { file: path.basename(file) },

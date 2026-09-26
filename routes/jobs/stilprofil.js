@@ -5,16 +5,13 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   aiCall, getPrompts, getBookPrompts,
   tps,
-  createJob, enqueueJob, findActiveJobId,
   jsonBody,
   loadOrderedBookContents, loadPageContents, groupByChapter, buildSinglePassBookText,
   contentHttpError, chunkLimitsFor,
+  startBookJob,
 } = require('./shared');
 const { BATCH_SIZE } = require('./shared/loader');
 const { resolveProvider } = require('../../lib/ai');
-const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { sessionEmail } = require('../../lib/acl');
 
 const stilprofilRouter = express.Router();
 
@@ -91,19 +88,12 @@ async function runStilprofilJob(jobId, bookId, userEmail) {
   }
 }
 
-stilprofilRouter.post('/stilprofil', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  const { requireBookAccess, sendACLError } = require('../../lib/acl');
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-  const userEmail = sessionEmail(req);
-  const existing = findActiveJobId('stilprofil', String(book_id), userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const jobId = createJob('stilprofil', book_id, userEmail, 'job.label.stilprofil', {}, String(book_id));
-  enqueueJob(jobId, () => runStilprofilJob(jobId, book_id, userEmail));
-  res.json({ jobId });
-});
+stilprofilRouter.post('/stilprofil', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'stilprofil',
+  minRole: 'editor',
+  label: 'job.label.stilprofil',
+  labelParams: {},
+  run: (jobId, { bookId, userEmail }) => runStilprofilJob(jobId, bookId, userEmail),
+}));
 
 module.exports = { stilprofilRouter, runStilprofilJob };

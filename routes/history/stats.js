@@ -15,6 +15,7 @@ const { METRICS_VERSION } = require('../../lib/page-index');
 const { chapterGrowthRows } = require('../../db/chapter-growth');
 const { buildChapterGrowth } = require('../../lib/chapter-growth');
 const { currentTz } = require('../../lib/local-date');
+const { resolvePageBookIds } = require('../../lib/content-ownership');
 
 function register(router) {
   // Seiten-Stats-Cache: alle gecachten Stats für ein Buch (geteilter Cache, nicht user-spezifisch)
@@ -44,12 +45,7 @@ function register(router) {
       logger.warn(`page-stats/batch: ${items.length} Rows ohne gueltige page_id verworfen.`);
       return res.json({ ok: true, count: 0, skipped: items.length });
     }
-    const placeholders = pageIds.map(() => '?').join(',');
-    const ownerByPage = new Map(
-      db.prepare(`SELECT page_id, book_id FROM pages WHERE page_id IN (${placeholders})`)
-        .all(...pageIds)
-        .map(r => [r.page_id, r.book_id])
-    );
+    const ownerByPage = resolvePageBookIds(pageIds);
 
     // ACL: nur Buecher, fuer die der User Editor-Zugriff hat. page_stats ist ein
     // geteilter Cache — ohne diese Pruefung koennte jeder eingeloggte User die
@@ -212,12 +208,12 @@ function register(router) {
   router.get('/style-samples/:book_id', (req, res) => {
     const bucket = String(req.query.bucket || '');
     if (!isSampleBucket(bucket)) {
-      return res.status(400).json({ error: 'Unbekannter Beispiel-Eimer.', error_code: 'INVALID_SAMPLE_BUCKET' });
+      return res.status(400).json({ error_code: 'INVALID_SAMPLE_BUCKET' });
     }
     const raw = String(req.query.chapter || '');
     const chapterId = (raw === UNCAT || raw === '') ? null : toIntId(raw);
     if (raw && raw !== UNCAT && !chapterId) {
-      return res.status(400).json({ error: 'Ungueltige Kapitel-ID.', error_code: 'INVALID_CHAPTER_ID' });
+      return res.status(400).json({ error_code: 'INVALID_CHAPTER_ID' });
     }
     const rows = loadStyleSamples(req.bookId, chapterId);
     res.json({

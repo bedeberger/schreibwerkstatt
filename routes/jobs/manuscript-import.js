@@ -27,10 +27,9 @@ const {
 } = require('../../lib/import-parsers/manuscript-split');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const bookAccess = require('../../db/book-access');
 const { getBookLocale } = require('../../db/schema');
-const { db } = require('../../db/connection');
 const logger = require('../../logger');
 
 const router = express.Router();
@@ -126,8 +125,7 @@ async function runManuscriptImportJob(jobId, { userEmail, mode, bookName, bookId
       );
       effBookId = created.id;
       try {
-        db.prepare('UPDATE books SET owner_email = COALESCE(owner_email, ?) WHERE book_id = ?')
-          .run(userEmail, effBookId);
+        contentStore.setBookOwner(effBookId, userEmail, { onlyIfUnset: true });
         bookAccess.grantAccess(effBookId, userEmail, 'owner', userEmail);
       } catch (gErr) {
         logger.warn(`Auto-Owner-Grant fuer book=${effBookId} fehlgeschlagen: ${gErr.message}`);
@@ -309,9 +307,7 @@ router.post('/manuscript-import', rawDocBody, async (req, res) => {
   if (!guarded) return;
 
   if (mode === 'merge') {
-    setContext({ book: bookId });
-    try { requireBookAccess(req, bookId, 'editor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'editor')) return;
   }
 
   const dedupKey = mode === 'merge' ? `merge:${bookId}` : `new:${bookName}`;
@@ -337,4 +333,4 @@ router.post('/manuscript-import', rawDocBody, async (req, res) => {
   res.status(202).json({ jobId });
 });
 
-module.exports = { manuscriptImportRouter: router, runManuscriptImportJob, manuscriptBuffers };
+module.exports = { manuscriptImportRouter: router, runManuscriptImportJob };

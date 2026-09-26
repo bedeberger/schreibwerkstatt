@@ -7,7 +7,7 @@ const appUsers = require('../db/app-users');
 const bookAccess = require('../db/book-access');
 const bookCategories = require('../db/book-categories');
 const books = require('../db/books');
-const { ACLError, aclParamGuard, requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
+const { guardBook, aclParamGuard, sessionEmail } = require('../lib/acl');
 const { resolvePageBookId } = require('../lib/content-ownership');
 const { db } = require('../db/connection');
 const { NOW_ISO_SQL } = require('../db/now');
@@ -191,21 +191,19 @@ router.put('/:book_id/category', aclParamGuard('editor'), jsonBody, (req, res) =
 // um Findings sicher anzuwenden; Editor/Owner ebenfalls). Buch-ID wird per
 // Page-ID nachgeladen.
 
-function _resolvePageRole(req, pageId, minRole) {
+// Antwortet selbst (404/401/403) und liefert dann null; sonst Buch + Rolle.
+// `guardBook` setzt den Log-Context und hinterlegt die Rolle in `req.bookRole`.
+function _guardPageRole(req, res, pageId, minRole) {
   const bookId = resolvePageBookId(pageId);
-  if (!bookId) throw new ACLError('PAGE_NOT_FOUND', 404);
-  const role = requireBookAccess(req, bookId, minRole);
-  return { bookId, role };
+  if (!bookId) { res.status(404).json({ error_code: 'PAGE_NOT_FOUND' }); return null; }
+  if (!guardBook(req, res, bookId, minRole)) return null;
+  return { bookId, role: req.bookRole };
 }
 
 router.get('/pages/:page_id/lock', (req, res) => {
   const pageId = parseInt(req.params.page_id, 10);
   if (!Number.isInteger(pageId) || pageId <= 0) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
-  try {
-    _resolvePageRole(req, pageId, 'viewer');
-  } catch (e) {
-    const sent = sendACLError(res, e); if (sent) return; throw e;
-  }
+  if (!_guardPageRole(req, res, pageId, 'viewer')) return;
   const lock = bookAccess.getPageLock(pageId);
   res.json({ lock: lock || null });
 });
@@ -221,12 +219,9 @@ router.post('/pages/:page_id/lock', jsonBody, (req, res) => {
   // nur 'editor'-Rolle, 'lektorat' braucht 'lektor'-Rolle.
   const reason = _VALID_LOCK_REASONS.has(req.body?.reason) ? req.body.reason : 'lektorat';
   const minRole = reason === 'edit' ? 'editor' : 'lektor';
-  let bookId;
-  try {
-    ({ bookId } = _resolvePageRole(req, pageId, minRole));
-  } catch (e) {
-    const sent = sendACLError(res, e); if (sent) return; throw e;
-  }
+  const g = _guardPageRole(req, res, pageId, minRole);
+  if (!g) return;
+  const { bookId } = g;
   try {
     const lock = bookAccess.acquireLock(pageId, bookId, email, reason);
     res.json({ lock });
@@ -269,12 +264,9 @@ router.delete('/pages/:page_id/lock', (req, res) => {
   if (!Number.isInteger(pageId) || pageId <= 0) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });
   const email = sessionEmail(req);
   const force = req.query?.force === 'true' || req.query?.force === '1';
-  let bookId, role;
-  try {
-    ({ bookId, role } = _resolvePageRole(req, pageId, force ? 'owner' : 'lektor'));
-  } catch (e) {
-    const sent = sendACLError(res, e); if (sent) return; throw e;
-  }
+  const g = _guardPageRole(req, res, pageId, force ? 'owner' : 'lektor');
+  if (!g) return;
+  const { bookId, role } = g;
   if (force) {
     const lock = bookAccess.getPageLock(pageId);
     const released = bookAccess.releaseLock(pageId, email, { force: true });

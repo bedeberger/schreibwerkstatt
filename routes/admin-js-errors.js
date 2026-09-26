@@ -10,6 +10,7 @@ const { setContext } = require('../lib/log-context');
 const { listJsErrors, deleteJsError, clearJsErrors } = require('../db/js-errors');
 const appUsers = require('../db/app-users');
 const logger = require('../logger');
+const { sessionEmail } = require('../lib/acl');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -37,7 +38,7 @@ router.delete('/:id', (req, res) => {
   const ok = deleteJsError(req.params.id);
   if (!ok) return res.status(404).json({ error_code: 'NOT_FOUND' });
   try {
-    appUsers.recordAuditEvent(req.session.user.email, 'admin.js_errors.delete', {
+    appUsers.recordAuditEvent(sessionEmail(req), 'admin.js_errors.delete', {
       ip: _clientIp(req),
       userAgent: req.headers['user-agent'] || null,
       meta: { id: parseInt(req.params.id, 10) },
@@ -58,7 +59,7 @@ router.delete('/', (req, res) => {
     return res.status(500).json({ error_code: 'DB_ERROR' });
   }
   try {
-    appUsers.recordAuditEvent(req.session.user.email, 'admin.js_errors.clear', {
+    appUsers.recordAuditEvent(sessionEmail(req), 'admin.js_errors.clear', {
       ip: _clientIp(req),
       userAgent: req.headers['user-agent'] || null,
       meta: { deleted },

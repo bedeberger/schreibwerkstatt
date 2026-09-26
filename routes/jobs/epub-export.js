@@ -11,7 +11,7 @@ const express = require('express');
 const {
   jobs, createJob, enqueueJob, jobAbortControllers,
   updateJob, completeJob, failJob, makeJobLogger,
-  findActiveJobId, i18nError, jsonBody,
+  findActiveJobId, i18nError, emptyScopeError, jsonBody,
 } = require('./shared');
 const { getBookSettings } = require('../../db/schema');
 const { getOwnerEmail } = require('../../db/book-access');
@@ -27,7 +27,7 @@ const { buildExportFilename } = require('../../lib/filenames');
 const { resolveSlug } = require('../../lib/export-builders/shared');
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 const router = express.Router();
 const VALID_SCOPES = new Set(['book', 'chapter', 'page']);
@@ -156,9 +156,8 @@ async function runEpubExportJob(jobId, { scope, entityId, includeSubchapters, sn
     });
   } catch (e) {
     if (e?.name === 'AbortError' || e?.message === 'job.cancelled') { failJob(jobId, e); return; }
-    if (e?.code === 'BOOK_EMPTY')    { failJob(jobId, i18nError('job.error.bookEmpty'));    return; }
-    if (e?.code === 'CHAPTER_EMPTY') { failJob(jobId, i18nError('job.error.chapterEmpty')); return; }
-    if (e?.code === 'PAGE_EMPTY')    { failJob(jobId, i18nError('job.error.pageEmpty'));    return; }
+    const empty = emptyScopeError(e);
+    if (empty) { failJob(jobId, empty); return; }
     log.error(`epub-export job ${jobId}: ${e.message}`);
     failJob(jobId, e);
   }
@@ -198,9 +197,7 @@ router.post('/epub-export', jsonBody, async (req, res) => {
   if (bookId) setContext({ book: bookId });
 
   if (bookId) {
-    const { requireBookAccess, sendACLError } = require('../../lib/acl');
-    try { requireBookAccess(req, bookId, 'viewer'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'viewer')) return;
   }
 
   const dedupId = `${scope}:${entityId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}`;

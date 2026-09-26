@@ -7,6 +7,7 @@ const { toIntId, inClause } = require('../lib/validate');
 const { aclParamGuard, sessionEmail } = require('../lib/acl');
 const { bookParamHandler } = require('../lib/log-context');
 const searchIndex = require('../lib/search');
+const { pageChapters } = require('../db/content-names');
 
 const router = express.Router();
 router.param('book_id', aclParamGuard('editor'));
@@ -60,14 +61,9 @@ router.get('/:book_id', (req, res) => {
   )];
   const pageChapterMap = {};
   if (derivePageIds.length) {
-    const { sql: pgSql, values: pgVals } = inClause(derivePageIds);
-    const pcRows = db.prepare(`
-      SELECT p.page_id, p.chapter_id, c.chapter_name
-      FROM pages p
-      JOIN chapters c ON c.chapter_id = p.chapter_id
-      WHERE p.page_id IN ${pgSql}
-    `).all(...pgVals);
-    for (const pc of pcRows) pageChapterMap[pc.page_id] = { chapter_id: pc.chapter_id, name: pc.chapter_name, haeufigkeit: 1, derived: true };
+    for (const [pageId, pc] of pageChapters(derivePageIds)) {
+      pageChapterMap[pageId] = { chapter_id: pc.chapter_id, name: pc.chapter_name, haeufigkeit: 1, derived: true };
+    }
   }
 
   const orte = rows.map(r => ({

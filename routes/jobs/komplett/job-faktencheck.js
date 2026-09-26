@@ -17,15 +17,16 @@ const {
   getBookSettings, saveFaktencheckIssues,
 } = require('../../../db/schema');
 const {
-  makeJobLogger, updateJob, completeJob, failJob,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError,
   getPrompts,
   jobAbortControllers, settledAll, tps,
 } = require('../shared');
-const { callAIWithTools, parseJSON } = require('../../../lib/ai');
+const { callAIWithTools, parseJSON, getContextConfigFor } = require('../../../lib/ai');
 const appSettings = require('../../../lib/app-settings');
 const { setContext } = require('../../../lib/log-context');
 const { makePhaseTimer } = require('./utils');
 const { _komplettAiOverrides } = require('./job-shared');
+const { chapterIdsByName, listWorldFactsWithChapterNames } = require('../../../db/content-names');
 
 // Modellname für den Cost-Ledger / Check-Zeile (parallel zu _modelName in remap.js).
 function _factcheckModelName(provider) {
@@ -69,15 +70,7 @@ function _narrativeYearSpan(bookIdInt, email) {
 function buildFactCheckCandidates(bookIdInt, email) {
   const { weltfakten_real_pruefen } = getBookSettings(bookIdInt, email);
   if (!weltfakten_real_pruefen) return { candidates: [], total: 0 };
-  const rows = db.prepare(`
-    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, c.chapter_name
-      FROM world_facts wf
-      LEFT JOIN world_fact_chapters wfc ON wfc.fact_id = wf.id
-      LEFT JOIN chapters c ON c.chapter_id = wfc.chapter_id
-     WHERE wf.book_id = ? AND wf.user_email IS ?
-       AND wf.kategorie IN (${FACTCHECK_CATEGORIES.map(() => '?').join(',')})
-     ORDER BY wf.sort_order, wf.id
-  `).all(bookIdInt, email, ...FACTCHECK_CATEGORIES);
+  const rows = listWorldFactsWithChapterNames(bookIdInt, email, FACTCHECK_CATEGORIES);
   // Bridge-Zeilen (1 je Kapitel) zu einem Kandidaten je Fakt gruppieren.
   const byId = new Map();
   for (const r of rows) {
@@ -91,14 +84,23 @@ function buildFactCheckCandidates(bookIdInt, email) {
 
 // Ein Judge-Call mit Web-Suche. Server-Tool-Turns können pausieren (`pause_turn`) → begrenzt
 // fortsetzen. Gibt den finalen Text zurück (JSON, ggf. mit Zitat-Prosa davor → parseJSON-Fallback).
-async function _judgeOneFact(tok, userPrompt, systemPrompt, signal) {
+// Ein am max_tokens-Deckel abgeschnittenes Urteil wirft, BEVOR geparst wird: parseJSON
+// repariert tolerant und machte aus dem Rumpf sonst ein scheinbar vollständiges Urteil.
+async function _judgeOneFact(tok, userPrompt, systemPrompt, signal, callTools = callAIWithTools) {
   let messages = [{ role: 'user', content: userPrompt }];
   let text = '';
   for (let turn = 0; turn < _MAX_JUDGE_TURNS; turn++) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    const r = await callAIWithTools(messages, systemPrompt, [WEB_SEARCH_TOOL], null, null, signal, 'claude');
+    const r = await callTools(messages, systemPrompt, [WEB_SEARCH_TOOL], null, null, signal, 'claude');
     tok.in += r.tokensIn || 0;
     tok.out += r.tokensOut || 0;
+    if (r.truncated || r.stopReason === 'max_tokens') {
+      const tokIn = r.tokensIn || 0;
+      const tokOut = r.tokensOut || 0;
+      throw i18nError('job.error.aiTruncated', {
+        max: getContextConfigFor('claude').maxTokensOut, tokIn, tokOut, total: tokIn + tokOut,
+      });
+    }
     if (r.text) text = r.text;
     if (r.stopReason === 'pause_turn') {
       messages.push({ role: 'assistant', content: r.rawContentBlocks });
@@ -139,10 +141,7 @@ async function runFaktencheckJob(jobId, bookId, bookName, userEmail, provider = 
 
     const spanne = _narrativeYearSpan(bookIdInt, email);
     // Auflösungs-Maps für saveFaktencheckIssues (Kapitel-Namen → chapter_id; figNameToId ungenutzt, da Faktenfehler keine Figuren tragen).
-    const chNameToId = Object.fromEntries(
-      db.prepare('SELECT chapter_name, chapter_id FROM chapters WHERE book_id = ?').all(bookIdInt)
-        .map(r => [r.chapter_name, r.chapter_id])
-    );
+    const chNameToId = chapterIdsByName(bookIdInt);
     const figNameToId = Object.fromEntries(
       db.prepare('SELECT name, fig_id FROM figures WHERE book_id = ? AND user_email IS ?').all(bookIdInt, email)
         .map(r => [r.name, r.fig_id])
@@ -187,6 +186,13 @@ async function runFaktencheckJob(jobId, bookId, bookName, userEmail, provider = 
     // AbortError gezielt re-raisen (settledAll fängt Rejects ab).
     const aborted = settled.find(r => r.status === 'rejected' && r.reason?.name === 'AbortError');
     if (aborted) throw aborted.reason;
+    // Verworfene Urteile (abgeschnitten, Provider-Fehler) sind ungeprüfte Fakten, keine
+    // „korrekten" — der Lauf sagt, wie viele es waren, statt sie still zu schlucken.
+    const failed = settled.filter(r => r.status === 'rejected');
+    if (failed.length) {
+      warnings.push({ key: 'job.warn.factcheckJudgeFailed', params: { count: failed.length, checked: candidates.length } });
+      log.warn(`Faktencheck: ${failed.length}/${candidates.length} Urteile verworfen (${failed[0].reason?.message || failed[0].reason}).`);
+    }
     const probleme = settled.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value);
     pt.mark('Judge');
 
@@ -210,4 +216,4 @@ async function runFaktencheckJob(jobId, bookId, bookName, userEmail, provider = 
   }
 }
 
-module.exports = { runFaktencheckJob, buildFactCheckCandidates, _narrativeYearSpan, FACTCHECK_CATEGORIES, _FACTCHECK_CANDIDATE_CAP };
+module.exports = { runFaktencheckJob, buildFactCheckCandidates, _judgeOneFact, _FACTCHECK_CANDIDATE_CAP };

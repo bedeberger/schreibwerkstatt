@@ -118,7 +118,7 @@ Beim Lesen einer Buchseite (Notebook-Editor, **Read-Modus**) erscheinen Leser-Ko
 
 ## Sicherheits-Invarianten
 
-- **Owner-Check**: jede `/share/api/*`-Route filtert via `link.owner_email === req.session.user.email`. ACL aufs Buch (`editor`+) wird beim `POST /share/api/links` per [lib/acl.js](../lib/acl.js)#`requireBookAccess` geprüft.
+- **Owner-Check**: jede `/share/api/*`-Route filtert via `link.owner_email === sessionEmail(req)`. ACL aufs Buch (`editor`+) wird beim `POST /share/api/links` per [lib/acl.js](../lib/acl.js)#`guardBook` geprüft.
 - **CSRF bewusst aus**: Reader-Comment-POST kommt explizit cross-origin (Link auf WhatsApp/Mail → fremde Domain → eigene Domain). Kein State-Change auf Owner-Account, Body steht sowieso im UI — Risiko akzeptiert.
 - **XSS**: Page-HTML aus DB ist bereits via html-clean sanitisiert; alles andere durchläuft `escHtml`. Owner-Karte rendert Kommentar-Body via Alpine-Text-Bindung, **keinen** `x-html`-Sink.
 - **GDPR**: nur IP-Hash gespeichert. Reader-Name optional, vor Render Server-Side escaped.

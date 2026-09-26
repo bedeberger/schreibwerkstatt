@@ -1,7 +1,7 @@
 'use strict';
 // Plot-Werkstatt (Beat-Board): CRUD für Akte (Spalten) + Beats (Karten) +
 // Drag-&-Drop-Reordering. Pro Buch + User skopiert; ACL-Guard via
-// requireBookAccess('editor') — planendes Welt-/Plot-Werkzeug, kein Lesezugang.
+// guardBook('editor') — planendes Welt-/Plot-Werkzeug, kein Lesezugang.
 //
 // KI-Assistenz (Brainstorm + Consistency) läuft separat über die Job-Queue
 // (routes/jobs/plot.js), nicht hier.
@@ -11,8 +11,7 @@ const { getDraftFigure, listFigurenWithDetails } = require('../db/schema');
 const plotDb = require('../db/plot');
 const { toIntId } = require('../lib/validate');
 const { resolveChapterBookId } = require('../lib/content-ownership');
-const { setContext } = require('../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
+const { guardBook, sessionEmail } = require('../lib/acl');
 const appSettings = require('../lib/app-settings');
 const { computeTimeFindings } = require('../lib/plot-time-consistency');
 const { yearFromString, bookYearSpan } = require('../lib/figure-years');
@@ -34,24 +33,20 @@ const MAX_ZEIT = 120;
 const MAX_ACT_NAME = 120;
 const MAX_THREAD_NAME = 120;
 
-function _guard(req, res, bookId, minRole = 'editor') {
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, minRole); return true; }
-  catch (e) { return !sendACLError(res, e); }
-}
-
 // Entity per :id laden + Owner (user_email) + Buch-ACL prüfen. Gibt die Entity
 // zurück oder null (die passende Fehler-Response wurde dann bereits gesendet).
 // SSoT für die sonst in jedem :id-Handler (Akt/Beat/Thread/Run) wiederholte
 // Login-/ID-/Owner-/Guard-Kette.
+// Der Login-Check steht VOR dem Guard, weil der Besitz über die E-Mail geprüft
+// wird — ohne ihn erschiene „nicht angemeldet" als 404. Gleicher Code wie der Guard.
 function _loadOwned(req, res, getFn, notFoundCode) {
   const userEmail = sessionEmail(req);
-  if (!userEmail) { res.status(401).json({ error_code: 'LOGIN_REQ' }); return null; }
+  if (!userEmail) { res.status(401).json({ error_code: 'NOT_LOGGED_IN' }); return null; }
   const id = toIntId(req.params.id);
   if (!id) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
   const row = getFn(id);
   if (!row || row.user_email !== userEmail) { res.status(404).json({ error_code: notFoundCode }); return null; }
-  if (!_guard(req, res, row.book_id)) return null;
+  if (!guardBook(req, res, row.book_id, 'editor')) return null;
   return row;
 }
 
@@ -59,15 +54,13 @@ function _loadOwned(req, res, getFn, notFoundCode) {
 // einem Schritt. Gibt { userEmail, bookId } zurück oder null (die passende
 // Fehler-Response wurde dann bereits gesendet). Pendant zu _loadOwned für die
 // :id-Handler — SSoT für die sonst in jedem GET-Collection-Handler wiederholte
-// Login-/book_id-/Guard-Kette. Der Guard läuft VOR handler-spezifischen
+// book_id-/Guard-Kette (den Login prüft der Guard). Der Guard läuft VOR handler-spezifischen
 // Zusatz-Validierungen (z.B. draft_id) — kein Leak an nicht-autorisierte Aufrufer.
 function _requireBook(req, res) {
-  const userEmail = sessionEmail(req);
-  if (!userEmail) { res.status(401).json({ error_code: 'LOGIN_REQ' }); return null; }
   const bookId = toIntId(req.query.book_id);
   if (!bookId) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
-  if (!_guard(req, res, bookId)) return null;
-  return { userEmail, bookId };
+  if (!guardBook(req, res, bookId, 'editor')) return null;
+  return { userEmail: sessionEmail(req), bookId };
 }
 
 // chapter_id muss zum Buch gehören, sonst NULL (kein Fremd-Verweis).
@@ -205,14 +198,13 @@ router.get('/chapter-beat-counts', (req, res) => {
 // ── Akte ─────────────────────────────────────────────────────────────────────
 router.post('/acts', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.body?.book_id);
   const name = (req.body?.name || '').toString().trim();
   const farbe = req.body?.farbe ? String(req.body.farbe).slice(0, 32) : null;
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
   if (!name)   return res.status(400).json({ error_code: 'NAME_REQ' });
   if (name.length > MAX_ACT_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
-  if (!_guard(req, res, bookId)) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   // thread_id optional: gesetzt → strang-eigener Akt (Hybrid). Fremd/leer → NULL
   // (geteilter Akt). Validierung gegen (Buch, User) via _validThreadId.
   const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
@@ -249,12 +241,11 @@ router.delete('/acts/:id', (req, res) => {
 
 router.put('/acts/order', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.body?.book_id);
   const order = Array.isArray(req.body?.order) ? req.body.order : null;
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
   if (!order)  return res.status(400).json({ error_code: 'ORDER_REQ' });
-  if (!_guard(req, res, bookId)) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   plotDb.reorderActs(bookId, userEmail, order);
   res.json({ ok: true });
 });
@@ -262,14 +253,13 @@ router.put('/acts/order', jsonBody, (req, res) => {
 // ── Handlungsstränge (Swimlanes) ───────────────────────────────────────────
 router.post('/threads', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.body?.book_id);
   const name = (req.body?.name || '').toString().trim();
   const farbe = req.body?.farbe ? String(req.body.farbe).slice(0, 32) : null;
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
   if (!name)   return res.status(400).json({ error_code: 'NAME_REQ' });
   if (name.length > MAX_THREAD_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
-  if (!_guard(req, res, bookId)) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   const figureId = _resolveThreadFigure(bookId, userEmail, req.body?.figure_id);
   const draftFigureId = _resolveThreadDraftFigure(bookId, userEmail, req.body?.draft_figure_id);
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
@@ -315,12 +305,11 @@ router.delete('/threads/:id', (req, res) => {
 
 router.put('/threads/order', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.body?.book_id);
   const order = Array.isArray(req.body?.order) ? req.body.order : null;
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
   if (!order)  return res.status(400).json({ error_code: 'ORDER_REQ' });
-  if (!_guard(req, res, bookId)) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   plotDb.reorderThreads(bookId, userEmail, order);
   res.json({ ok: true });
 });
@@ -354,7 +343,6 @@ router.delete('/threads/:id/fork-acts', (req, res) => {
 // ── Beats ──────────────────────────────────────────────────────────────────
 router.post('/beats', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.body?.book_id);
   const actId = toIntId(req.body?.act_id);
   const titel = (req.body?.titel || '').toString().trim();
@@ -362,7 +350,7 @@ router.post('/beats', jsonBody, (req, res) => {
   if (!actId)  return res.status(400).json({ error_code: 'ACTID_REQ' });
   if (!titel)  return res.status(400).json({ error_code: 'TITEL_REQ' });
   if (titel.length > MAX_TITEL) return res.status(400).json({ error_code: 'TITEL_TOO_LONG' });
-  if (!_guard(req, res, bookId)) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
 
   const act = plotDb.getAct(actId);
   if (!act || act.book_id !== bookId || act.user_email !== userEmail) {
@@ -471,12 +459,11 @@ router.delete('/beats/:id', (req, res) => {
 
 router.put('/beats/order', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.body?.book_id);
   const order = Array.isArray(req.body?.order) ? req.body.order : null;
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
   if (!order)  return res.status(400).json({ error_code: 'ORDER_REQ' });
-  if (!_guard(req, res, bookId)) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   plotDb.reorderBeats(bookId, userEmail, order);
   res.json({ ok: true });
 });
@@ -487,10 +474,9 @@ router.put('/beats/order', jsonBody, (req, res) => {
 const _REL_ERR = { SELF_RELATION: 'SELF_RELATION', BEAT_MISMATCH: 'BEAT_MISMATCH', BEAT_REQUIRED: 'BEAT_REQUIRED', TYP_REQUIRED: 'TYP_REQUIRED' };
 router.post('/beat-relations', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = toIntId(req.body?.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
-  if (!_guard(req, res, bookId)) return;
+  if (!guardBook(req, res, bookId, 'editor')) return;
   try {
     const rel = plotDb.createBeatRelation(bookId, userEmail, {
       fromBeatId: toIntId(req.body?.from_beat_id),

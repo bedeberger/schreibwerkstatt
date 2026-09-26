@@ -11,6 +11,7 @@ const { setContext } = require('../lib/log-context');
 const appUsers = require('../db/app-users');
 const bookAccess = require('../db/book-access');
 const { db } = require('../db/connection');
+const contentStore = require('../lib/content-store');
 const { toIntId } = require('../lib/validate');
 const logger = require('../logger');
 const { sessionEmail } = require('../lib/acl');
@@ -155,7 +156,7 @@ router.post('/:book_id/assign-owner', express.json({ limit: '4kb' }), (req, res)
   const performedBy = sessionEmail(req) || 'admin';
   try {
     db.transaction(() => {
-      db.prepare('UPDATE books SET owner_email = ? WHERE book_id = ?').run(target, bookId);
+      contentStore.setBookOwner(bookId, target);
       bookAccess.grantAccess(bookId, target, 'owner', performedBy);
     })();
     logger.info(`Admin assign-owner: book=${bookId} owner=${target} by ${performedBy}`);

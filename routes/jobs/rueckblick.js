@@ -16,14 +16,12 @@ const {
   loadOrderedBookContents, loadPageContents,
   chunkLimitsFor, BATCH_SIZE, jobAbortControllers,
   _modelName, tps, getFiguren,
-  createJob, enqueueJob, findActiveJobId,
   jsonBody,
+  startBookJob,
 } = require('./shared');
 const { parseZeitraum: _parseZeitraum, entryDate: _entryDate, matchesZeitraum: _matchesZeitraum, previousZeitraum: _previousZeitraum } = require('./rueckblick-dates');
 const crypto = require('crypto');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { sessionEmail } = require('../../lib/acl');
 
 const rueckblickRouter = express.Router();
 
@@ -224,22 +222,15 @@ async function runRueckblickJob(jobId, bookId, userEmail, zeitraum) {
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 rueckblickRouter.post('/rueckblick', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   const zeitraum = String(req.body?.zeitraum || '').trim();
+  if (!toIntId(req.body?.book_id)) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!_parseZeitraum(zeitraum)) return res.status(400).json({ error_code: 'ZEITRAUM_REQUIRED' });
-  setContext({ book: book_id });
-  const { requireBookAccess, sendACLError } = require('../../lib/acl');
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-  const userEmail = sessionEmail(req);
-  // dedupId mischt den Zeitraum ein, damit Monat ≠ Jahr nicht gegeneinander dedupen.
-  const dedupId = `${book_id}:${zeitraum}`;
-  const existing = findActiveJobId('rueckblick', dedupId, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const jobId = createJob('rueckblick', book_id, userEmail, 'job.label.rueckblick', { zeitraum }, dedupId);
-  enqueueJob(jobId, () => runRueckblickJob(jobId, book_id, userEmail, zeitraum));
-  res.json({ jobId });
+  startBookJob(req, res, {
+    type: 'rueckblick', minRole: 'editor', label: 'job.label.rueckblick', labelParams: { zeitraum },
+    // dedupId mischt den Zeitraum ein, damit Monat ≠ Jahr nicht gegeneinander dedupen.
+    dedupId: (bookId) => `${bookId}:${zeitraum}`,
+    run: (jobId, { bookId, userEmail }) => runRueckblickJob(jobId, bookId, userEmail, zeitraum),
+  });
 });
 
 module.exports = { rueckblickRouter, runRueckblickJob };

@@ -16,10 +16,10 @@
 
 const express = require('express');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
-  createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, jsonBody, jobAbortControllers,
   aiCall, getPrompts, getBookPrompts, loadOrderedBookContents,
   tps, _modelName,
+  startBookJob,
 } = require('./shared');
 const motifsDb = require('../../db/motifs');
 const { getBookSettings } = require('../../db/schema');
@@ -27,9 +27,6 @@ const { computeMotifFindings } = require('../../lib/motif-consistency');
 const { tServerParams } = require('../../lib/i18n-server');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
-const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
 
 const SEVERITY = ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig'];
 
@@ -187,19 +184,11 @@ async function runMotifConsistencyJob(jobId, bookId, userEmail) {
 
 const motifConsistencyRouter = express.Router();
 
-motifConsistencyRouter.post('/motif-consistency', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-  const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const existing = findActiveJobId('motif-consistency', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const jobId = createJob('motif-consistency', book_id, userEmail, 'job.label.motivConsistency', null, book_id);
-  enqueueJob(jobId, () => runMotifConsistencyJob(jobId, book_id, userEmail));
-  res.json({ jobId });
-});
+motifConsistencyRouter.post('/motif-consistency', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'motif-consistency',
+  minRole: 'lektor',
+  label: 'job.label.motivConsistency',
+  run: (jobId, { bookId, userEmail }) => runMotifConsistencyJob(jobId, bookId, userEmail),
+}));
 
 module.exports = { motifConsistencyRouter, runMotifConsistencyJob };

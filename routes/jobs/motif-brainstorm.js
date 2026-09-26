@@ -6,20 +6,17 @@
 
 const express = require('express');
 const {
-  makeJobLogger, updateJob, completeJob, failJob, i18nError,
-  createJob, enqueueJob, findActiveJobId, jsonBody, jobAbortControllers,
+  makeJobLogger, updateJob, completeJob, failJob, i18nError, jsonBody, jobAbortControllers,
   aiCall, getPrompts, getBookPrompts,
   loadOrderedBookContents, loadPageContents,
   groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
   chunkLimitsFor, tps, _modelName,
+  startBookJob,
 } = require('./shared');
 const motifsDb = require('../../db/motifs');
 const { getBookSettings } = require('../../db/schema');
 const { resolveProvider } = require('../../lib/ai');
 const { bookSettingsSigPart, buildBookPagesSig } = require('./komplett/utils');
-const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
 
 const VALID_TYP = new Set(['thema', 'motiv']);
 
@@ -173,20 +170,9 @@ async function runMotifBrainstormJob(jobId, bookId, userEmail, { force = false }
 
 const motifBrainstormRouter = express.Router();
 
-motifBrainstormRouter.post('/motif-brainstorm', jsonBody, (req, res) => {
-  const book_id = toIntId(req.body?.book_id);
-  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
-  const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const existing = findActiveJobId('motif-brainstorm', book_id, userEmail);
-  if (existing) return res.json({ jobId: existing, existing: true });
-  const force = req.body?.force === true;
-  const jobId = createJob('motif-brainstorm', book_id, userEmail, 'job.label.motivBrainstorm', null, book_id);
-  enqueueJob(jobId, () => runMotifBrainstormJob(jobId, book_id, userEmail, { force }));
-  res.json({ jobId });
-});
+motifBrainstormRouter.post('/motif-brainstorm', jsonBody, (req, res) => startBookJob(req, res, {
+  type: 'motif-brainstorm', minRole: 'lektor', label: 'job.label.motivBrainstorm',
+  run: (jobId, { bookId, userEmail }) => runMotifBrainstormJob(jobId, bookId, userEmail, { force: req.body?.force === true }),
+}));
 
 module.exports = { motifBrainstormRouter, runMotifBrainstormJob };

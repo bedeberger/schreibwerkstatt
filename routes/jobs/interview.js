@@ -31,8 +31,7 @@ const { getBookLocale } = require('../../db/schema');
 const searchIndex = require('../../lib/search');
 const { enqueueEmbedIndexJob } = require('./embed-index');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const logger = require('../../logger');
 
 const interviewRouter = express.Router();
@@ -118,9 +117,7 @@ interviewRouter.post('/interview-transcribe', jsonBody, (req, res) => {
   if (!itemId) return res.status(400).json({ error_code: 'ITEM_ID_REQUIRED' });
   const bookId = itemBookId(itemId);
   if (!bookId) return res.status(404).json({ error_code: 'ITEM_NOT_FOUND' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, bookId, 'editor')) return;
 
   if (!transcriptionAvailable()) {
     return res.status(404).json({ error_code: 'TRANSCRIBE_DISABLED' });

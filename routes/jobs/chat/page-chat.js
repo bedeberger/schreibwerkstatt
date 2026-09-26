@@ -3,6 +3,7 @@
 // Envelope mit `vorschlaege` (zeichengenaue Textersetzung) + updatedAt-Staleness.
 
 const { db } = require('../../../db/schema');
+const { getSessionRow } = require('../../../db/chat-sessions');
 const { callAIChat, chatTemperature, getContextConfigFor, resolveProvider } = require('../../../lib/ai');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
@@ -22,33 +23,30 @@ async function runChatJob(jobId, sessionId, userMsgId, message, userEmail) {
   try {
     updateJob(jobId, { statusText: 'job.phase.preparing', progress: 5 });
 
-    const session = db.prepare(`
-      SELECT cs.*, p.page_name FROM chat_sessions cs
-      LEFT JOIN pages p ON p.page_id = cs.page_id
-      WHERE cs.id = ? AND cs.user_email = ?
-    `).get(parseInt(sessionId), userEmail);
+    const session = getSessionRow(parseInt(sessionId), userEmail);
     if (!session) throw i18nError('job.error.sessionNotFound');
-    logger.info(`Start: «${session.page_name || '-'}» session=${sessionId}, page=${session.page_id || '-'}, msg-len=${message.length}`);
 
-    // Seiteninhalt frisch laden (via content-store)
+    // Seiteninhalt frisch laden (via content-store). Name und Kapitel kommen aus
+    // derselben Zeile — das Kapitel filtert unten die Figuren.
     let pageText = '';
     let pageUpdatedAt = null;
+    let pageChapterId = null;
     if (session.page_id && session.page_id > 0) {
       try {
         const pd = await contentStore.loadPage(session.page_id);
         pageText = htmlToText(pd.html || '');
         pageUpdatedAt = pd.updated_at || null;
+        pageChapterId = pd.chapter_id ?? null;
+        session.page_name = pd.name || null;
       } catch (e) {
         if (e.name === 'AbortError') throw e;
         logger.warn(`Seiteninhalt konnte nicht geladen werden: ${e.message}`);
       }
     }
+    logger.info(`Start: «${session.page_name || '-'}» session=${sessionId}, page=${session.page_id || '-'}, msg-len=${message.length}`);
 
     // Kontext aus DB laden – nur Figuren/Szenen/Orte des aktuellen Kapitels
-    const pageRow = session.page_id
-      ? db.prepare('SELECT chapter_id FROM pages WHERE page_id = ?').get(session.page_id)
-      : null;
-    const figuren = getFiguren(session.book_id, userEmail, pageRow?.chapter_id ?? null);
+    const figuren = getFiguren(session.book_id, userEmail, pageChapterId);
     const review  = getLatestReview(session.book_id, userEmail);
     const ideen    = getOpenIdeen(session.page_id, userEmail);
     const lektorat = getLatestPageCheck(session.page_id, userEmail);

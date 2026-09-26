@@ -74,6 +74,18 @@ function contentHttpError(e) {
   return e;
 }
 
+// Leerer Export-Scope (Buch/Kapitel/Seite ohne Inhalt) → i18n-Fehler fuer failJob.
+// Geteilt von PDF-, EPUB- und DOCX-Export; null bei jedem anderen Fehler.
+const _EMPTY_SCOPE_KEYS = {
+  BOOK_EMPTY: 'job.error.bookEmpty',
+  CHAPTER_EMPTY: 'job.error.chapterEmpty',
+  PAGE_EMPTY: 'job.error.pageEmpty',
+};
+function emptyScopeError(e) {
+  const key = _EMPTY_SCOPE_KEYS[e?.code];
+  return key ? i18nError(key) : null;
+}
+
 /**
  * Liefert die jobId eines AKTIVEN (queued/running) Dedup-Matches oder null.
  * `runningJobs` hält Einträge auch nach Abschluss noch CLEANUP_DELAY_MS lang;
@@ -321,7 +333,7 @@ const STATS_EXCLUDED_TYPES = ['figures', 'soziogramm', 'szenen', 'locations', 'f
 module.exports = {
   makeJobLogger,
   fmtTok, fmtDuration, _jobDurationFmt, _jobLogCtx, tps,
-  i18nError, contentHttpError,
+  i18nError, contentHttpError, emptyScopeError,
   findActiveJobId,
   createJob, updateJob, completeJob, failJob, cancelJob,
   JOB_TYPE_LABELS, STATS_EXCLUDED_TYPES,
