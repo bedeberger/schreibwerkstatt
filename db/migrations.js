@@ -11884,6 +11884,10 @@ function _runMigrationsLocked() {
     logger.info('DB-Migration auf Version 291 abgeschlossen (anthropic_cost_daily).');
   }
 
+  // Ab 292: Datei-Migrationen unter db/migrations/NNNN-name.js (db/migration-runner.js).
+  // Hier keine neuen if-version-Bloecke mehr anhaengen.
+  require('./migration-runner').runFileMigrations(db);
+
   // Schutzchecks: idempotent bei jedem Start.
   const feColsCheck = db.pragma('table_info(figure_events)').map(c => c.name);
   if (feColsCheck.length > 0 && !feColsCheck.includes('typ')) {

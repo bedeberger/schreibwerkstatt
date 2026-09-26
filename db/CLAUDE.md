@@ -35,31 +35,21 @@ Vermeide Sentinel-Werte (`page_id=0`, `page_name='__book__'`) als Diskriminator.
 
 ### Migration hinzufügen
 
-Neuen `if (version < N)`-Block in `runMigrations()` ([db/migrations.js](../db/migrations.js)) ergänzen (N = nächste fortlaufende Nummer, aktuelle Version siehe `schema_version`-Tabelle) + `UPDATE schema_version SET version = N`. Neue Tabellen als `CREATE TABLE IF NOT EXISTS` mit FKs. **Timestamp-Defaults**: `TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))` — siehe Harte Regel „DB-Timestamps: ISO+Z via `NOW_ISO_SQL`". `datetime('now')` ist verboten in neuen Schema-Defaults und neuen Inline-INSERT/UPDATE-Statements.
+Neue Migration = **neue Datei** `db/migrations/NNNN-kurzname.js` (N = nächste fortlaufende Nummer, vierstellig; Kleinbuchstaben/Ziffern/Bindestrich), Export `{ version: N, fkOff?: true, up(db) }`. Die `if (version < N)`-Blöcke in [db/migrations.js](../db/migrations.js) (bis 291) sind die Legacy-Kette und bekommen keinen Zuwachs. Der Runner [db/migration-runner.js](../db/migration-runner.js) läuft am Ende von `runMigrations()` und übernimmt pro Datei: Validierung (Dateipräfix == `version`, fortlaufend ohne Lücke — sonst Boot-Abbruch), **eine Transaktion** um `up` + `foreign_key_check` + `UPDATE schema_version`, bei `fkOff: true` `PRAGMA foreign_keys = OFF` **vor** und `= ON` **nach** der Transaktion (innerhalb ist das Pragma ein No-op), Log-Zeile. `up` schreibt darum weder FK-Check noch Versions-Bump selbst. Muster: [db/migrations/0292-user-email-fk-indexes.js](../db/migrations/0292-user-email-fk-indexes.js). Neue Tabellen als `CREATE TABLE IF NOT EXISTS` mit FKs. **Timestamp-Defaults**: `TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))` — siehe Harte Regel „DB-Timestamps: ISO+Z via `NOW_ISO_SQL`". `datetime('now')` ist verboten in neuen Schema-Defaults und neuen Inline-INSERT/UPDATE-Statements.
 
-**Pflicht: jede Migration endet mit:**
-```js
-const fkErrors = db.pragma('foreign_key_check');
-if (fkErrors.length) throw new Error(`Migration N: foreign_key_check meldet ${fkErrors.length} Verstoesse.`);
-db.prepare('UPDATE schema_version SET version = N').run();
-```
-
-**FK-Migration via Recreate-Pattern** (SQLite kann FKs nicht via `ALTER TABLE ADD CONSTRAINT`):
-1. `db.pragma('foreign_keys = OFF')`
-2. Pre-Cleanup: orphans nullen (UPDATE … SET ref = NULL WHERE ref NOT IN parent) bzw. löschen (CASCADE-Targets)
-3. `DROP TABLE IF EXISTS xxx_new` (defensiv gegen Crash-Reste)
-4. `CREATE TABLE xxx_new` mit finalen FKs + Indexen
-5. `INSERT INTO xxx_new SELECT … FROM xxx`
-6. `DROP TABLE xxx` → `ALTER TABLE xxx_new RENAME TO xxx`
-7. Indexe neu anlegen (Recreate verliert sie)
-8. `db.pragma('foreign_keys = ON')` + `foreign_key_check`
-9. `UPDATE schema_version`
+**FK-Migration via Recreate-Pattern** (SQLite kann FKs nicht via `ALTER TABLE ADD CONSTRAINT`) — Datei mit `fkOff: true`, `up` macht:
+1. Pre-Cleanup: orphans nullen (UPDATE … SET ref = NULL WHERE ref NOT IN parent) bzw. löschen (CASCADE-Targets)
+2. `DROP TABLE IF EXISTS xxx_new` (defensiv gegen Crash-Reste)
+3. `CREATE TABLE xxx_new` mit finalen FKs + Indexen
+4. `INSERT INTO xxx_new SELECT … FROM xxx`
+5. `DROP TABLE xxx` → `ALTER TABLE xxx_new RENAME TO xxx`
+6. Indexe neu anlegen (Recreate verliert sie)
 
 **Initial-Schema-Block** (oben in `migrations.js`) ist der „Stand vor allen Migrationen" für **Legacy-Installationen**. Nur additive Changes (neue Spalten via ALTER ADD COLUMN, neue Tabellen). FK-Anreicherung gehört in eigene Migrationen via Recreate-Pattern, nicht ins Initial-Schema — sonst brechen Daten-Migrationen, die ihre eigenen Vorbedingungen aus alten Spalten lesen, auf frischen DBs.
 
 **Fresh-DB-Fast-Path:** Brand-neue Installationen (keine `schema_version`-Tabelle) installieren stattdessen [db/squashed-schema.js](../db/squashed-schema.js) in einem einzigen `db.exec`-Call (End-Zustand nach allen Migrationen) und überspringen die Legacy-Chain komplett. `runMigrations()` sieht direkt `version === SQUASHED_VERSION` und ist no-op. Drift zwischen Squashed-Snapshot und Legacy-Chain ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated.
 
-**Pflicht nach jeder neuen Migration: `npm run squash:regen`** — regeneriert [db/squashed-schema.js](../db/squashed-schema.js) aus einem frischen Migration-Run. Wer das vergisst, lässt den Drift-Test in CI rot.
+**Pflicht nach jeder neuen Migration: `npm run squash:regen`** — regeneriert [db/squashed-schema.js](../db/squashed-schema.js) aus einem frischen Migration-Run. Wer das vergisst, lässt den Drift-Test in CI rot. Wird eine Migration geändert, deren Nummer schon `SQUASHED_VERSION` ist, nimmt der Regen den Fast-Path (Squash installiert, Datei gilt als gelaufen) und schreibt das alte Schema zurück — vorher `db/squashed-schema.js` auf den Stand vor der Migration zurücksetzen.
 
 **Pflicht: [docs/erd.md](../docs/erd.md) im selben Commit aktualisieren.** Stand-Zeile (Schema-Version + Tabellen-Anzahl) bumpen; betroffene Block-Definitionen (neue Spalten, geänderte Typen) anpassen; bei neuen Tabellen einen Block + die FK-Kanten in Section 1 (Übersicht) und ggf. im passenden thematischen Sub-Diagramm ergänzen; bei neuen FK-Kanten auf bestehende Tabellen die Kante in Section 1 nachziehen. Drift gegated durch [tests/unit/erd-drift.test.mjs](../tests/unit/erd-drift.test.mjs): prüft Stand-Zeile (Schema-Version + Tabellen-Anzahl) und Set-Gleichheit der Mermaid-Block-Definitionen (`name {`) gegen `sqlite_master` (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables). Vergessene Tabelle → CI rot.
 
