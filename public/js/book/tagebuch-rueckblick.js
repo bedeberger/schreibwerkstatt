@@ -4,7 +4,7 @@
 // (siehe tagebuch-rueckblick-card.js). KI-Felder werden im Template via x-text
 // (auto-escaped) gerendert — kein x-html-Sink.
 
-import { tzOpts, fetchJson } from '../utils.js';
+import { fetchJson, localeTag, tzOpts } from '../utils.js';
 import { quartileLevelFor, currentMonthKey } from './ymheatmap.js';
 import { isSelectedBook } from '../cards/book-guard.js';
 import { memoMethods } from '../cards/card-memo.js';
@@ -47,7 +47,7 @@ export const tagebuchRueckblickMethods = {
     if (mm) {
       const d = new Date(Date.UTC(parseInt(mm[1], 10), parseInt(mm[2], 10) - 1, 1));
       try {
-        return d.toLocaleDateString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
+        return d.toLocaleDateString(localeTag(Alpine.store('shell').uiLocale),
           tzOpts({ year: 'numeric', month: 'long' }));
       } catch { return v; }
     }
@@ -149,7 +149,7 @@ export const tagebuchRueckblickMethods = {
     if (!m) return String(datum || '');
     const d = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12));
     try {
-      return d.toLocaleDateString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
+      return d.toLocaleDateString(localeTag(Alpine.store('shell').uiLocale),
         tzOpts({ weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }));
     } catch { return String(datum); }
   },
@@ -268,7 +268,7 @@ export const tagebuchRueckblickMethods = {
   rueckblickEntryDate(iso) {
     if (!iso) return '';
     try {
-      return new Date(iso).toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH',
+      return new Date(iso).toLocaleString(localeTag(Alpine.store('shell').uiLocale),
         tzOpts({ day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
     } catch { return iso; }
   },
@@ -360,7 +360,7 @@ export const tagebuchRueckblickMethods = {
 
   // 12 lokalisierte Kurz-Monatsnamen (Spaltenköpfe des Kalenders).
   rbMonthLabels() {
-    const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = localeTag(Alpine.store('shell').uiLocale);
     return this._memo('rbMonthLabels', [locale], () => {
       const fmt = new Intl.DateTimeFormat(locale, tzOpts({ month: 'short' }));
       const out = [];

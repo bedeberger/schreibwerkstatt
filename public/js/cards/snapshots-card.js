@@ -5,7 +5,7 @@
 // + Reader (Fassung nur-lesend oeffnen) + Export (HTML/TXT/MD/EPUB/DOCX sync,
 // PDF via Job) + destruktiver Restore.
 
-import { fetchJson } from '../utils.js';
+import { fetchJson, numberFormat } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
 import { fromSnapshotTree } from '../manuscript-stream.js';
 import { renderInline } from '../page-revision-diff.js';
@@ -501,16 +501,12 @@ export function registerSnapshotsCard() {
     },
 
     formatNum(n) {
-      const app = window.__app;
-      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
-      return Number(n || 0).toLocaleString(locale);
+      return numberFormat(Alpine.store('shell').uiLocale).format(Number(n || 0));
     },
 
     formatDelta(d) {
       if (d == null) return '';
-      const app = window.__app;
-      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
-      return Number(d).toLocaleString(locale, { signDisplay: 'exceptZero' });
+      return numberFormat(Alpine.store('shell').uiLocale, { signDisplay: 'exceptZero' }).format(Number(d));
     },
 
     // Delta gegen die naechstaeltere Fassung (Liste DESC → idx+1).

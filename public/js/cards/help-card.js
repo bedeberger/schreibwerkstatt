@@ -19,7 +19,7 @@
 // Reiters quittiert (POST /changelog/seen) und aktualisiert den Store lokal
 // mit — ohne das bliebe der Punkt bis zum naechsten Reload stehen.
 
-import { tzOpts } from '../utils.js';
+import { localeTag, tzOpts } from '../utils.js';
 import { featureByKey } from './feature-registry.js';
 import { buildHelpSections } from './help-catalog.js';
 import { memoMethods } from './card-memo.js';
@@ -192,7 +192,7 @@ export function registerHelpCard() {
       if (!iso) return '';
       const d = new Date(iso + 'T12:00:00Z');
       if (Number.isNaN(d.getTime())) return iso;
-      const loc = window.Alpine.store('shell')?.uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const loc = localeTag(window.Alpine.store('shell')?.uiLocale);
       return d.toLocaleDateString(loc, tzOpts({ year: 'numeric', month: '2-digit', day: '2-digit' }));
     },
 

@@ -1,7 +1,7 @@
 // Buchschreibungsentwicklung – Zeitliniendiagramm.
 // Methoden werden in Alpine.data('bookStatsCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { escHtml, fetchJson, localIsoDaysAgo, tzOpts } from '../utils.js';
+import { escHtml, fetchJson, localeTag, localIsoDaysAgo, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
 import { createChartHolder, cssVar } from '../cards/chart-holder.js';
 import {
@@ -122,8 +122,8 @@ export const bookstatsMethods = {
     try {
       const result = await fetchJson('/sync/book/' + Alpine.store('nav').selectedBookId, { method: 'POST' });
       if (result.error) throw new Error(result.error);
-      const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
-      const now = new Date().toLocaleTimeString(localeTag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
+      const tag = localeTag(Alpine.store('shell').uiLocale);
+      const now = new Date().toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
       this.bookStatsSyncStatus = window.__app.t('bookstats.syncDone', { time: now });
       await this.loadBookStats(Alpine.store('nav').selectedBookId);
       // page_stats-Cache in tokEsts übernehmen, falls Seiten geladen.
@@ -224,10 +224,10 @@ export const bookstatsMethods = {
 
     const metricLabel = METRIC_KEYS[metric] ? window.__app.t(METRIC_KEYS[metric]) : metric;
 
-    const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
+    const tag = localeTag(Alpine.store('shell').uiLocale);
     const isDecimal = isPpc || isCum || metric === 'avg_sentence_len' || metric === 'avg_lix' || metric === 'avg_flesch_de' || metric === 'normseiten';
-    const fmt = v => isDecimal ? v.toLocaleString(localeTag, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-      : Math.round(v).toLocaleString(localeTag);
+    const fmt = v => isDecimal ? v.toLocaleString(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      : Math.round(v).toLocaleString(tag);
     const makeTick = () => v => {
       if (v === null) return '';
       return (isDelta && v >= 0 ? '+' : '') + fmt(v);
@@ -244,7 +244,7 @@ export const bookstatsMethods = {
     const fmtAvg = (v) => {
       if (isDecimal) return fmt(v);
       const digits = Math.abs(v) < 10 ? 1 : 0;
-      return v.toLocaleString(localeTag, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+      return v.toLocaleString(tag, { minimumFractionDigits: digits, maximumFractionDigits: digits });
     };
 
     const primary  = cssVar('--color-primary');

@@ -4,7 +4,7 @@
 // `toggleMyStatsCard` leben im Root (generiert aus EXCLUSIVE_CARDS). Daten:
 // `GET /me/profile-stats` (Tiles) + `GET /me/profile-stats-history` (Chart).
 
-import { tzOpts, localIsoDate, localIsoDaysAgo } from '../utils.js';
+import { localeTag, localIsoDate, localIsoDaysAgo, tzOpts } from '../utils.js';
 import { EVT } from '../events.js';
 import { computeWritingTimeStreak, computeWeekdayPattern, computeDerived, computeMilestones,
          computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
@@ -185,7 +185,7 @@ export function registerMyStatsCard() {
 
     // Wochentags-Kurzlabels Mo..So (Locale-aware, TZ-bereinigt).
     myStatsWeekdayLabels() {
-      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = localeTag(Alpine.store('shell').uiLocale);
       const fmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
       const monRef = new Date(2027, 0, 4); // 2027-01-04 ist ein Montag
       return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(monRef.getTime() + i * 86400000)));
@@ -194,7 +194,7 @@ export function registerMyStatsCard() {
     // Datum eines Streak-/Bestleistungs-Tages lesbar formatieren.
     myStatsDateLabel(iso) {
       if (!iso) return '';
-      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = localeTag(Alpine.store('shell').uiLocale);
       return new Date(iso + 'T12:00:00').toLocaleDateString(tag, tzOpts({ day: 'numeric', month: 'short', year: 'numeric' }));
     },
 
@@ -322,7 +322,7 @@ export function registerMyStatsCard() {
     // Zahl mit einer Nachkommastelle (Lesbarkeitswerte), Locale-aware.
     myStatsDec(n) {
       if (n == null) return '–';
-      const loc = Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = localeTag(Alpine.store('shell').uiLocale);
       return Number(n).toLocaleString(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     },
 
@@ -341,7 +341,7 @@ export function registerMyStatsCard() {
 
     // Locale-aware Tausender-Trennung (Swiss: de-CH = Apostroph).
     _myStatsFmt(n) {
-      const loc = Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = localeTag(Alpine.store('shell').uiLocale);
       return Number(n || 0).toLocaleString(loc);
     },
 

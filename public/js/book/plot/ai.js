@@ -2,7 +2,7 @@
 // Buchrealität), persistierte Lauf-Historie, Fullscreen-Toggle und das
 // Aufräumen der Poll-Timer. Die KI plant/prüft nur Struktur — kein Fliesstext.
 
-import { fetchJson, tzOpts } from '../../utils.js';
+import { fetchJson, localeTag, tzOpts } from '../../utils.js';
 import { startPoll, runningJobStatus } from '../../cards/job-helpers.js';
 import { toggleWrapFullscreen } from '../../fullscreen.js';
 import { normTitle } from './constants.js';
@@ -329,7 +329,7 @@ export const aiMethods = {
     if (!iso) return '';
     try {
       const d = new Date(iso);
-      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const locale = localeTag(Alpine.store('shell').uiLocale);
       return d.toLocaleString(locale, tzOpts());
     } catch { return iso; }
   },

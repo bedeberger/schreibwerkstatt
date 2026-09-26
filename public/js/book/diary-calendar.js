@@ -7,7 +7,7 @@
 // Page), wir wollen aber nicht pro Render rebuilden.
 
 import { contentRepo } from '../repo/content.js';
-import { dateTimeFormat, fetchJson, localIsoDate, tzOpts } from '../utils.js';
+import { dateTimeFormat, fetchJson, localeTag, localIsoDate, tzOpts } from '../utils.js';
 import { insertChapterItem } from './tree/load.js';
 import { isSelectedBook } from '../cards/book-guard.js';
 
@@ -474,13 +474,13 @@ export const diaryCalendarMethods = {
 
   // Wochentag (lang) eines `YYYY-MM-DD`. Noon-UTC + tzOpts → kein TZ-Tagessprung.
   _diaryWeekdayLabel(dateIso) {
-    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = localeTag(this.$store.shell.uiLocale);
     return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString(locale, tzOpts({ weekday: 'long' }));
   },
 
   // Volles Datum (z.B. „3. Juni 2025") eines `YYYY-MM-DD`.
   _diaryDateLabel(dateIso) {
-    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = localeTag(this.$store.shell.uiLocale);
     return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString(
       locale, tzOpts({ day: 'numeric', month: 'long', year: 'numeric' }));
   },

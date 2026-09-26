@@ -5,7 +5,7 @@
 // POST .../restore. Viewer ist natives <dialog>: Tabs "Inhalt | Vergleich",
 // Diff-Lib lazy.
 
-import { fetchJson } from '../utils.js';
+import { fetchJson, numberFormat } from '../utils.js';
 import { contentRepo } from '../repo/content.js';
 import { loadDiff } from '../lazy-libs.js';
 import { renderSideBySide } from '../page-revision-diff.js';
@@ -165,9 +165,7 @@ export function registerPageRevisionsCard() {
     },
 
     formatChars(n) {
-      const app = window.__app;
-      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
-      return Number(n || 0).toLocaleString(locale);
+      return numberFormat(Alpine.store('shell').uiLocale).format(Number(n || 0));
     },
 
     // Liste DESC sortiert (juengste zuerst). Vorgaengerin = revisions[idx+1].
@@ -183,9 +181,7 @@ export function registerPageRevisionsCard() {
 
     formatDelta(d) {
       if (d == null) return '';
-      const app = window.__app;
-      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
-      return Number(d).toLocaleString(locale, { signDisplay: 'exceptZero' });
+      return numberFormat(Alpine.store('shell').uiLocale, { signDisplay: 'exceptZero' }).format(Number(d));
     },
 
     // ── Viewer ───────────────────────────────────────────────────────────────

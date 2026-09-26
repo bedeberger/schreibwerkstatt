@@ -3,7 +3,7 @@
 // lazy geholt. Apply (Brainstorm) prüft beim Anwenden, ob knoten_id noch in
 // der Mindmap existiert — Live-Run gegen mutierten Tree nach `werkstatt.error.knotenGone`.
 
-import { fetchJson, tzOpts } from '../utils.js';
+import { fetchJson, localeTag, tzOpts } from '../utils.js';
 import { reattachWerkstattJob } from './job-poll.js';
 
 export const runsMethods = {
@@ -148,7 +148,7 @@ export const runsMethods = {
     try {
       const d = new Date(iso);
       // Locale-Abbildung wie im Rest der App (num-input.js): de→de-CH, en→en-US.
-      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const locale = localeTag(Alpine.store('shell').uiLocale);
       return d.toLocaleString(locale, tzOpts());
     } catch { return iso; }
   },

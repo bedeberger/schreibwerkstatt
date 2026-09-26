@@ -17,7 +17,7 @@
 // `/me/books` — zusammengefuehrt in my-books-compute.js.
 
 import { EVT } from '../events.js';
-import { tzOpts } from '../utils.js';
+import { localeTag, tzOpts } from '../utils.js';
 import {
   SHELF_TABS, mergeShelfRows, filterShelfRows, pinnedFirst, shelfTotals, mayToggleFinished,
 } from './my-books-compute.js';
@@ -183,7 +183,7 @@ export function registerMyBooksCard() {
 
     // ── Formatierung ───────────────────────────────────────────────────────
     _myBooksFmt(n) {
-      const loc = window.Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = localeTag(window.Alpine.store('shell').uiLocale);
       return Number(n || 0).toLocaleString(loc);
     },
 
@@ -206,7 +206,7 @@ export function registerMyBooksCard() {
       if (!value) return '–';
       const d = new Date(value.length === 10 ? value + 'T12:00:00Z' : value);
       if (Number.isNaN(d.getTime())) return '–';
-      const loc = window.Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = localeTag(window.Alpine.store('shell').uiLocale);
       return d.toLocaleDateString(loc, tzOpts({ year: 'numeric', month: '2-digit', day: '2-digit' }));
     },
   }));

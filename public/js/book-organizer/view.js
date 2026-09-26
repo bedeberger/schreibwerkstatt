@@ -9,6 +9,7 @@
 
 import { MAX_CHAPTER_DEPTH, COLLAPSE_THRESHOLD } from './constants.js';
 import { memoMethods } from '../cards/card-memo.js';
+import { localeTag } from '../utils.js';
 
 function _walkAllIds(chapters, out = []) {
   for (const c of chapters) {
@@ -240,7 +241,7 @@ export const viewMethods = {
   },
 
   _fmtNum(n) {
-    const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const tag = localeTag(Alpine.store('shell').uiLocale);
     return Number(n || 0).toLocaleString(tag);
   },
 
