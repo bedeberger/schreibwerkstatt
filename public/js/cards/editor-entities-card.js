@@ -53,6 +53,9 @@ export function registerEditorEntitiesCard() {
     _popoverAnchor: null,
     _repositionRaf: 0,
     _recomputeTimer: null,
+    // Re-Entry-Guard fuer _ensureSzenenLoaded: `<bookId>:<email>` des zuletzt
+    // angestossenen Szenen-Loads; null = nichts unterwegs bzw. Load fehlgeschlagen.
+    _szenenLoadTag: null,
     _abort: null,
     _onSettingsUpdated: null,
 
@@ -186,7 +189,7 @@ export function registerEditorEntitiesCard() {
       const bookId = Alpine.store('nav').selectedBookId;
       if (!bookId) return;
       if (Array.isArray(app.$store.catalog.szenen) && app.$store.catalog.szenen.length > 0) return;
-      const tag = bookId + ':' + (app?.session?.email || '');
+      const tag = bookId + ':' + (Alpine.store('session').currentUser?.email || '');
       if (this._szenenLoadTag === tag) return;
       this._szenenLoadTag = tag;
       Promise.resolve(app.loadSzenen?.(bookId)).catch(() => {

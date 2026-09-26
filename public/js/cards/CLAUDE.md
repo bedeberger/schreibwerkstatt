@@ -11,7 +11,7 @@ Gilt zusaetzlich zur Root-[CLAUDE.md](../../../CLAUDE.md).
 ## Neue Karte anlegen
 
 Der Frontend-Scope ist in **Alpine.data-Sub-Komponenten** aufgeteilt:
-- **Root** (`x-data="lektorat"` am `<body>`): Navigation (`selectedBookId`, `pages`, `tree`), Session, i18n, `showXxxCard`-Flags (Single Source of Truth für Hash-Router + Exklusivität), Job-Queue-Footer, globale Cross-Cutting-Methoden (`t`, `loadFiguren`, `selectPage`, `gotoStelle` …).
+- **Root** (`x-data="lektorat"` am `<body>`): Navigations-/Session-/i18n-Methoden (der State dazu liegt in `$store.nav`/`$store.session`/`$store.shell`), `showXxxCard`-Flags (Single Source of Truth für Hash-Router + Exklusivität), Job-Queue-Footer, globale Cross-Cutting-Methoden (`t`, `loadFiguren`, `selectPage`, `gotoStelle` …).
 - **Sub-Komponenten** in [public/js/cards/](../../../public/js/cards/) — eine pro UI-Karte. Buchebene: Figuren, Orte, Szenen, Ereignisse, Stil, Fehler-Heatmap, BookStats, BookSettings, UserSettings, Kontinuität, Ideen, Finetune-Export, PDF-Export, Buch-Overview, Buch-Chat, Buch-Review, Kapitel-Review, Palette. Editor-Subs: editor-find, editor-synonyme, editor-figur-lookup, editor-toolbar, editor-focus, editor-entities, lektorat-findings, page-history. Plus Seiten-Chat. Jede besitzt fachlichen State + Lifecycle.
 - **Im Root** verbleibt: `page-view`, `editor/edit`, `editor/utils`, Hash-Router, Auto-Save, Selection-Management, Navigation. Editor-UI-Slices laufen als eigene Cards mit Trampoline-Events aus dem Root (z.B. `editor:focus:toggle`).
 
@@ -29,12 +29,13 @@ Der Frontend-Scope ist in **Alpine.data-Sub-Komponenten** aufgeteilt:
 ### Root-Zugriff aus Sub-Komponenten (`$app` / `window.__app`)
 
 Alpine's `$root` zeigt auf das **nächste x-data-Element** (bei Sub-Komponenten also die Sub selbst), nicht auf die `lektorat`-Root. Darum gibt es `$app`:
-- **In Templates** (Alpine-Expressions): `$app.t('key')`, `$app.selectedBookId`, `$app.figuren`. Funktioniert über die Custom-Magic `Alpine.magic('app', …)` in [app.js](../../../public/js/app.js).
+- **In Templates** (Alpine-Expressions): `$app.t('key')`, `$app.selectedBookName`, `$app.editMode` — nur Root-Felder und -Methoden. Funktioniert über die Custom-Magic `Alpine.magic('app', …)` in [register-cards.js](../../../public/js/app/register-cards.js) (`registerAppMagics`).
 - **In JS-Methoden/Gettern** (Sub-Komponenten): `window.__app.xxx` — der Root cached sich in `init()` in `window.__app` (garantiert reaktiver Alpine-Proxy). Alpine-Magics sind in JS-Getter-Ausführungen **nicht** zuverlässig verfügbar; `window.__app` ist robust.
+- **Store-Felder nie über den Root:** `selectedBookId`, `uiLocale`, `currentUser`, `figuren` … leben in Stores ([docs/state-modell.md](../../../docs/state-modell.md), Ebene 3) und haben keinen Root-Proxy — `$app.selectedBookId`/`window.__app?.uiLocale` liefern still `undefined`. Zugriff via `$store.<name>.<feld>` (Template) bzw. `Alpine.store('<name>').<feld>` (JS). Gegated: [tests/unit/store-proxy-tripwire.test.mjs](../../../tests/unit/store-proxy-tripwire.test.mjs).
 
 ### Geteilter Fach-State: `Alpine.store('catalog')`
 
-`figuren`, `orte`, `szenen`, `globalZeitstrahl` leben in [public/js/cards/catalog-store.js](../../../public/js/cards/catalog-store.js). Der Root exponiert sie als Getter/Setter-Proxy, sodass `this.figuren = …` und `this.figuren.push(…)` aus Root-Methoden weiter funktionieren. Sub-Komponenten lesen via `$app.figuren` oder direkt `Alpine.store('catalog').figuren`.
+`figuren`, `orte`, `songs`, `szenen`, `globalZeitstrahl` leben in [public/js/cards/catalog-store.js](../../../public/js/cards/catalog-store.js). Kein Root-Proxy: Root-Methoden und gespreadete Module lesen `this.$store.catalog.figuren`, Sub-Komponenten `Alpine.store('catalog').figuren`, Templates `$store.catalog.figuren`. Loader reassignen die Arrays (nie pushen), damit die Lookup-Maps (`figurenById` …) neu bauen.
 
 ### Events zwischen Root und Subs
 

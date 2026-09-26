@@ -78,7 +78,7 @@ export const wortschatzMethods = {
   // „gemessen, Ergebnis null", null heisst „nicht messbar" (Text zu kurz für
   // MTLD/Heaps). Zahlen über die geteilte SSoT, nicht handgerollt.
   wsNum(v, decimals = 0) {
-    return formatNumber(v == null ? null : Number(v), window.__app?.uiLocale, decimals);
+    return formatNumber(v == null ? null : Number(v), Alpine.store('shell').uiLocale, decimals);
   },
 
   wsPercent(v, decimals = 1) {
@@ -112,7 +112,7 @@ export const wortschatzMethods = {
     if (!at) return '';
     const d = new Date(at);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleString(localeTag(window.__app?.uiLocale), tzOpts({
+    return d.toLocaleString(localeTag(Alpine.store('shell').uiLocale), tzOpts({
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     }));
   },

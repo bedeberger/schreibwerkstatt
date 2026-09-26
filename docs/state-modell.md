@@ -150,7 +150,7 @@ Ein Scope beschreibt eine Filterleiste:
 ## `$app` / `window.__app` (Root-Zugriff aus Subs)
 
 Alpine's `$root` zeigt auf das nächste `x-data` (= Sub selbst), nicht auf die `lektorat`-Root.
-- **In Templates** (Alpine-Expressions): `$app.t('key')`, `$app.selectedBookId`, `$app.figuren` — via `Alpine.magic('app', …)` in [public/js/app/register-cards.js](../public/js/app/register-cards.js) (`registerAppMagics`).
+- **In Templates** (Alpine-Expressions): `$app.t('key')`, `$app.selectedBookName`, `$app.figurenById` — nur Root-Felder/-Methoden, Store-Felder via `$store.<name>.*` ([tests/unit/store-proxy-tripwire.test.mjs](../tests/unit/store-proxy-tripwire.test.mjs)) — via `Alpine.magic('app', …)` in [public/js/app/register-cards.js](../public/js/app/register-cards.js) (`registerAppMagics`).
 - **In JS-Methoden/Gettern** (Subs): `window.__app.xxx`. Magics sind in JS-Getter-Ausführungen nicht zuverlässig; `window.__app` ist robust und ein reaktiver Alpine-Proxy.
 
 ## Event-Bus (Root → Subs)
