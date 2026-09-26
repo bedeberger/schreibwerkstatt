@@ -118,6 +118,8 @@ test('Namensfeld und Wurzel-Knoten bleiben gekoppelt, der Server haelt es fest',
 });
 
 test('Long-Press auf einen Knoten oeffnet das Knoten-Menue', async ({ browser }) => {
+  // Touch-Events gehen ueber CDP (Input.dispatchTouchEvent) — das gibt es nur in Chromium.
+  test.skip(test.info().project.name !== 'chromium', 'CDP-Touch nur in Chromium');
   const ctx = await browser.newContext({ hasTouch: true });
   const page = await ctx.newPage();
   try {

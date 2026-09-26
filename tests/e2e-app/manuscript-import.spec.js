@@ -79,7 +79,7 @@ test('geaenderte Zuordnung aendert die Gliederung', async ({ page }) => {
   await openManuscriptImport(page);
   await page.setInputFiles('#folder-import-card .folder-import-drop input[type=file]', DOC);
 
-  await setRole(page, 2, 'Unterkapitel');
+  await setRole(page, 2, 'Sub-Kapitel');
   // Aus 4 Seiten-Ueberschriften werden 4 Unterkapitel, die Seiten erben ihren Namen.
   await page.getByRole('button', { name: 'Vorschau berechnen' }).click();
   await expect(page.locator('.folder-import-preview-summary')).toHaveText('6 Kapitel, 4 Seiten');
