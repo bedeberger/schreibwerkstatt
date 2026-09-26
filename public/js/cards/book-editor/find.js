@@ -7,10 +7,56 @@
 // nur die Bucheditor-Eigenheit: N Block-Roots statt einem, Replace über
 // Range-Mutation (statt execCommand) und die Anbindung an die Save-Queue.
 
-import { collectMatches, createHighlightPair, rangeOf } from '../../editor/shared/text-find.js';
+import { collectMatches, collectTextNodes, createHighlightPair, rangeOf } from '../../editor/shared/text-find.js';
+import { clearRenderedDiagrams } from '../../diagram/mermaid-view.js';
+import { clearCaptionNumbers, XREF_NUM_SEL } from '../../xrefs/caption-preview.js';
 
 const highlights = createHighlightPair('book-editor-find-match', 'book-editor-find-current');
 export const clearHighlights = highlights.clear;
+
+// Inaktive Blöcke tragen Anzeige-Artefakte im DOM: das gerenderte Mermaid-SVG
+// und die Nummern-Badges der Beschriftungen. Beides ist nicht Manuskript —
+// Treffer darin sind keine Treffer, und nichts davon darf über Replace in
+// `block.html` landen. Bucheditor-lokal: der Notebook-Finder sucht nur im
+// Edit-Modus, dort gibt es diese Artefakte nicht.
+const ARTEFACT_SEL = `.mermaid-render, ${XREF_NUM_SEL}`;
+
+export function isInRenderArtefact(node) {
+  const el = node?.nodeType === 1 ? node : node?.parentElement;
+  return !!el?.closest?.(ARTEFACT_SEL);
+}
+
+// Treffer eines Blocks gegen die Artefakte abgleichen. Liefert den Treffer
+// (ggf. mit verschobenem Start) oder null, wenn er Artefakt-Text abdeckt.
+//
+// Sonderfall Grenze: das Offset-Mapping des geteilten Kerns legt einen Treffer,
+// der genau hinter einem Text-Node beginnt, an das ENDE dieses Nodes. Direkt
+// hinter einem Nummern-Badge („Abb. 1: |Legende") hiesse das: Start im Badge.
+// Ein solcher Start deckt kein Badge-Zeichen ab und wird auf den Anfang des
+// nächsten Text-Nodes gezogen — sonst landete das eingefügte Replace-Wort im
+// Badge und fiele mit ihm weg.
+export function filterArtefactMatch(m, root) {
+  if (!m?.startNode || !m?.endNode) return null;
+  let { startNode, startOffset } = m;
+  if (isInRenderArtefact(startNode) && startOffset >= (startNode.nodeValue || '').length) {
+    const nodes = collectTextNodes(root);
+    const next = nodes[nodes.indexOf(startNode) + 1];
+    if (!next) return null;
+    startNode = next;
+    startOffset = 0;
+  }
+  if (isInRenderArtefact(startNode) || isInRenderArtefact(m.endNode)) return null;
+  return startNode === m.startNode ? m : { ...m, startNode, startOffset };
+}
+
+// Manuskript-HTML eines Block-Containers ohne Anzeige-Artefakte. Liest aus
+// einem Klon, damit das sichtbare Bild stehen bleibt.
+export function cleanBlockHtml(container) {
+  const clone = container.cloneNode(true);
+  clearRenderedDiagrams(clone);
+  clearCaptionNumbers(clone);
+  return clone.innerHTML;
+}
 
 export const bookEditorFindMethods = {
     // ── Find / Replace ────────────────────────────────────────────────────
@@ -52,7 +98,9 @@ export const bookEditorFindMethods = {
       if (this.findTerm) {
         for (const el of this._allBlockEls()) {
           const pageId = parseInt(el.dataset.bookEditorPage, 10);
-          for (const m of collectMatches(el, this.findTerm, opts)) {
+          for (const raw of collectMatches(el, this.findTerm, opts)) {
+            const m = filterArtefactMatch(raw, el);
+            if (!m) continue;
             matches.push({ ...m, pageId, container: el });
           }
         }
@@ -95,7 +143,9 @@ export const bookEditorFindMethods = {
       if (this.findMatches.length === 0) return;
       const m = this.findMatches[this.findIndex];
       if (!m?.startNode || !m?.endNode) return;
-      this._doReplaceAt(m);
+      const touched = new Set();
+      this._doReplaceAt(m, touched);
+      this._resyncReplacedBlocks(touched);
       this.$nextTick(() => {
         this.recomputeFindMatches();
         if (this.findMatches.length > 0) {
@@ -112,15 +162,17 @@ export const bookEditorFindMethods = {
       // früheren Treffer intakt (sonst verschieben sich deren Offsets).
       const matches = this.findMatches.slice().reverse();
       let count = 0;
+      const touched = new Set();
       for (const m of matches) {
-        if (this._doReplaceAt(m)) count++;
+        if (this._doReplaceAt(m, touched)) count++;
       }
+      this._resyncReplacedBlocks(touched);
       const app = window.__app;
       app?.setStatus?.(app.t('bookEditor.find.replacedAll', { n: count }), false, 3000);
       this.$nextTick(() => this.recomputeFindMatches());
     },
 
-    _doReplaceAt(m) {
+    _doReplaceAt(m, touched) {
       if (!m.startNode || !m.endNode) return false;
       const container = m.container || m.startNode.parentElement?.closest('[data-book-editor-page]');
       if (!container) return false;
@@ -130,12 +182,26 @@ export const bookEditorFindMethods = {
         range.insertNode(document.createTextNode(this.findReplace));
         const block = this._blockById(parseInt(container.dataset.bookEditorPage, 10));
         if (block) {
-          block.html = container.innerHTML;
+          block.html = cleanBlockHtml(container);
           this._markBlockDirty(block);
+          touched?.add(container);
         }
         return true;
       } catch {
         return false;
+      }
+    },
+
+    // Nach dem Replace Bild und Nummern der betroffenen Blöcke nachziehen —
+    // der Quelltext eines Diagramms oder eine Beschriftung kann sich geändert
+    // haben. Erst nach ALLEN Ersetzungen: das Neu-Stempeln entfernt Badges und
+    // würde die Ranges der übrigen Treffer im selben Block verschieben.
+    _resyncReplacedBlocks(touched) {
+      for (const el of touched) {
+        const block = this._blockById(parseInt(el.dataset.bookEditorPage, 10));
+        if (!block) continue;
+        this._syncBlockDiagrams(el, block);
+        this._syncBlockCaptionNumbers(el, block);
       }
     },
 };

@@ -65,6 +65,15 @@ export function tErrorRaw(response) {
   return tRaw('common.unknownError');
 }
 
+/** Fehlertext für einen `fetchJson`-Fehler (utils/net.js): Backend-Body über
+ *  tErrorRaw, reiner Netzwerkausfall (status 0) als eigener Hinweis. Nie die
+ *  rohe `HTTP 4xx`-Message — die ist für den User kein Satz. */
+export function tFetchError(err) {
+  if (err?.body) return tErrorRaw(err.body);
+  if (err?.status === 0) return tRaw('common.networkError');
+  return tRaw('common.unknownError');
+}
+
 // Alpine-Methoden: `t` referenziert `this.$store.shell.uiLocale`, damit Alpine bei Sprachwechsel re-evaluiert.
 // `this?.` ist Pflicht: Wird die Methode aus einem Scope aufgerufen, in dem Alpine
 // den Receiver verliert (z. B. via `window.__app.t()` aus einer x-effect-Expression

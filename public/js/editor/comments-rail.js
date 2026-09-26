@@ -110,13 +110,17 @@ export const editorCommentsRailMethods = {
 
   destroy() {
     this._railAbort?.abort();
-    if (this._recomputeRaf) { cancelAnimationFrame(this._recomputeRaf); this._recomputeRaf = null; }
+    this._railCancelSchedule();
     this._railClearHL();
     const app = window.__app;
     if (app) { app.pageCommentRailOpen = false; app.pageCommentCount = 0; }
   },
 
   async _onBookChange(bookId) {
+    // Laufenden Load + Recompute des alten Buchs entwerten — auch bei
+    // view:reset (bookId null), wo kein neuer Load die ID überschreibt.
+    this._railInvalidateLoad();
+    this._railCancelSchedule();
     this.bookComments = [];
     this.commentThreads = [];
     this.commentGeneralThreads = [];

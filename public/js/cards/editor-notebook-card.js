@@ -25,18 +25,23 @@ export function registerEditorNotebookCard() {
     _formatMarksRaf: null,
     _formatMarksRO: null,
     _formatMarksAbort: null,
+    // Globale Listener der Karte (DIAGRAMS_REDRAWN): in destroy() abgeräumt.
+    _notebookAbort: null,
 
     init() {
       // Globaler Selbst-Ref für die Root-Trampoline. Pendant zu __focusCard /
       // __app. Alpine bindet `this` automatisch beim Method-Aufruf, das
       // einfache Festhalten der reaktiven Sub-Instanz reicht.
       window.__notebookCard = this;
+      this._notebookAbort = new AbortController();
       this._setupNotebookRestore();
       this._setupNotebookDiagrams();
       this._setupNotebookCaptionNumbers();
     },
 
     destroy() {
+      this._notebookAbort?.abort();
+      this._notebookAbort = null;
       if (window.__notebookCard === this) window.__notebookCard = null;
     },
 

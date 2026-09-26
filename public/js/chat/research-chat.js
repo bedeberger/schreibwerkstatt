@@ -3,8 +3,6 @@ import { fetchJson, escHtml, renderChatMarkdown } from '../utils.js';
 import {
   renderResearchAnswer as _renderResearchAnswerText,
   citedSources as _citedSources,
-  parseCiteDocNums as _parseCiteDocNums,
-  resolveSource as _resolveSource,
 } from './research-chat-render.js';
 
 // Recherche-Chat-Methoden (gespreadet in die rechercheCard). Agentischer Chat
@@ -24,20 +22,6 @@ export const researchChatMethods = {
     }
   },
 
-  // Tool-Call-Zusammenfassung eines Agent-Turns (nach Name gruppiert).
-  _researchToolSummary(toolCalls) {
-    if (!Array.isArray(toolCalls) || !toolCalls.length) return [];
-    const byName = new Map();
-    for (const tc of toolCalls) {
-      if (tc.name === 'final_answer') continue;
-      const e = byName.get(tc.name) || { name: tc.name, count: 0, errors: 0 };
-      e.count++;
-      if (tc.ok === false) e.errors++;
-      byName.set(tc.name, e);
-    }
-    return Array.from(byName.values());
-  },
-
   // Vorschläge einer Assistant-Nachricht (aus context_info.proposals).
   researchProposals(msg) {
     return (msg?.context_info?.proposals) || [];
@@ -47,10 +31,6 @@ export const researchChatMethods = {
   researchSources(msg) {
     return (msg?.context_info?.sources) || [];
   },
-
-  // Dokument-Indizes aus `index="4-4,4-5"` (Delegation an pure Helper).
-  _parseCiteDocNums(idxStr) { return _parseCiteDocNums(idxStr); },
-  _resolveSource(sources, n) { return _resolveSource(sources, n); },
 
   // Assistant-Antwort rendern. Delegiert an die pure Funktion (Unit-testbar);
   // die Alpine-Methode bleibt Bindung-Ziel der Templates (Live-Export erhalten).
@@ -117,7 +97,6 @@ export const researchChatMethods = {
   ...makeChatMethods({
     label: 'ResearchChat',
     props: {
-      show: 'researchChatOpen',
       sessions: 'researchChatSessions',
       messages: 'researchChatMessages',
       sessionId: 'researchChatSessionId',
@@ -127,6 +106,7 @@ export const researchChatMethods = {
       status: 'researchChatStatus',
       progress: 'researchChatProgress',
       pollTimer: '_researchChatPollTimer',
+      gen: '_researchChatGen',
     },
     scrollElId: 'research-chat-messages',
     activeJobType: 'research-chat',
@@ -138,8 +118,5 @@ export const researchChatMethods = {
       book_name: ctx.$app.selectedBookName,
     }),
     sendUrl: '/jobs/research-chat',
-    onPollProgress: function (job) {
-      this.researchChatStatus = this._runningJobStatus(job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut, job.progress, job.tokensPerSec, job.statusParams, job.cacheReadIn);
-    },
   }),
 };

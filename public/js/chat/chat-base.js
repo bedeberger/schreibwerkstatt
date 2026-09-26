@@ -5,6 +5,7 @@
 
 import { escHtml, fmtTok, renderChatMarkdown, fetchJson } from '../utils.js';
 import { startPoll, runningJobStatus } from '../cards/job-helpers.js';
+import { tFetchError } from '../i18n.js';
 
 function _newClientMsgId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -14,9 +15,31 @@ function _newClientMsgId() {
   return 'cm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
+// Tool-Calls eines agentischen Turns nach Name gruppiert: [{ name, count, errors }].
+// `skip`: Tool-Namen, die nicht in die Zusammenfassung gehören (Recherche-Chat:
+// `final_answer` ist die Antwort selbst, kein Werkzeug).
+export function toolSummary(toolCalls, { skip = [] } = {}) {
+  if (!Array.isArray(toolCalls) || !toolCalls.length) return [];
+  const byName = new Map();
+  for (const tc of toolCalls) {
+    if (skip.includes(tc.name)) continue;
+    const e = byName.get(tc.name) || { name: tc.name, count: 0, errors: 0 };
+    e.count++;
+    if (tc.ok === false) e.errors++;
+    byName.set(tc.name, e);
+  }
+  return Array.from(byName.values());
+}
+
 export function makeChatMethods(cfg) {
   const p = cfg.props;
-  const L = cfg.label; // 'Chat' oder 'BookChat'
+  const L = cfg.label; // 'Chat', 'BookChat' oder 'ResearchChat'
+  // Generationszähler: `reset${L}` zählt hoch, jeder async Pfad merkt sich den
+  // Stand vor dem ersten `await` und verwirft seine Antwort, wenn inzwischen ein
+  // Reset (Buch-/Seitenwechsel, Karte zu) lief — sonst schreibt eine späte
+  // Response das alte Buch/die alte Seite in die frisch geleerte Karte.
+  const GEN = p.gen || `_${L[0].toLowerCase()}${L.slice(1)}Gen`;
+  const gen = (ctx) => ctx[GEN] || 0;
 
   // ── Interne Helfer (Aufruf via .call(this)) ──────────────────────────────
 
@@ -25,8 +48,11 @@ export function makeChatMethods(cfg) {
     // bzw. gewähltes Buch): der Refresh läuft auch nach einem Job-Ende, und da
     // kann der User die Seite längst verlassen haben.
     if (!cfg.canOpen(this)) return;
+    const g = gen(this);
     try {
-      this[p.sessions] = await fetchJson(cfg.sessionsUrl(this));
+      const rows = await fetchJson(cfg.sessionsUrl(this));
+      if (gen(this) !== g) return;
+      this[p.sessions] = rows;
       if (cfg.onSessionsChanged) cfg.onSessionsChanged.call(this);
     } catch (e) {
       console.error(`[load${L}Sessions]`, e);
@@ -34,6 +60,7 @@ export function makeChatMethods(cfg) {
   }
 
   async function loadSession(sessionId) {
+    const g = gen(this);
     try {
       // Session-Payload und Active-Job-Check parallel — beide Reads idempotent,
       // sequentielle awaits verdoppelten sonst Latenz beim History-Klick.
@@ -45,6 +72,7 @@ export function makeChatMethods(cfg) {
               .catch((e) => { console.error(`[load${L}Session] active-job check:`, e); return null; })
           : Promise.resolve(null),
       ]);
+      if (gen(this) !== g) return;
       this[p.sessionId] = data.id;
       this[p.messages] = data.messages || [];
       this[p.status] = '';
@@ -73,13 +101,16 @@ export function makeChatMethods(cfg) {
 
   async function startNewSession() {
     if (!cfg.canOpen(this)) return;
+    const g = gen(this);
     try {
       if (cfg.onBeforeNewSession) await cfg.onBeforeNewSession.call(this);
+      if (gen(this) !== g) return;
       const { id } = await fetchJson(cfg.newSessionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cfg.newSessionBody(this)),
       });
+      if (gen(this) !== g) return;
       this[p.sessionId] = id;
       this[p.messages] = [];
       this[p.status] = '';
@@ -96,48 +127,37 @@ export function makeChatMethods(cfg) {
   // Skelett und Token-Status (liest sich als „dieses Gespräch wird bearbeitet")
   // und `onDone` zieht den User am Ende ungefragt dorthin zurück, wo er
   // weggeklickt hat.
-  function startPollLocal(jobId) {
-    const sessionId = this[p.sessionId];
+  function startPollLocal(jobId, sessionId = this[p.sessionId]) {
+    // Ohne Session gibt es kein Gespräch, dem der Lauf gehören könnte (Reset
+    // zwischen Senden und Job-Start) — nichts anzeigen, nichts pollen.
+    if (sessionId == null) { finishRun.call(this); return; }
     const root = window.__app;
+    const g = gen(this);
     this[p.runningSessionId] = sessionId;
     const viewing = () => this[p.sessionId] === sessionId;
-    const finish = () => {
-      this[p.loading] = false;
-      if (p.progress) this[p.progress] = 0;
-      this[p.runningSessionId] = null;
-      this[p.status] = '';
-    };
-    const emitProgress = cfg.onPollProgress
-      ? (job) => cfg.onPollProgress.call(this, job)
-      : (job) => {
-          const tokIn = job.tokensIn || 0;
-          const tokOut = job.tokensOut || 0;
-          if (tokIn + tokOut > 0) {
-            const tpsPart = job.tokensPerSec ? ` · ${Math.round(job.tokensPerSec)} tok/s` : '';
-            // tokIn ist bei Ollama/Llama erst am Streaming-Ende bekannt (aus
-            // usage) — vorher nur tokOut zeigen statt falscher Schätzwerte.
-            const inPart = tokIn > 0 ? `↑${fmtTok(tokIn)} ` : '';
-            this[p.status] = `<span class="muted-msg">${inPart}↓${fmtTok(tokOut)} Tokens${tpsPart}</span>`;
-          } else {
-            this[p.status] = '';
-          }
-        };
+    // Nach einem Reset gehört der Poller zu einer Karte, die es so nicht mehr
+    // gibt: jeder Callback bricht dann ab (der Stream kann noch einen Tick
+    // nachschieben, obwohl der Timer schon weg ist).
+    const stale = () => gen(this) !== g;
+    const finish = () => finishRun.call(this);
     startPoll(this, {
       timerProp: p.pollTimer,
       ...(p.progress ? { progressProp: p.progress } : {}),
       jobId,
-      lsKey: cfg.lsKeyFn ? cfg.lsKeyFn(sessionId) : null,
       onProgress: (job) => {
+        if (stale()) return;
         // Den Fortschritt traegt in diesem Fall die Zeile in der Historie.
         if (!viewing()) { setElsewhereStatus.call(this); return; }
-        emitProgress(job);
+        this[p.status] = this._runningJobStatus(job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut, job.progress, job.tokensPerSec, job.statusParams, job.cacheReadIn);
       },
       onNotFound: async () => {
+        if (stale()) return;
         finish();
         if (viewing()) await loadSession.call(this, sessionId);
         else await loadSessions.call(this);
       },
       onError: async (job) => {
+        if (stale()) return;
         // Belt-and-suspenders: startPoll clear't Timer eigentlich vor dem
         // Callback. Doppelt clearen schützt vor stuck `loading=true`-States,
         // bei denen weder „Neue Session" noch Senden möglich wäre.
@@ -163,6 +183,7 @@ export function makeChatMethods(cfg) {
         this[p.status] = errHtml;
       },
       onDone: async (job) => {
+        if (stale()) return;
         finish();
         // Nur nachladen, wenn der User noch in diesem Gespräch steht — sonst
         // wäre das ein Sprung weg von dem, was er gerade liest.
@@ -184,6 +205,14 @@ export function makeChatMethods(cfg) {
     });
   }
 
+  // Lauf-State der Karte räumen: Job-Ende, Fehler, Löschen der laufenden Session.
+  function finishRun() {
+    this[p.loading] = false;
+    if (p.progress) this[p.progress] = 0;
+    this[p.runningSessionId] = null;
+    this[p.status] = '';
+  }
+
   function scrollToBottom() {
     const el = document.getElementById(cfg.scrollElId);
     if (el) el.scrollTop = el.scrollHeight;
@@ -192,9 +221,6 @@ export function makeChatMethods(cfg) {
   // Wird beim $watch(showXxxCard) aufgerufen, wenn die Karte geöffnet wird.
   async function onVisible() {
     if (!cfg.canOpen(this)) return;
-    const root = window.__app;
-    root._checkDoneBeforeChat = root.checkDone;
-    root.checkDone = false;
     await loadSessions.call(this);
     if (this[p.sessions].length === 0) {
       await startNewSession.call(this);
@@ -215,24 +241,41 @@ export function makeChatMethods(cfg) {
   m[`load${L}Session`]     = function (id) { return loadSession.call(this, id); };
 
   m[`delete${L}Session`] = async function (id) {
+    const root = window.__app;
+    const g = gen(this);
     try {
-      await fetch('/chat/session/' + id, { method: 'DELETE' });
-      this[p.sessions] = this[p.sessions].filter(s => s.id !== id);
-      if (cfg.onSessionsChanged) cfg.onSessionsChanged.call(this);
-      if (this[p.sessionId] === id) {
-        // Laufenden Polling-Timer der gelöschten Session abbrechen, sonst
-        // pollt er weiter mit der nun toten sessionId/jobId.
-        if (this[p.pollTimer]) { clearInterval(this[p.pollTimer]); this[p.pollTimer] = null; }
-        this[p.sessionId] = null;
-        this[p.messages] = [];
+      // fetchJson prüft `ok`: ein 403/500 darf die Session nicht aus der
+      // Liste nehmen, die serverseitig noch existiert.
+      await fetchJson('/chat/session/' + id, { method: 'DELETE' });
+    } catch (e) {
+      console.error(`[delete${L}Session]`, e);
+      if (gen(this) === g) {
+        this[p.status] = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(tFetchError(e))}</span>`;
+      }
+      return;
+    }
+    if (gen(this) !== g) return;
+    // Der Poller gehört dem laufenden Gespräch, nicht dem sichtbaren: nur
+    // stoppen, wenn genau DESSEN Session gelöscht wurde — dann aber auch den
+    // Lauf-State räumen, sonst bleibt die Eingabe gesperrt (`loading`).
+    if (this[p.runningSessionId] === id) {
+      if (this[p.pollTimer]) { clearInterval(this[p.pollTimer]); this[p.pollTimer] = null; }
+      finishRun.call(this);
+    }
+    this[p.sessions] = this[p.sessions].filter(s => s.id !== id);
+    if (cfg.onSessionsChanged) cfg.onSessionsChanged.call(this);
+    if (this[p.sessionId] === id) {
+      this[p.sessionId] = null;
+      this[p.messages] = [];
+      try {
         if (this[p.sessions].length > 0) {
           await loadSession.call(this, this[p.sessions][0].id);
         } else {
           await startNewSession.call(this);
         }
+      } catch (e) {
+        console.error(`[delete${L}Session] reload`, e);
       }
-    } catch (e) {
-      console.error(`[delete${L}Session]`, e);
     }
   };
 
@@ -258,15 +301,23 @@ export function makeChatMethods(cfg) {
       this[p.messages].push({ role: 'user', content: msg, id: null, clientMsgId, sendError: false });
     }
     this.$nextTick(() => scrollToBottom.call(this));
+    // Session + Generation vor dem ersten `await` pinnen: der Lauf gehört dem
+    // Gespräch, in das gesendet wurde — auch wenn der User während des POST
+    // wechselt oder die Karte zurückgesetzt wird.
+    const sessionId = this[p.sessionId];
+    const g = gen(this);
     if (cfg.onBeforeSend) await cfg.onBeforeSend.call(this);
     try {
       const { jobId } = await fetchJson(cfg.sendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: this[p.sessionId], message: msg, client_msg_id: clientMsgId }),
+        body: JSON.stringify({ session_id: sessionId, message: msg, client_msg_id: clientMsgId }),
       });
-      if (cfg.lsKeyFn && jobId) localStorage.setItem(cfg.lsKeyFn(this[p.sessionId]), jobId);
-      if (jobId) startPollLocal.call(this, jobId);
+      // Reset während des POST: die Karte zeigt ein anderes Buch/eine andere
+      // Seite (oder nichts). Der Job läuft serverseitig weiter und erscheint
+      // beim nächsten Öffnen der Session über /jobs/active.
+      if (gen(this) !== g) return;
+      if (jobId) startPollLocal.call(this, jobId, sessionId);
       else { this[p.loading] = false; this.$nextTick(() => scrollToBottom.call(this)); }
       // Ab jetzt steht das Gespräch in der Historie: die User-Nachricht ist
       // serverseitig persistiert (_handleChatPost), und die Liste fuehrt nur
@@ -276,18 +327,17 @@ export function makeChatMethods(cfg) {
       await loadSessions.call(this);
     } catch (e) {
       console.error(`[send${L}Message]`, e);
+      if (gen(this) !== g) return;
       // Optimistische Msg behalten + sendError markieren + Input restaurieren,
       // damit User mit selber UUID erneut senden kann (Server dedupt dann).
       const tail = this[p.messages][this[p.messages].length - 1];
       if (tail && tail.clientMsgId === clientMsgId) tail.sendError = true;
       this[p.input] = msg;
-      this[p.status] = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(e.message)}</span>`;
+      this[p.status] = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(tFetchError(e))}</span>`;
       this[p.loading] = false;
       this.$nextTick(() => scrollToBottom.call(this));
     }
   };
-
-  m[`start${L}Poll`]      = function (jobId) { return startPollLocal.call(this, jobId); };
 
   // Laeuft der Job dieser Karte für genau dieses Gespräch? Alle Ladeanzeigen
   // (Progressbar, Skelett, Lauf-Punkt in der Historie) fragen danach statt nach
@@ -295,9 +345,10 @@ export function makeChatMethods(cfg) {
   m[`is${L}SessionRunning`] = function (id) {
     return !!this[p.loading] && id != null && this[p.runningSessionId] === id;
   };
-  m[`_scroll${L}ToBottom`] = function () { scrollToBottom.call(this); };
   // Server-persistierte Fallback-Nachrichten werden als `__i18n:key__` gespeichert
   // und beim Rendern in die aktuelle Locale aufgelöst (siehe CLAUDE.md, i18n-Regel).
+  // Tool-Call-Zusammenfassung eines agentischen Turns (Buch-/Recherche-Chat).
+  m._toolSummary = function (toolCalls, opts) { return toolSummary(toolCalls, opts); };
   m._renderChatMarkdown    = function (text) {
     const match = /^__i18n:([a-zA-Z0-9_.-]+)__$/.exec(text || '');
     return renderChatMarkdown(match ? window.__app.t(match[1]) : text);
@@ -337,8 +388,8 @@ export function makeChatMethods(cfg) {
     ].join(' · ');
   };
 
-  // Status-HTML für laufende Jobs — wird von onPollProgress-Callbacks der
-  // konkreten Chats genutzt (sie rufen this._runningJobStatus).
+  // Status-HTML für laufende Jobs — Fortschrittszeile aller drei Chats
+  // (startPollLocal#onProgress).
   // cacheReadIn (optional): Cache-Anteil der bisher gezählten Input-Tokens; im
   // agentischen Tool-Loop wächst tokensIn pro Iteration um den ganzen Präfix.
   m._runningJobStatus = function (statusText, tokIn, tokOut, maxTokOut, progress, tokPerSec, statusParams, cacheReadIn) {
@@ -349,6 +400,7 @@ export function makeChatMethods(cfg) {
   };
 
   m[`reset${L}`] = function () {
+    this[GEN] = gen(this) + 1;
     if (this[p.pollTimer]) { clearInterval(this[p.pollTimer]); this[p.pollTimer] = null; }
     this[p.sessions] = [];
     this[p.messages] = [];

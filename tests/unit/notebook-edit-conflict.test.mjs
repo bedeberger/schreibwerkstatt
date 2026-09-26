@@ -17,6 +17,11 @@ import { parseHTML } from 'linkedom';
 const { window } = parseHTML('<!doctype html><html><body></body></html>');
 globalThis.window = window;
 globalThis.document = window.document;
+// linkedom-DOMParser wickelt text/html-Fragmente nicht in <body> — Stub wie in
+// editor-shared-save.test.mjs (die Save-Pfade lesen htmlToText/stripLektoratMarks).
+globalThis.DOMParser = class {
+  parseFromString(html) { return parseHTML(`<!doctype html><html><body>${html}</body></html>`).document; }
+};
 window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
 globalThis.matchMedia = window.matchMedia;
 
@@ -237,4 +242,95 @@ test('submitConflictResolution: 2. 409 + Merge null → Draft behalten + editCon
   });
   assert.ok(app.conflictResolution, 'Auflösungs-State bleibt für erneuten Versuch erhalten');
   assert.equal(app.editSaving, false);
+});
+
+// --- Seitenwechsel mitten im Save --------------------------------------------
+// saveEdit/quickSave pinnen die Seite beim Start. Wechselt die Seite während
+// eines `await`, darf weder das HTML von Seite A auf Seite B gespeichert noch
+// der View-State von B (originalHtml, updated_at) mit dem Ergebnis von A
+// überschrieben werden.
+
+const lsMem = new Map();
+globalThis.localStorage = globalThis.localStorage || {
+  getItem: (k) => (lsMem.has(k) ? lsMem.get(k) : null),
+  setItem: (k, v) => { lsMem.set(k, String(v)); },
+  removeItem: (k) => { lsMem.delete(k); },
+  key: (i) => [...lsMem.keys()][i] ?? null,
+  get length() { return lsMem.size; },
+};
+
+function setSwitchApp() {
+  const app = {
+    editMode: true,
+    editSaving: false,
+    focusActive: false,
+    originalHtml: '<p>A-base</p>',
+    currentPage: { id: 1, name: 'A', updated_at: '2026-01-01T00:00:00Z' },
+    canEdit: () => true,
+    t: (k) => k,
+    setStatus() {},
+    _syncPageStatsAfterSave() {},
+    refreshPageAges() {},
+    updatePageView() {},
+    $store: { shell: { uiLocale: 'de' } },
+  };
+  window.__app = app;
+  return app;
+}
+
+function switchToB(app) {
+  app.currentPage = { id: 2, name: 'B', updated_at: '2026-03-03T00:00:00Z' };
+  app.originalHtml = '<p>B-base</p>';
+}
+
+function editCtx() {
+  const el = document.createElement('div');
+  el.innerHTML = '<p>A-neu mit genug Text</p>';
+  return Object.assign(Object.create(notebookEditMethods), {
+    _getEditEl: () => el,
+    _clearAutosaveTimers() {},
+    _filterFindingsAfterSave() {},
+    _teardownEditSession() {},
+  });
+}
+
+test('quickSave: Seitenwechsel während Conflict-Check → kein PUT, B unberührt', async () => {
+  const app = setSwitchApp();
+  const ctx = editCtx();
+  mockLoadPage(async () => { switchToB(app); return { updated_at: '2026-01-01T00:00:00Z' }; });
+  let puts = 0;
+  contentRepo.savePage = async () => { puts++; return { updated_at: 'x' }; };
+  await ctx.quickSave();
+  assert.equal(puts, 0);
+  assert.equal(app.originalHtml, '<p>B-base</p>');
+  assert.equal(app.currentPage.updated_at, '2026-03-03T00:00:00Z');
+  assert.equal(app.editSaving, false);
+});
+
+test('quickSave: Seitenwechsel während PUT → PUT auf A, View-State von B bleibt', async () => {
+  const app = setSwitchApp();
+  const ctx = editCtx();
+  mockLoadPage(async () => ({ updated_at: '2026-01-01T00:00:00Z' }));
+  const ids = [];
+  contentRepo.savePage = async (id) => { ids.push(id); switchToB(app); return { updated_at: '2026-09-09T00:00:00Z' }; };
+  await ctx.quickSave();
+  assert.deepEqual(ids, [1]);
+  assert.equal(app.originalHtml, '<p>B-base</p>');
+  assert.equal(app.currentPage.updated_at, '2026-03-03T00:00:00Z');
+});
+
+test('saveEdit: Seitenwechsel während Conflict-Check → Draft für A, kein PUT', async () => {
+  const app = setSwitchApp();
+  const ctx = editCtx();
+  mockLoadPage(async () => { switchToB(app); return { updated_at: '2026-01-01T00:00:00Z' }; });
+  let puts = 0;
+  contentRepo.savePage = async () => { puts++; return {}; };
+  const drafts = [];
+  ctx._keepAsDraft = (o) => drafts.push(o);
+  await ctx.saveEdit();
+  assert.equal(puts, 0);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].pageId, 1);
+  assert.equal(drafts[0].base, '<p>A-base</p>');
+  assert.equal(app.originalHtml, '<p>B-base</p>');
 });

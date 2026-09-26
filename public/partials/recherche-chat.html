@@ -33,7 +33,7 @@
               <template x-if="msg.context_info.web_searches > 0">
                 <span class="chat-context-tool" x-text="$app.t('recherche.chat.webSearches', { n: msg.context_info.web_searches })"></span>
               </template>
-              <template x-for="(entry, ei) in _researchToolSummary(msg.context_info.tool_calls)" :key="ei">
+              <template x-for="(entry, ei) in _toolSummary(msg.context_info.tool_calls, { skip: ['final_answer'] })" :key="ei">
                 <span class="chat-context-tool" x-text="entry.name + (entry.count > 1 ? ' ×' + entry.count : '')"></span>
               </template>
             </div>
@@ -108,7 +108,7 @@
       >
         <div class="chat-session-preview" x-text="(s.title || s.preview || $app.t('recherche.chat.untitled')).slice(0, 80)"></div>
         <div class="chat-session-meta"><span x-show="isResearchChatSessionRunning(s.id)" class="spinner chat-session-running" role="status" :aria-label="$app.t('chat.sessionRunning')" :data-tip="$app.t('chat.sessionRunning')"></span><span x-text="$app.formatDate(s.last_message_at)"></span></div>
-        <button type="button" class="chat-session-delete btn-card-close" @click.stop="deleteResearchChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
+        <button type="button" class="chat-session-delete btn-card-close" :disabled="isResearchChatSessionRunning(s.id)" @click.stop="deleteResearchChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
       </div>
     </template>
   </div>

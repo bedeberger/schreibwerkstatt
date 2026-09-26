@@ -6293,5 +6293,11 @@
   "admin.usage.breakdown.matrixTitle": "Matrix: User × Job-Typ",
   "admin.usage.breakdown.matrixHint": "Kosten aus dem Ledger (Preis zum Zeitpunkt des Aufrufs). Spalten: die sechs teuersten Job-Typen des Zeitraums, der Rest unter „Übrige“. Auf einen User klicken für die volle Aufschlüsselung.",
   "admin.usage.breakdown.other": "Übrige",
-  "admin.usage.breakdown.total": "Total"
+  "admin.usage.breakdown.total": "Total",
+  "bookEditor.unsavedOnSwitch": "{n} Seite(n) konnten vor dem Wechsel nicht gespeichert werden.",
+  "common.networkError": "Keine Verbindung zum Server.",
+  "bookEditor.loadFailed": "Buchinhalt konnte nicht geladen werden.",
+  "share.comments.replyFailed": "Antwort konnte nicht gesendet werden.",
+  "share.comments.resolveFailed": "Status des Kommentars konnte nicht geändert werden.",
+  "share.comments.deleteFailed": "Kommentar konnte nicht gelöscht werden."
 }

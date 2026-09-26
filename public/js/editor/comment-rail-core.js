@@ -55,6 +55,29 @@ function wrapP(text) {
 export function createCommentRail(cfg) {
   const K = cfg.keys;
 
+  // Aktions-Fehler (Antworten/Erledigt/Löschen) sichtbar machen — die Leiste
+  // hat keine eigene Fehlerzeile, die globale Statuszeile trägt es.
+  const reportError = (key, e) => {
+    console.warn('[comment-rail]', key, e);
+    const app = window.__app;
+    app?.setStatus?.(app.t(key), false, 6000);
+  };
+
+  // Laufendes Recompute-Scheduling abbrechen. Das Handle hält rAF UND den
+  // inneren Retry-Timeout: nur den rAF zu canceln liesse eine bereits laufende
+  // Retry-Kette weiterlaufen (parallele Ketten, Recompute nach destroy).
+  const cancelSchedule = (ctx) => {
+    const h = ctx[K.recomputeRaf];
+    if (h && typeof h === 'object') {
+      h.dead = true;
+      if (h.raf) cancelAnimationFrame(h.raf);
+      if (h.timer) clearTimeout(h.timer);
+    } else if (h) {
+      cancelAnimationFrame(h);
+    }
+    ctx[K.recomputeRaf] = null;
+  };
+
   const clearHL = () => {
     const api = highlightsApi();
     if (!api) return;
@@ -65,35 +88,54 @@ export function createCommentRail(cfg) {
   return {
     _railClearHL: clearHL,
 
+    // Aus destroy()/Reset der Karte: Scheduling stoppen + laufenden Load
+    // entwerten (seine Antwort gehört zu einem Buch, das nicht mehr offen ist).
+    _railCancelSchedule() { cancelSchedule(this); },
+    _railInvalidateLoad() { this[K.loadingBookId] = null; },
+
     // Buch-Kommentare laden (alle Links des Owners zum Buch) + auflösen.
     async _railLoad(bookId) {
       const id = bookId || Alpine.store('nav').selectedBookId;
-      if (!id) { this[K.comments] = []; this[K.threads] = []; return; }
+      if (!id) { this[K.loadingBookId] = null; this[K.comments] = []; this[K.threads] = []; return; }
       this[K.loadingBookId] = id;
+      let rows;
       try {
-        const rows = await fetchJson(`/share/api/book-comments/${encodeURIComponent(id)}`);
-        // Buch in der Zwischenzeit gewechselt? Verwerfen.
-        if (this[K.loadingBookId] !== id) return;
-        this[K.comments] = Array.isArray(rows) ? rows : [];
+        rows = await fetchJson(`/share/api/book-comments/${encodeURIComponent(id)}`);
       } catch {
-        this[K.comments] = [];
+        rows = [];
       }
+      // Buch in der Zwischenzeit gewechselt oder Karte zurückgesetzt? Verwerfen —
+      // auch im Fehlerfall, sonst leert ein später Fehler die Liste des neuen Buchs.
+      if (this[K.loadingBookId] !== id) return;
+      this[K.comments] = Array.isArray(rows) ? rows : [];
       this._railSchedule();
     },
 
     // Recompute debouncen + auf Seiten-/Stream-Render warten (Container wird erst
     // nach x-html/x-init befüllt). Mehrere Versuche, dann aufgeben.
     _railSchedule() {
-      if (this[K.recomputeRaf]) cancelAnimationFrame(this[K.recomputeRaf]);
+      cancelSchedule(this);
+      // Lokales Handle (roh, nicht der reaktive Proxy im State): `dead` beendet
+      // die Kette, egal in welchem Schritt sie gerade wartet.
+      const h = { raf: null, timer: null, dead: false };
       let tries = 0;
       const run = () => {
+        h.raf = null;
+        h.timer = null;
+        if (h.dead) return;
         if (cfg.shouldWait(this, window.__app) && tries++ < 20) {
-          this[K.recomputeRaf] = requestAnimationFrame(() => setTimeout(run, 80));
+          h.raf = requestAnimationFrame(() => {
+            h.raf = null;
+            if (!h.dead) h.timer = setTimeout(run, 80);
+          });
           return;
         }
+        h.dead = true;
+        this[K.recomputeRaf] = null;
         this._railRecompute();
       };
-      this[K.recomputeRaf] = requestAnimationFrame(run);
+      this[K.recomputeRaf] = h;
+      h.raf = requestAnimationFrame(run);
     },
 
     _railRecompute() {
@@ -261,11 +303,6 @@ export function createCommentRail(cfg) {
       cfg.afterRecompute?.(this);
     },
 
-    commentAuthorLabel(c) {
-      if (c.author_email) return window.__app.t('share.reader.author_badge');
-      return c.reader_name || window.__app.t('share.reader.anon');
-    },
-
     // Distinct Reviewer-Namen (Root-Kommentare von Lesern) der geladenen
     // Kommentare — speist die Reviewer-Combobox des Triage-Filters (#5).
     // Owner-Antworten (author_email) und Replies zählen nicht.
@@ -317,7 +354,10 @@ export function createCommentRail(cfg) {
         this[K.comments] = [...this[K.comments], reply];
         this[K.replyDrafts][rootId] = '';
         this._railRecompute();
-      } catch { /* still in der Leiste; Owner-Karte zeigt Fehler granular */ } finally {
+      } catch (e) {
+        // Entwurf bleibt stehen — der User kann erneut senden.
+        reportError('share.comments.replyFailed', e);
+      } finally {
         this[K.savingReply] = null;
       }
     },
@@ -333,10 +373,15 @@ export function createCommentRail(cfg) {
         });
         if (!res.ok) throw new Error('resolve failed');
         comment.resolved_at = resolved ? new Date().toISOString() : null;
+        // Neu auflösen: erledigte Stellen verlieren ihr Highlight, und der
+        // Status-Filter (offen/erledigt) blendet den Thread ggf. aus.
+        this._railRecompute();
         // Tree-/Seiten-Badge (offene Reviewer-Kommentare) syncen — Resolve ändert
         // die Pro-Seite-Zählung.
         window.__app?.refreshShareCommentCounts?.();
-      } catch { /* no-op */ } finally {
+      } catch (e) {
+        reportError('share.comments.resolveFailed', e);
+      } finally {
         this[K.savingResolve] = null;
       }
     },
@@ -354,7 +399,9 @@ export function createCommentRail(cfg) {
         // Root-Delete kaskadiert serverseitig — Buch-Kommentare neu laden + Badge syncen.
         await this._railLoad();
         window.__app?.refreshShareCommentCounts?.();
-      } catch { /* no-op */ }
+      } catch (e) {
+        reportError('share.comments.deleteFailed', e);
+      }
     },
   };
 }

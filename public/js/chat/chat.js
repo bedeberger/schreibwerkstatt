@@ -8,7 +8,6 @@ import { contentRepo } from '../repo/content.js';
 const baseMethods = makeChatMethods({
   label: 'Chat',
   props: {
-    show: 'showChatCard',
     sessions: 'chatSessions',
     messages: 'chatMessages',
     sessionId: 'chatSessionId',
@@ -18,6 +17,7 @@ const baseMethods = makeChatMethods({
     status: 'chatStatus',
     progress: 'chatProgress',
     pollTimer: '_chatPollTimer',
+    gen: '_chatGen',
     pendingRefresh: '_chatPendingRefresh',
   },
   scrollElId: 'chat-messages',
@@ -32,10 +32,6 @@ const baseMethods = makeChatMethods({
     page_name: ctx.$app.currentPage.name,
   }),
   sendUrl: '/jobs/chat',
-  lsKeyFn: (sessionId) => 'lektorat_chat_job_' + sessionId,
-  onPollProgress: function (job) {
-    this.chatStatus = this._runningJobStatus(job.statusText, job.tokensIn, job.tokensOut, job.maxTokensOut, job.progress, job.tokensPerSec, job.statusParams, job.cacheReadIn);
-  },
   onBeforeSend: async function () {
     const root = window.__app;
     // Ungespeicherte Editor-Änderungen flushen, sonst sieht der Chat-Job den

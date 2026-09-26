@@ -80,7 +80,7 @@ export const notebookCardMethods = {
     // Nach einem Theme-Wechsel steht ein neuer Render-Knoten im DOM: das
     // Rendern selbst ist dann schon erledigt (der Lauf ist idempotent), aber
     // die Kastenhoehe muss neu gemessen werden.
-    document.addEventListener(DIAGRAMS_REDRAWN, draw);
+    document.addEventListener(DIAGRAMS_REDRAWN, draw, { signal: this._notebookAbort?.signal });
     queueMicrotask(draw);
   },
 

@@ -51,9 +51,17 @@ export const lektoratMethods = {
   // `fresh: true` umgeht SWR; sonst koennte der CONTENT_CACHE nach kurz zuvor
   // gesetzten Edits noch die alte Fassung liefern und der gleich folgende PUT
   // wuerde frische Server-Edits mit Stale-Daten ueberschreiben.
+  //
+  // Die Seite wird beim Start gepinnt: Korrekturen gehören zu der Seite, auf
+  // der sie gefunden wurden, und ein Seitenwechsel während der Awaits darf
+  // weder Ziel noch Name des PUT verschieben. `stale: true` im Ergebnis sagt
+  // dem Aufrufer, dass inzwischen eine andere Seite offen ist — deren View-State
+  // (originalHtml, updated_at) fasst er dann nicht an.
   async _loadApplyAndSave(selectedErrors, onProgress, source = 'lektorat-apply') {
+    const pageId = this.currentPage.id;
+    const pageName = this.currentPage.name;
     onProgress(10, this.t('lektorat.loadingPage'));
-    const page = await contentRepo.loadPage(this.currentPage.id, { fresh: true });
+    const page = await contentRepo.loadPage(pageId, { fresh: true });
     page.html = stripFocusArtefacts(page.html || '');
 
     const skipped = [];
@@ -76,18 +84,19 @@ export const lektoratMethods = {
     onProgress(85, this.t('lektorat.saving'));
     // `page.updated_at` ist der frisch geladene Stand; PUT optimistisch gegen
     // genau diesen Stamp. Wenn dazwischen jemand schreibt → 409 vom Server.
-    const saved = await savePage(this.currentPage.id, {
+    const saved = await savePage(pageId, {
       html: finalHtml,
-      pageName: this.currentPage.name,
+      pageName,
       source,
       expectedUpdatedAt: page.updated_at || null,
     });
-    if (saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
+    const stale = this.currentPage?.id !== pageId;
+    if (!stale && saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
     // Uebernommene Korrekturen sind direkte Folge des Lektorats — Seite soll
     // nicht unmittelbar danach auf "seit Lektorat bearbeitet" flippen.
-    this.markPageChecked?.(this.currentPage.id);
-    this._syncPageStatsAfterSave?.(this.currentPage, finalHtml);
-    return { finalHtml, skipped };
+    this.markPageChecked?.(pageId);
+    this._syncPageStatsAfterSave?.({ id: pageId, updated_at: saved?.updated_at || null }, finalHtml);
+    return { finalHtml, skipped, pageId, stale };
   },
 
 
@@ -319,10 +328,17 @@ export const lektoratMethods = {
     if (selected.length === 0) return;
 
     try {
-      const { finalHtml, skipped } = await this._loadApplyAndSave(selected, (pct, text) => {
+      const { finalHtml, skipped, stale } = await this._loadApplyAndSave(selected, (pct, text) => {
         this.saveApplying = pct;
         if (text) this.setStatus(text, true);
       });
+      // Seite während des Speicherns gewechselt: gespeichert ist die richtige
+      // Seite, aber Findings-/History-/View-State gehören jetzt der neuen.
+      if (stale) {
+        this.saveApplying = null;
+        this.setStatus(this.t('lektorat.correctionsSaved'), false, 5000);
+        return;
+      }
 
       if (this.lastCheckId) {
         try {

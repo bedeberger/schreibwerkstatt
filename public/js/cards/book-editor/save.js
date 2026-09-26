@@ -11,6 +11,7 @@
 // bewegt hat.
 
 import { htmlToText } from '../../utils.js';
+import { tErrorRaw } from '../../i18n.js';
 import { readConflictBody, savePage } from '../../editor/shared/page-api.js';
 import { checkPageConflict } from '../../editor/shared/page-conflict.js';
 import { conflictText } from '../../editor/shared/conflict-text.js';
@@ -134,7 +135,8 @@ export const bookEditorSaveMethods = {
         block.conflict = { ...readConflictBody(e), remoteHtml: null };
         block.saveError = this._conflictText(block.conflict, 'hint');
       } else {
-        block.saveError = e.message || app.t('bookEditor.saveFailed');
+        // Übersetzter Backend-Fehler statt der rohen `PUT … HTTP 4xx`-Message.
+        block.saveError = e?.body ? tErrorRaw(e.body) : app.t('bookEditor.saveFailed');
       }
     } finally {
       block.saving = false;

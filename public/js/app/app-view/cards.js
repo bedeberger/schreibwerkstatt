@@ -239,7 +239,7 @@ export const cardsMethods = {
 
   // Seiten-Chat: lebt neben dem Editor, schließt NICHT den Editor. Toggle
   // merkt sich checkDone-Snapshot (Chat soll Findings temporär verbergen).
-  // checkDoneBeforeChat wird in chat-base beim onVisible gesetzt.
+  // checkDoneBeforeChat wird in chat-card.js beim onShow gesetzt.
   // Mutually exclusive mit Ideen — gleicher Slot neben Editor.
   async toggleChatCard() {
     if (this.showChatCard) {
