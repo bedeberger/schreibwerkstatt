@@ -1,10 +1,11 @@
 const express = require('express');
-const { db, upsertBookByName } = require('../db/schema');
+const { db } = require('../db/schema');
 const logger = require('../logger');
 const { toIntId } = require('../lib/validate');
 const contentStore = require('../lib/content-store');
-const { setContext } = require('../lib/log-context');
-const { aclParamGuard, requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
+const { aclParamGuard, guardBook, sessionEmail } = require('../lib/acl');
+const { pageBookGuard } = require('../lib/page-guard');
+const chatSessions = require('../db/chat-sessions');
 const { htmlToText } = require('./jobs/shared');
 
 const router = express.Router();
@@ -25,18 +26,15 @@ function normalizeContextInfo(ci) {
 
 // ── Routen ───────────────────────────────────────────────────────────────────
 
-/** Neue Chat-Session erstellen */
+/** Neue Seiten-Chat-Session erstellen.
+ *  Das Buch kommt aus der SEITE, nie aus dem Body (lib/page-guard.js): mit einem
+ *  eigenen `book_id` und einer fremden `page_id` läse der Snapshot unten sonst
+ *  fremden Seitentext in die eigene Session. */
 router.post('/session', jsonBody, async (req, res) => {
-  const { book_name } = req.body;
-  const book_id = toIntId(req.body?.book_id);
-  const page_id = toIntId(req.body?.page_id);
+  const g = pageBookGuard(req, res, { minRole: 'lektor', pageId: req.body?.page_id ?? 0 });
+  if (!g) return;
+  const { pageId: page_id, bookId: book_id } = g;
   const userEmail = sessionEmail(req);
-  if (!book_id || !page_id || !userEmail) {
-    return res.status(400).json({ error_code: 'BOOKID_PAGEID_LOGIN_REQ' });
-  }
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
 
   // Snapshot: Seitentext beim Chat-Öffnen einmalig sichern. Ermöglicht später
   // im System-Prompt einen Vergleich „Stand beim Öffnen" vs. „aktueller Stand",
@@ -53,27 +51,14 @@ router.post('/session', jsonBody, async (req, res) => {
   // Orphan-Cleanup: vorher angelegte leere Sessions desselben Users für dieselbe
   // Seite löschen, bevor wir eine neue erstellen. So sammeln sich keine Karteileichen
   // an, wenn der User Chat-Karte mehrmals öffnet/schliesst, ohne zu schreiben.
-  // Why: 60s-Schonfrist verhindert Race mit parallelem /jobs/chat-Send, der gerade
-  // erst user_msg in eine 30s-junge Session geschrieben hat — Cleanup würde sonst
-  // die Session mitsamt user_msg löschen und der laufende Chat-Job fällt auf
-  // FK-Verletzung beim assistant-msg-INSERT.
-  const cleanupRes = db.prepare(`
-    DELETE FROM chat_sessions
-    WHERE page_id = ? AND user_email = ? AND kind = 'page'
-      AND created_at < datetime('now', '-60 seconds')
-      AND NOT EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id)
-  `).run(page_id, userEmail);
-  if (cleanupRes.changes > 0) {
-    logger.info(`[chat/session] Orphan-Cleanup: ${cleanupRes.changes} leere page-Session(s) für page=${page_id} entfernt.`);
+  // Schonfrist + Begründung: db/chat-sessions.js#ORPHAN_GRACE_MS.
+  const removed = chatSessions.deleteEmptyPageSessions(page_id, userEmail);
+  if (removed > 0) {
+    logger.info(`[chat/session] Orphan-Cleanup: ${removed} leere page-Session(s) für page=${page_id} entfernt.`);
   }
 
-  upsertBookByName(book_id, book_name);
-  const now = new Date().toISOString();
-  const result = db.prepare(`
-    INSERT INTO chat_sessions (book_id, page_id, user_email, created_at, last_message_at, opening_page_text)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(book_id, page_id, userEmail, now, now, openingPageText);
-  res.json({ id: result.lastInsertRowid });
+  const id = chatSessions.insertPageSession({ bookId: book_id, pageId: page_id, userEmail, openingPageText });
+  res.json({ id });
 });
 
 // Buch-weite Chat-Session anlegen (Buch-Chat + Recherche-Chat). Beide
@@ -81,29 +66,16 @@ router.post('/session', jsonBody, async (req, res) => {
 // (leere, nie benutzte Sessions desselben kind älter als 60 s verwerfen) und
 // Insert sind geteilt. `minRole(book_id)` löst die Rolle ggf. buch-abhängig auf.
 function createBookScopedSession(req, res, { kind, minRole }) {
-  const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
+  if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  if (!guardBook(req, res, book_id, minRole(book_id))) return;
   const userEmail = sessionEmail(req);
-  if (!book_id || !userEmail) return res.status(400).json({ error_code: 'BOOKID_LOGIN_REQ' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, minRole(book_id)); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
 
-  const cleanup = db.prepare(`
-    DELETE FROM chat_sessions
-    WHERE book_id = ? AND kind = ? AND user_email = ?
-      AND created_at < datetime('now', '-60 seconds')
-      AND NOT EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id)
-  `).run(book_id, kind, userEmail);
-  if (cleanup.changes > 0) logger.info(`[chat/session/${kind}] Orphan-Cleanup: ${cleanup.changes} leere Session(s) für book=${book_id} entfernt.`);
+  const removed = chatSessions.deleteEmptyBookSessions(book_id, kind, userEmail);
+  if (removed > 0) logger.info(`[chat/session/${kind}] Orphan-Cleanup: ${removed} leere Session(s) für book=${book_id} entfernt.`);
 
-  upsertBookByName(book_id, book_name);
-  const now = new Date().toISOString();
-  const result = db.prepare(`
-    INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(book_id, kind, userEmail, now, now);
-  res.json({ id: result.lastInsertRowid });
+  const id = chatSessions.insertBookSession({ bookId: book_id, kind, userEmail });
+  res.json({ id });
 }
 
 // Kappung des Listen-`preview` (erste User-Nachricht). Die Session-Liste zeigt
@@ -118,21 +90,9 @@ const PREVIEW_CHARS = 200;
 // in der DB liegen — es gibt keinen zweiten Weg zu ihnen ausser der Session-ID.
 // Stattdessen ist der `preview` serverseitig gekappt (die Liste zeigt ohnehin nur
 // 80 Zeichen), damit die Antwort nicht mit der Zahl der Sessions mitwaechst.
+// Login + Buch-ID hat `aclParamGuard` geprüft, `req.bookId` ist gesetzt.
 function listBookScopedSessions(req, res, { kind }) {
-  const userEmail = sessionEmail(req);
-  const bookId = toIntId(req.params.book_id);
-  if (!bookId) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const rows = db.prepare(`
-    SELECT cs.id, cs.book_id, b.name AS book_name, cs.title, cs.created_at, cs.last_message_at,
-           (SELECT substr(content, 1, ${PREVIEW_CHARS}) FROM chat_messages
-             WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
-    FROM chat_sessions cs
-    LEFT JOIN books b ON b.book_id = cs.book_id
-    WHERE cs.book_id = ? AND cs.kind = ? AND cs.user_email = ?
-      AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = cs.id)
-    ORDER BY cs.last_message_at DESC
-  `).all(bookId, kind, userEmail);
-  res.json(rows);
+  res.json(chatSessions.listBookSessions(req.bookId, kind, sessionEmail(req), PREVIEW_CHARS));
 }
 
 /** Neue Buch-Chat-Session erstellen (ohne Seiten-Bezug).
@@ -159,32 +119,18 @@ router.get('/sessions/research/:book_id', (req, res) => listBookScopedSessions(r
 /** Alle Sessions einer Seite (neueste zuerst, max. 20).
  *  Siehe Kommentar oben — leere Sessions werden ausgefiltert. */
 router.get('/sessions/:page_id', (req, res) => {
-  const userEmail = sessionEmail(req);
   const pageId = toIntId(req.params.page_id);
   if (!pageId) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const rows = db.prepare(`
-    SELECT cs.id, cs.book_id, cs.page_id, p.page_name, cs.title, cs.created_at, cs.last_message_at,
-           (SELECT content FROM chat_messages WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
-    FROM chat_sessions cs
-    LEFT JOIN pages p ON p.page_id = cs.page_id
-    WHERE cs.page_id = ? AND cs.user_email = ?
-      AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = cs.id)
-    ORDER BY cs.last_message_at DESC
-    LIMIT 20
-  `).all(pageId, userEmail);
-  res.json(rows);
+  res.json(chatSessions.listPageSessions(pageId, sessionEmail(req), 20));
 });
 
-/** Session mit allen Nachrichten laden */
+/** Session mit allen Nachrichten laden. Der Öffnungs-Snapshot
+ *  (`opening_page_text`) bleibt serverseitig — Prompt-Material des Jobs. */
 router.get('/session/:id', (req, res) => {
   const userEmail = sessionEmail(req);
   const id = toIntId(req.params.id);
   if (!id) return res.status(400).json({ error_code: 'INVALID_ID' });
-  const session = db.prepare(`
-    SELECT cs.*, p.page_name FROM chat_sessions cs
-    LEFT JOIN pages p ON p.page_id = cs.page_id
-    WHERE cs.id = ? AND cs.user_email = ?
-  `).get(id, userEmail);
+  const session = chatSessions.getOwnedSession(id, userEmail);
   if (!session) return res.status(404).json({ error_code: 'SESSION_NOT_FOUND' });
 
   const messages = db.prepare(`
@@ -202,6 +148,7 @@ router.get('/session/:id', (req, res) => {
     })),
   });
 });
+
 
 /** Im Buch-Chat generiertes Bild streamen (Owner-Scope via Session-Join).
  *  ?download=1 erzwingt den Attachment-Disposition (Speichern-Dialog). */

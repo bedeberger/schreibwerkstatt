@@ -38,9 +38,8 @@ function _pageHasCitations(pageId) {
   catch { return false; }
 }
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
-const { resolvePageBookId } = require('../../lib/content-ownership');
+const { guardBook, sessionEmail } = require('../../lib/acl');
+const { pageBookGuard } = require('../../lib/page-guard');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider, effectiveProviderClass } = require('../../lib/ai');
 const { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratEffort } = require('./lektorat-split');
@@ -546,14 +545,10 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
 // ── Routen ────────────────────────────────────────────────────────────────────
 lektoratRouter.post('/check', jsonBody, (req, res) => {
   const { page_name } = req.body;
-  const page_id = toIntId(req.body?.page_id);
-  let book_id = toIntId(req.body?.book_id);
-  if (!page_id) return res.status(400).json({ error_code: 'PAGE_ID_REQUIRED' });
-  if (!book_id) book_id = resolvePageBookId(page_id);
-  if (!book_id) return res.status(404).json({ error_code: 'BOOK_NOT_FOUND' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  // Buch aus der Seite, nie aus dem Body (lib/page-guard.js).
+  const g = pageBookGuard(req, res, { minRole: 'lektor', pageId: req.body?.page_id ?? 0 });
+  if (!g) return;
+  const { pageId: page_id, bookId: book_id } = g;
   const userEmail = sessionEmail(req);
   const existing = findActiveJobId('check', page_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
@@ -568,9 +563,7 @@ lektoratRouter.post('/batch-check', jsonBody, (req, res) => {
   const { book_name } = req.body;
   const book_id = toIntId(req.body?.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  setContext({ book: book_id });
-  try { requireBookAccess(req, book_id, 'lektor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'lektor')) return;
   const userEmail = sessionEmail(req);
   const existing = findActiveJobId('batch-check', book_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });

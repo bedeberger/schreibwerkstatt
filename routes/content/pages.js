@@ -10,9 +10,8 @@ const bookPresence = require('../../db/book-presence');
 const appUsersDevices = require('../../db/app-users-devices');
 const bookAccess = require('../../db/book-access');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
 const { resolveChapterBookId } = require('../../lib/content-ownership');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 const { jsonBody, _validDeviceId, _deviceTokenLabel, _guardPage, _fail } = require('./shared');
 
 function register(router) {
@@ -200,9 +199,12 @@ function register(router) {
     if (!bookIdRaw && !chapterIdRaw) return res.status(400).json({ error_code: 'BOOK_OR_CHAPTER_REQUIRED' });
     const effBookId = bookIdRaw || resolveChapterBookId(chapterIdRaw);
     if (!effBookId) return res.status(404).json({ error_code: 'BOOK_NOT_FOUND' });
-    setContext({ book: effBookId });
-    try { requireBookAccess(req, effBookId, 'editor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, effBookId, 'editor')) return;
+    // Kapitel muss im geprüften Buch liegen: mit eigenem book_id + fremdem
+    // chapter_id landete die Seite sonst unter dem Kapitel eines fremden Buchs.
+    if (chapterIdRaw && resolveChapterBookId(chapterIdRaw) !== effBookId) {
+      return res.status(400).json({ error_code: 'CHAPTER_NOT_IN_BOOK' });
+    }
     try {
       const created = await contentStore.createPage({
         book_id: effBookId,
@@ -230,8 +232,7 @@ function register(router) {
       && req.body?.target_chapter_id !== null && req.body?.target_chapter_id !== 0;
     const targetChapterId = hasChap ? toIntId(req.body.target_chapter_id) : null;
     // editor-Recht auf dem Ziel-Buch erzwingen.
-    try { requireBookAccess(req, targetBookId, 'editor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, targetBookId, 'editor')) return;
     const email = sessionEmail(req);
     const blocking = bookAccess.getBlockingLockFor(pageId, email);
     if (blocking) return res.status(423).json({
@@ -317,9 +318,7 @@ function register(router) {
     const { getPageImage } = require('../../db/page-images');
     const row = getPageImage(id);
     if (!row) return res.status(404).json({ error_code: 'IMAGE_NOT_FOUND' });
-    setContext({ book: row.book_id });
-    try { requireBookAccess(req, row.book_id, 'viewer'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, row.book_id, 'viewer')) return;
 
     // Defense-in-depth: nur Raster-MIMEs inline; nosniff + restriktive CSP
     // verhindern HTML/Script-Interpretation des Bild-Bodys (Stored-XSS-Schutz).

@@ -6,9 +6,10 @@
 const { parseJSONLenient } = require('../../../lib/ai');
 const { stripTrailingEmptyJson } = require('../agentic-chat');
 const { toIntId } = require('../../../lib/validate');
-const { setContext } = require('../../../lib/log-context');
-const { db } = require('../../../db/schema');
-const { sessionEmail } = require('../../../lib/acl');
+const { db, getBookSettings } = require('../../../db/schema');
+const { getSessionForJob } = require('../../../db/chat-sessions');
+const { resolvePageBookId } = require('../../../lib/content-ownership');
+const { guardBook, sessionEmail } = require('../../../lib/acl');
 const {
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
 } = require('../shared');
@@ -69,7 +70,9 @@ function invalidateBookPageCache(bookId) {
 }
 
 // ── Gemeinsamer Route-Handler ────────────────────────────────────────────────
-function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
+// `kind` bindet den Job-Typ an die Session-Art: eine Session läuft nur unter
+// dem Chat, für den sie angelegt wurde.
+function _handleChatPost(req, res, { jobType, kind, labelFn, runFn }) {
   const { message } = req.body;
   const session_id = toIntId(req.body?.session_id);
   const clientMsgId = typeof req.body?.client_msg_id === 'string' && req.body.client_msg_id.length <= 64
@@ -77,6 +80,8 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
     : null;
   if (!session_id || !message?.trim()) return res.status(400).json({ error_code: 'SESSION_ID_MSG_REQUIRED' });
   const userEmail = sessionEmail(req);
+  // Derselbe Code wie der Buch-Guard — nur früher, weil die Session unten
+  // über die E-Mail geladen wird und ohne Login sonst als 404 erschiene.
   if (!userEmail) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
 
   // Idempotency: gleicher client_msg_id in selber Session → bestehende jobId zurück,
@@ -91,29 +96,27 @@ function _handleChatPost(req, res, { jobType, sessionSelect, labelFn, runFn }) {
   const existing = findActiveJobId(jobType, session_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
 
-  const session = db.prepare(sessionSelect).get(session_id, userEmail);
-  if (!session) return res.status(404).json({ error_code: 'SESSION_NOT_FOUND' });
-  if (session.book_id) setContext({ book: session.book_id });
+  const session = getSessionForJob(session_id, userEmail);
+  if (!session || session.kind !== kind) return res.status(404).json({ error_code: 'SESSION_NOT_FOUND' });
+
+  // Seiten-Chat: die Seite muss (noch) im Buch der Session liegen. Die Session
+  // trägt das Buch, gegen das unten geprüft wird — liegt die Seite woanders
+  // (verschoben, oder eine Alt-Session mit Client-`book_id`), liefe der Job mit
+  // der ACL des einen Buchs über den Text des anderen.
+  if (kind === 'page' && resolvePageBookId(session.page_id) !== session.book_id) {
+    return res.status(404).json({ error_code: 'SESSION_NOT_FOUND' });
+  }
 
   // ACL-Guard. Page-Chat: lektor+. Buch-Chat: editor+, ausser
   // book_settings.allow_lektor_book_chat=1 setzt es auf lektor+.
-  if (session.book_id) {
-    const { requireBookAccess, sendACLError, ACLError } = require('../../../lib/acl');
-    const { getBookSettings } = require('../../../db/schema');
-    let minRole = 'lektor';
-    if (jobType === 'book-chat') {
-      const bs = getBookSettings(session.book_id);
-      minRole = bs?.allow_lektor_book_chat ? 'lektor' : 'editor';
-    } else if (jobType === 'research-chat') {
-      // Recherche-Board ist editor-scoped → Recherche-Chat ebenso.
-      minRole = 'editor';
-    }
-    try { requireBookAccess(req, session.book_id, minRole); }
-    catch (e) {
-      if (e instanceof ACLError) { sendACLError(res, e); return; }
-      throw e;
-    }
+  // Recherche-Chat: editor+ (das Recherche-Board ist editor-scoped).
+  let minRole = 'lektor';
+  if (jobType === 'book-chat') {
+    minRole = getBookSettings(session.book_id)?.allow_lektor_book_chat ? 'lektor' : 'editor';
+  } else if (jobType === 'research-chat') {
+    minRole = 'editor';
   }
+  if (!guardBook(req, res, session.book_id, minRole)) return;
 
   const now = new Date().toISOString();
   const userMsgResult = db.prepare(

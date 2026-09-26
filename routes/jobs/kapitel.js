@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const {
-  db, getBookSettings, upsertBookByName,
+  db, getBookSettings,
   loadChapterMacroReviewCache, saveChapterMacroReviewCache,
 } = require('../../db/schema');
 const {
@@ -19,11 +19,10 @@ const { narrativeLabels } = require('./narrative-labels');
 const { loadChapterReviewKomplettContext, loadStrukturContext } = require('./review-context');
 const { applyQuoteVerification, belegHaystack } = require('../../lib/quote-verify');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
 const { getDescendantChapterIds } = require('../../db/book-order');
-const { sessionEmail } = require('../../lib/acl');
+const { guardBook, sessionEmail } = require('../../lib/acl');
 
 function _sigHash(obj) {
   return crypto.createHash('sha1').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 12);
@@ -140,7 +139,6 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
       logger.info(`«${chapterName}» – Cache-HIT (pages_sig match) – spart Kapitel-Review-Call.`);
       updateJob(jobId, { progress: 97, statusText: 'job.phase.checkpointLoaded' });
       const model = _modelName(effectiveProvider);
-      if (bookName) upsertBookByName(bookIdInt, bookName);
       db.prepare(`INSERT INTO chapter_reviews
         (book_id, chapter_id, reviewed_at, review_json, model, user_email)
         VALUES (?, ?, ?, ?, ?, ?)`)
@@ -270,7 +268,6 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
     saveChapterMacroReviewCache(bookIdInt, email, chapterIdInt, pagesSig, r, effectiveProvider);
 
     const model = _modelName(effectiveProvider);
-    if (bookName) upsertBookByName(parseInt(bookId), bookName);
     db.prepare(`INSERT INTO chapter_reviews
       (book_id, chapter_id, reviewed_at, review_json, model, user_email)
       VALUES (?, ?, ?, ?, ?, ?)`)
@@ -292,26 +289,35 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
-kapitelRouter.post('/chapter-review', jsonBody, (req, res) => {
-  const { chapter_name, book_name } = req.body;
+kapitelRouter.post('/chapter-review', jsonBody, async (req, res) => {
   const book_id = toIntId(req.body?.book_id);
   const chapter_id = toIntId(req.body?.chapter_id);
   const includeSubchapters = req.body?.include_subchapters === true;
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!chapter_id) return res.status(400).json({ error_code: 'CHAPTER_ID_REQUIRED' });
-  setContext({ book: book_id });
-  const { requireBookAccess, sendACLError } = require('../../lib/acl');
-  try { requireBookAccess(req, book_id, 'editor'); }
-  catch (e) { if (sendACLError(res, e)) return; throw e; }
+  if (!guardBook(req, res, book_id, 'editor')) return;
+  // Kapitel- und Buchname kommen aus dem Content-Store, nicht vom Client: beide
+  // gehen in Prompt und Cache-Signatur. Das Kapitel muss im geprüften Buch liegen.
+  let chapterName = '';
+  let bookName = '';
+  try {
+    const ch = await contentStore.loadChapter(chapter_id);
+    if (ch.book_id !== book_id) return res.status(400).json({ error_code: 'CHAPTER_NOT_IN_BOOK' });
+    chapterName = ch.name || '';
+    bookName = (await contentStore.loadBook(book_id)).name || '';
+  } catch (e) {
+    if (e?.status === 404) return res.status(404).json({ error_code: 'NOT_FOUND' });
+    throw e;
+  }
   const userEmail = sessionEmail(req);
   // Dedup auf Kapitel-Ebene – parallele Reviews unterschiedlicher Kapitel sind ok.
   const existing = findActiveJobId('chapter-review', chapter_id, userEmail);
   if (existing) return res.json({ jobId: existing, existing: true });
-  const label = chapter_name ? 'job.label.chapterReviewChapter' : 'job.label.chapterReview';
-  const labelParams = chapter_name ? { name: chapter_name } : null;
+  const label = chapterName ? 'job.label.chapterReviewChapter' : 'job.label.chapterReview';
+  const labelParams = chapterName ? { name: chapterName } : null;
   const jobId = createJob('chapter-review', book_id, userEmail, label, labelParams, chapter_id);
   enqueueJob(jobId, () => runChapterReviewJob(
-    jobId, book_id, chapter_id, chapter_name || '', book_name || '', userEmail,
+    jobId, book_id, chapter_id, chapterName, bookName, userEmail,
     { includeSubchapters },
   ));
   res.json({ jobId });

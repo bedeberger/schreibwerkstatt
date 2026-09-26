@@ -3,8 +3,8 @@
 
 const contentStore = require('../../lib/content-store');
 const { toIntId } = require('../../lib/validate');
-const { setContext } = require('../../lib/log-context');
-const { requireBookAccess, sendACLError } = require('../../lib/acl');
+const { guardBook } = require('../../lib/acl');
+const { resolveChapterBookId } = require('../../lib/content-ownership');
 const { jsonBody, _guardChapter, _fail } = require('./shared');
 
 function register(router) {
@@ -23,11 +23,13 @@ function register(router) {
     const name = (req.body?.name || '').toString().trim();
     if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
     if (!name) return res.status(400).json({ error_code: 'NAME_REQUIRED' });
-    setContext({ book: bookId });
-    try { requireBookAccess(req, bookId, 'editor'); }
-    catch (e) { if (sendACLError(res, e)) return; throw e; }
+    if (!guardBook(req, res, bookId, 'editor')) return;
+    const parentChapterId = Number.isFinite(req.body?.parent_chapter_id) ? req.body.parent_chapter_id : null;
+    // Eltern-Kapitel muss im geprüften Buch liegen (kein Fremd-Verweis im Baum).
+    if (parentChapterId != null && resolveChapterBookId(parentChapterId) !== bookId) {
+      return res.status(400).json({ error_code: 'CHAPTER_NOT_IN_BOOK' });
+    }
     try {
-      const parentChapterId = Number.isFinite(req.body?.parent_chapter_id) ? req.body.parent_chapter_id : null;
       const created = await contentStore.createChapter({
         book_id: bookId,
         name,

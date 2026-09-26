@@ -5,8 +5,8 @@
 
 const express = require('express');
 const { db } = require('../db/schema');
-const { setContext } = require('../lib/log-context');
-const { requireBookAccess, sendACLError, sessionEmail } = require('../lib/acl');
+const { guardBook, sessionEmail } = require('../lib/acl');
+const { pageBookGuard } = require('../lib/page-guard');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -64,7 +64,7 @@ const KNOWN_SOURCES = new Set(['palette', 'tile', 'sidebar', 'shortcut']);
 
 router.post('/track', jsonBody, (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!userEmail) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
   const key = (req.body?.key || '').toString();
   if (!ALLOWED_KEYS.has(key)) {
     return res.status(400).json({ error_code: 'INVALID_KEY' });
@@ -72,11 +72,7 @@ router.post('/track', jsonBody, (req, res) => {
   const rawSource = (req.body?.source || '').toString();
   const source = KNOWN_SOURCES.has(rawSource) ? rawSource : null;
   const bookId = parseInt(req.body?.book_id, 10);
-  if (bookId) {
-    setContext({ book: bookId });
-    try { requireBookAccess(req, bookId, 'viewer'); }
-    catch (e) { const sent = sendACLError(res, e); if (sent) return sent; throw e; }
-  }
+  if (bookId && !guardBook(req, res, bookId, 'viewer')) return;
   const now = Date.now();
   try {
     db.prepare(`
@@ -96,7 +92,7 @@ router.post('/track', jsonBody, (req, res) => {
 
 router.get('/recent', (req, res) => {
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
+  if (!userEmail) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
   const limit = Math.max(1, Math.min(20, parseInt(req.query.limit, 10) || 3));
   try {
     const rows = db.prepare(`
@@ -116,14 +112,12 @@ router.get('/recent', (req, res) => {
 // Seiten-Tracking: pro (User, Seite) wird die zuletzt geöffnete Zeit + Counter
 // geführt. Frontend ruft das beim Öffnen einer Seite (selectPage) auf.
 router.post('/page/track', jsonBody, (req, res) => {
+  // Buch aus der Seite, nie aus dem Body (lib/page-guard.js) — sonst liesse
+  // sich eine fremde Seite unter dem eigenen Buch in die „Zuletzt"-Liste tragen.
+  const g = pageBookGuard(req, res, { minRole: 'viewer', pageId: req.body?.page_id ?? 0 });
+  if (!g) return;
+  const { pageId, bookId } = g;
   const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
-  const pageId = parseInt(req.body?.page_id, 10);
-  const bookId = parseInt(req.body?.book_id, 10);
-  if (!pageId || !bookId) return res.status(400).json({ error_code: 'INVALID_IDS' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { const sent = sendACLError(res, e); if (sent) return sent; throw e; }
   const now = Date.now();
   try {
     db.prepare(`
@@ -143,13 +137,10 @@ router.post('/page/track', jsonBody, (req, res) => {
 
 // Letzte N Seiten des aktuellen Buchs für Command-Palette-Sektion „Zuletzt".
 router.get('/page/recent', (req, res) => {
-  const userEmail = sessionEmail(req);
-  if (!userEmail) return res.status(401).json({ error_code: 'LOGIN_REQ' });
   const bookId = parseInt(req.query.book_id, 10);
   if (!bookId) return res.status(400).json({ error_code: 'INVALID_BOOK_ID' });
-  setContext({ book: bookId });
-  try { requireBookAccess(req, bookId, 'viewer'); }
-  catch (e) { const sent = sendACLError(res, e); if (sent) return sent; throw e; }
+  if (!guardBook(req, res, bookId, 'viewer')) return;
+  const userEmail = sessionEmail(req);
   const limit = Math.max(1, Math.min(20, parseInt(req.query.limit, 10) || 5));
   try {
     const rows = db.prepare(`
