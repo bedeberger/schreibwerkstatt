@@ -98,6 +98,12 @@ export const lifecycleMethods = {
     this.selectedBrainstormRunId = null;
     this._savedPositions = null;
     this._pendingMotifId = null;
+    // Lauf-Flags der Jobs: die Poll-Timer räumt setupCardLifecycle (timerKeys)
+    // vorher ab — ohne Reset bliebe der Button des neuen Buchs gesperrt.
+    this.scanning = false;
+    this.indexing = false;
+    this.brainstorming = false;
+    this.consistencyRunning = false;
     this._memos = {};
   },
 

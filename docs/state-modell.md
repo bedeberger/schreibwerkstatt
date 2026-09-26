@@ -105,8 +105,8 @@ Der Helper macht:
 | Feld | Zweck |
 |------|-------|
 | `onShow(root)` | Override für `$watch(showFlag)`-Body (z.B. zusätzliche Side-Effects wie Textarea-Fokus, oder Mehrfach-Load). |
-| `onBookChanged(e, ctx, root)` | Vollständiger Override; skipt das Default-`reset+load`. Nutzen für Karten mit Coalesce-Logik (Microtask, debounce). |
-| `onViewReset(e, ctx, root)` | Vollständiger Override fürs `view:reset`-Verhalten. Nutzen, wenn `view:reset` mehr räumt als `book:changed` (z.B. user-scoped Profile-Liste in PDF-Export). |
+| `onBookChanged(e, ctx, root)` | Override; skipt das Default-`reset+load` (die `timerKeys` räumt der Helper trotzdem vorher ab). Nutzen für Karten mit Coalesce-Logik (Microtask, debounce). |
+| `onViewReset(e, ctx, root)` | Override fürs `view:reset`-Verhalten (die `timerKeys` räumt der Helper trotzdem vorher ab). Nutzen, wenn `view:reset` mehr räumt als `book:changed` (z.B. user-scoped Profile-Liste in PDF-Export). |
 | `resetStateView` | Eigenes Reset-Objekt nur fürs `view:reset` (wenn book vs. view unterschiedlich resetten). |
 | `refreshNeedsBookId: false` | Default: `card:refresh` ignoriert wenn kein Buch aktiv. False für Karten mit eigener Buch-Prüfung. |
 | `showNeedsBookId: false` | Analog für `$watch(showFlag)`. |
