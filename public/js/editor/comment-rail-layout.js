@@ -55,6 +55,16 @@ export function createCommentLayout(cfg) {
       if (!el || !this._commentResizeObs || this._commentObserved.has(el)) return;
       try { this._commentResizeObs.observe(el); this._commentObserved.add(el); } catch {}
     },
+    // Aus dem DOM gefallene Elemente (gelöschter/weggefilterter Thread, Buch-
+    // oder Seitenwechsel) nicht weiter beobachten und nicht festhalten.
+    _pruneObservedForLayout() {
+      if (!this._commentObserved) return;
+      for (const el of [...this._commentObserved]) {
+        if (el.isConnected) continue;
+        try { this._commentResizeObs?.unobserve(el); } catch {}
+        this._commentObserved.delete(el);
+      }
+    },
     _teardownCommentLayout() {
       try { this._commentResizeObs?.disconnect(); } catch {}
       this._commentResizeObs = null;
@@ -101,6 +111,7 @@ export function createCommentLayout(cfg) {
         for (const t of this[K.threads]) { t._anchorY = null; t._railTop = null; }
         return;
       }
+      this._pruneObservedForLayout();
       const layer = cfg.layerEl();
       const view = cfg.scopeEl();
       if (!layer || !view) return;

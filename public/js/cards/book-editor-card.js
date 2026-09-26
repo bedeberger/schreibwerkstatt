@@ -197,7 +197,7 @@ export function registerBookEditorCard() {
       this._savedFlash?.clearAll();
       if (this._findRecomputeTimer) { clearTimeout(this._findRecomputeTimer); this._findRecomputeTimer = null; }
       this._teardownOutlineObserver();
-      if (this._commentRecomputeRaf) { cancelAnimationFrame(this._commentRecomputeRaf); this._commentRecomputeRaf = null; }
+      this._railCancelSchedule();
       this._teardownCommentLayout();
       this._clearCommentHL();
       clearHighlights();
@@ -235,6 +235,8 @@ export function registerBookEditorCard() {
       this._teardownOutlineObserver();
       clearHighlights();
       this._clearCommentHL();
+      this._railCancelSchedule();
+      this._railInvalidateLoad();
       Object.assign(this, sessionState());
       if (!reload) return;
       if (!window.__app?.showBookEditorCard) return;

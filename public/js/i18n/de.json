@@ -6296,5 +6296,8 @@
   "admin.usage.breakdown.total": "Total",
   "bookEditor.unsavedOnSwitch": "{n} Seite(n) konnten vor dem Wechsel nicht gespeichert werden.",
   "common.networkError": "Keine Verbindung zum Server.",
-  "bookEditor.loadFailed": "Buchinhalt konnte nicht geladen werden."
+  "bookEditor.loadFailed": "Buchinhalt konnte nicht geladen werden.",
+  "share.comments.replyFailed": "Antwort konnte nicht gesendet werden.",
+  "share.comments.resolveFailed": "Status des Kommentars konnte nicht geändert werden.",
+  "share.comments.deleteFailed": "Kommentar konnte nicht gelöscht werden."
 }

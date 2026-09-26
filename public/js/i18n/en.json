@@ -6296,5 +6296,8 @@
   "admin.usage.breakdown.total": "Total",
   "bookEditor.unsavedOnSwitch": "{n} page(s) could not be saved before switching.",
   "common.networkError": "No connection to the server.",
-  "bookEditor.loadFailed": "Could not load the book contents."
+  "bookEditor.loadFailed": "Could not load the book contents.",
+  "share.comments.replyFailed": "Could not send the reply.",
+  "share.comments.resolveFailed": "Could not change the comment status.",
+  "share.comments.deleteFailed": "Could not delete the comment."
 }
