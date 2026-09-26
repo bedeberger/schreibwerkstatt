@@ -12,7 +12,7 @@ import { renderInline } from '../page-revision-diff.js';
 import { snapshotsPdfMethods } from './snapshots-pdf-export.js';
 import { snapshotsCompareMethods } from './snapshots-compare.js';
 import { snapshotsDriftMethods } from './snapshots-drift.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 // Modul-Cache fuer Fassungs-Vollzeilen. Das `content_json` einer Fassung kann
 // MB gross sein; es ist aber unveraenderlich pro id (kein retroaktives Update,
@@ -70,6 +70,7 @@ export function registerSnapshotsCard() {
     pdfError: '',
     pdfJobId: null,
     _pdfPollTimer: null,   // transienter Timer-Guard (siehe startPoll)
+    _lifecycle: null,
 
     init() {
       const app = window.__app;
@@ -79,21 +80,16 @@ export function registerSnapshotsCard() {
         if (on && Alpine.store('nav').selectedBookId) this.loadSnapshots(Alpine.store('nav').selectedBookId);
       });
 
-      this._onRefresh = (e) => {
-        if (e?.detail?.name !== 'snapshots') return;
-        if (Alpine.store('nav').selectedBookId) this.loadSnapshots(Alpine.store('nav').selectedBookId, { fresh: true });
-      };
-      this._onBookChanged = () => this.reset();
-      this._onViewReset = () => this.reset();
-      window.addEventListener(EVT.CARD_REFRESH, this._onRefresh);
-      window.addEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'snapshots',
+        onBookChanged: () => this.reset(),
+        onViewReset: () => this.reset(),
+        onCardRefresh: () => this.loadSnapshots(Alpine.store('nav').selectedBookId, { fresh: true }),
+      });
     },
 
     destroy() {
-      window.removeEventListener(EVT.CARD_REFRESH, this._onRefresh);
-      window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
-      window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle?.destroy();
       this._stopPdfPoll();
       document.body.classList.remove('snapshot-reader-open');
     },

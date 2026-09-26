@@ -5,7 +5,7 @@
 // `GET /me/profile-stats` (Tiles) + `GET /me/profile-stats-history` (Chart).
 
 import { localeTag, localIsoDate, localIsoDaysAgo, tzOpts } from '../utils.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 import { computeWritingTimeStreak, computeWeekdayPattern, computeDerived, computeMilestones,
          computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
          computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
@@ -46,20 +46,23 @@ export function registerMyStatsCard() {
     myStatsLoading: false,
     myStatsError: '',
     _memos: {},
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showMyStatsCard, (visible) => {
         if (visible) this.loadMyStats();
         else this._destroyChart();
       });
-      this._onRefresh = (ev) => {
-        if (ev?.detail?.name === 'myStats') this.loadMyStats();
-      };
-      window.addEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      // Buchübergreifend: kein Reset bei book:changed/view:reset, Refresh ohne Buch.
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'myStats',
+        refreshNeedsBookId: false,
+        onCardRefresh: () => this.loadMyStats(),
+      });
     },
 
     destroy() {
-      if (this._onRefresh) window.removeEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      this._lifecycle?.destroy();
       this._destroyChart();
       this._disconnectMyStatsThemeObserver();
     },

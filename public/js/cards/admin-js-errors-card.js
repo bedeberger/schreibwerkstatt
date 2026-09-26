@@ -3,7 +3,7 @@
 // (`showAdminJsErrorsCard`) im Root.
 
 import { adminJsErrorsMethods } from '../admin/js-errors.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerAdminJsErrorsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -13,26 +13,27 @@ export function registerAdminJsErrorsCard() {
     jsErrorsError: '',
     jsErrorsList: [],
     jsErrorsExpanded: {},
-    _onViewReset: null,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showAdminJsErrorsCard, async (visible) => {
         if (visible) await this.jsErrorsEnter();
         else this._jsErrorsLeave();
       });
-      this._onViewReset = () => {
-        this._jsErrorsLeave();
-        this.jsErrorsList = [];
-        this.jsErrorsExpanded = {};
-        this.jsErrorsError = '';
-        this.jsErrorsInitialized = false;
-      };
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle = setupCardLifecycle(this, {
+        onViewReset: () => {
+          this._jsErrorsLeave();
+          this.jsErrorsList = [];
+          this.jsErrorsExpanded = {};
+          this.jsErrorsError = '';
+          this.jsErrorsInitialized = false;
+        },
+      });
     },
 
     destroy() {
       this._jsErrorsLeave();
-      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle?.destroy();
     },
 
     ...adminJsErrorsMethods,

@@ -2,7 +2,7 @@
 // `showAdminBooksCard` und Toggle `toggleAdminBooksCard` leben im Root.
 
 import { adminBooksMethods } from '../admin/admin-books.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerAdminBooksCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -13,19 +13,20 @@ export function registerAdminBooksCard() {
     loading: false,
     busy: false,
     error: '',
-    _onViewReset: null,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showAdminBooksCard, async (visible) => {
         if (!visible) return;
         await this.loadAll();
       });
-      this._onViewReset = () => { this.error = ''; };
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle = setupCardLifecycle(this, {
+        onViewReset: () => { this.error = ''; },
+      });
     },
 
     destroy() {
-      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle?.destroy();
     },
 
     ...adminBooksMethods,

@@ -3,7 +3,7 @@
 // (`showAdminUsersCard`) im Root.
 
 import { adminUsersMethods } from '../admin/admin-users.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerAdminUsersCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -39,7 +39,7 @@ export function registerAdminUsersCard() {
     adminUsersInvitesBusy: null,             // id during remind/revoke
     adminUsersInvitesResult: null,           // { id, mail | cooldown, retryAfter }
 
-    _onViewReset: null,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showAdminUsersCard, async (visible) => {
@@ -55,22 +55,23 @@ export function registerAdminUsersCard() {
       this.$watch(() => this.adminUsersRequestsStatus, async () => {
         if (this.adminUsersTab === 'requests') await this.adminUsersRequestsLoad();
       });
-      this._onViewReset = () => {
-        this.adminUsersError = '';
-        this.adminUsersInviteResult = null;
-        this.adminUsersAuditEmail = null;
-        this.adminUsersAuditEvents = [];
-        this.adminUsersRequestsResult = null;
-        this.adminUsersInvitesResult = null;
-        this.adminUsersPasswordEmail = null;
-        this.adminUsersPasswordValue = '';
-        this.adminUsersPasswordResult = null;
-      };
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle = setupCardLifecycle(this, {
+        onViewReset: () => {
+          this.adminUsersError = '';
+          this.adminUsersInviteResult = null;
+          this.adminUsersAuditEmail = null;
+          this.adminUsersAuditEvents = [];
+          this.adminUsersRequestsResult = null;
+          this.adminUsersInvitesResult = null;
+          this.adminUsersPasswordEmail = null;
+          this.adminUsersPasswordValue = '';
+          this.adminUsersPasswordResult = null;
+        },
+      });
     },
 
     destroy() {
-      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle?.destroy();
     },
 
     ...adminUsersMethods,

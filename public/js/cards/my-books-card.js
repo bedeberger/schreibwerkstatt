@@ -16,7 +16,7 @@
 // Buchnamen kommen aus `$store.nav.books` (Content-Store-Regel), Kennzahlen aus
 // `/me/books` — zusammengefuehrt in my-books-compute.js.
 
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 import { localeTag, tzOpts } from '../utils.js';
 import {
   SHELF_TABS, mergeShelfRows, filterShelfRows, pinnedFirst, shelfTotals, mayToggleFinished,
@@ -32,19 +32,22 @@ export function registerMyBooksCard() {
     myBooksError: '',
     myBooksBusyId: null, // Buch, dessen Schalter gerade schreibt (Doppelklick-Guard)
     myBooksTabs: SHELF_TABS,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showMyBooksCard, (visible) => {
         if (visible) this.loadMyBooks();
       });
-      this._onRefresh = (ev) => {
-        if (ev?.detail?.name === 'myBooks') this.loadMyBooks();
-      };
-      window.addEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      // Buchübergreifend: kein Reset bei book:changed/view:reset, Refresh ohne Buch.
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'myBooks',
+        refreshNeedsBookId: false,
+        onCardRefresh: () => this.loadMyBooks(),
+      });
     },
 
     destroy() {
-      if (this._onRefresh) window.removeEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      this._lifecycle?.destroy();
     },
 
     async loadMyBooks() {
