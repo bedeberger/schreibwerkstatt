@@ -6295,5 +6295,6 @@
   "admin.usage.breakdown.other": "Other",
   "admin.usage.breakdown.total": "Total",
   "error.PAGE_NOT_FOUND": "Page not found.",
-  "error.CHAPTER_NOT_IN_BOOK": "The chapter does not belong to this book."
+  "error.CHAPTER_NOT_IN_BOOK": "The chapter does not belong to this book.",
+  "job.warn.factcheckJudgeFailed": "{count} of {checked} world facts remain unchecked (verdict cut off or AI error). Run the fact check again for these."
 }

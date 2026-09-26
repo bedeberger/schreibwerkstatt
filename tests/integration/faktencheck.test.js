@@ -1,8 +1,8 @@
 'use strict';
 // Weltfakten-Faktencheck: Kandidaten-Builder (Opt-in-Gating, Kategorie-Filter, Cap,
 // Kapitel-Gruppierung) + saveFaktencheckIssues (Anhang an neuesten Check, idempotenter
-// faktenfehler-Ersatz, Kontinuitäts-Befunde bleiben erhalten, Neuanlage ohne Check).
-// Der Web-Such-Judge selbst (callAIWithTools) ist reine Glue und hier nicht abgedeckt.
+// faktenfehler-Ersatz, Kontinuitäts-Befunde bleiben erhalten, Neuanlage ohne Check) + der
+// Truncated-/pause_turn-Umgang des Web-Such-Judges (`_judgeOneFact`, Tool-Call injiziert).
 
 const { test, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -126,4 +126,37 @@ test('saveFaktencheckIssues: legt Check an, wenn keiner existiert', () => {
   assert.ok(res);
   assert.equal(res.issues.length, 1);
   assert.equal(res.summary, '__i18n:kontinuitaet.faktencheck.summaryFound__');
+});
+
+// ── Judge: abgeschnittenes Urteil ───────────────────────────────────────────
+// parseJSON repariert tolerant — ein am max_tokens-Deckel abgeschnittenes Urteil
+// muss darum VOR dem Parsen verworfen werden, sonst würde aus dem Rumpf ein
+// scheinbar vollständiges „falsch"-Urteil.
+
+test('_judgeOneFact: truncated → wirft job.error.aiTruncated statt Teil-Urteil', async () => {
+  const { _judgeOneFact } = require('../../routes/jobs/komplett/job-faktencheck');
+  const tok = { in: 0, out: 0 };
+  const stub = async () => ({
+    text: '{"urteil":"falsch","quelle":"https://example.org/x","beschreibung":"Die Mondl',
+    truncated: true, stopReason: 'max_tokens', tokensIn: 100, tokensOut: 4000,
+  });
+  await assert.rejects(
+    () => _judgeOneFact(tok, 'prompt', 'system', null, stub),
+    (e) => e.message === 'job.error.aiTruncated' && e.i18nParams?.tokOut === 4000,
+  );
+  assert.equal(tok.out, 4000, 'Tokens werden trotzdem verbucht');
+});
+
+test('_judgeOneFact: pause_turn wird fortgesetzt, vollständiges Urteil kommt durch', async () => {
+  const { _judgeOneFact } = require('../../routes/jobs/komplett/job-faktencheck');
+  const tok = { in: 0, out: 0 };
+  let calls = 0;
+  const stub = async () => {
+    calls++;
+    if (calls === 1) return { text: '', stopReason: 'pause_turn', rawContentBlocks: [], tokensIn: 1, tokensOut: 1 };
+    return { text: '{"urteil":"korrekt"}', stopReason: 'end_turn', tokensIn: 1, tokensOut: 1 };
+  };
+  const text = await _judgeOneFact(tok, 'prompt', 'system', null, stub);
+  assert.equal(calls, 2);
+  assert.equal(text, '{"urteil":"korrekt"}');
 });

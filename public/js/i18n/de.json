@@ -6295,5 +6295,6 @@
   "admin.usage.breakdown.other": "Übrige",
   "admin.usage.breakdown.total": "Total",
   "error.PAGE_NOT_FOUND": "Seite nicht gefunden.",
-  "error.CHAPTER_NOT_IN_BOOK": "Das Kapitel gehört nicht zu diesem Buch."
+  "error.CHAPTER_NOT_IN_BOOK": "Das Kapitel gehört nicht zu diesem Buch.",
+  "job.warn.factcheckJudgeFailed": "{count} von {checked} Welt-Fakten blieben ungeprüft (Urteil abgeschnitten oder KI-Fehler). Für diese den Faktencheck erneut starten."
 }
