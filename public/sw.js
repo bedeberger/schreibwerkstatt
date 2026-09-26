@@ -53,6 +53,10 @@ importScripts('/sw-manifest.js');
 const SHELL_BUILD = self.__SHELL_BUILD || 'dev';
 const SHELL_MANIFEST = Array.isArray(self.__SHELL_MANIFEST) ? self.__SHELL_MANIFEST : [];
 const MANIFEST_SET = new Set(SHELL_MANIFEST);
+// Aktueller vendor/ + fonts/-Bestand (scripts/sw-manifest.js). Fehlt die Liste
+// (Manifest eines älteren Generators), bleibt der VENDOR_CACHE unangetastet.
+const VENDOR_SET = Array.isArray(self.__VENDOR_SET) && self.__VENDOR_SET.length
+  ? new Set(self.__VENDOR_SET) : null;
 const SHELL_CACHE = 'schreibwerkstatt-shell-' + SHELL_BUILD;
 const CONTENT_CACHE = 'schreibwerkstatt-content-v1';
 const CONFIG_CACHE = 'schreibwerkstatt-config-v2';
@@ -325,10 +329,26 @@ self.addEventListener('install', (event) => {
   })());
 });
 
+// Der VENDOR_CACHE ist generationsunabhängig und überlebt jeden Deploy — darum
+// räumt ihn niemand sonst auf. Ohne diesen Schritt bliebe jede ersetzte
+// Vendor-Version (neuer Dateiname, z.B. alpine-3.15.12 → 3.15.13) für immer
+// liegen. Entfernt wird, was nicht mehr im aktuellen Bestand steht; ein
+// trotzdem angefragter Alt-Pfad fällt ohnehin auf das Netz zurück (cache-first).
+async function pruneVendorCache() {
+  if (!VENDOR_SET) return;
+  const cache = await caches.open(VENDOR_CACHE);
+  for (const k of await cache.keys()) {
+    let pathname = null;
+    try { pathname = new URL(k.url).pathname; } catch {}
+    if (!pathname || !VENDOR_SET.has(pathname)) await cache.delete(k);
+  }
+}
+
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => !ACTIVE_CACHES.has(k)).map(k => caches.delete(k)));
+    try { await pruneVendorCache(); } catch {}
     // Kein clients.claim(): laufende Tabs behalten den alten SW (= alte
     // Partials + alte Module, kohärent), bis sie via Banner/Reload wechseln.
     // Activate läuft ohnehin erst nach 'skip-waiting', also nach User-Klick.
@@ -552,7 +572,30 @@ function notifyContentUpdated(pathname) {
   return postToClients({ type: 'content-updated', path: pathname });
 }
 
-async function _handleSwr(req, cacheName) {
+// Offline-Antwort der JSON-Endpunkte (Content, Config): 503 mit
+// `{ error: 'offline' }` — fetchJson liest daraus status + Body.
+function offlineJson() {
+  return new Response(JSON.stringify({ error: 'offline' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+}
+
+// Darf diese Netzantwort in einen Cache? 401/Fehler/Login-Redirects nicht,
+// sonst frieren sie fest.
+function _cacheable(res) {
+  return !!res && res.ok && res.type !== 'opaqueredirect';
+}
+
+// Stale-While-Revalidate für /content/* UND /config. Die beiden unterscheiden
+// sich nur in zwei Punkten, und genau die sind parametrisiert:
+//  - `cacheKey`: fester Schlüssel statt der Request-URL. /config legt unter
+//    CONFIG_PATH ab und matcht damit ohne Query — ein `?__fresh=1` am Aufrufer
+//    träfe sonst weiter den Cache-Eintrag, der Bypass MUSS darum hier stehen.
+//  - `content`: die Content-Regeln (LRU-Deckel, `_forbidsStale`, Nachzug-
+//    Meldung an die Tabs). /config hat keinen Deckel (ein Eintrag), keinen
+//    Konsumenten für eine Nachzug-Meldung und keinen no-cache-Vertrag.
+async function _handleSwr(req, cacheName, { cacheKey = null, content = true } = {}) {
   // Bypass-Marker: konsistenzkritische Reads (z.B. Konflikt-Check vor
   // Draft-Push) müssen frische Server-Daten sehen, nicht den SWR-Cache.
   // Sonst matcht ein stale `page.html` mit dem `draft.originalHtml` und
@@ -561,34 +604,35 @@ async function _handleSwr(req, cacheName) {
   if (url.searchParams.has('__fresh')) {
     try {
       const net = await fetch(req);
-      // Den CACHE-EINTRAG trotzdem nachziehen (wie handleConfig es tut). Der
-      // Marker heisst „beantworte MICH nicht aus dem Cache" — nicht „lass die
-      // Offline-Kopie auf dem Stand des allerersten Loads stehen". Ohne das
-      // frieren genau die Buecher ein, die man nur per Buchwechsel oeffnet
-      // (`FRESH_SOURCES`): ihr Baum kaeme im Zug nie aus dem Cache, weil er nie
-      // hineingeschrieben wurde. Der Aufrufer bekommt unveraendert die
-      // Netzantwort — an der Konsistenzzusage des Markers aendert sich nichts.
-      if (net && net.ok && net.type !== 'opaqueredirect') {
+      // Den CACHE-EINTRAG trotzdem nachziehen. Der Marker heisst „beantworte
+      // MICH nicht aus dem Cache" — nicht „lass die Offline-Kopie auf dem Stand
+      // des allerersten Loads stehen". Ohne das frieren genau die Buecher ein,
+      // die man nur per Buchwechsel oeffnet (`FRESH_SOURCES`): ihr Baum kaeme im
+      // Zug nie aus dem Cache, weil er nie hineingeschrieben wurde. Der Aufrufer
+      // bekommt unveraendert die Netzantwort — an der Konsistenzzusage des
+      // Markers aendert sich nichts.
+      if (_cacheable(net)) {
         const cw = await caches.open(cacheName);
         // Unter dem Pfad OHNE `__fresh` ablegen, sonst entsteht ein zweiter
         // Eintrag, den kein normaler Read je trifft (und der den 200er-Deckel
         // mit Dubletten fuellt). Eigene URL-Instanz: `url` wird weiter unten
         // noch gelesen.
-        const key = new URL(req.url);
-        key.searchParams.delete('__fresh');
-        await cw.put(new Request(key.toString()), net.clone());
-        await _evictContentCache(cw);
+        let key = cacheKey;
+        if (!key) {
+          const u = new URL(req.url);
+          u.searchParams.delete('__fresh');
+          key = new Request(u.toString());
+        }
+        await cw.put(key, net.clone());
+        if (content) await _evictContentCache(cw);
       }
       return net;
     } catch {
-      return new Response(JSON.stringify({ error: 'offline' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      });
+      return offlineJson();
     }
   }
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(req);
+  const cached = await cache.match(cacheKey || req);
   // Der Server darf widersprechen. Deklariert die GECACHTE Antwort `no-cache`
   // oder `no-store`, ist sie als Stale-Antwort nicht zugelassen — dann gilt
   // Netz-zuerst. Betrifft heute die drei `/content/*/release.json` (dort steht
@@ -597,21 +641,21 @@ async function _handleSwr(req, cacheName) {
   // Aussage, die der Endpunkt nicht machen wollte. Als Regel ist das die
   // billigste Absicherung gegen den naechsten solchen Endpunkt: er muss nur
   // seinen Header setzen und braucht keinen Eintrag in einer Liste hier.
-  if (cached && _forbidsStale(cached)) return _handleNetworkFirst(req, cacheName);
+  if (content && cached && _forbidsStale(cached)) return _handleNetworkFirst(req, cacheName);
   // Vergleichskopie ZIEHEN, BEVOR der Cache-Hit rausgeht: `clone()` wirft,
   // sobald der Client den Body gelesen hat. Traegt die gecachte Antwort einen
   // ETag, reicht spaeter der Header-Vergleich und der Klon entfaellt — der
   // Baum eines grossen Buchs sind ein paar hundert KB, die sonst bei jedem
   // Read doppelt im Speicher liegen.
-  const worthDiffing = !!cached && CONTENT_NOTIFY_REGEX.test(url.pathname);
+  const worthDiffing = content && !!cached && CONTENT_NOTIFY_REGEX.test(url.pathname);
   const cachedEtag = worthDiffing ? cached.headers.get('ETag') : null;
   const cachedClone = (worthDiffing && !cachedEtag) ? cached.clone() : null;
   const netPromise = fetch(req).then(async (res) => {
-    if (res && res.ok && res.type !== 'opaqueredirect') {
+    if (_cacheable(res)) {
       // Der Vergleich muss VOR dem cache.put laufen, sonst ist der alte Stand weg.
       const drifted = worthDiffing && !(await _samePayload(cachedEtag, cachedClone, res));
-      await cache.put(req, res.clone());
-      await _evictContentCache(cache);
+      await cache.put(cacheKey || req, res.clone());
+      if (content) await _evictContentCache(cache);
       if (drifted) notifyContentUpdated(url.pathname);
     }
     return res;
@@ -623,10 +667,7 @@ async function _handleSwr(req, cacheName) {
   }
   const net = await netPromise;
   if (net) return net;
-  return new Response(JSON.stringify({ error: 'offline' }), {
-    status: 503,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  });
+  return offlineJson();
 }
 
 // Zwei Klassen von /content/*-GETs, fuer die Stale-While-Revalidate die falsche
@@ -666,7 +707,7 @@ async function _handleNetworkFirst(req, cacheName) {
   const cache = await caches.open(cacheName);
   try {
     const net = await fetch(req);
-    if (net && net.ok && net.type !== 'opaqueredirect') {
+    if (_cacheable(net)) {
       await cache.put(req, net.clone());
       await _evictContentCache(cache);
     }
@@ -691,49 +732,17 @@ function handleContent(req) {
 // Offline-User den App-Shell-Bootstrap komplett durchlaufen können. 401/Fehler
 // werden nicht gecacht (via res.ok-Check), damit Login-Redirects nicht festfrieren.
 async function handleConfig(req) {
-  // Bypass-Marker wie in _handleSwr — hier ist er nicht optional, sondern die
+  // Bypass-Marker wie bei /content/* — hier ist er nicht optional, sondern die
   // Voraussetzung eines vorhandenen Mechanismus: der Wake-Refresh
   // (app-view/bookscope.js#_refreshAfterWake) holt `/config` ausschliesslich, um
   // eine abgelaufene Session an den globalen 401-Wrapper zu geben. Aus dem Cache
   // beantwortet, kommt dort eine gecachte 200 an, waehrend die echte 401 im
   // Hintergrund-Revalidate verworfen wird — der Check kann per Konstruktion nie
   // ausloesen, und der User erfaehrt vom Ablauf erst beim naechsten Schreibversuch.
-  // ACHTUNG: `cache.match(CONFIG_PATH)` ignoriert die Query, ein blosses
+  // ACHTUNG: der Cache-Schlüssel CONFIG_PATH ignoriert die Query, ein blosses
   // `?__fresh=1` am Aufrufer wuerde also weiterhin den Cache-Eintrag treffen.
-  // Der Bypass MUSS hier stehen.
-  const url = new URL(req.url);
-  if (url.searchParams.has('__fresh')) {
-    try {
-      const net = await fetch(req);
-      if (net && net.ok && net.type !== 'opaqueredirect') {
-        const cw = await caches.open(CONFIG_CACHE);
-        await cw.put(CONFIG_PATH, net.clone());
-      }
-      return net;
-    } catch {
-      return new Response(JSON.stringify({ error: 'offline' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      });
-    }
-  }
-  const cache = await caches.open(CONFIG_CACHE);
-  const cached = await cache.match(CONFIG_PATH);
-  const netPromise = fetch(req).then((res) => {
-    if (res && res.ok && res.type !== 'opaqueredirect') cache.put(CONFIG_PATH, res.clone());
-    return res;
-  }).catch(() => null);
-
-  if (cached) {
-    netPromise.catch(() => {});
-    return cached;
-  }
-  const net = await netPromise;
-  if (net) return net;
-  return new Response(JSON.stringify({ error: 'offline' }), {
-    status: 503,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  });
+  // Der Bypass MUSS im SW stehen — _handleSwr prüft ihn vor dem Cache-Lookup.
+  return _handleSwr(req, CONFIG_CACHE, { cacheKey: CONFIG_PATH, content: false });
 }
 
 // Sitzungs-gebundene Caches wegwerfen. ZWEI Anlaesse, gleiche Wirkung:
