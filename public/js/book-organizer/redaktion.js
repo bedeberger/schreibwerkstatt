@@ -20,7 +20,7 @@ export const redaktionMethods = {
    * Kasten ueber der Seitenliste waere unverhaeltnismaessig.
    */
   async loadRedaktion() {
-    const bookId = window.__app?.selectedBookId;
+    const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.redaktionEnabled = false; return; }
     try {
       const r = await fetchJson(`/redaktion/${bookId}`);

@@ -7,6 +7,7 @@
 import { erzaehlprofilMethods } from '../book/erzaehlprofil.js';
 import { createCardJobFeature } from './job-feature-card.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
+import { runningJobStatus } from './job-helpers.js';
 
 export function registerErzaehlprofilCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -25,7 +26,11 @@ export function registerErzaehlprofilCard() {
         if (d?.type !== 'erzaehlprofil') return;
         this.erzaehlprofilLoading = true;
         this.erzaehlprofilProgress = d.job.progress || 0;
-        this.erzaehlprofilStatus = `<span class="spinner"></span>${window.__app.t(d.job.statusText || 'common.analysisRunning', d.job.statusParams)}`;
+        this.erzaehlprofilStatus = runningJobStatus(
+          (k, p) => window.__app.t(k, p),
+          d.job.statusText || 'common.analysisRunning', d.job.tokensIn, d.job.tokensOut, d.job.maxTokensOut,
+          d.job.progress, d.job.tokensPerSec, d.job.statusParams,
+        );
         this.startErzaehlprofilPoll(d.jobId);
       };
 

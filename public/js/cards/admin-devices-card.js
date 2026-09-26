@@ -3,7 +3,7 @@
 // (`showAdminDevicesCard`) im Root.
 
 import { adminDevicesMethods } from '../admin/admin-devices.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerAdminDevicesCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -13,27 +13,27 @@ export function registerAdminDevicesCard() {
     devicesError: '',
     devicesList: [],
     devicesLatestVersions: {},
-    _onViewReset: null,
-    _onCardRefresh: null,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showAdminDevicesCard, async (visible) => {
         if (visible) await this.devicesEnter();
       });
-      this._onViewReset = () => {
-        this.devicesList = [];
-        this.devicesError = '';
-        this.devicesLatestVersions = {};
-        this.devicesInitialized = false;
-      };
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
-      this._onCardRefresh = (e) => { if (e.detail?.name === 'adminDevices') this.devicesRefresh(); };
-      window.addEventListener(EVT.CARD_REFRESH, this._onCardRefresh);
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'adminDevices',
+        refreshNeedsBookId: false,
+        onCardRefresh: () => this.devicesRefresh(),
+        onViewReset: () => {
+          this.devicesList = [];
+          this.devicesError = '';
+          this.devicesLatestVersions = {};
+          this.devicesInitialized = false;
+        },
+      });
     },
 
     destroy() {
-      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
-      if (this._onCardRefresh) window.removeEventListener(EVT.CARD_REFRESH, this._onCardRefresh);
+      this._lifecycle?.destroy();
     },
 
     ...adminDevicesMethods,

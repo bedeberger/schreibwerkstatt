@@ -22,8 +22,10 @@ import { ownedFilterKeys, resetFilterScopes, restoreFilterScopes, watchFilterSco
 //
 // Optional cfg fields:
 //   onShow(root)             — overrides default show-watch (which calls cfg.load)
-//   onBookChanged(e, ctx, r) — full override; skips the default reset+load
-//   onViewReset(e, ctx, r)   — full override; skips the default reset
+//   onBookChanged(e, ctx, r) — override; skips the default reset+load
+//                              (timerKeys are still cleared first)
+//   onViewReset(e, ctx, r)   — override; skips the default reset
+//                              (timerKeys are still cleared first)
 //   onCardRefresh(e, ctx, r) — runs in place of cfg.load on `card:refresh`
 //                              (name-match + book-id check are handled by helper)
 //   resetState               — object or factory `() => ({…})` (see applyReset)
@@ -102,11 +104,13 @@ export function setupCardLifecycle(ctx, cfg) {
     applyReset('view');
   };
 
+  // Overrides ersetzen Reset + Load, NICHT das Timer-Clearing: ein Poller des
+  // alten Buchs, der weiterliefe, schriebe sein Ergebnis in die Karte des neuen.
   const onBookChanged = cfg.onBookChanged
-    ? (e) => cfg.onBookChanged(e, ctx, root())
+    ? (e) => { clearTimers(); return cfg.onBookChanged(e, ctx, root()); }
     : defaultBookChanged;
   const onViewReset = cfg.onViewReset
-    ? (e) => cfg.onViewReset(e, ctx, root())
+    ? (e) => { clearTimers(); return cfg.onViewReset(e, ctx, root()); }
     : defaultViewReset;
   const onCardRefresh = (e) => {
     if (e.detail?.name !== cfg.name) return;

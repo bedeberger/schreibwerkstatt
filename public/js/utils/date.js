@@ -58,14 +58,7 @@ export function formatLastRun(isoStr, t, uiLocale) {
   if (isNaN(d.getTime())) return '';
   const tag = localeTag(uiLocale);
   const time = d.toLocaleTimeString(tag, tzOpts({ hour: '2-digit', minute: '2-digit' }));
-  // Tag-Bucket in appTimezone (nicht Browser-TZ): localIsoDate respektiert
-  // app_settings.app.timezone, damit „heute/gestern" konsistent mit den
-  // Server-Buckets (lib/local-date.js) und den restlichen TZ-Formattern bleibt
-  // — auch wenn der Browser des Users in einer anderen TZ steht. UTC-Mittag-
-  // Anker macht den Day-Diff DST-sicher.
-  const dDay = new Date(localIsoDate(d) + 'T12:00:00Z');
-  const today = new Date(localIsoDate(new Date()) + 'T12:00:00Z');
-  const diffDays = Math.round((today - dDay) / 86400000);
+  const diffDays = localDayDiff(d);
   if (diffDays < 7) return t('job.lastRun.rel', { rel: relativeDay(diffDays, uiLocale), time });
   const date = d.toLocaleDateString(tag, tzOpts({ day: '2-digit', month: '2-digit' }));
   return t('job.lastRun.dateAt', { date, time });
@@ -103,6 +96,18 @@ export function formatRelativeShort(isoStr, uiLocale) {
 // timeZone ist die app-weite appTimezone (matcht Server-Datums-Buckets).
 export function localIsoDate(d = new Date()) {
   return d.toLocaleDateString('en-CA', { timeZone: appTimezone });
+}
+
+// Kalendertage zwischen `then` und `now` in appTimezone (nicht Browser-TZ):
+// 0 = heute, 1 = gestern. Konsistent mit den Server-Buckets (lib/local-date.js),
+// auch wenn der Browser des Users in einer anderen TZ steht. UTC-Mittag-Anker
+// macht die Differenz DST-sicher. Ungültiges `then` → NaN.
+export function localDayDiff(then, now = new Date()) {
+  const a = then instanceof Date ? then : new Date(then);
+  if (isNaN(a.getTime())) return NaN;
+  const dThen = Date.parse(localIsoDate(a) + 'T12:00:00Z');
+  const dNow = Date.parse(localIsoDate(now) + 'T12:00:00Z');
+  return Math.round((dNow - dThen) / 86400000);
 }
 
 // Lokales ISO-Datum n Tage in der Vergangenheit, kollisionssicher über

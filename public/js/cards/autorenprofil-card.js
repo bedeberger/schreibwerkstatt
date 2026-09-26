@@ -94,7 +94,7 @@ export function registerAutorenprofilCard() {
     // `null` wird zu „–", nicht zu „0": null heisst „nicht messbar", nicht
     // „gemessen, Ergebnis null". Gleiche Regel wie in der Wortschatz-Karte.
     apNum(v, decimals = 1) {
-      return formatNumber(v == null ? null : Number(v), window.__app?.uiLocale, decimals);
+      return formatNumber(v == null ? null : Number(v), Alpine.store('shell').uiLocale, decimals);
     },
 
     /** Kennzahl nach ihrer eigenen Spec formatieren (Prozent-Flag + Nachkommastellen). */

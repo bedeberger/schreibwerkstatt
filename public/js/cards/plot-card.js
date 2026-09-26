@@ -119,6 +119,9 @@ export function registerPlotCard() {
     // Scrollcontainer, in dem ein verankertes Popover geclippt würde.
     threadActionsOpenId: null,
     threadMenuPos: { top: 0, left: 0 },
+    // Dismiss-Controller (cards/dismiss.js) des offenen Lane-Menüs: schliesst bei
+    // Scroll/Resize; null = Menü zu.
+    _threadMenuCloseHandler: null,
 
     // ID des Beats, dessen Anchor-Fundstellen-Popover offen ist (Single-Select).
     // Das Popover ist ein einzelnes, nach <body> teleportiertes .context-menu
@@ -126,6 +129,8 @@ export function registerPlotCard() {
     // Scrollcontainer, in dem ein verankertes Popover geclippt würde.
     beatOccPopoverBeatId: null,
     beatOccPopoverPos: { top: 0, left: 0 },
+    // Dismiss-Controller des offenen Fundstellen-Popovers (wie _threadMenuCloseHandler).
+    _occPopoverCloseHandler: null,
 
     // Eingeklappte „verworfen"-Beats pro Akt ({ [actId]: true }).
     verworfenOpen: {},
@@ -305,6 +310,7 @@ export function registerPlotCard() {
       this._clearJobs();
       this._destroySortables();
       this._detachOccPopoverListeners?.();
+      this._detachThreadMenuListeners?.();
       this._lifecycle?.destroy();
     },
 

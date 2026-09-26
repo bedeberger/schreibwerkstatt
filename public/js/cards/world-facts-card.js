@@ -5,6 +5,7 @@
 // Gruppierung nach Kategorie; Filter über Suche + Kategorie-Combobox.
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { fetchJson } from '../utils.js';
+import { memoMethods } from './card-memo.js';
 
 // Harte Kategorie-Gruppierung — SSoT für Reihenfolge + Icon je Key. Spiegelt die
 // Whitelist FAKT_KATEGORIE_WL (db/schema.js) und das Prompt-Enum
@@ -90,18 +91,8 @@ export function registerWorldFactsCard() {
       }
     },
 
-    // Ein Memo-Helper pro Modul (Array-Deps, shallow ===). Reset bei Reload.
-    _memo(key, deps, compute) {
-      const memos = (this._memos ||= {});
-      const hit = memos[key];
-      if (hit && hit.deps.length === deps.length
-          && hit.deps.every((d, i) => d === deps[i])) {
-        return hit.value;
-      }
-      const value = compute();
-      memos[key] = { deps: [...deps], value };
-      return value;
-    },
+    // Memo-Helper (cards/card-memo.js); Reset bei Reload.
+    ...memoMethods,
 
     // Einmal pro fakten-Satz: Counts je Kategorie + vorhandene Kategorien (kanonisch sortiert).
     get _wfIndex() {

@@ -25,6 +25,8 @@ export function registerFehlerHeatmapCard() {
     // Explizit deklariert statt lazy — CLAUDE.md "State explizit deklariert".
     // Reset ueber this._memos = {} im Lade-Pfad und bei jedem State-Reset.
     _memos: {},
+    // Anfrage-Zähler für loadFehlerHeatmap: nur die jüngste Antwort schreibt.
+    _fehlerHeatmapSeq: 0,
     _lifecycle: null,
 
     init() {

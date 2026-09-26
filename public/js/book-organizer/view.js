@@ -8,6 +8,8 @@
 // ergänzen nur neue/entfernte IDs.
 
 import { MAX_CHAPTER_DEPTH, COLLAPSE_THRESHOLD } from './constants.js';
+import { memoMethods } from '../cards/card-memo.js';
+import { localeTag } from '../utils.js';
 
 function _walkAllIds(chapters, out = []) {
   for (const c of chapters) {
@@ -239,23 +241,12 @@ export const viewMethods = {
   },
 
   _fmtNum(n) {
-    const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const tag = localeTag(Alpine.store('shell').uiLocale);
     return Number(n || 0).toLocaleString(tag);
   },
 
-  // Cache hit nur wenn alle deps identisch zur letzten Compute. Genau ein
-  // _memo-Helper pro Karte (CLAUDE.md), gemeinsamer this._memos-Speicher.
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length
-        && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js), gemeinsamer this._memos-Speicher.
+  ...memoMethods,
 };
 
 // Reiner Compute-Body des Memos (CLAUDE.md „Memo-Pattern"): nimmt die

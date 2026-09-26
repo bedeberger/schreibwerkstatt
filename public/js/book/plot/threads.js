@@ -5,6 +5,7 @@ import { fetchJson } from '../../utils.js';
 import { ACT_PALETTE } from './constants.js';
 import { EVT } from '../../events.js';
 import { computePopoverPos, refinePopoverPos } from '../../popover-anchor.js';
+import { attachDismiss, detachDismiss } from '../../cards/dismiss.js';
 
 export const threadsMethods = {
   async addThread() {
@@ -129,17 +130,11 @@ export const threadsMethods = {
   },
 
   _attachThreadMenuListeners() {
-    if (this._threadMenuCloseHandler) return;
-    this._threadMenuCloseHandler = () => this.closeThreadMenu();
-    window.addEventListener('scroll', this._threadMenuCloseHandler, true);
-    window.addEventListener('resize', this._threadMenuCloseHandler);
+    this._threadMenuCloseHandler ??= attachDismiss(() => this.closeThreadMenu());
   },
 
   _detachThreadMenuListeners() {
-    if (!this._threadMenuCloseHandler) return;
-    window.removeEventListener('scroll', this._threadMenuCloseHandler, true);
-    window.removeEventListener('resize', this._threadMenuCloseHandler);
-    this._threadMenuCloseHandler = null;
+    detachDismiss(this, '_threadMenuCloseHandler');
   },
 
   async setThreadColor(thread, key) {

@@ -48,22 +48,12 @@ export function registerKontinuitaetCard() {
         },
         load: () => this._loadKontinuitaetHistory(),
         onBookChanged: async (e, ctx, root) => {
-          if (ctx._kontinuitaetPollTimer) {
-            clearInterval(ctx._kontinuitaetPollTimer);
-            ctx._kontinuitaetPollTimer = null;
-          }
           doReset(ctx);
           if (!root.showKontinuitaetCard) return;
           if (!Alpine.store('nav').selectedBookId) return;
           await ctx._loadKontinuitaetHistory();
         },
-        onViewReset: (e, ctx) => {
-          if (ctx._kontinuitaetPollTimer) {
-            clearInterval(ctx._kontinuitaetPollTimer);
-            ctx._kontinuitaetPollTimer = null;
-          }
-          doReset(ctx);
-        },
+        onViewReset: (e, ctx) => doReset(ctx),
       });
     },
 

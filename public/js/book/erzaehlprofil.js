@@ -5,14 +5,17 @@
 // Themen-/Motiv-Verteilung übers Buch. Rein lesend, nie generativ im Buchtext.
 
 import { fetchJson } from '../utils.js';
+import { isSelectedBook } from '../cards/book-guard.js';
 
 const _POV_KEYS = ['ich', 'du', 'er_sie_personal', 'er_sie_auktorial', 'wir', 'gemischt'];
 const _TEMPUS_KEYS = ['praeteritum', 'praesens', 'gemischt'];
 
 export const erzaehlprofilMethods = {
   async _loadErzaehlprofil() {
+    const bookId = Alpine.store('nav').selectedBookId;
     try {
-      const data = await fetchJson('/jobs/erzaehlprofil/' + Alpine.store('nav').selectedBookId);
+      const data = await fetchJson('/jobs/erzaehlprofil/' + bookId);
+      if (!isSelectedBook(bookId)) return;
       this.erzaehlprofilResult = data;
     } catch (e) {
       console.error('[_loadErzaehlprofil]', e);

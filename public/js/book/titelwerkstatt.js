@@ -19,6 +19,7 @@ import {
   HEADLINE_FIELDS, HEADLINE_LONG_FIELDS, HEADLINE_CHANNELS,
   channelFit, fieldLen, fillPct, fitState, fieldLabelKey, channelLabelKey,
 } from '../headline/channels.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 const LS_KEY = (pageId) => `headline_job_${pageId}`;
 
@@ -75,20 +76,8 @@ export const titelwerkstattMethods = {
     }));
   },
 
-  // Cache-Treffer nur, wenn ALLE Deps referenzidentisch zum letzten Lauf sind.
-  // Ein Helper pro Modul, gemeinsamer Speicher `this._memos` (CLAUDE.md
-  // „Memo-Pattern"); Reset läuft über den Karten-Lifecycle.
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length
-        && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js); Reset läuft über den Karten-Lifecycle.
+  ...memoMethods,
 
   /** Wie viele Beiträge haben schon einen Titel? Kopfzeile der Karte.
    *

@@ -82,7 +82,7 @@ export const exportMethods = {
 
   exportScopeOptions() {
     const app = window.__app;
-    const opts = [{ value: 'book', label: app?.t?.('export.scope.book') || 'Buch' }];
+    const opts = [{ value: 'book', label: app.t('export.scope.book') }];
     if (this.exportChapterOptions().length) opts.push({ value: 'chapter', label: app.t('export.scope.chapter') });
     if (this.exportPageOptions().length)    opts.push({ value: 'page',    label: app.t('export.scope.page') });
     return opts;

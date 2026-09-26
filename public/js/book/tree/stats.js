@@ -1,4 +1,4 @@
-import { CHARS_PER_TOKEN, charBadgeLabel, localeTag, relativeDay, tzOpts } from '../../utils.js';
+import { CHARS_PER_TOKEN, charBadgeLabel, localDayDiff, localeTag, relativeDay, tzOpts } from '../../utils.js';
 import { htmlToPlainText } from '../../html-text.js';
 import { EVT } from '../../events.js';
 
@@ -8,14 +8,9 @@ import { EVT } from '../../events.js';
 
 const STALE_THRESHOLD_DAYS = 30;
 
-// Tag-Differenz auf Basis lokaler Mitternacht – analog zu fmtLastRun in
-// routes/jobs/shared.js. Verhindert Off-by-one bei Checks <24h, die aber
-// bereits am Vortag stattfanden.
-function _diffDays(then, now = new Date()) {
-  const a = new Date(then.getFullYear(), then.getMonth(), then.getDate());
-  const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((b - a) / 86400000);
-}
+// Tag-Differenz in Kalendertagen der App-Zeitzone (localDayDiff): ein Check
+// <24h, der aber am Vortag stattfand, zählt als „gestern".
+const _diffDays = localDayDiff;
 
 function _fmtTime(d, locale) {
   return d.toLocaleTimeString(localeTag(locale), tzOpts({ hour: '2-digit', minute: '2-digit' }));

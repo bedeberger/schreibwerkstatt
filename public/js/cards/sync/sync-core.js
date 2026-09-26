@@ -1,5 +1,6 @@
 import { EVT } from '../../events.js';
 import { startPoll } from '../job-helpers.js';
+import { isSelectedBook } from '../book-guard.js';
 
 // Push-Poller pro Seite: `_pushTimers[pageId]` hält ein Halter-Objekt, in dessen
 // `timer` startPoll seinen Handle schreibt. Stoppen = Intervall räumen UND
@@ -129,6 +130,7 @@ export function createSyncCard(spec) {
         }
         try {
           const res = await fetch(`${spec.endpointBase}/${bookId}/links`);
+          if (!isSelectedBook(bookId)) return;
           if (!res.ok) {
             this.connected = false;
             this.providerMeta = {};
@@ -136,6 +138,7 @@ export function createSyncCard(spec) {
             return;
           }
           const data = await res.json();
+          if (!isSelectedBook(bookId)) return;
           this.connected = !!data.connected;
           this.providerMeta = data;
           const map = {};

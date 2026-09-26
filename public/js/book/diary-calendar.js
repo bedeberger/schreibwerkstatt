@@ -7,8 +7,16 @@
 // Page), wir wollen aber nicht pro Render rebuilden.
 
 import { contentRepo } from '../repo/content.js';
-import { fetchJson, localIsoDate, tzOpts } from '../utils.js';
+import { dateTimeFormat, fetchJson, localeTag, localIsoDate, tzOpts } from '../utils.js';
 import { insertChapterItem } from './tree/load.js';
+import { isSelectedBook } from '../cards/book-guard.js';
+
+// Abbruch-Signal der Anlage-Kette in _createDiaryEntry: Buch während eines
+// awaits gewechselt. Kein Fehler für den User (er hat das Buch selbst gewechselt).
+class DiaryBookSwitched extends Error {}
+function _assertDiaryBook(bookId) {
+  if (!isSelectedBook(bookId)) throw new DiaryBookSwitched();
+}
 
 const _CACHE_KEY = '_diaryCalendarCache';
 
@@ -129,13 +137,13 @@ export const diaryCalendarMethods = {
   // richtigen Monat im Grid anzeigt).
   diaryCalendarCurrentMonth() {
     if (this.diaryCalendarYearMonth) return this.diaryCalendarYearMonth;
-    const now = new Date();
-    if (!this.diaryHasTodayEntry()) {
-      return { year: now.getFullYear(), month: now.getMonth() + 1 };
-    }
+    // „Heute" in der App-Zeitzone — dieselbe Quelle wie isToday im Grid.
+    const todayIso = localIsoDate();
+    const now = { year: parseInt(todayIso.slice(0, 4), 10), month: parseInt(todayIso.slice(5, 7), 10) };
+    if (!this.diaryHasTodayEntry()) return now;
     const months = this.diaryCalendarMonths();
     if (months[0]) return { year: months[0].year, month: months[0].month };
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    return now;
   },
 
   // 6x7-Grid, jeweils { date:'YYYY-MM-DD', dayNum, inMonth, hasPage, page, isToday }.
@@ -174,20 +182,20 @@ export const diaryCalendarMethods = {
     return this._formatYearMonth(monthEntry.year, monthEntry.month);
   },
 
+  // Kalender-Arithmetik läuft in UTC (Date.UTC); formatiert wird darum ebenfalls
+  // in UTC — sonst rutscht der Tag westlich von UTC auf den Vortag.
   _formatYearMonth(year, month) {
-    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
     const dt = new Date(Date.UTC(year, month - 1, 15));
-    return dt.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+    return dateTimeFormat(this.$store.shell.uiLocale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(dt);
   },
 
   // Wochentags-Header lokalisiert (Mo Di Mi … / Mon Tue Wed …).
   diaryCalendarWeekdayLabels() {
-    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const fmt = dateTimeFormat(this.$store.shell.uiLocale, { weekday: 'short', timeZone: 'UTC' });
     const labels = [];
     // 2024-01-01 ist ein Montag; davon ausgehend 7 Tage.
     for (let i = 0; i < 7; i++) {
-      const dt = new Date(Date.UTC(2024, 0, 1 + i));
-      labels.push(dt.toLocaleDateString(locale, { weekday: 'short' }));
+      labels.push(fmt.format(new Date(Date.UTC(2024, 0, 1 + i))));
     }
     return labels;
   },
@@ -223,9 +231,9 @@ export const diaryCalendarMethods = {
   },
 
   // Lädt Buchsprache (de/en) aus /booksettings, gecacht pro Buch. Default 'de'.
-  async _getDiaryBookLanguage() {
+  async _getDiaryBookLanguage(bookId = this.$store.nav.selectedBookId) {
     const cache = _ensureCache(this);
-    const id = String(this.$store.nav.selectedBookId || '');
+    const id = String(bookId || '');
     if (!id) return 'de';
     if (cache.langByBookId[id]) return cache.langByBookId[id];
     try {
@@ -247,7 +255,7 @@ export const diaryCalendarMethods = {
   // - month-style Sub-Kapitel vorhanden, gesuchter Monat dabei → matching Sub
   // - month-style Sub-Kapitel vorhanden, Monat fehlt → neu anlegen
   //   (Name "YYYY <Monatsname>" in Buchsprache, position = monthNum)
-  async _resolveDiaryEntryChapter(yearChapterId, year, monthNum) {
+  async _resolveDiaryEntryChapter(yearChapterId, year, monthNum, bookId) {
     const subs = (this.$store.nav.tree || []).filter(it =>
       it.type === 'chapter'
         && !it.solo
@@ -268,37 +276,41 @@ export const diaryCalendarMethods = {
     const match = monthSubs.find(x => x.month === monthNum);
     if (match) return match.sub.id;
 
-    const lang = await this._getDiaryBookLanguage();
+    const lang = await this._getDiaryBookLanguage(bookId);
+    _assertDiaryBook(bookId);
     const names = lang === 'en' ? MONTH_NAMES_EN : MONTH_NAMES_DE;
     const subName = `${year} ${names[monthNum - 1]}`;
     const created = await contentRepo.createChapter({
-      book_id: parseInt(this.$store.nav.selectedBookId, 10),
+      book_id: parseInt(bookId, 10),
       name: subName,
       parent_chapter_id: yearChapterId,
       position: monthNum,
     });
     if (!created?.id) throw new Error('createChapter (month) returned no id');
+    _assertDiaryBook(bookId);
     // Sub-Kapitel-Mutation: granularer Tree-Mirror deckt das nicht zuverlässig
     // ab. wake-Reload behält Selektion + State, erneuert nur Tree/Pages.
     await this.loadPages({ source: 'wake' });
+    _assertDiaryBook(bookId);
     return created.id;
   },
 
   // Sichert Jahr-Kapitel `YYYY` (Name = Jahrzahl, position = Jahrzahl).
   // Pattern stammt aus folder-import (routes/jobs/folder-import.js): ein
   // Top-Level-Kapitel pro Jahr. Liefert Chapter-ID.
-  async _ensureDiaryYearChapter(year) {
+  async _ensureDiaryYearChapter(year, bookId) {
     const yearStr = String(year);
     const existing = this.$store.nav.tree.find(
       it => it.type === 'chapter' && !it.solo && it.name === yearStr
     );
     if (existing) return existing.id;
     const created = await contentRepo.createChapter({
-      book_id: parseInt(this.$store.nav.selectedBookId, 10),
+      book_id: parseInt(bookId, 10),
       name: yearStr,
       position: parseInt(yearStr, 10),
     });
     if (!created?.id) throw new Error('createChapter returned no id');
+    _assertDiaryBook(bookId);
     const chapterItem = {
       type: 'chapter',
       id: created.id,
@@ -336,18 +348,23 @@ export const diaryCalendarMethods = {
     const existing = this.diaryCalendarPagesMap().get(dateIso);
     if (existing) { this.selectPage(existing); return; }
     this._diaryCreatingDate = dateIso;
+    // Buch-ID EINMAL lesen: die Kette legt bis zu drei Objekte an (Jahr, Monat,
+    // Seite). Wechselt der User dazwischen das Buch, darf der Rest weder im
+    // neuen Buch landen noch dessen Tree/Pages mutieren → Abbruch.
+    const bookId = this.$store.nav.selectedBookId;
     try {
       const year = parseInt(dateIso.slice(0, 4), 10);
       const monthNum = parseInt(dateIso.slice(5, 7), 10);
-      const yearChapterId = await this._ensureDiaryYearChapter(year);
-      const chapterId = await this._resolveDiaryEntryChapter(yearChapterId, year, monthNum);
+      const yearChapterId = await this._ensureDiaryYearChapter(year, bookId);
+      const chapterId = await this._resolveDiaryEntryChapter(yearChapterId, year, monthNum, bookId);
       const created = await contentRepo.createPage({
-        book_id: parseInt(this.$store.nav.selectedBookId, 10),
+        book_id: parseInt(bookId, 10),
         chapter_id: chapterId,
         name: dateIso,
         html: '<p></p>',
       });
       if (!created?.id) throw new Error('createPage returned no id');
+      _assertDiaryBook(bookId);
       this.$store.nav.pages = [...this.$store.nav.pages, created];
       const treeCh = this.$store.nav.tree.find(
         it => it.type === 'chapter' && !it.solo && String(it.id) === String(chapterId)
@@ -362,6 +379,7 @@ export const diaryCalendarMethods = {
       this.diaryCalendarYearMonth = { year, month: monthNum };
       this.selectPage(created);
     } catch (e) {
+      if (e instanceof DiaryBookSwitched) return;
       console.error('[_createDiaryEntry]', e);
       this.setStatus(this.t('calendar.createError'));
     } finally {
@@ -456,13 +474,13 @@ export const diaryCalendarMethods = {
 
   // Wochentag (lang) eines `YYYY-MM-DD`. Noon-UTC + tzOpts → kein TZ-Tagessprung.
   _diaryWeekdayLabel(dateIso) {
-    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = localeTag(this.$store.shell.uiLocale);
     return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString(locale, tzOpts({ weekday: 'long' }));
   },
 
   // Volles Datum (z.B. „3. Juni 2025") eines `YYYY-MM-DD`.
   _diaryDateLabel(dateIso) {
-    const locale = this.$store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH';
+    const locale = localeTag(this.$store.shell.uiLocale);
     return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString(
       locale, tzOpts({ day: 'numeric', month: 'long', year: 'numeric' }));
   },

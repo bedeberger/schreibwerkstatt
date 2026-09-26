@@ -2,11 +2,12 @@
 // Buchrealität), persistierte Lauf-Historie, Fullscreen-Toggle und das
 // Aufräumen der Poll-Timer. Die KI plant/prüft nur Struktur — kein Fliesstext.
 
-import { fetchJson, tzOpts } from '../../utils.js';
+import { fetchJson, localeTag, tzOpts } from '../../utils.js';
 import { startPoll, runningJobStatus } from '../../cards/job-helpers.js';
 import { toggleWrapFullscreen } from '../../fullscreen.js';
 import { normTitle } from './constants.js';
 import { EVT } from '../../events.js';
+import { attachDismiss, detachDismiss } from '../../cards/dismiss.js';
 
 export const aiMethods = {
   // ── KI: Brainstorm ──────────────────────────────────────────────────────
@@ -328,7 +329,7 @@ export const aiMethods = {
     if (!iso) return '';
     try {
       const d = new Date(iso);
-      const locale = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const locale = localeTag(Alpine.store('shell').uiLocale);
       return d.toLocaleString(locale, tzOpts());
     } catch { return iso; }
   },
@@ -433,17 +434,11 @@ export const aiMethods = {
   },
 
   _attachOccPopoverListeners() {
-    if (this._occPopoverCloseHandler) return;
-    this._occPopoverCloseHandler = () => this.closeBeatOccPopover();
-    window.addEventListener('scroll', this._occPopoverCloseHandler, true);
-    window.addEventListener('resize', this._occPopoverCloseHandler);
+    this._occPopoverCloseHandler ??= attachDismiss(() => this.closeBeatOccPopover());
   },
 
   _detachOccPopoverListeners() {
-    if (!this._occPopoverCloseHandler) return;
-    window.removeEventListener('scroll', this._occPopoverCloseHandler, true);
-    window.removeEventListener('resize', this._occPopoverCloseHandler);
-    this._occPopoverCloseHandler = null;
+    detachDismiss(this, '_occPopoverCloseHandler');
   },
 
   // Aus dem Popover an eine konkrete Fundstelle springen. Verlässt die Plot-Karte

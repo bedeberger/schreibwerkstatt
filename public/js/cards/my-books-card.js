@@ -16,8 +16,8 @@
 // Buchnamen kommen aus `$store.nav.books` (Content-Store-Regel), Kennzahlen aus
 // `/me/books` — zusammengefuehrt in my-books-compute.js.
 
-import { EVT } from '../events.js';
-import { tzOpts } from '../utils.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
+import { localeTag, tzOpts } from '../utils.js';
 import {
   SHELF_TABS, mergeShelfRows, filterShelfRows, pinnedFirst, shelfTotals, mayToggleFinished,
 } from './my-books-compute.js';
@@ -32,19 +32,22 @@ export function registerMyBooksCard() {
     myBooksError: '',
     myBooksBusyId: null, // Buch, dessen Schalter gerade schreibt (Doppelklick-Guard)
     myBooksTabs: SHELF_TABS,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showMyBooksCard, (visible) => {
         if (visible) this.loadMyBooks();
       });
-      this._onRefresh = (ev) => {
-        if (ev?.detail?.name === 'myBooks') this.loadMyBooks();
-      };
-      window.addEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      // Buchübergreifend: kein Reset bei book:changed/view:reset, Refresh ohne Buch.
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'myBooks',
+        refreshNeedsBookId: false,
+        onCardRefresh: () => this.loadMyBooks(),
+      });
     },
 
     destroy() {
-      if (this._onRefresh) window.removeEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      this._lifecycle?.destroy();
     },
 
     async loadMyBooks() {
@@ -183,7 +186,7 @@ export function registerMyBooksCard() {
 
     // ── Formatierung ───────────────────────────────────────────────────────
     _myBooksFmt(n) {
-      const loc = window.Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = localeTag(window.Alpine.store('shell').uiLocale);
       return Number(n || 0).toLocaleString(loc);
     },
 
@@ -206,7 +209,7 @@ export function registerMyBooksCard() {
       if (!value) return '–';
       const d = new Date(value.length === 10 ? value + 'T12:00:00Z' : value);
       if (Number.isNaN(d.getTime())) return '–';
-      const loc = window.Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = localeTag(window.Alpine.store('shell').uiLocale);
       return d.toLocaleDateString(loc, tzOpts({ year: 'numeric', month: '2-digit', day: '2-digit' }));
     },
   }));

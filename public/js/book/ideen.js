@@ -12,6 +12,7 @@ import { fetchJson } from '../utils.js';
 import { EVT } from '../events.js';
 import { IDEE_STATUSES, ideeStatus, isOpenIdee } from './ideen-shared.js';
 import { computePopoverPos, refinePopoverPos } from '../popover-anchor.js';
+import { attachDismiss, detachDismiss } from '../cards/dismiss.js';
 
 // Aktive Scope-IDs aus Root lesen. Liefert { kind, id } oder null.
 function _activeScope(app) {
@@ -89,17 +90,11 @@ export const ideenMethods = {
   },
 
   _attachMenuListeners() {
-    if (this._menuCloseHandler) return;
-    this._menuCloseHandler = () => this.closeMenu();
-    window.addEventListener('scroll', this._menuCloseHandler, true);
-    window.addEventListener('resize', this._menuCloseHandler);
+    this._menuCloseHandler ??= attachDismiss(() => this.closeMenu());
   },
 
   _detachMenuListeners() {
-    if (!this._menuCloseHandler) return;
-    window.removeEventListener('scroll', this._menuCloseHandler, true);
-    window.removeEventListener('resize', this._menuCloseHandler);
-    this._menuCloseHandler = null;
+    detachDismiss(this, '_menuCloseHandler');
   },
 
   // ── CRUD ─────────────────────────────────────────────────────────────────

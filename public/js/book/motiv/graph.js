@@ -7,6 +7,7 @@
 import { sendJson, escHtml } from '../../utils.js';
 import { toggleWrapFullscreen } from '../../fullscreen.js';
 import { ensureVis, graphPlaceholder, createGraphTooltip, graphTheme, paletteColors } from '../../graph-kit.js';
+import { attachDismiss, detachDismiss } from '../../cards/dismiss.js';
 
 // Themen-Palette: primär die vom Autor gewählte Farbe (themes.farbe = Palette-
 // Schlüssel, theme-aware --palette-*-Tokens wie in der Plot-Werkstatt); ohne Wahl
@@ -463,17 +464,11 @@ export const graphMethods = {
   },
 
   _attachGraphMenuListeners() {
-    if (this._graphMenuCloseHandler) return;
-    this._graphMenuCloseHandler = () => this.closeGraphMenu();
-    window.addEventListener('scroll', this._graphMenuCloseHandler, true);
-    window.addEventListener('resize', this._graphMenuCloseHandler);
+    this._graphMenuCloseHandler ??= attachDismiss(() => this.closeGraphMenu());
   },
 
   _detachGraphMenuListeners() {
-    if (!this._graphMenuCloseHandler) return;
-    window.removeEventListener('scroll', this._graphMenuCloseHandler, true);
-    window.removeEventListener('resize', this._graphMenuCloseHandler);
-    this._graphMenuCloseHandler = null;
+    detachDismiss(this, '_graphMenuCloseHandler');
   },
 
   // Knoten-Typ für den offenen Menü-Kontext: 'theme' | 'motif' | 'canvas' | 'other'.

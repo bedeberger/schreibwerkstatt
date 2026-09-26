@@ -3,7 +3,7 @@
 // (`showAdminParseFailsCard`) im Root.
 
 import { adminParseFailsMethods } from '../admin/ai-parse-fails.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerAdminParseFailsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -14,27 +14,28 @@ export function registerAdminParseFailsCard() {
     parseFailsFiles: [],
     parseFailsContent: {},
     parseFailsExpanded: {},
-    _onViewReset: null,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showAdminParseFailsCard, async (visible) => {
         if (visible) await this.parseFailsEnter();
         else this._parseFailsLeave();
       });
-      this._onViewReset = () => {
-        this._parseFailsLeave();
-        this.parseFailsFiles = [];
-        this.parseFailsContent = {};
-        this.parseFailsExpanded = {};
-        this.parseFailsError = '';
-        this.parseFailsInitialized = false;
-      };
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle = setupCardLifecycle(this, {
+        onViewReset: () => {
+          this._parseFailsLeave();
+          this.parseFailsFiles = [];
+          this.parseFailsContent = {};
+          this.parseFailsExpanded = {};
+          this.parseFailsError = '';
+          this.parseFailsInitialized = false;
+        },
+      });
     },
 
     destroy() {
       this._parseFailsLeave();
-      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle?.destroy();
     },
 
     ...adminParseFailsMethods,

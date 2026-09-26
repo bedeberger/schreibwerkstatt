@@ -4,8 +4,8 @@
 // `toggleMyStatsCard` leben im Root (generiert aus EXCLUSIVE_CARDS). Daten:
 // `GET /me/profile-stats` (Tiles) + `GET /me/profile-stats-history` (Chart).
 
-import { tzOpts, localIsoDate, localIsoDaysAgo } from '../utils.js';
-import { EVT } from '../events.js';
+import { localeTag, localIsoDate, localIsoDaysAgo, tzOpts } from '../utils.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 import { computeWritingTimeStreak, computeWeekdayPattern, computeDerived, computeMilestones,
          computeReadability, computeWeeklyDelta, computePerBookTime, computeEffortSplit,
          computeVolumeDelta, computeHourPattern, computeGoalAttainment, computeBookGoals,
@@ -13,6 +13,7 @@ import { computeWritingTimeStreak, computeWeekdayPattern, computeDerived, comput
 import { computeVolumeByCategory } from './my-stats-category.js';
 import { myStatsTrendMethods } from './my-stats-trends-methods.js';
 import { myStatsChartMethods, BOOK_COLORS } from './my-stats-chart-methods.js';
+import { memoMethods } from './card-memo.js';
 
 // Meilenstein-Label-Keys pro Kategorie (Wert via {n} interpoliert).
 const MILESTONE_LABELS = {
@@ -44,21 +45,24 @@ export function registerMyStatsCard() {
     myStatsCumulative: false,  // nur fuer Metrik 'writing' (kumulierte Schreibzeit)
     myStatsLoading: false,
     myStatsError: '',
-    _myStatsMemos: {},
+    _memos: {},
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showMyStatsCard, (visible) => {
         if (visible) this.loadMyStats();
         else this._destroyChart();
       });
-      this._onRefresh = (ev) => {
-        if (ev?.detail?.name === 'myStats') this.loadMyStats();
-      };
-      window.addEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      // Buchübergreifend: kein Reset bei book:changed/view:reset, Refresh ohne Buch.
+      this._lifecycle = setupCardLifecycle(this, {
+        name: 'myStats',
+        refreshNeedsBookId: false,
+        onCardRefresh: () => this.loadMyStats(),
+      });
     },
 
     destroy() {
-      if (this._onRefresh) window.removeEventListener(EVT.CARD_REFRESH, this._onRefresh);
+      this._lifecycle?.destroy();
       this._destroyChart();
       this._disconnectMyStatsThemeObserver();
     },
@@ -66,7 +70,7 @@ export function registerMyStatsCard() {
     async loadMyStats() {
       this.myStatsLoading = true;
       this.myStatsError = '';
-      this._myStatsMemos = {};
+      this._memos = {};
       try {
         const [statsR, histR] = await Promise.all([
           fetch('/me/profile-stats', { credentials: 'same-origin' }),
@@ -98,18 +102,8 @@ export function registerMyStatsCard() {
       return this.myStatsHistory.length > 0 || this.myStatsWriting.length > 0;
     },
 
-    // Ein Memo-Helper pro Modul (CLAUDE.md): Aggregat-Getter werden im Template
-    // mehrfach pro Render aufgerufen → Cache mit shallow-Array-Deps. Reset bei
-    // jedem Daten-Reload via this._myStatsMemos = {} in loadMyStats().
-    _memo(key, deps, fn) {
-      const prev = this._myStatsMemos[key];
-      if (prev && prev.deps.length === deps.length && prev.deps.every((d, i) => d === deps[i])) {
-        return prev.val;
-      }
-      const val = fn();
-      this._myStatsMemos[key] = { deps, val };
-      return val;
-    },
+    // Memo-Helper (cards/card-memo.js); Reset bei jedem Daten-Reload via this._memos = {} in loadMyStats().
+    ...memoMethods,
 
     // ── Zeitraum-Filter (steuert die ganze Karte) ──────────────────────────
     // Aktives Fenster { active, from, to } (ISO, inklusive; null = unbegrenzt).
@@ -194,7 +188,7 @@ export function registerMyStatsCard() {
 
     // Wochentags-Kurzlabels Mo..So (Locale-aware, TZ-bereinigt).
     myStatsWeekdayLabels() {
-      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = localeTag(Alpine.store('shell').uiLocale);
       const fmt = new Intl.DateTimeFormat(tag, tzOpts({ weekday: 'short' }));
       const monRef = new Date(2027, 0, 4); // 2027-01-04 ist ein Montag
       return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(monRef.getTime() + i * 86400000)));
@@ -203,7 +197,7 @@ export function registerMyStatsCard() {
     // Datum eines Streak-/Bestleistungs-Tages lesbar formatieren.
     myStatsDateLabel(iso) {
       if (!iso) return '';
-      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = localeTag(Alpine.store('shell').uiLocale);
       return new Date(iso + 'T12:00:00').toLocaleDateString(tag, tzOpts({ day: 'numeric', month: 'short', year: 'numeric' }));
     },
 
@@ -331,7 +325,7 @@ export function registerMyStatsCard() {
     // Zahl mit einer Nachkommastelle (Lesbarkeitswerte), Locale-aware.
     myStatsDec(n) {
       if (n == null) return '–';
-      const loc = Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = localeTag(Alpine.store('shell').uiLocale);
       return Number(n).toLocaleString(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     },
 
@@ -350,7 +344,7 @@ export function registerMyStatsCard() {
 
     // Locale-aware Tausender-Trennung (Swiss: de-CH = Apostroph).
     _myStatsFmt(n) {
-      const loc = Alpine.store('shell').uiLocale === 'de' ? 'de-CH' : 'en-US';
+      const loc = localeTag(Alpine.store('shell').uiLocale);
       return Number(n || 0).toLocaleString(loc);
     },
 

@@ -23,13 +23,12 @@
 import { loadChart } from '../lazy-libs.js';
 import { BOOK_COLORS } from '../cards/my-stats-chart-methods.js';
 import { startPoll } from '../cards/job-helpers.js';
-
-const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+import { tRaw } from '../i18n.js';
+import { createChartHolder, cssVar } from '../cards/chart-holder.js';
 
 // Ausserhalb von Alpine gehalten, damit der Reaktivitäts-Proxy die Chart.js-
 // Instanz nicht beschädigt (gleiche Begründung wie in book/bookstats.js).
-let _mapChart = null;
-let _themeObserver = null;
+const _map = createChartHolder();
 
 // Punkt-Radius: Grundgrösse plus ein wenig für die Länge der Seite (Chunk-Zahl).
 // Bewusst flach gedeckelt — die Karte soll Lage zeigen, nicht Umfang, und grosse
@@ -44,23 +43,21 @@ const MIN_MAP_POINTS = 3;
 
 /** Vom destroy() der Karte gerufen: Modul-State freigeben. */
 export function _destroyBookMapChart() {
-  if (_mapChart) { _mapChart.destroy(); _mapChart = null; }
+  _map.destroy();
 }
 export function _disconnectBookMapThemeObserver() {
-  if (_themeObserver) { _themeObserver.disconnect(); _themeObserver = null; }
+  _map.disconnect();
 }
 
 // Ein Canvas kann keine CSS-Custom-Properties auflösen — beim Theme-Wechsel muss
 // darum neu gezeichnet werden (gleiche Regel wie im Figuren-Graph, siehe
 // graph-kit.js#observeThemeChange).
 function _ensureThemeObserver(component) {
-  if (_themeObserver) return;
-  _themeObserver = new MutationObserver(() => {
-    if (!_mapChart || !window.__app?.showBuchlandkarteCard) return;
+  _map.ensureThemeRedraw(() => {
+    if (!window.__app?.showBuchlandkarteCard) return;
     _destroyBookMapChart();
     component.renderBookMap();
   });
-  _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }
 
 export const buchlandkarteMethods = {
@@ -115,22 +112,22 @@ export const buchlandkarteMethods = {
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.jobId) {
         this.bookMapLoading = false;
-        this.bookMapStatus = window.__app?.t?.(
+        this.bookMapStatus = tRaw(
           j.error_code === 'EMBED_DISABLED' ? 'buchlandkarte.needBackend' : 'buchlandkarte.error',
-        ) || 'Fehler';
+        );
         return;
       }
       this._pollBookMap(j.jobId);
     } catch (e) {
       this.bookMapLoading = false;
-      this.bookMapStatus = e.message || 'error';
+      this.bookMapStatus = tRaw('common.errorColon') + (e.message || '');
     }
   },
 
   _pollBookMap(jobId) {
     const failed = () => {
       this.bookMapLoading = false;
-      this.bookMapStatus = window.__app?.t?.('buchlandkarte.error') || 'Fehler';
+      this.bookMapStatus = tRaw('buchlandkarte.error');
     };
     startPoll(this, {
       timerProp: '_bookMapPollTimer',
@@ -218,7 +215,7 @@ export const buchlandkarteMethods = {
     const gridLine = cssVar('--color-border');
     const t = (k, p) => window.__app?.t?.(k, p) || k;
 
-    _mapChart = new Chart(canvas, {
+    _map.set(new Chart(canvas, {
       type: 'scatter',
       data: { datasets: this._bookMapDatasets(res.pages) },
       options: {
@@ -235,7 +232,7 @@ export const buchlandkarteMethods = {
         onClick: (_evt, elements) => {
           const el = elements?.[0];
           if (!el) return;
-          const pt = _mapChart?.data?.datasets?.[el.datasetIndex]?.data?.[el.index];
+          const pt = _map.get()?.data?.datasets?.[el.datasetIndex]?.data?.[el.index];
           if (pt?.pageId) this.bookMapGotoPage(pt.pageId);
         },
         scales: {
@@ -253,7 +250,7 @@ export const buchlandkarteMethods = {
           y: { min: -1, max: 1, grid: { color: gridLine }, ticks: { display: false }, title: { display: false } },
         },
       },
-    });
+    }));
     // Für Screenreader und als Titel-Attribut: das Canvas selbst ist stumm.
     canvas.setAttribute('aria-label', t('buchlandkarte.canvasAria', { n: res.pages.length }));
   },

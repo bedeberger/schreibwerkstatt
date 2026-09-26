@@ -3,7 +3,7 @@
 // (`showAdminLogsCard`) im Root.
 
 import { adminLogsMethods, ADMIN_LOGS_LEVELS } from '../admin/admin-logs.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerAdminLogsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -22,8 +22,7 @@ export function registerAdminLogsCard() {
     adminLogsOldestTs: null,
     adminLogsExpanded: {},
     adminLogsLevels: ADMIN_LOGS_LEVELS,
-    _onViewReset: null,
-    _onBookChanged: null,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showAdminLogsCard, async (visible) => {
@@ -33,19 +32,20 @@ export function registerAdminLogsCard() {
           this._adminLogsLeave();
         }
       });
-      this._onViewReset = () => {
-        this._adminLogsLeave();
-        this.adminLogsEntries = [];
-        this.adminLogsError = '';
-        this.adminLogsExpanded = {};
-        this.adminLogsInitialized = false;
-      };
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle = setupCardLifecycle(this, {
+        onViewReset: () => {
+          this._adminLogsLeave();
+          this.adminLogsEntries = [];
+          this.adminLogsError = '';
+          this.adminLogsExpanded = {};
+          this.adminLogsInitialized = false;
+        },
+      });
     },
 
     destroy() {
       this._adminLogsLeave();
-      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle?.destroy();
     },
 
     ...adminLogsMethods,

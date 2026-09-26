@@ -3,7 +3,7 @@
 
 import { adminSettingsMethods } from '../admin/admin-settings.js';
 import { adminAiProfilesMethods } from '../admin/admin-ai-profiles.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerAdminSettingsCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -37,7 +37,7 @@ export function registerAdminSettingsCard() {
     adminApiTokensNewExpiresAt: '',
     adminApiTokensJustCreated: null,
 
-    _onViewReset: null,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showAdminSettingsCard, async (visible) => {
@@ -49,15 +49,16 @@ export function registerAdminSettingsCard() {
       this.$watch('adminSettingsProviderSubtab', (t) => {
         if (t === 'profiles' && !this.adminProfilesList.length) this.adminProfilesLoad();
       });
-      this._onViewReset = () => {
-        this.adminSettingsError = '';
-        this.adminSettingsTestResult = null;
-      };
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle = setupCardLifecycle(this, {
+        onViewReset: () => {
+          this.adminSettingsError = '';
+          this.adminSettingsTestResult = null;
+        },
+      });
     },
 
     destroy() {
-      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle?.destroy();
     },
 
     ...adminSettingsMethods,

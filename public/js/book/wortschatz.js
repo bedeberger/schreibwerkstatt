@@ -9,6 +9,7 @@
 
 import { formatNumber, localeTag, tzOpts } from '../utils.js';
 import { startPoll } from '../cards/job-helpers.js';
+import { tRaw } from '../i18n.js';
 
 // Kein `get x()` in diesem gespreadeten Modul — Spread würde Getter beim Mount
 // mit falschem `this` auslösen. Reine Getter leben inline im Karten-Literal.
@@ -43,20 +44,20 @@ export const wortschatzMethods = {
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.jobId) {
         this.wortschatzLoading = false;
-        this.wortschatzStatus = window.__app?.t?.('wortschatz.error') || 'Fehler';
+        this.wortschatzStatus = tRaw('wortschatz.error');
         return;
       }
       this._pollWortschatz(j.jobId);
     } catch (e) {
       this.wortschatzLoading = false;
-      this.wortschatzStatus = e.message || 'error';
+      this.wortschatzStatus = tRaw('common.errorColon') + (e.message || '');
     }
   },
 
   _pollWortschatz(jobId) {
     const failed = () => {
       this.wortschatzLoading = false;
-      this.wortschatzStatus = window.__app?.t?.('wortschatz.error') || 'Fehler';
+      this.wortschatzStatus = tRaw('wortschatz.error');
     };
     startPoll(this, {
       timerProp: '_wortschatzPollTimer',
@@ -78,7 +79,7 @@ export const wortschatzMethods = {
   // „gemessen, Ergebnis null", null heisst „nicht messbar" (Text zu kurz für
   // MTLD/Heaps). Zahlen über die geteilte SSoT, nicht handgerollt.
   wsNum(v, decimals = 0) {
-    return formatNumber(v == null ? null : Number(v), window.__app?.uiLocale, decimals);
+    return formatNumber(v == null ? null : Number(v), Alpine.store('shell').uiLocale, decimals);
   },
 
   wsPercent(v, decimals = 1) {
@@ -112,7 +113,7 @@ export const wortschatzMethods = {
     if (!at) return '';
     const d = new Date(at);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleString(localeTag(window.__app?.uiLocale), tzOpts({
+    return d.toLocaleString(localeTag(Alpine.store('shell').uiLocale), tzOpts({
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     }));
   },

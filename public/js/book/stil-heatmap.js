@@ -10,7 +10,9 @@
 // darin die Min/Max-Skala ueber alle Kapitel steckt, wird daraus O(Kapitel^2).
 // Das Template liest darum ausschliesslich fertige Eigenschaften.
 
-import { fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy, tzOpts } from '../utils.js';
+import { escHtml, fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy, tzOpts } from '../utils.js';
+import { isSelectedBook } from '../cards/book-guard.js';
+import { memoMethods } from '../cards/card-memo.js';
 
 // Metrik-Schlüssel → i18n-Label. Reihenfolge = Spaltenreihenfolge in der Heatmap.
 // sampleBucket: Eimer im Drilldown-Endpunkt (/history/style-samples) bzw.
@@ -87,18 +89,8 @@ export function buildStilRows(chapters, uiLocale) {
 export const stilMethods = {
   get stilMetricDefs() { return STIL_METRICS; },
 
-  // Einziger Memo-Helper der Karte (siehe CLAUDE.md „Memo-Pattern"). Deps werden
-  // flach per === verglichen; `_memos` wird beim Reset der Karte geleert.
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js); `_memos` wird beim Reset der Karte geleert.
+  ...memoMethods,
 
   // Der Server entscheidet, ob nachgerechnet werden muss — er kennt
   // lib/page-index.js#METRICS_VERSION. Das Frontend hält bewusst keine Kopie
@@ -129,12 +121,14 @@ export const stilMethods = {
     this.stilLoading = true;
     try {
       const data = await fetchJson('/history/style-stats/' + bookId);
+      if (!isSelectedBook(bookId)) return;
       this.stilData = data;
       this.activeStilDetailKey = null;
       this.stilDetail = null;
     } catch (e) {
+      if (!isSelectedBook(bookId)) return;
       console.error('[loadStilStats]', e);
-      this.stilStatus = window.__app.t('common.errorColon') + (e.message || '');
+      this.stilStatus = window.__app.t('common.errorColon') + escHtml(e.message || '');
     } finally {
       this.stilLoading = false;
     }
@@ -144,13 +138,16 @@ export const stilMethods = {
     if (this.stilSyncing) return;
     this.stilSyncing = true;
     this.stilStatus = `<span class="spinner"></span>${window.__app.t('stil.computing')}`;
+    const bookId = Alpine.store('nav').selectedBookId;
     try {
-      const result = await fetchJson('/sync/book/' + Alpine.store('nav').selectedBookId, { method: 'POST' });
+      const result = await fetchJson('/sync/book/' + bookId, { method: 'POST' });
       if (result.error) throw new Error(result.error);
-      await this.loadStilStats(Alpine.store('nav').selectedBookId);
+      if (!isSelectedBook(bookId)) { this.stilStatus = ''; return; }
+      await this.loadStilStats(bookId);
       this.stilStatus = '';
     } catch (e) {
-      this.stilStatus = window.__app.t('common.errorColon') + (e.message || '');
+      if (!isSelectedBook(bookId)) { this.stilStatus = ''; return; }
+      this.stilStatus = window.__app.t('common.errorColon') + escHtml(e.message || '');
     } finally {
       this.stilSyncing = false;
     }

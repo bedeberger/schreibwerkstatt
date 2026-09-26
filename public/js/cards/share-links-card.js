@@ -6,9 +6,10 @@
 // Kommentar-Leiste verankerte UND allgemeine Threads zeigt und voll bedienbar ist.
 
 import { setupCardLifecycle } from './card-lifecycle.js';
-import { fetchJson, tzOpts } from '../utils.js';
+import { fetchJson, localeTag, tzOpts } from '../utils.js';
 import { copyText } from '../copy-button.js';
 import { EVT } from '../events.js';
+import { isSelectedBook } from './book-guard.js';
 
 export function registerShareLinksCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -159,6 +160,7 @@ export function registerShareLinksCard() {
       try {
         rows = await fetchJson(`/share/api/links?book_id=${encodeURIComponent(bookId)}`);
       } catch { return; }
+      if (!isSelectedBook(bookId)) return;
       if (!Array.isArray(rows)) return;
       const byToken = new Map(this.links.map(l => [l.token, l]));
       const sameSet = rows.length === this.links.length && rows.every(r => byToken.has(r.token));
@@ -192,9 +194,10 @@ export function registerShareLinksCard() {
     },
 
     targetLabel(link) {
-      if (link.kind === 'page') return link.page_name || `Page #${link.page_id}`;
-      if (link.kind === 'book') return link.book_name || window.__app.selectedBookName || window.__app.t('share.target.book');
-      return link.chapter_name || `Chapter #${link.chapter_id}`;
+      const app = window.__app;
+      if (link.kind === 'page') return link.page_name || app.t('share.target.pageFallback', { id: link.page_id });
+      if (link.kind === 'book') return link.book_name || app.selectedBookName || app.t('share.target.book');
+      return link.chapter_name || app.t('share.target.chapterFallback', { id: link.chapter_id });
     },
 
     pageOptions() {
@@ -367,7 +370,7 @@ export function registerShareLinksCard() {
       if (!iso) return '';
       try {
         const d = new Date(iso);
-        return d.toLocaleString(Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH', tzOpts({
+        return d.toLocaleString(localeTag(Alpine.store('shell').uiLocale), tzOpts({
           dateStyle: 'medium',
           timeStyle: 'short',
         }));
@@ -453,7 +456,7 @@ export function registerShareLinksCard() {
     // Intl.RelativeTimeFormat. Unter 1 Minute auf 1 geklemmt, damit nie
     // „in 0 Minuten" erscheint.
     _relFuture(d) {
-      const tag = Alpine.store('shell').uiLocale === 'en' ? 'en-US' : 'de-CH';
+      const tag = localeTag(Alpine.store('shell').uiLocale);
       const rtf = new Intl.RelativeTimeFormat(tag, { numeric: 'auto' });
       const diffMin = Math.round((d.getTime() - Date.now()) / 60000);
       if (diffMin < 60) return rtf.format(Math.max(diffMin, 1), 'minute');

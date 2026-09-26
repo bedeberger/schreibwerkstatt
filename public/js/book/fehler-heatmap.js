@@ -2,35 +2,27 @@
 // Daten kommen live aus /history/fehler-heatmap/:book_id — kein KI-Call, keine Sync-Phase.
 // Methoden werden in Alpine.data('fehlerHeatmapCard') gespreadet; Root-Zugriffe via window.__app.
 
-import { fetchJson, formatNumber, heatmapCellVars, minMaxBy, tzOpts } from '../utils.js';
+import { escHtml, fetchJson, formatNumber, heatmapCellVars, localeTag, minMaxBy, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
+import { isSelectedBook } from '../cards/book-guard.js';
+import { createChartHolder, cssVar } from '../cards/chart-holder.js';
+import { memoMethods } from '../cards/card-memo.js';
 
-const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 // Chart.js-Instanz + Theme-Observer als Modul-State (ausserhalb Alpines Proxy,
 // der die Chart-Instanz sonst beschädigt) — analog bookstats.js.
-let _trendChart = null;
-let _trendThemeObserver = null;
+const _trend = createChartHolder();
 
 function _ensureTrendThemeObserver(component) {
-  if (_trendThemeObserver) return;
-  _trendThemeObserver = new MutationObserver(() => {
-    if (!_trendChart || !window.__app.showFehlerHeatmapCard) return;
+  _trend.ensureThemeRedraw(() => {
+    if (!window.__app.showFehlerHeatmapCard) return;
     component.renderFehlerTrendChart();
   });
-  _trendThemeObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['data-theme'],
-  });
 }
 
-export function _disconnectFehlerTrendThemeObserver() {
-  if (_trendThemeObserver) { _trendThemeObserver.disconnect(); _trendThemeObserver = null; }
-}
+export function _disconnectFehlerTrendThemeObserver() { _trend.disconnect(); }
 
-export function _destroyFehlerTrendChart() {
-  if (_trendChart) { _trendChart.destroy(); _trendChart = null; }
-}
+export function _destroyFehlerTrendChart() { _trend.destroy(); }
 
 // Cluster-Gruppierung der Typen-Spalten. Reihenfolge in den Cluster-Arrays = Spalten-Reihenfolge.
 // Muss alle Typen aus ALLE_LEKTORAT_TYPEN (public/js/prompts/lektorat-typen.js) abdecken —
@@ -66,33 +58,30 @@ export const fehlerHeatmapMethods = {
   // Beginnt an dieser Spalte ein neues Cluster? (→ Trennlinie)
   fehlerHeatmapIsClusterStart(idx) { return FEHLER_CLUSTER_STARTS.has(idx); },
 
-  // Ein Memo-Helper pro Modul (CLAUDE.md): Cache mit shallow-Array-Deps-
-  // Vergleich (`===`). Reset ueber this._memos = {} im Lade-Pfad.
-  _memo(key, deps, compute) {
-    const memos = (this._memos ||= {});
-    const hit = memos[key];
-    if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
-      return hit.value;
-    }
-    const value = compute();
-    memos[key] = { deps: [...deps], value };
-    return value;
-  },
+  // Memo-Helper (cards/card-memo.js); Reset über this._memos = {} im Lade-Pfad.
+  ...memoMethods,
 
   async loadFehlerHeatmap() {
-    if (!Alpine.store('nav').selectedBookId) return;
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId) return;
+    // Nur die jüngste Anfrage darf schreiben: Modus-Wechsel und Buchwechsel
+    // können eine ältere, langsamere Antwort überholen lassen.
+    const seq = ++this._fehlerHeatmapSeq;
+    const current = () => seq === this._fehlerHeatmapSeq && isSelectedBook(bookId);
     this.fehlerHeatmapLoading = true;
     this.fehlerHeatmapStatus = '';
     this._memos = {};
     try {
       const mode = MODES.includes(this.fehlerHeatmapMode) ? this.fehlerHeatmapMode : 'open';
-      const data = await fetchJson(`/history/fehler-heatmap/${Alpine.store('nav').selectedBookId}?mode=${mode}`);
+      const data = await fetchJson(`/history/fehler-heatmap/${bookId}?mode=${mode}`);
+      if (!current()) return;
       this.fehlerHeatmapData = data;
     } catch (e) {
+      if (!current()) return;
       console.error('[loadFehlerHeatmap]', e);
-      this.fehlerHeatmapStatus = window.__app.t('common.errorColon') + (e.message || '');
+      this.fehlerHeatmapStatus = window.__app.t('common.errorColon') + escHtml(e.message || '');
     } finally {
-      this.fehlerHeatmapLoading = false;
+      if (seq === this._fehlerHeatmapSeq) this.fehlerHeatmapLoading = false;
     }
   },
 
@@ -108,11 +97,14 @@ export const fehlerHeatmapMethods = {
 
   // ── Fehlerdichte-Trend über die Fassungen ─────────────────────────────────
   async loadFehlerTrend() {
-    if (!Alpine.store('nav').selectedBookId) return;
+    const bookId = Alpine.store('nav').selectedBookId;
+    if (!bookId) return;
     try {
-      const data = await fetchJson(`/history/fehler-trend/${Alpine.store('nav').selectedBookId}`);
+      const data = await fetchJson(`/history/fehler-trend/${bookId}`);
+      if (!isSelectedBook(bookId)) return;
       this.fehlerTrendData = data?.versions || [];
     } catch (e) {
+      if (!isSelectedBook(bookId)) return;
       console.error('[loadFehlerTrend]', e);
       this.fehlerTrendData = [];
     }
@@ -158,7 +150,7 @@ export const fehlerHeatmapMethods = {
     _destroyFehlerTrendChart();
 
     const points = this._fehlerTrendPoints();
-    const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
+    const tag = localeTag(Alpine.store('shell').uiLocale);
     const labels = points.map(v => v.label || window.__app.t('fehlerHeatmap.trend.versionLabel', { n: v.seq }));
     const data = points.map(v => this._fehlerTrendPer1k(v));
 
@@ -168,7 +160,7 @@ export const fehlerHeatmapMethods = {
 
     _ensureTrendThemeObserver(this);
 
-    _trendChart = new window.Chart(canvas, {
+    _trend.set(new window.Chart(canvas, {
       type: 'line',
       data: {
         labels,
@@ -196,7 +188,7 @@ export const fehlerHeatmapMethods = {
               title: (items) => {
                 const v = points[items[0]?.dataIndex];
                 if (!v) return '';
-                const when = v.created_at ? new Date(v.created_at).toLocaleDateString(localeTag, tzOpts({ day: '2-digit', month: '2-digit', year: '2-digit' })) : '';
+                const when = v.created_at ? new Date(v.created_at).toLocaleDateString(tag, tzOpts({ day: '2-digit', month: '2-digit', year: '2-digit' })) : '';
                 return when ? `${items[0].label} · ${when}` : items[0].label;
               },
               label: (ctx) => {
@@ -220,7 +212,7 @@ export const fehlerHeatmapMethods = {
           },
         },
       },
-    });
+    }));
   },
 
   fehlerHeatmapChapterKey(ch) {

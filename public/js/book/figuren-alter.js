@@ -253,7 +253,7 @@ export const figurenAlterMethods = {
     if (Number.isNaN(d.getTime())) return '';
     // Datums-Anzeige ausschliesslich ueber den geteilten Formatter (harte Regel
     // „Frontend-Datums-Display: nur via tzOpts") — dateTimeFormat merged es.
-    const date = dateTimeFormat(window.__app?.uiLocale, { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+    const date = dateTimeFormat(Alpine.store('shell').uiLocale, { dateStyle: 'medium', timeStyle: 'short' }).format(d);
     return this._t('common.asOf', { date });
   },
 

@@ -18,6 +18,7 @@ import {
   buildTimelineItems, timelineBounds, layoutBandItems, bandAxisTicks, buildBandModel,
 } from './ereignisse/band.js';
 import { normalizeEvent, normalizeEvents, compareEvents, sortEvents } from './ereignisse/model.js';
+import { memoMethods } from './card-memo.js';
 
 export { hasEventYear, formatEventDateParts };
 export { subtypIcon, bandMarkerColor, eventSpanYears, POINT_SUBTYPES };
@@ -123,19 +124,8 @@ export function registerEreignisseCard() {
       this._lifecycle?.destroy();
     },
 
-    // Ein Memo-Helper pro Modul (CLAUDE.md): Cache mit shallow-Array-Deps-
-    // Vergleich (`===`). Cache hit nur wenn ALLE Deps identisch zur letzten
-    // Compute. Reset über this._memos = {} (load-Pfad).
-    _memo(key, deps, compute) {
-      const memos = (this._memos ||= {});
-      const hit = memos[key];
-      if (hit && hit.deps.length === deps.length && hit.deps.every((d, i) => d === deps[i])) {
-        return hit.value;
-      }
-      const value = compute();
-      memos[key] = { deps: [...deps], value };
-      return value;
-    },
+    // Memo-Helper (cards/card-memo.js); Reset über this._memos = {} (load-Pfad).
+    ...memoMethods,
 
     // UI-Helper. Lesen $root-Filter + -Daten.
     ereignisseKapitelListe() {

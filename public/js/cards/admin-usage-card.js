@@ -3,7 +3,7 @@
 // (`showAdminUsageCard`) im Root.
 
 import { adminUsageMethods } from '../admin/admin-usage.js';
-import { EVT } from '../events.js';
+import { setupCardLifecycle } from './card-lifecycle.js';
 
 export function registerAdminUsageCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -63,7 +63,7 @@ export function registerAdminUsageCard() {
     adminUsageTimeSeries: [],
     adminUsageTimeSeriesKey: '',
 
-    _onViewReset: null,
+    _lifecycle: null,
 
     init() {
       this.$watch(() => window.__app.showAdminUsageCard, async (visible) => {
@@ -94,16 +94,17 @@ export function registerAdminUsageCard() {
         this.adminUsageChatOffset = 0;
         if (this.adminUsageTab === 'jobs' || this.adminUsageTab === 'chat') this.adminUsageLoadTab();
       });
-      this._onViewReset = () => {
-        this.adminUsageError = '';
-        this.adminUsageTimeSeries = [];
-        this.adminUsageTimeSeriesKey = '';
-      };
-      window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle = setupCardLifecycle(this, {
+        onViewReset: () => {
+          this.adminUsageError = '';
+          this.adminUsageTimeSeries = [];
+          this.adminUsageTimeSeriesKey = '';
+        },
+      });
     },
 
     destroy() {
-      if (this._onViewReset) window.removeEventListener(EVT.VIEW_RESET, this._onViewReset);
+      this._lifecycle?.destroy();
       this._adminUsageDestroyCharts();
     },
 

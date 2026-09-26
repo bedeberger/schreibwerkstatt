@@ -7,9 +7,10 @@
 // im `loadXxx`/`resetXxx` der Karte) — ein Reset einzelner Keys gibt es
 // bewusst nicht, weil die Deps ohnehin die feinere Invalidierung tragen.
 //
-// Konsumenten: `bookOverviewCard` (via book-overview/load.js),
-// `kapitelReviewCard` (via cards/kapitel-dashboard.js). Beide spreaden das
-// Objekt in ihre Alpine-Komponente; der Speicher `_memos` lebt pro Instanz.
+// Einzige Implementierung: Karten und Fachmodule spreaden `...memoMethods` in
+// ihr Methods-Objekt bzw. ihre Alpine-Komponente, statt `_memo` lokal
+// nachzubauen (gegated: tests/unit/dedup-tripwire.test.mjs). Der Speicher
+// `_memos` lebt pro Instanz.
 export const memoMethods = {
   _memo(key, deps, compute) {
     const memos = (this._memos ||= {});

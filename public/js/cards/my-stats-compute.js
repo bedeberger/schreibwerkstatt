@@ -268,14 +268,18 @@ export function computeReadability(historyRows, todayLocal = new Date()) {
   };
 }
 
-// Geschriebene Zeichen diese Woche vs. letzte Woche (Mo-Start, lokal).
+// Geschriebene Zeichen diese Woche vs. letzte Woche (Mo-Start, App-Zeitzone).
 // chars im Snapshot ist die Gesamtgroesse → Zuwachs = Differenz der
 // Wochengrenz-Snapshots. Basis je Buch = letzter Snapshot vor Wochenbeginn.
+// Wochentag + Grenzdaten aus dem App-TZ-Datum von heute, gerechnet auf dem
+// UTC-Mittag dieses Datums (UTC kennt keine DST → exakte Tagesschritte);
+// getDay() der Browser-TZ läge westlich/östlich der App-TZ einen Tag daneben.
 export function computeWeeklyDelta(historyRows, todayLocal = new Date()) {
-  const today = new Date(todayLocal); today.setHours(12, 0, 0, 0);
-  const dowMon = (today.getDay() + 6) % 7;            // Mo=0 ... So=6
-  const cThisBase = localIsoDaysAgo(dowMon + 1, today); // Sonntag vor dieser Woche
-  const cLastBase = localIsoDaysAgo(dowMon + 8, today); // Sonntag vor letzter Woche
+  const noonUtc = Date.parse(localIsoDate(new Date(todayLocal)) + 'T12:00:00Z');
+  const dowMon = (new Date(noonUtc).getUTCDay() + 6) % 7; // Mo=0 ... So=6
+  const isoMinus = (n) => new Date(noonUtc - n * 86400000).toISOString().slice(0, 10);
+  const cThisBase = isoMinus(dowMon + 1); // Sonntag vor dieser Woche
+  const cLastBase = isoMinus(dowMon + 8); // Sonntag vor letzter Woche
 
   const cur = latestSnapshotPerBook(historyRows);
   const thisBase = snapshotPerBookOnOrBefore(historyRows, cThisBase);

@@ -6299,5 +6299,7 @@
   "bookEditor.loadFailed": "Could not load the book contents.",
   "share.comments.replyFailed": "Could not send the reply.",
   "share.comments.resolveFailed": "Could not change the comment status.",
-  "share.comments.deleteFailed": "Could not delete the comment."
+  "share.comments.deleteFailed": "Could not delete the comment.",
+  "share.target.pageFallback": "Page #{id}",
+  "share.target.chapterFallback": "Chapter #{id}"
 }

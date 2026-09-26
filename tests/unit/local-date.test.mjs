@@ -61,3 +61,15 @@ test('Bug-Sentinel: lokal-Mitternacht in CET ≠ UTC-Vortag', () => {
   assert.equal(localSlice, '2026-05-04');
   // utcSlice driftet je nach Test-Runner-TZ; nur localSlice ist stabil.
 });
+
+test('localDayDiff: Kalendertage in App-TZ (Europe/Zurich), nicht Browser-TZ', async () => {
+  const { localDayDiff } = await import('../../public/js/utils.js');
+  const now = new Date('2026-05-04T08:00:00+02:00'); // Mo 08:00 Zurich
+  assert.equal(localDayDiff(new Date('2026-05-04T00:30:00+02:00'), now), 0);
+  // So 23:30 Zurich = So 21:30 UTC → gestern, obwohl < 24h
+  assert.equal(localDayDiff(new Date('2026-05-03T23:30:00+02:00'), now), 1);
+  // Mo 00:30 Zurich = So 22:30 UTC: in einer UTC-Browser-TZ wäre das „gestern"
+  assert.equal(localDayDiff('2026-05-03T22:30:00Z', now), 0);
+  assert.equal(localDayDiff(new Date('2026-04-04T12:00:00Z'), now), 30);
+  assert.ok(Number.isNaN(localDayDiff('kaputt', now)));
+});
