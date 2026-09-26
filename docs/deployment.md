@@ -4,7 +4,7 @@ Ausführliche Anleitung für den Betrieb und das Selbst-Hosting von Schreibwerks
 
 ## Voraussetzungen
 
-- Node.js v20–25 (`engines: >=20 <26`; Node 26 noch nicht unterstützt: better-sqlite3 11.x baut nicht gegen das V8 in Node 26 — Bump auf 12.x ausstehend). Empfohlen: `.nvmrc` (Node 24).
+- Node.js v22–25 (`engines: >=22 <26`; Node 20 ist EOL, und `npm test` übergibt Globs an `node --test` (erst ab Node 21); Node 26 noch nicht unterstützt: better-sqlite3 11.x baut nicht gegen das V8 in Node 26 — Bump auf 12.x ausstehend). Empfohlen: `.nvmrc` (Node 24).
 - Öffentliche HTTPS-URL (Reverse-Proxy mit TLS) für Produktion.
 - Login-Pfad: **Admin-Bootstrap** (Email+Passwort via ENV) und/oder **Google OAuth2** (Callback `https://<domain>/auth/callback`). Mindestens einer muss konfiguriert sein.
 

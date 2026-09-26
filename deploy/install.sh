@@ -15,8 +15,8 @@ echo ""
 
 # Node.js prüfen
 if ! command -v node &>/dev/null; then
-  echo "Node.js nicht gefunden. Installiere Node.js 20..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  echo "Node.js nicht gefunden. Installiere Node.js 22 (LTS)..."
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
 else
   NODE_VER=$(node -v)

@@ -146,8 +146,8 @@ apt-get update -qq
 apt-get install -y -qq curl ca-certificates sqlite3 git >/dev/null
 
 if ! command -v node &>/dev/null; then
-  echo "→ Node.js 20 installieren…"
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null
+  echo "→ Node.js 22 (LTS) installieren…"
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
   apt-get install -y -qq nodejs >/dev/null
 fi
 echo "  Node: $(node -v)"
