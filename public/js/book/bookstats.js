@@ -3,11 +3,11 @@
 
 import { escHtml, fetchJson, localIsoDaysAgo, tzOpts } from '../utils.js';
 import { loadChart } from '../lazy-libs.js';
+import { createChartHolder, cssVar } from '../cards/chart-holder.js';
 import {
   computeAvgSummary, metricKind, rollingSeries, rollingWindowForRange, trendSeries,
 } from './bookstats-avg.js';
 
-const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 // Chart-Labels kommen zur Render-Zeit über t() (siehe _metricLabel()), damit sie
 // bei Sprachwechsel live nachgezogen werden.
@@ -41,30 +41,19 @@ const CUMULATIVE_METRICS = new Set(['writing_cumulative', 'lektorat_cumulative',
 
 // Ausserhalb von Alpine gespeichert, damit die Chart.js-Instanz nicht durch
 // Alpines Reaktivitäts-Proxy beschädigt wird.
-let _statsChart = null;
-let _themeObserver = null;
+const _stats = createChartHolder();
 
 function _ensureThemeObserver(component) {
-  if (_themeObserver) return;
-  _themeObserver = new MutationObserver(() => {
-    if (!_statsChart || !window.__app?.showBookStatsCard) return;
-    _statsChart.destroy();
-    _statsChart = null;
+  _stats.ensureThemeRedraw(() => {
+    if (!window.__app?.showBookStatsCard) return;
+    _stats.destroy();
     component.renderStatsChart();
   });
-  _themeObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['data-theme'],
-  });
 }
 
-export function _disconnectThemeObserver() {
-  if (_themeObserver) { _themeObserver.disconnect(); _themeObserver = null; }
-}
+export function _disconnectThemeObserver() { _stats.disconnect(); }
 
-export function _destroyStatsChart() {
-  if (_statsChart) { _statsChart.destroy(); _statsChart = null; }
-}
+export function _destroyStatsChart() { _stats.destroy(); }
 
 // Badge-Texte der Ø-Zeile. Bestandsgrössen zeigen den Ø-ZUWACHS (mit Vorzeichen),
 // Tagesmengen die Ø-Menge pro Kalendertag plus Σ und Ø je aktivem Tag,
@@ -183,7 +172,7 @@ export const bookstatsMethods = {
     // neuen Canvas-Dimensionen ein — nach einem display:none↔block-Wechsel
     // (Buchwechsel: bookStatsData = [] → = rows) bleibt das Diagramm sonst
     // mit stale Dimensionen leer, bis ein Reflow nachzieht.
-    if (_statsChart) { _statsChart.destroy(); _statsChart = null; }
+    _stats.destroy();
 
     const metric = this.bookStatsMetric;
     const isWriting  = WRITING_METRICS.has(metric);
@@ -324,7 +313,7 @@ export const bookstatsMethods = {
 
     _ensureThemeObserver(this);
 
-    _statsChart = new Chart(canvas, {
+    _stats.set(new Chart(canvas, {
       type: 'line',
       data: { labels, datasets },
       options: {
@@ -362,6 +351,6 @@ export const bookstatsMethods = {
           },
         },
       },
-    });
+    }));
   },
 };

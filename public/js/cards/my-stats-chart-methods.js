@@ -8,10 +8,10 @@
 // bookstats.js). Sie sind darum an dieses Modul gebunden und werden nur ueber
 // die hier exportierten Methoden angefasst.
 import { loadChart } from '../lazy-libs.js';
-import { tzOpts } from '../utils.js';
+import { localeTag, tzOpts } from '../utils.js';
+import { createChartHolder, cssVar } from './chart-holder.js';
 import { bucketizeIso, aggregateByBucket } from './my-stats-compute.js';
 
-const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 // Chart-Metriken: content aus book_stats_history (Summe pro Tag), writing aus
 // writing_time. Label-Keys werden zur Render-Zeit via t() aufgeloest (Locale-live).
@@ -34,30 +34,24 @@ export const BOOK_COLORS = [
   '#6aaf4e', '#b06ad0', '#d98f5e', '#4e8fd0',
 ];
 
-let _chart = null;
-let _themeObserver = null;
+const _holder = createChartHolder();
 
 export const myStatsChartMethods = {
   // Vom destroy() der Karte gerufen: Modul-State freigeben, sonst ueberlebt der
   // Observer das Unmount und rendert in ein totes Canvas.
   _disconnectMyStatsThemeObserver() {
-    if (_themeObserver) { _themeObserver.disconnect(); _themeObserver = null; }
+    _holder.disconnect();
   },
 
   _destroyChart() {
-    if (_chart) { _chart.destroy(); _chart = null; }
+    _holder.destroy();
   },
 
   _ensureThemeObserver() {
-    if (_themeObserver) return;
-    _themeObserver = new MutationObserver(() => {
-      if (!_chart || !window.__app.showMyStatsCard) return;
-      _chart.destroy();
-      _chart = null;
+    _holder.ensureThemeRedraw(() => {
+      if (!window.__app.showMyStatsCard) return;
+      _holder.destroy();
       this.renderMyStatsChart();
-    });
-    _themeObserver.observe(document.documentElement, {
-      attributes: true, attributeFilter: ['data-theme'],
     });
   },
 
@@ -81,7 +75,7 @@ export const myStatsChartMethods = {
       }
     }
     // Immer frisch aufbauen (Update-Pfad liest keine neuen Canvas-Dimensionen).
-    if (_chart) { _chart.destroy(); _chart = null; }
+    _holder.destroy();
 
     const metric = this.myStatsMetric;
     // Zeit-Metriken (Schreib- bzw. Lektoratszeit) sind Tages-Deltas in Sekunden;
@@ -135,9 +129,9 @@ export const myStatsChartMethods = {
     // X-Achse = sortierte eindeutige Buckets über alle Bücher.
     const buckets = [...new Set(rows.map(r => bucketizeIso(r.date, gran)))].sort();
 
-    const localeTag = (Alpine.store('shell').uiLocale === 'en') ? 'en-US' : 'de-CH';
+    const tag = localeTag(Alpine.store('shell').uiLocale);
     const labels = buckets.map(b => {
-      if (gran === 'month') return new Date(b + 'T12:00:00').toLocaleDateString(localeTag, tzOpts({ month: 'short', year: '2-digit' }));
+      if (gran === 'month') return new Date(b + 'T12:00:00').toLocaleDateString(tag, tzOpts({ month: 'short', year: '2-digit' }));
       const [y, m, dd] = b.split('-');
       return `${dd}.${m}.${y.slice(2)}`;
     });
@@ -209,7 +203,7 @@ export const myStatsChartMethods = {
 
     this._ensureThemeObserver();
 
-    _chart = new window.Chart(canvas, {
+    _holder.set(new window.Chart(canvas, {
       type: 'line',
       data: { labels, datasets },
       options: {
@@ -237,6 +231,6 @@ export const myStatsChartMethods = {
           },
         },
       },
-    });
+    }));
   },
 };
