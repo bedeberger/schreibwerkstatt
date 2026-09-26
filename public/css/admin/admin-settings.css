@@ -234,28 +234,6 @@
   opacity: 0.85;
 }
 
-.admin-settings-sweep {
-  display: grid;
-  gap: var(--space-md);
-  padding: var(--space-lg);
-  margin-top: var(--space-lg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-tag-bg);
-}
-
-.admin-settings-sweep h4 {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--color-text);
-}
-
-.admin-settings-sweep p {
-  margin: 0;
-  font-size: var(--font-size-sm);
-}
-
 /* API-Tab: Token-Liste, Plain-Token-Reveal, Scrape-Snippets */
 .admin-api-tokens-table {
   width: 100%;
@@ -388,8 +366,7 @@
     flex-shrink: 0;
     padding: var(--space-sm) var(--space-md);
   }
-  .admin-settings-subsection,
-  .admin-settings-sweep {
+  .admin-settings-subsection {
     padding: var(--space-md);
   }
   .admin-settings-actions { flex-wrap: wrap; }
