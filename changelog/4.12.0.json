@@ -1,0 +1,66 @@
+{
+  "version": "4.12.0",
+  "date": "2026-09-27",
+  "entries": [
+    {
+      "kind": "verbessert",
+      "de": "Offline-Arbeit: Sobald die Verbindung zurück ist, meldet die App, wie viele offline bearbeitete Seiten gespeichert wurden und bei welchen es einen Konflikt gab.",
+      "en": "Offline work: once the connection is back, the app reports how many pages edited offline were saved and which ones ran into a conflict."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Faktencheck: Konnte die KI ein Urteil nicht vollständig abgeben, zählt die Aussage nicht mehr als geprüft. Ein Hinweis nennt, wie viele Aussagen offen geblieben sind.",
+      "en": "Fact check: if the AI could not finish a verdict, the statement no longer counts as checked. A notice shows how many statements were left open."
+    },
+    {
+      "kind": "verbessert",
+      "de": "KI-Antworten, die mitten in der Ausgabe ins Zeitlimit laufen, werden jetzt automatisch erneut versucht und zeigen sonst eine verständliche Fehlermeldung.",
+      "en": "AI replies that hit the time limit mid-answer are now retried automatically and otherwise show an understandable error message."
+    },
+    {
+      "kind": "behoben",
+      "de": "Seiten-Editor: Wer während des Speicherns zu einer anderen Seite wechselte, konnte den Text der alten Seite in die neue schreiben. Jede Seite speichert jetzt nur noch in sich selbst.",
+      "en": "Page editor: switching pages while saving could write the old page's text into the new one. Each page now only ever saves into itself."
+    },
+    {
+      "kind": "behoben",
+      "de": "Bucheditor: Beim Wechsel des Buchs oder der Ansicht gehen ungespeicherte Änderungen nicht mehr verloren. Suchen und Ersetzen findet keine Treffer mehr in Diagrammen und Abbildungsnummern.",
+      "en": "Book editor: switching books or views no longer loses unsaved changes. Find and replace no longer matches inside diagrams and figure numbers."
+    },
+    {
+      "kind": "behoben",
+      "de": "Kommentar-Leiste in Leseansicht und Bucheditor: Nach „Erledigt“ passen sich Markierung und Filter sofort an. Scheitert Antworten, Erledigen oder Löschen, erscheint eine Meldung, und der Antwort-Entwurf bleibt stehen.",
+      "en": "Comment rail in reading view and book editor: after “Resolve”, highlight and filter update right away. If replying, resolving or deleting fails, a message appears and the reply draft is kept."
+    },
+    {
+      "kind": "behoben",
+      "de": "Chats: Das Löschen eines anderen Gesprächs bricht eine laufende Antwort nicht mehr ab, und nach dem Löschen bleibt die Eingabe nicht mehr gesperrt. Fehler erscheinen als verständliche Meldung.",
+      "en": "Chats: deleting another conversation no longer cancels a running reply, and the input no longer stays locked afterwards. Errors show as understandable messages."
+    },
+    {
+      "kind": "behoben",
+      "de": "Das Öffnen von Buch-Chat oder Recherche-Chat blendet die Lektorat-Markierungen im Seiten-Editor nicht mehr aus.",
+      "en": "Opening the book chat or research chat no longer hides the proofreading highlights in the page editor."
+    },
+    {
+      "kind": "behoben",
+      "de": "Text-Export: Sonderzeichen wie &, Anführungszeichen und Gedankenstriche erscheinen korrekt statt als Codes wie „&amp;“. Exportierte Dateinamen tragen die Uhrzeit der eingestellten Zeitzone.",
+      "en": "Text export: characters such as &, quotation marks and dashes appear correctly instead of codes like “&amp;”. Exported file names carry the time of the configured time zone."
+    },
+    {
+      "kind": "behoben",
+      "de": "Tagebuch und Statistik: Wochentage, Monate und „heute“/„gestern“ richten sich nach der eingestellten Zeitzone. Die Woche beginnt überall am Montag.",
+      "en": "Diary and statistics: weekdays, months and “today”/“yesterday” follow the configured time zone. The week starts on Monday everywhere."
+    },
+    {
+      "kind": "behoben",
+      "de": "Die farbigen Initialen-Punkte bei Kommentaren, Freigaben und Anwesenheit folgen jetzt dem in der App gewählten hellen oder dunklen Design.",
+      "en": "The coloured initial dots on comments, shares and presence now follow the light or dark theme chosen in the app."
+    },
+    {
+      "kind": "behoben",
+      "de": "Mehr Fehlermeldungen im Bucheditor und in der Buchansicht sind übersetzt, und die Symbol-Knöpfe der Export-Profile sind für Screenreader benannt.",
+      "en": "More error messages in the book editor and book view are translated, and the icon buttons of the export profiles are labelled for screen readers."
+    }
+  ]
+}
