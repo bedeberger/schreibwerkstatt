@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "altcha-lib": "^2.2.0",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^12.11.1",
     "better-sqlite3-session-store": "^0.1.0",
     "compression": "^1.8.1",
     "diff": "^9.0.0",
