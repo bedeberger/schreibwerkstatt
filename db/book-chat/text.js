@@ -1,7 +1,8 @@
 'use strict';
-// Seiten-/Kapitel-Abfragen der textfokussierten Buch-Chat-Tools
+// Abfragen der textfokussierten Buch-Chat-Tools
 // (routes/jobs/book-chat-tools/tools-text.js): Scope-Listen für Passagen- und
-// Dialogsuche, Seiten-/Kapitel-Kopfdaten, Orts-Erwähnungen je Kapitel. Den
+// Dialogsuche, Seiten-/Kapitel-Kopfdaten, jüngster Seiten-Check, Orts-Lookup
+// und Orts-Erwähnungen je Kapitel. Das Tool führt selbst kein SQL aus. Den
 // Seitentext selbst lädt das Tool über die Content-Store-Facade; Handler fassen
 // `pages`/`chapters`/`books` nie selbst an (CLAUDE.md „Content-Store-Facade als
 // einziger Eintrittspunkt"). Optionale Filter werden hier ans SQL gehängt.
@@ -82,6 +83,28 @@ function listPagesForDialogue(bookId, { chapterId = null, pageId = null } = {}) 
   return db.prepare(sql).all(...params);
 }
 
+const _stmtLatestPageCheck = db.prepare(`
+    SELECT checked_at, error_count, fazit, stilanalyse, model
+    FROM page_checks
+    WHERE page_id = ? AND user_email IS ?
+    ORDER BY checked_at DESC
+    LIMIT 1
+  `);
+
+/** Jüngster Lektorat-Check einer Seite für einen User (NULL-sicher). */
+function getLatestPageCheck(pageId, userEmail) {
+  return _stmtLatestPageCheck.get(pageId, userEmail);
+}
+
+const _stmtLocationRefByLocId = db.prepare(
+    'SELECT id, loc_id, name FROM locations WHERE book_id = ? AND user_email IS ? AND loc_id = ?'
+  );
+
+/** Ort (id, loc_id, name) per loc_id, gescoped auf (Buch, User). */
+function getLocationRefByLocId(bookId, userEmail, locId) {
+  return _stmtLocationRefByLocId.get(bookId, userEmail, locId);
+}
+
 const _stmtLocationChapters = db.prepare(`
     SELECT lc.chapter_id, c.chapter_name, lc.haeufigkeit
     FROM location_chapters lc
@@ -101,5 +124,7 @@ module.exports = {
   getChapterInBook,
   listChapterPages,
   listPagesForDialogue,
+  getLatestPageCheck,
+  getLocationRefByLocId,
   listLocationChaptersWithNames,
 };

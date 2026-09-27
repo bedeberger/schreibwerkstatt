@@ -3,11 +3,15 @@
 // Beide bauen auf Subqueries mit MAX(checked_at) bzw. sort_order auf und
 // haengen via Bridge-Tabellen (issue_figures/issue_chapters bzw.
 // event_chapters/event_pages/event_figures) an figures/pages/chapters.
+// Das SQL liegt in db/book-chat/timeline.js.
 
-const { db } = require('../../../db/schema');
-const { inClause } = require('../../../lib/validate');
 const {
+  getLatestContinuityCheck,
+  listContinuityIssuesForCheck,
+  listContinuityIssueFigures,
   listContinuityIssueChapters,
+  listTimelineEvents,
+  listTimelineEventFigures,
   listTimelineEventChapters,
   listTimelineEventPages,
 } = require('../../../db/book-chat/timeline');
@@ -19,13 +23,7 @@ const CONTINUITY_DEFAULT_LIMIT = 30;
 
 function tool_list_continuity_issues(input, ctx) {
   const userEmail = ctx.userEmail || null;
-  const check = db.prepare(`
-    SELECT id, checked_at, summary, model
-    FROM continuity_checks
-    WHERE book_id = ? AND user_email IS ?
-    ORDER BY checked_at DESC
-    LIMIT 1
-  `).get(ctx.bookId, userEmail);
+  const check = getLatestContinuityCheck(ctx.bookId, userEmail);
   if (!check) {
     return {
       issues: [],
@@ -38,12 +36,7 @@ function tool_list_continuity_issues(input, ctx) {
   const chapterFilter = Number.isInteger(input?.chapter_id) ? input.chapter_id           : null;
   const limit = Math.min(100, Math.max(1, Number.isInteger(input?.limit) ? input.limit : CONTINUITY_DEFAULT_LIMIT));
 
-  let issues = db.prepare(`
-    SELECT id, schwere, typ, beschreibung, stelle_a, stelle_b, empfehlung, sort_order
-    FROM continuity_issues
-    WHERE check_id = ?
-    ORDER BY sort_order, id
-  `).all(check.id);
+  let issues = listContinuityIssuesForCheck(check.id);
 
   if (schwereFilter) issues = issues.filter(i => (i.schwere || '').toLowerCase() === schwereFilter);
   if (typFilter)     issues = issues.filter(i => (i.typ || '').toLowerCase()     === typFilter);
@@ -53,16 +46,8 @@ function tool_list_continuity_issues(input, ctx) {
   }
 
   const issueIds = issues.map(i => i.id);
-  const { sql: idSql, values: idVals } = inClause(issueIds);
 
-  const figRows = db.prepare(`
-    SELECT cif.issue_id, COALESCE(f.fig_id, NULL) AS fig_id,
-           COALESCE(f.name, cif.figur_name) AS name
-    FROM continuity_issue_figures cif
-    LEFT JOIN figures f ON f.id = cif.figure_id
-    WHERE cif.issue_id IN ${idSql}
-    ORDER BY cif.issue_id, cif.sort_order
-  `).all(...idVals);
+  const figRows = listContinuityIssueFigures(issueIds);
   const chRows = listContinuityIssueChapters(issueIds);
 
   const figByIssue = new Map();
@@ -121,12 +106,7 @@ function tool_get_timeline(input, ctx) {
   const typFilter = typeof input?.typ === 'string' ? input.typ.toLowerCase() : null;
   const limit = Math.min(200, Math.max(1, Number.isInteger(input?.limit) ? input.limit : TIMELINE_DEFAULT_LIMIT));
 
-  const events = db.prepare(`
-    SELECT id, datum, ereignis, typ, bedeutung
-    FROM zeitstrahl_events
-    WHERE book_id = ? AND user_email = ?
-    ORDER BY sort_order, id
-  `).all(ctx.bookId, userEmail);
+  const events = listTimelineEvents(ctx.bookId, userEmail);
 
   if (!events.length) {
     return {
@@ -136,17 +116,10 @@ function tool_get_timeline(input, ctx) {
   }
 
   const eventIds = events.map(e => e.id);
-  const { sql: idSql, values: idVals } = inClause(eventIds);
 
   const chRows = listTimelineEventChapters(eventIds);
   const pgRows = listTimelineEventPages(eventIds);
-  const fgRows = db.prepare(`
-    SELECT zef.event_id, f.fig_id, COALESCE(f.name, zef.figur_name) AS name
-    FROM zeitstrahl_event_figures zef
-    LEFT JOIN figures f ON f.id = zef.figure_id
-    WHERE zef.event_id IN ${idSql}
-    ORDER BY zef.event_id, zef.sort_order
-  `).all(...idVals);
+  const fgRows = listTimelineEventFigures(eventIds);
 
   const chByEvt = new Map();
   for (const r of chRows) {

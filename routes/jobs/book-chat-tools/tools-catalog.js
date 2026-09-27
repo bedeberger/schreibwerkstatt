@@ -3,8 +3,7 @@
 // Ideen, Buch-Settings, Revisionen). Reines DB-Aggregat, kein BookStack-
 // Roundtrip. Temporal-Tools (Kontinuitaet/Zeitstrahl) liegen in tools-timeline.js.
 
-const { db, getBookSettings, getBookName, worldFactsScanState } = require('../../../db/schema');
-const { inClause } = require('../../../lib/validate');
+const { getBookSettings, getBookName, worldFactsScanState } = require('../../../db/schema');
 const { narrativeLabels } = require('../narrative-labels');
 const pageRevisions = require('../../../db/page-revisions');
 const { _truncateResult, _findFigure } = require('./shared');
@@ -12,9 +11,12 @@ const { isIdeeStatus, isOpenIdeeStatus, normalizeIdeeStatus } = require('../../.
 const { listLocationChaptersWithNames } = require('../../../db/book-chat/text');
 const {
   listChaptersWithStats, listPagesWithStats, getPageHeader, listIdeenWithPlaces,
-  listLocationsWithFirstPage, listLocationChaptersForLocations, getLocationByLocId,
-  findLocationByName, listLocationScenesWithPlaces, listSongsWithFirstPage,
-  listSongChaptersForSongs, listScenesWithPlaces, listFiguresWithMentions,
+  listLocationsWithFirstPage, listLocationChaptersForLocations,
+  listLocationFiguresForLocations, listLocationFigures, getLocationIdByLocId,
+  getLocationByLocId, findLocationByName, listLocationScenesWithPlaces,
+  listSongsWithFirstPage, listSongChaptersForSongs, listSongFiguresForSongs,
+  listSongScenesForSongs, listScenesWithPlaces, listSceneFiguresForScenes,
+  listSceneLocationsForScenes, listFiguresWithMentions, listWorldFacts,
   listWorldFactChapterNames,
 } = require('../../../db/book-chat/catalog');
 
@@ -143,15 +145,9 @@ function tool_list_locations(input, ctx) {
   }
 
   const locIds = rows.map(r => r.id);
-  const { sql: idSql, values: idVals } = inClause(locIds);
 
   const chRows = listLocationChaptersForLocations(locIds);
-  const fgRows = db.prepare(`
-    SELECT lf.location_id, f.fig_id, f.name
-    FROM location_figures lf
-    JOIN figures f ON f.id = lf.figure_id AND f.book_id = ? AND f.user_email IS ?
-    WHERE lf.location_id IN ${idSql}
-  `).all(ctx.bookId, userEmail, ...idVals);
+  const fgRows = listLocationFiguresForLocations(ctx.bookId, userEmail, locIds);
 
   const chByLoc = new Map();
   for (const r of chRows) {
@@ -211,21 +207,10 @@ function tool_list_songs(input, ctx) {
   }
 
   const songIds = rows.map(r => r.id);
-  const { sql: idSql, values: idVals } = inClause(songIds);
 
   const chRows = listSongChaptersForSongs(songIds);
-  const fgRows = db.prepare(`
-    SELECT sf.song_id, f.fig_id, f.name, sf.kontext_typ
-    FROM song_figures sf
-    JOIN figures f ON f.id = sf.figure_id
-    WHERE sf.song_id IN ${idSql}
-  `).all(...idVals);
-  const scRows = db.prepare(`
-    SELECT ss.song_id, fs.id AS scene_id, fs.titel
-    FROM song_scenes ss
-    JOIN figure_scenes fs ON fs.id = ss.scene_id
-    WHERE ss.song_id IN ${idSql}
-  `).all(...idVals);
+  const fgRows = listSongFiguresForSongs(songIds);
+  const scRows = listSongScenesForSongs(songIds);
 
   const chBy = new Map();
   for (const r of chRows) {
@@ -282,12 +267,7 @@ function tool_get_location_profile(input, ctx) {
 
   const kapitel = listLocationChaptersWithNames(locRow.id).map(r => ({ chapter_id: r.chapter_id, chapter_name: r.chapter_name || null, haeufigkeit: r.haeufigkeit }));
 
-  const figuren = db.prepare(`
-    SELECT f.fig_id, f.name
-    FROM location_figures lf
-    JOIN figures f ON f.id = lf.figure_id AND f.book_id = ? AND f.user_email IS ?
-    WHERE lf.location_id = ?
-  `).all(ctx.bookId, userEmail, locRow.id).map(r => ({ fig_id: r.fig_id, name: r.name || null }));
+  const figuren = listLocationFigures(ctx.bookId, userEmail, locRow.id).map(r => ({ fig_id: r.fig_id, name: r.name || null }));
 
   const szenen = listLocationScenesWithPlaces(locRow.id, ctx.bookId, userEmail).map(r => ({
     scene_id: r.scene_id, titel: r.titel, wertung: r.wertung || null,
@@ -332,9 +312,7 @@ function tool_list_scenes(input, ctx) {
   }
   let locFilterId = null;
   if (input?.loc_id) {
-    const locRow = db.prepare(
-      'SELECT id FROM locations WHERE book_id = ? AND loc_id = ? AND user_email IS ?'
-    ).get(ctx.bookId, input.loc_id, userEmail);
+    const locRow = getLocationIdByLocId(ctx.bookId, input.loc_id, userEmail);
     if (!locRow) return { error: 'Ort nicht gefunden' };
     locFilterId = locRow.id;
   }
@@ -345,20 +323,9 @@ function tool_list_scenes(input, ctx) {
   if (!rows.length) return { scenes: [], total: 0, hint: 'Keine Szenen für diesen Filter.' };
 
   const sceneIds = rows.map(r => r.id);
-  const { sql: idSql, values: idVals } = inClause(sceneIds);
 
-  const sfRows = db.prepare(`
-    SELECT sf.scene_id, f.fig_id, f.name
-    FROM scene_figures sf
-    JOIN figures f ON f.id = sf.figure_id
-    WHERE sf.scene_id IN ${idSql}
-  `).all(...idVals);
-  const slRows = db.prepare(`
-    SELECT sl.scene_id, l.loc_id, l.name
-    FROM scene_locations sl
-    JOIN locations l ON l.id = sl.location_id
-    WHERE sl.scene_id IN ${idSql}
-  `).all(...idVals);
+  const sfRows = listSceneFiguresForScenes(sceneIds);
+  const slRows = listSceneLocationsForScenes(sceneIds);
 
   const sfBy = new Map();
   for (const r of sfRows) {
@@ -524,16 +491,7 @@ function tool_list_world_facts(input, ctx) {
   const kategorie = typeof input?.kategorie === 'string' && input.kategorie.trim() ? input.kategorie.trim().toLowerCase() : null;
   const subjekt   = typeof input?.subjekt === 'string' && input.subjekt.trim() ? input.subjekt.trim() : null;
 
-  let sql = `
-    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, wf.seite_label
-    FROM world_facts wf
-    WHERE wf.book_id = ? AND wf.user_email IS ?`;
-  const params = [ctx.bookId, userEmail];
-  if (kategorie !== null) { sql += ' AND wf.kategorie = ?'; params.push(kategorie); }
-  if (subjekt !== null)   { sql += ' AND wf.subjekt LIKE ?'; params.push(`%${subjekt}%`); }
-  sql += ' ORDER BY wf.sort_order, wf.id';
-
-  const rows = db.prepare(sql).all(...params);
+  const rows = listWorldFacts(ctx.bookId, userEmail, { kategorie, subjekt });
   if (!rows.length) {
     const { scanned } = worldFactsScanState(ctx.bookId, userEmail);
     const hint = !scanned

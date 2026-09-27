@@ -4,9 +4,9 @@
 // zeigt, was der User VORHAT, nicht was schon im Manuskript steht. Pro Buch + User
 // skopiert (kein geteilter Katalog). Read-only, kein KI-Call.
 
-const { db } = require('../../../db/schema');
 const { listActs, listThreads, listBeats } = require('../../../db/plot');
 const { listDraftFigures } = require('../../../db/draft-figures');
+const { listFigureNamesForUser } = require('../../../db/book-chat/figures');
 const { _truncateResult } = require('./shared');
 
 const BEAT_DESC_PREVIEW = 600;
@@ -18,9 +18,7 @@ const BEAT_STATUS = ['geplant', 'im_buch'];
 // gescoped — analog zu db/plot.js#resolveFigureIds.
 function _figureNameMap(bookId, userEmail) {
   const map = {};
-  for (const r of db.prepare(
-    'SELECT fig_id, name, kurzname FROM figures WHERE book_id = ? AND user_email = ?'
-  ).all(bookId, userEmail)) {
+  for (const r of listFigureNamesForUser(bookId, userEmail)) {
     map[r.fig_id] = r.name || r.kurzname || r.fig_id;
   }
   return map;

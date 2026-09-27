@@ -2,9 +2,11 @@
 // Geteilte Helfer für Buch-Chat-Tools. Bündelt Token-Budget-Klemmgrenzen,
 // das _truncateResult-Pattern und die _findFigure-Lookup-Heuristik.
 
-const { db } = require('../../../db/schema');
 const { INPUT_BUDGET_CHARS } = require('../../../lib/ai');
 const { pageTitle } = require('../../../db/content-names');
+const {
+  getFigureByFigId, findFigureByName, getSceneTitle, getFigureName,
+} = require('../../../db/book-chat/figures');
 
 // Obergrenzen schützen das Token-Budget gegen ausufernde Tool-Calls. Skaliert mit
 // MODEL_CONTEXT, damit User mit grösserem Kontextfenster reichere Tool-Antworten
@@ -43,8 +45,8 @@ function _truncateResult(obj) {
  */
 function resolveEntityTitle(kind, entityId) {
   if (kind === 'page')   return pageTitle(entityId)?.title ?? null;
-  if (kind === 'scene')  return db.prepare('SELECT titel AS t FROM figure_scenes WHERE id = ?').get(entityId)?.t ?? null;
-  if (kind === 'figure') return db.prepare('SELECT name AS t FROM figures WHERE id = ?').get(entityId)?.t ?? null;
+  if (kind === 'scene')  return getSceneTitle(entityId) ?? null;
+  if (kind === 'figure') return getFigureName(entityId) ?? null;
   return null;
 }
 
@@ -53,19 +55,10 @@ function _findFigure(input, ctx) {
   const userEmail = ctx.userEmail || null;
   let row = null;
   if (input.figur_id) {
-    row = db.prepare(
-      'SELECT id, fig_id, name, kurzname FROM figures WHERE book_id = ? AND fig_id = ? AND user_email IS ?'
-    ).get(ctx.bookId, input.figur_id, userEmail);
+    row = getFigureByFigId(ctx.bookId, input.figur_id, userEmail);
   }
   if (!row && input.figur_name) {
-    const q = `%${input.figur_name}%`;
-    row = db.prepare(
-      `SELECT id, fig_id, name, kurzname FROM figures
-         WHERE book_id = ? AND user_email IS ?
-           AND (name LIKE ? OR kurzname LIKE ?)
-         ORDER BY CASE WHEN name = ? OR kurzname = ? THEN 0 ELSE 1 END, id
-         LIMIT 1`
-    ).get(ctx.bookId, userEmail, q, q, input.figur_name, input.figur_name);
+    row = findFigureByName(ctx.bookId, userEmail, input.figur_name);
   }
   return row;
 }

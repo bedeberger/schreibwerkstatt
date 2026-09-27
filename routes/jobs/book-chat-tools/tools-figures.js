@@ -1,7 +1,6 @@
 'use strict';
 // Figuren-fokussierte Tools: Pronomenzählung, Auftritte, Beziehungen, Voll-Profil.
 
-const { db } = require('../../../db/schema');
 const { _truncateResult, _findFigure } = require('./shared');
 const {
   listPronounCountsWithChapters,
@@ -9,6 +8,12 @@ const {
   listFigureAppearancesWithChapters,
   listFigureEventsWithPlaces,
   listFigureScenesWithPlaces,
+  listPronounCounts,
+  listFigureRelationsWithNames,
+  listFiguresByFigIds,
+  getFigureRow,
+  listFigureTagNames,
+  listRelationsOfFigure,
 } = require('../../../db/book-chat/figures');
 
 // ── count_pronouns ────────────────────────────────────────────────────────────
@@ -39,9 +44,7 @@ function tool_count_pronouns(input, ctx) {
     : PRONOUN_KEYS;
 
   if (!perChapter) {
-    const rows = db.prepare(
-      'SELECT pronoun_counts FROM page_stats WHERE book_id = ? AND pronoun_counts IS NOT NULL'
-    ).all(ctx.bookId);
+    const rows = listPronounCounts(ctx.bookId);
     const counts = _aggregatePronounsFromRows(rows, filterKeys);
     return { counts, scope: 'book', pronouns: filterKeys, pages_indexed: rows.length };
   }
@@ -131,16 +134,7 @@ function tool_get_figure_relations(input, ctx) {
     if (!focus) return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
   }
 
-  const rows = db.prepare(`
-    SELECT ff.fig_id   AS from_fig_id, ff.name AS from_name,
-           ft.fig_id   AS to_fig_id,   ft.name AS to_name,
-           r.typ, r.beschreibung, r.machtverhaltnis, r.belege
-    FROM figure_relations r
-    JOIN figures ff ON ff.id = r.from_fig_id
-    JOIN figures ft ON ft.id = r.to_fig_id
-    WHERE r.book_id = ? AND r.user_email IS ?
-    ORDER BY ff.name, ft.name
-  `).all(ctx.bookId, userEmail);
+  const rows = listFigureRelationsWithNames(ctx.bookId, userEmail);
 
   const filtered = focus
     ? rows.filter(r => r.from_fig_id === focus.fig_id || r.to_fig_id === focus.fig_id)
@@ -162,11 +156,7 @@ function tool_get_figure_relations(input, ctx) {
   const nodeIds = new Set();
   for (const e of edges) { nodeIds.add(e.from.fig_id); nodeIds.add(e.to.fig_id); }
   const nodes = nodeIds.size
-    ? db.prepare(
-        `SELECT fig_id, name, kurzname, typ FROM figures
-           WHERE book_id = ? AND user_email IS ?
-             AND fig_id IN (${[...nodeIds].map(() => '?').join(',')})`
-      ).all(ctx.bookId, userEmail, ...nodeIds)
+    ? listFiguresByFigIds(ctx.bookId, userEmail, nodeIds)
     : [];
 
   return _truncateResult({
@@ -187,11 +177,9 @@ function tool_get_figure_profile(input, ctx) {
   const figRow = _findFigure(input, ctx);
   if (!figRow) return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
 
-  const f = db.prepare(`
-    SELECT * FROM figures WHERE id = ?
-  `).get(figRow.id);
+  const f = getFigureRow(figRow.id);
 
-  const tags = db.prepare('SELECT tag FROM figure_tags WHERE figure_id = ?').all(figRow.id).map(t => t.tag);
+  const tags = listFigureTagNames(figRow.id);
 
   const appearances = listFigureAppearancesWithChapters(figRow.id);
 
@@ -199,16 +187,7 @@ function tool_get_figure_profile(input, ctx) {
 
   const scenes = listFigureScenesWithPlaces(figRow.id, ctx.bookId, userEmail);
 
-  const relations = db.prepare(`
-    SELECT ff.fig_id AS from_fig_id, ff.name AS from_name,
-           ft.fig_id AS to_fig_id,   ft.name AS to_name,
-           r.typ, r.beschreibung, r.machtverhaltnis
-    FROM figure_relations r
-    JOIN figures ff ON ff.id = r.from_fig_id
-    JOIN figures ft ON ft.id = r.to_fig_id
-    WHERE r.book_id = ? AND r.user_email IS ?
-      AND (ff.id = ? OR ft.id = ?)
-  `).all(ctx.bookId, userEmail, figRow.id, figRow.id);
+  const relations = listRelationsOfFigure(ctx.bookId, userEmail, figRow.id);
 
   let zitate = [];
   if (f.schluesselzitate) { try { zitate = JSON.parse(f.schluesselzitate) || []; } catch { zitate = []; } }

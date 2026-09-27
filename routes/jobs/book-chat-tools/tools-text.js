@@ -2,7 +2,6 @@
 // Text-fokussierte Tools: Seiten + Kapiteltexte laden, Volltext-/Regex-Suche,
 // Zitate via Offset oder Pattern, Dialogerkennung, Erst-/Letztauftritt.
 
-const { db } = require('../../../db/schema');
 const { htmlToText } = require('../shared');
 const contentStore = require('../../../lib/content-store');
 const { htmlToPlainText } = require('../../../lib/html-text');
@@ -26,6 +25,8 @@ const {
   getChapterInBook,
   listChapterPages,
   listPagesForDialogue,
+  getLatestPageCheck,
+  getLocationRefByLocId,
   listLocationChaptersWithNames,
 } = require('../../../db/book-chat/text');
 const { listFigureMentionsWithPages } = require('../../../db/book-chat/figures');
@@ -150,13 +151,7 @@ async function tool_search_passages(input, ctx) {
 const LATEST_CHECK_STILANALYSE_CHARS = 600;
 
 function _latestCheckForPage(pageId, userEmail) {
-  const row = db.prepare(`
-    SELECT checked_at, error_count, fazit, stilanalyse, model
-    FROM page_checks
-    WHERE page_id = ? AND user_email IS ?
-    ORDER BY checked_at DESC
-    LIMIT 1
-  `).get(pageId, userEmail || null);
+  const row = getLatestPageCheck(pageId, userEmail || null);
   if (!row) return null;
   const stil = row.stilanalyse || null;
   return {
@@ -502,9 +497,7 @@ function tool_find_first_last_mention(input, ctx) {
     };
   }
 
-  const locRow = db.prepare(
-    'SELECT id, loc_id, name FROM locations WHERE book_id = ? AND user_email IS ? AND loc_id = ?'
-  ).get(ctx.bookId, userEmail, input.loc_id.trim());
+  const locRow = getLocationRefByLocId(ctx.bookId, userEmail, input.loc_id.trim());
   if (!locRow) {
     return { error: 'Ort nicht gefunden', hint: 'Pruefe loc_id via list_locations.' };
   }
