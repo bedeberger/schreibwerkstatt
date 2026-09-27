@@ -2,13 +2,13 @@
 // Analyse-Tools: Buch-/Kapitel-Reviews, Lektorat-Hotspots + Findings,
 // Stil-Metriken (Buch/Kapitel/Seite), N-Gram-Wiederholungen.
 
-const { db } = require('../../../db/schema');
 const { htmlToPlainText } = require('../../../lib/html-text');
 const { _truncateResult } = require('./shared');
 const { listChaptersForBook } = require('../../../db/content-names');
 const {
   STIL_METRIC_COLS,
   getLatestBookReview,
+  getBookStilTotals,
   listLatestChapterReviews,
   listLektoratHotspotRows,
   listLektoratFindingRows,
@@ -267,20 +267,7 @@ function tool_get_stil_metrics(input, ctx) {
   const limit = Math.min(50, Math.max(1, Number.isInteger(input?.limit) ? input.limit : STIL_DEFAULT_LIMIT));
 
   if (scope === 'book') {
-    const r = db.prepare(`
-      SELECT
-        COUNT(*) AS pages,
-        SUM(words) AS words, SUM(chars) AS chars,
-        SUM(sentences) AS sentences, SUM(dialog_chars) AS dialog_chars,
-        SUM(filler_count) AS filler_count,
-        SUM(passive_count) AS passive_count,
-        SUM(adverb_count) AS adverb_count,
-        AVG(avg_sentence_len) AS avg_sentence_len,
-        AVG(sentence_len_p90) AS sentence_len_p90,
-        AVG(lix) AS lix, AVG(flesch_de) AS flesch_de
-      FROM page_stats
-      WHERE book_id = ? AND sentences IS NOT NULL
-    `).get(ctx.bookId);
+    const r = getBookStilTotals(ctx.bookId);
     if (!r || !r.pages) return { hint: 'Keine Stil-Metriken vorhanden. Sync ausfuehren.' };
     const dialog_ratio = r.chars ? Math.round((r.dialog_chars / r.chars) * 1000) / 10 : null;
     return _truncateResult({

@@ -98,6 +98,26 @@ function listLektoratFindingRows(bookId, userEmail, { pageId = null, chapterId =
 /** Spalten von page_stats, nach denen `listPageStilMetric` sortieren darf. */
 const STIL_METRIC_COLS = ['filler_count', 'passive_count', 'adverb_count', 'sentences', 'dialog_chars', 'avg_sentence_len', 'sentence_len_p90', 'lix', 'flesch_de'];
 
+const _stmtBookStilTotals = db.prepare(`
+      SELECT
+        COUNT(*) AS pages,
+        SUM(words) AS words, SUM(chars) AS chars,
+        SUM(sentences) AS sentences, SUM(dialog_chars) AS dialog_chars,
+        SUM(filler_count) AS filler_count,
+        SUM(passive_count) AS passive_count,
+        SUM(adverb_count) AS adverb_count,
+        AVG(avg_sentence_len) AS avg_sentence_len,
+        AVG(sentence_len_p90) AS sentence_len_p90,
+        AVG(lix) AS lix, AVG(flesch_de) AS flesch_de
+      FROM page_stats
+      WHERE book_id = ? AND sentences IS NOT NULL
+    `);
+
+/** Buchweites Stil-Aggregat über alle Seiten mit Satz-Metriken (pages = 0 ohne Daten). */
+function getBookStilTotals(bookId) {
+  return _stmtBookStilTotals.get(bookId);
+}
+
 /** Stil-Aggregat je Kapitel in Leserichtung, optional auf ein Kapitel begrenzt. */
 function listChapterStilMetrics(bookId, chapterId) {
   let sql = `
@@ -175,6 +195,7 @@ function listPagesWithBody(bookId, { chapterId = null, pageId = null } = {}) {
 module.exports = {
   STIL_METRIC_COLS,
   getLatestBookReview,
+  getBookStilTotals,
   listLatestChapterReviews,
   listLektoratHotspotRows,
   listLektoratFindingRows,
