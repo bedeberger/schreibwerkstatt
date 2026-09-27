@@ -1,9 +1,10 @@
 'use strict';
-// Seiten-/Kapitel-JOINs der Listing-/Lookup-Tools des Buch-Chats
+// Abfragen der Listing-/Lookup-Tools des Buch-Chats
 // (routes/jobs/book-chat-tools/tools-catalog.js): Kapitel- und Seiteninventar,
-// Ideen, Orte, Songs, Szenen, Figuren-Erwähnungen, Revisions-Kopf, Welt-Fakten-
-// Kapitel. Handler fassen `pages`/`chapters`/`books` nie selbst an (CLAUDE.md
-// „Content-Store-Facade als einziger Eintrittspunkt"); optionale Filter und
+// Ideen, Orte, Songs, Szenen samt ihren Figuren-/Orts-/Szenen-Bridges,
+// Figuren-Erwähnungen, Revisions-Kopf, Welt-Fakten. Das Tool führt selbst kein
+// SQL aus; Seiten-/Kapitelnamen kommen per JOIN von hier (CLAUDE.md
+// „Content-Store-Facade als einziger Eintrittspunkt"). Optionale Filter und
 // IN-Listen werden hier ans SQL gehängt (leere Liste → `(NULL)`, matcht nichts).
 
 const { db } = require('../connection');
@@ -129,6 +130,38 @@ function listLocationChaptersForLocations(locationIds) {
   `).all(...idVals);
 }
 
+/** Figuren mehrerer Orte; nur Figuren aus (Buch, User). Ohne ORDER BY. */
+function listLocationFiguresForLocations(bookId, userEmail, locationIds) {
+  const { sql: idSql, values: idVals } = inClause(locationIds);
+  return db.prepare(`
+    SELECT lf.location_id, f.fig_id, f.name
+    FROM location_figures lf
+    JOIN figures f ON f.id = lf.figure_id AND f.book_id = ? AND f.user_email IS ?
+    WHERE lf.location_id IN ${idSql}
+  `).all(bookId, userEmail, ...idVals);
+}
+
+const _stmtLocationFigures = db.prepare(`
+    SELECT f.fig_id, f.name
+    FROM location_figures lf
+    JOIN figures f ON f.id = lf.figure_id AND f.book_id = ? AND f.user_email IS ?
+    WHERE lf.location_id = ?
+  `);
+
+/** Figuren eines Orts; nur Figuren aus (Buch, User). Ohne ORDER BY. */
+function listLocationFigures(bookId, userEmail, locationId) {
+  return _stmtLocationFigures.all(bookId, userEmail, locationId);
+}
+
+const _stmtLocationIdByLocId = db.prepare(
+      'SELECT id FROM locations WHERE book_id = ? AND loc_id = ? AND user_email IS ?'
+    );
+
+/** locations.id per loc_id, gescoped auf (Buch, User) — Filter von list_scenes. */
+function getLocationIdByLocId(bookId, locId, userEmail) {
+  return _stmtLocationIdByLocId.get(bookId, locId, userEmail);
+}
+
 const _stmtLocationByLocId = db.prepare(`
       SELECT l.id, l.loc_id, l.name, l.typ, l.beschreibung, l.stimmung,
              l.erste_erwaehnung, l.erste_erwaehnung_page_id, p.page_name AS erste_erwaehnung_page_name
@@ -215,6 +248,29 @@ function listSongChaptersForSongs(songIds) {
   `).all(...idVals);
 }
 
+/** Figuren mehrerer Songs mit Song-Kontext. Ohne ORDER BY, ohne Buch-Scope
+ *  (die Song-IDs sind bereits auf das Buch gefiltert). */
+function listSongFiguresForSongs(songIds) {
+  const { sql: idSql, values: idVals } = inClause(songIds);
+  return db.prepare(`
+    SELECT sf.song_id, f.fig_id, f.name, sf.kontext_typ
+    FROM song_figures sf
+    JOIN figures f ON f.id = sf.figure_id
+    WHERE sf.song_id IN ${idSql}
+  `).all(...idVals);
+}
+
+/** Szenen mehrerer Songs (id + Titel). Ohne ORDER BY. */
+function listSongScenesForSongs(songIds) {
+  const { sql: idSql, values: idVals } = inClause(songIds);
+  return db.prepare(`
+    SELECT ss.song_id, fs.id AS scene_id, fs.titel
+    FROM song_scenes ss
+    JOIN figure_scenes fs ON fs.id = ss.scene_id
+    WHERE ss.song_id IN ${idSql}
+  `).all(...idVals);
+}
+
 // ── Szenen ───────────────────────────────────────────────────────────────────
 
 /** Szenen eines Buchs mit Kapitel- und Seitenname. Filter optional:
@@ -244,6 +300,28 @@ function listScenesWithPlaces(bookId, userEmail, { chapterId = null, pageId = nu
   return db.prepare(sql).all(...params);
 }
 
+/** Figuren mehrerer Szenen. Ohne ORDER BY. */
+function listSceneFiguresForScenes(sceneIds) {
+  const { sql: idSql, values: idVals } = inClause(sceneIds);
+  return db.prepare(`
+    SELECT sf.scene_id, f.fig_id, f.name
+    FROM scene_figures sf
+    JOIN figures f ON f.id = sf.figure_id
+    WHERE sf.scene_id IN ${idSql}
+  `).all(...idVals);
+}
+
+/** Orte mehrerer Szenen. Ohne ORDER BY. */
+function listSceneLocationsForScenes(sceneIds) {
+  const { sql: idSql, values: idVals } = inClause(sceneIds);
+  return db.prepare(`
+    SELECT sl.scene_id, l.loc_id, l.name
+    FROM scene_locations sl
+    JOIN locations l ON l.id = sl.location_id
+    WHERE sl.scene_id IN ${idSql}
+  `).all(...idVals);
+}
+
 // ── Figuren ──────────────────────────────────────────────────────────────────
 
 const _stmtFiguresWithMentions = db.prepare(`
@@ -263,6 +341,20 @@ function listFiguresWithMentions(bookId, userEmail) {
 }
 
 // ── Welt-Fakten ──────────────────────────────────────────────────────────────
+
+/** Welt-Fakten von (Buch, User). Filter optional: `kategorie` (exakt),
+ *  `subjekt` (Teilstring per LIKE); null = kein Filter. */
+function listWorldFacts(bookId, userEmail, { kategorie = null, subjekt = null } = {}) {
+  let sql = `
+    SELECT wf.id, wf.kategorie, wf.subjekt, wf.fakt, wf.seite_label
+    FROM world_facts wf
+    WHERE wf.book_id = ? AND wf.user_email IS ?`;
+  const params = [bookId, userEmail];
+  if (kategorie !== null) { sql += ' AND wf.kategorie = ?'; params.push(kategorie); }
+  if (subjekt !== null)   { sql += ' AND wf.subjekt LIKE ?'; params.push(`%${subjekt}%`); }
+  sql += ' ORDER BY wf.sort_order, wf.id';
+  return db.prepare(sql).all(...params);
+}
 
 /** Kapitelnamen mehrerer Welt-Fakten, je Fakt in Leserichtung (chapter_name
  *  NULL bei gelöschtem Kapitel). */
@@ -284,12 +376,20 @@ module.exports = {
   listIdeenWithPlaces,
   listLocationsWithFirstPage,
   listLocationChaptersForLocations,
+  listLocationFiguresForLocations,
+  listLocationFigures,
+  getLocationIdByLocId,
   getLocationByLocId,
   findLocationByName,
   listLocationScenesWithPlaces,
   listSongsWithFirstPage,
   listSongChaptersForSongs,
+  listSongFiguresForSongs,
+  listSongScenesForSongs,
   listScenesWithPlaces,
+  listSceneFiguresForScenes,
+  listSceneLocationsForScenes,
   listFiguresWithMentions,
+  listWorldFacts,
   listWorldFactChapterNames,
 };
