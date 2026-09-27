@@ -157,6 +157,13 @@ test('createJob: Modell-Recording (global vs. komplett vs. book-chat)', () => {
   const kontId = shared.createJob('kontinuitaet', 'mb3', 'u@x', null);
   assert.equal(modelOf(kontId), 'claude-opus-4-8');
 
+  // Mit Lektorat-Override fahren Seiten- und Batch-Lektorat dieses Modell.
+  appSettings.set('ai.claude.model.lektorat', 'claude-opus-5-5');
+  const checkOvId = shared.createJob('check', 'mb1b', 'u@x', null);
+  assert.equal(persistedModelOf(checkOvId), 'claude-opus-5-5');
+  assert.equal(modelOf(shared.createJob('batch-check', 'mb1c', 'u@x', null)), 'claude-opus-5-5');
+  appSettings.set('ai.claude.model.lektorat', '');
+
   // Buch-Chat fährt den Bookchat-Override (Opus).
   const bookChatId = shared.createJob('book-chat', 'mb4', 'u@x', null);
   assert.equal(modelOf(bookChatId), 'claude-opus-4-8');

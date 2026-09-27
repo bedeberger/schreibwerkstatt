@@ -198,6 +198,22 @@ export const adminSettingsMethods = {
     this.adminApiTokensJustCreated = null;
   },
 
+  // Wie viele Claude-Werte im eingeklappten „Erweitert"-Bereich weichen vom
+  // Standard ab (Per-Job-Modell, explizites Limit/Timeout)? Der Zähler steht am
+  // Toggle, damit eine aktive Abweichung nicht hinter dem Einklappen verschwindet.
+  adminClaudeOverrideCount() {
+    const keys = [
+      'ai.claude.model.lektorat', 'ai.claude.model.komplett', 'ai.claude.model.komplett.extract',
+      'ai.claude.model.bookchat', 'ai.claude.context_window', 'ai.claude.max_tokens_out',
+      'ai.claude.context_window.komplett', 'ai.claude.max_tokens_out.komplett', 'ai.claude.timeout_ms.komplett',
+      'ai.claude.context_window.bookchat', 'ai.claude.max_tokens_out.bookchat', 'ai.claude.timeout_ms.bookchat',
+    ];
+    return keys.filter(k => {
+      const v = this.adminSettingsForm?.[k];
+      return typeof v === 'string' ? v.trim() !== '' : Number(v) > 0;
+    }).length;
+  },
+
   adminSettingsIsDirty(key) {
     const s = this.adminSettingsMap[key];
     if (!s) return false;

@@ -111,13 +111,15 @@ function createJob(type, bookId, userEmail, label, labelParams = null, dedupId =
   const provider = resolveProvider({ userEmail: userEmail || null });
   let model = _modelName(provider);
   // Einzelne Job-Familien fahren ein eigenes Modell (Per-Job-Override in den App-Settings,
-  // gespiegelt von _komplettAiOverrides bzw. _bookChatAiOverrides). Dann muss
+  // gespiegelt von _komplettAiOverrides, _bookChatAiOverrides bzw.
+  // applyLektoratAiOverrides). Dann muss
   // job_runs.model das TATSÄCHLICH genutzte Modell spiegeln, nicht das globale — sonst
   // verbucht das Kosten-Tracking z.B. einen Opus-Lauf zum Sonnet-Default-Tarif.
-  // Der Buch-Chat-Override bleibt claude-only (Tool-Use), der Komplett-Override nicht.
+  // Buch-Chat- und Lektorat-Override sind claude-only, der Komplett-Override nicht.
   let overrideKey = null;
   if (type === 'komplett-analyse' || type === 'kontinuitaet') overrideKey = `ai.${provider}.model.komplett`;
   else if (type === 'book-chat' && provider === 'claude') overrideKey = 'ai.claude.model.bookchat';
+  else if ((type === 'check' || type === 'batch-check') && provider === 'claude') overrideKey = 'ai.claude.model.lektorat';
   if (overrideKey) {
     const overrideModel = String(appSettings.get(overrideKey) || '').trim();
     if (overrideModel) model = overrideModel;

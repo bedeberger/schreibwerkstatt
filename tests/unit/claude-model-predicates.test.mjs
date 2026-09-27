@@ -60,6 +60,7 @@ function _bootstrap() {
 // xhigh  = 'xhigh' wird durchgelassen (kam erst mit Opus 4.7)
 const TABLE = [
   // Modellstring             modern  maxOut  effort  max    xhigh
+  ['claude-opus-5-5',         true,   128000, true,   true,  true],
   ['claude-opus-5',           true,   128000, true,   true,  true],
   ['claude-opus-5[1m]',       true,   128000, true,   true,  true],
   ['claude-sonnet-5',         true,   128000, true,   true,  true],
@@ -142,5 +143,37 @@ test('Tokenizer-Rate haengt am gefragten Provider, nicht am global eingestellten
       'Claude behaelt seine eigene Rate, auch wenn global ein lokaler Provider eingestellt ist');
     assert.equal(cfg.getContextConfigFor('ollama').charsPerToken, 4);
     assert.equal(cfg.getContextConfigFor('claude').charsPerToken <= 3, true);
+  } finally { teardown(); }
+});
+
+// Kontextfenster + Output-Cap werden ohne Setting aus dem EFFEKTIVEN Modell abgeleitet
+// (Job-Override vor global). Ein explizites Setting > 0 gewinnt weiterhin.
+test('Kontextfenster/Output-Cap: aus dem Modell abgeleitet, Setting > 0 gewinnt', () => {
+  const { cfg, logCtx, teardown } = _bootstrap();
+  const appSettings = require_('../../lib/app-settings');
+  try {
+    assert.equal(cfg._claudeModelContext('claude-opus-5-5'), 1000000);
+    assert.equal(cfg._claudeModelContext('claude-sonnet-5'), 1000000);
+    assert.equal(cfg._claudeModelContext('claude-sonnet-4-6'), 200000);
+    assert.equal(cfg._claudeModelContext('claude-haiku-4-5'), 200000);
+
+    appSettings.set('ai.claude.model', 'claude-opus-5-5');
+    assert.equal(cfg._resolveClaudeContextWindow(), 1000000);
+    assert.equal(cfg._resolveClaudeMaxOut(), 128000);
+
+    // Per-Job-Modell (z.B. Lektorat) bestimmt die Ableitung, nicht das globale.
+    appSettings.set('ai.claude.model', 'claude-sonnet-4-6');
+    assert.equal(cfg._resolveClaudeContextWindow(), 200000);
+    assert.equal(cfg._resolveClaudeMaxOut(), 64000);
+    logCtx.runWithContext({ job: 'check' }, () => {
+      logCtx.setContext({ aiJob: { provider: 'claude', model: 'claude-opus-5-5' } });
+      assert.equal(cfg._resolveClaudeContextWindow(), 1000000);
+      assert.equal(cfg._resolveClaudeMaxOut(), 128000);
+    });
+
+    appSettings.set('ai.claude.context_window', 300000);
+    appSettings.set('ai.claude.max_tokens_out', 32000);
+    assert.equal(cfg._resolveClaudeContextWindow(), 300000);
+    assert.equal(cfg._resolveClaudeMaxOut(), 32000);
   } finally { teardown(); }
 });

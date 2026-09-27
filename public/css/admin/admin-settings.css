@@ -355,3 +355,17 @@
   }
 }
 }
+
+/* Eingeklappter „Erweitert"-Bereich im Claude-Tab: Toggle trägt den Zähler aktiver
+   Abweichungen als Badge, das Panel reiht dieselben Unterabschnitte wie oben. */
+.admin-settings-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+.admin-settings-advanced > .collapsible-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}

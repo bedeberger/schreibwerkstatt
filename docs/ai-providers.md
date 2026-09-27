@@ -43,8 +43,8 @@ Alle KI-Konfig liegt in der `app_settings`-Tabelle. Admin-PUT via `/admin/settin
 | `ai.provider` | `claude` | `API_PROVIDER` | Globaler Provider (`claude` \| `ollama` \| `openai-compat`) |
 | `ai.claude.api_key` | – | `ANTHROPIC_API_KEY` | Pflicht bei Claude |
 | `ai.claude.model` | `claude-sonnet-4-6` | `MODEL_NAME` | |
-| `ai.claude.context_window` | 200 000 | `MODEL_CONTEXT` | Gesamtfenster (Input+Output) |
-| `ai.claude.max_tokens_out` | 64 000 | `MODEL_TOKEN` | Output-Cap (`MAX_TOKENS_OUT`) |
+| `ai.claude.context_window` | 0 = aus Modell | `MODEL_CONTEXT` | Gesamtfenster (Input+Output); 0 → `_claudeModelContext` (moderne Generation 1M, ältere 200K) |
+| `ai.claude.max_tokens_out` | 0 = aus Modell | `MODEL_TOKEN` | Output-Cap (`MAX_TOKENS_OUT`); 0 → `_claudeModelMaxOut` (128K bzw. 64K) |
 | `ai.claude.retry_max` | 3 | – | Retry-Attempts bei 429/529 |
 | `ai.claude.timeout_ms` | 600 000 | – | Hard-Timeout (10 min) |
 | `ai.ollama.host` | `http://localhost:11434` | `OLLAMA_HOST` | |
@@ -122,8 +122,8 @@ Viele lokale Modelle (Qwen3, DeepSeek-R1-Distill, Magistral …) denken per Defa
 ## Token-Budgets
 
 Boot-Konstanten in `lib/ai.js` lesen den **Claude-Globalwert** beim Modul-Load:
-- `MODEL_CONTEXT = ai.claude.context_window` (Default 200 000). Bei lokalen Modellen auf native Kontextgrösse setzen (Mistral-Small3.2 / Llama-3.1: 128 000, ältere: 32 000 / 8 000).
-- `MAX_TOKENS_OUT = ai.claude.max_tokens_out` (Default 64 000). Job-spezifische Overrides per `Math.min` gedeckelt.
+- `MODEL_CONTEXT = ai.claude.context_window`, bei 0 aus dem globalen Claude-Modell abgeleitet (`_claudeModelContext`: Opus 4.7+/Sonnet 5+/Fable 1M, ältere 200K). Pro Call rechnet `_resolveClaudeContextWindow` am **effektiven** Modell (Job-Override vor global).
+- `MAX_TOKENS_OUT = ai.claude.max_tokens_out`, bei 0 aus dem Modell abgeleitet (`_claudeModelMaxOut`). Job-spezifische Overrides per `Math.min` gedeckelt.
 - `CHARS_PER_TOKEN`: Default `3` (Claude) / `4` (lokal), Override via `ai.chars_per_token`. Tokenizer-Heuristik für Char→Token-Umrechnung. Die Konstante folgt dem **global** eingestellten Provider und ist ausserdem die **Anzeige**-Rate (`page_stats.tok`, `/config` → Frontend) — eine Zahl pro Instanz, weil `page_stats` buchweit persistiert wird und nicht pro User verschiedene Umfänge zeigen darf. Die **Budget**-Rechnung nimmt dagegen die Rate des gefragten Providers (siehe `getContextConfigFor` unten).
 
 Abgeleitet:
@@ -136,7 +136,7 @@ Hard-Check beim Boot **pro Provider**: `max_tokens_out + contextSafetyMargin(con
 
 **Messen statt raten:** `npm run calibrate:tokens -- --book <id>` ([scripts/calibrate-chars-per-token.js](../scripts/calibrate-chars-per-token.js)) misst die tatsächliche Rate deutschen Buchtexts gegen `/v1/messages/count_tokens` (kostenlos, kein Inferenz-Call) und vergleicht sie mit der Annahme aus `_claudeCharsPerToken` — dieselbe Funktion, aus der die Budgets fallen, keine Kopie. Gemessen wird die **Differenz** zweier Probenlängen, damit der konstante Request-Overhead herausfällt. Liegt die Annahme ÜBER dem gemessenen Wert, passt weniger Text ins Fenster als gerechnet → Kontext-Overflow mitten im Job (Exit-Code 1). Nach jedem Modellwechsel laufen lassen: der Tokenizer der modernen Generation (Opus 4.7+/Sonnet 5+/Fable) produziert ~1×–1.35× so viele Tokens wie der ältere.
 
-**Per-Provider via `getContextConfigFor(provider)`** ([lib/ai.js:968](../lib/ai.js#L968)): liefert `{ contextWindow, maxTokensOut, charsPerToken, safetyMargin, inputBudgetTokens, inputBudgetChars }` aus `ai.<provider>.context_window` + `ai.<provider>.max_tokens_out`. Fallback-Defaults: `claude=200000`, `ollama=32000`, `llama=32000` (`PROVIDER_CONTEXT_DEFAULTS`). `charsPerToken` kommt **pro Provider** (`claude=3` bzw. modell-abhängig ≤2.5, lokal `4`) und nicht aus der globalen Boot-Konstante — im Mischbetrieb (KI-Profile) bekäme ein Claude-Call sonst die Rate eines lokalen Tokenizers und damit ein um ein Drittel zu grosses Zeichenbudget. Ein explizit gesetztes `ai.chars_per_token` übersteuert weiterhin alle Provider. Boot-Konstanten bleiben Claude-spezifisch für Backwards-Compat; neue Code-Pfade mit auflösbarem `userEmail` nutzen den Helper.
+**Per-Provider via `getContextConfigFor(provider)`** ([lib/ai.js:968](../lib/ai.js#L968)): liefert `{ contextWindow, maxTokensOut, charsPerToken, safetyMargin, inputBudgetTokens, inputBudgetChars }` aus `ai.<provider>.context_window` + `ai.<provider>.max_tokens_out`. Fallback-Defaults: Claude aus dem effektiven Modell (`_claudeModelContext`), `ollama=32000`, `openai-compat=32000` (`PROVIDER_CONTEXT_DEFAULTS`). `charsPerToken` kommt **pro Provider** (`claude=3` bzw. modell-abhängig ≤2.5, lokal `4`) und nicht aus der globalen Boot-Konstante — im Mischbetrieb (KI-Profile) bekäme ein Claude-Call sonst die Rate eines lokalen Tokenizers und damit ein um ein Drittel zu grosses Zeichenbudget. Ein explizit gesetztes `ai.chars_per_token` übersteuert weiterhin alle Provider. Boot-Konstanten bleiben Claude-spezifisch für Backwards-Compat; neue Code-Pfade mit auflösbarem `userEmail` nutzen den Helper.
 
 Job-Konstanten skalieren automatisch:
 - `SINGLE_PASS_LIMIT = 0.7 × INPUT_BUDGET_CHARS`

@@ -1,0 +1,26 @@
+{
+  "version": "4.12.2",
+  "date": "2026-09-27",
+  "entries": [
+    {
+      "kind": "verbessert",
+      "de": "Lektorat und andere KI-Aufgaben: Der Fortschrittsbalken läuft jetzt auch weiter, während die KI noch nachdenkt, statt minutenlang stillzustehen und dann zu springen.",
+      "en": "Proofreading and other AI tasks: the progress bar now keeps moving while the AI is still thinking, instead of standing still for minutes and then jumping ahead."
+    },
+    {
+      "kind": "verbessert",
+      "de": "App-Einstellungen, Reiter „Provider“: Kontextfenster und Output-Limit für Claude richten sich jetzt automatisch nach dem gewählten Modell. Neuere Modelle verarbeiten so deutlich längere Texte auf einmal.",
+      "en": "App settings, “Provider” tab: Claude’s context window and output limit now follow the selected model automatically. Newer models can therefore handle much longer texts in one go."
+    },
+    {
+      "kind": "verbessert",
+      "de": "App-Einstellungen, Reiter „Provider“: Die Claude-Einstellungen sind übersichtlicher. Modelle pro Aufgabe und Limits liegen unter „Erweitert“, ein Zähler zeigt, wie viele Werte dort vom Standard abweichen.",
+      "en": "App settings, “Provider” tab: the Claude settings are tidier. Per-task models and limits sit under “Advanced”, and a counter shows how many values there differ from the default."
+    },
+    {
+      "kind": "behoben",
+      "de": "Kostenübersicht: Lektorate mit eigenem Claude-Modell wurden zum Preis des allgemeinen Modells verbucht. Sie erscheinen jetzt mit dem tatsächlich genutzten Modell.",
+      "en": "Cost overview: proofreading runs with their own Claude model were billed at the general model’s price. They now show the model that was actually used."
+    }
+  ]
+}

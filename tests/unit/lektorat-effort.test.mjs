@@ -135,3 +135,44 @@ test('aiCall meldet den Thinking-Block über tok.onThinking (an bei Block-Start,
     teardown();
   }
 });
+
+// Während des Denkens streamt Claude keinen Text — der Balken muss trotzdem
+// zeitbasiert vorrücken (Timer in aiCall), statt bis zum ersten Text stillzustehen.
+test('aiCall: Fortschrittsbalken rückt in der Denkphase ohne Text-Events vor', async () => {
+  const origFetch = globalThis.fetch;
+  process.env.ANTHROPIC_API_KEY = 'sk-test';
+  const { jobsAi, teardown } = _bootstrap();
+  const shared = require_('../../routes/jobs/shared');
+  const enc = new TextEncoder();
+  let release;
+  const gate = new Promise(r => { release = r; });
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    async start(ctrl) {
+      ctrl.enqueue(enc.encode('data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}\n'));
+      ctrl.enqueue(enc.encode('data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}\n'));
+      await gate;
+      ctrl.enqueue(enc.encode([
+        'data: {"type":"content_block_stop","index":0}',
+        'data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}',
+        'data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"{\\"fehler\\":[]}"}}',
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":9}}',
+        'data: [DONE]', '',
+      ].join('\n')));
+      ctrl.close();
+    },
+  }), { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  try {
+    const jobId = shared.createJob('check', 'think-bar', 'u@x', null);
+    shared.jobs.get(jobId).status = 'running';   // updateJob schreibt nur laufende Jobs
+    const tok = { in: 0, out: 0, ms: 0 };
+    const call = jobsAi.aiCall(jobId, tok, 'prompt', 'sys', 10, 90, 3000, 0.2, 1000, 'claude');
+    await new Promise(r => setTimeout(r, 2300));
+    const during = shared.jobs.get(jobId).progress;
+    release();
+    assert.deepEqual(await call, { fehler: [] });
+    assert.ok(during > 10 && during < 90, `Balken während des Denkens: ${during}`);
+  } finally {
+    globalThis.fetch = origFetch;
+    teardown();
+  }
+});
