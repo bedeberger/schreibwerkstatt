@@ -2,6 +2,8 @@
 //   • Claude: ein Timeout MITTEN im Stream (reader.read) ist AI_TIMEOUT (transient,
 //     retrybar), nicht ein roher AbortError — Text- und Tool-Pfad.
 //   • Claude: Overload vor dem ersten Delta wird wiederholt (withOverloadRetry).
+//   • Claude: genDurationMs (Basis fuer tok/s) umfasst die Denkphase, weil
+//     output_tokens die Denk-Tokens mitzaehlt.
 //   • Ollama + openai-compat: Fehler-Chunks im Stream werfen mit der Server-Meldung
 //     statt still mit leerem Text zu enden; Ollama hat einen Hard-Timeout.
 //   • Semaphore/Lock: wartende Aufrufer sind per Signal abbrechbar.
@@ -95,6 +97,42 @@ test('Claude: Overload (529) vor dem ersten Delta wird wiederholt, dann Text + U
     assert.equal(r.tokensIn, 15);
     assert.equal(r.tokensOut, 7);
     assert.equal(r.stopReason, 'end_turn');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+// SSE-Stream, der zwischen Event-Gruppen echte Pausen macht.
+function pacedSseResponse(groups, pauseMs) {
+  const enc = new TextEncoder();
+  let i = 0;
+  const body = new ReadableStream({
+    async pull(ctrl) {
+      if (i >= groups.length) { ctrl.close(); return; }
+      if (i > 0) await new Promise((r) => setTimeout(r, pauseMs));
+      ctrl.enqueue(enc.encode(groups[i++].map((e) => `data: ${JSON.stringify(e)}\n\n`).join('')));
+    },
+  });
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+}
+
+test('Claude: genDurationMs umfasst die Denkphase (display omitted), nicht nur die Textzeit', async () => {
+  globalThis.fetch = async () => pacedSseResponse([
+    [
+      { type: 'message_start', message: { usage: { input_tokens: 10 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } },
+    ],
+    [
+      { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'sig' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'text', text: '' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: '{"ok":true}' } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 500 } },
+    ],
+  ], 60);
+  try {
+    const r = await _callClaude(PROMPT, 'sys', null, null, null);
+    assert.equal(r.text, '{"ok":true}');
+    assert.ok(r.genDurationMs >= 50, `genDurationMs=${r.genDurationMs} deckt die Denkphase nicht ab`);
   } finally { globalThis.fetch = realFetch; }
 });
 

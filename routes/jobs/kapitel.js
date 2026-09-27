@@ -10,7 +10,7 @@ const {
   aiCall, getPrompts, getBookPrompts,
   jobAbortControllers,
   htmlToText, splitGroupsIntoChunks, loadOrderedBookContents,
-  _modelName, tps,
+  _modelName, applyReviewAiOverrides, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody, BATCH_SIZE, chunkLimitsFor,
 } = require('./shared');
@@ -57,7 +57,8 @@ async function runChapterReviewJob(jobId, bookId, chapterId, chapterName, bookNa
   const email = userEmail || '';
   const effectiveProvider = resolveProvider({ userEmail });
   const { singlePass: SINGLE_PASS_LIMIT, perChunk: PER_CHUNK_LIMIT } = chunkLimitsFor(effectiveProvider);
-  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
+  const effortSuffix = applyReviewAiOverrides(effectiveProvider, logger);
+  const cacheVersion = `${_modelName(effectiveProvider)}${effortSuffix}:${PROMPTS_VERSION || ''}`;
   try {
     updateJob(jobId, { statusText: 'job.phase.loadingPages', progress: 0 });
     // Bei includeSubchapters: rekursiv alle Sub-Kapitel-IDs ermitteln und

@@ -19,6 +19,7 @@
         <div x-data="settingField({ k: 'ai.claude.model', label: 'admin.settings.label.model', ph: 'claude-opus-5-5', help: 'admin.settings.help.claudeModel', models: 'claude' })"></div>
         <div x-data="settingField({ k: 'ai.claude.effort.lektorat', label: 'admin.settings.label.aiClaudeEffortLektorat', ph: 'medium', help: 'admin.settings.help.lektoratEffort' })"></div>
         <div x-data="settingField({ k: 'ai.claude.effort.komplett', label: 'admin.settings.label.aiClaudeEffortKomplett', ph: 'high', help: 'admin.settings.help.komplettEffort' })"></div>
+        <div x-data="settingField({ k: 'ai.claude.effort.review', label: 'admin.settings.label.aiClaudeEffortReview', ph: 'high', help: 'admin.settings.help.reviewEffort' })"></div>
 
         <h4 class="admin-settings-subheading"><span x-text="$app.t('admin.settings.claude.billingTitle')"></span></h4>
         <small class="muted-msg muted-msg--sm" x-text="$app.t('admin.settings.claude.billingIntro')"></small>

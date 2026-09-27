@@ -1,0 +1,26 @@
+{
+  "version": "4.12.3",
+  "date": "2026-09-27",
+  "entries": [
+    {
+      "kind": "verbessert",
+      "de": "Lektorat: Pro Seite erscheinen jetzt höchstens 10 Stil-Hinweise statt 20, und zwar die gewichtigsten. Rechtschreibung und Grammatik sind davon nicht betroffen, die Obergrenze lässt sich in den App-Einstellungen anpassen.",
+      "en": "Proofreading: each page now shows at most 10 style suggestions instead of 20, keeping the most important ones. Spelling and grammar are not affected, and the limit can be changed in the app settings."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Buch- und Kapitelbewertung: Claude denkt beim Bewerten jetzt gründlicher nach, auch auf neueren Modellen. Die Denk-Tiefe lässt sich in den App-Einstellungen unter „Erweitert“ einstellen.",
+      "en": "Book and chapter review: Claude now thinks more thoroughly when reviewing, including on newer models. The depth can be set in the app settings under “Advanced”."
+    },
+    {
+      "kind": "behoben",
+      "de": "Fortschrittsanzeige von KI-Aufgaben: Die angezeigte Geschwindigkeit in tok/s war bei denkenden Modellen viel zu hoch. Sie stimmt jetzt.",
+      "en": "Progress display of AI tasks: the speed shown in tok/s was far too high for thinking models. It is now accurate."
+    },
+    {
+      "kind": "behoben",
+      "de": "Die Download-Links für die Apps und die Browser-Erweiterung fehlten zeitweise. Sie erscheinen jetzt wieder zuverlässig.",
+      "en": "The download links for the apps and the browser extension were sometimes missing. They now show up reliably again."
+    }
+  ]
+}

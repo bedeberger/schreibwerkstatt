@@ -58,6 +58,7 @@ module.exports = {
   emptyScopeError: jobsMod.emptyScopeError,
 
   _modelName: model._modelName,
+  applyReviewAiOverrides: model.applyReviewAiOverrides,
   settledAll: ai.settledAll,
   retryOnTransientAi: ai.retryOnTransientAi,
 

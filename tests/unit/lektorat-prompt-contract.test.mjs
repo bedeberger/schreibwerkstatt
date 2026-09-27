@@ -210,3 +210,19 @@ test('Nachbarkontext: ohne Auszuege kein Block, lokal nie', () => {
   const local = prompts.buildLektoratPrompt(SAMPLE, { langCode: 'de', previousExcerpt: 'a', nextExcerpt: 'b' });
   assert.ok(!local.includes('<nachbarkontext>'));
 });
+
+// Die Stil-Obergrenze im Prompt folgt `stylisticCap` (Server: ai.lektorat_stylistic_cap).
+// Ein fest verdrahteter Wert liefe gegen den Handler-Backstop auseinander, der nach
+// Textposition kappt — dann fielen die guten Funde am Seitenende weg.
+test('Stil-Obergrenze im Prompt folgt stylisticCap (narrativ + Fach, Kombi + Stil-Pass)', () => {
+  prompts.configurePrompts(cfg, 'claude');
+  const narrativ = prompts.buildLektoratPrompt(SAMPLE, { langCode: 'de', stylisticCap: 7 });
+  assert.match(narrativ, /mehr als 7 solcher stilistischen Einträge/);
+  assert.match(narrativ, /nur die schwersten 7 behalten/);
+  assert.doesNotMatch(narrativ, /~20/);
+  const stil = prompts.buildStilLektoratPrompt(SAMPLE, { langCode: 'de', stylisticCap: 7 });
+  assert.match(stil, /nur die schwersten 7 behalten/);
+  const fach = prompts.buildLektoratPrompt(SAMPLE, { langCode: 'de', buchtyp: 'sachbuch', stylisticCap: 7 });
+  assert.match(fach, /nur die schwersten 7 behalten/);
+  assert.match(prompts.buildLektoratPrompt(SAMPLE, { langCode: 'de' }), /nur die schwersten 10 behalten/);
+});

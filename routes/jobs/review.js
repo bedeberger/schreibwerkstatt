@@ -11,7 +11,7 @@ const {
   aiCall, getPrompts, getBookPrompts,
   loadOrderedBookContents, loadPageContents, groupByChapter, splitGroupsIntoChunks, buildSinglePassBookText,
   chunkLimitsFor, BATCH_SIZE, jobAbortControllers, settledAll,
-  _modelName, tps,
+  _modelName, applyReviewAiOverrides, tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
@@ -20,7 +20,6 @@ const { loadReviewKomplettContext, loadReviewMotivContext, loadStrukturContext, 
 const { applyQuoteVerification, belegHaystack } = require('../../lib/quote-verify');
 const { toIntId } = require('../../lib/validate');
 const contentStore = require('../../lib/content-store');
-const appSettings = require('../../lib/app-settings');
 const { resolveProvider } = require('../../lib/ai');
 const { guardBook, sessionEmail } = require('../../lib/acl');
 
@@ -83,7 +82,8 @@ async function runReviewJob(jobId, bookId, bookName, userEmail) {
   const { singlePass: SINGLE_PASS_LIMIT, perChunk: PER_CHUNK_LIMIT } = chunkLimitsFor(effectiveProvider);
   // Cache-Version: Modellname + Prompts-Schema-Version. Ändert sich eins davon,
   // werden alle persistierten Review-Caches automatisch verworfen.
-  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}`;
+  const effortSuffix = applyReviewAiOverrides(effectiveProvider, logger);
+  const cacheVersion = `${_modelName(effectiveProvider)}${effortSuffix}:${PROMPTS_VERSION || ''}`;
   const narrativeSig = _sigHash(narrative);
   // Stilprofil fliesst in SYSTEM_BUCHBEWERTUNG (Referenz-Framing) → muss den
   // Cache invalidieren, wenn der Autor das Profil ändert.
@@ -234,7 +234,7 @@ async function runReviewJob(jobId, bookId, bookName, userEmail) {
     r.basis = basis;
     r.profil = profil;
 
-    const model = _modelName(appSettings.get('ai.provider') || 'claude');
+    const model = _modelName(effectiveProvider);
     db.prepare('INSERT INTO book_reviews (book_id, reviewed_at, review_json, model, user_email) VALUES (?, ?, ?, ?, ?)')
       .run(parseInt(bookId), new Date().toISOString(), JSON.stringify(r), model, userEmail || null);
 

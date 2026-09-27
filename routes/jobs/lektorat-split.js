@@ -36,7 +36,7 @@ function consensusThreshold() {
 //     leer = folgt `ai.claude.model`. Erlaubt ein denkendes Modell (Opus/Sonnet 5)
 //     fuers Lektorat, waehrend die uebrigen Jobs beim globalen Modell bleiben.
 //   `ai.claude.effort.lektorat` — nur auf Modellen mit adaptivem Denken. Dort waehlt
-//     die API ohne Feld 'high', und das Modell denkt pro Pass Zehntausende Tokens
+//     die API ohne Feld den Modell-Default (meist 'high'), und das Modell denkt pro Pass Zehntausende Tokens
 //     stumm (Minuten ohne Stream-Text, Output-Kosten ein Vielfaches). Sonnet 4.6 und
 //     aelter denken nicht; ein Effort dort kuerzte die sichtbare Antwort.
 // Rueckgabe: { model, cacheSuffix }. `model` ist das effektiv laufende Modell (fuer
@@ -182,4 +182,4 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   return { fehler, szenen: stilResult.szenen, stilanalyse: stilResult.stilanalyse, fazit: stilResult.fazit };
 }
 
-module.exports = { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratAiOverrides };
+module.exports = { lektoratAnalyze, objektivRuns, consensusThreshold, splitEnabled, applyLektoratAiOverrides };

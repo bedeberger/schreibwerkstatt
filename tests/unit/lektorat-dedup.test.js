@@ -17,7 +17,7 @@ useTmpDb('lektorat-dedup');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 require('../../db/migrations');
 
-const { dedupFehler, validateLektoratFehler, capStylisticFehler, STYLISTIC_TYPEN } = require('../../routes/jobs/lektorat');
+const { dedupFehler, validateLektoratFehler, capStylisticFehler, STYLISTIC_TYPEN, _runSig } = require('../../routes/jobs/lektorat');
 
 // validateLektoratFehler filtert gegen das Typ-Set des Buchtyp-Profils (SSoT:
 // public/js/prompts/lektorat-typen.js, ESM — hier nicht importierbar, weil diese
@@ -175,4 +175,19 @@ test('validateLektoratFehler verwirft profilfremde Typen', () => {
   const narrativ = new Set(['rechtschreibung', 'grammatik', 'stil', 'show_vs_tell']);
   const nar = validateLektoratFehler(input, 'de-CH', narrativ);
   assert.deepEqual(nar.map(f => f.typ), ['grammatik', 'show_vs_tell']);
+});
+
+// ── _runSig: Lauf-Parameter in der Cache-Signatur ────────────────────────────
+// Stil-Obergrenze und Pass-Aufteilung stecken in keinem Prompt-String, formen aber
+// den Output — ohne sie in der Signatur lieferte der Cache nach einer Umstellung
+// das Ergebnis der alten Konfiguration (z.B. beim Split-an/aus-Vergleich).
+test('_runSig: Stil-Obergrenze und Split-Konfiguration aendern die Signatur', () => {
+  const appSettings = require('../../lib/app-settings');
+  assert.deepEqual(_runSig(false), { sc: 10, sp: '1/2' });
+  assert.deepEqual(_runSig(true), { sc: 10, sp: 0 }, 'lokal splittet nie');
+  appSettings.set('ai.lektorat_stylistic_cap', 5);
+  appSettings.set('ai.lektorat_objective_runs', 3);
+  assert.deepEqual(_runSig(false), { sc: 5, sp: '3/2' });
+  appSettings.set('ai.lektorat_split', false);
+  assert.deepEqual(_runSig(false), { sc: 5, sp: 0 });
 });

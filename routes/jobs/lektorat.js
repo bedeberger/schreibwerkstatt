@@ -43,7 +43,7 @@ const { pageBookGuard } = require('../../lib/page-guard');
 const { listChaptersForBook } = require('../../db/content-names');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider, effectiveProviderClass } = require('../../lib/ai');
-const { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratAiOverrides } = require('./lektorat-split');
+const { lektoratAnalyze, objektivRuns, consensusThreshold, splitEnabled, applyLektoratAiOverrides } = require('./lektorat-split');
 const {
   lastParagraph, firstParagraph, findPreviousPage, findNextPage, dropNeighbourFindings,
 } = require('./lektorat-context');
@@ -96,7 +96,7 @@ const STYLISTIC_TYPEN = new Set([
   'hedging', 'amtsdeutsch',
 ]);
 
-const DEFAULT_STYLISTIC_CAP = 20;
+const DEFAULT_STYLISTIC_CAP = 10;
 
 // Deterministischer Backstop zur Prompt-Regel „max ~20 stilistische Findings".
 // Modelle zählen und selbst-limitieren unzuverlässig – der Prompt bittet zwar um
@@ -115,7 +115,10 @@ function capStylisticFehler(fehler, cap = DEFAULT_STYLISTIC_CAP) {
   });
 }
 
-// Cap aus app_settings (Admin-tunebar), Default 20 – analog ai.lektorat_batch_concurrency.
+// Cap aus app_settings (Admin-tunebar), Default 10 – analog ai.lektorat_batch_concurrency.
+// Derselbe Wert steht als Mengen-Obergrenze im Prompt (promptOpts.stylisticCap): dort
+// priorisiert das Modell nach Schwere, dieser Backstop schneidet nur nach Textposition.
+// Laufen beide auseinander, kappt der Backstop die guten Funde am Seitenende.
 function stylisticCap() {
   const n = parseInt(appSettings.get('ai.lektorat_stylistic_cap'), 10);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_STYLISTIC_CAP;
@@ -133,6 +136,15 @@ function finalizeFehler(fehler, locale, validTypen, neighbour = null) {
   const valid = validateLektoratFehler(fehler, locale, validTypen);
   const own = neighbour ? dropNeighbourFindings(valid, neighbour.text, neighbour.excerpts) : valid;
   return capStylisticFehler(dedupFehler(own), stylisticCap());
+}
+
+// Lauf-Parameter, die den Output formen, aber in keinem Prompt-String stecken: die
+// Stil-Obergrenze und die Pass-Aufteilung (Split an/aus, Zahl der Objektiv-Läufe,
+// Konsens-Schwelle). Gehören in die Cache-Signatur, sonst liefert der Cache nach
+// einer Umstellung das Ergebnis der alten Konfiguration.
+function _runSig(local) {
+  const split = !local && splitEnabled();
+  return { sc: stylisticCap(), sp: split ? `${objektivRuns()}/${consensusThreshold()}` : 0 };
 }
 
 // Erlaubte Fehlertypen für dieses Buch. SSoT ist das Buchtyp-Profil in
@@ -271,6 +283,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
       stp: bookSettings?.stilprofil || '',
       pe: previousExcerpt, ne: nextExcerpt, cn: chapterName, pn: pd.name, cv: cacheVersion, lc: langCode,
       bl: hatBelege,
+      ..._runSig(local),
     }) : null;
     const cached = ctxSig ? loadLektoratCache(bookId, userEmail, pageId, ctxSig, effectiveProvider) : null;
     const validTypen = _validTypen(prompts, bookSettings?.buchtyp, local, pageTextsorte);
@@ -296,6 +309,7 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
           erklaerungRule: lektoratErklaerungRule,
           korrekturRegeln: lektoratKorrekturRegeln,
           figuren, figurenBeziehungen, orte, motive, hatBelege,
+          stylisticCap: stylisticCap(),
           pageName: pd.name, chapterName,
           ...narrativeLabels(bookSettings),
           textsorte: pageTextsorte,
@@ -450,6 +464,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
           stp: bookSettings?.stilprofil || '',
           pe: previousExcerpt, ne: nextExcerpt, cn: chapterName, pn: p.name, cv: cacheVersion, lc: langCode,
           bl: batchHatBelege,
+          ..._runSig(local),
         });
         const cached = loadLektoratCache(bookId, userEmail, p.id, ctxSig, effectiveProvider);
 
@@ -478,6 +493,7 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
               orte: batchOrte,
               motive: batchMotive,
               hatBelege: batchHatBelege,
+              stylisticCap: stylisticCap(),
               pageName: p.name,
               chapterName,
               ...narrativeLabels(bookSettings),
@@ -573,4 +589,4 @@ lektoratRouter.post('/batch-check', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { lektoratRouter, runCheckJob, runBatchCheckJob, dedupFehler, validateLektoratFehler, capStylisticFehler, STYLISTIC_TYPEN };
+module.exports = { lektoratRouter, runCheckJob, runBatchCheckJob, dedupFehler, validateLektoratFehler, capStylisticFehler, STYLISTIC_TYPEN, _runSig };
