@@ -1,7 +1,9 @@
 'use strict';
-// Seiten-/Kapitel-JOINs der figurenfokussierten Buch-Chat-Tools
-// (routes/jobs/book-chat-tools/tools-figures.js). Handler fassen
-// `pages`/`chapters`/`books` nie selbst an (CLAUDE.md „Content-Store-Facade als
+// Abfragen der figurenfokussierten Buch-Chat-Tools
+// (routes/jobs/book-chat-tools/tools-figures.js) plus der geteilten
+// Figuren-Lookups (`_findFigure`, `resolveEntityTitle` in shared.js, Namens-Map
+// von get_plot_board). Die Tool-Module führen selbst kein SQL aus; Seiten-/
+// Kapitel-JOINs liegen ebenfalls hier (CLAUDE.md „Content-Store-Facade als
 // einziger Eintrittspunkt").
 
 const { db } = require('../connection');
@@ -80,7 +82,136 @@ function listFigureScenesWithPlaces(figureId, bookId, userEmail) {
   return _stmtScenes.all(figureId, bookId, userEmail);
 }
 
+// ── Lookups (shared.js, tools-plot.js) ──────────────────────────────────────
+
+const _stmtFigureByFigId = db.prepare(
+      'SELECT id, fig_id, name, kurzname FROM figures WHERE book_id = ? AND fig_id = ? AND user_email IS ?'
+    );
+
+/** Figur per fig_id (exakt), gescoped auf Buch + User (NULL-sicher). */
+function getFigureByFigId(bookId, figId, userEmail) {
+  return _stmtFigureByFigId.get(bookId, figId, userEmail);
+}
+
+const _stmtFigureByName = db.prepare(
+      `SELECT id, fig_id, name, kurzname FROM figures
+         WHERE book_id = ? AND user_email IS ?
+           AND (name LIKE ? OR kurzname LIKE ?)
+         ORDER BY CASE WHEN name = ? OR kurzname = ? THEN 0 ELSE 1 END, id
+         LIMIT 1`
+    );
+
+/** Figur per Namens-Teilstring auf name/kurzname; exakter Treffer zuerst, dann id. */
+function findFigureByName(bookId, userEmail, name) {
+  const q = `%${name}%`;
+  return _stmtFigureByName.get(bookId, userEmail, q, q, name, name);
+}
+
+const _stmtSceneTitle = db.prepare('SELECT titel AS t FROM figure_scenes WHERE id = ?');
+
+/** Szenentitel per figure_scenes.id; undefined, wenn die Szene fehlt. */
+function getSceneTitle(sceneId) {
+  return _stmtSceneTitle.get(sceneId)?.t;
+}
+
+const _stmtFigureName = db.prepare('SELECT name AS t FROM figures WHERE id = ?');
+
+/** Figurenname per figures.id; undefined, wenn die Figur fehlt. */
+function getFigureName(figureId) {
+  return _stmtFigureName.get(figureId)?.t;
+}
+
+const _stmtFigureNamesForUser = db.prepare(
+    'SELECT fig_id, name, kurzname FROM figures WHERE book_id = ? AND user_email = ?'
+  );
+
+/** fig_id/name/kurzname aller Figuren von (Buch, User) — `user_email = ?`,
+ *  ein leerer/NULL-User matcht also keine NULL-Zeilen. */
+function listFigureNamesForUser(bookId, userEmail) {
+  return _stmtFigureNamesForUser.all(bookId, userEmail);
+}
+
+// ── count_pronouns / get_figure_relations / get_figure_profile ─────────────
+
+const _stmtPronounCounts = db.prepare(
+      'SELECT pronoun_counts FROM page_stats WHERE book_id = ? AND pronoun_counts IS NOT NULL'
+    );
+
+/** pronoun_counts aller Seiten eines Buchs (buchweite Aggregation). */
+function listPronounCounts(bookId) {
+  return _stmtPronounCounts.all(bookId);
+}
+
+const _stmtRelationsWithNames = db.prepare(`
+    SELECT ff.fig_id   AS from_fig_id, ff.name AS from_name,
+           ft.fig_id   AS to_fig_id,   ft.name AS to_name,
+           r.typ, r.beschreibung, r.machtverhaltnis, r.belege
+    FROM figure_relations r
+    JOIN figures ff ON ff.id = r.from_fig_id
+    JOIN figures ft ON ft.id = r.to_fig_id
+    WHERE r.book_id = ? AND r.user_email IS ?
+    ORDER BY ff.name, ft.name
+  `);
+
+/** Alle Beziehungen von (Buch, User) mit fig_id/Name beider Seiten, nach Namen sortiert. */
+function listFigureRelationsWithNames(bookId, userEmail) {
+  return _stmtRelationsWithNames.all(bookId, userEmail);
+}
+
+/** Knoten-Stammdaten zu einer Menge fig_ids, gescoped auf (Buch, User). Ohne ORDER BY. */
+function listFiguresByFigIds(bookId, userEmail, figIds) {
+  const ids = [...figIds];
+  return db.prepare(
+        `SELECT fig_id, name, kurzname, typ FROM figures
+           WHERE book_id = ? AND user_email IS ?
+             AND fig_id IN (${ids.map(() => '?').join(',')})`
+      ).all(bookId, userEmail, ...ids);
+}
+
+const _stmtFigureRow = db.prepare(`
+    SELECT * FROM figures WHERE id = ?
+  `);
+
+/** Vollständige figures-Zeile per id. */
+function getFigureRow(figureId) {
+  return _stmtFigureRow.get(figureId);
+}
+
+const _stmtFigureTags = db.prepare('SELECT tag FROM figure_tags WHERE figure_id = ?');
+
+/** Tags einer Figur (ohne ORDER BY, Einfügereihenfolge der Tabelle). */
+function listFigureTagNames(figureId) {
+  return _stmtFigureTags.all(figureId).map(t => t.tag);
+}
+
+const _stmtRelationsOfFigure = db.prepare(`
+    SELECT ff.fig_id AS from_fig_id, ff.name AS from_name,
+           ft.fig_id AS to_fig_id,   ft.name AS to_name,
+           r.typ, r.beschreibung, r.machtverhaltnis
+    FROM figure_relations r
+    JOIN figures ff ON ff.id = r.from_fig_id
+    JOIN figures ft ON ft.id = r.to_fig_id
+    WHERE r.book_id = ? AND r.user_email IS ?
+      AND (ff.id = ? OR ft.id = ?)
+  `);
+
+/** Ein- und ausgehende Beziehungen einer Figur (figures.id) in (Buch, User). */
+function listRelationsOfFigure(bookId, userEmail, figureId) {
+  return _stmtRelationsOfFigure.all(bookId, userEmail, figureId, figureId);
+}
+
 module.exports = {
+  getFigureByFigId,
+  findFigureByName,
+  getSceneTitle,
+  getFigureName,
+  listFigureNamesForUser,
+  listPronounCounts,
+  listFigureRelationsWithNames,
+  listFiguresByFigIds,
+  getFigureRow,
+  listFigureTagNames,
+  listRelationsOfFigure,
   listPronounCountsWithChapters,
   listFigureMentionsWithPages,
   listFigureAppearancesWithChapters,
