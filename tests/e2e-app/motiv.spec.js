@@ -40,9 +40,11 @@ test('Motiv-Werkstatt: anlegen, verknüpfen, Graph — ohne Konsolenfehler', asy
   );
 
   // Thema + zwei Motive anlegen, erstes selektieren, Beziehung setzen — alles am
-  // echten Scope gegen das Backend.
+  // echten Scope gegen das Backend. Gezählt wird der Zuwachs, nicht der Bestand:
+  // die Datei läuft `serial`, ein Retry startet sie auf der DB des Vorlaufs neu.
   const result = await page.evaluate(async () => {
     const card = window.Alpine.$data(document.querySelector('.card--motiv'));
+    const before = { themes: card.themes.length, motifs: card.motifs.length, relations: card.relations.length };
 
     card.newThemeName = 'Wasser & Schuld';
     await card.addTheme();
@@ -62,10 +64,10 @@ test('Motiv-Werkstatt: anlegen, verknüpfen, Graph — ohne Konsolenfehler', asy
     await card.addRelation();
 
     return {
-      themes: card.themes.length,
-      motifs: card.motifs.length,
-      relations: card.relations.length,
-      relTyp: card.relations[0]?.typ,
+      themes: card.themes.length - before.themes,
+      motifs: card.motifs.length - before.motifs,
+      relations: card.relations.length - before.relations,
+      relTyp: card.relations.find(r => r.from_motif_id === firstId && r.to_motif_id === secondId)?.typ,
       semanticActiveIsBool: typeof card.semanticActive() === 'boolean',
     };
   });
