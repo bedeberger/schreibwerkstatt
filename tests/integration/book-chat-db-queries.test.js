@@ -23,6 +23,11 @@ const call = (name, input = {}) => TOOLS[name](input, { bookId: BOOK, userEmail:
 
 const ids = {};
 
+// Zweiter User und Aufrufer im Buch OTHER (Abschnitt „Abgeleitete Tabellen").
+const V = 'bob@example.com';
+const callO = (name, input = {}, user = U) => TOOLS[name](input, { bookId: OTHER, userEmail: user, inputBudgetChars: 100000 });
+const o = {};
+
 function seed() {
   ctx.dbSeed.setBook({
     books: [{ id: BOOK, name: 'Queries' }, { id: OTHER, name: 'Fremd' }],
@@ -111,6 +116,7 @@ test.before(() => {
   TOOLS = require('../../routes/jobs/book-chat-tools').TOOLS;
   db = require('../../db/connection').db;
   seed();
+  seedOther();
 });
 test.after(() => { ctx.cleanup(); });
 
@@ -254,4 +260,169 @@ test('list_continuity_issues + get_timeline: Kapitel-/Seitennamen der Bridges', 
   const t = call('get_timeline');
   assert.equal(t.events[0].kapitel[0].chapter_name, 'Zwei');
   assert.equal(t.events[0].seiten[0].page_name, 'P-ohne');
+});
+
+// ── Abgeleitete Tabellen (figures, locations, songs, …) ─────────────────────
+// Eigenes Buch OTHER, damit die Zählungen der Tests oben unberührt bleiben.
+
+function seedOther() {
+  const insFig = db.prepare(`INSERT INTO figures (book_id, user_email, fig_id, name, kurzname, typ, sort_order, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+  o.nord = insFig.run(OTHER, U, 'fig_nord', 'Anna Nord', 'Anna', 'haupt', 0, T).lastInsertRowid;
+  o.ann = insFig.run(OTHER, U, 'fig_ann', 'Ann', null, 'neben', 1, T).lastInsertRowid;
+  o.zoe = insFig.run(OTHER, U, 'fig_zoe', 'Zoe', null, null, 2, T).lastInsertRowid;
+  o.bobAnn = insFig.run(OTHER, V, 'fig_ann', 'Ann Bob', null, null, 0, T).lastInsertRowid;
+  db.prepare('INSERT INTO figure_tags (figure_id, tag) VALUES (?, ?)').run(o.nord, 'mutig');
+
+  const insRel = db.prepare('INSERT INTO figure_relations (book_id, from_fig_id, to_fig_id, typ, beschreibung, user_email, machtverhaltnis, belege) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  insRel.run(OTHER, o.zoe, o.ann, 'feind', null, U, null, null);
+  insRel.run(OTHER, o.nord, o.ann, 'freund', 'd', U, 1, JSON.stringify(['b1', 'b2', 'b3', 'b4']));
+  insRel.run(OTHER, o.bobAnn, o.nord, 'fremd', null, V, null, null);
+
+  const insLoc = db.prepare('INSERT INTO locations (book_id, loc_id, name, sort_order, user_email, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
+  o.hafen = insLoc.run(OTHER, 'loc_hafen', 'Hafen', 0, U, T).lastInsertRowid;
+  o.hafenBook = insLoc.run(BOOK, 'loc_hafen', 'Hafen im Nachbarbuch', 0, U, T).lastInsertRowid;
+  const insLf = db.prepare('INSERT INTO location_figures (location_id, figure_id) VALUES (?, ?)');
+  insLf.run(o.hafen, o.nord);
+  insLf.run(o.hafen, o.bobAnn); // fremder User — darf nicht erscheinen
+  const insLc = db.prepare('INSERT INTO location_chapters (location_id, chapter_id, haeufigkeit) VALUES (?, ?, 2)');
+  insLc.run(o.hafen, 91021);
+  insLc.run(o.hafenBook, 91011);
+
+  const insSc = db.prepare('INSERT INTO figure_scenes (book_id, user_email, titel, sort_order, updated_at) VALUES (?, ?, ?, ?, ?)');
+  o.scene = insSc.run(OTHER, U, 'Hafen-Szene', 0, T).lastInsertRowid;
+  insSc.run(OTHER, U, 'Leere Szene', 1, T);
+  db.prepare('INSERT INTO scene_figures (scene_id, figure_id) VALUES (?, ?)').run(o.scene, o.nord);
+  db.prepare('INSERT INTO scene_locations (scene_id, location_id) VALUES (?, ?)').run(o.scene, o.hafen);
+
+  const insSong = db.prepare('INSERT INTO songs (book_id, song_uid, titel, sort_order, user_email, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
+  o.song = insSong.run(OTHER, 'song_x', 'Seemannslied', 0, U, T).lastInsertRowid;
+  db.prepare('INSERT INTO song_figures (song_id, figure_id, kontext_typ) VALUES (?, ?, ?)').run(o.song, o.nord, 'singt');
+  db.prepare('INSERT INTO song_scenes (scene_id, song_id) VALUES (?, ?)').run(o.scene, o.song);
+
+  const insCc = db.prepare('INSERT INTO continuity_checks (book_id, checked_at, summary, user_email) VALUES (?, ?, ?, ?)');
+  const oldCheck = insCc.run(OTHER, T, 'alt', U).lastInsertRowid;
+  const check = insCc.run(OTHER, T2, 'neu', U).lastInsertRowid;
+  insCc.run(OTHER, '2026-03-01T10:00:00.000Z', 'bob', V);
+  const insCi = db.prepare('INSERT INTO continuity_issues (check_id, book_id, user_email, schwere, typ, beschreibung, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  insCi.run(oldCheck, OTHER, U, 'hoch', 'zeit', 'aus altem Check', 0);
+  const i2 = insCi.run(check, OTHER, U, 'niedrig', 'ort', 'zweites', 1).lastInsertRowid;
+  const i1 = insCi.run(check, OTHER, U, 'hoch', 'figur', 'erstes', 0).lastInsertRowid;
+  const insCif = db.prepare('INSERT INTO continuity_issue_figures (issue_id, figure_id, figur_name, sort_order) VALUES (?, ?, ?, ?)');
+  insCif.run(i1, o.nord, 'ignoriert', 1);
+  insCif.run(i1, null, 'Freitext', 0);
+  insCif.run(i2, null, null, 0); // ohne Namen — fällt weg
+
+  const insZe = db.prepare('INSERT INTO zeitstrahl_events (book_id, user_email, datum, ereignis, typ, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
+  const e2 = insZe.run(OTHER, U, '2001', 'Später', null, 1).lastInsertRowid;
+  const e1 = insZe.run(OTHER, U, '2000', 'Früher', 'politisch', 0).lastInsertRowid;
+  insZe.run(OTHER, V, '1990', 'Bob', null, 0);
+  const insZef = db.prepare('INSERT INTO zeitstrahl_event_figures (event_id, figure_id, figur_name, sort_order) VALUES (?, ?, ?, ?)');
+  insZef.run(e1, o.nord, null, 1);
+  insZef.run(e1, null, 'Frei', 0);
+  insZef.run(e2, o.ann, null, 0);
+
+  const insWf = db.prepare('INSERT INTO world_facts (book_id, kategorie, subjekt, fakt, sort_order, user_email) VALUES (?, ?, ?, ?, ?, ?)');
+  insWf.run(OTHER, 'magie', 'Anna Nord', 'zaubert', 1, U);
+  insWf.run(OTHER, 'geografie', 'Hafen', 'liegt im Norden', 0, U);
+  insWf.run(OTHER, 'magie', 'Zoe', 'kann nichts', 2, U);
+  insWf.run(OTHER, 'magie', 'Anna Nord', 'bob', 0, V);
+}
+
+test('_findFigure: fig_id exakt je User, Name mit Exact-Match-Bonus', () => {
+  assert.equal(callO('get_figure_profile', { figur_id: 'fig_ann' }).name, 'Ann');
+  assert.equal(callO('get_figure_profile', { figur_id: 'fig_ann' }, V).name, 'Ann Bob');
+  // „Ann" trifft „Anna Nord" (LIKE) und „Ann" (exakt) — exakt gewinnt trotz höherer id.
+  assert.equal(callO('get_figure_profile', { figur_name: 'Ann' }).fig_id, 'fig_ann');
+  // „Anna" ist exakt der kurzname von Anna Nord.
+  assert.equal(callO('get_figure_profile', { figur_name: 'Anna' }).fig_id, 'fig_nord');
+  assert.equal(callO('get_figure_profile', { figur_id: 'fig_nord' }, V).error, 'Figur nicht gefunden');
+});
+
+test('get_figure_relations / get_figure_profile: Kanten nach Namen, User-Scope, belege gekappt', () => {
+  const r = callO('get_figure_relations');
+  assert.deepEqual(r.edges.map(e => [e.from.name, e.to.name]), [['Anna Nord', 'Ann'], ['Zoe', 'Ann']]);
+  assert.deepEqual(r.edges[0].belege, ['b1', 'b2', 'b3']);
+  assert.deepEqual(r.nodes.map(n => n.fig_id).sort(), ['fig_ann', 'fig_nord', 'fig_zoe']);
+  assert.equal(callO('get_figure_relations', { figur_id: 'fig_zoe' }).total, 1);
+  const p = callO('get_figure_profile', { figur_id: 'fig_nord' });
+  assert.deepEqual(p.eigenschaften, ['mutig']);
+  assert.deepEqual(p.beziehungen.map(b => b.to.name), ['Ann']);
+  assert.equal(p.typ, 'haupt');
+});
+
+test('list_locations / get_location_profile: Figuren nur aus Buch + User', () => {
+  const l = callO('list_locations');
+  assert.deepEqual(l.locations.map(x => [x.loc_id, x.figuren.map(f => f.fig_id)]), [['loc_hafen', ['fig_nord']]]);
+  const p = callO('get_location_profile', { loc_id: 'loc_hafen' });
+  assert.equal(p.name, 'Hafen');
+  assert.deepEqual(p.figuren.map(f => f.fig_id), ['fig_nord']);
+  assert.match(callO('get_location_profile', { loc_id: 'loc_hafen' }, V).error, /^Ort nicht gefunden/);
+});
+
+test('list_scenes / list_songs: Figuren-, Orts- und Szenen-Bridges, loc_id-Filter im Buch', () => {
+  const s = callO('list_scenes', { loc_id: 'loc_hafen' });
+  assert.deepEqual(s.scenes.map(x => x.titel), ['Hafen-Szene']);
+  assert.deepEqual(s.scenes[0].figuren, [{ fig_id: 'fig_nord', name: 'Anna Nord' }]);
+  assert.deepEqual(s.scenes[0].orte, [{ loc_id: 'loc_hafen', name: 'Hafen' }]);
+  assert.equal(callO('list_scenes', { loc_id: 'loc_nope' }).error, 'Ort nicht gefunden');
+  const g = callO('list_songs');
+  assert.deepEqual(g.songs[0].figuren, [{ fig_id: 'fig_nord', name: 'Anna Nord', kontext_typ: 'singt' }]);
+  assert.deepEqual(g.songs[0].szenen, [{ scene_id: o.scene, titel: 'Hafen-Szene' }]);
+});
+
+test('find_first_last_mention (Ort): loc_id getrimmt, Buch- und User-Scope', () => {
+  const r = callO('find_first_last_mention', { loc_id: ' loc_hafen ' });
+  assert.equal(r.name, 'Hafen');
+  assert.equal(call('find_first_last_mention', { loc_id: 'loc_hafen' }).name, 'Hafen im Nachbarbuch');
+  assert.match(callO('find_first_last_mention', { loc_id: 'loc_hafen' }, V).error, /^Ort nicht gefunden/);
+});
+
+test('list_continuity_issues: nur jüngster Check des Users, Figuren mit Freitext-Fallback', () => {
+  const c = callO('list_continuity_issues');
+  assert.equal(c.summary, 'neu');
+  assert.deepEqual(c.issues.map(i => i.beschreibung), ['erstes', 'zweites']);
+  assert.deepEqual(c.issues[0].figuren, [{ fig_id: null, name: 'Freitext' }, { fig_id: 'fig_nord', name: 'Anna Nord' }]);
+  assert.deepEqual(c.issues[1].figuren, []);
+  assert.equal(callO('list_continuity_issues', {}, V).summary, 'bob');
+});
+
+test('get_timeline: sort_order, Figuren-Fallback, Fokusfigur, User-Scope', () => {
+  const t = callO('get_timeline');
+  assert.deepEqual(t.events.map(e => e.ereignis), ['Früher', 'Später']);
+  assert.deepEqual(t.events[0].figuren, [{ fig_id: null, name: 'Frei' }, { fig_id: 'fig_nord', name: 'Anna Nord' }]);
+  assert.deepEqual(callO('get_timeline', { figur_id: 'fig_ann' }).events.map(e => e.ereignis), ['Später']);
+  assert.deepEqual(callO('get_timeline', {}, V).events.map(e => e.ereignis), ['Bob']);
+});
+
+test('list_world_facts: sort_order, kategorie exakt, subjekt als Teilstring, User-Scope', () => {
+  assert.deepEqual(callO('list_world_facts').fakten.map(f => f.fakt), ['liegt im Norden', 'zaubert', 'kann nichts']);
+  assert.deepEqual(callO('list_world_facts', { kategorie: 'MAGIE' }).fakten.map(f => f.fakt), ['zaubert', 'kann nichts']);
+  assert.deepEqual(callO('list_world_facts', { subjekt: 'Nor' }).fakten.map(f => f.fakt), ['zaubert']);
+  assert.deepEqual(callO('list_world_facts', {}, V).fakten.map(f => f.fakt), ['bob']);
+});
+
+test('get_stil_metrics (Buch) / count_pronouns (Buch): Summen nur über das eigene Buch', () => {
+  const s = call('get_stil_metrics', { scope: 'book' });
+  assert.equal(s.pages, 4);
+  assert.equal(s.passive_count, 6);
+  assert.equal(s.words, 28);
+  assert.ok(callO('get_stil_metrics', { scope: 'book' }).hint);
+  const p = call('count_pronouns', { pronouns: ['ich'] });
+  assert.equal(p.pages_indexed, 3);
+  assert.deepEqual(p.counts.ich, { narr: 5, dlg: 2 });
+});
+
+test('get_pages: latest_check ist der jüngste Check des Users', async () => {
+  const mine = await call('get_pages', { ids: [910101] });
+  assert.equal(mine.pages[0].latest_check.fazit, 'neu');
+  const other = await TOOLS.get_pages({ ids: [910101] }, { bookId: BOOK, userEmail: V, inputBudgetChars: 100000 });
+  assert.equal(other.pages[0].latest_check, undefined);
+});
+
+test('resolveEntityTitle: Szene/Figur per id, gelöscht → null', () => {
+  const { resolveEntityTitle } = require('../../routes/jobs/book-chat-tools/shared');
+  assert.equal(resolveEntityTitle('scene', o.scene), 'Hafen-Szene');
+  assert.equal(resolveEntityTitle('figure', o.zoe), 'Zoe');
+  assert.equal(resolveEntityTitle('figure', 99999999), null);
+  assert.equal(resolveEntityTitle('page', 910101), 'P-Zwei');
 });
