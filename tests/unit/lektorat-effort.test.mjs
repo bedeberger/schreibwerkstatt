@@ -1,10 +1,11 @@
-// Lektorat-Effort + Denk-Status.
+// Lektorat-Modell + -Effort + Denk-Status.
 //
 // Auf Modellen mit adaptivem Denken (Sonnet 5+, Opus 4.7+) waehlt die API ohne
 // Effort-Feld 'high': das Seiten-Lektorat denkt dann pro Pass Zehntausende Tokens
 // stumm, der Stream liefert minutenlang nur Pings, und der Job steht sichtbar bei
-// 10 %. `applyLektoratEffort` bindet deshalb `ai.claude.effort.lektorat` — aber nur
-// dort; Sonnet 4.6 (kein Thinking) bleibt unberuehrt. Der Denk-Block selbst wird
+// 10 %. `applyLektoratAiOverrides` bindet deshalb `ai.claude.effort.lektorat` — aber nur
+// dort; Sonnet 4.6 (kein Thinking) bleibt unberuehrt. Dieselbe Funktion routet
+// `ai.claude.model.lektorat`; der Effort richtet sich nach DIESEM Modell. Der Denk-Block selbst wird
 // ueber `tok.onThinking` gemeldet, damit die Statuszeile ihn anzeigen kann.
 
 import { test } from 'node:test';
@@ -37,35 +38,73 @@ function _bootstrap() {
 
 const quietLogger = { info() {}, warn() {}, error() {} };
 
-test('applyLektoratEffort: Sonnet 5 bekommt den Default-Effort medium im Job-Bag', () => {
-  const { split, cfg, logCtx, teardown } = _bootstrap();
+// `ai.claude.model` global setzen und das Lektorat darauf laufen lassen.
+function _globalModel(appSettings, model) {
+  appSettings.set('ai.claude.model', model, { updatedBy: 'test' });
+}
+
+test('applyLektoratAiOverrides: Sonnet 5 bekommt den Default-Effort medium im Job-Bag', () => {
+  const { split, cfg, appSettings, logCtx, teardown } = _bootstrap();
   try {
+    _globalModel(appSettings, 'claude-sonnet-5');
     logCtx.runWithContext({ job: 'check' }, () => {
-      assert.equal(split.applyLektoratEffort('claude', 'claude-sonnet-5', quietLogger), ':e=medium');
+      assert.deepEqual(split.applyLektoratAiOverrides('claude', quietLogger), { model: 'claude-sonnet-5', cacheSuffix: ':e=medium' });
       assert.deepEqual(logCtx.getContext().aiJob, { provider: 'claude', effort: 'medium' });
       assert.deepEqual(cfg._claudeOutputConfigParams('claude-sonnet-5'), { output_config: { effort: 'medium' } });
     });
   } finally { teardown(); }
 });
 
-test('applyLektoratEffort: Sonnet 4.6 und fremde Provider bleiben ohne Effort', () => {
-  const { split, logCtx, teardown } = _bootstrap();
+test('applyLektoratAiOverrides: Sonnet 4.6 und fremde Provider bleiben ohne Bag', () => {
+  const { split, appSettings, logCtx, teardown } = _bootstrap();
   try {
+    _globalModel(appSettings, 'claude-sonnet-4-6');
     logCtx.runWithContext({ job: 'check' }, () => {
-      assert.equal(split.applyLektoratEffort('claude', 'claude-sonnet-4-6', quietLogger), '');
-      assert.equal(split.applyLektoratEffort('openai-compat', 'claude-sonnet-5', quietLogger), '');
+      assert.deepEqual(split.applyLektoratAiOverrides('claude', quietLogger), { model: 'claude-sonnet-4-6', cacheSuffix: '' });
+      assert.equal(split.applyLektoratAiOverrides('openai-compat', quietLogger).cacheSuffix, '');
       assert.equal(logCtx.getContext().aiJob, undefined);
     });
   } finally { teardown(); }
 });
 
-test('applyLektoratEffort: leerer Setting-Wert = kein Effort-Feld', () => {
+test('applyLektoratAiOverrides: leerer Effort-Wert = kein Effort-Feld', () => {
   const { split, appSettings, logCtx, teardown } = _bootstrap();
   try {
+    _globalModel(appSettings, 'claude-sonnet-5');
     appSettings.set('ai.claude.effort.lektorat', '', { updatedBy: 'test' });
     logCtx.runWithContext({ job: 'check' }, () => {
-      assert.equal(split.applyLektoratEffort('claude', 'claude-sonnet-5', quietLogger), '');
+      assert.equal(split.applyLektoratAiOverrides('claude', quietLogger).cacheSuffix, '');
       assert.equal(logCtx.getContext().aiJob, undefined);
+    });
+  } finally { teardown(); }
+});
+
+// Das Lektorat-Modell schlaegt das globale — und der Effort richtet sich nach dem
+// Lektorat-Modell, nicht nach dem globalen: global Sonnet 4.6 (denkt nicht) +
+// Lektorat Opus 5.5 (denkt) muss den Effort senden.
+test('applyLektoratAiOverrides: ai.claude.model.lektorat routet Modell + Effort', () => {
+  const { split, cfg, appSettings, logCtx, teardown } = _bootstrap();
+  try {
+    _globalModel(appSettings, 'claude-sonnet-4-6');
+    appSettings.set('ai.claude.model.lektorat', 'claude-opus-5-5', { updatedBy: 'test' });
+    logCtx.runWithContext({ job: 'check' }, () => {
+      assert.deepEqual(split.applyLektoratAiOverrides('claude', quietLogger), { model: 'claude-opus-5-5', cacheSuffix: ':e=medium' });
+      assert.deepEqual(logCtx.getContext().aiJob, { provider: 'claude', model: 'claude-opus-5-5', effort: 'medium' });
+      assert.equal(cfg._resolveClaudeModel(), 'claude-opus-5-5');
+    });
+    // Ausserhalb des Job-Kontexts bleibt das globale Modell unberuehrt.
+    assert.equal(cfg._resolveClaudeModel(), 'claude-sonnet-4-6');
+  } finally { teardown(); }
+});
+
+test('applyLektoratAiOverrides: Lektorat-Modell ohne Denken setzt nur das Modell', () => {
+  const { split, appSettings, logCtx, teardown } = _bootstrap();
+  try {
+    _globalModel(appSettings, 'claude-sonnet-5');
+    appSettings.set('ai.claude.model.lektorat', 'claude-sonnet-4-6', { updatedBy: 'test' });
+    logCtx.runWithContext({ job: 'check' }, () => {
+      assert.deepEqual(split.applyLektoratAiOverrides('claude', quietLogger), { model: 'claude-sonnet-4-6', cacheSuffix: '' });
+      assert.deepEqual(logCtx.getContext().aiJob, { provider: 'claude', model: 'claude-sonnet-4-6' });
     });
   } finally { teardown(); }
 });

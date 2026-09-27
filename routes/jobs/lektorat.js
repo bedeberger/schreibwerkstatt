@@ -10,7 +10,7 @@ const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError, contentHttpError,
   aiCall, getPrompts, getBookPrompts,
   htmlToTextForPrompt, jobAbortControllers,
-  _modelName, tps,
+  tps,
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
   jsonBody,
 } = require('./shared');
@@ -43,7 +43,7 @@ const { pageBookGuard } = require('../../lib/page-guard');
 const { listChaptersForBook } = require('../../db/content-names');
 const appSettings = require('../../lib/app-settings');
 const { resolveProvider, effectiveProviderClass } = require('../../lib/ai');
-const { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratEffort } = require('./lektorat-split');
+const { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratAiOverrides } = require('./lektorat-split');
 const {
   lastParagraph, firstParagraph, findPreviousPage, findNextPage, dropNeighbourFindings,
 } = require('./lektorat-context');
@@ -188,7 +188,8 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
   const locale = bookId ? getBookLocale(bookId, userEmail) : 'de-CH';
   const bookSettings = bookId ? getBookSettings(bookId, userEmail) : null;
   const effectiveProvider = resolveProvider({ userEmail });
-  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}${applyLektoratEffort(effectiveProvider, _modelName(effectiveProvider), logger)}`;
+  const { model, cacheSuffix } = applyLektoratAiOverrides(effectiveProvider, logger);
+  const cacheVersion = `${model}:${PROMPTS_VERSION || ''}${cacheSuffix}`;
   try {
     logger.info(`Start: Seite #${pageId}`);
     updateJob(jobId, { statusText: 'job.phase.loadingPageContent', progress: 5 });
@@ -308,7 +309,6 @@ async function runCheckJob(jobId, pageId, bookId, userEmail) {
       if (ctxSig) saveLektoratCache(bookId, userEmail, pageId, ctxSig, result, effectiveProvider);
     }
 
-    const model = _modelName(effectiveProvider);
     const szenen = Array.isArray(result?.szenen) ? result.szenen : [];
     const errorsJson = JSON.stringify(result.fehler);
 
@@ -356,7 +356,8 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
   const prompts = await getPrompts(userEmail);
   const { PROMPTS_VERSION } = prompts;
   const effectiveProvider = resolveProvider({ userEmail });
-  const cacheVersion = `${_modelName(effectiveProvider)}:${PROMPTS_VERSION || ''}${applyLektoratEffort(effectiveProvider, _modelName(effectiveProvider), logger)}`;
+  const { model, cacheSuffix } = applyLektoratAiOverrides(effectiveProvider, logger);
+  const cacheVersion = `${model}:${PROMPTS_VERSION || ''}${cacheSuffix}`;
   const { SYSTEM_LEKTORAT_BLOCKS: SYSTEM_LEKTORAT, STOPWORDS: batchStopwords, ERKLAERUNG_RULE: batchErklaerungRule, KORREKTUR_REGELN: batchKorrekturRegeln } = await getBookPrompts(bookId, userEmail);
   const locale = getBookLocale(bookId, userEmail);
   const langCode = (locale || 'de-CH').split('-')[0];
@@ -384,7 +385,6 @@ async function runBatchCheckJob(jobId, bookId, userEmail) {
     const callsPerPage = split ? objektivRuns() + 1 : 1;
     const concurrency = Math.max(1, Math.floor(rawConcurrency / callsPerPage));
     const tok = { in: 0, out: 0, ms: 0, inflight: new Map() };
-    const model = _modelName(effectiveProvider);
     let done = 0, totalErrors = 0;
 
     // Absatz-Cache pro page_id ({ first, last }), damit die Nachbarseiten-Extraktion

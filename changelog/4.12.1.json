@@ -1,0 +1,11 @@
+{
+  "version": "4.12.1",
+  "date": "2026-09-27",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "App-Einstellungen, Reiter „Provider“: Unter „Modell (Lektorat)“ lässt sich für das Lektorat ein eigenes Claude-Modell wählen. Chat und Bewertungen bleiben beim allgemeinen Modell.",
+      "en": "App settings, “Provider” tab: “Model (proofreading)” lets you pick a separate Claude model for proofreading. Chat and reviews stay on the general model."
+    }
+  ]
+}

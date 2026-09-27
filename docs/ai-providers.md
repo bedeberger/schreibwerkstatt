@@ -323,7 +323,7 @@ Präzedenz: **per-Call-Tier > Job-Bag > Profil > Instanz-Setting.**
 |--------|----------|-----------------|
 | `_komplettAiOverrides` ([job-shared.js](../routes/jobs/komplett/job-shared.js)) | `claude`, `openai-compat` | `ai.<provider>.{model,context_window,max_tokens_out,timeout_ms}.komplett` (+ `effort.komplett` nur Claude) |
 | `_bookChatClaudeOverrides` ([book-chat.js](../routes/jobs/chat/book-chat.js)) | `claude` (Tool-Use) | `ai.claude.*.bookchat` |
-| `applyLektoratEffort` ([lektorat-split.js](../routes/jobs/lektorat-split.js)) | `claude`, nur Modelle mit adaptivem Denken | `ai.claude.effort.lektorat` (Default `medium`; ohne Feld denkt Sonnet 5 auf `high` minutenlang stumm) |
+| `applyLektoratAiOverrides` ([lektorat-split.js](../routes/jobs/lektorat-split.js)) | `claude` | `ai.claude.model.lektorat` (leer = globales Modell) + `ai.claude.effort.lektorat` (Default `medium`, nur wenn das Lektorat-Modell adaptiv denkt; ohne Feld denkt Sonnet 5 auf `high` minutenlang stumm). Das effektive Modell fliesst in die Lektorat-cacheVersion und in `page_checks.model` |
 
 Ollama hat bewusst keinen Override-Satz: dort ist das Modell an das geladene Gewicht gebunden.
 

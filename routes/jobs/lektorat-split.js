@@ -6,7 +6,7 @@
 // und – wenn ja – wie viele Objektiv-Läufe der Konsens fährt (ai.lektorat_objective_runs).
 // Lokale Provider splitten nie (ein kombinierter Single-Call).
 
-const { aiCall, i18nError, updateJob } = require('./shared');
+const { aiCall, i18nError, updateJob, _modelName } = require('./shared');
 const appSettings = require('../../lib/app-settings');
 const { setContext } = require('../../lib/log-context');
 const { _claudeUsesAdaptiveThinking } = require('../../lib/ai');
@@ -30,20 +30,35 @@ function consensusThreshold() {
   return Number.isFinite(n) && n > 0 ? n : 2;
 }
 
-// Effort fuer das Lektorat (`ai.claude.effort.lektorat`) als Job-Bag binden — nur bei
-// Claude und nur auf Modellen mit adaptivem Denken. Dort waehlt die API ohne Feld
-// 'high', und das Modell denkt pro Pass Zehntausende Tokens stumm (Minuten ohne
-// Stream-Text, Output-Kosten ein Vielfaches). Sonnet 4.6 und aelter denken nicht;
-// ein Effort dort kuerzte die sichtbare Antwort, darum bleibt deren Lauf unberuehrt.
-// Rueckgabe: Suffix fuer die cacheVersion (`:e=<effort>`) oder '' — Caches ohne
-// Effort (Sonnet 4.6) behalten so ihre bisherige Version.
-function applyLektoratEffort(effectiveProvider, model, logger) {
-  if (effectiveProvider !== 'claude' || !_claudeUsesAdaptiveThinking(model)) return '';
-  const effort = String(appSettings.get('ai.claude.effort.lektorat') || '').trim().toLowerCase();
-  if (!effort) return '';
-  setContext({ aiJob: { provider: 'claude', effort } });
-  logger.info(`Lektorat-Effort (${model}): ${effort}.`);
-  return `:e=${effort}`;
+// Modell + Effort des Lektorats als EIN Job-Bag binden (setContext ersetzt `aiJob`
+// ganz — zwei getrennte Setzer wuerden sich gegenseitig ueberschreiben). Nur Claude.
+//   `ai.claude.model.lektorat` — eigenes Modell fuers Seiten- und Batch-Lektorat,
+//     leer = folgt `ai.claude.model`. Erlaubt ein denkendes Modell (Opus/Sonnet 5)
+//     fuers Lektorat, waehrend die uebrigen Jobs beim globalen Modell bleiben.
+//   `ai.claude.effort.lektorat` — nur auf Modellen mit adaptivem Denken. Dort waehlt
+//     die API ohne Feld 'high', und das Modell denkt pro Pass Zehntausende Tokens
+//     stumm (Minuten ohne Stream-Text, Output-Kosten ein Vielfaches). Sonnet 4.6 und
+//     aelter denken nicht; ein Effort dort kuerzte die sichtbare Antwort.
+// Rueckgabe: { model, cacheSuffix }. `model` ist das effektiv laufende Modell (fuer
+// cacheVersion und page_checks.model), `cacheSuffix` = `:e=<effort>`
+// oder '' — Caches ohne Effort (Sonnet 4.6) behalten so ihre bisherige Version.
+function applyLektoratAiOverrides(effectiveProvider, logger) {
+  const baseModel = _modelName(effectiveProvider);
+  if (effectiveProvider !== 'claude') return { model: baseModel, cacheSuffix: '' };
+  const override = String(appSettings.get('ai.claude.model.lektorat') || '').trim();
+  const model = override || baseModel;
+  const bag = { provider: 'claude' };
+  if (override) bag.model = override;
+  let cacheSuffix = '';
+  if (_claudeUsesAdaptiveThinking(model)) {
+    const effort = String(appSettings.get('ai.claude.effort.lektorat') || '').trim().toLowerCase();
+    if (effort) { bag.effort = effort; cacheSuffix = `:e=${effort}`; }
+  }
+  if (Object.keys(bag).length > 1) {
+    setContext({ aiJob: bag });
+    logger.info(`Lektorat-Override: ${JSON.stringify(bag)}.`);
+  }
+  return { model, cacheSuffix };
 }
 
 // Statuszeile des Einzel-Lektorats. „KI denkt nach …", solange mindestens ein
@@ -167,4 +182,4 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   return { fehler, szenen: stilResult.szenen, stilanalyse: stilResult.stilanalyse, fazit: stilResult.fazit };
 }
 
-module.exports = { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratEffort };
+module.exports = { lektoratAnalyze, objektivRuns, splitEnabled, applyLektoratAiOverrides };
