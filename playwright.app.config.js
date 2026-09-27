@@ -18,10 +18,21 @@
 // zweite auf dem Endzustand der ersten startet und reihenfolgeabhaengig rot wird.
 // Getrennte Ports/DBs statt Reset-Hooks: der webServer-Block laeuft einmal pro
 // Lauf, nicht pro Projekt.
-const DB = './tests/.tmp/smoke.db';
-const PORT = 8766;
-const DB_FF = './tests/.tmp/smoke-firefox.db';
-const PORT_FF = 8767;
+//
+// Sharding (CI, .github/workflows/deploy.yml): mehrere Playwright-Prozesse mit
+// `--shard=i/n` laufen gleichzeitig, jeder mit `SMOKE_SHARD=i` — eigene Ports,
+// eigene DBs, eigener outputDir, also dieselbe Isolation wie zwischen den
+// Engines. `workers: 1` bleibt pro Shard: die Specs einer Datei-Gruppe teilen
+// weiterhin genau einen Seed-Stand. `SMOKE_ENGINES=chromium` bootet nur den
+// Chromium-Server — Playwright startet sonst jeden webServer-Eintrag
+// unabhaengig vom --project-Filter.
+const SHARD = Number(process.env.SMOKE_SHARD) || 0;
+const ENGINES = (process.env.SMOKE_ENGINES || 'chromium,firefox').split(',');
+const SUFFIX = SHARD ? `-s${SHARD}` : '';
+const DB = `./tests/.tmp/smoke${SUFFIX}.db`;
+const PORT = 8766 + SHARD * 2;
+const DB_FF = `./tests/.tmp/smoke-firefox${SUFFIX}.db`;
+const PORT_FF = 8767 + SHARD * 2;
 
 // `mkdir -p`: tests/.tmp/ ist gitignored und fehlt in jedem frischen Checkout (CI).
 const serve = (db, port) =>
@@ -30,6 +41,7 @@ const serve = (db, port) =>
 module.exports = {
   testDir: './tests/e2e-app',
   testMatch: '**/*.spec.js',
+  outputDir: SHARD ? `./test-results/app${SUFFIX}` : undefined,
   fullyParallel: false,
   workers: 1,
   // Lokal EIN Retry, seit die Suite zwei Engines gegen zwei eigene Server faehrt:
@@ -62,7 +74,7 @@ module.exports = {
       testMatch: ['**/smoke.spec.js', '**/focus-editor-app.spec.js', '**/notebook-*.spec.js'],
       use: { browserName: 'firefox', baseURL: `http://localhost:${PORT_FF}` },
     },
-  ],
+  ].filter((p) => ENGINES.includes(p.name)),
   webServer: [
     // DB vor dem Boot loeschen (inkl. -wal/-shm), damit dev-seed greift.
     // reuseExistingServer: false auch lokal — das `rm -f` laeuft nur beim
@@ -72,7 +84,7 @@ module.exports = {
     // bricht Playwright lieber laut ab (Rest-Server beenden: lsof -i :8766).
     // Kein dedizierter Health-Endpoint — in LOCAL_DEV_MODE liefert `/` die SPA
     // (Auth-Guard via Dev-Session gebypasst), reicht als Readiness-Signal.
-    {
+    ENGINES.includes('chromium') && {
       command: serve(DB, PORT),
       url: `http://localhost:${PORT}/`,
       timeout: 60000,
@@ -80,7 +92,7 @@ module.exports = {
       stdout: 'pipe',
       stderr: 'pipe',
     },
-    {
+    ENGINES.includes('firefox') && {
       command: serve(DB_FF, PORT_FF),
       url: `http://localhost:${PORT_FF}/`,
       timeout: 60000,
@@ -88,5 +100,5 @@ module.exports = {
       stdout: 'pipe',
       stderr: 'pipe',
     },
-  ],
+  ].filter(Boolean),
 };

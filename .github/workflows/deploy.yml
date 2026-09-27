@@ -199,8 +199,7 @@ jobs:
   # ohnehin nacheinander, parallele Port-Kollisionen gibt es dort nicht.
   #
   # Nur Chromium: das firefox-Projekt der Config bleibt lokal (`npm run
-  # test:smoke`). Beide webServer-Eintraege booten trotzdem — Playwright startet
-  # sie unabhaengig vom --project-Filter; das kostet nur einen Server-Boot.
+  # test:smoke`); SMOKE_ENGINES=chromium laesst auch dessen Server weg.
   e2e-app:
     name: Playwright gegen die echte App (Smoke + App-Specs)
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJson('["self-hosted","prod"]') }}
@@ -237,8 +236,36 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
-      - name: App-Specs ausführen (Chromium)
-        run: npx playwright test --config=playwright.app.config.js --project=chromium --reporter=list
+      # Zwei Shards gleichzeitig, je mit eigenem Server + eigener Wegwerf-DB
+      # (SMOKE_SHARD → Ports/DB/outputDir, siehe playwright.app.config.js). Pro
+      # Shard bleibt `workers: 1`, die Specs einer Datei-Gruppe teilen weiter
+      # genau einen Seed-Stand. Seriell brauchte die Suite ~4,5 min fast nur
+      # fuer den Grundaufwand pro Test (Browser + SPA-Boot), nicht fuer IO.
+      # Mehr als zwei nicht: ein Shard belegt ~1,3 GB, der LXC teilt seine 6 GB
+      # mit der Prod-App. Ausgabe pro Shard gepuffert und danach am Stueck
+      # ausgegeben, damit die Reports nicht ineinanderlaufen.
+      - name: App-Specs ausführen (Chromium, 2 Shards)
+        env:
+          SMOKE_ENGINES: chromium
+        run: |
+          n=2
+          for i in $(seq 1 $n); do
+            SMOKE_SHARD=$i npx playwright test --config=playwright.app.config.js \
+              --project=chromium --shard=$i/$n --reporter=list > "shard-$i.log" 2>&1 &
+            pids[$i]=$!
+          done
+          status=0
+          for i in $(seq 1 $n); do
+            if ! wait "${pids[$i]}"; then status=1; echo "::error::App-Specs Shard $i/$n rot"; fi
+          done
+          for i in $(seq 1 $n); do
+            echo "::group::Shard $i/$n"; cat "shard-$i.log"; echo "::endgroup::"
+          done
+          # Zusammenfassung ausserhalb der Gruppen, damit sie ohne Aufklappen sichtbar ist.
+          for i in $(seq 1 $n); do
+            echo "Shard $i/$n: $(grep -E '^\s+[0-9]+ (passed|failed|flaky|skipped)' "shard-$i.log" | tr -s ' ' | tr '\n' ' ')"
+          done
+          exit $status
 
   deploy:
     name: Deploy auf Prod-LXC
