@@ -16,6 +16,18 @@ set -euo pipefail
 
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
+# Node-Major vor allem anderen pruefen (package.json#engines: >=22). Das CD
+# aktualisiert Node bewusst nicht selbst — ein System-Paket-Upgrade gehoert in
+# install.sh/install-demo.sh. Ohne diese Probe scheitert ein zu altes Node erst
+# tief in `npm install` am Build eines nativen Moduls.
+NODE_MIN_MAJOR=22
+NODE_HAVE_MAJOR=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
+if [ "$NODE_HAVE_MAJOR" -lt "$NODE_MIN_MAJOR" ]; then
+  echo "✗ Node $(node -v 2>/dev/null || echo fehlt) ist zu alt, gebraucht wird >= ${NODE_MIN_MAJOR}." >&2
+  echo "  Auf der LXC: curl -fsSL https://deb.nodesource.com/setup_${NODE_MIN_MAJOR}.x | bash - && apt-get install -y nodejs" >&2
+  exit 1
+fi
+
 FLAVOUR="${SW_FLAVOUR:-prod}"
 case "$FLAVOUR" in
   prod)

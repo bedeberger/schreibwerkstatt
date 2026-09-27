@@ -13,15 +13,21 @@ echo ""
 echo "=== Schreibwerkstatt Installer ==="
 echo ""
 
-# Node.js prüfen
-if ! command -v node &>/dev/null; then
-  echo "Node.js nicht gefunden. Installiere Node.js 22 (LTS)..."
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+# Node.js prüfen — fehlt es oder ist es älter als package.json#engines (>=22),
+# wird Node 22 installiert. Native Module wie better-sqlite3 liefern für ältere
+# Majors keine Prebuilds mehr; ohne Build-Toolchain scheitert dann `npm install`.
+NODE_MAJOR=22
+node_major() { node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
+if ! command -v node &>/dev/null || [ "$(node_major)" -lt "$NODE_MAJOR" ]; then
+  echo "Node.js fehlt oder ist zu alt. Installiere Node.js ${NODE_MAJOR} (LTS)..."
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
   apt-get install -y nodejs
-else
-  NODE_VER=$(node -v)
-  echo "Node.js gefunden: $NODE_VER"
 fi
+if [ "$(node_major)" -lt "$NODE_MAJOR" ]; then
+  echo "Node.js $(node -v) ist noch zu alt — altes nodejs/npm-Paket entfernen (apt-get remove nodejs npm) und erneut starten." >&2
+  exit 1
+fi
+echo "Node.js: $(node -v)"
 
 # Zielverzeichnis anlegen
 echo "Installiere nach $INSTALL_DIR..."
