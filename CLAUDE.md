@@ -54,6 +54,7 @@ Diese Regeln setzt ein Hook ([.claude/settings.json](.claude/settings.json), [sc
 | Neue `/metrics`-Kennzahl ⇒ Home-Assistant-Configs im selben Commit | `drift-reminders.js` | [docs/homeassistant/README.md](docs/homeassistant/README.md) |
 | Unit-Tests vor dem Commit | `stop-run-unit-tests.js` (Turn-Ende) | unten, „Tests" |
 | Editor-/Chat-/Kommentar-Mehrdeutigkeit im Prompt | `prompt-disambiguation.js` (injiziert Hinweis) | oben, „Bevor du anfängst" |
+| Nur auf `main` — kein Branch, kein Worktree, kein Subagent mit `isolation: "worktree"` | `main-only-guard.js` **blockt** | unten, „Arbeitsweise" |
 
 Ein Hook warnt, er lehrt nicht: **die Alternative steht im Volltext**, und wer eine dieser Regeln ändern will, liest dort zuerst die Begründung.
 
@@ -99,6 +100,10 @@ Lies das Doc, **bevor** du im jeweiligen Bereich etwas änderst — nicht danach
 Die drei Sync-Proxy-Ausnahmen zur Job-Queue-Regel sind LanguageTool, STT und TTS — sonst gilt sie ohne Ausnahme.
 
 ## Arbeitsweise
+
+### Nur auf main
+
+Entwickelt und committet wird ausschliesslich auf `main`. Keine Feature-/Fix-Branches, keine Worktrees, Subagents **ohne** `isolation: "worktree"` starten — jeder so isolierte Agent hinterlässt einen `worktree-agent-*`-Branch, auch wenn seine Arbeit längst auf `main` liegt.
 
 ### Feature-Pläne
 

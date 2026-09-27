@@ -10,6 +10,16 @@
             "statusMessage": "Style-/SQL-Regeln pruefen"
           }
         ]
+      },
+      {
+        "matcher": "Agent|EnterWorktree|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/main-only-guard.js",
+            "statusMessage": "Nur-main-Regel pruefen"
+          }
+        ]
       }
     ],
     "PostToolUse": [
