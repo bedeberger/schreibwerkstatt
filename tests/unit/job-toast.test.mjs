@@ -1,8 +1,12 @@
 // Tests für _onJobFinished → Job-Done-Toast.
 // Whitelist-Filter, Severity-Mapping, Auto-Dismiss-Verhalten via Stub-Timer.
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { appJobsCoreMethods } from '../../public/js/app/app-jobs-core.js';
+
+// Simulierte Timer: der echte Auto-Dismiss-Timer (bis 9 s) hielte den
+// Test-Prozess sonst nach dem letzten Test am Leben.
+mock.timers.enable({ apis: ['setTimeout'] });
 
 function makeCtx() {
   // Nav-State lebt in Alpine.store('nav') (kein Root-Proxy mehr): nav unter
@@ -107,6 +111,22 @@ test('_dismissJobToast räumt State + Timer', () => {
   ctx._dismissJobToast();
   assert.equal(ctx.$store.jobs.jobToast, null);
   assert.equal(ctx.$store.jobs._jobToastTimer, null);
+});
+
+test('Auto-Dismiss: ok nach 4,5 s, err nach 9 s', () => {
+  const ctx = makeCtx();
+  ctx._onJobFinished({ type: 'review', jobId: 20, bookId: 1, job: { status: 'done' } });
+  mock.timers.tick(4499);
+  assert.ok(ctx.$store.jobs.jobToast);
+  mock.timers.tick(1);
+  assert.equal(ctx.$store.jobs.jobToast, null);
+  assert.equal(ctx.$store.jobs._jobToastTimer, null);
+
+  ctx._onJobFinished({ type: 'pdf-export', jobId: 21, bookId: 1, job: { status: 'error', error: 'x' } });
+  mock.timers.tick(8999);
+  assert.ok(ctx.$store.jobs.jobToast);
+  mock.timers.tick(1);
+  assert.equal(ctx.$store.jobs.jobToast, null);
 });
 
 test('aufeinanderfolgende Toasts ersetzen sich (Timer reset)', () => {

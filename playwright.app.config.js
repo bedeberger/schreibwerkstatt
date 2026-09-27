@@ -53,7 +53,15 @@ module.exports = {
     // in Gecko sauber bootet, sieht man sonst erst aus dem Feld (js_errors).
     // Firefox statt WebKit, weil playwright.config.js die WebKit-Achse bereits
     // gezielt ueber `*.webkit.spec.js` bedient.
-    { name: 'firefox', use: { browserName: 'firefox', baseURL: `http://localhost:${PORT_FF}` } },
+    // Nur Smoke + die Editor-Specs: dort haengt das Verhalten an Selection,
+    // contenteditable und Geometrie, wo Gecko eigene Fehler zeigt. Die uebrigen
+    // Karten-Specs pruefen App-Logik, die in beiden Engines gleich laeuft — sie
+    // doppelt zu fahren kostete rund die Haelfte der Suite-Laufzeit.
+    {
+      name: 'firefox',
+      testMatch: ['**/smoke.spec.js', '**/focus-editor-app.spec.js', '**/notebook-*.spec.js'],
+      use: { browserName: 'firefox', baseURL: `http://localhost:${PORT_FF}` },
+    },
   ],
   webServer: [
     // DB vor dem Boot loeschen (inkl. -wal/-shm), damit dev-seed greift.

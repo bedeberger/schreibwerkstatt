@@ -2,9 +2,13 @@
 // darf nie als „anderer User" formuliert werden. Deckt die drei Faelle des
 // Toasts + den Tree-Tooltip ab.
 
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { appCollabMethods } from '../../public/js/app/app-collab.js';
+
+// Simulierte Timer: der echte 7-s-Toast-Timer hielte den Test-Prozess sonst
+// nach dem letzten Test am Leben.
+mock.timers.enable({ apis: ['setTimeout'] });
 
 // Minimal-Kontext: nur was die getesteten Methoden anfassen. `t` gibt den Key
 // samt Params zurueck, damit der Test die Key-Wahl prueft statt Wortlaut.

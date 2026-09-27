@@ -7,7 +7,7 @@ Vier Suiten, sequenziell via `npm test`. Erstmaliges Setup: `npx playwright inst
 | Unit | `node --test` | [tests/unit/](../tests/unit/) | `npm run test:unit` | Parallelisiert (concurrency 4), kein Browser; DB-Tests je File auf eigener Wegwerf-SQLite |
 | Integration | `node --test` | [tests/integration/](../tests/integration/) | `npm run test:integration` | Parallelisiert (concurrency 4), Mock-AI, Content-Store gegen Test-SQLite |
 | E2E | Playwright | [tests/e2e/](../tests/e2e/) | `npm run test:e2e` | Chromium gegen `tests/server.js` mit Fixture-Harness |
-| Smoke | Playwright | [tests/e2e-app/](../tests/e2e-app/) | `npm run test:smoke` | Chromium gegen die **echte** App (`node server.js`, `LOCAL_DEV_MODE`) |
+| Smoke | Playwright | [tests/e2e-app/](../tests/e2e-app/) | `npm run test:smoke` | Chromium gegen die **echte** App (`node server.js`, `LOCAL_DEV_MODE`); lokal zusätzlich Firefox nur für `smoke`, `focus-editor-app` und `notebook-*` (CI: nur Chromium) |
 
 ## Wann welche Suite?
 
