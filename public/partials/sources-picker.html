@@ -12,6 +12,9 @@
         <button type="button" class="search-clear--icon" x-show="srcPoolFilter" @click="srcPoolFilter = ''"
                 :aria-label="$app.t('search.clear')" :data-tip="$app.t('search.clear')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </span>
+      <div x-data="combobox($app.t('sources.filter.tag'), $app.t('sources.filter.allTags'))"
+           x-modelable="value" x-model="srcPoolTag"
+           x-effect="options = srcTagOptions()"></div>
       <button type="button" class="icon-btn icon-btn--ghost" @click="closeSourcePicker()"
               :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
     </div>
@@ -30,6 +33,7 @@
             <span class="sources-picker-meta">
               <span class="tag entity-typ-tag" x-text="p._typeLabel"></span>
               <span x-show="p.year" x-text="p.year"></span>
+              <template x-for="t in (p.tags || [])" :key="t"><span class="tag sources-tag" x-text="t"></span></template>
               <span class="sources-picker-books" x-show="p.book_count > 0"
                     x-text="$app.t('sources.picker.usedInN', { n: p.book_count })"></span>
             </span>

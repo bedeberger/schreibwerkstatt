@@ -25,7 +25,7 @@ export function registerEditorNotebookCard() {
     _formatMarksRaf: null,
     _formatMarksRO: null,
     _formatMarksAbort: null,
-    // Globale Listener der Karte (DIAGRAMS_REDRAWN): in destroy() abgeräumt.
+    // Globale Listener der Karte (DIAGRAMS_REDRAWN, Bild-load): in destroy() abgeräumt.
     _notebookAbort: null,
 
     init() {
@@ -37,6 +37,7 @@ export function registerEditorNotebookCard() {
       this._setupNotebookRestore();
       this._setupNotebookDiagrams();
       this._setupNotebookCaptionNumbers();
+      this._setupNotebookPageHeight();
     },
 
     destroy() {

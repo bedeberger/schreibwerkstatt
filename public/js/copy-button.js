@@ -15,6 +15,9 @@
 //
 // Config-Optionen:
 //   text     Pflicht. Funktion oder String → kopierter Wert.
+//   html     Optional. Funktion oder String → zusaetzlich als text/html in die
+//            Zwischenablage (Rich-Text-Editoren uebernehmen Liste, Kursiv und
+//            Links). Leer → nur Klartext.
 //   label    Default-Label. Funktion oder String. Default `t('common.copy')`.
 //   copied   Flash-Label. Funktion oder String. Default `t('common.copied')`.
 //   duration Flash-Dauer in ms. Default 2000.
@@ -45,6 +48,24 @@ export async function copyText(text) {
   }
 }
 
+/** Klartext UND HTML in die Zwischenablage: ein Rich-Text-Ziel (Moodle, Word,
+ *  Mail) nimmt die HTML-Fassung, ein Textfeld die Klartext-Fassung. Ohne
+ *  ClipboardItem-Support (aeltere Browser, non-secure-context) bleibt es beim
+ *  Klartext. */
+export async function copyRich(text, html) {
+  if (!html) return copyText(text);
+  try {
+    if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) throw new Error('no ClipboardItem');
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/plain': new Blob([String(text ?? '')], { type: 'text/plain' }),
+      'text/html': new Blob([String(html)], { type: 'text/html' }),
+    })]);
+    return true;
+  } catch (_) {
+    return copyText(text);
+  }
+}
+
 export function registerCopyButton() {
   if (typeof window === 'undefined' || !window.Alpine) return;
   window.Alpine.data('copyButton', (cfg = {}) => ({
@@ -52,6 +73,7 @@ export function registerCopyButton() {
     _timer: null,
     _cfg: {
       text: cfg.text,
+      html: cfg.html ?? null,
       label: cfg.label ?? (() => window.__app?.t?.('common.copy') ?? 'Copy'),
       copiedLabel: cfg.copied ?? (() => window.__app?.t?.('common.copied') ?? 'Copied'),
       duration: cfg.duration ?? 2000,
@@ -69,7 +91,7 @@ export function registerCopyButton() {
       const el = this.$el;
       el.setAttribute('type', 'button');
       el.addEventListener('click', async () => {
-        const ok = await copyText(this._resolve(this._cfg.text));
+        const ok = await copyRich(this._resolve(this._cfg.text), this._resolve(this._cfg.html));
         if (!ok) return;
         this._copied = true;
         this._render();

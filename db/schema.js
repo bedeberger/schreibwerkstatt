@@ -187,6 +187,8 @@ module.exports = {
   createSource:           sources.createSource,
   updateSource:           sources.updateSource,
   deleteSource:           sources.deleteSource,
+  setSourceTags:          sources.setSourceTags,
+  listPoolTags:           sources.listPoolTags,
   linkSource:             sources.linkSource,
   unlinkSource:           sources.unlinkSource,
   isSourceLinked:         sources.isSourceLinked,

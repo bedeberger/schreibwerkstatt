@@ -269,6 +269,35 @@ test('CASCADE: Quelle, Seite und Buch raeumen Fund-Index und Bruecke auf', () =>
   assert.equal(db.pragma('foreign_key_check').length, 0);
 });
 
+test('Schlagworte: normalisiert, Full-Replace, PATCH ohne tags laesst sie stehen', () => {
+  const s = makeSource(BOOK, { title: 'Scrum Guide', tags: ['  ZHAW ', 'zhaw', 'CAS   AITPM', '', 42] });
+  assert.deepEqual(s.tags, ['CAS AITPM', 'ZHAW']);   // getrimmt, Dublette (NOCASE) weg, alphabetisch
+
+  // Archivieren ohne `tags` darf die Schlagworte nicht leeren.
+  assert.deepEqual(schema.updateSource(s.id, { archived: 1 }).tags, ['CAS AITPM', 'ZHAW']);
+  assert.deepEqual(schema.updateSource(s.id, { tags: ['Agil'] }).tags, ['Agil']);
+
+  // Mit der Zeile in Buch- und Pool-Sicht.
+  assert.deepEqual(schema.listSources(BOOK, { includeArchived: true }).find(x => x.id === s.id).tags, ['Agil']);
+  assert.deepEqual(schema.getSource(s.id).tags, ['Agil']);
+});
+
+test('listPoolTags zaehlt je Schlagwort, nur die eigene Bibliothek, CASCADE beim Loeschen', () => {
+  const OWNER = 'tags@x.test';
+  const a = makeSource(null, { title: 'A', tags: ['ZHAW', 'Strategie'] }, OWNER);
+  makeSource(null, { title: 'B', tags: ['zhaw'] }, OWNER);
+  makeSource(null, { title: 'C', tags: ['ZHAW'] }, 'fremd@x.test');
+
+  assert.deepEqual(schema.listPoolTags(OWNER), [
+    { tag: 'Strategie', count: 1 },
+    { tag: 'ZHAW', count: 2 },
+  ]);
+
+  schema.deleteSource(a.id);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM source_tags WHERE source_id = ?').get(a.id).n, 0);
+  assert.deepEqual(schema.listPoolTags(OWNER), [{ tag: 'zhaw', count: 1 }]);
+});
+
 test('archivierte Quellen sind aus der Standardliste ausgeblendet', () => {
   const bookId = 4005;
   schema.upsertBookByName(bookId, 'Archiv');

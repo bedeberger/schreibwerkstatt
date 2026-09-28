@@ -1,0 +1,113 @@
+<!-- Export-Panel der Quellen-Karte: Auswahl (Buecher, Schlagworte, nur
+     belegte) → Format → Kopieren/Herunterladen. Fragment von
+     partials/sources.html (via `<!-- @include sources-export -->`), kein
+     eigener x-data-Scope — Methoden in public/js/sources/export-panel.js,
+     Formatierung pure in public/js/sources/export.js. -->
+  <!-- x-if statt x-show: die Comboboxen (Zitierstil, Format) sollen nicht
+       dauerhaft im DOM neben denen der Buch-Einstellungen haengen. -->
+  <template x-if="srcExportOpen">
+  <div class="sources-export">
+    <div class="sources-picker-head">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
+      <span class="sources-picker-title" x-text="$app.t('sources.export.title')"></span>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="closeSourceExport()"
+              :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
+    </div>
+
+    <div class="card-form-grid">
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" x-text="$app.t('sources.export.books')"></label>
+        <div class="card-form-field">
+          <div x-data="combobox({ placeholder: $app.t('sources.export.booksAll'), multiple: true })"
+               x-modelable="value" x-model="srcExportBooks"
+               x-effect="options = srcExportBookOptions()"
+               @combobox-change="srcExportBooks = $event.detail; loadSourceExportRows()"></div>
+          <div class="export-chip-row" x-show="srcExportBooks.length">
+            <template x-for="chip in srcExportBookChips()" :key="chip.id">
+              <span class="export-chip">
+                <span x-text="chip.label"></span>
+                <button type="button" class="export-chip-remove" :aria-label="$app.t('common.remove')"
+                        @click="removeSrcExportBook(chip.id)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
+              </span>
+            </template>
+          </div>
+          <p class="card-form-field-note" x-text="$app.t('sources.export.booksHint')"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" x-text="$app.t('sources.export.tags')"></label>
+        <div class="card-form-field">
+          <div x-data="combobox({ placeholder: $app.t('sources.export.tagsAll'), multiple: true })"
+               x-modelable="value" x-model="srcExportTags"
+               x-effect="options = srcExportTagOptions()"></div>
+          <div class="export-chip-row" x-show="srcExportTags.length">
+            <template x-for="t in srcExportTags" :key="t">
+              <span class="export-chip">
+                <span x-text="t"></span>
+                <button type="button" class="export-chip-remove" :aria-label="$app.t('common.remove')"
+                        @click="removeSrcExportTag(t)"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
+              </span>
+            </template>
+          </div>
+          <p class="card-form-field-note" x-text="$app.t('sources.export.tagsHint')"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('sources.export.filter')"></label>
+        <div class="form-stack">
+          <label class="form-check">
+            <input type="checkbox" x-model="srcExportCitedOnly" :disabled="srcExportBooks.length === 0">
+            <span class="form-check-title" x-text="$app.t('sources.export.citedOnly')"></span>
+          </label>
+          <label class="form-check">
+            <input type="checkbox" x-model="srcExportArchived">
+            <span class="form-check-title" x-text="$app.t('sources.export.includeArchived')"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card-form-row">
+        <label class="card-form-label" x-text="$app.t('sources.export.format')"></label>
+        <div class="card-form-field">
+          <div x-data="combobox({ placeholder: $app.t('sources.export.format'), compact: false })"
+               x-modelable="value" x-model="srcExportFormat"
+               x-effect="options = srcExportFormatOptions()"></div>
+          <p class="card-form-field-note" x-text="$app.t('sources.export.formatHint.' + srcExportFormat)"></p>
+        </div>
+      </div>
+
+      <div class="card-form-row" x-show="srcExportIsStyled()">
+        <label class="card-form-label" x-text="$app.t('sources.export.style')"></label>
+        <div class="card-form-field sources-export-style">
+          <div x-data="combobox({ placeholder: $app.t('sources.export.style'), compact: false })"
+               x-modelable="value" x-model="srcExportStyle"
+               x-effect="options = srcExportStyleOptions()"></div>
+          <div x-data="combobox({ placeholder: $app.t('sources.export.lang'), compact: false })"
+               x-modelable="value" x-model="srcExportLang"
+               x-effect="options = srcExportLangOptions()"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="muted-msg muted-msg--sm" x-show="srcExportLoading" x-text="$app.t('sources.export.loading')"></div>
+    <p class="card-form-error" x-show="srcExportError" x-cloak x-text="srcExportError"></p>
+
+    <div x-show="!srcExportLoading && !srcExportError" x-cloak>
+      <p class="muted-msg muted-msg--sm" x-text="srcExportSummary()"></p>
+      <textarea class="card-form-textarea sources-export-preview" readonly rows="10"
+                :aria-label="$app.t('sources.export.preview')"
+                x-show="srcExportResult().count > 0" :value="srcExportResult().text"></textarea>
+      <div class="sources-export-actions" x-show="srcExportResult().count > 0">
+        <button class="primary" x-data="copyButton({ text: () => srcExportResult().text, html: () => srcExportResult().html })"></button>
+        <button type="button" @click="downloadSourceExport()">
+          <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
+          <span x-text="$app.t('sources.export.download')"></span>
+        </button>
+      </div>
+      <p class="card-form-field-note" x-show="srcExportIsStyled() && srcExportResult().count > 0"
+         x-text="$app.t('sources.export.copyHint')"></p>
+    </div>
+  </div>
+  </template>

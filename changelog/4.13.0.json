@@ -1,0 +1,21 @@
+{
+  "version": "4.13.0",
+  "date": "2026-09-28",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Quellen-Karte, Knopf „Exportieren“: Das Quellenverzeichnis lässt sich ohne Buchtext exportieren, etwa als formatierte Literaturliste, Linksammlung, BibTeX oder RIS. Eingefügt in Moodle oder Word bleiben Aufzählung, Kursivsatz und Links erhalten.",
+      "en": "Sources card, “Export” button: the bibliography can be exported without the book text, e.g. as a formatted reference list, link list, BibTeX or RIS. Pasted into Moodle or Word, the list keeps its bullets, italics and links."
+    },
+    {
+      "kind": "neu",
+      "de": "Quellen-Karte: Quellen können jetzt Schlagworte tragen, zum Beispiel einen Kurs oder ein Projekt. Sie gelten in allen Büchern und filtern das Verzeichnis, die Bibliotheks-Auswahl und den Export.",
+      "en": "Sources card: sources can now carry tags, for example a course or a project. They apply in all books and filter the list, the library picker and the export."
+    },
+    {
+      "kind": "behoben",
+      "de": "Seitenansicht: Bei Seiten mit Bildern war der Lesekasten zu niedrig, und die Bilder verschwanden hinter einer inneren Scrollleiste. Der Kasten wächst jetzt mit den Bildern mit.",
+      "en": "Page view: on pages with images the reading box was too short, and the images disappeared behind an inner scrollbar. The box now grows with the images."
+    }
+  ]
+}

@@ -93,6 +93,7 @@ export const sourcesMethods = {
 
     this.srcFilterText = '';
     this.srcFilterType = '';
+    this.srcFilterTag = '';
     if (s.archived) this.srcShowArchived = true;
     if (s.cite_count > 0 && this.srcCitationsId !== s.id) this.openSourceCitations(s);
 
@@ -169,13 +170,14 @@ export const sourcesMethods = {
     // `_uiLocale()` in den Deps, weil die Zeilen ein lokalisiertes Typ-Label
     // backen — ohne den Dep bleibt es nach einem Sprachwechsel stehen.
     return this._memo('rows', [
-      this.sources, this.srcFilterText, this.srcFilterType,
+      this.sources, this.srcFilterText, this.srcFilterType, this.srcFilterTag,
       this.srcShowArchived, this._uiLocale(),
     ], () => {
       const type = this.srcFilterType || '';
       let list = this.sources;
       if (!this.srcShowArchived) list = list.filter(s => !s.archived);
       if (type) list = list.filter(s => s.csl_type === type);
+      if (this.srcFilterTag) list = list.filter(s => this.srcMatchesTag(s, this.srcFilterTag));
       return this._computeSourceRows(filterSources(list, this.srcFilterText));
     });
   },
@@ -211,15 +213,19 @@ export const sourcesMethods = {
   startCreateSource() {
     this.srcEditingId = 'new';
     this.srcDraft = draftFromSource(null);
+    this.srcTagInput = '';
     this.srcFormError = '';
     this.closeSourceCitations();
+    this.closeSourceExport();
   },
 
   startEditSource(s) {
     if (!s?.id) return;
     this.srcEditingId = s.id;
     this.srcDraft = draftFromSource(s);
+    this.srcTagInput = '';
     this.srcFormError = '';
+    this.closeSourceExport();
   },
 
   cancelSourceEdit() {
@@ -268,6 +274,9 @@ export const sourcesMethods = {
   async saveSource() {
     const bookId = _bookId();
     if (!bookId || !this.srcCanSave()) return;
+    // Ein getipptes, noch nicht mit Enter bestaetigtes Schlagwort gilt mit —
+    // sonst verschwindet es beim Speichern kommentarlos.
+    if (this.srcTagInput) this.addSrcDraftTag();
     this.sourcesBusy = true;
     this.srcFormError = '';
     try {
@@ -279,6 +288,7 @@ export const sourcesMethods = {
       }
       this.cancelSourceEdit();
       await this.loadSources();
+      this.loadSourceTags();
       this._sourcesChanged();
       this._flashSourcesSaved();
     } catch (e) {
@@ -315,9 +325,10 @@ export const sourcesMethods = {
     if (this.srcPickerOpen) { this.closeSourcePicker(); return; }
     this.cancelSourceEdit();
     this.closeSourceCitations();
-    // Beide Panels sitzen an derselben Stelle unter der Toolbar — nebeneinander
+    // Die Panels sitzen an derselben Stelle unter der Toolbar — nebeneinander
     // offen wuerden sie den Blick auf die Tabelle verstellen.
     this.closeSourceDetect();
+    this.closeSourceExport();
     this.srcPickerOpen = true;
     await this.loadSourcePool();
   },
@@ -326,6 +337,7 @@ export const sourcesMethods = {
     this.srcPickerOpen = false;
     this.srcPool = [];
     this.srcPoolFilter = '';
+    this.srcPoolTag = '';
     this.srcPoolError = '';
     this._memos = {};
   },
@@ -350,8 +362,9 @@ export const sourcesMethods = {
   },
 
   srcPoolRows() {
-    return this._memo('pool', [this.srcPool, this.srcPoolFilter, this._uiLocale()],
-      () => this._computeSourceRows(filterSources(this.srcPool, this.srcPoolFilter)));
+    return this._memo('pool', [this.srcPool, this.srcPoolFilter, this.srcPoolTag, this._uiLocale()],
+      () => this._computeSourceRows(filterSources(
+        this.srcPool.filter(s => this.srcMatchesTag(s, this.srcPoolTag)), this.srcPoolFilter)));
   },
 
   /** Quelle aus der Bibliothek diesem Buch zuordnen. Kein Kopieren: beide

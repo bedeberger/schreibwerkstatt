@@ -16,6 +16,8 @@ import { setupCardLifecycle } from './card-lifecycle.js';
 import { sourcesMethods } from '../sources/manage.js';
 import { sourcesDocMethods } from '../sources/doc.js';
 import { sourcesDetectMethods } from '../sources/detect.js';
+import { sourcesTagMethods } from '../sources/tags.js';
+import { sourcesExportMethods } from '../sources/export-panel.js';
 import { draftFromSource } from '../sources/fields.js';
 
 // Filterleiste pro Buch im localStorage (siehe public/js/filter-persist.js).
@@ -23,7 +25,7 @@ import { draftFromSource } from '../sources/fields.js';
 // `srcLibQuery` (semantische Suche) sind Eingaben eines offenen Panels, kein
 // Blick auf die Liste — sie sollen beim naechsten Oeffnen leer sein.
 const SRC_FILTER_SCOPES = [
-  { scope: 'sources', defaults: { srcFilterText: '', srcFilterType: '', srcShowArchived: false } },
+  { scope: 'sources', defaults: { srcFilterText: '', srcFilterType: '', srcFilterTag: '', srcShowArchived: false } },
 ];
 
 export function registerSourcesCard() {
@@ -42,7 +44,13 @@ export function registerSourcesCard() {
     // Filter-Bar.
     srcFilterText: '',
     srcFilterType: '',
+    srcFilterTag: '',
     srcShowArchived: false,
+
+    // Schlagworte der eigenen Bibliothek ([{ tag, count }], GET /sources/tags)
+    // und die laufende Eingabe im Formular (sources/tags.js).
+    srcPoolTags: [],
+    srcTagInput: '',
 
     // Detail-Formular. `srcEditingId`: null = zu, 'new' = Anlage, sonst die id.
     srcEditingId: null,
@@ -84,6 +92,23 @@ export function registerSourcesCard() {
     srcPoolLoading: false,
     srcPoolError: '',
     srcPoolFilter: '',
+    srcPoolTag: '',
+
+    // Export-Panel (sources/export-panel.js). `srcExportBooks` sind Buch-IDs
+    // als Strings (Combobox-Werte); leer = ganze eigene Bibliothek.
+    // `srcExportRows` ist die ungefilterte Rohliste der Buchauswahl.
+    srcExportOpen: false,
+    srcExportBooks: [],
+    srcExportTags: [],
+    srcExportCitedOnly: false,
+    srcExportArchived: false,
+    srcExportFormat: 'list',
+    srcExportStyle: 'apa7',
+    srcExportLang: 'de',
+    srcExportRows: [],
+    srcExportLoading: false,
+    srcExportError: '',
+    _srcExportSeq: 0,
 
     // Quellen-Erkennung (Job `source-detect`): Panel, Lauf, Funde. `srcDetected`
     // lebt nur im Client — ein Fund wird erst zur Quelle, wenn er uebernommen
@@ -124,7 +149,7 @@ export function registerSourcesCard() {
         // gegen ein Formular weiter, das es nicht mehr gibt.
         timerKeys: ['_srcIndexTimer'],
         filterScopes: SRC_FILTER_SCOPES,
-        load: () => this.loadSources(),
+        load: () => { this.loadSources(); this.loadSourceTags(); },
         extraListeners: [
           // Permalink #book/X/quellen/<sourceId>: der Hash-Router dispatcht das
           // Event, _focusSourceById hebt die Zeile hervor (bzw. merkt sie bis
@@ -153,6 +178,11 @@ export function registerSourcesCard() {
           srcPool: [],
           srcPoolError: '',
           srcPoolFilter: '',
+          srcPoolTag: '',
+          srcTagInput: '',
+          srcExportOpen: false,
+          srcExportRows: [],
+          srcExportError: '',
           // Buchwechsel verwirft die Funde: sie beziehen sich auf den Text des
           // alten Buchs und waeren im neuen sinnlos (und uebernehmbar!).
           srcDetectOpen: false,
@@ -187,6 +217,8 @@ export function registerSourcesCard() {
           srcCitations: [],
           srcPickerOpen: false,
           srcPool: [],
+          srcExportOpen: false,
+          srcExportRows: [],
           srcDetectError: '',
         }),
       });
@@ -205,5 +237,7 @@ export function registerSourcesCard() {
     ...sourcesMethods,
     ...sourcesDocMethods,
     ...sourcesDetectMethods,
+    ...sourcesTagMethods,
+    ...sourcesExportMethods,
   }));
 }

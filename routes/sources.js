@@ -25,6 +25,7 @@ const {
   listSources, listPoolSources, getSource, createSource, updateSource, deleteSource,
   findSourceByUrl, findImportDuplicate, findSimilarSource,
   linkSource, unlinkSource, isSourceLinked, listSourceBooks, getBookQuoteStats,
+  listPoolTags,
   listBookCitations, listSourceCitations,
 } = require('../db/schema');
 const { toIntId } = require('../lib/validate');
@@ -99,6 +100,19 @@ router.get('/pool', (req, res) => {
     excludeBookId: excludeBookId || null,
   });
   res.json(_applyTypeFilter(rows, req.query));
+});
+
+// ── Schlagworte der Bibliothek ───────────────────────────────────────────────
+// GET /sources/tags → [{ tag, count }]
+// Nur der eigene Pool, wie /pool: Vorschlagsliste im Formular und Filter im
+// Picker und im Export. Schlagworte an fremden Quellen (Co-Autor) kommen mit
+// der jeweiligen Quellenzeile, nicht hier.
+//
+// Steht VOR /:id, sonst faengt der Id-Handler 'tags' ab.
+router.get('/tags', (req, res) => {
+  const email = sessionEmail(req);
+  if (!email) return res.status(401).json({ error_code: 'NOT_LOGGED_IN' });
+  res.json(listPoolTags(email));
 });
 
 // ── Zitat-Kennzahlen eines Buchs ─────────────────────────────────────────────

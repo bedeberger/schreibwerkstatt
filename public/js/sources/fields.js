@@ -165,6 +165,40 @@ export function draftToPersons(rows) {
 // weitergereicht, damit die Formular-Konsumenten ihren Import behalten.
 export { personLabel, primaryPersonLabel } from './search.js';
 
+// ── Schlagworte ──────────────────────────────────────────────────────────────
+
+/** Deckungsgleich mit MAX_TAGS/MAX_TAG_LEN in db/sources/shared.js — der Server
+ *  normalisiert autoritativ, das Formular soll nur nichts anbieten, was er
+ *  danach still kappt. */
+export const MAX_TAGS = 20;
+export const MAX_TAG_LEN = 40;
+
+/** Schlagwort-Liste wie der Server sie ablegt: getrimmt, Innen-Whitespace
+ *  einfach, ohne Dubletten (Gross-/Kleinschreibung egal, erste Form gewinnt). */
+export function normalizeTagList(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const raw of list) {
+    if (typeof raw !== 'string') continue;
+    const tag = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_TAG_LEN).trim();
+    const key = tag.toLowerCase();
+    if (!tag || seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+    if (out.length >= MAX_TAGS) break;
+  }
+  return out;
+}
+
+/** Traegt die Quelle eines der Schlagworte (Gross-/Kleinschreibung egal)?
+ *  Leere Auswahl = kein Filter. */
+export function hasAnyTag(src, tags) {
+  if (!Array.isArray(tags) || tags.length === 0) return true;
+  const own = new Set((src?.tags || []).map(t => t.toLowerCase()));
+  return tags.some(t => own.has(String(t).toLowerCase()));
+}
+
 // ── Draft ↔ Quelle ───────────────────────────────────────────────────────────
 
 /** Leerer bzw. aus einer Quelle vorbefuellter Formular-Draft. */
@@ -174,6 +208,7 @@ export function draftFromSource(src = null) {
     authors: personsToDraft(src?.authors),
     editors: personsToDraft(src?.editors),
     archived: src?.archived ? 1 : 0,
+    tags: Array.isArray(src?.tags) ? [...src.tags] : [],
   };
   for (const f of TEXT_FIELDS) draft[f] = src?.[f] || '';
   // Dokument-Metadaten werden am Form gezeigt, aber nicht über das Formular
@@ -197,6 +232,7 @@ export function draftToPayload(draft) {
     authors: draftToPersons(draft?.authors),
     editors: draftToPersons(draft?.editors),
     archived: draft?.archived ? 1 : 0,
+    tags: normalizeTagList(draft?.tags),
   };
   for (const f of TEXT_FIELDS) {
     const v = draft?.[f];

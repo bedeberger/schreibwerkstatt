@@ -17,6 +17,10 @@ import { isSelectedBook } from '../cards/book-guard.js';
 // lieber etwas zu gross, `max-height` deckelt nur (siehe `_diagramsPx`).
 const DIAGRAM_FALLBACK_PX = 320;
 
+// Pauschale Bildhöhe bis zum `load` (die Abbildungs-Markup-SSoT schreibt keine
+// width/height-Attribute, die Höhe ist vorher also unbekannt).
+const IMAGE_FALLBACK_PX = 320;
+
 // Weiche Typen: standardmässig nicht vorausgewählt (User entscheidet pro Finding).
 // `hedging` ist weich (Absicherungs-Mass ist Autorenentscheid); die übrigen
 // Fach-Typen (unbelegt, begriffsinkonsistenz, autorenform) sind hart – das sind
@@ -202,29 +206,41 @@ export const pageViewMethods = {
   // chapterFigures: [],
   // showChapterFigures: false,
 
-  /** Ist-Höhe der Leseansicht, wenn ihr DOM zur aktuellen Seite gehört.
+  /** Ist-Höhe der Leseansicht, wenn ihr DOM zur aktuellen Seite gehört und
+   *  fertig aufgebaut ist.
    *
-   *  Nur für Seiten mit Diagramm: dessen Höhe lässt sich aus dem Quelltext
-   *  nicht ableiten (zwei Zeilen Code können 400 px Grafik sein), und in der
-   *  Leseansicht ist der `<pre>` ausgeblendet, taucht in der Wortzahl also
-   *  ohnehin nicht auf. Ohne Messung deckelt `--pcv-max-h` den Kasten auf die
-   *  Prosa-Höhe und das Diagramm verschwindet hinter einer inneren Scrollbar.
+   *  Nur für Seiten mit Diagramm oder Bild: deren Höhe lässt sich aus dem Text
+   *  nicht ableiten (zwei Zeilen Mermaid-Code können 400 px Grafik sein, ein
+   *  `<img>` hat gar keinen Text), die Wortzahl-Schätzung kennt sie also nicht.
+   *  Ohne Messung deckelt `--pcv-max-h` den Kasten auf die Prosa-Höhe und die
+   *  Grafik verschwindet hinter einer inneren Scrollbar.
    *
    *  `scrollHeight` (inkl. Padding) statt einer Summe aus Einzelhöhen: das ist
    *  genau die gesuchte Grösse, misst Ränder und Zeilenumbrüche korrekt mit und
    *  hat keine Rückkopplung — `max-height` ändert die Inhaltshöhe nicht.
    *
-   *  Liefert 0 (→ Aufrufer schätzt), solange nicht sicher ist, dass das DOM zum
-   *  aktuellen HTML gehört: nach einem Seitenwechsel steht bis zum nächsten
-   *  Alpine-Tick die Vorgängerseite da, und vor dem mermaid-Lauf fehlen die
-   *  Render-Knoten. Die Leseansicht ruft nach dem Rendern erneut hier durch. */
-  _measuredPageViewPx(diagramCount) {
-    const view = document.querySelector('.page-content-view:not(.page-content-view--editing)');
+   *  Liefert 0 (→ Aufrufer schätzt), solange nicht sicher ist, dass das DOM
+   *  steht: nach einem Seitenwechsel steht bis zum nächsten Alpine-Tick die
+   *  Vorgängerseite da, vor dem mermaid-Lauf fehlen die Render-Knoten, und ein
+   *  Bild vor seinem `load` hat noch keine Höhe. Die Notebook-Karte ruft nach
+   *  Rendern, Rückkehr aus dem Edit-Modus und Bild-`load` erneut hier durch
+   *  (editor/notebook/card.js#`_setupNotebookPageHeight`).
+   *
+   *  Der Notebook-Editor braucht das nicht: `.page-content-view--editing`
+   *  deckelt fest auf `70vh` und wächst bis dahin mit seinem Inhalt, auch beim
+   *  Tippen und mit frisch eingefügten Bildern. */
+  _measuredPageViewPx(diagramCount, imageCount) {
+    const view = document.querySelector('.page-content-view:not(.page-content-view--editing):not(.revision-viewer__content)');
     if (!view) return 0;
+    const imgs = [...view.querySelectorAll('img')];
     if (view.querySelectorAll(DIAGRAM_SEL).length !== diagramCount) return 0;
+    if (imgs.length !== imageCount) return 0;
     // Fehlgeschlagene Diagramme zählen mit: der Fehlerknoten trägt dieselbe
     // Klasse, und der Quelltext daneben braucht ebenfalls Platz.
     if (view.querySelectorAll('.mermaid-render').length !== diagramCount) return 0;
+    // `complete` ist auch bei einem kaputten Bild true — dessen Platzhalter
+    // ist dann die richtige Höhe.
+    if (imgs.some(img => !img.complete)) return 0;
     if (!view.scrollHeight) return 0;
     // `max-height` rechnet border-box (globales box-sizing), `scrollHeight`
     // nicht — ohne den Rahmenzuschlag bleiben 2 px Scrollrest stehen.
@@ -236,36 +252,36 @@ export const pageViewMethods = {
     // Nach Edits ist tokEsts stale → aktuellen Text aus originalHtml ableiten,
     // sonst auf Cache fallback (bevor die Seite geladen ist).
     let words = 0;
-    let diagramPx = 0;
+    let blockPx = 0;
     let measuredPx = 0;
     if (this.originalHtml) {
       const doc = new DOMParser().parseFromString(this.originalHtml, 'text/html');
       const diagrams = [...(doc.body?.querySelectorAll(DIAGRAM_SEL) || [])];
+      const imageCount = doc.body?.querySelectorAll('img').length || 0;
       // Diagramm-Notation zählt nirgends als Prosa (gleiche Regel wie
       // html-text/TTS/LanguageTool): Quelltext raus aus der Wortzahl, die
       // Blockhöhe kommt separat dazu.
       for (const d of diagrams) d.remove();
       const text = (doc.body?.textContent || '').trim();
       words = text ? text.split(/\s+/).length : 0;
-      if (diagrams.length) {
-        measuredPx = this._measuredPageViewPx(diagrams.length);
+      if (diagrams.length || imageCount) {
+        measuredPx = this._measuredPageViewPx(diagrams.length, imageCount);
         // Schätzung bis zum Render: Pauschale pro Grafik, mindestens aber die
         // Quelltexthöhe (Edit-Modus, mermaid nicht geladen, ungültiger Code —
         // dort steht der `<pre>` mit ~20 px Zeilenhöhe).
         for (const d of diagrams) {
           const codeLines = (d.textContent || '').split('\n').length;
-          diagramPx += Math.max(DIAGRAM_FALLBACK_PX, codeLines * 20 + 40);
+          blockPx += Math.max(DIAGRAM_FALLBACK_PX, codeLines * 20 + 40);
         }
+        blockPx += imageCount * IMAGE_FALLBACK_PX;
       }
     } else {
       words = this.tokEsts?.[this.currentPage?.id]?.words || 0;
     }
     // ~7 Wörter/Zeile bei 64ch Spalte mit langen deutschen Wörtern.
     // line-height 1.7 × 17px = 28.9px; 28px top + 28px bottom Padding = 56px.
-    // Vorher: 12 wpm + nur Content-Höhe → Box deutlich zu kurz, Inhalt
-    // overflowte sichtbar unter den weissen Hintergrund.
     const estLines = Math.ceil(words / 7);
-    const contentPx = measuredPx || (estLines * 29 + 56 + diagramPx);
+    const contentPx = measuredPx || (estLines * 29 + 56 + blockPx);
     const minPx = window.innerHeight * 0.20;
     const maxPx = window.innerHeight * 0.80;
     const px = Math.round(Math.min(maxPx, Math.max(minPx, contentPx)));

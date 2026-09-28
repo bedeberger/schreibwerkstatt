@@ -32,6 +32,7 @@ export const sourcesDetectMethods = {
     this.srcDetectOpen = !this.srcDetectOpen;
     if (!this.srcDetectOpen) return;
     this.closeSourcePicker();
+    this.closeSourceExport();
     // Historie erst beim Aufklappen holen — die Karte oeffnet oft, ohne dass
     // die Erkennung ueberhaupt gebraucht wird.
     this.loadDetectRuns();

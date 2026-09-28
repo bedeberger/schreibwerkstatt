@@ -12,13 +12,14 @@
 // Die Zugriffsregeln dazu liegen in routes/sources.js, die Fachdoku in
 // docs/quellen.md.
 //
-// Aufteilung — fuenf Themen, die nur die Tabelle teilen:
+// Aufteilung — Themen, die nur die Tabelle teilen:
 //   shared.js       Feld-Inventar, Normalisierung, SQL-Fragmente, Zeilen-Mapper
 //   pool.js         die Bibliothek: CRUD + Dublettenfragen
 //   links.js        Bruecke Buch ↔ Quelle
 //   citations.js    abgeleiteter Fund-Index + Zitat-Kennzahlen
 //   detect-runs.js  Historie der Quellen-Erkennung
 //   doc.js          PDF-Anhang (BLOB + Volltext + Index-Stempel)
+//   tags.js         Schlagworte (Schreibpfad + Schlagwort-Liste der Bibliothek)
 //
 // authors/editors sind JSON-Arrays [{family, given} | {literal}] nach CSL-JSON;
 // `literal` fuer Koerperschaften ("Bundesamt fuer Statistik"). Normalisiert wird
@@ -31,6 +32,7 @@ const links = require('./sources/links');
 const citations = require('./sources/citations');
 const detectRuns = require('./sources/detect-runs');
 const doc = require('./sources/doc');
+const tags = require('./sources/tags');
 
 module.exports = {
   // Feld-Inventar + Normalisierung (shared)
@@ -39,10 +41,12 @@ module.exports = {
   OTON_CHANNELS: shared.OTON_CHANNELS,
   OTON_AUTH: shared.OTON_AUTH,
   normalizePersons: shared.normalizePersons,
+  normalizeTags: shared.normalizeTags,
 
   ...pool,
   ...links,
   ...citations,
   ...detectRuns,
   ...doc,
+  ...tags,
 };

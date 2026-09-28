@@ -84,6 +84,41 @@ export const notebookCardMethods = {
     queueMicrotask(draw);
   },
 
+  // Kastenhöhe der Leseansicht (`--pcv-max-h`) nachmessen, sobald sie steht.
+  // Bilder und Diagramme kennt die Schätzung aus dem Seiten-HTML nur als
+  // Pauschale; gemessen wird in book/page-view.js#`_measuredPageViewPx`, und
+  // zwar erst, wenn alle Bilder geladen sind. Auslöser: Seitenwechsel/
+  // Re-Render, Rückkehr aus dem Edit-Modus (die Leseansicht war
+  // `display:none`, `scrollHeight` 0) und jedes `load`/`error` eines Bildes.
+  // `load` bubbelt nicht, darum capture am Dokument; ein rAF bündelt die
+  // Events einer Seite mit vielen Bildern. Der Editor deckelt fest (siehe
+  // `_measuredPageViewPx`) und braucht keine Nachmessung.
+  _setupNotebookPageHeight() {
+    let raf = 0;
+    const remeasure = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const app = window.__app;
+        if (!app || app.editMode || app.focusActive) return;
+        app._updatePageViewHeight?.();
+      });
+    };
+    const afterRender = () => this.$nextTick(remeasure);
+    this.$watch(() => window.__app?.renderedPageHtml, afterRender);
+    this.$watch(() => window.__app?.editMode, afterRender);
+    const onImage = (e) => {
+      const t = e.target;
+      if (t?.tagName !== 'IMG') return;
+      if (!t.closest('.page-content-view:not(.page-content-view--editing)') || t.closest('.revision-viewer__content')) return;
+      remeasure();
+    };
+    const signal = this._notebookAbort?.signal;
+    document.addEventListener('load', onImage, { capture: true, signal });
+    document.addEventListener('error', onImage, { capture: true, signal });
+    signal?.addEventListener('abort', () => { if (raf) cancelAnimationFrame(raf); });
+  },
+
   // Nummern in Abbildungslegenden und Tabellenbeschriftungen der Leseansicht
   // („Abb. 3.2: Der Käfer"). Ohne sie steht die Legende am Bildschirm nackt da,
   // und wer prüfen will, ob „vgl. Abb. 3.2" im Text auf die richtige Abbildung

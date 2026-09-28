@@ -415,3 +415,38 @@ test('citations: ohne book_id nur der Besitzer, mit book_id buch-skopiert', asyn
   // … und nicht das andere.
   assert.equal((await api('GET', `/sources/${src.id}/citations?book_id=${PRIVAT}`)).status, 403);
 });
+
+// ── Schlagworte ──────────────────────────────────────────────────────────────
+
+test('tags: anlegen/aendern ueber die CRUD-Routen, Liste nur der eigenen Bibliothek, nur der Besitzer setzt', async () => {
+  const BOOK = seedBook(9600);
+  const { grantAccess } = require('../../db/book-access');
+  grantAccess(BOOK, 'mitarbeit@test.dev', 'editor', 'autor@test.dev');
+
+  const created = await api('POST', '/sources', { book_id: BOOK, title: 'Scrum Guide', tags: ['ZHAW', ' zhaw ', 'Agil'] });
+  assert.equal(created.status, 200, JSON.stringify(created.json));
+  assert.deepEqual(created.json.tags, ['Agil', 'ZHAW']);
+
+  const bad = await api('PUT', `/sources/${created.json.id}`, { tags: 'ZHAW' });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.json.params.field, 'tags');
+
+  const upd = await api('PUT', `/sources/${created.json.id}`, { tags: ['ZHAW', 'CAS AITPM'] });
+  assert.deepEqual(upd.json.tags, ['CAS AITPM', 'ZHAW']);
+
+  const list = await api('GET', `/sources?book_id=${BOOK}`);
+  assert.deepEqual(list.json[0].tags, ['CAS AITPM', 'ZHAW']);
+
+  assert.deepEqual((await api('GET', '/sources/tags')).json, [
+    { tag: 'CAS AITPM', count: 1 },
+    { tag: 'ZHAW', count: 1 },
+  ]);
+
+  // Co-Autor: sieht die Schlagworte an der Zeile, aber nicht in SEINER
+  // Bibliotheksliste, und setzen darf er sie nicht.
+  sessionUser = 'mitarbeit@test.dev';
+  assert.deepEqual((await api('GET', `/sources?book_id=${BOOK}`)).json[0].tags, ['CAS AITPM', 'ZHAW']);
+  assert.deepEqual((await api('GET', '/sources/tags')).json, []);
+  const foreign = await api('PUT', `/sources/${created.json.id}`, { tags: [] });
+  assert.equal(foreign.status, 403);
+});

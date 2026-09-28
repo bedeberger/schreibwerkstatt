@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 292, 167 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 293, 168 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -44,6 +44,7 @@ erDiagram
   motifs ||--o{ idea_links           : "linked from"
   books ||--o{ book_source_links     : uses
   sources ||--o{ book_source_links   : "used by"
+  sources ||--o{ source_tags         : tagged
   sources ||--o{ source_citations    : "cited in"
   pages ||--o{ source_citations      : cites
   books ||--o{ source_detect_runs    : "detection runs"
@@ -649,6 +650,14 @@ erDiagram
     %% M:N Buch ↔ Pool-Quelle. Entknüpfen ist eine Buch-Operation (ab 'editor'),
     %% Löschen im Pool trifft alle Bücher und kann nur der Besitzer.
   }
+  source_tags {
+    INTEGER source_id  PK,FK "ON DELETE CASCADE"
+    TEXT    tag        PK "COLLATE NOCASE — „ZHAW“ und „zhaw“ sind dasselbe Schlagwort"
+    TEXT    created_at
+    %% Schlagworte am Bibliothekseintrag (gelten in allen Büchern der Quelle,
+    %% setzen nur der Besitzer). Kein Tag-Stamm: die Schlagwort-Liste eines Users
+    %% ist die DISTINCT-Menge über seine Quellen.
+  }
   source_citations {
     INTEGER source_id    PK,FK "ON DELETE CASCADE"
     INTEGER page_id      PK,FK "ON DELETE CASCADE"
@@ -716,6 +725,7 @@ erDiagram
 
   books   ||--o{ book_source_links  : uses
   sources ||--o{ book_source_links  : "used by"
+  sources ||--o{ source_tags        : tagged
   sources ||--o{ source_citations   : "cited in"
   pages   ||--o{ source_citations   : cites
   books   ||--o{ source_detect_runs : "detection runs"

@@ -17,6 +17,7 @@ const {
   rowToSource: _row,
   toColumnValues: _values,
 } = require('./shared');
+const { setSourceTags } = require('./tags');
 
 const _stmtListForBook = db.prepare(`
   SELECT ${_SOURCE_COLS}, ${_BOOK_COUNT_SQL}
@@ -161,22 +162,28 @@ function findSourceByUrl(ownerEmail, rawUrl, bookId = null) {
 }
 
 /** Neue Quelle im Pool des Users. Die Buch-Zuordnung ist ein eigener Schritt
- *  (linkSource) — eine Quelle kann ohne Buch in der Bibliothek liegen. */
-function createSource(ownerEmail, fields = {}) {
+ *  (linkSource) — eine Quelle kann ohne Buch in der Bibliothek liegen.
+ *  `fields.tags` (Array) setzt die Schlagworte in derselben Transaktion. */
+const createSource = db.transaction((ownerEmail, fields = {}) => {
   const v = _values(fields);
   const info = _stmtInsert.run(
     ownerEmail, v.csl_type, v.authors, v.editors, v.archived, ...v.text
   );
+  if (Array.isArray(fields.tags)) setSourceTags(info.lastInsertRowid, fields.tags);
   return getSource(info.lastInsertRowid);
-}
+});
 
-function updateSource(id, fields = {}) {
+/** PATCH-artig: nur uebergebene Felder aendern sich. `tags` ersetzt die
+ *  Schlagworte nur, wenn es mitkommt — ein Archivieren-Klick ohne `tags`
+ *  darf sie nicht leeren. */
+const updateSource = db.transaction((id, fields = {}) => {
   const base = getSource(id);
   if (!base) return null;
   const v = _values(fields, base);
   _stmtUpdate.run(v.csl_type, v.authors, v.editors, v.archived, ...v.text, parseInt(id));
+  if (Array.isArray(fields.tags)) setSourceTags(id, fields.tags);
   return getSource(id);
-}
+});
 
 /** Aus der Bibliothek loeschen — wirkt in ALLEN Buechern. Bruecken-Zeilen und
  *  Fundstellen verschwinden per CASCADE. Fuer „nur hier weg" ist unlinkSource

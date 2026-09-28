@@ -37,6 +37,8 @@ const OTON_AUTH = ['keine', 'ausstehend', 'freigegeben', 'abgelehnt'];
 const MAX_FIELD_LEN = 500;
 const MAX_NOTE_LEN = 4000;
 const MAX_PERSONS = 50;
+const MAX_TAGS = 20;
+const MAX_TAG_LEN = 40;
 
 function _str(v, max = MAX_FIELD_LEN) {
   if (v == null) return null;
@@ -68,6 +70,36 @@ function normalizePersons(v) {
     if (literal) out.push({ literal });
   }
   return out;
+}
+
+// Schlagworte in eine Form bringen: getrimmt, Innen-Whitespace auf ein Leer-
+// zeichen, gedeckelt, ohne Dubletten (Gross-/Kleinschreibung zaehlt nicht —
+// dieselbe Regel wie COLLATE NOCASE im Primaerschluessel von source_tags).
+// Die erste Schreibweise gewinnt. Kein Array → leere Liste.
+function normalizeTags(v) {
+  if (!Array.isArray(v)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const raw of v) {
+    if (typeof raw !== 'string') continue;
+    const tag = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_TAG_LEN).trim();
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+    if (out.length >= MAX_TAGS) break;
+  }
+  return out;
+}
+
+function _tags(json) {
+  try {
+    const v = JSON.parse(json);
+    if (!Array.isArray(v)) return [];
+    return v.filter(t => typeof t === 'string')
+      .sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' }));
+  } catch { return []; }
 }
 
 function _persons(json) {
@@ -119,7 +151,8 @@ const _SOURCE_COLS = `
   s.created_at, s.updated_at,
   ${TEXT_FIELDS.map(f => `s.${f}`).join(', ')},
   s.doc_mime, s.doc_name, s.doc_pages, s.doc_chars, s.doc_indexed_at, s.doc_content_hash,
-  (s.doc IS NOT NULL) AS has_doc
+  (s.doc IS NOT NULL) AS has_doc,
+  (SELECT json_group_array(t.tag) FROM source_tags t WHERE t.source_id = s.id) AS tags_json
 `;
 
 
@@ -131,6 +164,7 @@ function _row(r) {
     csl_type: r.csl_type,
     authors: _persons(r.authors),
     editors: _persons(r.editors),
+    tags: _tags(r.tags_json),
     archived: r.archived ? 1 : 0,
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -180,8 +214,8 @@ function _values(src, base = null) {
 
 module.exports = {
   CSL_TYPES, TEXT_FIELDS, OTON_CHANNELS, OTON_AUTH,
-  MAX_FIELD_LEN, MAX_NOTE_LEN, MAX_PERSONS,
-  str: _str, normalizePersons,
+  MAX_FIELD_LEN, MAX_NOTE_LEN, MAX_PERSONS, MAX_TAGS, MAX_TAG_LEN,
+  str: _str, normalizePersons, normalizeTags,
   BOOK_COUNT_SQL: _BOOK_COUNT_SQL,
   POOL_COUNT_SQL: _POOL_COUNT_SQL,
   SOURCE_COLS: _SOURCE_COLS,

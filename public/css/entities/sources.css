@@ -128,7 +128,8 @@
 
 .sources-person-row input { min-width: 6rem; }
 
-.sources-form-actions {
+.sources-form-actions,
+.sources-export-actions {
   display: flex;
   gap: var(--space-sm);
   margin-top: var(--space-md);
@@ -205,9 +206,12 @@
 
 /* ── Bibliotheks-Picker ───────────────────────────────────────────────────── */
 /* Gleiche Panel-Form wie das Fundstellen-Panel (gerahmt, Akzentkante links) —
-   beide sind Aufklapp-Bereiche der Karte, nur mit anderem Inhalt. */
+   beide sind Aufklapp-Bereiche der Karte, nur mit anderem Inhalt. Das
+   Export-Panel teilt die Form (eigene Klasse, damit Selektoren auf den Picker
+   nicht ins Export-Panel greifen). */
 
-.sources-picker {
+.sources-picker,
+.sources-export {
   margin: var(--space-md) 0;
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--card-accent);
@@ -537,5 +541,41 @@
 
 @media (max-width: 960px) {
   .sources-lib-search { padding: var(--space-3); }
+}
+
+/* ── Schlagworte ──────────────────────────────────────────────────────────── */
+/* Chips in der Tabellenzeile und im Picker; Vorschlaege unter dem Eingabefeld
+   des Formulars sind dieselbe Form als Button. */
+.sources-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+.sources-tag { white-space: nowrap; }
+.sources-tag-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-top: var(--space-6);
+}
+.sources-tag--suggest {
+  border: none;
+  cursor: pointer;
+}
+.sources-tag--suggest:hover { color: var(--color-text); }
+
+/* ── Export-Panel ─────────────────────────────────────────────────────────── */
+/* Rahmen teilt es mit .sources-picker (oben); Kopfzeile ist .sources-picker-head. */
+.sources-export-style {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.sources-export-preview {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-mini);
+  white-space: pre;
+  overflow-x: auto;
 }
 }
