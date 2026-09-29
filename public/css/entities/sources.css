@@ -507,6 +507,11 @@
   color: var(--color-warn-text); font-size: var(--font-size-xs); margin-top: var(--space-2xs);
 }
 
+/* ── Quelle aus PDF ──────────────────────────────────────────────────────── */
+.sources-pdf-draft { margin: var(--space-md) 0; }
+.sources-pdf-origin { margin-bottom: var(--space-3); }
+.sources-pdf-origin .btn-compact { margin-left: var(--space-3); }
+
 /* ── Semantische Bibliothekssuche (Pool-Scope) ──────────────────────────── */
 .sources-lib-search {
   border-top: 1px solid var(--color-border);

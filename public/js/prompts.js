@@ -358,6 +358,9 @@ export {
   buildSourceDetectPrompt,
   SCHEMA_SOURCE_DETECT,
   SOURCE_DETECT_TYPES,
+  buildSourcePdfSystemPrompt,
+  buildSourcePdfPrompt,
+  SCHEMA_SOURCE_PDF,
 } from './prompts/sources.js';
 
 export {

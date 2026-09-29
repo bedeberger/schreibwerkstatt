@@ -41,6 +41,9 @@ const DE = {
   etAlNumeric: 'u. a.',
   quoteOpen: '„',   // „
   quoteClose: '“',  // "
+  // Erscheinungsdatum (Zeitung, Web) — ausgeschrieben, wie im Verzeichnis ueblich.
+  months: ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August',
+    'September', 'Oktober', 'November', 'Dezember'],
 };
 
 const EN = {
@@ -67,6 +70,8 @@ const EN = {
   etAlNumeric: 'et al.',
   quoteOpen: '“',   // "
   quoteClose: '”',  // "
+  months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+    'September', 'October', 'November', 'December'],
 };
 
 export const LANGS = ['de', 'en'];

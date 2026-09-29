@@ -76,7 +76,7 @@ function _recentTwin(bookId, { kind, title, body, url }) {
 // Body: { book_id, mode: 'research'|'source'|'both',
 //         url, title, body, kind, tags, source,
 //         authors, editors, container_title, publisher, place, year,
-//         doi, isbn, csl_type, accessed_at, note }
+//         issued_date, doi, isbn, csl_type, accessed_at, note }
 //
 // Antwort: { research_item, research_created, source, source_created,
 //            source_linked } — jeder Teil sagt einzeln, ob er neu entstanden
@@ -127,6 +127,8 @@ router.post('/', jsonBody, (req, res) => {
       publisher: req.body?.publisher ?? null,
       place: req.body?.place ?? null,
       year: req.body?.year ?? null,
+      // Erscheinungsdatum (z.B. aus `article:published_time`); ISO oder TT.MM.JJJJ.
+      issued_date: req.body?.issued_date ?? null,
       doi: req.body?.doi ?? null,
       isbn: req.body?.isbn ?? null,
       url: rawUrl || null,

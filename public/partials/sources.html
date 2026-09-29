@@ -45,6 +45,10 @@
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
       <span x-text="$app.t('sources.detect.open')"></span>
     </button>
+    <button type="button" class="btn-compact" @click="pickSourcePdf()" :disabled="sourcesBusy || srcPdfBusy">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
+      <span x-text="srcPdfBusy ? $app.t('sources.pdfDraft.running') : $app.t('sources.pdfDraft.open')"></span>
+    </button>
     <button type="button" class="btn-compact" @click="toggleSourceExport()" :aria-expanded="srcExportOpen">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>
       <span x-text="$app.t('sources.export.open')"></span>
@@ -69,6 +73,8 @@
       <span class="filter-count" x-text="sourceRows().length + ' / ' + sourcesVisibleTotal()"></span>
     </div>
   </div>
+
+<!-- @include sources-pdf-draft -->
 
 <!-- @include sources-picker -->
 

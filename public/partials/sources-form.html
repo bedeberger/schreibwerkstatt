@@ -11,6 +11,18 @@
             :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
   </div>
 
+  <!-- Entwurf aus einem PDF (sources/pdf-draft.js): woher die Angaben kommen,
+       und ob das Werk schon in der Bibliothek liegt. -->
+  <div class="sources-pdf-origin" x-show="srcEditingId === 'new' && srcPdfInfo" x-cloak>
+    <p :class="srcPdfInfo?.verified ? 'card-form-hint' : 'sources-doc-warn'" x-text="srcPdfInfoText()"></p>
+    <p class="card-form-hint" x-show="srcPdfUrlText()" x-text="srcPdfUrlText()"></p>
+    <p class="sources-doc-warn" x-show="srcPdfInfo?.existing_source_id">
+      <span x-text="$app.t('sources.pdfDraft.existing')"></span>
+      <button type="button" class="btn-compact" @click="useExistingSourceForPdf()" :disabled="sourcesBusy"
+              x-text="$app.t('sources.pdfDraft.useExisting')"></button>
+    </p>
+  </div>
+
   <div class="card-form-grid">
     <div class="card-form-row">
       <label class="card-form-label" x-text="$app.t('sources.field.cslType')"></label>
@@ -75,7 +87,8 @@
             <input type="text" class="card-form-input" x-model="srcDraft[f.key]"
                    :aria-label="$app.t(f.labelKey)" maxlength="500"
                    :placeholder="f.key === 'accessed_at' ? $app.t('sources.field.accessedAt.ph')
-                               : f.key === 'oton_date' ? $app.t('sources.field.otonDate.ph') : ''">
+                               : f.key === 'oton_date' ? $app.t('sources.field.otonDate.ph')
+                               : f.key === 'issued_date' ? $app.t('sources.field.issuedDate.ph') : ''">
           </template>
         </div>
       </div>
@@ -154,6 +167,19 @@
          nochmals (403 NOT_SOURCE_OWNER). Der extrahierte Plain-Text wird
          semantisch indiziert; Upload triggert asynchron den Index-Job, dessen
          Fortschritt die Karte pollt (public/js/sources/doc.js). -->
+    <template x-if="srcEditingId === 'new' && srcPdfPendingName">
+      <div class="card-form-row card-form-row--top">
+        <label class="card-form-label" x-text="$app.t('sources.doc.section')"></label>
+        <div class="card-form-field">
+          <div class="sources-doc-attached">
+            <span x-text="srcPdfPendingName"></span>
+            <button type="button" class="icon-btn icon-btn--ghost" @click="discardPendingPdf()"
+                    :data-tip="$app.t('sources.doc.remove')" :aria-label="$app.t('sources.doc.remove')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
+          </div>
+          <p class="card-form-field-note" x-text="$app.t('sources.pdfDraft.pendingHint')"></p>
+        </div>
+      </div>
+    </template>
     <template x-if="srcEditingId !== 'new'">
       <div class="card-form-row card-form-row--top">
         <label class="card-form-label" x-text="$app.t('sources.doc.section')"></label>

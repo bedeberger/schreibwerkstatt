@@ -18,6 +18,7 @@ import { sourcesDocMethods } from '../sources/doc.js';
 import { sourcesDetectMethods } from '../sources/detect.js';
 import { sourcesTagMethods } from '../sources/tags.js';
 import { sourcesExportMethods } from '../sources/export-panel.js';
+import { sourcesPdfDraftMethods } from '../sources/pdf-draft.js';
 import { draftFromSource } from '../sources/fields.js';
 
 // Filterleiste pro Buch im localStorage (siehe public/js/filter-persist.js).
@@ -66,6 +67,17 @@ export function registerSourcesCard() {
     srcDocError: '',
     srcDocIndexing: false,
     _srcIndexTimer: null,
+
+    // Quelle aus PDF (Job `source-pdf-draft`, sources/pdf-draft.js). Die Datei
+    // selbst liegt ausserhalb des reaktiven State; hier nur Lauf + Anzeige.
+    // `srcPdfInfo`: Herkunft des Entwurfs im offenen Formular (null = von Hand).
+    srcPdfBusy: false,
+    srcPdfProgress: 0,
+    srcPdfStatus: '',
+    srcPdfError: '',
+    srcPdfInfo: null,
+    srcPdfPendingName: '',
+    _srcPdfPollTimer: null,
 
     // Semantische Bibliothekssuche (Pool-Scope): Sucht die PDF-Volltexte der
     // eigenen Quellen nach Sinn. UI ist ein Collapsible in der Quellen-Karte.
@@ -147,7 +159,7 @@ export function registerSourcesCard() {
         showFlag: 'showSourcesCard',
         // Buchwechsel/View-Reset stoppen den Index-Poll mit — sonst tickt er
         // gegen ein Formular weiter, das es nicht mehr gibt.
-        timerKeys: ['_srcIndexTimer'],
+        timerKeys: ['_srcIndexTimer', '_srcPdfPollTimer'],
         filterScopes: SRC_FILTER_SCOPES,
         load: () => { this.loadSources(); this.loadSourceTags(); },
         extraListeners: [
@@ -196,6 +208,12 @@ export function registerSourcesCard() {
           srcDetectMeta: null,
           srcDetectRuns: [],
           srcDetectRunId: null,
+          srcPdfBusy: false,
+          srcPdfProgress: 0,
+          srcPdfStatus: '',
+          srcPdfError: '',
+          srcPdfInfo: null,
+          srcPdfPendingName: '',
           _pendingFocusSourceId: null,
           _memos: {},
         }),
@@ -220,6 +238,7 @@ export function registerSourcesCard() {
           srcExportOpen: false,
           srcExportRows: [],
           srcDetectError: '',
+          srcPdfError: '',
         }),
       });
     },
@@ -230,6 +249,7 @@ export function registerSourcesCard() {
       // startPoll fährt setInterval — beim Kartenabbau stoppen, sonst pollt der
       // Lauf weiter gegen eine Komponente, die es nicht mehr gibt.
       if (this._srcDetectPollTimer) { clearInterval(this._srcDetectPollTimer); this._srcDetectPollTimer = null; }
+      if (this._srcPdfPollTimer) { clearInterval(this._srcPdfPollTimer); this._srcPdfPollTimer = null; }
       this._stopSourceIndexPoll();
       this._lifecycle?.destroy();
     },
@@ -239,5 +259,6 @@ export function registerSourcesCard() {
     ...sourcesDetectMethods,
     ...sourcesTagMethods,
     ...sourcesExportMethods,
+    ...sourcesPdfDraftMethods,
   }));
 }

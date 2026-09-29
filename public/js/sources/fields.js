@@ -11,11 +11,13 @@
 // Feldern gleichzeitig waere unbenutzbar — diese Datei ist die Sicht-Schicht
 // darauf, nicht eine zweite Wahrheit ueber das Schema.
 
+import { parseIssuedDate } from './issued-date.js';
+
 /** Deckungsgleich mit CSL_TYPES in db/sources.js. Laufen die auseinander,
  *  bietet das Formular einen Typ an, den die Route mit 400 INVALID_VALUE
  *  ablehnt. Reihenfolge = Anzeige-Reihenfolge in der Typ-Combobox. */
 export const SOURCE_TYPES = [
-  'book', 'chapter', 'article', 'website', 'thesis',
+  'book', 'chapter', 'article', 'newspaper', 'website', 'thesis',
   'report', 'legal', 'interview', 'film', 'dataset', 'other',
 ];
 
@@ -25,6 +27,7 @@ export const DEFAULT_SOURCE_TYPE = 'book';
  *  den leeren Draft; die Sichtbarkeit entscheidet `fieldsForType`. */
 export const TEXT_FIELDS = [
   'citekey', 'title', 'container_title', 'publisher', 'place', 'year',
+  'issued_date',
   'edition', 'volume', 'issue', 'pages', 'doi', 'isbn', 'issn', 'url',
   'accessed_at', 'note',
   'oton_role', 'oton_channel', 'oton_date', 'oton_auth',
@@ -52,16 +55,19 @@ const TYPE_FIELDS = {
   book:      ['publisher', 'place', 'edition', 'volume', 'isbn', 'doi'],
   chapter:   ['container_title', 'publisher', 'place', 'edition', 'pages', 'isbn', 'doi'],
   article:   ['container_title', 'volume', 'issue', 'pages', 'doi', 'issn'],
-  website:   ['container_title', 'publisher'],
+  // Zeitung/Magazin: das Datum ist hier der eigentliche Nachweis, darum direkt
+  // hinter dem Jahr (s. db/sources/shared.js#CSL_TYPES).
+  newspaper: ['issued_date', 'container_title', 'pages', 'issn'],
+  website:   ['issued_date', 'container_title', 'publisher'],
   thesis:    ['publisher', 'place', 'doi'],
-  report:    ['publisher', 'place', 'volume', 'doi', 'isbn'],
+  report:    ['issued_date', 'publisher', 'place', 'volume', 'doi', 'isbn'],
   legal:     ['container_title', 'place', 'pages'],
   // O-Ton/Interview: Medium + Ort bleiben (Publikationsort des Gespraechs),
   // dazu die vier redaktionellen Angaben aus db/sources.js#TEXT_FIELDS.
   interview: ['oton_role', 'oton_channel', 'oton_date', 'oton_auth', 'publisher', 'place'],
   film:      ['publisher', 'place'],
   dataset:   ['publisher', 'volume', 'doi'],
-  other:     ['container_title', 'publisher', 'place', 'pages', 'doi'],
+  other:     ['issued_date', 'container_title', 'publisher', 'place', 'pages', 'doi'],
 };
 
 // Typspezifische Label-Ueberschreibungen. `container_title` heisst beim
@@ -72,6 +78,7 @@ const LABEL_OVERRIDE = {
   container_title: {
     chapter: 'containerBook',
     article: 'containerJournal',
+    newspaper: 'containerNewspaper',
     website: 'containerSite',
     legal:   'containerLegal',
   },
@@ -238,6 +245,11 @@ export function draftToPayload(draft) {
     const v = draft?.[f];
     out[f] = v == null || String(v).trim() === '' ? null : String(v).trim();
   }
+  // Datum fuehrt, Jahr folgt — dieselbe Regel wie db/sources/shared.js, damit
+  // die Vorschau zeigt, was gespeichert wird. Ein unlesbares Datum bleibt roh
+  // stehen: der Server lehnt es mit INVALID_VALUE ab, statt es still zu kippen.
+  const iso = parseIssuedDate(out.issued_date);
+  if (iso) { out.issued_date = iso; out.year = iso.slice(0, 4); }
   return out;
 }
 

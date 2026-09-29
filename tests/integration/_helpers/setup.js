@@ -89,6 +89,7 @@ function bootstrap() {
   const lektorat = require('../../../routes/jobs/lektorat');
   const synonyme = require('../../../routes/jobs/synonyme');
   const sourceDetect = require('../../../routes/jobs/source-detect');
+  const sourcePdfDraft = require('../../../routes/jobs/source-pdf-draft');
   const figurAlter = require('../../../routes/jobs/figur-alter');
   const motifConsistency = require('../../../routes/jobs/motif-consistency');
   const autorenprofil = require('../../../routes/jobs/autorenprofil');
@@ -111,7 +112,7 @@ function bootstrap() {
     try { fs.unlinkSync(`${dbFile}-shm`); } catch (_) {}
   }
 
-  return { mockAi, dbSeed, komplett, review, kapitel, rueckblick, lektorat, synonyme, sourceDetect, figurAlter, motifConsistency, autorenprofil, shared, dbSchema, dbFile, cleanup };
+  return { mockAi, dbSeed, komplett, review, kapitel, rueckblick, lektorat, synonyme, sourceDetect, sourcePdfDraft, figurAlter, motifConsistency, autorenprofil, shared, dbSchema, dbFile, cleanup };
 }
 
 const POLL_MS = 10;

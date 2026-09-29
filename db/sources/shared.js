@@ -8,9 +8,12 @@
 // Pool-Sicht muessen dieselben vier Zahlen liefern, nur anders skopiert.
 
 const { MAX_TEXT_CHARS } = require('../../lib/pdf-extract');
+const { parseIssuedDate } = require('../../lib/issued-date');
 
+// `newspaper` = Zeitungs-/Magazinartikel (CSL `article-newspaper`): ein eigener
+// Typ, weil die Stile dort das volle Datum setzen, beim Fachaufsatz nur das Jahr.
 const CSL_TYPES = [
-  'book', 'chapter', 'article', 'website', 'thesis',
+  'book', 'chapter', 'article', 'newspaper', 'website', 'thesis',
   'report', 'legal', 'interview', 'film', 'dataset', 'other',
 ];
 
@@ -18,6 +21,9 @@ const CSL_TYPES = [
 // UPDATE und der Normalisierung, damit die drei nicht auseinanderlaufen.
 const TEXT_FIELDS = [
   'citekey', 'title', 'container_title', 'publisher', 'place', 'year',
+  // Genaues Erscheinungsdatum, ISO-partiell (lib/issued-date.js). `year` bleibt
+  // daneben stehen — Sortierung, Kurzbeleg und Jahres-Buchstaben laufen darueber.
+  'issued_date',
   'edition', 'volume', 'issue', 'pages', 'doi', 'isbn', 'issn', 'url',
   'accessed_at', 'note',
   // O-Ton: vier Angaben, die eine Publikation nicht hat, eine Aussage aus einem
@@ -202,6 +208,14 @@ function _values(src, base = null) {
     archived: pick('archived', base?.archived) ? 1 : 0,
     text: TEXT_FIELDS.map(f => {
       const v = _str(pick(f, base?.[f]), f === 'note' ? MAX_NOTE_LEN : MAX_FIELD_LEN);
+      // Datum fuehrt, Jahr folgt: sonst stuende im Kurzbeleg ein anderes Jahr
+      // als im Verzeichniseintrag. Unlesbares Datum → weg (die Route lehnt es
+      // vorher mit 400 ab; der Import soll daran nicht scheitern).
+      if (f === 'issued_date') return parseIssuedDate(v);
+      if (f === 'year') {
+        const iso = parseIssuedDate(_str(pick('issued_date', base?.issued_date)));
+        return iso ? iso.slice(0, 4) : v;
+      }
       // Enum-Felder auf die Allowlist klemmen statt den Request abzulehnen: ein
       // unbekannter Wert soll den Import einer Quelle nicht scheitern lassen,
       // aber auch nicht als Freitext im Badge landen.

@@ -164,7 +164,7 @@ test('OpenLibrary: leere Antwort → null', () => {
 test('Entwuerfe tragen genau die Spalten von sources', () => {
   const expected = [
     'csl_type', 'citekey', 'authors', 'editors', 'title', 'container_title',
-    'publisher', 'place', 'year', 'edition', 'volume', 'issue', 'pages',
+    'publisher', 'place', 'year', 'issued_date', 'edition', 'volume', 'issue', 'pages',
     'doi', 'isbn', 'issn', 'url', 'accessed_at', 'note',
   ].sort();
   for (const d of [mapCrossrefWork(CROSSREF_ARTICLE), mapCrossrefWork(CROSSREF_BOOK),

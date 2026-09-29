@@ -211,6 +211,7 @@ export const sourcesMethods = {
 
   // ── Formular ───────────────────────────────────────────────────────────────
   startCreateSource() {
+    this._clearPdfDraft();
     this.srcEditingId = 'new';
     this.srcDraft = draftFromSource(null);
     this.srcTagInput = '';
@@ -221,6 +222,7 @@ export const sourcesMethods = {
 
   startEditSource(s) {
     if (!s?.id) return;
+    this._clearPdfDraft();
     this.srcEditingId = s.id;
     this.srcDraft = draftFromSource(s);
     this.srcTagInput = '';
@@ -229,6 +231,7 @@ export const sourcesMethods = {
   },
 
   cancelSourceEdit() {
+    this._clearPdfDraft();
     this.srcEditingId = null;
     this.srcDraft = draftFromSource(null);
     this.srcFormError = '';
@@ -282,7 +285,10 @@ export const sourcesMethods = {
     try {
       const payload = draftToPayload(this.srcDraft);
       if (this.srcEditingId === 'new') {
-        await _send('/sources', 'POST', { book_id: Number(bookId), ...payload });
+        const created = await _send('/sources', 'POST', { book_id: Number(bookId), ...payload });
+        // Entwurf aus einem PDF (sources/pdf-draft.js): das PDF erst jetzt
+        // anhaengen, wo es die Quelle gibt.
+        await this._attachPendingPdf(created?.id);
       } else {
         await _send(`/sources/${this.srcEditingId}`, 'PUT', payload);
       }

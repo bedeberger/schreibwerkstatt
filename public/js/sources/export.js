@@ -147,17 +147,18 @@ function _links(sources, opts) {
 // lib/bib-parse.js: je Gattung der Typ, den der Import wieder auf dieselbe
 // Gattung abbildet.
 const BIBTEX_TYPE = {
-  book: 'book', chapter: 'incollection', article: 'article', website: 'online',
+  // newspaper → @article + entrysubtype (biblatex); der Import liest den Subtyp.
+  book: 'book', chapter: 'incollection', article: 'article', newspaper: 'article', website: 'online',
   thesis: 'thesis', report: 'report', legal: 'legal', interview: 'misc',
   film: 'movie', dataset: 'dataset', other: 'misc',
 };
 const RIS_TYPE = {
-  book: 'BOOK', chapter: 'CHAP', article: 'JOUR', website: 'ELEC',
+  book: 'BOOK', chapter: 'CHAP', article: 'JOUR', newspaper: 'NEWS', website: 'ELEC',
   thesis: 'THES', report: 'RPRT', legal: 'LEGAL', interview: 'GEN',
   film: 'MPCT', dataset: 'DATA', other: 'GEN',
 };
 const CSL_JSON_TYPE = {
-  book: 'book', chapter: 'chapter', article: 'article-journal', website: 'webpage',
+  book: 'book', chapter: 'chapter', article: 'article-journal', newspaper: 'article-newspaper', website: 'webpage',
   thesis: 'thesis', report: 'report', legal: 'legislation', interview: 'interview',
   film: 'motion_picture', dataset: 'dataset', other: 'document',
 };
@@ -216,11 +217,13 @@ function _bibtex(sources) {
     const add = (name, v) => { if (v != null && String(v).trim() !== '') f.push([name, v]); };
     if (s.authors?.length) add('author', s.authors.map(_personBib).join(' and '));
     if (s.editors?.length) add('editor', s.editors.map(_personBib).join(' and '));
+    if (s.csl_type === 'newspaper') add('entrysubtype', 'newspaper');
     add('title', s.title);
-    add(s.csl_type === 'article' ? 'journal' : 'booktitle', s.container_title);
+    add(s.csl_type === 'article' || s.csl_type === 'newspaper' ? 'journal' : 'booktitle', s.container_title);
     add(s.csl_type === 'thesis' ? 'school' : 'publisher', s.publisher);
     add('address', s.place);
     add('year', s.year);
+    add('date', s.issued_date);
     add('edition', s.edition);
     add('volume', s.volume);
     add('number', s.issue);
@@ -256,10 +259,12 @@ function _ris(sources) {
     for (const p of s.authors || []) add('AU', _personRis(p));
     for (const p of s.editors || []) add('ED', _personRis(p));
     add('TI', s.title);
-    add(s.csl_type === 'article' ? 'JO' : 'T2', s.container_title);
+    add(s.csl_type === 'article' || s.csl_type === 'newspaper' ? 'JO' : 'T2', s.container_title);
     add('PB', s.publisher);
     add('CY', s.place);
     add('PY', s.year);
+    // RIS-Datumsform „2024/03/12/" — so schreiben Zotero und EndNote das Feld.
+    if (s.issued_date) add('DA', `${String(s.issued_date).replace(/-/g, '/')}/`);
     add('ET', s.edition);
     add('VL', s.volume);
     add('IS', s.issue);
@@ -300,7 +305,7 @@ function _cslJson(sources) {
     set('container-title', s.container_title);
     set('publisher', s.publisher);
     set('publisher-place', s.place);
-    if (s.year) item.issued = _cslDate(s.year);
+    if (s.issued_date || s.year) item.issued = _cslDate(s.issued_date || s.year);
     set('edition', s.edition);
     set('volume', s.volume);
     set('issue', s.issue);

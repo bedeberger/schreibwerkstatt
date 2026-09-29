@@ -1,0 +1,16 @@
+{
+  "version": "4.14.0",
+  "date": "2026-09-29",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Quellen-Karte, Knopf „Aus PDF“: Nach Auswahl eines PDFs füllt die App das Formular mit Titel, Personen und Jahr vor und hängt das PDF beim Speichern gleich an. Liegt das Werk schon in der Bibliothek, lässt sich die vorhandene Quelle übernehmen.",
+      "en": "Sources card, “From PDF” button: pick a PDF and the app pre-fills the form with title, people and year, attaching the PDF when you save. If the work is already in your library, you can reuse the existing source."
+    },
+    {
+      "kind": "neu",
+      "de": "Quellen-Karte: Neuer Quellentyp „Zeitungs-/Magazinartikel“ mit Feld „Erscheinungsdatum“. Im Verzeichnis steht bei solchen Artikeln und bei Websites jetzt das volle Datum statt nur des Jahres.",
+      "en": "Sources card: new source type “Newspaper/magazine article” with a “Publication date” field. For such articles and for websites, the bibliography now shows the full date instead of just the year."
+    }
+  ]
+}

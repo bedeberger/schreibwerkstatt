@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 293, 168 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 294, 168 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -607,7 +607,7 @@ erDiagram
   sources {
     INTEGER id              PK
     TEXT    owner_email     "Besitzer der Bibliothek (kein FK, wie alle E-Mail-Spalten); Schreibrecht liegt allein beim Besitzer"
-    TEXT    csl_type        "book|chapter|article|website|thesis|report|legal|interview|film|dataset|other (CSL-Vokabular)"
+    TEXT    csl_type        "book|chapter|article|newspaper|website|thesis|report|legal|interview|film|dataset|other (CSL-Vokabular; newspaper = Zeitungs-/Magazinartikel)"
     TEXT    citekey         "Zitierschlüssel, UNIQUE pro Bibliothek/owner_email (NULL beliebig oft)"
     TEXT    authors         "JSON [{family,given}|{literal}] nach CSL-JSON"
     TEXT    editors         "JSON, gleiche Form wie authors"
@@ -615,7 +615,8 @@ erDiagram
     TEXT    container_title "Sammelband/Zeitschrift/Website"
     TEXT    publisher
     TEXT    place
-    TEXT    year            "TEXT, nicht INTEGER: 'o. J.', '2019/2021', 'im Druck'"
+    TEXT    year            "TEXT, nicht INTEGER: 'o. J.', '2019/2021', 'im Druck'. Ist issued_date gesetzt, folgt year dessen Jahr"
+    TEXT    issued_date     "Genaues Erscheinungsdatum, ISO-partiell YYYY|YYYY-MM|YYYY-MM-DD (Zeitung, Web, Bericht)"
     TEXT    edition
     TEXT    volume
     TEXT    issue

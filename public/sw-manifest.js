@@ -5,7 +5,7 @@
 // __SHELL_BUILD: content hash over all listed assets → drives SHELL_CACHE.
 // __SHELL_MANIFEST: the coherent set precached atomically at SW install.
 // __VENDOR_SET: current vendor/ + fonts/ files — VENDOR_CACHE prune list.
-self.__SHELL_BUILD = "b15ed08ada5cb1e0";
+self.__SHELL_BUILD = "273b26576a846f3b";
 self.__SHELL_MANIFEST = [
   "/css/admin/admin-backup.css",
   "/css/admin/admin-home.css",
@@ -709,7 +709,9 @@ self.__SHELL_MANIFEST = [
   "/js/sources/format/sort.js",
   "/js/sources/format/styles.js",
   "/js/sources/from-research.js",
+  "/js/sources/issued-date.js",
   "/js/sources/manage.js",
+  "/js/sources/pdf-draft.js",
   "/js/sources/search.js",
   "/js/sources/source-cache.js",
   "/js/sources/tags.js",
@@ -930,6 +932,7 @@ self.__SHELL_MANIFEST = [
   "/partials/sources-export.html",
   "/partials/sources-form.html",
   "/partials/sources-lib-search.html",
+  "/partials/sources-pdf-draft.html",
   "/partials/sources-picker.html",
   "/partials/sources.html",
   "/partials/stil-heatmap.html",

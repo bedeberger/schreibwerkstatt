@@ -38,6 +38,7 @@ Browser → NGINX (HTTPS) → Express (Port 3737)
   /sources/by-url  → „liegt dieses Dokument schon im Pool?" (normalisierter URL-Vergleich, `lib/url-normalize.js`) — die Dublettenfrage der Browser-Erweiterung vor dem Erfassen
   /sources/evidence → Belegvorschlag: zu einer unbelegten Behauptung die passende Stelle in der eigenen Quellen-Bibliothek (semantisch, kein KI-Call); liefert `linked` mit, weil ein Marker nur als Fundstelle zaehlt, wenn die Quelle dem Buch zugeordnet ist
   /jobs/source-detect → Quellen-Erkennung: findet im Buchtext LOSE erwaehnte Werke (ohne Quellen-Marker) und schlaegt sie zur Aufnahme vor
+  /jobs/source-pdf-draft → Quelle aus PDF: DOI/ISBN → Register, sonst Titelseite lesen → Register-Suche; liefert nur einen Entwurf (Anlage + Anhang laufen ueber /sources)
   /lexicon/:book_id  → Wortschatz-Analyse lesen (abgeleitete Kennzahlen + Ranglisten, read-only)
   /jobs/lexicon-scan → Wortschatz-Scan: laengenrobuste Diversitaetsmasse + Lieblingswoerter + Wendungen (kein KI-Call)
   /jobs/manuscript-import → EIN Word-/ODT-Dokument nach Ueberschriften-Ebenen in Kapitel + Seiten zerlegen (Zuordnung h1..h6 kommt vom User); …/preview liefert dieselbe Gliederung synchron, ohne zu schreiben — kein KI-Call

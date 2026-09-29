@@ -320,6 +320,7 @@ const JOB_TYPE_LABELS = {
   'research-link':         'job.label.researchLink',
   'rueckblick':            'job.label.rueckblickType',
   'source-detect':         'job.label.sourceDetect',
+  'source-pdf-draft':      'job.label.sourcePdfDraft',
   'source-embed-index':    'job.label.sourceEmbedIndex',
   'stilprofil':            'job.label.stilprofil',
   'autorenprofil':         'job.label.autorenprofil',

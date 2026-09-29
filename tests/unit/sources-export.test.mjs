@@ -128,3 +128,32 @@ test('Leere Auswahl liefert leeren Text, jedes Format hat Datei-Metadaten', () =
     assert.ok(exportFileMeta(format).ext, format);
   }
 });
+
+// Zeitungsartikel mit Datum: Gattung UND Tagesdatum muessen jeden Rundlauf
+// ueberleben — sonst wird aus dem Artikel nach einem Austausch ein Fachaufsatz
+// mit Jahreszahl, und das Datum im Verzeichnis ist weg.
+const NEWS = {
+  id: 9, csl_type: 'newspaper', title: 'Die Stadt wächst', year: '2024', issued_date: '2024-03-12',
+  authors: [{ family: 'Meier', given: 'Anna' }], container_title: 'Neue Zürcher Zeitung', pages: '5',
+  url: 'https://www.nzz.ch/stadt', tags: [],
+};
+
+test('Zeitungsartikel: BibTeX- und RIS-Rundlauf behalten Gattung und Datum', () => {
+  for (const format of ['bibtex', 'ris']) {
+    const text = exportSources([NEWS, SOURCES[1]], { format }).text;
+    const back = parseBib(format, text);
+    const n = back.find(b => b.title === 'Die Stadt wächst');
+    assert.equal(n.csl_type, 'newspaper', format);
+    assert.equal(n.issued_date, '2024-03-12', format);
+    assert.equal(n.year, '2024', format);
+    assert.equal(n.container_title, 'Neue Zürcher Zeitung', format);
+    // Der Fachaufsatz daneben bekommt kein Datum angedichtet.
+    assert.equal(back.find(b => b.title === 'Agile Führung').issued_date, null, format);
+  }
+});
+
+test('Zeitungsartikel: CSL-JSON article-newspaper mit vollem Datum', () => {
+  const [item] = JSON.parse(exportSources([NEWS], { format: 'csl-json' }).text);
+  assert.equal(item.type, 'article-newspaper');
+  assert.deepEqual(item.issued, { 'date-parts': [[2024, 3, 12]] });
+});

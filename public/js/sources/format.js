@@ -25,6 +25,7 @@ import { labelsFor } from './format/labels.js';
 import { runsToText, runsToHtml, pageLabel } from './format/runs.js';
 import { shortNames } from './format/persons.js';
 import { STYLE_BUILDERS } from './format/styles.js';
+import { parseIssuedDate } from './issued-date.js';
 
 export { LANGS, labelsFor } from './format/labels.js';
 export { runsToText, runsToHtml } from './format/runs.js';
@@ -54,8 +55,18 @@ function _style(style) {
  *  eindeutige Zeiger, ein Buchstabe waere ein zweites, ueberfluessiges
  *  Unterscheidungsmerkmal. */
 function _withSuffix(src, suffix, style) {
+  src = _withIssuedYear(src);
   if (!suffix || style === 'numeric' || !src?.year) return src;
   return { ...src, year: `${String(src.year).trim()}${suffix}` };
+}
+
+/** Datum fuehrt, Jahr folgt — dieselbe Regel wie der Schreibpfad
+ *  (db/sources/shared.js). Gespeicherte Quellen tragen das Jahr schon; hier
+ *  zaehlt es fuer Eingaben, die noch nicht durch den Server gingen (Vorschau). */
+function _withIssuedYear(src) {
+  const iso = parseIssuedDate(src?.issued_date);
+  if (!iso || String(src.year || '').trim() === iso.slice(0, 4)) return src;
+  return { ...src, year: iso.slice(0, 4) };
 }
 
 /** Voll-Eintrag als Run-Liste (kursive Titel bleiben erkennbar).

@@ -26,6 +26,7 @@ export const SOURCE_DETECT_TYPES = {
   buch: 'book',
   aufsatz: 'article',
   zeitschrift: 'article',
+  zeitungsartikel: 'newspaper',
   kapitel: 'chapter',
   hochschulschrift: 'thesis',
   bericht: 'report',
@@ -87,7 +88,8 @@ Regeln:
 - "titel" so, wie der Text ihn nennt. Nennt der Text nur den Autor ("bei Foucault heisst es"), lass "titel" leer und trage die Person ein.
 - "autoren" als Klarnamen in Leserichtung ("Michel Foucault"), eine Person pro Eintrag. Nennt der Text keine Person, bleibt das Array leer.
 - "jahr" nur, wenn es im Text steht. Sonst leer.
-- "container" nur bei Aufsaetzen: die Zeitschrift oder der Sammelband, in dem der Aufsatz steht.
+- "container" nur bei Aufsaetzen und Zeitungsartikeln: die Zeitschrift, der Sammelband bzw. die Zeitung, in der der Text steht.
+- "zeitungsartikel" fuer Beitraege in Zeitungen und Publikumsmagazinen (auch online), "aufsatz" fuer Fachzeitschriften.
 - "erwaehnung" ist ein WOERTLICHES Zitat aus dem obigen Text (ein Satz, hoechstens 200 Zeichen), in dem das Werk vorkommt. Nicht umformulieren — die Autorin springt darueber an die Fundstelle.
 - Dasselbe Werk nur EINMAL, auch wenn es mehrfach vorkommt.
 ${_fehlfundBlock(buchtyp)}
@@ -115,4 +117,64 @@ export const SCHEMA_SOURCE_DETECT = _obj({
       erwaehnung: _str,
     }),
   },
+});
+
+// ── Quelle aus PDF (Job `source-pdf-draft`) ─────────────────────────────────
+// Letzte Stufe der PDF-Erfassung, nur wenn weder DOI noch ISBN zu einem
+// Registertreffer gefuehrt haben: das Modell liest die Titelseite und notiert,
+// WELCHES Werk das Dokument ist. Dieselbe Grenze wie oben — kein Feld fuer
+// Verlag, Ort, ISBN oder DOI; die kanonischen Angaben holt danach wieder
+// searchWork. Das Info-Dictionary des PDFs geht als Hinweis mit, ist aber oft
+// falsch (Dateiname als Title, Satzprogramm als Author) und darum ausdruecklich
+// nachrangig.
+
+export function buildSourcePdfSystemPrompt() {
+  return `Du bist wissenschaftliche Hilfskraft und erfasst Literatur. Du bekommst den Anfang eines Dokuments (Titelseite, Titelei, Kopf eines Aufsatzes, ein gedruckter Zeitungs- oder Webartikel) und bestimmst, welches WERK dieses Dokument ist.
+
+Du bist Erfasserin, nicht Rechercheurin: du notierst ausschliesslich, was im vorliegenden Text steht. Du ergaenzt keine Angabe aus deinem Weltwissen. Fehlende Angaben bleiben leer — eine Luecke ist brauchbar, eine erfundene Angabe nicht.${_jsonOnly()}`;
+}
+
+/**
+ * @param {string} text  Textanfang des PDFs (bereits gekuerzt).
+ * @param {{title?: string, author?: string}} meta  Info-Dictionary des PDFs.
+ */
+export function buildSourcePdfPrompt(text, meta = {}) {
+  const hints = [
+    meta?.title ? `Title: ${String(meta.title).slice(0, 300)}` : '',
+    meta?.author ? `Author: ${String(meta.author).slice(0, 300)}` : '',
+  ].filter(Boolean);
+  const metaSeg = hints.length
+    ? `\nPDF-METADATEN (oft unzuverlaessig — nur verwenden, wenn der Text sie bestaetigt):\n${hints.join('\n')}\n`
+    : '';
+  return `Bestimme das Werk, dessen Anfang hier vorliegt.
+${metaSeg}
+TEXT:
+${text}
+
+Regeln:
+- "titel" so, wie er auf der Titelseite bzw. im Kopf steht, mit Untertitel (durch ": " getrennt). Keine Kopf-/Fusszeilen, keine Zeitschriftennamen als Titel.
+- "autoren" als Klarnamen in Leserichtung ("Michel Foucault"), eine Person pro Eintrag, ohne Titel und Affiliation. Nennt die Titelseite nur Herausgeber, trage sie trotzdem hier ein.
+- "jahr" nur, wenn es im Text steht (Impressum, Copyright-Vermerk, Kopfzeile). Sonst leer.
+- "datum" ist das Erscheinungsdatum des Artikels so, wie es im Text steht ("12. März 2024", "12.03.2024", "March 12, 2024") — nur bei Zeitungs-, Magazin- und Webartikeln, und nur wenn es dasteht. Nicht das Druck- oder Abrufdatum aus Kopf-/Fusszeilen des Browsers. Sonst leer.
+- "container" nur bei Aufsaetzen, Kapiteln und Zeitungsartikeln: die Zeitschrift, der Sammelband bzw. die Zeitung oder das Magazin.
+- "typ": "zeitungsartikel" fuer Beitraege in Zeitungen und Publikumsmagazinen (auch online), "aufsatz" fuer Fachzeitschriften, "webseite" fuer sonstige Online-Texte (Blogbeitrag, Seite einer Organisation).
+- Ist kein Werk erkennbar (leerer oder unlesbarer Text), lass alle Felder leer.
+
+Erlaubte Werte fuer "typ": ${TYP_ENUM.join(', ')}.
+
+Antworte mit diesem JSON-Schema:
+{
+  "werk": { "typ": "buch", "titel": "Titel: Untertitel", "autoren": ["Vorname Nachname"], "jahr": "1962", "datum": "", "container": "" }
+}`;
+}
+
+export const SCHEMA_SOURCE_PDF = _obj({
+  werk: _obj({
+    typ: { type: 'string', enum: TYP_ENUM },
+    titel: _str,
+    autoren: { type: 'array', items: _str },
+    jahr: _str,
+    datum: _str,
+    container: _str,
+  }),
 });
