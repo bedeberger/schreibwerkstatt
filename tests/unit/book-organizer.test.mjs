@@ -362,8 +362,15 @@ test('_memo cached auf Array-Deps und invalidiert bei Aenderung', () => {
 // `_pushUndo` verwirft Records, solange `_inHistoryFlight` steht (Schutz gegen
 // Selbst-Aufzeichnung der Applier) — innerhalb des try-Blocks aufgezeichnet
 // verschwand der Redo→Undo-Rückweg, nach einem Redo war nichts mehr undo-bar.
-test('historyRedo legt den Record zurueck auf den Undo-Stack', async () => {
+function makeSeededCard() {
+  seedNav();
   const card = makeCard();
+  card._snapshotFromNav();
+  return card;
+}
+
+test('historyRedo legt den Record zurueck auf den Undo-Stack', async () => {
+  const card = makeSeededCard();
   card._applyInverse = async () => true;
   card._applyForward = async () => true;
   card._pushUndo({ kind: 'rename-chapter', id: 1, oldName: 'A', newName: 'B' });
@@ -382,10 +389,11 @@ test('historyRedo legt den Record zurueck auf den Undo-Stack', async () => {
 });
 
 test('historyUndo eines create invalidiert den Redo-Stack', async () => {
-  const card = makeCard();
+  const card = makeSeededCard();
   card._applyInverse = async () => true;
-  card._pushUndo({ kind: 'reorder', before: {}, after: {} });
-  card._pushUndo({ kind: 'create-chapter', id: 5, name: 'Neu' }, { clearRedo: false });
+  const snap = card._snapshotWorkstate();
+  card._pushUndo({ kind: 'reorder', before: snap, after: snap });
+  card._pushUndo({ kind: 'create-chapter', id: 2, name: 'Zwei' }, { clearRedo: false });
 
   await card.historyUndo();
   assert.equal(card._redoStack.length, 0, 'kein Redo nach create-Undo (neue ID beim Wiederanlegen)');
@@ -393,16 +401,17 @@ test('historyUndo eines create invalidiert den Redo-Stack', async () => {
 });
 
 test('fehlgeschlagenes Undo/Redo laesst den Stack unveraendert', async () => {
-  const card = makeCard();
+  const card = makeSeededCard();
   card._applyInverse = async () => false;
   card._applyForward = async () => false;
-  card._pushUndo({ kind: 'rename-page', id: 9, oldName: 'A', newName: 'B' });
+  card._pushUndo({ kind: 'rename-page', id: 901, oldName: 'A', newName: 'B' });
 
   await card.historyUndo();
   assert.equal(card._undoStack.length, 1);
   assert.equal(card._redoStack.length, 0);
 
-  card._redoStack = [{ kind: 'reorder', before: {}, after: {} }];
+  const snap = card._snapshotWorkstate();
+  card._redoStack = [{ kind: 'reorder', before: snap, after: snap }];
   await card.historyRedo();
   assert.equal(card._redoStack.length, 1);
   assert.equal(card._undoStack.length, 1);
@@ -413,4 +422,51 @@ test('waehrend eines Flights zeichnet _pushUndo nichts auf', () => {
   card._inHistoryFlight = true;
   card._pushUndo({ kind: 'reorder', before: {}, after: {} });
   assert.equal(card._undoStack.length, 0);
+});
+
+// Fremd-Änderungen (Sidebar, Collab) laufen nicht durch die History. Ein Record,
+// der danach nicht mehr zum Bestand passt, darf nicht eingespielt werden —
+// sonst geht ein Order-PUT mit fehlenden/toten IDs raus (Server: MISSING_*).
+test('Reorder-Undo mit veraltetem Snapshot leert die History statt einzuspielen', async () => {
+  const card = makeSeededCard();
+  let applied = false;
+  card._applyInverse = async () => { applied = true; return true; };
+  const before = card._snapshotWorkstate();
+  card._pushUndo({ kind: 'rename-chapter', id: 1, oldName: 'A', newName: 'Eins' });
+  card._pushUndo({ kind: 'reorder', before, after: card._snapshotWorkstate() });
+  // Remote-Anlage einer Seite → Workstate kennt eine ID mehr als der Snapshot.
+  card.soloPages.push({ id: 999, name: 'Neu', chapter_id: 0 });
+
+  await card.historyUndo();
+  assert.equal(applied, false, 'Snapshot ohne Seite 999 wird nicht eingespielt');
+  assert.equal(card._undoStack.length, 0);
+  assert.equal(card._redoStack.length, 0);
+});
+
+test('Reorder-Undo mit gleichem Bestand, anderer Reihenfolge ist nicht stale', async () => {
+  const card = makeSeededCard();
+  let applied = false;
+  card._applyInverse = async () => { applied = true; return true; };
+  const before = card._snapshotWorkstate();
+  card.workTree.reverse();
+  card.workTree[0].pages.reverse();
+  card._pushUndo({ kind: 'reorder', before, after: card._snapshotWorkstate() });
+
+  await card.historyUndo();
+  assert.equal(applied, true);
+  assert.equal(card._redoStack.length, 1);
+});
+
+test('Rename-/Create-Record auf verschwundenes Ziel ist stale', () => {
+  const card = makeSeededCard();
+  assert.equal(card._isRecordStale({ kind: 'rename-page', id: 901 }, 'undo'), false);
+  assert.equal(card._isRecordStale({ kind: 'rename-page', id: 4711 }, 'undo'), true);
+  assert.equal(card._isRecordStale({ kind: 'rename-chapter', id: 11 }, 'redo'), false);
+  assert.equal(card._isRecordStale({ kind: 'create-chapter', id: 4711 }, 'undo'), true);
+});
+
+test('_fmtDec1 formatiert eine Nachkommastelle in der UI-Locale', () => {
+  const card = makeCard();
+  assert.equal(card._fmtDec1(2), '2.0');
+  assert.equal(card._fmtDec1(12.345), '12.3');
 });

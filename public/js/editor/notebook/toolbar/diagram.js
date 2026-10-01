@@ -14,7 +14,7 @@
 // Aufraeumpunkt — ESC, Backdrop und Abbrechen laufen alle durch `dlg.close()`.
 
 import { getEditEl } from '../../utils.js';
-import { replaceBlockOutsideList } from './_shared.js';
+import { replaceBlockOutsideList, ensureSlotAfter } from './_shared.js';
 import { htmlToElement } from './caret-panel.js';
 import { buildDiagramHtml, diagramCode, DIAGRAM_MAX_CHARS } from '../../../diagram/mermaid-html.js';
 import { renderDiagramSvg } from '../../../diagram/mermaid-view.js';
@@ -176,13 +176,7 @@ export const diagramMethods = {
     } else {
       editEl.appendChild(node);
     }
-    // Ein atomarer Block am Dokumentende liesse keinen Caret-Anker uebrig —
-    // dieselbe Lage wie bei `<hr>` und `<figure>`.
-    if (!node.nextElementSibling) {
-      const p = document.createElement('p');
-      p.appendChild(document.createElement('br'));
-      node.insertAdjacentElement('afterend', p);
-    }
+    ensureSlotAfter(node);
     window.__app?._markEditDirty?.();
     this.closeDiagramDialog();
   },

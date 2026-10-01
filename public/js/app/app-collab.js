@@ -529,6 +529,8 @@ export const appCollabMethods = {
       }
       if (!r.ok) return null;
       const data = await r.json();
+      // startEdit wartet nicht hierauf: Session schon beendet → freigeben, sonst hielte der Heartbeat den Lock am Leben.
+      if (!this.editMode || this.currentPage?.id !== pageId) { this._releaseEditLock(pageId); return null; }
       this.$store.collab._currentEditLock = data?.lock || null;
       this.$store.collab.foreignEditLock = null;
       this._startLockHeartbeat(pageId);

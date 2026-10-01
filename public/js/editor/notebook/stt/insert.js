@@ -103,26 +103,33 @@ export const sttInsertMethods = {
 
   // Haengt ein '.' an den letzten Textknoten eines Blocks an, wenn dieser nicht
   // bereits auf einem Satz-/Doppelpunkt endet — damit beim Absatzwechsel der
-  // vorausgehende Satz sauber schliesst.
+  // vorausgehende Satz sauber schliesst. Nur an Prosa-Absaetzen: Ueberschrift,
+  // Liste, Tabelle oder Diagramm-Quelltext bekommen keinen Punkt, und ein
+  // atomarer Chip (Beleg, Querverweis) am Absatzende bleibt unangetastet.
   _sttEnsureTerminalPunct(block) {
     try {
-      if (!block || block.nodeType !== 1) return;
+      if (!block || block.nodeType !== 1 || block.tagName !== 'P') return;
       // Schliessende Anfuehrungs-/Klammerzeichen mit abstreifen, damit ein vom
       // Modell gesetztes Satzzeichen im Dialog („…her.«") erkannt wird und wir
       // keinen zweiten Punkt anhaengen.
       const txt = (block.textContent || '').replace(/[\s"'’”“»«)\]]+$/u, '');
       if (!txt || /[.!?…:;]$/.test(txt)) return;
+      // Steht ein atomarer Chip als letzter Inhalt, liefert die Suche `ATOMIC`
+      // und bricht auf jeder Ebene ab, statt zu einem frueheren Text zu springen.
+      const ATOMIC = {};
       const lastTextNode = (node) => {
         for (let i = node.childNodes.length - 1; i >= 0; i--) {
           const c = node.childNodes[i];
           if (c.nodeType === 3 && c.textContent.trim()) return c;
-          if (c.nodeType === 1) { const r = lastTextNode(c); if (r) return r; }
+          if (c.nodeType === 1) {
+            if (c.getAttribute('contenteditable') === 'false') return ATOMIC;
+            const r = lastTextNode(c); if (r) return r;
+          }
         }
         return null;
       };
       const tn = lastTextNode(block);
-      if (tn) tn.textContent = tn.textContent.replace(/\s+$/, '') + '.';
-      else block.appendChild(document.createTextNode('.'));
+      if (tn && tn !== ATOMIC) tn.textContent = tn.textContent.replace(/\s+$/, '') + '.';
     } catch { /* noop */ }
   },
 

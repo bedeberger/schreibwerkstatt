@@ -9,7 +9,7 @@
 
 import { MAX_CHAPTER_DEPTH, COLLAPSE_THRESHOLD } from './constants.js';
 import { memoMethods } from '../cards/card-memo.js';
-import { localeTag } from '../utils.js';
+import { numberFormat } from '../utils.js';
 
 function _walkAllIds(chapters, out = []) {
   for (const c of chapters) {
@@ -241,8 +241,13 @@ export const viewMethods = {
   },
 
   _fmtNum(n) {
-    const tag = localeTag(Alpine.store('shell').uiLocale);
-    return Number(n || 0).toLocaleString(tag);
+    return numberFormat(Alpine.store('shell').uiLocale).format(Number(n || 0));
+  },
+
+  // Eine Nachkommastelle (Normseiten in der Längenverteilung).
+  _fmtDec1(n) {
+    return numberFormat(Alpine.store('shell').uiLocale,
+      { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Number(n || 0));
   },
 
   // Memo-Helper (cards/card-memo.js), gemeinsamer this._memos-Speicher.

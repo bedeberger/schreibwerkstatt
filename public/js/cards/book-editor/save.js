@@ -12,6 +12,7 @@
 
 import { htmlToText } from '../../utils.js';
 import { tErrorRaw } from '../../i18n.js';
+import { contentRepo } from '../../repo/content.js';
 import { readConflictBody, savePage } from '../../editor/shared/page-api.js';
 import { checkPageConflict } from '../../editor/shared/page-conflict.js';
 import { conflictText } from '../../editor/shared/conflict-text.js';
@@ -170,14 +171,39 @@ export const bookEditorSaveMethods = {
     this._enqueueSave(block.pageId);
   },
 
-  resolveConflictTakeRemote(block) {
-    if (!block.conflict) return;
-    block.html = block.conflict.remoteHtml || '';
-    block.originalHtml = block.html;
-    block.originalUpdatedAt = block.conflict.remoteUpdatedAt;
+  // Der 409-Pfad (Race nach dem Pre-Check) kennt nur die Metadaten aus dem
+  // Server-Body, nicht das Remote-HTML — dann frisch lesen. Ein `remoteHtml ||
+  // ''` zeigte stattdessen eine leere Seite, und der nächste Tastendruck
+  // überschriebe die Remote-Fassung mit dem Rest.
+  async resolveConflictTakeRemote(block) {
+    const conflict = block.conflict;
+    if (!conflict) return;
+    let remoteHtml = conflict.remoteHtml;
+    let remoteUpdatedAt = conflict.remoteUpdatedAt;
+    if (remoteHtml == null) {
+      try {
+        const remote = await contentRepo.loadPage(block.pageId, { fresh: true });
+        remoteHtml = remote?.html || '';
+        remoteUpdatedAt = remote?.updated_at || remoteUpdatedAt;
+      } catch (e) {
+        const app = window.__app;
+        block.saveError = e?.body ? tErrorRaw(e.body) : (app?.t('bookEditor.loadFailed') || '');
+        return;
+      }
+      // Während des Reads anders entschieden (Überschreiben) → nichts tun.
+      if (block.conflict !== conflict) return;
+    }
+    this._autosave.clear(block.pageId);
+    block.html = remoteHtml;
+    block.originalHtml = remoteHtml;
+    block.originalUpdatedAt = remoteUpdatedAt;
     block.dirty = false;
     block.conflict = null;
     block.saveError = '';
+    // Aktiver Block: `_maybeRehydrate` lässt dessen DOM in Ruhe (Invariante 3)
+    // — der User sähe weiter die eigene Fassung, und der nächste Tastendruck
+    // schriebe sie über die gerade übernommene. Darum erst deaktivieren.
+    if (this.activePageId === block.pageId) this.activePageId = null;
     block._rev++;   // externe Mutation → _maybeRehydrate schreibt den Block neu
   },
 

@@ -18,8 +18,31 @@
 // Delete (Kapitel/Seite) ist ebenfalls nicht reversibel (Hard-Delete in SQLite,
 // keine Content-Snapshots). Delete-Operationen rufen `_clearHistory()` und
 // blocken damit Undo komplett, statt einen inkonsistenten Stack zu hinterlassen.
+//
+// Fremd-Änderungen (Sidebar-Kontextmenü, Collab-Feed, Catch-up) verändern den
+// Bestand an Kapiteln/Seiten, ohne durch diese History zu laufen. Ein Record,
+// der danach nicht mehr zum Bestand passt, wird vor dem Einspielen erkannt
+// (`_isRecordStale`) und leert die History — sonst schickte ein Reorder-Undo
+// einen Tree mit fehlenden/toten IDs, der Server lehnte ihn ab
+// (MISSING_PAGE/-CHAPTER) und der Fehlerpfad lüde das ganze Buch neu.
 
 const HISTORY_MAX = 10;
+
+// Sortierter ID-Schlüssel eines Workstates ({ workTree, soloPages }) — gleich,
+// wenn beide Stände dieselben Kapitel und Seiten enthalten.
+function _workstateIdKey({ workTree, soloPages }) {
+  const ids = [];
+  const walk = (list) => {
+    for (const c of list || []) {
+      ids.push('c' + c.id);
+      for (const p of c.pages || []) ids.push('p' + p.id);
+      walk(c.subchapters);
+    }
+  };
+  walk(workTree);
+  for (const p of soloPages || []) ids.push('p' + p.id);
+  return ids.sort().join(',');
+}
 
 export const historyMethods = {
   _clearHistory() {
@@ -69,6 +92,7 @@ export const historyMethods = {
     if (this.organizerSaving || this._inHistoryFlight) return;
     const rec = this._undoStack.pop();
     if (!rec) return;
+    if (this._isRecordStale(rec, 'undo')) { this._dropStaleHistory(); return; }
     this._inHistoryFlight = true;
     let ok = false;
     try {
@@ -90,6 +114,7 @@ export const historyMethods = {
     if (this.organizerSaving || this._inHistoryFlight) return;
     const rec = this._redoStack.pop();
     if (!rec) return;
+    if (this._isRecordStale(rec, 'redo')) { this._dropStaleHistory(); return; }
     this._inHistoryFlight = true;
     let ok = false;
     try {
@@ -99,6 +124,25 @@ export const historyMethods = {
     }
     if (!ok) { this._redoStack.push(rec); return; }
     this._pushUndo(rec, { clearRedo: false });
+  },
+
+  // Passt der Record noch zum aktuellen Workstate? Reorder: der einzuspielende
+  // Snapshot muss exakt dieselben Kapitel- und Seiten-IDs enthalten (nur die
+  // Anordnung darf abweichen). Rename/Create: das Ziel muss noch existieren.
+  _isRecordStale(rec, dir) {
+    if (rec.kind === 'reorder') {
+      const snap = dir === 'undo' ? rec.before : rec.after;
+      return _workstateIdKey(snap) !== _workstateIdKey(this);
+    }
+    if (rec.kind === 'rename-chapter' || rec.kind === 'create-chapter') return !this._findChapter(rec.id);
+    if (rec.kind === 'rename-page' || rec.kind === 'create-page') return !this._findPage(rec.id);
+    return false;
+  },
+
+  _dropStaleHistory() {
+    this._clearHistory();
+    const root = window.__app;
+    root?.setStatus?.(root.t('bookOrganizer.historyStale'));
   },
 
   async _applyInverse(rec) {

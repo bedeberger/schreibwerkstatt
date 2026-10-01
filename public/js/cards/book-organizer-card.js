@@ -17,7 +17,7 @@
 // würden eigene Reassignments im Tree zur Selbst-Reentry führen.
 //
 // Methoden-Pool kommt aus ../book-organizer.js (Slices: dnd, persist, mirror,
-// crud, history, view).
+// crud, history, view, redaktion).
 
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { loadSortable } from '../lazy-libs.js';
@@ -113,6 +113,13 @@ export function registerBookOrganizerCard() {
             this._invalidateDiaryCache();
             await this._rerender();
           } },
+          // Kapitel ausserhalb angelegt (Sidebar-Kontextmenü) — in-place in
+          // nav.tree eingehängt, kein pages:loaded. Workstate nachziehen, damit
+          // der nächste Order-PUT es mitschickt.
+          { type: EVT.CHAPTER_ADDED, handler: async () => {
+            if (!window.__app.showBookOrganizerCard) return;
+            await this._rerender();
+          } },
         ],
       });
 
@@ -122,7 +129,7 @@ export function registerBookOrganizerCard() {
       this._onHistoryKeydown = (e) => {
         if (!window.__app?.showBookOrganizerCard) return;
         const tag = e.target?.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
         const cmd = e.metaKey || e.ctrlKey;
         if (!cmd) return;
         const key = e.key.toLowerCase();

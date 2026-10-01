@@ -86,6 +86,7 @@ init ──setupCardLifecycle──▶ idle
 - **Caret-Fallback ist Pflicht:** trifft der Klick kein Textnode (Padding, Zeilenabstand, Rand) oder fehlt die API, setzt `_placeCaret` den Caret an den Anfang des ersten Kindblocks. Ohne ihn ist der Block fokussiert, aber jede Tastatureingabe verpufft — fehlerfrei und unsichtbar.
 - Element-Lookups laufen über **`this.$root`**, nicht `this.$el`: in einer aus `@click` gerufenen Methode zeigt `$el` auf das auslösende Element (den Block-Body), nicht auf die Karten-Wurzel.
 - Vorheriger aktiver Block wird vor dem Wechsel `_enqueueSave`'d, wenn dirty.
+- **Nur mit Schreibrecht:** `activateBlock` und Replace greifen nur bei `app.canEdit()` (editor/owner, unbekannte Rolle = Legacy-Fallback). Lektor und Viewer lesen, suchen und kommentieren im Stream; die Ersetzen-Zeile der Find-Leiste ist ausgeblendet. Reine UX — der PUT prüft serverseitig `editor`.
 
 ### Render-Sync (`_mountBlockEl` / `_maybeRehydrate`)
 - **`_mountBlockEl`** (x-init am Block-Container): einmaliger Initial-Write von `block.html` + `data-rev`.
@@ -106,7 +107,7 @@ Code: [book-editor/save.js](../public/js/cards/book-editor/save.js).
   6. `savePage(pageId, { html, pageName, source: 'book', expectedUpdatedAt })` aus [shared/page-api.js](../public/js/editor/shared/page-api.js). Erfolg → `applySaveOutcome(block, { snapshot, savedHtml, savedUpdatedAt })`.
   7. 409 PAGE_CONFLICT (Race nach Pre-Check) → identische Conflict-Banner-Branch.
   8. `app._syncPageStatsAfterSave?.(...)` — Page-Stats konsistent zum Notebook-/Focus-Save-Pfad (Frontend/Server-Parität, siehe Harte Regel „HTML→Text-Normalisierung" in CLAUDE.md).
-- Konflikt-Resolution: `resolveConflictOverwrite(block)` (Remote-`updated_at` übernehmen, re-queue) / `resolveConflictTakeRemote(block)` (Remote-HTML übernehmen, dirty=false, `_rev++` → Re-Hydrate).
+- Konflikt-Resolution: `resolveConflictOverwrite(block)` (Remote-`updated_at` übernehmen, re-queue) / `resolveConflictTakeRemote(block)` (Remote-HTML übernehmen, dirty=false, `_rev++` → Re-Hydrate). Der 409-Pfad trägt kein `remoteHtml` — dann liest `resolveConflictTakeRemote` die Seite frisch (`contentRepo.loadPage(id, { fresh: true })`), statt eine leere Seite zu übernehmen. Ist der Block aktiv, wird er vorher deaktiviert: `_maybeRehydrate` schreibt den aktiven Block nicht (Invariante 3), der User sähe sonst weiter die eigene Fassung und der nächste Tastendruck speicherte sie über die übernommene.
 
 ### Save-All (Cmd/Ctrl+S)
 - Sammelt alle dirty Pages → in Queue → `await _processQueue()` (kein Polling).
@@ -123,6 +124,7 @@ Code: [book-editor/save.js](../public/js/cards/book-editor/save.js).
 - Highlight: **CSS Custom Highlight API** über `createHighlightPair('book-editor-find-match', 'book-editor-find-current')`, kein DOM-Wrap. Browser ohne API → keine Highlights, Navigation bleibt funktional.
 - Replace: `Range.deleteContents` + `createTextNode(replace)` + `range.insertNode`. Danach `block.html = container.innerHTML`, dirty + autosave-schedule.
 - Replace-All läuft rückwärts über die Match-Liste (sonst verschieben sich nachfolgende Offsets).
+- Einzel-Replace prüft vorher `_matchStillValid` (Nodes noch im DOM, Range-Text = Suchbegriff). Hat der User seit der Suche im aktiven Block getippt, zeigen die gespeicherten Offsets auf anderen Text — dann wird neu gesucht und nicht ersetzt.
 
 ## Outline (Sticky-TOC)
 
@@ -167,7 +169,7 @@ Neue Aktion / neuer Block-Typ / neuer Find-Modus:
 
 | Datei | Deckt ab |
 |---|---|
-| [tests/unit/book-editor-blocks.test.mjs](../tests/unit/book-editor-blocks.test.mjs) | `buildBlocksFromPages`: Chapter-Boundary-Marker, Solo-Pages vor erstem Kapitel, `originalHtml`/`originalUpdatedAt`-Initialisierung. Dazu `applySaveOutcome`: Dirty-Ausgang inkl. „während des Saves weitergetippt" |
+| [tests/unit/book-editor-blocks.test.mjs](../tests/unit/book-editor-blocks.test.mjs) | `buildBlocksFromPages`: Chapter-Boundary-Marker, Solo-Pages vor erstem Kapitel, `originalHtml`/`originalUpdatedAt`-Initialisierung. Dazu `applySaveOutcome`: Dirty-Ausgang inkl. „während des Saves weitergetippt". `resolveConflictTakeRemote`: Frisch-Read im 409-Pfad, Deaktivierung des aktiven Blocks |
 | [tests/unit/text-find.test.mjs](../tests/unit/text-find.test.mjs) | Geteilter Find-Kern: Offset-Rückmapping über Node-Grenzen, Ganzwort-Regel, Case-Sensitivität, Grenz-Semantik am Node-Übergang |
 | [tests/e2e-app/book-editor.spec.js](../tests/e2e-app/book-editor.spec.js) | **Verhalten gegen die echte App**: Klick aktiviert + fokussiert Block, Tippen → dirty, Save-All → persistiert (Reload-Probe), Caret-Fallback ohne `caretRangeFromPoint`, Find/Replace über den Stream, Outline-Collapse |
 | [tests/e2e-app/smoke.spec.js](../tests/e2e-app/smoke.spec.js) | Karte + alle drei Editoren öffnen ohne Konsolenfehler |

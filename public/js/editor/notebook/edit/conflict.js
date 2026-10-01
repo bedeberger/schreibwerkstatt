@@ -1,5 +1,5 @@
 // Teil von notebookEditMethods (siehe Facade edit.js).
-import { FEATURE_BLOCK_MERGE, buildResolvedHtml, checkPageConflict, conflictBannerFrom, conflictText, contentRepo, editorHost, isPageConflict, mergeBlocks, mergedToHtml, mountEditorHtml, readConflictBody, savePage, trackMerge, writeDraft } from './_shared.js';
+import { FEATURE_BLOCK_MERGE, buildResolvedHtml, checkPageConflict, clearDraft, conflictBannerFrom, conflictText, contentRepo, editorHost, isPageConflict, mergeBlocks, mergedToHtml, mountEditorHtml, readConflictBody, savePage, trackMerge, writeDraft } from './_shared.js';
 
 export const conflictMethods = {
 
@@ -129,15 +129,17 @@ export const conflictMethods = {
   //   { stale: true } — Seite inzwischen gewechselt, Aufrufer sichert nur den Draft
   //   null — kein Merge möglich → Aufrufer macht den _keepAsDraft-Fallback
   async _retryAfterConflict({ localHtml, source, pageId, pageName, tag }) {
-    const app = editorHost();
-    // Vor dem möglichen Öffnen des Auflösungs-Modals zurücksetzen:
-    // `submitConflictResolution` bricht bei gesetztem `editSaving` früh ab,
-    // der User käme aus dem Modal nicht heraus.
-    app.editSaving = false;
+    // `editSaving` bleibt bis zum Schluss gesetzt: während Merge-Read und
+    // Re-Save darf weder der Autosave-Tick noch ein zweiter Klick einen
+    // parallelen PUT absetzen. Öffnet der Merge das Auflösungs-Modal, kehren
+    // alle Aufrufer sofort zurück und setzen das Flag im `finally` zurück —
+    // ohne dazwischenliegendes `await`, das Modal ist bis dahin nicht klickbar.
     const merge = await this._attemptBlockMerge({ localHtml, source, pageId });
     if (merge?.stale) return { stale: true };
     if (merge?.conflict) return { conflict: true };
     if (!merge?.merged) return null;
+    // Während des Merge-Reads verworfen oder Seite gewechselt: nichts speichern.
+    if (!this._stillEditing(pageId)) return { stale: true };
     try {
       const saved = await savePage(pageId, {
         html: merge.saveHtml, pageName, source, expectedUpdatedAt: merge.expectedAt,
@@ -284,15 +286,21 @@ export const conflictMethods = {
     if (!cr || app.editSaving) return;
     const finalHtml = buildResolvedHtml(cr.merged, cr.decisions);
     const source = cr.source || (app.focusActive ? 'focus' : 'main');
+    // Name beim Start festhalten (siehe _pinSaveTarget): nach einem `await`
+    // kann `currentPage` schon die nächste Seite sein.
+    const pageName = app.currentPage?.name;
     app.editSaving = true;
     app.setStatus(app.t('edit.saving'), true);
     try {
       const saved = await savePage(cr.pageId, {
         html: finalHtml,
-        pageName: app.currentPage?.name,
+        pageName,
         source,
         expectedUpdatedAt: cr.remoteUpdatedAt,
       });
+      // Auf dem Server ist die Auflösung; den State einer inzwischen geöffneten
+      // anderen Seite fasst sie nicht an.
+      if (!this._stillEditing(cr.pageId)) { clearDraft(cr.pageId); return; }
       this._applySaveSuccess(saved, finalHtml, { pageId: cr.pageId, applyToEditor: true });
       trackMerge('conflict_resolved', { mix: this._resolutionMix(cr) });
       app.conflictResolution = null;
@@ -305,14 +313,19 @@ export const conflictMethods = {
         // lokal aufgelöste Fassung gegen den jetzt frischen Remote-Stand neu
         // block-mergen — gemeinsamer Pfad mit saveEdit/quickSave, nur mit
         // finalHtml als lokaler Quelle (= die gerade getroffene Auflösung).
+        // Seite gewechselt: der Draft vom Konflikt-Zeitpunkt liegt schon
+        // (_attemptBlockMerge), Merge und Banner gehörten der alten Seite.
+        if (!this._stillEditing(cr.pageId)) return;
         const retry = await this._retryAfterConflict({
           localHtml: finalHtml, source, pageId: cr.pageId,
-          pageName: app.currentPage?.name, tag: 'submitConflictResolution',
+          pageName, tag: 'submitConflictResolution',
         });
+        if (retry?.stale) return;
         // _openConflictResolution hat den conflictResolution-State auf den neuen
         // Remote-Stand ersetzt → User löst die neue Kollision auf.
         if (retry?.conflict) return;
         if (retry) {
+          if (!this._stillEditing(cr.pageId)) { clearDraft(cr.pageId); return; }
           this._applySaveSuccess(retry.saved, retry.html, { pageId: cr.pageId, applyToEditor: true });
           trackMerge('conflict_resolved', { mix: this._resolutionMix(cr) });
           app.conflictResolution = null;
@@ -355,6 +368,7 @@ export const conflictMethods = {
     if (!cr?.pageId) return;
     try {
       const remote = await contentRepo.loadPage(cr.pageId, { fresh: true });
+      if (!this._stillEditing(cr.pageId)) return;
       if (remote?.html != null) {
         this._applyMergedToEditor(remote.html);
         app.originalHtml = remote.html;

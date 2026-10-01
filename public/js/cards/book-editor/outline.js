@@ -6,7 +6,7 @@ export const bookEditorOutlineMethods = {
     _initOutlineObserver() {
       this._teardownOutlineObserver();
       if (typeof IntersectionObserver === 'undefined') return;
-      const targets = document.querySelectorAll('.book-editor-page-card');
+      const targets = this.$root.querySelectorAll('.book-editor-page-card');
       if (targets.length === 0) return;
       const visible = new Map();
       let rafScheduled = false;
@@ -67,7 +67,7 @@ export const bookEditorOutlineMethods = {
     },
 
     scrollToBlock(pageId) {
-      const el = document.querySelector(`[data-outline-page-id="${pageId}"]`);
+      const el = this.$root.querySelector(`[data-outline-page-id="${pageId}"]`);
       if (!el) return;
       el.scrollIntoView({ block: 'start', behavior: 'smooth' });
       this.visiblePageId = pageId;

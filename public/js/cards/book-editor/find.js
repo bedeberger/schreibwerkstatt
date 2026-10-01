@@ -140,9 +140,19 @@ export const bookEditorFindMethods = {
     },
 
     replaceCurrent() {
-      if (this.findMatches.length === 0) return;
+      if (!this._canEdit() || this.findMatches.length === 0) return;
       const m = this.findMatches[this.findIndex];
       if (!m?.startNode || !m?.endNode) return;
+      // Treffer veraltet (seit der Suche im aktiven Block getippt): die Offsets
+      // zeigen dann auf anderen Text, und Ersetzen träfe die falsche Stelle.
+      // Neu suchen und den Klick nicht ausführen — der User sieht den
+      // aktualisierten Treffer und bestätigt erneut.
+      if (!this._matchStillValid(m)) {
+        const at = this.findIndex;
+        this.recomputeFindMatches();
+        if (this.findMatches.length > 0) this._selectMatch(Math.min(at, this.findMatches.length - 1));
+        return;
+      }
       const touched = new Set();
       this._doReplaceAt(m, touched);
       this._resyncReplacedBlocks(touched);
@@ -154,8 +164,20 @@ export const bookEditorFindMethods = {
       });
     },
 
+    _matchStillValid(m) {
+      if (!m.startNode?.isConnected || !m.endNode?.isConnected) return false;
+      try {
+        const text = rangeOf(m).toString();
+        return this.findCaseSensitive
+          ? text === this.findTerm
+          : text.toLowerCase() === this.findTerm.toLowerCase();
+      } catch {
+        return false;
+      }
+    },
+
     replaceAll() {
-      if (!this.findTerm) return;
+      if (!this._canEdit() || !this.findTerm) return;
       this.recomputeFindMatches();
       if (this.findMatches.length === 0) return;
       // Von hinten nach vorne: Ersetzungen weiter hinten lassen die Ranges der

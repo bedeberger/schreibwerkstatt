@@ -14,6 +14,7 @@ import { TODO_LIST_SEL } from '../editor/shared/todo-html.js';
 import { invalidateSourceCache } from '../sources/source-cache.js';
 import { closestCiteEl } from '../sources/cite-html.js';
 import { closestTableEl } from '../table/table-html.js';
+import { closestDiagramEl } from '../diagram/mermaid-html.js';
 import { closestFigureEl } from '../figure/figure-html.js';
 import { invalidateXrefTargetCache } from '../editor/notebook/toolbar/xref.js';
 import { EVT } from '../events.js';
@@ -227,8 +228,8 @@ export function registerEditorToolbarCard() {
         if (!app?.editMode || app.focusActive) return;
         const editEl = e.target?.closest?.('.page-content-view--editing');
         if (!editEl) return;
-        const pre = e.target?.closest?.('pre.mermaid');
-        if (!pre || !editEl.contains(pre)) return;
+        const pre = closestDiagramEl(e.target, editEl);
+        if (!pre) return;
         this.openDiagramForEl(pre);
       }, { signal });
 

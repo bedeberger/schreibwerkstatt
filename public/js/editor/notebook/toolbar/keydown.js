@@ -8,6 +8,8 @@ import { getEditEl, placeCaretIn, _brLeftOfCaret, _formatStamp, findTodoLi, find
 import { createTodoItem, TODO_TEXT_SEL, TODO_LIST_SEL } from '../../shared/todo-html.js';
 import { matchHistoryCommand } from '../../shared/shortcuts.js';
 
+const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock']);
+
 export const keydownMethods = {
   // Reihenfolge ist verhaltensrelevant (z.B. Shift+Enter vor Enter-in-Todo).
   // Die Handler bis zum Focus-Hard-Stop laufen in BEIDEN Modi (Notebook +
@@ -15,6 +17,19 @@ export const keydownMethods = {
   _onEditKeydown(e) {
     const app = window.__app;
     if (!app?.editMode) return;
+    // Enter, das eine IME-Komposition bestaetigt, ist keine Struktur-Taste.
+    if (e.isComposing) return;
+    // Ein offenes Slash-Menue besitzt die Tastatur zuerst: sonst wandelte
+    // `_kbTodoEnter`/`_kbPoemEnter` die leere Zeile, aus der das Menue geoeffnet
+    // wurde, und das Menue bliebe verwaist ueber einem geloesten Block stehen.
+    // Im Focus-Modus oeffnet es nie (siehe Hard-Stop unten).
+    if (!app.focusActive && this._kbSlashNav(e)) return;
+    // Die Klick-Markierung einer <hr> gilt nur fuer den naechsten Loeschgriff.
+    // Wer stattdessen tippt oder den Caret bewegt, hat sich umentschieden —
+    // sonst loeschte das naechste Backspace die Linie statt des Zeichens.
+    if (e.key !== 'Backspace' && e.key !== 'Delete' && !MODIFIER_KEYS.has(e.key)) {
+      getEditEl()?.querySelectorAll('hr.hr-selected').forEach((h) => h.classList.remove('hr-selected'));
+    }
 
     if (this._kbSoftBreak(e, app)) return;
     if (this._kbTodoEnter(e, app)) return;
@@ -30,7 +45,6 @@ export const keydownMethods = {
     // Default weiter.
     if (app.focusActive) return;
 
-    if (this._kbSlashNav(e)) return;
     if (this._kbDeleteBlock(e, app)) return;
     // Struktur-Grenzen: spezifisch vor generisch. `_kbTodoDelete` und
     // `_kbFigureCaption` schützen je ein Void-Element (Checkbox bzw. Bild),

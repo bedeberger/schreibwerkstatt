@@ -319,6 +319,11 @@ export const ttsProofMethods = {
         const ended = await this._ttsPlayUrl(rt, url);
         if (activeRt !== rt) return;
         if (!ended) return; // pausiert/gestoppt -> Steuerung liegt bei Toggle/Stop
+        // Gespieltes Segment freigeben: die Schleife laeuft nur vorwaerts, sonst
+        // hielte eine lange Seite bis zum Stop jedes Audio-Blob im Speicher.
+        rt.cache.delete(idx);
+        rt.urls.delete(url);
+        try { URL.revokeObjectURL(url); } catch { /* noop */ }
         rt.i++;
         // Atempause vor dem naechsten Fragment (an Absatzgrenzen laenger). Dauer
         // vom Admin konfigurierbar (this.$store.tts.pause aus /config), Default via

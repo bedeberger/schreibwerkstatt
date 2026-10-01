@@ -14,9 +14,10 @@ Code: [public/js/cards/book-organizer-card.js](../public/js/cards/book-organizer
 | `book-organizer/mirror.js` | In-Place-Spiegelung `workTree`/`soloPages` → `nav.tree`/`nav.pages` + Depth-First-Reordering + Order-Maps + Chapter-Stats. |
 | `book-organizer/crud.js` | Create/Rename/Delete für Kapitel + Seiten + `movePageToBook`, jeweils Server-Call + Mirror + History-Push. |
 | `book-organizer/history.js` | Undo/Redo-Stacks (FIFO max 10), Record-Typen, `_applyInverse`/`_applyForward`. |
-| `book-organizer/view.js` | Collapse-State pro Kapitel, Suchfilter (`filteredWorkTree`/`filteredSoloPages`), Combobox-Optionen, Jump-to-Chapter, `_findChapter`, Kapitel-Längenverteilung. |
+| `book-organizer/view.js` | Collapse-State pro Kapitel, Suchfilter (`filteredWorkTree`/`filteredSoloPages`), Combobox-Optionen, Jump-to-Chapter, `_findChapter`, Kapitel-Längenverteilung, Zahlen-Formatter (`_fmtNum`/`_fmtDec1` über `numberFormat`). |
+| `book-organizer/redaktion.js` | Redaktions-Stufe pro Beitrag (nur journalistische Bücher, Gate `redaktionEnabled` vom Server): laden, setzen, Plakette + Stale-Hinweis. Siehe [journalismus.md](journalismus.md). |
 
-Spread-Reihenfolge in der Facade: dnd → persist → mirror → crud → history → view. Slices teilen `this`-State, kein Cross-Import zwischen Slices — geteilte Konstanten kommen aus `constants.js`.
+Spread-Reihenfolge in der Facade: dnd → persist → mirror → crud → history → view → redaktion. Slices teilen `this`-State, kein Cross-Import zwischen Slices — geteilte Konstanten kommen aus `constants.js`.
 
 ## Markup-Layout
 
@@ -59,9 +60,10 @@ Der buch-skopierte Teil des States kommt aus **einer** Factory `freshState()` in
 - **`onBookChanged`** — Sortable destroyen, gesamten Card-State leeren. **Vor `loadPages`** — der nachfolgende `pages:loaded`-Listener triggert dann den neuen Snapshot.
 - **`onCardRefresh`** — nur `_rerender()`. **Kein `loadPages`** — Drag/Rename/CRUD mutieren `nav.tree` in-place, Server-Stand und Card-State sind synchron. `loadPages` würde Sidebar-Tree clearen und neu fetchen → Flicker.
 - **`onViewReset`** — Sortable destroyen + State leeren.
+- **`chapter:added`-Listener** (`EVT.CHAPTER_ADDED`) — ein Kapitel wurde ausserhalb der Karte angelegt (Sidebar-Kontextmenü, Leeres-Buch-CTA; [tree/load.js](../public/js/book/tree/load.js)#`createChapter` hängt es in-place in `nav.tree`, kein Reload). Bei sichtbarer Karte → `_rerender()`. Ohne das fehlte das Kapitel im Workstate, und der nächste Order-PUT scheiterte am Server mit `MISSING_CHAPTER`. Neue Seiten von ausserhalb brauchen kein Pendant: jeder lokale Anlage-Pfad öffnet die Seite per `selectPage`, was die Karte schliesst; Remote-Anlagen kommen über den Catch-up als `pages:loaded`.
 - **`pages:loaded`- + `page:removed`-Listener** — separat über `extraListeners`. Beide greifen nur, wenn die Karte sichtbar ist: `pages:loaded` nach echten Server-Reloads (Buchwechsel, `loadPages`) → `_rerender()`; `page:removed` immer dann, wenn eine Seite aus dem Store verschwindet — **lokales Löschen (`deletePageById`), Remote-Delete aus dem Collab-Feed, Move in ein anderes Buch**. In allen drei Fällen hat `tree/load.js#_removePageFromTree` `nav.tree`/`nav.pages` bereits in-place bereinigt (ohne Reload); der Listener zieht die daraus **abgeleiteten** Sichten nach: `_rebuildPageOrderMaps()`, `_invalidateDiaryCache()`, `_rerender()` (Workstate-Snapshot). Ohne das bliebe die Zeile stehen bzw. zeigten Order-Maps und Diary-Kalender auf eine Seite, die es nicht mehr gibt. **Kein `$watch(nav.tree)`** — eigene Reassignments im Tree würden Selbst-Reentry erzeugen.
 
-Tastatur (window-Listener via Lifecycle-Signal): Cmd/Ctrl+Z → `historyUndo`, Cmd/Ctrl+Shift+Z bzw. Cmd/Ctrl+Y → `historyRedo`. **Greift nicht** in INPUT/TEXTAREA (native Edit-Undo der Rename-Felder soll funktionieren) und nur bei sichtbarer Karte.
+Tastatur (window-Listener via Lifecycle-Signal): Cmd/Ctrl+Z → `historyUndo`, Cmd/Ctrl+Shift+Z bzw. Cmd/Ctrl+Y → `historyRedo`. **Greift nicht** in INPUT/TEXTAREA/contenteditable (native Edit-Undo der Rename-Felder und Editoren soll funktionieren) und nur bei sichtbarer Karte.
 
 `$watch('organizerSearch')` → `_reattachSortables()`: der Such-Toggle erzeugt/entfernt `x-if`-gatete Page-ULs, also müssen die Instanzen neu binden — und `_reattachSortables` zieht `_refreshSortableDisabled()` mit, das bei aktiver Suche alle Instanzen disabled (Reorder über gefiltertem DOM würde die Reihenfolge brechen).
 
@@ -179,6 +181,8 @@ Records (siehe `history.js`):
 
 **Delete (Kapitel/Seite) ist nicht reversibel.** Hard-Delete in SQLite, keine Content-Snapshots. `deleteChapter`/`deletePage` rufen `_clearHistory()` und blocken damit Undo komplett, statt einen inkonsistenten Stack zu hinterlassen. `deleteChapter` verweigert ausserdem nicht-leere Kapitel und Kapitel, deren Seite gerade im Editor offen ist.
 
+**Stale-Schutz.** Fremd-Änderungen (Sidebar, Collab-Feed, Catch-up) ändern den Bestand an Kapiteln/Seiten, ohne durch die History zu laufen. Vor jedem Einspielen prüft `_isRecordStale(rec, dir)`: Reorder-Snapshot muss exakt dieselben Kapitel-/Seiten-IDs wie der aktuelle Workstate enthalten, Rename/Create-Ziel muss noch existieren. Passt er nicht, leert `_dropStaleHistory()` beide Stacks und meldet `bookOrganizer.historyStale` — statt einen Tree mit fehlenden/toten IDs zu schicken, den der Server ablehnt (Fehlerpfad = voller `loadPages`).
+
 `_inHistoryFlight` blockt parallele Undo/Redo-Calls. `_pushUndo` während eines Replay-Schritts ist no-op (sonst würde der Replay sich selbst in den Stack pushen).
 
 `_applyForward` für Reorder spielt das `after`-Snapshot ein. Für Rename ruft es `_doRenameChapter/_doRenamePage` mit `newName`. Create-Forward gibt es nicht — `_pushRedo` wird in `historyUndo` für Create-Records explizit übersprungen.
@@ -202,7 +206,7 @@ Records (siehe `history.js`):
 - **Page-Membership-Mirror rekursiert über alle Tiefen.** Seiten in Sub-Kapiteln dürfen nicht durchs Raster fallen.
 - **Drop-Handler revertieren Sortables DOM-Move zuerst** (`revertSortable(evt)`, geteiltes Modul), dann mutieren sie das Modell. Indizes/Parent/Tiefe kommen aus dem `evt`, nicht aus dem DOM. Alpine bleibt alleiniger DOM-Besitzer.
 - **Snapshots via `JSON.parse(JSON.stringify(…))`**, nicht `structuredClone`.
-- **Delete clear't History.** Create-Undo invalidiert Redo-Stack.
+- **Delete clear't History.** Create-Undo invalidiert Redo-Stack. Record, der nicht mehr zum Bestand passt, leert die History vor dem Einspielen (`_isRecordStale`).
 - **Suche disabled Sortable**, nicht das Suchfeld.
 - **`x-ignore` aufs Drag-Item** während des Drags (Alpine-MutationObserver-Schutz).
 - **Move-Combobox via `movePageToChapter`** — gleiche Persist-Sequenz wie DnD, kein Direct-Mutate.

@@ -81,7 +81,7 @@ view  ──startEdit──▶ edit  ──saveEdit──▶ view
 5. Kürzungs-Safety: neuer Text < 20 % vom alten und Original > 50 Z → `appConfirm` „kürzer speichern?".
 6. `_resolveConflictBeforeSave({ silent: false })` — Pre-Check + Merge + ggf. Überschreib-Modal (s.u.).
 7. `contentRepo.savePage(id, buildSavePayload({ source: focusActive ? 'focus' : 'main', expectedUpdatedAt }))` (siehe [shared/save-pipeline.js](../public/js/editor/shared/save-pipeline.js)).
-8. `_applySaveSuccess(saved, savedHtml)` — **SSoT für die Save-Erfolgs-Nachbereitung** (Lifecycle): übernimmt `currentPage.updated_at`, setzt `originalHtml`/`currentPageEmpty`, ruft `_filterFindingsAfterSave` + `_syncPageStatsAfterSave` + `refreshPageAges`, räumt Draft + Autosave-Timer + `editDirty`/`saveOffline`/`editConflict`, `updatePageView`. Alle sechs Save-Pfade (saveEdit/quickSave/submitConflictResolution × Haupt- + 409-Re-Merge) rufen denselben Helper — keine Copy-Paste-Drift. `applyToEditor:true` spiegelt zusätzlich den gemergten Stand in den Editor (Konflikt-Auflösung). **Timer-Reset ist Pflicht:** der Autosave-Max-Timer wird von `_scheduleAutosave` nur gesetzt, wenn für den Key noch keiner läuft (`setOnce`) — bliebe er nach dem Save armiert, messe der 120-s-Cap der nächsten Tipp-Serie noch von der Baseline vor diesem Save.
+8. `_applySaveSuccess(saved, savedHtml)` — **SSoT für die Save-Erfolgs-Nachbereitung** (Lifecycle): übernimmt `currentPage.updated_at`, setzt `originalHtml`/`currentPageEmpty`, ruft `_filterFindingsAfterSave` + `_syncPageStatsAfterSave` + `refreshPageAges`, räumt Draft + Autosave-Timer + `editDirty`/`saveOffline`/`editConflict`, `updatePageView`. Alle sechs Save-Pfade (saveEdit/quickSave/submitConflictResolution × Haupt- + 409-Re-Merge) rufen denselben Helper — keine Copy-Paste-Drift. `applyToEditor:true` spiegelt zusätzlich den gemergten Stand in den Editor (Konflikt-Auflösung). **Während des PUT Getipptes bleibt ungespeichert markiert:** der Editor ist während des Saves beschreibbar; weicht der Live-Stand vom gespeicherten HTML ab, bleibt `editDirty=true`, der Draft wird auf der neuen Basis neu geschrieben und der Autosave neu geplant. Der Helper meldet das mit Rückgabe `true`, und `saveEdit` baut die Session dann **nicht** ab (der Teardown verwürfe den Text). **Timer-Reset ist Pflicht:** der Autosave-Max-Timer wird von `_scheduleAutosave` nur gesetzt, wenn für den Key noch keiner läuft (`setOnce`) — bliebe er nach dem Save armiert, messe der 120-s-Cap der nächsten Tipp-Serie noch von der Baseline vor diesem Save.
 9. `_filterFindingsAfterSave(newHtml)` — Findings, deren `original` nicht mehr matcht (Überlebens-Check via `findInHtml`, tolerant gegen Tag-/Whitespace-Differenzen, identisch zu `sortByPosition`), fliegen raus + selectedFindings + appliedOriginals + correctedHtml resetten.
 10. Teardown **nur wenn nicht im Focus** via `_teardownEditSession()` (s.u.). Im Focus bleibt `editMode=true`.
 11. Fehlerpfade: 409 `PAGE_CONFLICT` (Race nach Pre-Check) → `_retryAfterConflict` (s.u.); kollisionsfrei = stille Re-Save, sonst Auflösungs-Banner; bei Flag-off/Fehlschlag `_keepAsDraft` + klassischer Banner. Netzwerkfehler → `_keepAsDraft` (`saveOffline=true`), Online-Retry feuert `quickSave`.
@@ -93,7 +93,7 @@ view  ──startEdit──▶ edit  ──saveEdit──▶ view
 | Helper | Aufgabe |
 |---|---|
 | `_resolveConflictBeforeSave({ localHtml, source, silent })` | Pre-Check → Block-Merge → bei nicht-mergebarem Konflikt Modal (`silent:false`) bzw. Banner (`silent:true`). Liefert `{ proceed, saveHtml, expectedAt, merged }`. |
-| `_retryAfterConflict({ localHtml, source, pageId, pageName, tag })` | 409-Race nach dem PUT: Merge gegen den frischen Remote-Stand + Re-Save. Liefert `{ saved, html }`, `{ conflict:true }` oder `null`. Setzt `editSaving=false`, **bevor** ein Auflösungs-Modal aufgehen kann (`submitConflictResolution` bricht bei gesetztem Flag früh ab → sonst Sackgasse). |
+| `_retryAfterConflict({ localHtml, source, pageId, pageName, tag })` | 409-Race nach dem PUT: Merge gegen den frischen Remote-Stand + Re-Save. Liefert `{ saved, html }`, `{ conflict:true }`, `{ stale:true }` (Seite gewechselt oder Session verworfen — vor dem Re-Save erneut über `_stillEditing` geprüft) oder `null`. Lässt `editSaving` bis zum Schluss gesetzt: während Merge-Read und Re-Save darf kein Autosave-Tick und kein zweiter Klick parallel speichern. Öffnet der Merge das Auflösungs-Modal, setzen die Aufrufer das Flag im `finally` zurück, ohne dazwischenliegendes `await` — das Modal ist bis dahin nicht klickbar. |
 | `_keepAsDraft({ pageId, html, banner, statusKey })` | Fallback: Draft zuerst, dann `saveOffline` + Banner + Status. |
 | `_conflictBannerFrom(conflict)` / `_conflictHintText(banner)` | Banner-Feldsatz bzw. Statuszeile. Beide delegieren nach `editor/shared/` — Feldsatz an [page-conflict.js](../public/js/editor/shared/page-conflict.js)#`conflictBannerFrom`, Wortlaut (Gerät vs. User) an [conflict-text.js](../public/js/editor/shared/conflict-text.js)#`conflictText` (Varianten `banner`/`hint`/`modal`). Neuer Auftritt ⇒ Key-Paar dort eintragen, die Verzweigung nicht erneut ausschreiben. |
 
@@ -112,7 +112,7 @@ Flag `FEATURE_BLOCK_MERGE` ([app-state.js](../public/js/app/app-state.js)). Grei
 - **Reihenfolge:** Erst Draft schreiben → dann Netzwerk versuchen. Offline-Tab kann jederzeit ohne Datenverlust geschlossen werden.
 - `editSaving=true` früh setzen (Race-Schutz vs. Auto-Save-Tick + Ctrl+S + exitFocusMode-Save).
 - Konflikt im Pre-Check oder 409 → `saveOffline=true` + `editConflict`-Banner; **keine** Modal-Frage (sonst Modal-Spam im Hintergrund-Save).
-- Erfolg → Draft löschen, `editDirty=false`, `lastAutosaveAt` setzen, Statusleiste `editor.savedAt`.
+- Erfolg → Draft löschen, `editDirty=false`, `lastAutosaveAt` setzen, Statuszeile leeren (der Save-Indicator in der Subline zeigt „gespeichert HH:MM“).
 
 ### cancelEdit
 - Bei `editDirty` → `appConfirm` „verwerfen?". Klick „nein" → kein Cleanup, Editor bleibt.
@@ -177,23 +177,27 @@ Cleanup bei `cancelEdit` / `saveEdit` (Non-Focus-Pfad).
 
 ## Toolbar (Bubble + Slash)
 
-Sub-Karte `editorToolbarCard` ([cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js)), Methods aus der Facade [notebook/toolbar.js](../public/js/editor/notebook/toolbar.js), die aus dem Subfolder `toolbar/` spreadet: `bubble.js` (Bubble-Toolbar + Link-Bar), `slash.js` (Slash-Menü), `keydown.js` (Keydown-Dispatcher), `_shared.js` (Modul-Helfer + `SLASH_ITEMS` + Block-Lookups). Beide Layer als teleportierte Templates in [partials/editor-toolbar.html](../public/partials/editor-toolbar.html) → `position:fixed` ist ausserhalb des `.card`-Transform-Kontextes.
+Sub-Karte `editorToolbarCard` ([cards/editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js)), Methods aus der Facade [notebook/toolbar.js](../public/js/editor/notebook/toolbar.js), die aus dem Subfolder `toolbar/` spreadet: `bubble.js` (Bubble-Toolbar + Link-Bar), `slash.js` (Slash-Menü + Bild-Upload), `keydown.js` (Keydown-Dispatcher), `caret-panel.js` (geteilte Panel-Choreografie), `cite.js` (Beleg-Picker), `xref.js` (Querverweis-Picker), `diagram.js` / `table.js` / `image.js` (Block-Dialoge), `_shared.js` (Modul-Helfer + `SLASH_ITEMS` + Block-Lookups + `ensureSlotAfter`). Beide Layer als teleportierte Templates in [partials/editor-toolbar.html](../public/partials/editor-toolbar.html) → `position:fixed` ist ausserhalb des `.card`-Transform-Kontextes.
 
 | Layer | Trigger | Sichtbar wenn | Funktion |
 |---|---|---|---|
 | Bubble | non-collapsed Selection im Editor | `editMode && !focusActive && !sel.isCollapsed` | Bold/Italic (Inline) — Single-Word-Flag steuert zusätzliche Aktionen; dazu Link-, Beleg- und Querverweis-Einstieg |
-| Slash | `/` in leerem Block | `editMode && !focusActive` | Block-Transform: `p`, `h2`, `h3`, `blockquote`, `.poem`, `ul/li`, `hr` |
+| Slash | `/` in leerem Block | `editMode && !focusActive` | Block-Transform, Umbrüche und Einfügen (Liste siehe „Slash-Items“) |
 | Beleg-Picker | Toolbar-Button, Bubble-Button oder **Klick auf einen bestehenden Chip** | `citeShow && editMode && !focusActive` | Quelle wählen/wechseln, Stellenangabe, Zitat-Art, Beleg entfernen |
 | Querverweis-Picker | Bubble-Button | `xrefShow && editMode && !focusActive` | Kapitel/Abbildung als Ziel + Anzeigeform |
 
-**Im Focus deaktiviert.** Bubble/Slash gaten via `if (app.focusActive) return;` ([toolbar.js#L56](../public/js/editor/notebook/toolbar.js#L56), [#L148](../public/js/editor/notebook/toolbar.js#L148)). Cmd/Ctrl+B/I und Cmd/Ctrl+Shift+H laufen weiter, weil B/I auch im Focus-Notwendig-Whitelist sind.
+**Im Focus deaktiviert.** Die Bubble gatet in [toolbar/bubble.js](../public/js/editor/notebook/toolbar/bubble.js)#`_updateBubble`, Slash und Block-Transforms hinter dem Focus-Hard-Stop in [toolbar/keydown.js](../public/js/editor/notebook/toolbar/keydown.js)#`_onEditKeydown`. Davor laufen in beiden Modi: Soft-Break, Enter in Checkbox-Liste/Gedicht, Datumsstempel, Cmd/Ctrl+B/I, Cmd/Ctrl+Shift+H, Link, Undo/Redo.
 
-### Slash-Items ([toolbar.js#L14-22](../public/js/editor/notebook/toolbar.js#L14-L22))
-`paragraph`, `h2`, `h3`, `blockquote` (mit innerem `<p>`), `poem` (`div.poem` + innerem `<p>`), `list` (`ul > li`), `hr` (+ Folge-`<p>`). Tag-Swap am ganzen Block; Caret landet im Replacement (oder im wrapP-`<p>`). Eingesetzt wird ausschliesslich über `replaceBlockOutsideList` ([toolbar/_shared.js](../public/js/editor/notebook/toolbar/_shared.js)) — siehe Invariante 19.
+### Slash-Items (`SLASH_ITEMS` in [toolbar/_shared.js](../public/js/editor/notebook/toolbar/_shared.js))
+- **Block:** `paragraph`, `h2`, `h3`, `blockquote` (mit innerem `<p>`), `poem` (`div.poem` + innerem `<p>`), `list` (`ul > li`), `todo` (Checkbox-Liste).
+- **Umbruch:** `hr`, `pagebreak`, `blankpage` (je `<hr>` mit Klasse, + Folge-`<p>`).
+- **Einfügen:** `bild` (Upload → `<figure>`), `diagramm`, `tabelle` (Dialoge), `heute`/`jetzt`/`zeit` (Datumsstempel als Text).
+
+Tag-Swap am ganzen Block; Caret landet im Replacement (oder im wrapP-`<p>`). Eingesetzt wird ausschliesslich über `replaceBlockOutsideList` — siehe Invariante 19. Abbildung, Diagramm und Tabelle nehmen keinen Caret an; steht hinter ihnen kein Block mehr, legt `ensureSlotAfter` einen leeren Absatz an, damit darunter weitergeschrieben werden kann. Der Bild-Upload fügt nur ein, wenn nach dem Upload noch dieselbe Seite im Edit-Modus offen ist.
 
 ### Caret-verankerte Panels ([toolbar/caret-panel.js](../public/js/editor/notebook/toolbar/caret-panel.js))
 
-Vier Panels folgen derselben Choreografie: **Link-Bar** ([toolbar/bubble.js](../public/js/editor/notebook/toolbar/bubble.js)), **Beleg-Picker** ([toolbar/cite.js](../public/js/editor/notebook/toolbar/cite.js)), **Querverweis-Picker** ([toolbar/xref.js](../public/js/editor/notebook/toolbar/xref.js)) und **Diagramm-Dialog** ([toolbar/diagram.js](../public/js/editor/notebook/toolbar/diagram.js)) — Range beim Oeffnen sichern, Panel ueber der Range verankern, beim Uebernehmen an genau dieser Range einfuegen, Caret dahinter, schliessen, Editor wieder fokussieren.
+Drei Panels folgen derselben Choreografie: **Link-Bar** ([toolbar/bubble.js](../public/js/editor/notebook/toolbar/bubble.js)), **Beleg-Picker** ([toolbar/cite.js](../public/js/editor/notebook/toolbar/cite.js)) und **Querverweis-Picker** ([toolbar/xref.js](../public/js/editor/notebook/toolbar/xref.js)) — Range beim Oeffnen sichern, Panel ueber der Range verankern, beim Uebernehmen an genau dieser Range einfuegen, Caret dahinter, schliessen, Editor wieder fokussieren.
 
 Die gemeinsamen Schritte liegen in `caret-panel.js`; was gesucht, formatiert und eingefuegt wird, bleibt im jeweiligen Modul.
 
@@ -222,7 +226,7 @@ Das Menü ist nach `<body>` teleportiert (`position: fixed`) und wird per JS am 
 Nachziehen bei Bewegung: `scroll` (capture, auch interne Container), `visualViewport`-`resize`/`scroll` (Tastatur öffnet/schliesst) und `$watch('slashQuery')` (Liste schrumpft) — alle drei in `editorToolbarCard#init()` am AbortController-`signal`. Scrollt der Block aus dem Band, schliesst das Menü statt am Bandrand zu parken.
 
 ### Keydown-Dispatcher (`_onEditKeydown` in [toolbar/keydown.js](../public/js/editor/notebook/toolbar/keydown.js))
-Statt eines Megaswitch eine geordnete Kette benannter Handler (`_kbSoftBreak`, `_kbTodoEnter`, `_kbPoemEnter`, `_kbDateStamp`, `_kbInlineFormat`, `_kbHorizontalRule`, `_kbLink`, `_kbUndoRedo`, dann Focus-Hard-Stop, dann `_kbSlashNav`, `_kbDeleteBlock`, `_kbTodoDelete`, `_kbFigureCaption`, `_kbBlockBoundary`, `_kbSlashTrigger`). Die drei Struktur-Handler stehen **spezifisch vor generisch**: die beiden Void-Element-Fälle (Checkbox, Bild) vor dem allgemeinen Wrapper-Grenz-Handler. Jeder Handler gibt `true` zurück, wenn er das Event konsumiert hat → der Dispatcher bricht ab. **Reihenfolge ist verhaltensrelevant** (z.B. Shift+Enter vor Enter-in-Todo); die Handler bis zum Focus-Hard-Stop laufen in beiden Modi, danach sind Slash + Block-Transforms tabu. Neuer Shortcut → eigenen `_kb*`-Handler ergänzen und an der richtigen Stelle in die Dispatcher-Kette hängen.
+Statt eines Megaswitch eine geordnete Kette benannter Handler. Vorab: eine laufende IME-Komposition (`e.isComposing`) wird ignoriert, ein offenes Slash-Menü (`_kbSlashNav`) bekommt die Taste **zuerst** (sonst wandelte `_kbTodoEnter`/`_kbPoemEnter` die leere Zeile, aus der es geöffnet wurde, und das Menü bliebe über einem gelösten Block stehen), und jede Taste ausser Backspace/Delete/Modifier hebt eine `hr.hr-selected`-Markierung auf. Dann (`_kbSoftBreak`, `_kbTodoEnter`, `_kbPoemEnter`, `_kbDateStamp`, `_kbInlineFormat`, `_kbHorizontalRule`, `_kbLink`, `_kbUndoRedo`, dann Focus-Hard-Stop, dann `_kbDeleteBlock`, `_kbTodoDelete`, `_kbFigureCaption`, `_kbBlockBoundary`, `_kbSlashTrigger`). Die drei Struktur-Handler stehen **spezifisch vor generisch**: die beiden Void-Element-Fälle (Checkbox, Bild) vor dem allgemeinen Wrapper-Grenz-Handler. Jeder Handler gibt `true` zurück, wenn er das Event konsumiert hat → der Dispatcher bricht ab. **Reihenfolge ist verhaltensrelevant** (z.B. Shift+Enter vor Enter-in-Todo); die Handler bis zum Focus-Hard-Stop laufen in beiden Modi, danach sind Slash + Block-Transforms tabu. Neuer Shortcut → eigenen `_kb*`-Handler ergänzen und an der richtigen Stelle in die Dispatcher-Kette hängen.
 
 ### Löschen in Checkbox-Listen (`_kbTodoDelete` in [toolbar/keydown.js](../public/js/editor/notebook/toolbar/keydown.js))
 
@@ -231,7 +235,7 @@ Eine Checkbox-Zeile ist `<li class="todo-item"><input type="checkbox"><span clas
 | Caret | Taste | Verhalten |
 |---|---|---|
 | Zeilenanfang, Zeile darüber existiert | Backspace | Inhalt an die Zeile darüber anhängen, eigene Zeile weg. Der `checked`-Zustand der **bleibenden** Zeile gilt. |
-| Zeilenanfang, erste Zeile der Liste | Backspace | Liste verlassen: Inhalt wandert in einen `<p>` **vor** der Liste (`_todoLiToParagraph`), leere Liste wird entfernt. Spiegelt `_kbTodoEnter` (leere Zeile → raus). |
+| Zeilenanfang, erste Zeile der Liste | Backspace | Liste verlassen: Inhalt wandert in einen `<p>` **vor** der Liste (`_blockToParagraph`), leere Liste wird entfernt. Spiegelt `_kbTodoEnter` (leere Zeile → raus). |
 | Zeilenende, Zeile darunter existiert | Delete | Zeile darunter hochziehen (deren Checkbox geht mit ihr; die eigene bleibt). |
 | Zeilenende, letzte Zeile | Delete | Absatz-artigen Folgeblock hochziehen. Steht dort etwas anderes (Liste, Gedicht, `<hr>`) oder nichts → No-Op statt Default. |
 | Anfang eines `<p>` direkt **nach** der Liste | Backspace | Inhalt an die letzte Checkbox-Zeile anhängen (`_kbTodoDeleteAdjacent`). |
@@ -288,33 +292,34 @@ Invarianten der Leseansicht-Variante:
 - `Cmd/Ctrl+B` / `+I` → `_applyInline('bold'|'italic')` (auch im Focus).
 - `Cmd/Ctrl+Shift+H` → `insertHorizontalRule` (auch im Focus).
 - `/` in leerem Block → Slash-Menü öffnen.
-- Slash-Menü offen: `↑/↓` Navigation, `Enter` Apply, `Esc` Schliessen, jedes Zeichen → Menü zu (Zeichen läuft durch).
+- Slash-Menü offen: `↑/↓` Navigation, `Enter` Apply, `Esc` Schliessen, druckbare Zeichen filtern die Liste (`slashQuery`), Backspace kürzt den Filter bzw. schliesst bei leerem Filter.
 
 ## Void-/Caret-lose Block-Elemente: Klick-Selektion + Löschen
 
 Manche Block-Elemente nehmen keinen Caret an (`<hr>` ist void; künftig denkbar: Bild-Block, Embed, Divider-Varianten). Im `contenteditable` lassen sie sich daher nicht selektieren und es gibt keinen natürlichen Lösch-Pfad. Muster, um ein solches Element editierbar (löschbar) zu machen — am Beispiel `<hr>`:
 
-1. **Klick-Selektion** ([editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js), delegierter `click`-Listener im `init()` mit AbortController-`signal`): Klick auf das Element setzt eine transiente Klasse `.<tag>-selected` (z. B. `.hr-selected`). Klick irgendwo sonst im `.page-content-view--editing` hebt die Markierung aller Geschwister wieder auf. SSoT der Selektion ist die DOM-Klasse, kein Alpine-State.
+1. **Klick-Selektion** ([editor-toolbar-card.js](../public/js/cards/editor-toolbar-card.js), delegierter `click`-Listener im `init()` mit AbortController-`signal`): Klick auf das Element setzt eine transiente Klasse `.<tag>-selected` (z. B. `.hr-selected`). Klick irgendwo sonst im `.page-content-view--editing` hebt die Markierung aller Geschwister wieder auf, ebenso jede Taste ausser Backspace/Delete (`_onEditKeydown`) — sonst löschte nach dem Weitertippen das nächste Backspace die Linie statt des Zeichens. SSoT der Selektion ist die DOM-Klasse, kein Alpine-State.
 2. **Visuelle Markierung** ([page-view.css](../public/css/page/page-view.css)): `.page-content-view--editing <tag> { cursor: pointer; }` + `.page-content-view--editing <tag>.<tag>-selected { … outline … }` (Akzent via `var(--color-accent)`). Nur unter `--editing` (Read-Modus bleibt unverändert). Zusätzlich `.page-content-view--editing:has(<tag>.<tag>-selected) { caret-color: transparent; }` — der Caret hat bei selektiertem void-Element keinen sinnvollen Slot und landet sonst quer zwischen Element und Folgeabsatz. Kommt zurück, sobald die Selektion (Klick woanders) die Klasse entfernt.
-3. **Keyboard-Löschen** ([toolbar.js](../public/js/editor/notebook/toolbar.js) `_onEditKeydown`, Backspace/Delete-Branch): Liegt ein `<tag>.<tag>-selected` im Edit-Container, `e.preventDefault()` + `.remove()` + `_markEditDirty()`. Vor der normalen Caret-Nachbar-Logik.
+3. **Keyboard-Löschen** ([toolbar/keydown.js](../public/js/editor/notebook/toolbar/keydown.js) `_kbDeleteBlock`): Liegt ein `<tag>.<tag>-selected` im Edit-Container, `e.preventDefault()` + `.remove()` + `_markEditDirty()`. Vor der normalen Caret-Nachbar-Logik.
 4. **Transient halten** ([utils.js](../public/js/utils.js) `stripFocusArtefacts`): die `-selected`-Klasse ist reine Laufzeit-Dekoration und MUSS vor Save + Dirty-Compare gestrippt werden (gleicher Mechanismus wie `.focus-paragraph-active`). Sonst landet sie in der Revision und erzeugt Falsch-Dirty. `stripFocusArtefacts` läuft im Save- **und** Compare-Pfad (via `stripLektoratMarks`) — neue transiente Klasse dort in Guard + `querySelectorAll`-Selektor + `classList.remove`-Argumentliste ergänzen.
 
 **Caret-Nachbar-Pfad als Ergänzung** (gleicher Backspace/Delete-Branch): Caret am Block-Anfang + Backspace löscht eine direkt davor liegende `<hr>`, Caret am Block-Ende + Delete eine dahinter. Nachbar-Lookup auf **Top-Level-Child** von `editEl` heben (nicht `block.previousElementSibling`), damit auch `<hr>` neben Listen/`figure`/`table` erreichbar ist (Caret-Block ist dort das tief verschachtelte `<li>`).
 
 ## Paste-Handler
 
-`_onEditPaste` ([edit/input.js](../public/js/editor/notebook/edit/input.js)) verhindert, dass Computed-Styles inline aus anderen BookStack-Seiten / Websites in die DB wandern (sonst überschreiben sie `.poem` & Co.).
+`_onEditPaste` / `_onEditCopy` / `_onEditCut` ([edit/input.js](../public/js/editor/notebook/edit/input.js)) delegieren an den geteilten Handler [shared/paste.js](../public/js/editor/shared/paste.js) (alle drei Editoren). Er verhindert, dass Computed-Styles inline aus anderen Seiten / Websites in die DB wandern (sonst überschreiben sie `.poem` & Co.):
 
 1. `e.preventDefault`.
-2. Clipboard-HTML lesen → `cleanContentArtefacts(html)` ([public/js/utils.js](../public/js/utils.js)) — Cleaner-Kette zieht Font/Color/Span-Hüllen ab.
-3. `execCommand('insertHTML', false, cleaned)`.
-4. Fallback Plain-Text wenn kein HTML.
-5. `_markEditDirty()`.
+2. Plain-Text, der wie ein Konfigurations-Block aussieht (≥ 3 Zeilen, ≥ 60 % `key: value`), wird als `<pre>` eingefügt.
+3. Sonst Clipboard-HTML durch `sanitizePasteHtml` (Tag-Whitelist), ohne verwertbares HTML Fallback auf Plain-Text.
+4. Bei Erfolg `_markEditDirty()` (Paste und Cut).
+
+Copy/Cut schreiben ausschliesslich `text/plain` — fremde Apps bekommen keine Inline-Styles, Lektorat-Marks oder Custom-Klassen ins Clipboard.
 
 ## Pflicht-Invarianten
 
 1. **Save-Source explizit:** `buildSavePayload` verlangt `'main'` (Normal-Editor) oder `'focus'` — Aufrufer entscheidet, nicht die Lib. Quelle: `this.focusActive ? 'focus' : 'main'`.
-2. **Pre-Save-Conflict-Check via `fresh: true`:** `checkPageConflict` ([editor/shared/page-conflict.js](../public/js/editor/shared/page-conflict.js), geteilt mit dem Bucheditor) ruft `contentRepo.loadPage(id, { fresh: true })`. Ohne `fresh` liefert der SW-SWR-Cache stale `updated_at` und der Pre-Check passt fälschlich durch → Overwrite remote save. Siehe [feedback_stale_rmw](../.claude/projects/-Users-bd-ClaudeProjects-schreibwerkstatt/memory/feedback_stale_rmw.md).
+2. **Pre-Save-Conflict-Check via `fresh: true`:** `checkPageConflict` ([editor/shared/page-conflict.js](../public/js/editor/shared/page-conflict.js), geteilt mit dem Bucheditor) ruft `contentRepo.loadPage(id, { fresh: true })`. Ohne `fresh` liefert der SW-SWR-Cache stale `updated_at` und der Pre-Check passt fälschlich durch → Overwrite remote save.
 3. **`stripLektoratMarks` vor jedem Save + jedem Dirty-Vergleich.** Verbindlich aus [shared/html-clean.js](../public/js/editor/shared/html-clean.js). Lokales Strip wäre Drift vs. Server-Sicht.
 4. **`normalizeForCompare` für Dirty-Check.** `editDirty` darf nicht byte-genau vergleichen — Whitespace/Attribut-Ordnung weichen identisch-semantisch ab. Verwendet identische Cleaner-Kette wie Save.
 5. **Draft IMMER zuerst.** `quickSave` schreibt erst localStorage, dann Netzwerk. Offline-Tab-Close darf nichts verlieren.

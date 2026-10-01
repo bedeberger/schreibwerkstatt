@@ -2,7 +2,7 @@
 // (editorToolbarCard). Im Fokus-Modus deaktiviert (Trigger im keydown-Dispatch
 // hinter dem Focus-Hard-Stop).
 
-import { getEditEl, placeCaretIn, replaceBlockOutsideList, SLASH_ITEMS, _formatStamp } from './_shared.js';
+import { getEditEl, placeCaretIn, replaceBlockOutsideList, ensureSlotAfter, SLASH_ITEMS, _formatStamp } from './_shared.js';
 import { createTodoList } from '../../shared/todo-html.js';
 import { htmlToElement } from './caret-panel.js';
 import { buildFigureHtml, FIGURE_CAPTION_SEL } from '../../../figure/figure-html.js';
@@ -160,7 +160,9 @@ export const slashMethods = {
 
   // Bild-Upload: Datei-Dialog → Upload → <figure>-Insert. Der Trigger-Block
   // wird vor dem async Upload gesichert; ist er beim Zurueckkommen weg (User hat
-  // weitergetippt), haengen wir das Bild ans Editor-Ende.
+  // weitergetippt), haengen wir das Bild ans Editor-Ende. Hat der User waehrend
+  // des Uploads die Seite gewechselt oder den Edit-Modus verlassen, wird nichts
+  // eingefuegt — das Bild gehoert zur Seite, fuer die es hochgeladen wurde.
   async _slashInsertImage(block) {
     const app = window.__app;
     const pageId = app?.currentPage?.id;
@@ -168,8 +170,10 @@ export const slashMethods = {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/png,image/jpeg,image/webp,image/gif';
-    input.style.display = 'none';
+    input.hidden = true;
     document.body.appendChild(input);
+    // Abgebrochener Datei-Dialog feuert kein `change`, nur `cancel`.
+    input.addEventListener('cancel', () => input.remove(), { once: true });
     input.addEventListener('change', async () => {
       const file = input.files && input.files[0];
       input.remove();
@@ -179,11 +183,12 @@ export const slashMethods = {
         result = await contentRepo.uploadPageImage(pageId, file);
       } catch {
         app?._showJobToast?.({
-          message: app?.t?.('editor.image.uploadError') || 'Bild-Upload fehlgeschlagen',
+          message: app?.t?.('editor.image.uploadError'),
           severity: 'err', jobType: 'image', bookId: null,
         });
         return;
       }
+      if (!app.editMode || app.currentPage?.id !== pageId) return;
       this._insertImageFigure(block, result);
     }, { once: true });
     input.click();
@@ -203,6 +208,7 @@ export const slashMethods = {
     } else {
       editEl.appendChild(fig);
     }
+    ensureSlotAfter(fig);
     const cap = fig.querySelector(FIGURE_CAPTION_SEL);
     if (cap) placeCaretIn(cap);
     window.__app?._markEditDirty?.();

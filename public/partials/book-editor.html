@@ -320,7 +320,7 @@
                 :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">
           <svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </div>
-      <div class="book-editor-find-row">
+      <div class="book-editor-find-row" x-show="$app.canEdit()">
         <input type="text"
                class="book-editor-find-input book-editor-find-input--replace"
                x-model="findReplace"

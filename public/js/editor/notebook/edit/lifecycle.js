@@ -40,10 +40,19 @@ export const lifecycleMethods = {
   // Aufrufer je nach Pfad. `applyToEditor` spiegelt das gespeicherte HTML in
   // den Live-Editor (Konflikt-Auflösungs-Pfade, damit Folge-Edits auf dem
   // gemergten Stand aufbauen).
+  //
+  // Der Editor bleibt waehrend des PUT beschreibbar. Was in dieser Zeit
+  // getippt wurde, liegt weder auf dem Server noch (nach dem clearDraft unten)
+  // im Draft — darum wird der Live-Stand gegen das Gespeicherte geprueft: weicht
+  // er ab, bleibt die Session dirty, der Draft wird auf der neuen Basis neu
+  // geschrieben und der Autosave neu geplant. Rueckgabe `true` = es gibt noch
+  // Ungespeichertes (saveEdit baut die Session dann nicht ab).
   _applySaveSuccess(saved, html, { pageId = null, applyToEditor = false } = {}) {
     const app = editorHost();
-    if (!app) return;
+    if (!app) return false;
     if (applyToEditor) this._applyMergedToEditor(html);
+    const liveEl = !applyToEditor && app.editMode ? this._getEditEl?.() : null;
+    const typedDuringSave = !!liveEl && !isNoChange(stripLektoratMarks(liveEl.innerHTML), html);
     if (saved?.updated_at && app.currentPage) app.currentPage.updated_at = saved.updated_at;
     app.originalHtml = html;
     app.currentPageEmpty = !htmlToText(html).trim();
@@ -63,7 +72,13 @@ export const lifecycleMethods = {
     app.editDirty = false;
     app.saveOffline = false;
     app.editConflict = null;
+    if (typedDuringSave) {
+      app.editDirty = true;
+      this._flushDraftSaveNow();
+      this._scheduleAutosave();
+    }
     app.updatePageView?.();
+    return typedDuringSave;
   },
 
 
@@ -345,11 +360,14 @@ export const lifecycleMethods = {
           expectedUpdatedAt: pre.expectedAt,
         });
         if (!this._stillEditing(pin.pageId)) { clearDraft(pin.pageId); return; }
-        this._applySaveSuccess(saved, pre.saveHtml);
+        const typedDuringSave = this._applySaveSuccess(saved, pre.saveHtml);
         // Kein extra setStatus vor dem Teardown — Save-Indicator in der Subline
         // zeigt schon "gespeichert HH:MM"; doppelte Notification wäre redundant.
-        // Im Fokus bleibt die Session offen (User schreibt weiter).
-        if (!app.focusActive) this._teardownEditSession();
+        // Im Fokus bleibt die Session offen (User schreibt weiter), ebenso wenn
+        // während des PUT weitergetippt wurde — der Teardown verwürfe das.
+        if (!typedDuringSave) {
+          if (!app.focusActive) this._teardownEditSession();
+        }
         // Auto-Merge-Hinweis NACH dem Save melden (wie im 409-Pfad): vor dem PUT
         // gesetzt, überschreibt ihn die „speichere…"-Zeile sofort wieder.
         if (pre.merged) app.setStatus(app.t('edit.conflict.merged.silent'), false, 3000);

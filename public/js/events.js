@@ -35,6 +35,11 @@ export const EVT = {
   // Karten mit eigener Edit-Repräsentation des Baums (Buchorganizer) ziehen
   // darauf ihren Snapshot nach — `pages:loaded` feuert hier bewusst nicht.
   PAGE_REMOVED: 'page:removed',                 // detail: { pageId }
+  // Ein Kapitel wurde ausserhalb des Buchorganizers lokal in nav.tree
+  // eingehängt, OHNE Reload (Sidebar-Kontextmenü/Leeres-Buch-CTA,
+  // tree/load.js#createChapter). Der Organizer zieht darauf seinen Workstate
+  // nach — sonst fehlte das Kapitel im nächsten Order-PUT (Server: MISSING_CHAPTER).
+  CHAPTER_ADDED: 'chapter:added',               // detail: { chapterId }
 
   // ── Command-Palette ──────────────────────────────────────────────────────
   PALETTE_OPEN: 'palette:open',                 // detail: { mode? }

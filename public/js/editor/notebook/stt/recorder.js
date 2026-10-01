@@ -64,6 +64,11 @@ export const sttRecorderMethods = {
       try { return MediaRecorder.isTypeSupported(m); } catch { return false; }
     });
     this.$store.stt.pending = true;
+    // Start-Generation: `_sttStop` zaehlt sie hoch. Endet getUserMedia erst,
+    // nachdem der User waehrend des Berechtigungs-Prompts gestoppt, den Edit-
+    // Modus verlassen oder die Seite gewechselt hat, gibt der Start das Mikrofon
+    // sofort wieder frei, statt ohne sichtbaren Editor weiter aufzunehmen.
+    const seq = (this._sttStartSeq = (this._sttStartSeq || 0) + 1);
     let stream;
     try {
       // Mono + DSP-Filter: kleinere Segmente (Diktat = ein Sprecher) und weniger
@@ -79,6 +84,10 @@ export const sttRecorderMethods = {
       this._showJobToast?.({ message: this.t(key), severity: 'err', jobType: 'stt', bookId: null });
       return;
     }
+    if (seq !== this._sttStartSeq || !this.editMode) {
+      stream.getTracks().forEach(t => t.stop());
+      return;
+    }
 
     let rec;
     try {
@@ -91,11 +100,20 @@ export const sttRecorderMethods = {
     }
 
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioCtx();
-    const source = audioCtx.createMediaStreamSource(stream);
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 1024;
-    source.connect(analyser);
+    let audioCtx, source, analyser;
+    try {
+      audioCtx = new AudioCtx();
+      source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+    } catch {
+      try { audioCtx?.close(); } catch { /* noop */ }
+      stream.getTracks().forEach(t => t.stop());
+      this.$store.stt.pending = false;
+      this._showJobToast?.({ message: this.t('stt.error.unavailable'), severity: 'err', jobType: 'stt', bookId: null });
+      return;
+    }
     const timeDomain = new Uint8Array(analyser.fftSize);
 
     const rt = {
@@ -270,6 +288,7 @@ export const sttRecorderMethods = {
 
   _sttStop() {
     const rt = this._sttRt;
+    this._sttStartSeq = (this._sttStartSeq || 0) + 1; // laufenden Start entwerten
     this.$store.stt.recording = false;
     this.$store.stt.pending = false;
     this.$store.stt.busy = false;

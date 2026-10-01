@@ -1,0 +1,41 @@
+{
+  "version": "4.14.1",
+  "date": "2026-10-01",
+  "entries": [
+    {
+      "kind": "verbessert",
+      "de": "Bucheditor: Wer im Buch nur Lektor- oder Leserechte hat, kann im Manuskript lesen, suchen und kommentieren, aber keine Seite mehr anklicken und bearbeiten. Die Ersetzen-Zeile der Suche ist für diese Rollen ausgeblendet.",
+      "en": "Book editor: people with only editor-reviewer or reader access can read, search and comment in the manuscript, but can no longer click into a page to edit it. The replace row of the search bar is hidden for these roles."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Buchorganizer: Wurde das Buch zwischenzeitlich anderswo geändert, leert der Organizer seinen Rückgängig-Verlauf mit einem Hinweis, statt einen veralteten Stand zurückzuspielen.",
+      "en": "Book organizer: if the book was changed elsewhere in the meantime, the organizer clears its undo history with a notice instead of restoring an outdated state."
+    },
+    {
+      "kind": "behoben",
+      "de": "Seiten-Editor: Text, den du während des Speicherns weitergetippt hast, ging beim Verlassen des Bearbeitungsmodus manchmal verloren. Er bleibt jetzt als ungespeichert markiert und wird mitgespeichert.",
+      "en": "Page editor: text you kept typing while a save was running was sometimes lost when leaving edit mode. It now stays marked as unsaved and gets saved too."
+    },
+    {
+      "kind": "behoben",
+      "de": "Bucheditor, Suchen und Ersetzen: Hast du nach der Suche im Text weitergetippt, konnte „Ersetzen“ die falsche Stelle treffen. Die Suche aktualisiert den Treffer jetzt zuerst, und du bestätigst erneut.",
+      "en": "Book editor, find and replace: if you kept typing after searching, “Replace” could hit the wrong spot. The search now refreshes the match first and you confirm again."
+    },
+    {
+      "kind": "behoben",
+      "de": "Buchorganizer: Ein Kapitel, das du über die Seitenleiste angelegt hast, fehlte im Organizer, und das nächste Verschieben schlug fehl. Rückgängig mit Strg+Z greift ausserdem nicht mehr, während du in einem Editor schreibst.",
+      "en": "Book organizer: a chapter you created from the sidebar was missing from the organizer, and the next move failed. Undo with Ctrl+Z also no longer kicks in while you are typing in an editor."
+    },
+    {
+      "kind": "behoben",
+      "de": "Seiten-Editor, Diktat: Am Ende von Überschriften, Listen oder hinter einem Beleg wird kein Punkt mehr angehängt. Brichst du den Start ab, bevor das Mikrofon freigegeben ist, nimmt die App nicht mehr unbemerkt weiter auf.",
+      "en": "Page editor, dictation: no full stop is added anymore at the end of headings, lists or after a citation. If you cancel before microphone access is granted, the app no longer keeps recording unnoticed."
+    },
+    {
+      "kind": "behoben",
+      "de": "Seiten-Editor: Ein offenes Slash-Menü reagiert auf Enter jetzt zuverlässig, auch in einer leeren Listen- oder Gedichtzeile. Eine angeklickte Trennlinie wird beim Weitertippen nicht mehr vom nächsten Backspace gelöscht.",
+      "en": "Page editor: an open slash menu now reliably responds to Enter, even on an empty list or poem line. A clicked divider is no longer deleted by the next Backspace once you keep typing."
+    }
+  ]
+}

@@ -3,8 +3,7 @@
 // Timer liegen BEWUSST am Host (Root, deklariert im notebookState-Slice von
 // app-state.js), nicht an der Karte: `_stopAutosave` wird auch aus Root-Kontext
 // gerufen (app-view/page.js#resetPage via Trampoline) und muss dieselben Timer
-// treffen. Der card-lokale `_undoTimer` (history.js) ist die Ausnahme, weil Undo
-// card-only ist — daher kein Widerspruch.
+// treffen.
 //
 // Die idle+max-Regel selbst liegt in editor/shared/autosave.js, geteilt mit dem
 // Bucheditor: die beiden Editoren dürfen nicht mit unterschiedlichem Rhythmus

@@ -18,7 +18,7 @@
 // stellen Tabellen nur dar.
 
 import { getEditEl } from '../../utils.js';
-import { replaceBlockOutsideList } from './_shared.js';
+import { replaceBlockOutsideList, ensureSlotAfter } from './_shared.js';
 import { htmlToElement } from './caret-panel.js';
 import {
   buildTableHtml, tableModel, emptyTableModel,
@@ -193,13 +193,7 @@ export const tableMethods = {
     } else {
       editEl.appendChild(node);
     }
-    // Ein atomarer Block am Dokumentende liesse keinen Caret-Anker uebrig —
-    // dieselbe Lage wie bei `<hr>`, `<figure>` und dem Diagramm.
-    if (!node.nextElementSibling) {
-      const p = document.createElement('p');
-      p.appendChild(document.createElement('br'));
-      node.insertAdjacentElement('afterend', p);
-    }
+    ensureSlotAfter(node);
     window.__app?._markEditDirty?.();
     this.closeTableDialog();
   },

@@ -1767,6 +1767,7 @@
   "bookEditor.find.replacedAll": "{n} Treffer ersetzt.",
   "bookOrganizer.title": "Buchorganizer",
   "bookOrganizer.hint": "Per Drag&Drop ordnen. Klick auf Namen zum Umbenennen. Tab/Shift+Tab im Kapitel-Feld rückt ein/aus (max 3 Ebenen).",
+  "bookOrganizer.historyStale": "Rückgängig/Wiederholen nicht mehr möglich: Das Buch wurde zwischenzeitlich anderswo geändert. Der Verlauf wurde geleert.",
   "bookOrganizer.lengthDist": "Kapitellängen (Zeichen vs. Median)",
   "bookOrganizer.addSubchapter": "Sub-Kapitel",
   "bookOrganizer.subchaptersCount": "{n} Sub-Kapitel",

@@ -408,8 +408,17 @@ export function registerBookEditorCard() {
       this._pendingMousedown = { x: event.clientX, y: event.clientY, pageId: block.pageId };
     },
 
+    // Schreibrecht am Buch (editor/owner; unbekannte Rolle = Legacy-Fallback
+    // erlaubt). Lektor und Viewer lesen und suchen im Stream, aktivieren aber
+    // keinen Block — sonst tippen sie in einen Block, dessen Save der Server mit
+    // 403 abweist. Nur UX: der PUT-Pfad prüft selbst.
+    _canEdit() {
+      return window.__app?.canEdit?.() !== false;
+    },
+
     async activateBlock(block) {
       if (this.activePageId === block.pageId) return;
+      if (!this._canEdit()) return;
       const prevId = this.activePageId;
       if (prevId != null) {
         const prev = this._blockById(prevId);
@@ -495,6 +504,8 @@ export function registerBookEditorCard() {
       if (event.key === 'Enter' && event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
         document.execCommand('insertLineBreak');
+        // Wie beim Clipboard: nicht jeder Browser feuert danach `input`.
+        block.html = event.currentTarget.innerHTML;
         this._markBlockDirty(block);
       }
     },

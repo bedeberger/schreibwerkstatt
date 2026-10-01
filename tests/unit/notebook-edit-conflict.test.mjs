@@ -167,6 +167,7 @@ const conflict409 = (extra = {}) => Object.assign(new Error('conflict'), {
 
 function setConflictApp(extra = {}) {
   const app = {
+    editMode: true,
     editSaving: false,
     focusActive: false,
     originalHtml: '<p data-bid="aa">base</p>',

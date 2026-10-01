@@ -1,8 +1,8 @@
 <!-- Buchorganizer -->
 <!--
   Alpine.data-Sub-Komponente — siehe public/js/cards/book-organizer-card.js.
-  DnD via SortableJS (lazy aus lazy-libs.js). Reorder/Move setzt BookStack-
-  priority + chapter_id pro Item; Renames + CRUD direkt auf den BookStack-Endpoints.
+  DnD via SortableJS (lazy aus lazy-libs.js). Reorder/Move als Single-Tree-PUT
+  an /content/books/:id/order; Renames + CRUD über contentRepo (docs/buchorganizer.md).
 -->
 <div class="card card--organizer" x-data="bookOrganizerCard" x-show="$app.showBookOrganizerCard" x-cloak>
   <div class="card-header">
@@ -157,7 +157,7 @@
             <span class="overview-chapter-chars" x-text="_fmtNum(ch.chars) + ' ' + $app.t('bookstats.unit.z')"></span>
             <span class="overview-chapter-ns"
                   :data-tip="$app.t('bookstats.metric.normseiten')"
-                  x-text="ch.normseiten.toLocaleString($store.shell.uiLocale === 'en' ? 'en-US' : 'de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ' + $app.t('bookstats.unit.ns')"></span>
+                  x-text="_fmtDec1(ch.normseiten) + ' ' + $app.t('bookstats.unit.ns')"></span>
             <span class="overview-chapter-words" x-text="_fmtNum(ch.words) + ' ' + $app.t('bookstats.unit.w')"></span>
             <span class="overview-chapter-pages" x-text="ch.pages + ' ' + $app.t('bookstats.unit.s')"></span>
           </span>
@@ -181,7 +181,7 @@
         <div class="blog-conflict-body">
           <div class="blog-conflict-side">
             <div class="blog-conflict-side-header">
-              <h4 x-text="$app.t('blog.conflict.local', { $store.shell.appName: $store.shell.appName })"></h4>
+              <h4 x-text="$app.t('blog.conflict.local', { appName: $store.shell.appName })"></h4>
               <span class="muted" x-text="$blog.conflictData.local.name"></span>
             </div>
             <div class="blog-conflict-content" x-html="$blog.conflictData.local.html"></div>

@@ -405,6 +405,7 @@ export const treeLoadMethods = {
       });
       this._rebuildTreeOrderMaps();
       this._persistTreeOpenState();
+      window.dispatchEvent(new CustomEvent(EVT.CHAPTER_ADDED, { detail: { chapterId: created.id } }));
       return chapterItem;
     } catch (e) {
       console.error('[createChapter]', e);

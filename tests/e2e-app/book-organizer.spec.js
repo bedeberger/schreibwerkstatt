@@ -179,3 +179,37 @@ test('Organizer-deletePage laeuft durch dieselbe Methode', async ({ page }) => {
   expect((await organizerRowIds(page)).includes(String(victim))).toBe(false);
   guard.assertClean('organizer delete');
 });
+
+// Kapitel aus dem Sidebar-Kontextmenue (Root `createChapter`) haengt sich
+// in-place in nav.tree, ohne Reload. Der offene Organizer muss es per
+// `chapter:added` in seinen Workstate holen — sonst fehlt es im naechsten
+// Order-PUT, und der Server lehnt den Tree mit MISSING_CHAPTER ab.
+test('Sidebar-Kapitelanlage bei offenem Organizer landet im Workstate und im Order-PUT', async ({ page }) => {
+  const guard = attachConsoleGuard(page);
+  await bootApp(page);
+  await selectSeededBook(page);
+  await openOrganizer(page);
+
+  const chapterId = await page.evaluate(async () => {
+    window.__app.newChapterTitle = 'Sidebar-Kapitel';
+    const item = await window.__app.createChapter();
+    return item.id;
+  });
+
+  await expect(page.locator(`.card--organizer .organizer-chapter[data-chapter-id="${chapterId}"]`)).toBeVisible();
+
+  // Ein Reorder ueber den Organizer-Pfad muss durchgehen (kein MISSING_CHAPTER).
+  const ok = await page.evaluate(async () => {
+    const el = document.querySelector('.card--organizer');
+    const card = window.Alpine.$data(el);
+    card.workTree.reverse();
+    return card._persistOrder({ mirror: 'chapters' });
+  });
+  expect(ok, 'Order-PUT mit dem neuen Kapitel akzeptiert').toBe(true);
+  guard.assertClean('sidebar-kapitel im organizer');
+
+  await page.evaluate(async (id) => {
+    const { contentRepo } = await import('/js/repo/content.js');
+    await contentRepo.deleteChapter(id);
+  }, chapterId);
+});

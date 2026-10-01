@@ -218,3 +218,14 @@ export function replaceBlockOutsideList(editEl, block, node) {
   }
   return node;
 }
+
+// Leerer Absatz mit Caret-Slot (`<p><br></p>`) hinter `node`, falls dort kein
+// Block mehr folgt. Ein nicht beschreibbarer Block am Dokumentende (Abbildung,
+// Diagramm, Tabelle) liesse sonst keinen Ort, um darunter weiterzuschreiben.
+export function ensureSlotAfter(node) {
+  if (!node || node.nextElementSibling) return null;
+  const p = document.createElement('p');
+  p.appendChild(document.createElement('br'));
+  node.insertAdjacentElement('afterend', p);
+  return p;
+}

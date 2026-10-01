@@ -1767,6 +1767,7 @@
   "bookEditor.find.replacedAll": "{n} matches replaced.",
   "bookOrganizer.title": "Book organizer",
   "bookOrganizer.hint": "Drag to reorder. Click a name to rename. Tab/Shift+Tab in the chapter field indents/outdents (max 3 levels).",
+  "bookOrganizer.historyStale": "Undo/redo is no longer possible: the book was changed elsewhere in the meantime. The history has been cleared.",
   "bookOrganizer.lengthDist": "Chapter lengths (chars vs. median)",
   "bookOrganizer.addSubchapter": "Sub-chapter",
   "bookOrganizer.subchaptersCount": "{n} sub-chapters",

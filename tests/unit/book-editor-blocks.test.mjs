@@ -136,3 +136,56 @@ test('applySaveOutcome: ohne updated_at bleibt der bisherige Stempel stehen', ()
   applySaveOutcome(block, { snapshot: '<p>neu</p>', savedHtml: '<p>neu</p>' });
   assert.equal(block.originalUpdatedAt, 'T0');
 });
+
+// ── Konflikt „Remote übernehmen" ─────────────────────────────────────────────
+const { bookEditorSaveMethods } = await import('../../public/js/cards/book-editor/save.js');
+const { contentRepo } = await import('../../public/js/repo/content.js');
+
+// Minimaler Card-Scope: nur, was resolveConflictTakeRemote anfasst.
+const takeRemoteCtx = (activePageId) => ({
+  ...bookEditorSaveMethods,
+  activePageId,
+  _autosave: { clear: () => {} },
+});
+
+const conflictBlock = (remoteHtml) => ({
+  kind: 'page', pageId: 7, name: 'P', html: '<p>lokal</p>', originalHtml: '<p>alt</p>',
+  originalUpdatedAt: 'T0', dirty: true, saving: false, saveError: 'Konflikt', savedAt: null, _rev: 0,
+  conflict: { remoteUserName: 'x', remoteUpdatedAt: 'T9', remoteHtml },
+});
+
+test('resolveConflictTakeRemote: Remote-HTML aus dem Pre-Check wird übernommen', async () => {
+  const ctx = takeRemoteCtx(null);
+  const block = conflictBlock('<p>remote</p>');
+  await ctx.resolveConflictTakeRemote(block);
+  assert.equal(block.html, '<p>remote</p>');
+  assert.equal(block.originalHtml, '<p>remote</p>');
+  assert.equal(block.originalUpdatedAt, 'T9');
+  assert.equal(block.dirty, false);
+  assert.equal(block.conflict, null);
+  assert.equal(block._rev, 1, 'externe Mutation → Re-Hydrate');
+});
+
+test('resolveConflictTakeRemote: 409-Pfad ohne Remote-HTML liest die Seite frisch', async () => {
+  const orig = contentRepo.loadPage;
+  const calls = [];
+  contentRepo.loadPage = async (id, opts) => { calls.push([id, opts]); return { html: '<p>frisch</p>', updated_at: 'T10' }; };
+  try {
+    const ctx = takeRemoteCtx(null);
+    const block = conflictBlock(null);
+    await ctx.resolveConflictTakeRemote(block);
+    assert.deepEqual(calls, [[7, { fresh: true }]]);
+    assert.equal(block.html, '<p>frisch</p>', 'sonst steht eine leere Seite im Stream');
+    assert.equal(block.originalUpdatedAt, 'T10');
+  } finally {
+    contentRepo.loadPage = orig;
+  }
+});
+
+test('resolveConflictTakeRemote: aktiver Block wird deaktiviert, damit der DOM neu geschrieben wird', async () => {
+  const ctx = takeRemoteCtx(7);
+  const block = conflictBlock('<p>remote</p>');
+  await ctx.resolveConflictTakeRemote(block);
+  assert.equal(ctx.activePageId, null,
+    'sonst lässt _maybeRehydrate den DOM stehen und der nächste Tastendruck speichert die lokale Fassung');
+});
