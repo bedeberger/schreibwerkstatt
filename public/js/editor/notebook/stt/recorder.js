@@ -86,6 +86,10 @@ export const sttRecorderMethods = {
     }
     if (seq !== this._sttStartSeq || !this.editMode) {
       stream.getTracks().forEach(t => t.stop());
+      // Abgebrochen von `_sttStop`: der hat `pending` schon geraeumt. Sonst
+      // (Edit-Modus weg ohne Stop) selbst raeumen, sonst bliebe der Mic-Knopf
+      // am Re-Entry-Guard haengen.
+      if (seq === this._sttStartSeq) this.$store.stt.pending = false;
       return;
     }
 

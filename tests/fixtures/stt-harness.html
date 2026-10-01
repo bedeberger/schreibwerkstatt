@@ -98,6 +98,8 @@
         },
       },
       selectedBookId: 1,
+      // Root-Stand: Diktat laeuft nur im Edit-Modus (_sttStart prueft das nach getUserMedia).
+      editMode: true,
       t: (k) => k,
       _getEditEl: () => editor,
       _markEditDirty: () => { window.__dirtyCount++; },
