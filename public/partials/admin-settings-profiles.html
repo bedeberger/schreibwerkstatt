@@ -3,6 +3,7 @@
            jeweiligen Provider-Sub-Tabs (Aufloesung: lib/ai/profile.js#aiSetting). -->
       <div x-show="adminSettingsProviderSubtab === 'profiles'" class="admin-settings-subsection">
         <p class="muted-msg muted-msg--sm" x-text="$app.t('admin.profiles.intro')"></p>
+        <div x-data="settingField({ k: 'ai.user_api.enabled', type: 'toggle', label: 'admin.settings.label.userApiEnabled', help: 'admin.settings.help.userApiEnabled' })"></div>
 
         <div x-show="adminProfilesLoading" class="muted-msg" x-text="$app.t('common.loading')"></div>
         <div x-show="adminProfilesError" class="error-msg" x-text="adminProfilesError"></div>

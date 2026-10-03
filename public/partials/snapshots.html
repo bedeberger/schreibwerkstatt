@@ -58,7 +58,7 @@
              rows: () => snapshots,
              defaultKey: 'created_at',
              persistKey: 'book.snapshots',
-             types: { seq: 'number', created_at: 'date', chars: 'number', pages: 'number', chapters: 'number' },
+             types: { seq: 'number', created_at: 'date', chars: 'number', pages: 'number', chapters: 'number', size_bytes: 'number' },
            })">
       <thead>
         <tr>
@@ -73,6 +73,8 @@
               @click="sortBy('pages')" x-text="$app.t('snapshots.col.pages')"></th>
           <th class="snapshots-num sortable-th" :class="sortClass('chapters')" :aria-sort="ariaSort('chapters')"
               @click="sortBy('chapters')" x-text="$app.t('snapshots.col.chapters')"></th>
+          <th class="snapshots-num sortable-th" :class="sortClass('size_bytes')" :aria-sort="ariaSort('size_bytes')"
+              @click="sortBy('size_bytes')" x-text="$app.t('snapshots.col.size')"></th>
           <th x-text="$app.t('snapshots.col.actions')"></th>
         </tr>
       </thead>
@@ -100,6 +102,7 @@
             <td class="snapshots-num" x-text="formatNum(s.chars)"></td>
             <td class="snapshots-num" x-text="formatNum(s.pages)"></td>
             <td class="snapshots-num" x-text="formatNum(s.chapters)"></td>
+            <td class="snapshots-num" x-text="formatSize(s.size_bytes)"></td>
             <td>
               <div class="snapshots-actions">
                 <button type="button" class="btn-compact"
@@ -126,123 +129,8 @@
     </table>
   </div>
 
-  <!-- Vergleich zweier Fassungen. -->
-  <section x-show="snapshots.length >= 2" x-cloak class="snapshots-compare">
-    <h3 class="snapshots-compare__title" x-text="$app.t('snapshots.compareTitle')"></h3>
-    <div class="snapshots-compare__pickers">
-      <div class="snapshots-picker">
-        <label class="snapshots-picker__label" x-text="$app.t('snapshots.compareFrom')"></label>
-        <div x-data="combobox($app.t('snapshots.compareFrom'))"
-             x-modelable="value" x-model="compareFrom"
-             x-effect="options = snapshots.map(s => ({ value: String(s.id), label: snapOptionLabel(s) }))"
-             @combobox-change="onCompareChange('from', $event.detail)"></div>
-      </div>
-      <div class="snapshots-picker">
-        <label class="snapshots-picker__label" x-text="$app.t('snapshots.compareTo')"></label>
-        <div x-data="combobox($app.t('snapshots.compareTo'))"
-             x-modelable="value" x-model="compareTo"
-             x-effect="options = snapshots.map(s => ({ value: String(s.id), label: snapOptionLabel(s) }))"
-             @combobox-change="onCompareChange('to', $event.detail)"></div>
-      </div>
-    </div>
-
-    <div x-show="sameSelection()" x-cloak class="muted-msg" x-text="$app.t('snapshots.compareSame')"></div>
-
-    <div x-show="diffLoading" x-cloak class="muted-msg" x-text="$app.t('snapshots.diffLoading')"></div>
-    <div x-show="diffError" x-cloak class="muted-msg muted-msg--error"
-         x-text="$app.t('snapshots.diffError') + ' ' + diffError"></div>
-
-    <template x-if="diff && !diffLoading && !diffError">
-      <div class="snapshots-diff">
-        <div class="snapshots-summary">
-          <span class="badge badge-ok" x-show="diff.summary.added"
-                x-text="$app.t('snapshots.summary.added', { n: diff.summary.added })"></span>
-          <span class="badge badge-err" x-show="diff.summary.removed"
-                x-text="$app.t('snapshots.summary.removed', { n: diff.summary.removed })"></span>
-          <span class="badge badge-warn" x-show="diff.summary.changed"
-                x-text="$app.t('snapshots.summary.changed', { n: diff.summary.changed })"></span>
-          <span class="badge" x-show="diff.summary.renamed"
-                x-text="$app.t('snapshots.summary.renamed', { n: diff.summary.renamed })"></span>
-          <span class="badge" x-show="diff.summary.moved"
-                x-text="$app.t('snapshots.summary.moved', { n: diff.summary.moved })"></span>
-          <span class="tag snapshots-summary__chars"
-                x-text="$app.t('snapshots.charsDelta', { d: formatDelta(diff.summary.charsTo - diff.summary.charsFrom) })"></span>
-        </div>
-
-        <!-- Publikations-Metadaten-Diff (Titelei/ISBN/Cover …) — Felder, die der
-             Inhalts-Diff nicht sieht. -->
-        <div class="snapshots-pubdiff" x-show="pubDiff.length" x-cloak>
-          <h4 class="snapshots-pubdiff__title" x-text="$app.t('snapshots.pub.title')"></h4>
-          <div class="table-scroll">
-            <table class="entity-grid-table snapshots-pubdiff__table">
-              <thead>
-                <tr>
-                  <th x-text="$app.t('snapshots.pub.field')"></th>
-                  <th x-text="$app.t('snapshots.compareFrom')"></th>
-                  <th x-text="$app.t('snapshots.compareTo')"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="p in pubDiff" :key="p.key">
-                  <tr>
-                    <td x-text="pubFieldLabel(p.key)"></td>
-                    <td class="snapshots-pubdiff__from" x-text="pubValueDisplay(p, 'from')"></td>
-                    <td class="snapshots-pubdiff__to" x-text="pubValueDisplay(p, 'to')"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <label class="form-check snapshots-showall">
-          <input type="checkbox" x-model="showUnchanged">
-          <span x-text="$app.t('snapshots.showUnchanged')"></span>
-        </label>
-
-        <div x-show="!visibleEntries().length" class="muted-msg" x-text="$app.t('snapshots.noChanges')"></div>
-
-        <ul class="snapshots-entries">
-          <template x-for="(entry, idx) in visibleEntries()" :key="entryKey(entry, idx)">
-            <li class="snapshots-entry" :class="'snapshots-entry--' + entry.status">
-              <div class="snapshots-entry__head internal-link"
-                   @click="toggleEntry(entry, idx)">
-                <span class="badge" :class="{
-                        'badge-ok': entry.status === 'added',
-                        'badge-err': entry.status === 'removed',
-                        'badge-warn': entry.status === 'changed',
-                      }" x-text="statusLabel(entry)"></span>
-                <span class="snapshots-entry__name" x-text="entry.name || $app.t('snapshots.untitled')"></span>
-                <span class="snapshots-entry__path" x-text="chapterPathLabel(entry.chapterPath)"></span>
-                <span class="tag" x-show="entry.renamed"
-                      x-text="$app.t('snapshots.renamedTag', { old: entry.oldName })"></span>
-                <span class="tag" x-show="entry.moved"
-                      x-text="$app.t('snapshots.movedTag', { from: chapterPathLabel(entry.oldChapterPath) })"></span>
-                <span class="history-chevron" :class="{ open: !!expanded[entryKey(entry, idx)] }" aria-hidden="true"></span>
-              </div>
-              <div x-show="expandLoading[entryKey(entry, idx)]" x-cloak class="muted-msg muted-msg--sm"
-                   x-text="$app.t('snapshots.diffLoading')"></div>
-              <template x-if="expanded[entryKey(entry, idx)] !== undefined && !expandLoading[entryKey(entry, idx)]">
-                <div class="snapshots-entry__diff">
-                  <div x-show="!expanded[entryKey(entry, idx)]" class="muted-msg muted-msg--sm"
-                       x-text="$app.t('snapshots.noTextChange')"></div>
-                  <template x-if="expanded[entryKey(entry, idx)]">
-                    <div>
-                      <div class="revision-diff-header" aria-hidden="true">
-                        <span x-text="$app.t('editor.revisions.viewer.colPrev')"></span>
-                        <span x-text="$app.t('editor.revisions.viewer.colThis')"></span>
-                      </div>
-                      <div class="revision-diff-body" x-html="expanded[entryKey(entry, idx)]"></div>
-                    </div>
-                  </template>
-                </div>
-              </template>
-            </li>
-          </template>
-        </ul>
-      </div>
-    </template>
-  </section>
+  <!-- @include snapshots-compare -->
+  <!-- @include snapshots-trash -->
 
   <!-- Reader-Overlay (Fassung nur-lesend) — ausgelagert (LOC-Split). -->
   <!-- @include snapshots-reader -->

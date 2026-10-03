@@ -311,7 +311,12 @@ export function makeChatMethods(cfg) {
       const { jobId } = await fetchJson(cfg.sendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, message: msg, client_msg_id: clientMsgId }),
+        // `sendExtra`: zusätzliche Body-Felder eines Chats (Recherche-Chat:
+        // `context` des Kontext-Chips). Der Server legt sie an der User-Nachricht ab.
+        body: JSON.stringify({
+          session_id: sessionId, message: msg, client_msg_id: clientMsgId,
+          ...(cfg.sendExtra ? cfg.sendExtra(this) : {}),
+        }),
       });
       // Reset während des POST: die Karte zeigt ein anderes Buch/eine andere
       // Seite (oder nichts). Der Job läuft serverseitig weiter und erscheint
@@ -345,6 +350,31 @@ export function makeChatMethods(cfg) {
   m[`is${L}SessionRunning`] = function (id) {
     return !!this[p.loading] && id != null && this[p.runningSessionId] === id;
   };
+  // Feedback (Daumen hoch/runter) an einer Assistant-Antwort — alle drei Chats.
+  // Erneuter Klick auf denselben Daumen nimmt es zurück. Optimistisch gesetzt,
+  // bei Fehler zurückgerollt; Auswertung im Admin-Usage (db/chat-quality.js).
+  m._chatFeedback = async function (msg, value) {
+    if (!msg || msg.role !== 'assistant' || !msg.id || msg._feedbackSaving) return;
+    const prev = msg.feedback ?? null;
+    const next = prev === value ? null : value;
+    msg.feedback = next;
+    msg._feedbackSaving = true;
+    try {
+      await fetchJson(`/chat/message/${msg.id}/feedback`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback: next }),
+      });
+    } catch (e) {
+      console.error(`[${L} feedback]`, e);
+      msg.feedback = prev;
+      const root = window.__app;
+      this[p.status] = `<span class="error-msg">${root.t('common.errorColon')}${escHtml(tFetchError(e))}</span>`;
+    } finally {
+      msg._feedbackSaving = false;
+    }
+  };
+
   // Server-persistierte Fallback-Nachrichten werden als `__i18n:key__` gespeichert
   // und beim Rendern in die aktuelle Locale aufgelöst (siehe CLAUDE.md, i18n-Regel).
   // Tool-Call-Zusammenfassung eines agentischen Turns (Buch-/Recherche-Chat).

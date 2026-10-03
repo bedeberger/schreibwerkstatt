@@ -14,7 +14,13 @@ const {
   listTimelineEventFigures,
   listTimelineEventChapters,
   listTimelineEventPages,
+  findDatedEvents,
+  getBirthEvent,
 } = require('../../../db/book-chat/timeline');
+const { getFigureRow } = require('../../../db/book-chat/figures');
+const { listFigureAges } = require('../../../db/figure-ages');
+const { getBookSettings } = require('../../../db/book-settings');
+const { parseDatum } = require('../../../lib/datum-parse');
 const { _truncateResult, _findFigure } = require('./shared');
 
 // ── list_continuity_issues ────────────────────────────────────────────────────
@@ -164,7 +170,105 @@ function tool_get_timeline(input, ctx) {
   });
 }
 
+// ── get_figure_age ────────────────────────────────────────────────────────────
+// Alter/Jahrgang einer Figur zu einem Jahr bzw. zu datierten Ereignissen. Die Rechnung
+// läuft HIER, nicht im Modell: ein Sprachmodell rechnet «1989 − 1961» zuverlässig
+// falsch genug, dass eine Altersangabe im Chat nicht mehr belegt ist. Quellen sind die
+// vorhandenen Daten (docs/figur-alter.md, docs/figur-lebenslauf.md): Steckbrief-Feld
+// `geburtstag`, Geburts-Ereignis im Zeitstrahl, Alters-Index (figure_ages). Kein
+// KI-Call, keine Schätzung — fehlt ein Geburtsjahr, sagt das Ergebnis genau das.
+
+const AGE_EVENT_LIMIT = 10;
+const AGE_BELEGE_LIMIT = 5;
+
+/** Alter zum Zeitpunkt `at` bei Geburt `birth` (je {y, m?, d?}). Mit Monat (+Tag) auf
+ *  beiden Seiten exakt, sonst als Spanne [n−1, n] — ohne Geburtstag im Jahr ist nicht
+ *  entscheidbar, ob er schon war. */
+function ageAt(birth, at) {
+  if (!Number.isInteger(birth?.y) || !Number.isInteger(at?.y)) return null;
+  const n = at.y - birth.y;
+  let von = n - 1, bis = n;
+  if (birth.m && at.m) {
+    if (at.m > birth.m) von = bis = n;
+    else if (at.m < birth.m) von = bis = n - 1;
+    else if (birth.d && at.d) von = bis = (at.d >= birth.d ? n : n - 1);
+  }
+  const out = von === bis ? { alter: bis, exakt: true } : { alter_von: von, alter_bis: bis, exakt: false };
+  if (bis < 0) out.vor_geburt = true;
+  return out;
+}
+
+function _birthCandidates(bookId, userEmail, fig) {
+  const out = [];
+  const row = getFigureRow(fig.id);
+  if (row?.geburtstag) {
+    const p = parseDatum(row.geburtstag);
+    if (Number.isInteger(p.year)) out.push({ quelle: 'steckbrief', y: p.year, m: p.month || null, d: p.day || null, label: row.geburtstag });
+  }
+  const evt = getBirthEvent(bookId, userEmail, fig.id);
+  if (evt?.y != null) out.push({ quelle: 'geburts_ereignis', y: evt.y, m: evt.m || null, d: evt.d || null });
+  return out;
+}
+
+function tool_get_figure_age(input, ctx) {
+  const userEmail = ctx.userEmail || '';
+  if (!input?.figur_id && !input?.figur_name) return { error: 'figur_id oder figur_name erforderlich.' };
+  const fig = _findFigure(input, ctx);
+  if (!fig) return { error: 'Figur nicht gefunden', hint: 'Prüfe die Figurenliste im System-Prompt.' };
+
+  const ageRow = listFigureAges(ctx.bookId, userEmail).find(a => a.fig_id === fig.fig_id) || null;
+  const candidates = _birthCandidates(ctx.bookId, userEmail, fig);
+  if (ageRow?.geburtsjahr != null) candidates.push({ quelle: 'alters_index', y: ageRow.geburtsjahr, m: null, d: null });
+  // Vorrang: Steckbrief (gehört dem Autor) › Geburts-Ereignis › Alters-Index.
+  const birth = candidates[0] || null;
+  const years = [...new Set(candidates.map(c => c.y))];
+
+  const out = {
+    figur: { fig_id: fig.fig_id, name: fig.name },
+    geburt: birth ? { jahr: birth.y, ...(birth.m ? { monat: birth.m } : {}), ...(birth.d ? { tag: birth.d } : {}), quelle: birth.quelle } : null,
+    ...(years.length > 1 ? { geburtsjahr_widerspruch: candidates.map(c => ({ quelle: c.quelle, jahr: c.y })) } : {}),
+    zeitlinie_real: !!getBookSettings(ctx.bookId, userEmail)?.zeitlinie_real,
+  };
+
+  if (ageRow) {
+    out.alters_index = {
+      alter_von: ageRow.alter_von, alter_bis: ageRow.alter_bis,
+      bezugsjahr_von: ageRow.bezugsjahr_von, bezugsjahr_bis: ageRow.bezugsjahr_bis,
+      gerechnet: ageRow.gerechnet, konfidenz: ageRow.konfidenz,
+      belege: (ageRow.belege || []).slice(0, AGE_BELEGE_LIMIT).map(b => ({
+        art: b.art, wert: b.wert, bezugsjahr: b.bezugsjahr, zitat: b.zitat, page_id: b.page_id, page_name: b.page_name,
+      })),
+    };
+  }
+
+  if (Number.isInteger(input?.jahr)) {
+    out.zum_jahr = { jahr: input.jahr, ...(birth ? ageAt(birth, { y: input.jahr }) : { hinweis: 'Kein Geburtsjahr bekannt — Alter nicht berechenbar.' }) };
+  }
+
+  const needle = typeof input?.ereignis === 'string' ? input.ereignis.trim() : '';
+  if (needle) {
+    const events = findDatedEvents(ctx.bookId, userEmail, needle, AGE_EVENT_LIMIT);
+    out.zu_ereignissen = events.map(e => {
+      const at = { y: e.y, m: e.m, d: e.d };
+      const age = birth ? ageAt(birth, at) : null;
+      return {
+        ereignis: e.ereignis, datum: e.datum, jahr: e.y,
+        ...(e.ye != null && e.ye !== e.y ? { jahr_ende: e.ye } : {}),
+        ...(e.unsicher ? { datum_unsicher: true } : {}),
+        ...(age || {}),
+      };
+    });
+    if (!events.length) out.ereignis_hinweis = `Kein datiertes Ereignis mit «${needle}» im Zeitstrahl. Mit get_timeline/search_passages das Datum suchen und dann mit jahr= erneut fragen.`;
+  }
+
+  if (!birth) out.hinweis = 'Kein Geburtsjahr bekannt (weder Steckbrief noch Geburts-Ereignis noch Alters-Index). Wörtliche Altersangaben stehen ggf. unter alters_index; sonst search_passages.';
+  else if (!birth.m) out.rechnung = 'Nur das Geburtsjahr ist bekannt: Alter als Spanne (vor/nach dem Geburtstag).';
+  return _truncateResult(out);
+}
+
 module.exports = {
   tool_list_continuity_issues,
   tool_get_timeline,
+  tool_get_figure_age,
+  ageAt,
 };

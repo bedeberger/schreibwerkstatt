@@ -2,6 +2,7 @@ import { fetchJson } from '../../utils.js';
 import { contentRepo } from '../../repo/content.js';
 import { EVT } from '../../events.js';
 import { getLastBookId } from '../../local-prefs.js';
+import { sweepOrphanBookKeys } from '../../storage-sweep.js';
 
 // Buch-/Seiten-Laden + Tree-Build, Buchwahl-Combobox, Kapitel-Anlage,
 // Token-Estimate-Backfill (Server-Push + IntersectionObserver-Lazy).
@@ -130,6 +131,12 @@ export const treeLoadMethods = {
         ? null
         : this._serverLastOpenedBookId?.();
       this.$store.nav.books = await contentRepo.listBooks({ fresh: readsFresh(opts) });
+      // Einmal pro Sitzung: Ansichts-Prefs gelöschter/entzogener Bücher räumen.
+      const sweepEmail = this.$store.session.currentUser?.email;
+      if (!this._bookPrefsSwept && sweepEmail) {
+        this._bookPrefsSwept = true;
+        sweepOrphanBookKeys(sweepEmail, this.$store.nav.books);
+      }
       // Wake-Refresh: Caller (_refreshAfterWake) triggert loadPages selbst mit source='wake'.
       // Hier weiterzureichen würde Tree erneut clearen (loadPages ohne source) → Flicker.
       // skipPages: für Metadaten-only-Refreshes (Kategorie/Tag/Rename) — Pagetree bleibt stehen.

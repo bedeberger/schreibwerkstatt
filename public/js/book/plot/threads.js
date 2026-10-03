@@ -12,6 +12,7 @@ export const threadsMethods = {
     const app = window.__app;
     const name = (this.newThreadName || '').trim();
     if (!name) { this.errorMessage = app.t('plot.error.nameRequired'); return; }
+    if (this.busy || this._inHistoryFlight) return;
     this.busy = true;
     try {
       const thread = await fetchJson('/plot/threads', {
@@ -45,16 +46,6 @@ export const threadsMethods = {
     this.$nextTick(() => { this.$root?.querySelector('.plot-thread-name-input')?.focus(); });
   },
   cancelEditThread() { this.editingThreadId = null; },
-
-  // Bindung ist exklusiv: eine Strang-Zeile gehört zu höchstens einer Figur.
-  setThreadDraftFigure(figId) {
-    this.threadDraft.figure_id = (this.threadDraft.figure_id === figId) ? '' : figId;
-    if (this.threadDraft.figure_id) this.threadDraft.draft_figure_id = '';
-  },
-  setThreadDraftDraftFigure(draftId) {
-    this.threadDraft.draft_figure_id = (this.threadDraft.draft_figure_id === draftId) ? '' : draftId;
-    if (this.threadDraft.draft_figure_id) this.threadDraft.figure_id = '';
-  },
 
   async saveEditThread(thread) {
     const app = window.__app;
@@ -97,7 +88,7 @@ export const threadsMethods = {
     this.threadColorPickerId = this.threadColorPickerId === threadId ? null : threadId;
   },
 
-  // Lane-Aktions-Dropdown (Kebab). Einzelnes, nach <body> teleportiertes
+  // Lane-Aktions-Dropdown (Kebab). Einzelnes, nach .card--plot teleportiertes
   // .context-menu — die Lane sitzt in einem overflow-x/will-change-Scrollcontainer,
   // in dem ein am Trigger verankertes Popover geclippt bzw. eingesperrt würde.
   // JS-positioniert aus dem Trigger-Rect (Pattern wie das Ideen-Meatball-Menü).
@@ -142,6 +133,9 @@ export const threadsMethods = {
     this.threadColorPickerId = null;
     const farbe = ACT_PALETTE.includes(key) ? key : null;
     if (farbe === (thread.farbe || null)) return;
+    // Kein Schreiben während Undo/Redo/anderer Mutation (Record-Verlust).
+    if (this.busy || this._inHistoryFlight) return;
+    this.busy = true;
     try {
       const updated = await fetchJson(`/plot/threads/${thread.id}`, {
         method: 'PATCH',
@@ -154,7 +148,7 @@ export const threadsMethods = {
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');
-    }
+    } finally { this.busy = false; }
   },
 
   async deleteThread(thread) {
@@ -165,17 +159,26 @@ export const threadsMethods = {
       confirmLabel: app.t('common.delete'),
       danger: true,
     })) return;
+    // Eigene Aktstruktur? Dann hängt der Server die Beats auf die geteilten Akte
+    // um bzw. befördert die eigenen Akte zu geteilten (act_id-Remap über viele
+    // Beats) — wie beim Fork neu laden statt lokal raten.
+    const hadOwnActs = this._threadHasOwn(thread.id);
     this.busy = true;
     try {
       await fetchJson(`/plot/threads/${thread.id}`, { method: 'DELETE' });
       // Löschen ist nicht reversibel (siehe plot/history.js) → Historie leeren.
       this._clearHistory();
-      this.threads = this.threads.filter(t => t.id !== thread.id);
-      // Server setzt thread_id der Beats auf NULL (SET NULL) — lokal spiegeln,
-      // die Beats fallen in die „ohne Strang"-Lane.
-      this.beats = this.beats.map(b => (b.thread_id === thread.id ? { ...b, thread_id: null } : b));
-      this._memos = {};
       if (this.editingThreadId === thread.id) this.editingThreadId = null;
+      if (this.threadActionsOpenId === thread.id) this.closeThreadMenu();
+      if (hadOwnActs) {
+        await this.loadBoard();
+      } else {
+        this.threads = this.threads.filter(t => t.id !== thread.id);
+        // Server setzt thread_id der Beats auf NULL (SET NULL) — lokal spiegeln,
+        // die Beats fallen in die „ohne Strang"-Lane.
+        this.beats = this.beats.map(b => (b.thread_id === thread.id ? { ...b, thread_id: null } : b));
+        this._memos = {};
+      }
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.delete');
@@ -185,22 +188,34 @@ export const threadsMethods = {
   // Strang-Reihenfolge per Pfeil-Button (a11y, analog moveAct).
   async moveThread(thread, dir) {
     const app = window.__app;
+    if (this.busy || this._inHistoryFlight) return;
     const ordered = [...this.threads].sort((a, b) => a.position - b.position);
     const idx = ordered.findIndex(t => t.id === thread.id);
     const swap = idx + dir;
     if (idx < 0 || swap < 0 || swap >= ordered.length) return;
     const orderBefore = ordered.map(t => t.id); // Undo-Ziel
-    [ordered[idx], ordered[swap]] = [ordered[swap], ordered[idx]];
-    ordered.forEach((t, i) => { t.position = i; });
-    this.threads = ordered;
+    const orderAfter = [...orderBefore];
+    [orderAfter[idx], orderAfter[swap]] = [orderAfter[swap], orderAfter[idx]];
+    // Unveränderlich (neue Objekte), damit der Snapshot beim PUT-Fehler zurückrollt.
+    const snapshot = this.threads;
+    const pos = new Map(orderAfter.map((id, i) => [id, i]));
+    this.threads = ordered
+      .map(t => ({ ...t, position: pos.get(t.id) }))
+      .sort((a, b) => a.position - b.position);
     this._memos = {};
+    this.busy = true;
     try {
       await fetchJson('/plot/threads/order', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, order: ordered.map(t => t.id) }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, order: orderAfter }),
       });
-      this._recordThreadOrder(orderBefore, ordered.map(t => t.id));
-    } catch (e) { this.errorMessage = app.t('plot.error.save'); }
+      this._recordThreadOrder(orderBefore, orderAfter);
+      this.errorMessage = '';
+    } catch (e) {
+      this.threads = snapshot;
+      this._memos = {};
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
   },
 };

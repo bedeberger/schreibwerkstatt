@@ -2,6 +2,7 @@
 // Intensität/Figuren-Draft und Drag-&-Drop-Reordering über beide Pfade.
 
 import { fetchJson } from '../../utils.js';
+import { mergeBeatRow, beatFieldsEqual } from './constants.js';
 
 export const beatsMethods = {
   // ── Beat anlegen (flach + Grid-Zelle teilen den Kern) ───────────────────────
@@ -21,6 +22,9 @@ export const beatsMethods = {
     const app = window.__app;
     const titel = (this.newBeatTitel || '').trim();
     if (!titel) { cancel(); return; }
+    // Doppel-Enter / Undo im Flug: kein zweiter POST, kein verschluckter Record
+    // (der Titel bleibt im Feld stehen).
+    if (this.busy || this._inHistoryFlight) return;
     this.busy = true;
     try {
       const beat = await fetchJson('/plot/beats', {
@@ -118,8 +122,26 @@ export const beatsMethods = {
       () => this.saveNewBeatCell(actId, threadId, { keepAdding: false }));
   },
 
-  startEditBeat(beat) {
+  // Ein offener ANDERER Beat wird zuerst committet (wie Klick ausserhalb), erst
+  // danach überschreibt der neue Draft den alten — sonst gingen dessen Edits still
+  // verloren (der @click.outside des alten Panels feuert NACH diesem Handler und
+  // sieht editingBeatId schon umgesetzt). Scheitert das Speichern, bleibt der alte
+  // Beat offen. Derselbe Beat erneut (z. B. Spannungsbogen-Punkt) → Draft bleibt.
+  async startEditBeat(beat) {
+    if (!beat) return false;
+    if (this.editingBeatId === beat.id) return true;
+    if (this.editingBeatId != null) {
+      const prev = (this.beats || []).find(b => b.id === this.editingBeatId);
+      if (prev) {
+        const ok = await this.commitEditBeat(prev);
+        if (ok === false) return false;
+      } else {
+        this.cancelEditBeat();
+      }
+    }
     this.editingBeatId = beat.id;
+    this.relDraftTyp = '';
+    this.relDraftTarget = '';
     // Permalink-Spiegel für den Beat (#book/X/plot/<beatId>): Hash-Router liest
     // Alpine.store('nav').plotBeatId. editingBeatId bleibt SSoT in der Karte.
     if (window.Alpine) window.Alpine.store('nav').plotBeatId = beat.id;
@@ -135,6 +157,7 @@ export const beatsMethods = {
       motif_ids: (beat.motifs || []).map(m => m.id),
       location_ids: (beat.locations || []).map(l => l.id),
     };
+    return true;
   },
   cancelEditBeat() { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; },
 
@@ -155,18 +178,26 @@ export const beatsMethods = {
   // Klick ausserhalb des Edit-Panels: Änderungen committen (wie Save) und dann
   // schliessen. Leerer Titel → nichts Sinnvolles zu speichern, einfach verwerfen
   // (saveEditBeat würde sonst mit Fehler offen bleiben).
+  // true = gespeichert/verworfen (Panel zu), false = Speichern gescheitert.
   async commitEditBeat(beat) {
-    if (!(this.beatDraft.titel || '').trim()) { this.cancelEditBeat(); return; }
-    await this.saveEditBeat(beat);
+    if (!(this.beatDraft.titel || '').trim()) { this.cancelEditBeat(); return true; }
+    return this.saveEditBeat(beat);
   },
 
   // Deep-Link-Ziel öffnen: Beat suchen → Edit + zentriert ins Bild. Noch nicht
-  // geladenes Board → ID merken, loadBoard() ruft uns danach erneut auf.
-  _focusBeatById(rawId) {
+  // geladenes Board → ID merken, loadBoard() ruft uns danach mit fromLoad erneut
+  // auf. Fehlt die ID auch im frisch geladenen Board (gelöscht, fremder Link),
+  // wird sie verworfen statt endlos neu geparkt.
+  _focusBeatById(rawId, { fromLoad = false } = {}) {
     const id = parseInt(rawId);
     if (!Number.isInteger(id)) return;
     const beat = (this.beats || []).find(b => b.id === id);
-    if (!beat) { this._pendingFocusBeatId = id; return; }
+    if (!beat) {
+      if (!fromLoad) { this._pendingFocusBeatId = id; return; }
+      const nav = window.Alpine?.store('nav');
+      if (nav && nav.plotBeatId === id) nav.plotBeatId = null;
+      return;
+    }
     this.startEditBeat(beat);
     this.$nextTick(() => this.scrollToBeat(id));
   },
@@ -226,14 +257,27 @@ export const beatsMethods = {
     this.beatDraft.location_ids = [...set];
   },
 
-  async saveEditBeat(beat) {
+  // Reentrance-sicher: Commit-Wege (Enter, Cmd+S, Klick ausserhalb, Wechsel auf
+  // einen anderen Beat via startEditBeat) können im selben Klick zusammenfallen —
+  // ein zweiter Aufruf während des Flights teilt dessen Ergebnis statt doppelt
+  // zu PATCHen. Liefert true (gespeichert bzw. nichts zu speichern) / false.
+  saveEditBeat(beat) {
+    if (this._beatSavePromise) return this._beatSavePromise;
+    const p = this._saveEditBeatCore(beat);
+    this._beatSavePromise = p;
+    const clear = () => { if (this._beatSavePromise === p) this._beatSavePromise = null; };
+    p.then(clear, clear);
+    return p;
+  },
+
+  async _saveEditBeatCore(beat) {
     const app = window.__app;
     const titel = (this.beatDraft.titel || '').trim();
-    if (!titel) { this.errorMessage = app.t('plot.error.titelRequired'); return; }
-    this.busy = true;
+    if (!titel) { this.errorMessage = app.t('plot.error.titelRequired'); return false; }
     // Ausgangsstand VOR dem PATCH festhalten (Undo-Ziel) — der Draft ist das
-    // After, der Beat-Row-Snapshot das Before.
-    const before = this._beatFieldSnapshot(beat);
+    // After, der aktuelle Beat-Row-Snapshot das Before.
+    const cur = (this.beats || []).find(b => b.id === beat.id) || beat;
+    const before = this._beatFieldSnapshot(cur);
     const after = {
       titel,
       beschreibung: this.beatDraft.beschreibung || '',
@@ -249,6 +293,14 @@ export const beatsMethods = {
       motif_ids: [...this.beatDraft.motif_ids],
       location_ids: [...this.beatDraft.location_ids],
     };
+    const close = () => {
+      if (this.editingBeatId !== beat.id) return;
+      this.editingBeatId = null;
+      if (window.Alpine) window.Alpine.store('nav').plotBeatId = null;
+    };
+    // Dirty-Check: nichts geändert → kein PATCH, kein Undo-Record, nur schliessen.
+    if (beatFieldsEqual(before, after)) { close(); this.errorMessage = ''; return true; }
+    this.busy = true;
     try {
       const updated = await fetchJson(`/plot/beats/${beat.id}`, {
         method: 'PATCH',
@@ -257,31 +309,38 @@ export const beatsMethods = {
       });
       this._replaceBeat(updated);
       this._recordBeatFields(beat.id, before, after);
-      this.editingBeatId = null;
-      if (window.Alpine) window.Alpine.store('nav').plotBeatId = null;
+      close();
       this.errorMessage = '';
       // Kapitel-Zuweisung kann sich geändert haben → Editor-Indikator syncen.
       app.refreshPlotBeatCounts?.();
+      return true;
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');
+      return false;
     } finally { this.busy = false; }
   },
 
   // Verwerfen-Flag umschalten (eigene Achse, unabhängig vom Status). Sofort
   // persistiert — funktioniert aus Ansicht und Edit-Panel.
+  // busy-Guard: läuft gerade ein Undo/Redo oder eine andere Mutation, würde der
+  // Record sonst zwischen Pop und Gegen-Push landen (und den Redo-Stack leeren).
   async toggleBeatVerworfen(beat) {
     const app = window.__app;
+    if (!beat || this.busy || this._inHistoryFlight) return;
+    const was = beat.verworfen ? 1 : 0;
+    this.busy = true;
     try {
       const updated = await fetchJson(`/plot/beats/${beat.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ verworfen: beat.verworfen ? 0 : 1 }),
+        body: JSON.stringify({ verworfen: was ? 0 : 1 }),
       });
       this._replaceBeat(updated);
-      this._recordBeatFields(beat.id, { verworfen: beat.verworfen ? 1 : 0 }, { verworfen: beat.verworfen ? 0 : 1 });
+      this._recordBeatFields(beat.id, { verworfen: was }, { verworfen: was ? 0 : 1 });
       // Verwerfen ändert, ob der Beat in den Page-Count zählt → Indikator syncen.
       app.refreshPlotBeatCounts?.();
     } catch (e) { this.errorMessage = app.t('plot.error.save'); }
+    finally { this.busy = false; }
   },
 
   async deleteBeat(beat) {
@@ -297,25 +356,52 @@ export const beatsMethods = {
       // Hard-Delete ohne Snapshot: der Beat ist weg, und Records im Stack, die ihn
       // referenzieren (Platzierung, Felder), wären danach Nieten → Historie leeren.
       this._clearHistory();
-      this.beats = this.beats.filter(b => b.id !== beat.id);
-      // Server kaskadiert die Kanten dieses Beats — lokal nachziehen (ein- + ausgehend).
-      this.relations = this.relations.filter(r => r.from_beat_id !== beat.id && r.to_beat_id !== beat.id);
-      this._memos = {};
-      if (this.editingBeatId === beat.id) { this.editingBeatId = null; if (window.Alpine) window.Alpine.store('nav').plotBeatId = null; }
+      this._pruneBeatsLocal([beat.id]);
       this.errorMessage = '';
-      // Gelöschter Beat kann ein Kapitel-Count gewesen sein → Indikator syncen.
-      app.refreshPlotBeatCounts?.();
-      this.loadTimeChecks();
     } catch (e) {
       this.errorMessage = app.t('plot.error.delete');
     } finally { this.busy = false; }
   },
 
+  // Server-Antwort eines Beat-PATCH über den bisherigen Board-Beat legen: die
+  // nur von GET /plot gelieferten Felder (occ_count/occ_top) bleiben erhalten,
+  // wenn die Antwort sie nicht trägt (pure: constants.js#mergeBeatRow).
+  _mergeBeatRow(updated) {
+    if (!updated || updated.id == null) return updated;
+    const cur = (this.beats || []).find(b => b.id === updated.id);
+    return mergeBeatRow(cur, updated);
+  },
+
+  // Einziger Weg, einen PATCH-Rückgabewert ins Board zu legen — merged immer
+  // über _mergeBeatRow, damit kein Pfad das Anker-Badge auf 'drift' kippt.
   _replaceBeat(row) {
-    this.beats = this.beats.map(b => (b.id === row.id ? row : b));
+    if (!row || row.id == null) return;
+    const merged = this._mergeBeatRow(row);
+    this.beats = this.beats.map(b => (b.id === merged.id ? merged : b));
     this._memos = {};
     // Zeit, Figuren oder Verworfen-Flag können sich geändert haben.
     this.loadTimeChecks();
+  },
+
+  // Gemeinsamer lokaler Nachzug, wenn Beats serverseitig verschwunden sind
+  // (Beat-/Akt-Löschen, Undo eines Create): Beats + ihre ein-/ausgehenden Kanten
+  // raus, offener Edit/Permalink/Fundstellen-Popover zurücksetzen, Memos leeren,
+  // Kapitel-Indikator + Zeit-Messung nachladen. Historie fasst er NICHT an — das
+  // entscheidet der Aufrufer (Löschen leert, ein Undo-Applier darf es nicht).
+  _pruneBeatsLocal(ids) {
+    const gone = new Set(ids || []);
+    if (gone.size) {
+      this.beats = (this.beats || []).filter(b => !gone.has(b.id));
+      this.relations = (this.relations || []).filter(r => !gone.has(r.from_beat_id) && !gone.has(r.to_beat_id));
+      if (gone.has(this.editingBeatId)) this.cancelEditBeat();
+      const nav = window.Alpine?.store('nav');
+      if (nav && gone.has(nav.plotBeatId)) nav.plotBeatId = null;
+      if (gone.has(this.beatOccPopoverBeatId)) this.closeBeatOccPopover?.();
+      if (gone.has(this._pendingFocusBeatId)) this._pendingFocusBeatId = null;
+    }
+    this._memos = {};
+    window.__app?.refreshPlotBeatCounts?.();
+    this.loadTimeChecks?.();
   },
 
   // ── Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff) ────────────────────
@@ -329,6 +415,7 @@ export const beatsMethods = {
     const toId = this.relDraftTarget ? parseInt(this.relDraftTarget) : null;
     const typ = this.relDraftTyp || '';
     if (!toId || !typ) { this.errorMessage = app.t('plot.relation.incomplete'); return; }
+    if (this.busy || this._inHistoryFlight) return;
     this.busy = true;
     try {
       const rel = await fetchJson('/plot/beat-relations', {
@@ -353,7 +440,7 @@ export const beatsMethods = {
 
   async deleteBeatRelationById(relId) {
     const app = window.__app;
-    if (!relId) return;
+    if (!relId || this.busy || this._inHistoryFlight) return;
     try {
       await fetchJson(`/plot/beat-relations/${relId}`, { method: 'DELETE' });
       // Wie jedes Löschen: nicht reversibel (Wiederanlegen vergibt eine neue ID).
@@ -374,6 +461,8 @@ export const beatsMethods = {
   async _dropBeat(targetActId, targetThreadId, beforeBeatId = null) {
     const beatId = this._dragBeatId;
     if (beatId == null) return;
+    // Kein Drop während Undo/Redo oder einer anderen Mutation (Record-Verlust).
+    if (this.busy || this._inHistoryFlight) { this._dragBeatId = null; return; }
     const beat = this.beats.find(b => b.id === beatId);
     if (!beat) { this._dragBeatId = null; return; }
     const origActId = beat.act_id;
@@ -409,8 +498,11 @@ export const beatsMethods = {
     const cells = sameCell
       ? [{ actId: targetActId, threadId: tid }]
       : [{ actId: origActId, threadId: origThreadId }, { actId: targetActId, threadId: tid }];
-    const ok = await this._persistCells(cells);
-    if (ok) this._recordBeatPlace(placeBefore);
+    this.busy = true;
+    try {
+      const ok = await this._persistCells(cells);
+      if (ok) this._recordBeatPlace(placeBefore);
+    } finally { this.busy = false; }
   },
 
   // true = persistiert (Aufrufer darf den Undo-Record schreiben), false = Fehler,

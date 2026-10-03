@@ -3,6 +3,7 @@
 
 import { escHtml, fmtTok } from '../utils.js';
 import { jobStreamOpen, onJobStream } from '../event-stream.js';
+import { lsRemove } from '../safe-storage.js';
 
 // Bei offenem Job-Stream ersetzt der Push die Poll-Ticks; nur jeder n-te Tick
 // läuft als Sicherheitsnetz (bei 2 s: alle 30 s).
@@ -66,7 +67,7 @@ export function startPoll(ctx, config) {
     detach();
     if (!mine) return;
     ctx[config.timerProp] = null;
-    if (config.lsKey) localStorage.removeItem(config.lsKey);
+    if (config.lsKey) lsRemove(config.lsKey);
   };
   // true = dieser Poller ist abgelöst/abgeräumt → still aussteigen.
   const stale = () => {

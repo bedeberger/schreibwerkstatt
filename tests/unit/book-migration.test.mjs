@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const {
   FORMAT, VERSION, MAX_DEPTH,
   buildManifest, normalizeIncludes, treeToNodes, buildBookJson,
-  validateManifest, validateBookJson, planFromNodes,
+  validateManifest, validateBookJson, planFromNodes, orderTreeFromOps,
 } = require('../../lib/book-bundle.js');
 
 test('buildManifest setzt Format + Version + normalisierte includes', () => {
@@ -14,15 +14,15 @@ test('buildManifest setzt Format + Version + normalisierte includes', () => {
   assert.equal(m.format, FORMAT);
   assert.equal(m.version, VERSION);
   assert.equal(m.sourceBookId, 42);
-  assert.deepEqual(m.includes, { analysis: false, lektorat: false, chats: false });
+  assert.deepEqual(m.includes, { analysis: false, lektorat: false, chats: false, research: false });
 
   const m2 = buildManifest({ sourceBookId: 1, includes: { analysis: true, chats: 1 } });
-  assert.deepEqual(m2.includes, { analysis: true, lektorat: false, chats: true });
+  assert.deepEqual(m2.includes, { analysis: true, lektorat: false, chats: true, research: false });
 });
 
 test('normalizeIncludes ist tolerant gegen Müll', () => {
-  assert.deepEqual(normalizeIncludes(null), { analysis: false, lektorat: false, chats: false });
-  assert.deepEqual(normalizeIncludes({ analysis: 'yes', foo: 1 }), { analysis: true, lektorat: false, chats: false });
+  assert.deepEqual(normalizeIncludes(null), { analysis: false, lektorat: false, chats: false, research: false });
+  assert.deepEqual(normalizeIncludes({ analysis: 'yes', foo: 1 }), { analysis: true, lektorat: false, chats: false, research: false });
 });
 
 test('treeToNodes baut Hierarchie + Reihenfolge inkl. inline-HTML', () => {
@@ -170,4 +170,71 @@ test('Round-Trip: Tree -> nodes -> plan rekonstruiert Struktur', () => {
   const pages = ops.filter(o => o.op === 'page').map(o => o.name);
   assert.deepEqual(chapters, ['A', 'A.1']);
   assert.deepEqual(pages, ['a1', 'a2']);
+});
+
+// ── Reihenfolge (Interleaving) + excluded ────────────────────────────────────
+const ILV_TREE = {
+  topPages: [{ id: 1, name: 'Vorwort' }, { id: 4, name: 'Nachwort' }],
+  chapters: [{
+    id: 10, name: 'Teil I', excluded: false,
+    pages: [{ id: 2, name: 'A' }],
+    subchapters: [{ id: 11, name: 'Notizen', excluded: true, pages: [{ id: 3, name: 'N' }], subchapters: [] }],
+  }],
+};
+// Order: Vorwort, Teil I (Unterkapitel VOR Seite A), Nachwort.
+const ILV_ORDER = [
+  { type: 'page', id: 1 },
+  { type: 'chapter', id: 10, children: [
+    { type: 'chapter', id: 11, children: [{ type: 'page', id: 3 }] },
+    { type: 'page', id: 2 },
+  ] },
+  { type: 'page', id: 4 },
+];
+
+test('treeToNodes folgt dem Order-Tree inkl. Interleaving und traegt excluded', () => {
+  const nodes = treeToNodes(ILV_TREE, new Map(), null, ILV_ORDER);
+  assert.deepEqual(nodes.map(n => n.srcId), [1, 10, 4]);
+  assert.deepEqual(nodes[1].children.map(n => n.srcId), [11, 2]);
+  assert.equal(nodes[1].excluded, false);
+  assert.equal(nodes[1].children[0].excluded, true);
+});
+
+test('treeToNodes faellt ohne/unvollstaendigen Order-Tree auf Listen-Reihenfolge zurueck', () => {
+  const legacy = treeToNodes(ILV_TREE, new Map(), null, null);
+  assert.deepEqual(legacy.map(n => n.srcId), [1, 4, 10]);
+  const partial = treeToNodes(ILV_TREE, new Map(), null, [{ type: 'page', id: 1 }]);
+  assert.deepEqual(partial.map(n => n.srcId), [1, 4, 10]);
+});
+
+test('planFromNodes reicht excluded durch, Altbestand bleibt undefined', () => {
+  const { ops } = planFromNodes([
+    { type: 'chapter', name: 'X', srcId: 1, excluded: true, children: [] },
+    { type: 'chapter', name: 'Y', srcId: 2, children: [] },
+  ]);
+  assert.equal(ops[0].excluded, true);
+  assert.equal(ops[1].excluded, undefined);
+});
+
+test('orderTreeFromOps rekonstruiert Interleaving + reicht Kinder fehlender Kapitel weiter', () => {
+  const nodes = treeToNodes(ILV_TREE, new Map(), null, ILV_ORDER);
+  const { ops } = planFromNodes(nodes);
+  const chapterIdByTemp = new Map();
+  const pageIdByOp = new Map();
+  ops.forEach((o, i) => {
+    if (o.op === 'chapter') chapterIdByTemp.set(o.tempId, o.srcId + 100);
+    else pageIdByOp.set(i, o.srcId + 100);
+  });
+  assert.deepEqual(orderTreeFromOps(ops, chapterIdByTemp, pageIdByOp), [
+    { type: 'page', id: 101 },
+    { type: 'chapter', id: 110, children: [
+      { type: 'chapter', id: 111, children: [{ type: 'page', id: 103 }] },
+      { type: 'page', id: 102 },
+    ] },
+    { type: 'page', id: 104 },
+  ]);
+  // Unterkapitel 11 nicht angelegt → seine Seite wandert ins Eltern-Kapitel.
+  const missing = new Map(chapterIdByTemp);
+  missing.delete(ops.find(o => o.op === 'chapter' && o.srcId === 11).tempId);
+  const tree = orderTreeFromOps(ops, missing, pageIdByOp);
+  assert.deepEqual(tree[1].children, [{ type: 'page', id: 103 }, { type: 'page', id: 102 }]);
 });

@@ -1,0 +1,181 @@
+<!-- Plot-Chat-Panel der Plot-Werkstatt (jeder Provider; agentisch oder klassisch).
+     Entwickelt das Beat-Board im Gespräch; Änderungen kommen als Vorschläge, die
+     der User EINZELN übernimmt oder verwirft (Vorschlagskarten wie im Seiten-Chat).
+     Scope + Methoden aus plotCard (chat/plot-chat.js, chat/plot-chat-proposals.js).
+     Deep-Doc: docs/plot-chat.md -->
+<div x-show="plotChatOpen" x-cloak class="plot-chat">
+  <div class="card-section-head">
+    <span class="plot-chat-title" x-text="$app.t('plot.chat.heading')"></span>
+    <div class="plot-chat-head-actions">
+      <button type="button" class="icon-btn icon-btn--ghost" @click="startNewPlotChatSession()" :disabled="plotChatLoading" :data-tip="$app.t('chat.newSessionTitle')" :aria-label="$app.t('chat.newSession')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg></button>
+      <button type="button" class="icon-btn icon-btn--ghost" @click="plotChatOpen = false" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
+    </div>
+  </div>
+
+  <div x-show="plotChatProgress > 0 && isPlotChatSessionRunning(plotChatSessionId)" class="progress-bar-wrap">
+    <div class="progress-bar" :style="{ '--progress': plotChatProgress + '%' }"></div>
+  </div>
+  <div x-show="plotChatStatus" class="card-status" x-html="plotChatStatus"></div>
+
+  <div id="plot-chat-messages" class="chat-messages plot-chat-messages">
+    <div x-show="plotChatMessages.length === 0 && !plotChatLoading" class="chat-empty" x-text="$app.t('plot.chat.empty')"></div>
+
+    <template x-for="(msg, msgIdx) in plotChatMessages" :key="msgIdx">
+      <div :class="'chat-msg chat-msg--' + msg.role">
+        <div class="chat-msg-bubble">
+          <div x-show="msg.role === 'user'" class="chat-msg-text" x-text="msg.content"></div>
+          <div x-show="msg.role === 'assistant'" class="chat-msg-text" x-html="_renderChatMarkdown(msg.content)"></div>
+
+          <template x-if="msg.role === 'assistant' && msg.context_info">
+            <div class="chat-context-info">
+              <template x-for="(entry, ei) in _toolSummary(msg.context_info.tool_calls, { skip: ['final_answer'] })" :key="ei">
+                <span class="chat-context-badge" x-text="entry.name + (entry.count > 1 ? ' ×' + entry.count : '')"></span>
+              </template>
+              <span class="chat-context-badge" x-show="plotChatCostLabel(msg)" x-text="plotChatCostLabel(msg)"></span>
+            </div>
+          </template>
+
+          <!-- Vorschläge ans Board: jeder einzeln übernehmen/verwerfen -->
+          <template x-if="msg.role === 'assistant' && plotProposals(msg).length">
+            <div class="chat-vorschlaege plot-chat-proposals">
+              <template x-for="(p, pi) in plotProposals(msg)" :key="pi">
+                <div class="chat-vorschlag"
+                     :class="{ 'chat-vorschlag--applied': plotProposalStatus(msg, pi).state === 'applied', 'chat-vorschlag--discarded': plotProposalStatus(msg, pi).state === 'discarded', 'chat-vorschlag--stale': plotProposalStatus(msg, pi).state === 'open' && (plotProposalStatus(msg, pi).stale || plotProposalStatus(msg, pi).blocked) }">
+                  <div class="chat-vorschlag-header">
+                    <span class="chat-vorschlag-label"
+                          x-text="plotProposalStatus(msg, pi).state === 'applied' ? $app.t('plot.chat.applied') : plotProposalStatus(msg, pi).state === 'discarded' ? $app.t('chat.discarded') : plotProposalTypeLabel(p)"></span>
+                    <span class="chat-vorschlag-actions">
+                      <button type="button" class="chat-vorschlag-btn" x-show="plotProposalStatus(msg, pi).state === 'open'"
+                              @click="applyPlotProposal(msg, pi)" :disabled="!!p._applying || !!plotProposalStatus(msg, pi).blocked || busy"
+                              :data-tip="plotProposalStatus(msg, pi).blocked ? $app.t(plotProposalStatus(msg, pi).blocked.key, plotProposalStatus(msg, pi).blocked.params || {}) : null">
+                        <span x-show="p._applying" class="spinner"></span>
+                        <span x-text="p._applying ? $app.t('common.saving') : (plotProposalStatus(msg, pi).removed ? $app.t('plot.chat.reapply') : $app.t('chat.apply'))"></span>
+                      </button>
+                      <button type="button" class="chat-vorschlag-btn" x-show="plotProposalStatus(msg, pi).state === 'applied' && plotProposalBeatId(p)"
+                              @click="showPlotProposalBeat(p)" x-text="$app.t('plot.chat.show')"></button>
+                      <button type="button" class="chat-vorschlag-btn chat-vorschlag-btn--ghost" x-show="plotProposalStatus(msg, pi).state !== 'applied'"
+                              @click="discardPlotProposal(msg, pi, plotProposalStatus(msg, pi).state !== 'discarded')" :disabled="!!p._applying"
+                              x-text="plotProposalStatus(msg, pi).state === 'discarded' ? $app.t('chat.restore') : $app.t('chat.discard')"></button>
+                    </span>
+                  </div>
+
+                  <!-- Neuer Beat / Akt / Strang -->
+                  <template x-if="p.type === 'beat_create'">
+                    <div class="chat-vorschlag-diff">
+                      <div class="chat-vorschlag-title" x-text="p.fields?.titel"></div>
+                      <div class="plot-chat-proposal-text" x-show="p.fields?.beschreibung" x-text="p.fields?.beschreibung"></div>
+                      <div class="plot-chat-proposal-meta">
+                        <span x-show="plotProposalWhere(p)" x-text="plotProposalWhere(p)"></span>
+                        <span x-show="p.labels?.chapter" x-text="$app.t('plot.chat.meta.chapter', { name: p.labels?.chapter })"></span>
+                        <span x-show="p.fields?.intensitaet" x-text="$app.t('plot.chat.meta.intensity', { n: p.fields?.intensitaet })"></span>
+                        <span x-show="p.fields?.zeit" x-text="$app.t('plot.chat.meta.time', { zeit: p.fields?.zeit })"></span>
+                        <span x-show="(p.labels?.figuren || []).length" x-text="$app.t('plot.chat.meta.figures', { names: (p.labels?.figuren || []).join(', ') })"></span>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="p.type === 'act_create' || p.type === 'thread_create'">
+                    <div class="chat-vorschlag-diff">
+                      <div class="chat-vorschlag-title" x-text="p.name"></div>
+                      <div class="plot-chat-proposal-meta">
+                        <span x-show="plotProposalWhere(p)" x-text="plotProposalWhere(p)"></span>
+                        <span x-show="p.labels?.figur" x-text="$app.t('plot.chat.meta.mainFigure', { name: p.labels?.figur })"></span>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- Beat ändern: Feld für Feld vorher → nachher -->
+                  <template x-if="p.type === 'beat_update'">
+                    <div class="chat-vorschlag-diff">
+                      <div class="chat-vorschlag-title" x-text="p.labels?.beat"></div>
+                      <template x-for="row in plotProposalRows(p)" :key="row.key">
+                        <div class="plot-chat-proposal-row">
+                          <span class="plot-chat-proposal-field" x-text="$app.t('plot.chat.field.' + row.key)"></span>
+                          <template x-if="row.diff">
+                            <span class="chat-word-diff"><template x-for="(part, di) in row.diff" :key="di"><span :class="'chat-word-diff__' + part.t" x-text="part.v"></span></template></span>
+                          </template>
+                          <template x-if="!row.diff && !row.flag">
+                            <span><span class="finding-original" x-text="row.before"></span> <span class="finding-korrektur" x-text="row.after"></span></span>
+                          </template>
+                          <template x-if="row.flag">
+                            <span x-text="$app.t(row.flag === 'on' ? 'plot.chat.verworfenOn' : 'plot.chat.verworfenOff')"></span>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+
+                  <!-- Beat verschieben / Akt umbenennen / Strang ändern -->
+                  <template x-if="p.type === 'beat_move'">
+                    <div class="chat-vorschlag-diff">
+                      <div class="chat-vorschlag-title" x-text="p.labels?.beat"></div>
+                      <div class="plot-chat-proposal-meta">
+                        <span class="finding-original" x-text="plotProposalFrom(p)"></span>
+                        <span class="finding-korrektur" x-text="plotProposalWhere(p)"></span>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="p.type === 'act_update'">
+                    <div class="chat-vorschlag-diff">
+                      <span class="finding-original" x-text="p.before?.name"></span>
+                      <span class="finding-korrektur" x-text="p.name"></span>
+                    </div>
+                  </template>
+                  <template x-if="p.type === 'thread_update'">
+                    <div class="chat-vorschlag-diff">
+                      <div class="chat-vorschlag-title" x-text="p.labels?.thread"></div>
+                      <div class="plot-chat-proposal-row" x-show="p.fields?.name">
+                        <span class="plot-chat-proposal-field" x-text="$app.t('plot.chat.field.name')"></span>
+                        <span><span class="finding-original" x-text="p.before?.name"></span> <span class="finding-korrektur" x-text="p.fields?.name"></span></span>
+                      </div>
+                      <div class="plot-chat-proposal-row" x-show="p.labels?.figur">
+                        <span class="plot-chat-proposal-field" x-text="$app.t('plot.chat.field.mainFigure')"></span>
+                        <span><span class="finding-original" x-text="p.labels?.figur_before || '—'"></span> <span class="finding-korrektur" x-text="p.labels?.figur"></span></span>
+                      </div>
+                    </div>
+                  </template>
+
+                  <div x-show="p.begruendung" class="chat-vorschlag-begruendung" x-text="p.begruendung"></div>
+                  <div x-show="plotProposalStatus(msg, pi).state === 'open' && plotProposalStatus(msg, pi).blocked" class="plot-chat-proposal-note" x-text="plotProposalStatus(msg, pi).blocked ? $app.t(plotProposalStatus(msg, pi).blocked.key, plotProposalStatus(msg, pi).blocked.params || {}) : ''"></div>
+                  <div x-show="plotProposalStatus(msg, pi).state === 'open' && !plotProposalStatus(msg, pi).blocked && plotProposalStatus(msg, pi).stale" class="plot-chat-proposal-note" x-text="$app.t('plot.chat.stale')"></div>
+                  <div x-show="plotProposalStatus(msg, pi).removed" class="plot-chat-proposal-note" x-text="$app.t('plot.chat.removed')"></div>
+                  <div x-show="p._error" class="chat-vorschlag-error" x-text="p._error"></div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <div x-show="msg.role === 'assistant' && _chatTokenInfo(msg)" class="chat-token-info" :title="_chatTokenTitle(msg)" x-text="_chatTokenInfo(msg)"></div>
+          <!-- @include chat-feedback -->
+        </div>
+      </div>
+    </template>
+
+    <div x-show="isPlotChatSessionRunning(plotChatSessionId)" class="chat-skeleton-wrapper">
+      <div class="chat-skeleton"></div>
+    </div>
+  </div>
+
+  <div class="chat-input-row">
+    <textarea class="chat-input plot-chat-input" x-model="plotChatInput" rows="1"
+              :placeholder="$app.t('plot.chat.placeholder')" :aria-label="$app.t('plot.chat.placeholder')"
+              :disabled="plotChatLoading" data-spellcheck="spelling"
+              @keydown.enter="if(!$event.isComposing && $event.keyCode !== 229 && !$event.shiftKey && !$event.ctrlKey && !$event.metaKey) { $event.preventDefault(); sendPlotChatMessage(); }"></textarea>
+    <button type="button" class="chat-send-btn" @click="sendPlotChatMessage()" :disabled="plotChatLoading || !plotChatInput.trim()" :aria-label="$app.t('chat.send')">
+      <span x-show="plotChatLoading" class="spinner"></span>
+      <svg x-show="!plotChatLoading" class="icon" aria-hidden="true"><use href="/icons.svg#arrow-up"/></svg>
+    </button>
+  </div>
+  <div class="chat-input-hint" x-text="$app.t('plot.chat.hint')"></div>
+
+  <!-- Session-Historie -->
+  <div x-show="plotChatSessions.length > 0" class="card-history-section">
+    <div class="chat-history-title" x-text="$app.t('chat.history')"></div>
+    <template x-for="s in plotChatSessions" :key="s.id">
+      <div class="chat-session-item" :class="s.id === plotChatSessionId ? 'chat-session-item--active' : ''" @click="loadPlotChatSession(s.id)">
+        <div class="chat-session-preview" x-text="(s.title || s.preview || $app.t('plot.chat.untitled')).slice(0, 80)"></div>
+        <div class="chat-session-meta"><span x-show="isPlotChatSessionRunning(s.id)" class="spinner chat-session-running" role="status" :aria-label="$app.t('chat.sessionRunning')" :data-tip="$app.t('chat.sessionRunning')"></span><span x-text="$app.formatDate(s.last_message_at)"></span></div>
+        <button type="button" class="chat-session-delete btn-card-close" :disabled="isPlotChatSessionRunning(s.id)" @click.stop="deletePlotChatSession(s.id)" :data-tip="$app.t('common.delete')" :aria-label="$app.t('common.delete')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg></button>
+      </div>
+    </template>
+  </div>
+</div>

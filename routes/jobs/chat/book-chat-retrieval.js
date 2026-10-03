@@ -62,8 +62,10 @@ async function selectPassagesSemantic(bookId, query, budgetChars, signal) {
 // top_k = 0 schaltet den Erst-Kontext ab (dann verhält sich der Agent wie vorher).
 // Mehrere Chunks derselben Seite sind hier erlaubt — bei einer Faktenfrage stehen
 // Frage und Antwort oft in benachbarten Passagen einer Seite.
+// `userEmail`: Szenen/Figuren sind Analyse-Daten pro User, der Index hängt nur am Buch
+// — Treffer aus der Analyse eines Mitautors fallen weg (resolveEntityTitle-Scope).
 // Rückgabe: { hits, chars } oder null (kein Index / keine Treffer / abgeschaltet).
-async function preContextPassages(bookId, query, { signal } = {}) {
+async function preContextPassages(bookId, query, { signal, userEmail = null } = {}) {
   const topK = parseInt(appSettings.get('jobs.book_chat.pre_rag_top_k'), 10);
   const budget = parseInt(appSettings.get('jobs.book_chat.pre_rag_chars'), 10);
   if (!(topK > 0) || !(budget > 0)) return null;
@@ -75,7 +77,7 @@ async function preContextPassages(bookId, query, { signal } = {}) {
   let chars = 0;
   for (const h of raw) {
     if (chars >= budget) break;
-    const title = resolveEntityTitle(h.kind, h.entity_id);
+    const title = resolveEntityTitle(h.kind, h.entity_id, { userEmail });
     if (title == null) continue; // Entität gelöscht, Chunk noch im Index
     const text = String(h.text || '').slice(0, budget - chars);
     if (text.length < 50) continue;

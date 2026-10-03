@@ -114,12 +114,12 @@ test('PUT /admin/settings/:key mit __unchanged__-Sentinel (encrypted) → keine 
 });
 
 test('DELETE /admin/settings/:key → Default greift', async () => {
-  appSettings.set('cron.stale_days', 99, { updatedBy: 'test' });
-  const r = await _req('DELETE', '/admin/settings/cron.stale_days', {
+  appSettings.set('ai.claude.retry_max', 9, { updatedBy: 'test' });
+  const r = await _req('DELETE', '/admin/settings/ai.claude.retry_max', {
     user: 'alice@example.com', role: 'admin',
   });
   assert.equal(r.status, 200);
-  assert.equal(appSettings.get('cron.stale_days'), 7); // Default
+  assert.equal(appSettings.get('ai.claude.retry_max'), 3); // Default
 });
 
 test('PUT ohne value-Feld → 400', async () => {

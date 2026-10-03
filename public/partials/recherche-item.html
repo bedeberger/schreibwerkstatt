@@ -8,9 +8,13 @@
      Aktionsmenue und Verknuepfungs-/Tag-Block sind eigene Fragmente, weil der
      Detail-Dialog sie wortgleich mitbenutzt. -->
     <template x-for="item in items" :key="item.id">
-      <div class="research-item" :data-research-id="item.id" :class="{ 'research-item--pinned': item.pinned, 'research-item--archived': item.archived, 'research-item--open': detailItemId === item.id }">
+      <div class="research-item" :data-research-id="item.id" :class="{ 'research-item--pinned': item.pinned, 'research-item--archived': item.archived, 'research-item--open': detailItemId === item.id, 'research-item--selected': bulkMode && isBulkSelected(item) }">
         <div class="research-item-body research-item-body--clickable" @click="onItemBodyClick(item, $event)">
           <div class="research-item-head">
+            <!-- Mehrfachauswahl: Checkbox nur im Auswahl-Modus (bulk.js). -->
+            <input type="checkbox" class="research-item-select" x-show="bulkMode" x-cloak
+                   :checked="isBulkSelected(item)" @change="toggleBulkSelect(item)"
+                   :aria-label="$app.t('recherche.bulk.select', { title: item.title || kindLabel(item.kind) })">
             <span class="research-kind-badge palette-badge" :class="'research-kind-badge--' + item.kind" x-text="kindLabel(item.kind)"></span>
             <!-- Titel als Button: der tastaturerreichbare Weg in die Detailansicht
                  (der Klick auf die ganze Zeile ist nur Maus-Komfort). Ohne eigenen
@@ -22,7 +26,7 @@
                  Gesetzt wird er im Aktionsmenue (oder per Drag im Board). -->
             <span class="research-status-badge" :class="'research-status-badge--' + itemStatus(item)"
                   x-show="showStatusBadge(item)" x-cloak
-                  :data-tip="$app.t('recherche.status.label')" x-text="statusLabel(itemStatus(item))"></span>
+                  :data-tip="statusTip(item)" x-text="statusLabel(itemStatus(item))"></span>
             <div class="research-item-actions" x-data="{ menuCtx: 'list' }">
               <button type="button" class="icon-btn" @click="openDetail(item, { edit: true })" :disabled="busy" :data-tip="$app.t('recherche.edit')" :aria-label="$app.t('recherche.edit')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg></button>
               <!-- @include recherche-item-menu -->
@@ -57,6 +61,12 @@
           <!-- @include recherche-item-urls -->
 
           <div x-show="item.source" class="research-item-source" x-text="item.source"></div>
+
+          <!-- Recherche-Abgleich: Manuskript weicht vom Fundstueck ab. Details +
+               Sprung zur Stelle im Detail-Dialog (recherche-findings.html). -->
+          <button type="button" class="research-findings-chip" x-show="itemFindings(item).length" x-cloak
+                  @click="openDetail(item)"
+                  x-text="$app.t('recherche.crosscheck.chip', { n: itemFindings(item).length })"></button>
 
           <!-- @include recherche-item-relations -->
         </div>

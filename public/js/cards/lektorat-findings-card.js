@@ -6,10 +6,10 @@
 // lektoratState am Root, weil sie mit editor-edit (Filter nach Save), history
 // (History-Eintrag laden), chat-card (Chat-Proposals-Overlay) und page-view
 // (rendering) eng gekoppelt sind. Die Sub bündelt nur UI-Methoden
-// (`handleFindingPointer`, `_isHardFinding`) und das Partial-Scope für
+// (`handleFindingPointer`, `_findingKind`) und das Partial-Scope für
 // DOM-Isolation.
 
-import { isHardFinding } from '../book/page-view.js';
+import { findingKind, findingBadgeClass } from '../book/page-view.js';
 import { lektoratEvidenceMethods, lektoratEvidenceState } from '../editor/lektorat-evidence.js';
 
 // Split-Modus Media Query — dieselbe Schwelle wie page-view.js.
@@ -47,7 +47,8 @@ export function registerLektoratFindingsCard() {
       });
     },
 
-    _isHardFinding(typ) { return isHardFinding(typ); },
+    _findingKind(typ) { return findingKind(typ); },
+    _findingBadgeClass(typ) { return findingBadgeClass(typ); },
 
     ...lektoratEvidenceMethods,
 

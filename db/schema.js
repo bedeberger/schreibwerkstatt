@@ -134,12 +134,10 @@ module.exports = {
   getPageMotifs:            motifs.getPageMotifs,
   // pages
   reconcilePageIds:   pages.reconcilePageIds,
-  pruneStaleBookData: pages.pruneStaleBookData,
   // books
   upsertBook:         books.upsertBook,
   upsertBookByName:   books.upsertBookByName,
   getBookName:        books.getBookName,
-  pruneStaleByAge:    books.pruneStaleByAge,
   // token-usage
   getDailyTokenUsage:    tokenUsage.getDailyTokenUsage,
   getDailyTotalsByUser:  tokenUsage.getDailyTotalsByUser,

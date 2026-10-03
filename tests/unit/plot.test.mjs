@@ -587,7 +587,7 @@ test('plot DB: figurePlotUsage — direkt verlinkt + via Strang + via Quell-Figu
 test('plot prompts: Brainstorm nennt Ziel-Akt + listet Board + Werkstatt-Figuren + verlangt JSON', () => {
   const acts = [{ id: 1, name: 'Akt 1' }, { id: 2, name: 'Akt 2' }];
   const beats = [{ id: 9, act_id: 1, titel: 'Auftakt', status: 'geplant', chapter_name: null }];
-  const out = prompts.buildPlotBrainstormPrompt('Akt 2', acts, beats, 'Krimi',
+  const out = prompts.buildPlotBrainstormPrompt(2, acts, beats, 'Krimi',
     [{ name: 'Anna', typ: 'Prot' }], ['Kap 1'], [{ name: 'Mara', archetype: 'mentor' }]);
   assert.ok(out.includes('Akt 2'));
   assert.ok(out.includes('AKT (geteilt): Akt 1'));
@@ -599,7 +599,7 @@ test('plot prompts: Brainstorm nennt Ziel-Akt + listet Board + Werkstatt-Figuren
 });
 
 test('plot prompts: Brainstorm ohne Werkstatt-Figuren lässt den Block weg', () => {
-  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', [], []);
+  const out = prompts.buildPlotBrainstormPrompt(1, [{ id: 1, name: 'Akt 1' }], [], '', [], []);
   assert.ok(!out.includes('FIGUREN-WERKSTATT'));
 });
 
@@ -608,7 +608,7 @@ test('plot prompts: Werkstatt-Figur rendert Psychologie (Will/Braucht/Wunde/Lüg
     want: ['Macht'], need: ['Vertrauen'], wound: ['Verrat'], lie: ['Niemand bleibt'],
     bogen: ['hart', 'verletzlich'], konflikt: ['Pflicht vs. Liebe'],
   } }];
-  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', [], [], wf);
+  const out = prompts.buildPlotBrainstormPrompt(1, [{ id: 1, name: 'Akt 1' }], [], '', [], [], wf);
   assert.ok(out.includes('Will: Macht'));
   assert.ok(out.includes('Braucht: Vertrauen'));
   assert.ok(out.includes('Wunde: Verrat'));
@@ -623,7 +623,7 @@ test('plot prompts: Brainstorm rendert reichen Katalog-Figuren-Kontext (Kurzname
     geschlecht: 'weiblich', beschreibung: 'Zynische Ermittlerin mit Vergangenheit.',
     tags: ['traumatisiert', 'loyal'],
   }];
-  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', figuren);
+  const out = prompts.buildPlotBrainstormPrompt(1, [{ id: 1, name: 'Akt 1' }], [], '', figuren);
   assert.ok(out.includes('FIGUREN-ENSEMBLE'));
   assert.ok(out.includes('Anna Held'));
   assert.ok(out.includes('Anni'));
@@ -634,7 +634,7 @@ test('plot prompts: Brainstorm rendert reichen Katalog-Figuren-Kontext (Kurzname
 
 test('plot prompts: Brainstorm kürzt überlange Figuren-Beschreibung', () => {
   const lang = 'X'.repeat(400);
-  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '',
+  const out = prompts.buildPlotBrainstormPrompt(1, [{ id: 1, name: 'Akt 1' }], [], '',
     [{ name: 'Anna', beschreibung: lang }]);
   assert.ok(out.includes('…'));
   assert.ok(!out.includes('X'.repeat(300)));
@@ -662,7 +662,7 @@ test('plot prompts: Brainstorm mit Ziel-Strang nennt Strang + Hauptfigur + filte
     { id: 10, act_id: 1, thread_id: 8, titel: 'Lucas Plan', status: 'geplant', chapter_name: null },
   ];
   const threads = [{ id: 7, name: 'Mara', figur: 'Mara Stein' }, { id: 8, name: 'Luca', figur: null }];
-  const out = prompts.buildPlotBrainstormPrompt('Akt 1', acts, beats, '', [], [], [], threads, threads[0]);
+  const out = prompts.buildPlotBrainstormPrompt(1, acts, beats, '', [], [], [], threads, threads[0]);
   assert.ok(out.includes('HANDLUNGSSTRÄNGE'));
   assert.ok(out.includes('ZIEL-STRANG: "Mara"'));
   assert.ok(out.includes('Mara Stein'));            // gebundene Hauptfigur
@@ -688,7 +688,7 @@ test('plot prompts: Consistency mit Strängen listet Stränge + Strang-Prüfpunk
 test('plot prompts: ohne Stränge bleibt der Strang-Block weg (Abwärtskompat)', () => {
   const acts = [{ id: 1, name: 'Akt 1' }];
   const beats = [{ id: 9, act_id: 1, titel: 'Auftakt', status: 'geplant', chapter_name: null }];
-  const bs = prompts.buildPlotBrainstormPrompt('Akt 1', acts, beats, '', [], []);
+  const bs = prompts.buildPlotBrainstormPrompt(1, acts, beats, '', [], []);
   assert.ok(!bs.includes('HANDLUNGSSTRÄNGE'));
   assert.ok(!bs.includes('ZIEL-STRANG'));
   const cons = prompts.buildPlotConsistencyPrompt(acts, beats, [], [], [], '');
@@ -702,7 +702,7 @@ test('plot prompts: Brainstorm rendert Figuren-Beziehungen + Lebensereignisse', 
     beziehungen: [{ mit: 'Bert', typ: 'Schwester' }, { mit: 'Carl', typ: 'Rivalin' }],
     lebensereignisse: [{ datum: '1990', ereignis: 'Geburt', kapitel: 'Kap 1' }],
   }];
-  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '', figuren);
+  const out = prompts.buildPlotBrainstormPrompt(1, [{ id: 1, name: 'Akt 1' }], [], '', figuren);
   assert.ok(out.includes('Beziehungen: Bert (Schwester); Carl (Rivalin)'));
   assert.ok(out.includes('Ereignisse: 1990: Geburt [Kap 1]'));
 });
@@ -710,7 +710,7 @@ test('plot prompts: Brainstorm rendert Figuren-Beziehungen + Lebensereignisse', 
 test('plot prompts: Brainstorm rendert Schauplätze + Zeitstrahl-Blöcke', () => {
   const orte = [{ name: 'Burg', typ: 'Schauplatz', stimmung: 'düster', beschreibung: 'Alte Festung.' }];
   const zeitstrahl = [{ datum: '1991', ereignis: 'Brand', figur: 'Anna', kapitel: 'Kap 2' }];
-  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '',
+  const out = prompts.buildPlotBrainstormPrompt(1, [{ id: 1, name: 'Akt 1' }], [], '',
     [], [], [], [], null, orte, zeitstrahl);
   assert.ok(out.includes('SCHAUPLÄTZE'));
   assert.ok(out.includes('Burg'));
@@ -739,7 +739,7 @@ test('plot prompts: Consistency rendert Schauplätze + Zeitstrahl + Kontinuität
 test('plot prompts: neue Kontext-Blöcke entfallen ohne Daten (Abwärtskompat)', () => {
   const acts = [{ id: 1, name: 'Akt 1' }];
   const beats = [{ id: 9, act_id: 1, titel: 'Auftakt', status: 'geplant', chapter_name: null }];
-  const bs = prompts.buildPlotBrainstormPrompt('Akt 1', acts, beats, '', [], []);
+  const bs = prompts.buildPlotBrainstormPrompt(1, acts, beats, '', [], []);
   assert.ok(!bs.includes('SCHAUPLÄTZE'));
   assert.ok(!bs.includes('ZEITSTRAHL'));
   const cons = prompts.buildPlotConsistencyPrompt(acts, beats, [], [], [], '');
@@ -757,7 +757,7 @@ test('plot prompts: Brainstorm rendert verknüpfte Recherche (Titel/Inhalt/Quell
     title: 'Münzprägung 1640', body: 'Taler wurden mit Wasserkraft geprägt.',
     source: 'Stadtarchiv', beats: ['Der Raub'], threads: [],
   }];
-  const out = prompts.buildPlotBrainstormPrompt('Akt 1', [{ id: 1, name: 'Akt 1' }], [], '',
+  const out = prompts.buildPlotBrainstormPrompt(1, [{ id: 1, name: 'Akt 1' }], [], '',
     [], [], [], [], null, [], [], recherche);
   assert.ok(out.includes('VERKNÜPFTE RECHERCHE'));
   assert.ok(out.includes('Münzprägung 1640'));
@@ -780,7 +780,8 @@ test('plot prompts: Consistency rendert verknüpfte Recherche + Recherche-Abglei
 test('plot prompts: Schemas haben die erwartete Form', () => {
   assert.deepEqual(prompts.SCHEMA_PLOT_BRAINSTORM.properties.vorschlaege.items.required.sort(), ['begruendung', 'label']);
   const k = prompts.SCHEMA_PLOT_CONSISTENCY.properties.konflikte.items;
-  assert.deepEqual(k.required.sort(), ['beat', 'beat_id', 'problem', 'schwere', 'vorschlag']);
+  assert.deepEqual(k.required.sort(), ['aktion', 'beat', 'beat_id', 'problem', 'schwere', 'typ', 'vorschlag']);
+  assert.deepEqual(prompts.SCHEMA_PLOT_CONSISTENCY.required.sort(), ['erledigt', 'fazit', 'konflikte']);
   assert.deepEqual(prompts.PLOT_SEVERITY_ENUM, ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig']);
 });
 

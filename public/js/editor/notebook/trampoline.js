@@ -46,6 +46,10 @@ export const notebookTrampoline = {
   _onEditCopy(e) { card()?._onEditCopy(e); },
   _onEditCut(e) { card()?._onEditCut(e); },
   _markEditDirty() { card()?._markEditDirty(); },
+  // Seiten-Chat: Ersetzung im Live-Editor statt Server-Write (edit/input.js).
+  _applyTextReplacement(original, replacement) {
+    return card()?._applyTextReplacement(original, replacement) ?? { ok: false, reason: 'notEditing' };
+  },
   _flushDraftSaveNow() { card()?._flushDraftSaveNow(); },
   _stopAutosave() { card()?._stopAutosave(); },
   _uninstallOnlineRetry() { card()?._uninstallOnlineRetry(); },

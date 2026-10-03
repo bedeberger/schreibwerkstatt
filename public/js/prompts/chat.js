@@ -210,9 +210,9 @@ export function buildWeltfaktenBlock(welt, opts = {}) {
  * @param {Array}       figuren         Figuren-Array aus der DB (kann leer sein)
  * @param {Object}      review          Letzte Buchbewertung aus der DB (kann null sein)
  * @param {string|null} systemOverride  Optionaler System-Prompt-Override
- * @param {string|null} openingPageText Snapshot beim Chat-Öffnen; nur setzen wenn
- *                                      ungleich pageText (sonst null → keine
- *                                      redundante Section).
+ * @param {string|null} pageChangeNote  Änderungen seit Chat-Start als kompakter
+ *                                      Wort-Diff (prompts/page-chat.js#formatPageChange);
+ *                                      null = unverändert. Nie eine zweite Vollfassung.
  * @param {Array}       ideen           Offene Ideen des Autors für diese Seite +
  *                                      das umliegende Kapitel — Notizen zu möglichen
  *                                      Fortsetzungen, Szenen, Ankern. Jedes Item hat
@@ -234,7 +234,7 @@ export function buildWeltfaktenBlock(welt, opts = {}) {
 //   Block 2 (5min): seiten-spezifischer Anteil (Seitenname/-inhalt + Ideen +
 //     Lektorat + JSON-Format-Trailer) — stabil über die Turns einer Seiten-Session,
 //     invalidiert beim Seitenwechsel oder wenn der Autor die Seite editiert.
-export function buildChatSystemPrompt(pageName, pageText, figuren, review, systemOverride = null, openingPageText = null, ideen = null, lektorat = null, opts = {}) {
+export function buildChatSystemPrompt(pageName, pageText, figuren, review, systemOverride = null, pageChangeNote = null, ideen = null, lektorat = null, opts = {}) {
   const stable = [systemOverride ?? SYSTEM_CHAT];
 
   // Figuren des KAPITELS (der Aufrufer filtert), trotzdem gebudgetet: auch ein
@@ -257,21 +257,13 @@ export function buildChatSystemPrompt(pageName, pageText, figuren, review, syste
     '',
   ];
 
-  if (openingPageText) {
+  page.push('=== SEITENINHALT ===', pageText, '');
+  if (pageChangeNote) {
     page.push(
-      '=== SEITENINHALT BEIM CHAT-START ===',
-      openingPageText,
+      '=== ÄNDERUNGEN DES AUTORS SEIT CHAT-START ([-entfernt-] {+eingefügt+}) ===',
+      pageChangeNote,
       '',
-      '=== SEITENINHALT JETZT (nach Änderungen des Autors) ===',
-      pageText,
-      '',
-      'Hinweis: Der Autor hat die Seite seit Chat-Start verändert. Beziehe dich beim Antworten auf den aktuellen Stand; verweise nur auf den Chat-Start-Stand, wenn die Änderung selbst Thema ist.',
-      '',
-    );
-  } else {
-    page.push(
-      '=== SEITENINHALT ===',
-      pageText,
+      'Hinweis: Frühere Antworten und Vorschläge dieses Gesprächs beziehen sich teils auf den alten Stand. Beziehe dich auf den aktuellen Seiteninhalt oben; erwähne die Änderungen nur, wenn sie selbst Thema sind.',
       '',
     );
   }
@@ -311,14 +303,16 @@ export function buildChatSystemPrompt(pageName, pageText, figuren, review, syste
     '      "ersatz": "Ersatztext",',
     '      "begruendung": "kurze Begründung"',
     '    }',
-    '  ]',
+    '  ],',
+    '  "titel_varianten": ["Titelvariante"]',
     '}',
     '',
     'VORSCHLÄGE-REGELN:',
     '- Wenn du stilistische, inhaltliche oder sprachliche Schwächen erkennst oder der Autor nach Verbesserungen fragt: liefere mindestens einen konkreten Vorschlag mit original und ersatz.',
-    '- original muss zeichengenau mit dem Seitentext übereinstimmen.',
+    '- original muss zeichengenau mit dem Seitentext übereinstimmen und darin genau einmal vorkommen (sonst etwas mehr Kontext mitnehmen).',
     '- ersatz muss den Stil des Autors beibehalten.',
     '- vorschlaege ist nur dann ein leeres Array, wenn die Frage rein inhaltlich/konzeptionell ist und keine Textstelle betrifft (z.B. Plotfragen, Figurenmotivation).',
+    '- titel_varianten nur, wenn der Autor nach einem Titel, einer Überschrift oder Headline fragt: dann 3 bis 5 kurze, unterschiedliche Varianten (nur der Titel, ohne Anführungszeichen oder Nummerierung). Sonst ein leeres Array.',
     ...(_isLocal ? [] : ['', JSON_ONLY]),
   );
 
@@ -382,6 +376,7 @@ export function buildBookChatAgentSystemPrompt(bookName, figuren, review, system
     ...ifAny(['get_reviews'], '- Kapitel-Qualität, Stärken/Schwächen → get_reviews'),
     ...ifAny(['get_plot_board'], '- Geplante Handlung / Beat-Board / was noch nicht geschrieben ist → get_plot_board'),
     ...ifAny(['get_motifs', 'get_motif_occurrences'], '- Geplante Themen & Motive, Soll/Ist-Abgleich (welche Motive fehlen im Text) → get_motifs, get_motif_occurrences'),
+    ...ifAny(['list_research_items', 'read_research_item'], '- Recherche-Material des Autors (gesammelte Fakten, Zitate, Quellen; was zu einem Kapitel gehört, was noch nicht eingearbeitet ist; stimmt der Text mit dem Gesammelten überein?) → list_research_items, read_research_item'),
     '',
     'Rufe Werkzeuge an, bevor du vermutest.',
     'KOSTEN-LEITER — nimm die billigste Quelle, die die Frage beantwortet, und HÖRE DANN AUF:',
@@ -573,6 +568,7 @@ export const SCHEMA_CHAT = _obj({
     type: 'array',
     items: _obj({ original: _str, ersatz: _str, begruendung: _str }),
   },
+  titel_varianten: { type: 'array', items: _str },
 });
 
 export const SCHEMA_BOOK_CHAT = _obj({ antwort: _str });

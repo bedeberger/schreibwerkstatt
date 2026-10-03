@@ -6,7 +6,7 @@
 const { getBookSettings, getBookName, worldFactsScanState } = require('../../../db/schema');
 const { narrativeLabels } = require('../narrative-labels');
 const pageRevisions = require('../../../db/page-revisions');
-const { _truncateResult, _findFigure } = require('./shared');
+const { _truncateResult, _findFigure, resultCapFor } = require('./shared');
 const { isIdeeStatus, isOpenIdeeStatus, normalizeIdeeStatus } = require('../../../lib/ideen-status');
 const { listLocationChaptersWithNames } = require('../../../db/book-chat/text');
 const {
@@ -21,8 +21,16 @@ const {
 } = require('../../../db/book-chat/catalog');
 
 // ── list_chapters ────────────────────────────────────────────────────────────
+// Kompakt + paginiert: die Zusammenfassung (Summen, hint, Seitenformat) steht VOR
+// der Kapitelliste — wird gekürzt, verliert das Modell die hintersten Kapitel, nie
+// die Summen. Seiten als Tupel `[page_id, page_name, words]` statt Objekten (spart
+// die Schlüssel pro Seite, bei Büchern mit hunderten Seiten der Hauptteil). Passt
+// die Liste nicht in den Ergebnis-Deckel, wird sie kapitelweise abgeschnitten und
+// `next_offset` genannt — kein String-Schnitt mitten in einer Seite.
 
-function tool_list_chapters(_input, ctx) {
+const LIST_CHAPTERS_PAGE_FORMAT = '[page_id, page_name, words]';
+
+function tool_list_chapters(input, ctx) {
   const chapterRows = listChaptersWithStats(ctx.bookId);
 
   // Seiten mit ihren Kapitelzuordnungen laden – inkl. Seiten ohne Kapitel (chapter_id IS NULL)
@@ -35,7 +43,7 @@ function tool_list_chapters(_input, ctx) {
     totalPages++;
     totalWords += p.words;
     totalChars += p.chars;
-    const entry = { page_id: p.page_id, page_name: p.page_name, words: p.words };
+    const entry = [p.page_id, p.page_name, p.words];
     if (p.chapter_id == null) orphanPages.push(entry);
     else {
       if (!pagesByChapter.has(p.chapter_id)) pagesByChapter.set(p.chapter_id, []);
@@ -43,21 +51,43 @@ function tool_list_chapters(_input, ctx) {
     }
   }
 
-  const chapters = chapterRows.map(r => ({
+  const allChapters = chapterRows.map(r => ({
     chapter_id:   r.chapter_id,
     chapter_name: r.chapter_name,
-    page_count:   r.page_count,
     words:        r.words,
     pages:        pagesByChapter.get(r.chapter_id) || [],
   }));
 
-  return _truncateResult({
-    chapters,
-    ...(orphanPages.length ? { pages_without_chapter: orphanPages } : {}),
-    total_pages: totalPages,
-    total_words: totalWords,
-    hint: _listChaptersHint(totalChars, ctx.inputBudgetChars),
+  const offset = Math.max(0, Number.isInteger(input?.offset) ? input.offset : 0);
+  const limit  = Number.isInteger(input?.limit) && input.limit > 0 ? input.limit : allChapters.length;
+  const head = {
+    total_chapters: allChapters.length,
+    total_pages:    totalPages,
+    total_words:    totalWords,
+    hint:           _listChaptersHint(totalChars, ctx.inputBudgetChars),
+    page_format:    LIST_CHAPTERS_PAGE_FORMAT,
+  };
+  if (!head.hint) delete head.hint;
+
+  const cap = resultCapFor(ctx);
+  let shown = allChapters.slice(offset, offset + limit);
+  const build = (list) => ({
+    ...head,
+    offset,
+    chapters: list,
+    ...(offset === 0 && orphanPages.length ? { pages_without_chapter: orphanPages } : {}),
+    ...(offset + list.length < allChapters.length ? { next_offset: offset + list.length } : {}),
   });
+  let out = build(shown);
+  // Kapitelweise kürzen, bis es passt (mindestens ein Kapitel bleibt).
+  while (shown.length > 1 && JSON.stringify(out).length > cap) {
+    shown = shown.slice(0, Math.max(1, Math.floor(shown.length * 0.75)));
+    out = build(shown);
+  }
+  if (out.next_offset != null) {
+    out.paging_hint = `Weitere Kapitel: list_chapters mit offset=${out.next_offset} aufrufen.`;
+  }
+  return _truncateResult(out, cap);
 }
 
 // Lade-Hinweis abhängig davon, ob das ganze Buch in das Input-Budget passt.

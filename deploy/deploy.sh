@@ -83,10 +83,15 @@ fi
 # --chown: setzt die Ziel-Ownership direkt beim Transfer. Ohne das uebernimmt
 # rsync (als root) den Owner aus dem Runner-Workspace und der chown-Pass unten
 # muesste jede synchronisierte Datei nochmal anfassen.
+#
+# Logs: Winston rotiert nach schreibwerkstatt1.log … schreibwerkstatt5.log (Ziffer
+# VOR der Endung, logger.js tailable). Darum `schreibwerkstatt*.log*` und nicht
+# `schreibwerkstatt.log*` — sonst raeumt --delete bei jedem Deploy alle
+# Rotationen weg und die Log-Historie reicht nur bis zur letzten Rotation.
 RSYNC_EXCLUDES=(
   --exclude='.env' --exclude='node_modules' --exclude='.git'
   --exclude='schreibwerkstatt.db' --exclude='schreibwerkstatt.db-wal' --exclude='schreibwerkstatt.db-shm'
-  --exclude='schreibwerkstatt.log*' --exclude='backup' --exclude='backups' --exclude='ai_parse_fails'
+  --exclude='schreibwerkstatt*.log*' --exclude='backup' --exclude='backups' --exclude='ai_parse_fails'
   # Marker von deploy/apply-migrations.sh (liegt in $INSTALL_DIR, nicht im Repo).
   # Ohne Exclude loescht --delete ihn bei jedem Deploy, und jede Einmal-Migration
   # (veraPDF, Ghostscript, EPUBCheck …) liefe beim naechsten Deploy erneut.

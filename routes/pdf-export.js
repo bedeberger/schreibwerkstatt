@@ -14,8 +14,8 @@ const {
   setPdfExportProfileDefault,
 } = require('../db/schema');
 const { defaultConfig, validateConfig } = require('../lib/pdf-export-defaults');
-const { prepareCover, MAX_INPUT_BYTES } = require('../lib/cover-prepare');
-const { listFonts, isAllowed: isFontAllowed, fetchFont } = require('../lib/font-fetch');
+const { prepareCover, MAX_INPUT_BYTES, MAX_INPUT_PIXELS } = require('../lib/cover-prepare');
+const { listFonts, isAllowed: isFontAllowed, fetchFont, findDisallowedFont } = require('../lib/font-fetch');
 const { toIntId } = require('../lib/validate');
 const logger = require('../logger');
 const { sessionEmail } = require('../lib/acl');
@@ -27,6 +27,36 @@ const rawCoverBody = express.raw({ type: ['image/*', 'application/octet-stream']
 const NAME_MAX = 80;
 const PROFILE_MAX_PER_SCOPE = 20;
 
+
+// Font-Auswahl gegen die Whitelist (lib/font-fetch.js#FONT_LIST) pruefen —
+// auf JEDEM Weg, der eine Konfiguration persistiert (Anlegen, Klonen,
+// Vorlage, Import, Speichern), damit ein Profil nicht erst beim Render oder
+// beim naechsten PUT scheitert. Antwortet selbst; true = Antwort ist raus.
+function _rejectDisallowedFont(res, cfg) {
+  const bad = findDisallowedFont(cfg.font);
+  if (!bad) return false;
+  res.status(400).json({ error_code: 'FONT_NOT_ALLOWED', params: bad });
+  return true;
+}
+
+// Bild-Fehler aus lib/cover-prepare.js → i18n-Key fuer den User. Der rohe
+// Fehlertext (libvips-Meldung) geht nur ins Log.
+const _IMAGE_ERROR_KEYS = {
+  'cover-too-large':          'pdfExport.imageError.tooLarge',
+  'cover-too-many-pixels':    'pdfExport.imageError.tooManyPixels',
+  'cover-unsupported-format': 'pdfExport.imageError.unsupportedFormat',
+};
+function _imageErrorResponse(res, errorCode, e) {
+  const reasonKey = _IMAGE_ERROR_KEYS[e?.message] || 'pdfExport.imageError.invalid';
+  if (!_IMAGE_ERROR_KEYS[e?.message]) logger.warn(`pdf-export Bild-Upload abgelehnt: ${e?.message}`);
+  return res.status(400).json({
+    error_code: errorCode,
+    message_key: reasonKey,
+    params: { maxMb: Math.round(MAX_INPUT_BYTES / (1024 * 1024)), maxMp: Math.round(MAX_INPUT_PIXELS / 1e6) },
+  });
+}
+
+const _isUniqueViolation = (e) => e?.code === 'SQLITE_CONSTRAINT_UNIQUE';
 
 function _ownedOr404(profile, userEmail) {
   if (!profile) return { error_code: 'PROFILE_NOT_FOUND', status: 404 };
@@ -76,6 +106,7 @@ router.post('/profiles', jsonBody, (req, res) => {
   } else {
     cfg = validateConfig(config || defaultConfig());
   }
+  if (_rejectDisallowedFont(res, cfg)) return;
 
   try {
     // bookId=0 → _scope() wandelt in user_default-Scope.
@@ -83,6 +114,8 @@ router.post('/profiles', jsonBody, (req, res) => {
     logger.info(`PDF-Export-Profil erstellt: «${safeName}» (id=${profile.id})`);
     res.status(201).json(profile);
   } catch (e) {
+    // Name-Race zwischen Dup-Check oben und INSERT (zwei Tabs, Doppelklick).
+    if (_isUniqueViolation(e)) return res.status(409).json({ error_code: 'PROFILE_NAME_TAKEN' });
     logger.error(`pdf-export profile create: ${e.message}`);
     res.status(500).json({ error_code: 'PROFILE_CREATE_FAILED' });
   }
@@ -109,17 +142,15 @@ router.put('/profiles/:id', jsonBody, (req, res) => {
   }
 
   const cfg = validateConfig(config || profile.config);
-  // Font-Auswahl gegen Whitelist prüfen, damit das Profil nicht später beim
-  // Render scheitert.
-  const roles = ['body', 'heading', 'title', 'subtitle', 'byline'];
-  for (const r of roles) {
-    const f = cfg.font[r];
-    if (!isFontAllowed(f.family, f.weight || 400, 'normal')) {
-      return res.status(400).json({ error_code: 'FONT_NOT_ALLOWED', params: { role: r, family: f.family, weight: f.weight } });
-    }
-  }
+  if (_rejectDisallowedFont(res, cfg)) return;
 
-  const updated = updatePdfExportProfile(id, safeName, cfg);
+  let updated;
+  try {
+    updated = updatePdfExportProfile(id, safeName, cfg);
+  } catch (e) {
+    if (_isUniqueViolation(e)) return res.status(409).json({ error_code: 'PROFILE_NAME_TAKEN' });
+    throw e;
+  }
   res.json(updated);
 });
 
@@ -168,7 +199,7 @@ router.post('/profiles/:id/back-cover', rawCoverBody, async (req, res) => {
   try {
     prepared = await prepareCover(req.body);
   } catch (e) {
-    return res.status(400).json({ error_code: 'BACK_COVER_INVALID', params: { reason: e.message } });
+    return _imageErrorResponse(res, 'BACK_COVER_INVALID', e);
   }
   setPdfExportProfileBackCover(id, prepared.buffer, prepared.mime);
   res.json({ ok: true, mime: prepared.mime, width: prepared.width, height: prepared.height, bytes: prepared.buffer.length });
@@ -218,7 +249,7 @@ router.post('/profiles/:id/spine-image', rawCoverBody, async (req, res) => {
   try {
     prepared = await prepareCover(req.body);
   } catch (e) {
-    return res.status(400).json({ error_code: 'SPINE_IMAGE_INVALID', params: { reason: e.message } });
+    return _imageErrorResponse(res, 'SPINE_IMAGE_INVALID', e);
   }
   setPdfExportProfileSpineImage(id, prepared.buffer, prepared.mime);
   res.json({ ok: true, mime: prepared.mime, width: prepared.width, height: prepared.height, bytes: prepared.buffer.length });

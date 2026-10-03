@@ -5,6 +5,7 @@
 import { figurWerkstattMethods } from '../figur-werkstatt.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
+import { befundSeverityMethods } from '../utils/befund-severity.js';
 
 export function registerFigurWerkstattCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -206,5 +207,7 @@ export function registerFigurWerkstattCard() {
     },
 
     ...figurWerkstattMethods,
+    // Schwere-Plakette der Konflikte + Bogen-Befunde (Befund-Skala, nicht Szenen-Stärke).
+    ...befundSeverityMethods,
   }));
 }

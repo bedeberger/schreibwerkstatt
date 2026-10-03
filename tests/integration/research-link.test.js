@@ -211,3 +211,61 @@ test('unbekanntes Item → failJob (researchItemMissing), kein KI-Call', async (
   assert.equal(job.error, 'job.error.researchItemMissing');
   assert.equal(ctx.mockAi.log.length, 0);
 });
+
+test('Seiten-Vorschläge aus den Embeddings: eigene Seiten mit Auszug, fremde und schon verknüpfte fallen weg', async () => {
+  const BOOK_ID = 7210;
+  const ids = seedWorld(BOOK_ID);
+  db.prepare("INSERT INTO books (book_id, name, created_at, updated_at) VALUES (7211, 'Fremd', ?, ?)").run(NOW, NOW);
+  db.prepare("INSERT INTO pages (page_id, book_id, page_name, position, priority, updated_at) VALUES (721001, ?, 'Grabung', 1, 1, ?)").run(BOOK_ID, NOW);
+  db.prepare("INSERT INTO pages (page_id, book_id, page_name, position, priority, updated_at) VALUES (721002, ?, 'Schon da', 2, 2, ?)").run(BOOK_ID, NOW);
+  db.prepare("INSERT INTO pages (page_id, book_id, page_name, position, priority, updated_at) VALUES (721101, 7211, 'Fremdseite', 1, 1, ?)").run(NOW);
+  db.prepare("INSERT INTO research_item_links (item_id, target_kind, page_id) VALUES (?, 'page', 721002)").run(ids.itemId);
+  aiReturnsLinks([]);
+
+  const embed = require('../../lib/embed');
+  const sr = require('../../lib/semantic-retrieval');
+  const orig = { isEnabled: embed.isEnabled, similarToEntity: sr.similarToEntity };
+  embed.isEnabled = () => true;
+  sr.similarToEntity = async (bookId, kind, id) => {
+    assert.equal(kind, 'research');
+    assert.equal(id, ids.itemId);
+    return { notIndexed: false, hits: [
+      { kind: 'page', entity_id: 721101, text: 'fremd', score: 0.9 },
+      { kind: 'page', entity_id: 721001, text: 'Sie gruben   in Olten.', score: 0.8 },
+      { kind: 'page', entity_id: 721002, text: 'schon verknüpft', score: 0.7 },
+    ] };
+  };
+  try {
+    const job = await runJob(BOOK_ID, ids.itemId);
+    assert.equal(job.status, 'done', job.error || '');
+    assert.deepEqual(job.result.suggestions, [
+      { target_kind: 'page', target_id: 721001, label: 'Grabung', grund: '„Sie gruben in Olten."', source: 'semantic' },
+    ]);
+  } finally {
+    embed.isEnabled = orig.isEnabled;
+    sr.similarToEntity = orig.similarToEntity;
+  }
+});
+
+test('Seiten-Vorschläge: nicht indexiertes Fundstück → Freitext-Anfrage (Array-Rückgabe)', async () => {
+  const BOOK_ID = 7212;
+  const ids = seedWorld(BOOK_ID);
+  db.prepare("INSERT INTO pages (page_id, book_id, page_name, position, priority, updated_at) VALUES (721201, ?, 'Grabung', 1, 1, ?)").run(BOOK_ID, NOW);
+  aiReturnsLinks([]);
+  const embed = require('../../lib/embed');
+  const sr = require('../../lib/semantic-retrieval');
+  const orig = { isEnabled: embed.isEnabled, similarToEntity: sr.similarToEntity, semanticQuery: sr.semanticQuery };
+  embed.isEnabled = () => true;
+  sr.similarToEntity = async () => ({ notIndexed: true, hits: [] });
+  let q = null;
+  sr.semanticQuery = async (bookId, query) => { q = query; return [{ kind: 'page', entity_id: 721201, text: 'Grabung', score: 0.5 }]; };
+  try {
+    const job = await runJob(BOOK_ID, ids.itemId);
+    assert.equal(job.status, 'done', job.error || '');
+    assert.match(q, /Bronzezeit/);
+    assert.deepEqual(job.result.suggestions.map(s => s.target_id), [721201]);
+  } finally {
+    Object.assign(embed, { isEnabled: orig.isEnabled });
+    Object.assign(sr, { similarToEntity: orig.similarToEntity, semanticQuery: orig.semanticQuery });
+  }
+});

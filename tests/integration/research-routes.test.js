@@ -73,7 +73,7 @@ test.after(() => {
 test.beforeEach(() => {
   sessionUser = 'autor@test.dev';
   sessionExtra = null;
-  for (const t of ['research_item_links', 'research_item_urls', 'research_items',
+  for (const t of ['chat_messages', 'chat_sessions', 'research_item_links', 'research_item_urls', 'research_items',
     'figure_scenes', 'locations', 'figures', 'pages', 'chapters', 'book_access', 'books']) {
     db.prepare(`DELETE FROM ${t}`).run();
   }
@@ -571,9 +571,178 @@ test('POST /:id/scrape: fremdes Buch → ACL greift vor dem Request', async () =
   const restore = installScrapeStub();
   try {
     const item = await createItem(BOOK, { kind: 'link', title: '', urls: [{ url: `${SCRAPE_HOST}/a` }] });
-    sessionUser = 'fremd@test.dev';
+    sessionUser = 'owner@test.dev';
     const { status } = await api('POST', `/research/${item.id}/scrape`, {});
     assert.equal(status, 403);
     assert.deepEqual(scrapeCalls, [], 'ohne Recht geht kein Request raus');
   } finally { restore(); }
+});
+
+// ── Dubletten: POST / mit schon erfasster URL ───────────────────────────────
+
+test('POST /: gleiche URL im selben Buch → 409 DUPLICATE_URL mit existing_id', async () => {
+  const BOOK = 8330;
+  seedBook(BOOK);
+  const first = await createItem(BOOK, { kind: 'link', urls: ['https://www.example.org/artikel/?utm_source=x'] });
+  // Normalisiert gleich (www., Trailing-Slash, Tracking-Parameter, http/https).
+  const { status, json } = await api('POST', '/research', {
+    book_id: BOOK, kind: 'link', title: 'Nochmal', urls: ['http://example.org/artikel'],
+  });
+  assert.equal(status, 409);
+  assert.equal(json.error_code, 'DUPLICATE_URL');
+  assert.equal(json.existing_id, first.id);
+  assert.equal(json.params.existing_id, first.id);
+  const n = db.prepare('SELECT COUNT(*) AS n FROM research_items WHERE book_id = ?').get(BOOK).n;
+  assert.equal(n, 1, 'kein zweites Fundstück angelegt');
+});
+
+test('POST /: allow_duplicate übersteuert den 409 (zwei Zitate derselben Seite)', async () => {
+  const BOOK = 8331;
+  seedBook(BOOK);
+  await createItem(BOOK, { kind: 'quote', body: 'Zitat A', urls: ['https://example.org/a'] });
+  const { status, json } = await api('POST', '/research', {
+    book_id: BOOK, kind: 'quote', body: 'Zitat B', urls: ['https://example.org/a'], allow_duplicate: true,
+  });
+  assert.equal(status, 200, JSON.stringify(json));
+  assert.equal(json.urls[0].url, 'https://example.org/a');
+});
+
+test('POST /: gleiche URL in anderem Buch oder an archiviertem Fundstück → kein 409', async () => {
+  const A = 8332; const B = 8333;
+  seedBook(A); seedBook(B);
+  const a = await createItem(A, { kind: 'link', urls: ['https://example.org/x'] });
+  await createItem(B, { kind: 'link', urls: ['https://example.org/x'] });
+  db.prepare('UPDATE research_items SET archived = 1 WHERE id = ?').run(a.id);
+  await createItem(A, { kind: 'link', urls: ['https://example.org/x'] });
+});
+
+// ── Chat-Vorschlag speichern (POST /chat-proposal) ──────────────────────────
+
+function seedResearchMessage(bookId, proposals, user = 'autor@test.dev') {
+  const sid = db.prepare(
+    "INSERT INTO chat_sessions (book_id, kind, user_email, created_at, last_message_at) VALUES (?, 'research', ?, ?, ?)"
+  ).run(bookId, user, NOW, NOW).lastInsertRowid;
+  const mid = db.prepare(
+    "INSERT INTO chat_messages (session_id, role, content, context_info, created_at) VALUES (?, 'assistant', 'Antwort', ?, ?)"
+  ).run(sid, JSON.stringify({ mode: 'research', proposals }), NOW).lastInsertRowid;
+  return mid;
+}
+
+test('POST /chat-proposal: speichert mit Bearbeitung + Kontext-Link und persistiert saved_item_id', async () => {
+  const BOOK = 8340;
+  const { pageId } = seedBook(BOOK);
+  const mid = seedResearchMessage(BOOK, [
+    { kind: 'fact', title: 'Roh', body: 'Inhalt', urls: [{ url: 'https://example.org/f', label: 'F' }], tags: ['alt'] },
+  ]);
+  const { status, json } = await api('POST', '/research/chat-proposal', {
+    message_id: mid, index: 0,
+    edits: { title: 'Bearbeitet', kind: 'note', tags: ['neu'] },
+    link: { target_kind: 'page', target_id: pageId },
+  });
+  assert.equal(status, 200, JSON.stringify(json));
+  assert.equal(json.item.title, 'Bearbeitet');
+  assert.equal(json.item.kind, 'note');
+  assert.deepEqual(json.item.tags, ['neu']);
+  assert.equal(json.item.links.length, 1);
+  assert.equal(json.item.links[0].target_kind, 'page');
+  const ci = JSON.parse(db.prepare('SELECT context_info FROM chat_messages WHERE id = ?').get(mid).context_info);
+  assert.equal(ci.proposals[0].saved_item_id, json.item.id);
+
+  // Zweiter Klick: kein zweites Fundstück.
+  const again = await api('POST', '/research/chat-proposal', { message_id: mid, index: 0 });
+  assert.equal(again.status, 409);
+  assert.equal(again.json.error_code, 'ALREADY_SAVED');
+  assert.equal(again.json.item_id, json.item.id);
+});
+
+test('POST /chat-proposal: URL schon im Board → 409 DUPLICATE_URL, allow_duplicate speichert', async () => {
+  const BOOK = 8341;
+  seedBook(BOOK);
+  const existing = await createItem(BOOK, { kind: 'link', urls: ['https://example.org/d'] });
+  const mid = seedResearchMessage(BOOK, [{ kind: 'link', title: 'D', urls: [{ url: 'https://example.org/d' }] }]);
+  const r1 = await api('POST', '/research/chat-proposal', { message_id: mid, index: 0 });
+  assert.equal(r1.status, 409);
+  assert.equal(r1.json.existing_id, existing.id);
+  const r2 = await api('POST', '/research/chat-proposal', { message_id: mid, index: 0, allow_duplicate: true });
+  assert.equal(r2.status, 200);
+  assert.notEqual(r2.json.item.id, existing.id);
+});
+
+test('POST /chat-proposal: fremde Session → 404, ungültiger Index → 404', async () => {
+  const BOOK = 8342;
+  seedBook(BOOK);
+  grantAccessFor(BOOK, 'owner@test.dev');
+  const mid = seedResearchMessage(BOOK, [{ kind: 'note', title: 'X', body: 'y' }], 'owner@test.dev');
+  const r1 = await api('POST', '/research/chat-proposal', { message_id: mid, index: 0 });
+  assert.equal(r1.status, 404);
+  assert.equal(r1.json.error_code, 'PROPOSAL_NOT_FOUND');
+  const own = seedResearchMessage(BOOK, [{ kind: 'note', title: 'X', body: 'y' }]);
+  const r2 = await api('POST', '/research/chat-proposal', { message_id: own, index: 3 });
+  assert.equal(r2.status, 404);
+});
+
+function grantAccessFor(bookId, user) {
+  require('../../db/book-access').grantAccess(bookId, user, 'editor', user);
+}
+
+// ── Mehrfachauswahl + Status-Zuschreibung ───────────────────────────────────
+
+test('PATCH status: hält fest, wer und wann (status_by nur für existierende Konten)', async () => {
+  seedBook(4401);
+  db.prepare("INSERT OR IGNORE INTO app_users (email) VALUES ('autor@test.dev')").run();
+  db.prepare("UPDATE app_users SET display_name = 'Autorin' WHERE email = 'autor@test.dev'").run();
+  const it = await createItem(4401);
+  const { status, json } = await api('PATCH', `/research/${it.id}`, { status: 'eingearbeitet' });
+  assert.equal(status, 200);
+  assert.equal(json.status, 'eingearbeitet');
+  assert.equal(json.status_by, 'autor@test.dev');
+  assert.equal(json.status_by_name, 'Autorin');
+  assert.match(json.status_at, /Z$/);
+  assert.equal((await api('PATCH', `/research/${it.id}`, { status: 'quatsch' })).status, 400);
+});
+
+test('POST /bulk: Status, Tag, Archiv, Verknüpfung, Löschen — nur Fundstücke des Buchs', async () => {
+  const ids = seedBook(4402);
+  seedBook(4403);
+  const a = await createItem(4402, { title: 'A' });
+  const b = await createItem(4402, { title: 'B' });
+  const foreign = await createItem(4403, { title: 'Fremd' });
+  const all = [a.id, b.id, foreign.id];
+
+  let r = await api('POST', '/research/bulk', { book_id: 4402, ids: all, action: 'status', status: 'in_arbeit' });
+  assert.deepEqual(r.json, { ok: true, count: 2 });
+  assert.equal(db.prepare('SELECT status FROM research_items WHERE id = ?').get(foreign.id).status, 'offen', 'fremdes Buch unberührt');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM research_items WHERE book_id = 4402 AND status = ?').get('in_arbeit').n, 2);
+
+  r = await api('POST', '/research/bulk', { book_id: 4402, ids: all, action: 'add_tag', tag: 'Rom' });
+  assert.equal(r.json.count, 2);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM research_item_tags WHERE tag = 'rom' OR tag = 'Rom'").get().n, 2);
+
+  r = await api('POST', '/research/bulk', { book_id: 4402, ids: [a.id, b.id], action: 'link', target_kind: 'page', target_id: ids.pageId });
+  assert.equal(r.json.count, 2);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM research_item_links WHERE target_kind = 'page' AND page_id = ?").get(ids.pageId).n, 2);
+
+  // Ziel aus fremdem Buch → ganze Aktion zurück, nichts verknüpft.
+  const other = db.prepare('SELECT page_id FROM pages WHERE book_id = 4403').get().page_id;
+  r = await api('POST', '/research/bulk', { book_id: 4402, ids: [a.id, b.id], action: 'link', target_kind: 'page', target_id: other });
+  assert.equal(r.status, 400);
+  assert.equal(r.json.error_code, 'BOOK_MISMATCH');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM research_item_links WHERE page_id = ?').get(other).n, 0);
+
+  r = await api('POST', '/research/bulk', { book_id: 4402, ids: [a.id], action: 'archive' });
+  assert.equal(db.prepare('SELECT archived FROM research_items WHERE id = ?').get(a.id).archived, 1);
+
+  r = await api('POST', '/research/bulk', { book_id: 4402, ids: all, action: 'delete' });
+  assert.equal(r.json.count, 2);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM research_items').get().n, 1, 'nur das fremde bleibt');
+
+  assert.equal((await api('POST', '/research/bulk', { book_id: 4402, ids: [1], action: 'nope' })).status, 400);
+  assert.equal((await api('POST', '/research/bulk', { book_id: 4402, ids: [1], action: 'status', status: 'x' })).status, 400);
+});
+
+test('POST /bulk: ohne Buchzugriff → 403', async () => {
+  seedBook(4404);
+  sessionUser = 'eindringling@test.dev';
+  const r = await api('POST', '/research/bulk', { book_id: 4404, ids: [1], action: 'archive' });
+  assert.equal(r.status, 403);
 });

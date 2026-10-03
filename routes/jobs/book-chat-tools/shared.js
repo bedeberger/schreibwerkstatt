@@ -4,14 +4,18 @@
 
 const { INPUT_BUDGET_CHARS } = require('../../../lib/ai');
 const { pageTitle } = require('../../../db/content-names');
+const { truncateToolResult } = require('./truncate');
 const {
   getFigureByFigId, findFigureByName, getSceneTitle, getFigureName,
+  getSceneTitleForUser, getFigureNameForUser,
 } = require('../../../db/book-chat/figures');
 
 // Obergrenzen schützen das Token-Budget gegen ausufernde Tool-Calls. Skaliert mit
 // MODEL_CONTEXT, damit User mit grösserem Kontextfenster reichere Tool-Antworten
-// bekommen (mehr Seiten, längere Snippets). chat.js schneidet zusätzlich hart auf
-// TOOL_RESULT_CAP_CHARS, bevor die Antwort an das Modell geht.
+// bekommen (mehr Seiten, längere Snippets). Der Loop (agentic-chat.js) schneidet
+// zusätzlich hart auf `toolResultCap` (book-chat.js#_toolResultCapChars), bevor die
+// Antwort an das Modell geht — executeTool kürzt darum vorher strukturiert auf
+// denselben Deckel (resultCapFor).
 // Divisor 36 ≈ BOOK_CHAT_MAX_TOOL_ITER (6) × typische Tool-Calls/Iter (3) × Sicherheit (2).
 const MAX_RESULT_CHARS       = Math.max(4000, Math.floor(INPUT_BUDGET_CHARS / 36));
 const MAX_CHARS_PER_PAGE     = MAX_RESULT_CHARS;
@@ -21,20 +25,19 @@ const MAX_SEARCH_RESULTS     = 30;
 const MAX_PAGES_PER_FETCH    = 20;
 const SEARCH_SNIPPET_CONTEXT = 120; // Zeichen vor + nach dem Treffer
 
-/** Kürzt ein Tool-Result-Objekt, damit es nicht das Token-Budget sprengt. */
-function _truncateResult(obj) {
-  const s = JSON.stringify(obj);
-  if (s.length <= MAX_RESULT_CHARS) return obj;
-  // Fallback: wenn shown/results-Array existiert, kürzen und truncated-Flag setzen
-  if (Array.isArray(obj.results) && obj.results.length > 5) {
-    return {
-      ..._truncateResult({ ...obj, results: obj.results.slice(0, 10) }),
-      truncated: true,
-      total_results: obj.results.length,
-    };
-  }
-  // Letzter Ausweg: stringifizieren und hart schneiden
-  return { _truncated: s.slice(0, MAX_RESULT_CHARS - 100) + '… [result truncated]' };
+/** Kürzt ein Tool-Result-Objekt strukturerhaltend (truncate.js), damit es nicht das
+ *  Token-Budget sprengt. `maxChars` default MAX_RESULT_CHARS; executeTool reicht
+ *  zusätzlich den Loop-Deckel aus ctx.resultCapChars durch, damit der harte
+ *  String-Schnitt im Loop (agentic-chat.js) praktisch nie greift. */
+function _truncateResult(obj, maxChars = MAX_RESULT_CHARS) {
+  return truncateToolResult(obj, maxChars);
+}
+
+/** Effektiver Ergebnis-Deckel eines Tool-Calls: kleinerer Wert aus dem globalen
+ *  MAX_RESULT_CHARS und dem Loop-Deckel des laufenden Jobs (ctx.resultCapChars). */
+function resultCapFor(ctx) {
+  const loopCap = Number(ctx?.resultCapChars) || 0;
+  return loopCap > 0 ? Math.min(MAX_RESULT_CHARS, loopCap) : MAX_RESULT_CHARS;
 }
 
 /**
@@ -42,11 +45,18 @@ function _truncateResult(obj) {
  * `search_similar` (tools-text.js) und dem Erst-Kontext des agentischen Buch-Chats
  * (routes/jobs/chat/book-chat-retrieval.js) — beide lösen dieselben drei Kinds des
  * Embedding-Index auf. Rückgabe null = Entität gelöscht, Chunk noch im Index.
+ *
+ * `opts.userEmail` (gesetzt = User-Scope): Szenen und Figuren sind Analyse-Daten pro
+ * User, der Embedding-Index hängt aber nur am Buch. Mit userEmail fallen Szenen/
+ * Figuren eines anderen Users im selben Buch weg (null wie gelöscht) — sonst sähe ein
+ * Mitautor über search_similar/Erst-Kontext die Analyse-Texte des anderen.
  */
-function resolveEntityTitle(kind, entityId) {
+function resolveEntityTitle(kind, entityId, opts = {}) {
+  const scoped = Object.prototype.hasOwnProperty.call(opts, 'userEmail');
+  const user = opts.userEmail ?? null;
   if (kind === 'page')   return pageTitle(entityId)?.title ?? null;
-  if (kind === 'scene')  return getSceneTitle(entityId) ?? null;
-  if (kind === 'figure') return getFigureName(entityId) ?? null;
+  if (kind === 'scene')  return (scoped ? getSceneTitleForUser(entityId, user) : getSceneTitle(entityId)) ?? null;
+  if (kind === 'figure') return (scoped ? getFigureNameForUser(entityId, user) : getFigureName(entityId)) ?? null;
   return null;
 }
 
@@ -71,6 +81,7 @@ module.exports = {
   MAX_PAGES_PER_FETCH,
   SEARCH_SNIPPET_CONTEXT,
   _truncateResult,
+  resultCapFor,
   _findFigure,
   resolveEntityTitle,
 };

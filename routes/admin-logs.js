@@ -16,7 +16,7 @@ const { parseLines } = require('../lib/log-parser');
 const { readLinesReverse, listRotatedFiles } = require('../lib/log-reverse-read');
 const { sessionEmail } = require('../lib/acl');
 
-const LOG_FILE = path.join(__dirname, '..', 'schreibwerkstatt.log');
+const { LOG_FILE } = require('../lib/log-file');
 const MAX_FILES = 4;
 
 const router = express.Router();

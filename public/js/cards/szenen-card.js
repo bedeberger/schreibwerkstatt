@@ -9,6 +9,7 @@
 //     (Root-Spread; von komplett-Job und anderen genutzt)
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { applySzenenFilters } from '../app/app-ui.js';
+import { lsGet, lsSet } from '../safe-storage.js';
 
 export function registerSzenenCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -16,7 +17,7 @@ export function registerSzenenCard() {
     szenenLoading: false,
     szenenProgress: 0,
     szenenStatus: '',
-    viewMode: localStorage.getItem('szenen.viewMode') === 'grid' ? 'grid' : 'list', // 'list' | 'grid'
+    viewMode: lsGet('szenen.viewMode') === 'grid' ? 'grid' : 'list', // 'list' | 'grid'
     _szenenPollTimer: null,
     _lifecycle: null,
 
@@ -34,7 +35,7 @@ export function registerSzenenCard() {
     },
 
     init() {
-      this.$watch('viewMode', (v) => localStorage.setItem('szenen.viewMode', v));
+      this.$watch('viewMode', (v) => lsSet('szenen.viewMode', v));
       this._lifecycle = setupCardLifecycle(this, {
         name: 'szenen',
         showFlag: 'showSzenenCard',

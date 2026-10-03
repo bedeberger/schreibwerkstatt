@@ -1,6 +1,6 @@
 # ERD — schreibwerkstatt
 
-Stand: Schema-Version 294, 168 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
+Stand: Schema-Version 302, 169 Tabellen (ohne `sqlite_*`/`schema_version`/FTS5-Shadow-Tables; inkl. FTS5-Virtual `search_index`/`search_trigram` + `search_meta`).
 
 Quelle: Squashed-Schema-Snapshot in [db/squashed-schema.js](../db/squashed-schema.js) (regeneriert via `node tools/dump-schema.js`) + [db/migrations.js](../db/migrations.js). Drift gegen die Legacy-Migration-Kette ist durch [tests/unit/squash-drift.test.mjs](../tests/unit/squash-drift.test.mjs) gegated. Mermaid-Diagramme — in VSCode mit „Markdown Preview Mermaid Support" (oder GitHub) direkt sichtbar.
 
@@ -15,6 +15,7 @@ erDiagram
   books ||--o{ chapters              : has
   books ||--o{ pages                 : has
   books ||--o{ page_deletions        : logs
+  chapters |o--o{ page_deletions     : trashed_from
   chapters ||--o{ pages              : groups
   chapters ||--o{ chapters           : "parent (max 3 levels)"
 
@@ -184,6 +185,7 @@ erDiagram
   app_users ||--o{ komplett_scope    : "chooses run scope"
   app_users ||--|| author_profile    : "own style profile"
   app_users ||--o{ page_locks        : holds
+  app_users ||--o{ research_items    : "sets status (status_by)"
   app_users ||--o{ page_presence     : pings
   app_users ||--o{ book_presence     : pings
   app_users ||--o{ app_users_devices : "owns devices"
@@ -193,6 +195,7 @@ erDiagram
   app_users ||--|| user_credentials  : "local password hash"
   app_users ||--o{ user_password_tokens : "set/reset links"
   ai_profiles ||--o{ app_users       : "assigned to"
+  app_users ||--o| ai_profiles       : "own API access"
   books     ||--o{ user_dictionary   : "scoped (NULL=global)"
 
   user_invites ||--o{ registration_requests : "linked invite"
@@ -323,6 +326,10 @@ erDiagram
     TEXT    deleted_at      "ISO-8601; Cursor fuer /changes-Feed"
     TEXT    deleted_by_email "Loeschender User"
     TEXT    device_id       "Geraet des Loeschers"
+    TEXT    body_html       "Papierkorb: Inhalt beim Loeschen (NULL = nicht wiederherstellbar)"
+    INTEGER chapter_id      FK "ON DELETE SET NULL; Kapitel beim Loeschen"
+    TEXT    images_json     "Papierkorb: referenzierte Bild-BLOBs als base64"
+    TEXT    restored_at     "ISO-8601; gesetzt nach Wiederherstellung"
   }
   page_stats {
     INTEGER page_id          PK,FK
@@ -539,6 +546,8 @@ erDiagram
     INTEGER doc_pages
     INTEGER doc_chars   "Laenge von doc_text — == MAX_TEXT_CHARS heisst: Volltext gedeckelt"
     TEXT    status      "offen|in_arbeit|eingearbeitet|verworfen — Einarbeitungs-Achse (Spalten des Status-Boards); NEBEN archived, nicht darin"
+    TEXT    status_at   "wann der Status zuletzt gesetzt wurde (ISO+Z)"
+    TEXT    status_by   FK "app_users(email), ON DELETE SET NULL — wer ihn gesetzt hat"
     INTEGER pinned
     INTEGER archived
     TEXT    created_at
@@ -588,6 +597,20 @@ erDiagram
     TEXT    url       "http/https"
     TEXT    label     "optionaler Anzeigetext"
     INTEGER position  "Reihenfolge"
+    TEXT    created_at
+    TEXT    checked_at  "letzte Link-Pruefung (Job research-link-check)"
+    INTEGER check_ok    "1|0, NULL = nie geprueft"
+    INTEGER check_code  "HTTP-Status; NULL bei Netz-/Timeout-Fehler"
+    TEXT    check_error "Fehlergrund ohne HTTP-Status"
+  }
+  research_item_findings {
+    INTEGER id          PK
+    INTEGER item_id     FK "research_items(id), ON DELETE CASCADE"
+    INTEGER book_id     FK "ON DELETE CASCADE"
+    INTEGER page_id     FK "pages(page_id), ON DELETE CASCADE — Befund ohne Stelle ist gegenstandslos"
+    TEXT    typ         "widerspruch|zitat — Job research-crosscheck"
+    TEXT    stelle      "woertlicher Ausschnitt der Manuskriptstelle (gegen den Seitentext geprueft)"
+    TEXT    erklaerung
     TEXT    created_at
   }
   research_item_links {
@@ -742,6 +765,9 @@ erDiagram
   research_items    ||--o{ research_item_tags  : tagged
   research_items    ||--o{ research_item_urls  : urls
   research_items    ||--o{ research_item_links : links
+  research_items    ||--o{ research_item_findings : "crosscheck findings"
+  books             ||--o{ research_item_findings : has
+  pages             ||--o{ research_item_findings : "finding at"
   chapters          ||--o{ research_item_links : "linked (chapter)"
   pages             ||--o{ research_item_links : "linked (page)"
   figures           ||--o{ research_item_links : "linked (figure)"
@@ -1236,6 +1262,7 @@ erDiagram
     INTEGER sort_order   "Reihenfolge in Zelle (Akt × Strang)"
     TEXT    created_at
     TEXT    updated_at
+    TEXT    content_updated_at "nur titel/beschreibung/status/verworfen — Stale-Basis der Beat-Verankerung"
   }
   plot_beat_figures {
     INTEGER beat_id   FK "PK, CASCADE"
@@ -1463,8 +1490,8 @@ erDiagram
   chat_sessions {
     INTEGER id              PK
     INTEGER book_id         FK
-    TEXT    kind            "page|book|research"
-    INTEGER page_id         FK "NULL bei kind=book/research"
+    TEXT    kind            "page|book|research|plot"
+    INTEGER page_id         FK "NULL bei kind=book/research/plot"
     TEXT    user_email
     TEXT    title           "KI-Titel für History-Eintrag (NULL → Vorschau-Fallback)"
     TEXT    created_at
@@ -1477,7 +1504,7 @@ erDiagram
     TEXT    role              "user|assistant"
     TEXT    content
     TEXT    vorschlaege       "JSON"
-    TEXT    context_info
+    TEXT    context_info      "JSON; an User-Nachrichten ggf. repeat_of (Wiederholung binnen 24h)"
     TEXT    provider          "claude|ollama|llama"
     TEXT    model
     INTEGER tokens_in
@@ -1487,6 +1514,8 @@ erDiagram
     INTEGER cache_creation_1h_in "1h-TTL-Anteil von cache_creation_in (2x-Tarif)"
     INTEGER web_searches      "Anzahl Anthropic-Web-Suchen (nur Recherche-Chat; Server-Tool-Kostenposten)"
     REAL    tps
+    INTEGER feedback          "1|-1|NULL, Daumen hoch/runter (nur assistant)"
+    TEXT    feedback_at
     TEXT    created_at
   }
   chat_images {
@@ -1714,6 +1743,7 @@ erDiagram
     INTEGER max_parallel   "NULL = global; eigener Semaphore-Bucket je Profil"
     TEXT    notes
     TEXT    created_by     FK "app_users(email) ON DELETE SET NULL"
+    TEXT    owner_email    FK "app_users(email) ON DELETE CASCADE; UNIQUE; NULL = Admin-Profil, sonst eigener Zugang des Kontos"
     TEXT    created_at
     TEXT    updated_at
   }
@@ -1973,8 +2003,8 @@ erDiagram
     BLOB    spine_image
     TEXT    spine_image_mime
     INTEGER is_default
-    INTEGER created_at
-    INTEGER updated_at
+    TEXT    created_at
+    TEXT    updated_at
   }
 
   docx_export_profile {

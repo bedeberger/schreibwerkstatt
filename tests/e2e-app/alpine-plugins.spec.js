@@ -58,14 +58,18 @@ test('Palette: x-trap haelt Tab im Panel, blendet Hintergrund aus, Fokus kehrt z
 });
 
 // ── x-collapse: collapsible-Panel ──────────────────────────────────────────
-// Traeger ist die PDF-Export-Karte (Format-Tab: „Raender (mm)") — eine der
-// wenigen Karten, deren Klapp-Sektionen ohne Zusatz-Setup sichtbar sind. Der
+// Traeger ist die PDF-Export-Karte (Layout-Tab: „Raender (mm)") — eine der
+// wenigen Karten, deren Klapp-Sektionen ohne Buch-Setup sichtbar sind. Der
 // Test greift den ersten sichtbaren, geschlossenen Toggle statt einer festen
 // Klasse: geprueft wird das Primitiv, nicht diese eine Sektion.
+// Experten-Ansicht ist Pflicht-Setup: in der Default-Ansicht „Einfach" sind die
+// Feinsatz-Sektionen der Karte ausgeblendet (pdf-export-layout.html).
 test('collapsible: Panel-Hoehe gleitet statt zu springen', async ({ page }) => {
   await bootApp(page);
   await selectSeededBook(page);
   await page.evaluate(() => window.__app.togglePdfExportCard());
+  await page.evaluate(() => window.Alpine
+    .$data(document.querySelector('.card--pdfexport')).setUiMode('expert'));
   await expect(page.locator('.card--pdfexport .collapsible-toggle').first()).toBeVisible();
 
   const result = await page.evaluate(() => new Promise((resolve) => {

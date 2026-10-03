@@ -7,18 +7,25 @@
 // (routes/jobs/plot.js), nicht hier.
 
 const express = require('express');
-const { getDraftFigure, listFigurenWithDetails } = require('../db/schema');
+const { getDraftFigure } = require('../db/schema');
 const plotDb = require('../db/plot');
 const { toIntId } = require('../lib/validate');
-const { resolveChapterBookId } = require('../lib/content-ownership');
 const { guardBook, sessionEmail } = require('../lib/acl');
 const appSettings = require('../lib/app-settings');
 const { computeTimeFindings } = require('../lib/plot-time-consistency');
-const { yearFromString, bookYearSpan } = require('../lib/figure-years');
+const { yearFromString, bookYearSpan, computeFigureYears } = require('../lib/figure-years');
+const { beatsInReadingOrder } = require('../lib/plot-reading-order');
 const logger = require('../logger');
+const {
+  _loadOwned, _requireBook, _validChapterId, _parseIntensitaet, _parseFlag,
+  _anchorOpts, _withAnchor, _resolveThreadFigure, _resolveThreadDraftFigure,
+} = require('./plot-helpers');
 
 const router = express.Router();
 const jsonBody = express.json();
+
+// Status der Plot-Chat-Vorschläge (übernommen/verworfen) — PATCH /plot/chat-proposal.
+router.use('/', require('./plot-chat-proposals').plotChatProposalsRouter);
 
 // Status ist die binäre Realisierungsachse (Idee ↔ eingearbeitet). „Verworfen" ist
 // ein eigenes Flag (verworfen 0/1), keine Status-Stufe. Auf Akt-Ebene gibt es
@@ -32,66 +39,9 @@ const MAX_BESCHREIBUNG = 4000;
 const MAX_ZEIT = 120;
 const MAX_ACT_NAME = 120;
 const MAX_THREAD_NAME = 120;
-
-// Entity per :id laden + Owner (user_email) + Buch-ACL prüfen. Gibt die Entity
-// zurück oder null (die passende Fehler-Response wurde dann bereits gesendet).
-// SSoT für die sonst in jedem :id-Handler (Akt/Beat/Thread/Run) wiederholte
-// Login-/ID-/Owner-/Guard-Kette.
-// Der Login-Check steht VOR dem Guard, weil der Besitz über die E-Mail geprüft
-// wird — ohne ihn erschiene „nicht angemeldet" als 404. Gleicher Code wie der Guard.
-function _loadOwned(req, res, getFn, notFoundCode) {
-  const userEmail = sessionEmail(req);
-  if (!userEmail) { res.status(401).json({ error_code: 'NOT_LOGGED_IN' }); return null; }
-  const id = toIntId(req.params.id);
-  if (!id) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
-  const row = getFn(id);
-  if (!row || row.user_email !== userEmail) { res.status(404).json({ error_code: notFoundCode }); return null; }
-  if (!guardBook(req, res, row.book_id, 'editor')) return null;
-  return row;
-}
-
-// Book-skopierte Collection-Handler (kein :id): Login + book_id + ACL-Guard in
-// einem Schritt. Gibt { userEmail, bookId } zurück oder null (die passende
-// Fehler-Response wurde dann bereits gesendet). Pendant zu _loadOwned für die
-// :id-Handler — SSoT für die sonst in jedem GET-Collection-Handler wiederholte
-// book_id-/Guard-Kette (den Login prüft der Guard). Der Guard läuft VOR handler-spezifischen
-// Zusatz-Validierungen (z.B. draft_id) — kein Leak an nicht-autorisierte Aufrufer.
-function _requireBook(req, res) {
-  const bookId = toIntId(req.query.book_id);
-  if (!bookId) { res.status(400).json({ error_code: 'INVALID_ID' }); return null; }
-  if (!guardBook(req, res, bookId, 'editor')) return null;
-  return { userEmail: sessionEmail(req), bookId };
-}
-
-// chapter_id muss zum Buch gehören, sonst NULL (kein Fremd-Verweis).
-function _validChapterId(bookId, chapterId) {
-  if (!chapterId) return null;
-  return resolveChapterBookId(chapterId) === bookId ? parseInt(chapterId, 10) : null;
-}
-
-// Ein Akt passt zu einem Strang, wenn er GETEILT ist (thread_id NULL) ODER genau
-// diesem Strang gehört (Hybrid-Akte). Verhindert, dass ein Beat in den eigenen Akt
-// eines FREMDEN Strangs (oder in die „ohne Strang"-Lane auf einem eigenen Akt) wandert.
-function _actFitsThread(act, threadId) {
-  return act.thread_id == null || act.thread_id === (threadId ?? null);
-}
-
-// Spannungswert (1–5) für den Spannungsbogen, sonst NULL. Out-of-Range / Müll → NULL.
-function _validIntensitaet(raw) {
-  if (raw === null || raw === '' || typeof raw === 'undefined') return null;
-  const n = parseInt(raw);
-  return (Number.isInteger(n) && n >= 1 && n <= 5) ? n : null;
-}
-
-// Figuren-Bindung eines Strangs auflösen + aufs (Buch, User)-Subset validieren.
-// figure_id kommt als TEXT-fig_id (Frontend-Identität) → INTEGER figures.id;
-// draft_figure_id ist bereits INTEGER draft_figures.id. Fremd/leer → null.
-function _resolveThreadFigure(bookId, userEmail, rawFigId) {
-  return rawFigId ? (plotDb.resolveFigureIds(bookId, userEmail, [rawFigId])[0] || null) : null;
-}
-function _resolveThreadDraftFigure(bookId, userEmail, rawDraftId) {
-  return rawDraftId ? (plotDb.resolveDraftFigureIds(bookId, userEmail, [rawDraftId])[0] || null) : null;
-}
+// Validierungsfehler der Reorder-Transaktionen (db/plot/structure.js + beats.js) —
+// geworfen VOR jedem Schreibzugriff, die Transaktion rollt komplett zurück.
+const _ORDER_ERR = new Set(['ORDER_INVALID', 'ACT_MISMATCH', 'ACT_THREAD_MISMATCH', 'ACT_SCOPE_MIXED']);
 
 // ── Board laden ──────────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
@@ -102,12 +52,9 @@ router.get('/', (req, res) => {
   // → Drift-Badge + Fundstellen-Popover im Frontend (Soll `status` vs. Ist). Kein
   // Extra-Call. navigableOnly: nur anspringbare Fundstellen (Szene ohne Seite fällt
   // raus); minScore: konfigurierbarer Score-Floor blendet schwache Treffer aus.
-  const minScore = Number(appSettings.get('plot.anchor.min_score')) || 0;
-  const occMap = plotDb.beatOccurrenceMap(bookId, userEmail, { minScore, navigableOnly: true });
-  const beats = plotDb.listBeats(bookId, userEmail).map(b => {
-    const occ = occMap.get(b.id);
-    return { ...b, occ_count: occ ? occ.count : 0, occ_top: occ ? occ.top : [] };
-  });
+  const occMap = plotDb.beatOccurrenceMap(bookId, userEmail, _anchorOpts());
+  const beats = plotDb.listBeats(bookId, userEmail)
+    .map(b => _withAnchor(b, occMap.get(b.id) || { count: 0, top: [] }));
   // Geplante Beats werden nur verankert, wenn die Promotion-Erkennung an ist — dann
   // zählen sie auch für die Stale-Heuristik (sonst würde ein geänderter geplanter
   // Beat fälschlich zum „Verankerung aktualisieren"-Angebot führen).
@@ -118,7 +65,10 @@ router.get('/', (req, res) => {
     threads: plotDb.listThreads(bookId, userEmail),
     beats,
     relations: plotDb.listBeatRelations(bookId, userEmail),
-    beatAnchor: { stale: plotDb.beatAnchorStale(bookId, userEmail, staleStatuses) },
+    beatAnchor: {
+      stale: plotDb.beatAnchorStale(bookId, userEmail, staleStatuses),
+      ranAt: plotDb.beatAnchorLastRun(bookId, userEmail),
+    },
   });
 });
 
@@ -126,26 +76,33 @@ router.get('/', (req, res) => {
 // Datierte Beats gegen Geburtsjahre, Buchspanne und Board-Reihenfolge — pure
 // Rechnung in lib/plot-time-consistency.js, kein Job, kein callAI. Der KI-Check
 // verlässt sich darauf, dass die App das selbst nachrechnet (prompts/plot.js).
-// Das Geburtsjahr liefert `listFigurenWithDetails` bereits über die SSoT
-// lib/figure-years.js; ohne echte Zeitlinie ist es null, dann entsteht nur der
-// Chronologie-Teil. `scanned` = mindestens ein Beat trägt eine Jahreszahl —
-// undatiert ist ungeprüft, nicht in Ordnung.
+// Reihenfolge PRO LANE (lib/plot-reading-order.js): die Chronologie wird nur
+// innerhalb eines Strangs gemessen, parallele Stränge sind kein Rückschritt.
+// Die Katalog-Hauptfigur des Strangs gilt in jedem Beat der Lane als beteiligt
+// (Live-Vererbung). Geburtsjahr aus der SSoT lib/figure-years.js; ohne echte
+// Zeitlinie ist es null, dann entsteht nur der Chronologie-/Spannen-Teil.
+// `scanned` = mindestens ein Beat trägt eine Jahreszahl — undatiert ist
+// ungeprüft, nicht in Ordnung.
 router.get('/time-check', (req, res) => {
   const ctx = _requireBook(req, res);
   if (!ctx) return;
   const { userEmail, bookId } = ctx;
-  const acts = plotDb.listActs(bookId, userEmail);
-  const actPos = new Map(acts.map((a, i) => [a.id, a.position ?? i]));
-  // Board-Lesereihenfolge: Akt-Position, dann sort_order — dieselbe Ordnung,
-  // die das Board zeichnet; die Chronologie-Prüfung urteilt über genau sie.
-  const beats = plotDb.listBeats(bookId, userEmail)
-    .sort((a, b) => ((actPos.get(a.act_id) ?? 0) - (actPos.get(b.act_id) ?? 0))
-                 || ((a.sort_order ?? 0) - (b.sort_order ?? 0))
-                 || (a.id - b.id))
-    .map((b, i) => ({ ...b, ordnung: i, jahr: yearFromString(b.zeit) }));
+  const threads = plotDb.listThreads(bookId, userEmail);
+  const threadFig = new Map(threads.filter(t => t.fig_id).map(t => [t.id, t.fig_id]));
+  const beats = beatsInReadingOrder({
+    acts: plotDb.listActs(bookId, userEmail), threads, beats: plotDb.listBeats(bookId, userEmail),
+  }).map(b => {
+    const inherited = b.thread_id != null ? threadFig.get(b.thread_id) : null;
+    const figIds = inherited && !(b.fig_ids || []).includes(inherited) ? [...(b.fig_ids || []), inherited] : (b.fig_ids || []);
+    return { ...b, fig_ids: figIds, jahr: yearFromString(b.zeit) };
+  });
   const figures = new Map();
-  for (const f of ((listFigurenWithDetails(bookId, userEmail) || {}).figuren || [])) {
-    if (f.geburtsjahr != null) figures.set(f.id, { name: f.name, geburtsjahr: f.geburtsjahr });
+  const years = computeFigureYears(bookId, userEmail);
+  if (years && years.size) {
+    for (const f of plotDb.listFigureIdentities(bookId, userEmail)) {
+      const fy = years.get(f.id);
+      if (fy && fy.geburtsjahr != null) figures.set(f.fig_id, { name: f.name, geburtsjahr: fy.geburtsjahr });
+    }
   }
   res.json({
     befunde: computeTimeFindings({ beats, figures, bookSpan: bookYearSpan(bookId, userEmail) }),
@@ -206,8 +163,13 @@ router.post('/acts', jsonBody, (req, res) => {
   if (name.length > MAX_ACT_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
   if (!guardBook(req, res, bookId, 'editor')) return;
   // thread_id optional: gesetzt → strang-eigener Akt (Hybrid). Fremd/leer → NULL
-  // (geteilter Akt). Validierung gegen (Buch, User) via _validThreadId.
+  // (geteilter Akt). Validierung gegen (Buch, User) via _validThreadId. Nur für
+  // Stränge, die schon eigene Akte haben — die eigene Struktur entsteht per Fork
+  // (Klon aller geteilten Akte), nie durch einen einzelnen Akt.
   const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
+  if (threadId != null && !plotDb.threadHasOwnActs(bookId, userEmail, threadId)) {
+    return res.status(400).json({ error_code: 'THREAD_NOT_FORKED' });
+  }
   const act = plotDb.createAct(bookId, userEmail, { name, farbe, threadId });
   logger.info(`[plot] act create id=${act.id} book=${bookId} thread=${threadId ?? '-'}`);
   res.json(act);
@@ -226,8 +188,9 @@ router.patch('/acts/:id', jsonBody, (req, res) => {
   // Board-Alltag. Eigene Achse, kein Status: die Beats bleiben unangetastet und
   // zaehlen weiter in allen Kennzahlen (siehe db/plot.js).
   const archiviert = typeof req.body?.archiviert !== 'undefined'
-    ? (req.body.archiviert ? 1 : 0)
+    ? _parseFlag(req.body.archiviert)
     : (act.archiviert ? 1 : 0);
+  if (archiviert === undefined) return res.status(400).json({ error_code: 'INVALID_FLAG' });
   res.json(plotDb.updateAct(id, { name, farbe, archiviert }));
 });
 
@@ -246,7 +209,12 @@ router.put('/acts/order', jsonBody, (req, res) => {
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
   if (!order)  return res.status(400).json({ error_code: 'ORDER_REQ' });
   if (!guardBook(req, res, bookId, 'editor')) return;
-  plotDb.reorderActs(bookId, userEmail, order);
+  try {
+    plotDb.reorderActs(bookId, userEmail, order);
+  } catch (e) {
+    if (_ORDER_ERR.has(e.code)) return res.status(400).json({ error_code: e.code });
+    throw e;
+  }
   res.json({ ok: true });
 });
 
@@ -260,6 +228,8 @@ router.post('/threads', jsonBody, (req, res) => {
   if (!name)   return res.status(400).json({ error_code: 'NAME_REQ' });
   if (name.length > MAX_THREAD_NAME) return res.status(400).json({ error_code: 'NAME_TOO_LONG' });
   if (!guardBook(req, res, bookId, 'editor')) return;
+  // Figurenbindung exklusiv: Katalog ODER Werkstatt, nie beides.
+  if (req.body?.figure_id && req.body?.draft_figure_id) return res.status(400).json({ error_code: 'THREAD_FIGURE_CONFLICT' });
   const figureId = _resolveThreadFigure(bookId, userEmail, req.body?.figure_id);
   const draftFigureId = _resolveThreadDraftFigure(bookId, userEmail, req.body?.draft_figure_id);
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
@@ -279,13 +249,18 @@ router.patch('/threads/:id', jsonBody, (req, res) => {
   const farbe = typeof req.body?.farbe === 'string' ? req.body.farbe.slice(0, 32)
     : (req.body?.farbe === null ? null : thread.farbe);
   // Bindung nur ändern, wenn der Key explizit mitkommt — sonst Bestand behalten.
+  // Exklusiv: eine gesetzte Katalog-Bindung leert die Werkstatt-Bindung und
+  // umgekehrt; beide zugleich zu setzen ist ein Client-Fehler.
+  if (req.body?.figure_id && req.body?.draft_figure_id) return res.status(400).json({ error_code: 'THREAD_FIGURE_CONFLICT' });
   let figureId = thread.figure_id;
+  let draftFigureId = thread.draft_figure_id;
   if (typeof req.body?.figure_id !== 'undefined') {
     figureId = _resolveThreadFigure(thread.book_id, userEmail, req.body.figure_id);
+    if (figureId != null) draftFigureId = null;
   }
-  let draftFigureId = thread.draft_figure_id;
   if (typeof req.body?.draft_figure_id !== 'undefined') {
     draftFigureId = _resolveThreadDraftFigure(thread.book_id, userEmail, req.body.draft_figure_id);
+    if (draftFigureId != null) figureId = null;
   }
   // Kapitel-Bindung nur ändern, wenn der Key explizit mitkommt — sonst Bestand.
   let chapterId = thread.chapter_id;
@@ -357,13 +332,16 @@ router.post('/beats', jsonBody, (req, res) => {
     return res.status(400).json({ error_code: 'ACT_MISMATCH' });
   }
   const beschreibung = req.body?.beschreibung ? String(req.body.beschreibung).slice(0, MAX_BESCHREIBUNG) : null;
-  const status = STATUSES.includes(req.body?.status) ? req.body.status : 'geplant';
-  const verworfen = req.body?.verworfen ? 1 : 0;
+  const status = typeof req.body?.status === 'undefined' ? 'geplant' : req.body.status;
+  if (!STATUSES.includes(status)) return res.status(400).json({ error_code: 'INVALID_STATUS' });
+  const verworfen = typeof req.body?.verworfen === 'undefined' ? 0 : _parseFlag(req.body.verworfen);
+  if (verworfen === undefined) return res.status(400).json({ error_code: 'INVALID_FLAG' });
   const chapterId = _validChapterId(bookId, toIntId(req.body?.chapter_id));
-  const intensitaet = _validIntensitaet(req.body?.intensitaet);
+  const intensitaet = typeof req.body?.intensitaet === 'undefined' ? null : _parseIntensitaet(req.body.intensitaet);
+  if (intensitaet === undefined) return res.status(400).json({ error_code: 'INVALID_INTENSITAET' });
   const zeit = req.body?.zeit ? String(req.body.zeit).trim().slice(0, MAX_ZEIT) || null : null;
   const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
-  if (!_actFitsThread(act, threadId)) return res.status(400).json({ error_code: 'ACT_THREAD_MISMATCH' });
+  if (!plotDb.actFitsThread(act, threadId)) return res.status(400).json({ error_code: 'ACT_THREAD_MISMATCH' });
   const figureIds = plotDb.resolveFigureIds(bookId, userEmail, req.body?.figure_ids);
   const draftFigureIds = plotDb.resolveDraftFigureIds(bookId, userEmail, req.body?.draft_figure_ids);
   const motifIds = plotDb.resolveMotifIds(bookId, userEmail, req.body?.motif_ids);
@@ -371,7 +349,7 @@ router.post('/beats', jsonBody, (req, res) => {
 
   const beat = plotDb.createBeat(bookId, actId, userEmail, { titel, beschreibung, status, verworfen, chapterId, intensitaet, zeit, threadId, figureIds, draftFigureIds, motifIds, locationIds });
   logger.info(`[plot] beat create id=${beat.id} act=${actId} book=${bookId}`);
-  res.json(beat);
+  res.json(_withAnchor(beat));
 });
 
 router.patch('/beats/:id', jsonBody, (req, res) => {
@@ -395,13 +373,15 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
     fields.status = req.body.status;
   }
   if (typeof req.body?.verworfen !== 'undefined') {
-    fields.verworfen = req.body.verworfen ? 1 : 0;
+    fields.verworfen = _parseFlag(req.body.verworfen);
+    if (fields.verworfen === undefined) return res.status(400).json({ error_code: 'INVALID_FLAG' });
   }
   if (typeof req.body?.chapter_id !== 'undefined') {
     fields.chapter_id = _validChapterId(beat.book_id, toIntId(req.body.chapter_id));
   }
   if (typeof req.body?.intensitaet !== 'undefined') {
-    fields.intensitaet = _validIntensitaet(req.body.intensitaet);
+    fields.intensitaet = _parseIntensitaet(req.body.intensitaet);
+    if (fields.intensitaet === undefined) return res.status(400).json({ error_code: 'INVALID_INTENSITAET' });
   }
   if (typeof req.body?.zeit !== 'undefined') {
     const z = req.body.zeit == null ? '' : String(req.body.zeit).trim();
@@ -419,13 +399,12 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
   if (typeof req.body?.thread_id !== 'undefined') {
     fields.thread_id = plotDb._validThreadId(beat.book_id, userEmail, toIntId(req.body.thread_id));
   }
-  // Akt-Strang-Kompatibilität des Resultats prüfen (Hybrid-Akte): der effektive
-  // Akt darf kein eigener Akt eines anderen Strangs sein als der effektive Strang.
+  // Akt-Strang-Kompatibilität des RESULTIERENDEN Paars prüfen (Hybrid-Akte).
   if (typeof fields.act_id !== 'undefined' || typeof fields.thread_id !== 'undefined') {
     const effActId = typeof fields.act_id !== 'undefined' ? fields.act_id : beat.act_id;
     const effThreadId = typeof fields.thread_id !== 'undefined' ? fields.thread_id : (beat.thread_id ?? null);
     const effAct = plotDb.getAct(effActId);
-    if (effAct && !_actFitsThread(effAct, effThreadId)) {
+    if (effAct && !plotDb.actFitsThread(effAct, effThreadId)) {
       return res.status(400).json({ error_code: 'ACT_THREAD_MISMATCH' });
     }
   }
@@ -446,7 +425,7 @@ router.patch('/beats/:id', jsonBody, (req, res) => {
       && typeof motifIds === 'undefined' && typeof locationIds === 'undefined') {
     return res.status(400).json({ error_code: 'NO_FIELDS' });
   }
-  res.json(plotDb.updateBeat(id, fields, figureIds, draftFigureIds, motifIds, locationIds));
+  res.json(_withAnchor(plotDb.updateBeat(id, fields, figureIds, draftFigureIds, motifIds, locationIds)));
 });
 
 router.delete('/beats/:id', (req, res) => {
@@ -464,7 +443,12 @@ router.put('/beats/order', jsonBody, (req, res) => {
   if (!bookId) return res.status(400).json({ error_code: 'BOOKID_REQ' });
   if (!order)  return res.status(400).json({ error_code: 'ORDER_REQ' });
   if (!guardBook(req, res, bookId, 'editor')) return;
-  plotDb.reorderBeats(bookId, userEmail, order);
+  try {
+    plotDb.reorderBeats(bookId, userEmail, order);
+  } catch (e) {
+    if (_ORDER_ERR.has(e.code)) return res.status(400).json({ error_code: e.code });
+    throw e;
+  }
   res.json({ ok: true });
 });
 

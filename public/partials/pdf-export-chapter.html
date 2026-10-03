@@ -11,7 +11,7 @@
 ></div>
             </div>
           </div>
-          <div class="card-form-row" x-show="activeProfile.config.chapter.numbering !== 'none'">
+          <div class="card-form-row" x-show="uiMode === 'expert' && activeProfile.config.chapter.numbering !== 'none'">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.numberingMode')"></label>
             <div class="card-form-field">
               <div x-data="combobox($app.t('pdfExport.chapter.numberingMode'))"
@@ -21,7 +21,7 @@
             </div>
           </div>
           <div class="card-form-row card-form-row--top"
-               x-show="activeProfile.config.chapter.numbering !== 'none'">
+               x-show="uiMode === 'expert' && activeProfile.config.chapter.numbering !== 'none'">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.unnumberedChapters')"></label>
             <div class="card-form-field">
               <div x-data="combobox({ placeholder: $app.t('pdfExport.chapter.unnumberedPick'), multiple: true })"
@@ -40,7 +40,7 @@
               <p class="card-form-field-note" x-text="$app.t('pdfExport.chapter.unnumberedHint')"></p>
             </div>
           </div>
-          <p class="card-form-field-note" x-text="$app.t('pdfExport.chapter.skipCounterMoved')"></p>
+          <p class="card-form-field-note" x-show="uiMode === 'expert'" x-text="$app.t('pdfExport.chapter.skipCounterMoved')"></p>
           <p class="card-form-section-divider" x-text="$app.t('pdfExport.chapter.group.appearance')"></p>
           <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.breakBefore')"></label>
@@ -60,13 +60,13 @@
 ></div>
             </div>
           </div>
-          <div class="card-form-row">
+          <div class="card-form-row" x-show="uiMode === 'expert'">
             <label class="card-form-label" x-text="$app.t('pdfExport.chapter.spaceBeforeMm')"></label>
             <div class="card-form-field">
               <input type="text" x-data="numInput({ step: 1, min: 0, max: 200 })" x-modelable="value" x-model="activeProfile.config.chapter.spaceBeforeMm" class="pdfx-num-input">
             </div>
           </div>
-          <div class="card-form-row">
+          <div class="card-form-row" x-show="uiMode === 'expert'">
             <label class="card-form-label">&nbsp;</label>
             <div class="card-form-field">
               <label class="pdfx-check">
@@ -96,7 +96,7 @@
             </div>
           </div>
 
-          <div class="collapsible-wrap" x-data="collapsible()">
+          <div class="collapsible-wrap" x-data="collapsible()" x-show="uiMode === 'expert'">
             <button type="button" class="collapsible-toggle" x-bind="trigger">
               <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
               <span x-text="$app.t('pdfExport.chapter.pageStructureLegend')"></span>

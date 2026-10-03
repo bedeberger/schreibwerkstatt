@@ -77,6 +77,8 @@
             <template x-if="s.kind === 'chapter'">
               <div class="book-editor-chapter-header" :class="'snapshot-reader__chapter--d' + s.depth">
                 <span class="book-editor-chapter-name" x-text="s.name || $app.t('snapshots.untitled')"></span>
+                <button type="button" class="btn-compact snapshot-reader__restore" x-show="canRestoreNode(s)"
+                        @click="restoreNode(s)" :disabled="!!restoringNodeKey" x-text="restoreNodeLabel(s)"></button>
               </div>
             </template>
             <template x-if="s.kind === 'page'">
@@ -88,6 +90,9 @@
                   <span class="snapshot-reader__badge" x-show="s.status === 'changed' || s.status === 'removed'"
                         :class="'snapshot-reader__badge--' + s.status"
                         x-text="$app.t('snapshots.reader.status.' + s.status)"></span>
+                  <button type="button" class="btn-compact snapshot-reader__restore"
+                          x-show="canRestoreNode(s) && s.status !== 'unchanged'"
+                          @click="restoreNode(s)" :disabled="!!restoringNodeKey" x-text="restoreNodeLabel(s)"></button>
                 </div>
                 <div class="book-editor-page-body snapshot-reader__diff" x-html="s.renderHtml"></div>
               </div>

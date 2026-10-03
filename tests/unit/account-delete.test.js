@@ -253,7 +253,7 @@ test('Demo-Konto: Reset statt Loeschung — Konto und Token bleiben, Inhalte sin
 
 // Spalten, die auf ein Konto zeigen. Bewusst eng und benannt: ein Muster wie
 // /_by$/ wuerde `updated_by`-artige Felder mitnehmen, die keine Adresse halten.
-const ACTOR_COL_RE = /(^|_)email$|^(invited_by|granted_by|added_by|created_by|updated_by|reviewed_by)$/;
+const ACTOR_COL_RE = /(^|_)email$|^(invited_by|granted_by|added_by|created_by|updated_by|reviewed_by|status_by)$/;
 
 test('USER_REF_PLAN deckt jede konto-bezogene Spalte des Schemas ab', () => {
   const planned = new Set(USER_REF_PLAN.map(e => `${e.table}.${e.column}`));

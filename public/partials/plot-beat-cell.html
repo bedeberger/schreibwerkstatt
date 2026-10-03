@@ -16,13 +16,16 @@
            So bleibt die übrige Karte voll klickbar (Titel→Edit, Tags→Figur
            springen) ohne Drag/Klick-Konflikt. Nur Ansichtsmodus. Status wird
            nicht mehr in der Kopfzeile gezeigt (nur Border-Farbe + Status-Filter),
-           gesetzt wird er über die Status-Tabs im Bearbeiten-Modus. -->
-      <span class="plot-beat-grip" :data-tip="$app.t('plot.beat.dragHandle')" :aria-label="$app.t('plot.beat.dragHandle')">
+           gesetzt wird er über die Status-Tabs im Bearbeiten-Modus.
+           Tastatur/Touch-Alternative zum Ziehen: Beat öffnen → „Verschieben"
+           (plot-beat-move.html); der Hinweis steht im Label des Griffs. -->
+      <span class="plot-beat-grip" role="img" :data-tip="$app.t('plot.beat.dragHandleHint')" :aria-label="$app.t('plot.beat.dragHandleHint')">
         <svg class="icon" aria-hidden="true"><use href="/icons.svg#grip-vertical"/></svg>
       </span>
-      <span class="plot-beat-title" @click="startEditBeat(beat)" x-text="beat.titel"></span>
+      <!-- Titel = Bearbeiten-Einstieg, darum ein echter Button (Tab + Enter). -->
+      <button type="button" class="plot-beat-title" @click="startEditBeat(beat)" x-text="beat.titel"></button>
       <!-- Konsistenz-Warn-Badge: zeigt, dass der aktive Prüflauf diesen Beat beanstandet -->
-      <button type="button" class="plot-beat-warn" :class="'plot-beat-warn--' + beatTopSeverity(beat)"
+      <button type="button" class="plot-beat-warn" :class="'plot-beat-warn--' + befundSeverityTone(beatTopSeverity(beat))"
               x-show="consistencyResult && beatKonflikte(beat).length"
               @click.stop="focusKonfliktForBeat(beat)"
               :data-tip="beatKonflikteTip(beat)" :aria-label="$app.t('plot.beat.konfliktBadge')">
@@ -38,22 +41,37 @@
       <!-- Verankerungs-Badge (Soll status vs. Ist-Fundstellen aus der semantischen
            Suche). Nur „im Buch"-Beats werden verankert: 'confirmed' zeigt die
            Fundstellen-Zahl und öffnet bei Klick das Fundstellen-Popover (Liste →
-           Sprung zur Textstelle); 'drift' (im_buch ohne Fund) warnt (nicht
-           navigierbar). 'none' (geplant/verworfen) rendert nichts. -->
+           Sprung zur Textstelle); 'drift' (im_buch ohne Fund) warnt — ohne Popup,
+           darum kein Button, sondern eine reine Plakette (role=img).
+           'none' (geplant/verworfen) rendert nichts. -->
       <button type="button" class="plot-beat-anchor" :class="'plot-beat-anchor--' + beatAnchorState(beat)"
-              x-show="beatAnchorState(beat) !== 'none'"
-              @click.stop="beat.occ_count && openBeatOccPopover($event, beat)"
+              x-show="beatAnchorState(beat) !== 'none' && beat.occ_count"
+              @click.stop="_rememberMenuTrigger($event); openBeatOccPopover($event, beat)"
               aria-haspopup="menu" :aria-expanded="beatOccPopoverBeatId === beat.id"
-              :data-tip="beatAnchorTip(beat)" :aria-label="beatAnchorTip(beat)">
-        <span x-show="beat.occ_count" x-text="beat.occ_count"></span>
-        <span x-show="!beat.occ_count" aria-hidden="true">!</span>
-      </button>
+              :data-tip="beatAnchorTip(beat)" :aria-label="beatAnchorTip(beat)"
+              x-text="beat.occ_count"></button>
+      <span class="plot-beat-anchor plot-beat-anchor--drift" role="img"
+            x-show="beatAnchorState(beat) === 'drift'"
+            :data-tip="beatAnchorTip(beat)" :aria-label="beatAnchorTip(beat)"><span aria-hidden="true">!</span></span>
     </div>
     <p class="plot-beat-desc" x-show="beat.beschreibung" x-text="beat.beschreibung"></p>
-    <div class="plot-beat-meta" x-show="beat.chapter_name || beat.zeit || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length) || (beat.motifs && beat.motifs.length) || (beat.locations && beat.locations.length)">
+    <div class="plot-beat-meta" x-show="beat.chapter_name || beat.zeit || (beat.fig_ids && beat.fig_ids.length) || (beat.draft_fig_ids && beat.draft_fig_ids.length) || (beat.motifs && beat.motifs.length) || (beat.locations && beat.locations.length) || inheritedChapterForBeat(beat) || inheritedFigureForBeat(beat)">
       <span class="kapitel-badge kapitel-badge--primary internal-link" x-show="beat.chapter_name"
             @click.stop="beat.chapter_name && $app.openKapitelByName(beat.chapter_name)"
             x-text="beat.chapter_name"></span>
+      <!-- Live-Vererbung Strang → Beat (nie auf den Beat geschrieben): Kapitel des
+           Strangs, solange der Beat kein eigenes hat; Hauptfigur des Strangs, sofern
+           nicht schon explizit verlinkt. Gedämpft + gepunktet = „geerbt". -->
+      <span class="kapitel-badge kapitel-badge--inherited internal-link" x-show="inheritedChapterForBeat(beat)"
+            @click.stop="$app.openKapitelByName(inheritedChapterForBeat(beat))"
+            :data-tip="$app.t('plot.beat.inheritedChapter')"
+            x-text="inheritedChapterForBeat(beat)"></span>
+      <template x-if="inheritedFigureForBeat(beat)">
+        <span class="tag tag--inherited internal-link"
+              @click.stop="inheritedFigureForBeat(beat).kind === 'catalog' ? $app.openFigurById(inheritedFigureForBeat(beat).id) : $app.openWerkstattDraftById(inheritedFigureForBeat(beat).id)"
+              :data-tip="$app.t('plot.beat.inheritedFigure')"
+              x-text="inheritedFigureForBeat(beat).label"></span>
+      </template>
       <!-- Erzaehlte Zeit (Freitext). Nicht klickbar: sie zeigt auf kein Objekt,
            sondern ist eine Angabe ueber die Welt — die Pruefung dagegen laeuft
            in der Zeit-Messung (lib/plot-time-consistency.js). -->
@@ -95,9 +113,9 @@
     <div class="plot-beat-rels" x-show="beatRelationsOut(beat).length">
       <template x-for="rel in beatRelationsOut(beat)" :key="rel.id">
         <span class="plot-beat-rel internal-link" @click.stop="scrollToBeat(rel.to_beat_id)"
-              :data-tip="relTypeLabel(rel.typ) + ': ' + rel.to_titel">
+              :data-tip="relTypeLabel(rel.typ) + ': ' + relTargetTitle(rel)">
           <span class="plot-beat-rel-typ" x-text="relTypeLabel(rel.typ)"></span>
-          <span class="plot-beat-rel-target" x-text="rel.to_titel"></span>
+          <span class="plot-beat-rel-target" x-text="relTargetTitle(rel)"></span>
         </span>
       </template>
     </div>

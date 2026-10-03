@@ -3,6 +3,7 @@ import { startPoll as _startPollFn, runningJobStatus as _runningJobStatusFn } fr
 import { EXCLUSIVE_CARDS } from '../cards/feature-registry.js';
 import { EVT } from '../events.js';
 import { startEventStream, jobStreamOpen, onJobQueueStream } from '../event-stream.js';
+import { lsGet, lsRemove } from '../safe-storage.js';
 
 // Bei offenem Job-Stream kommt die Queue-Liste per Push; der 5-s-Poll läuft
 // dann nur noch jeden n-ten Tick als Sicherheitsnetz (alle 30 s).
@@ -28,9 +29,12 @@ const JOB_NAV_CARD = {
   'geocode-resolve':   'orte',
   'plot-brainstorm':   'plot',
   'plot-consistency':  'plot',
+  'plot-chat':         'plot',
   'book-chat':         'bookChat',
   'research-chat':     'recherche',
   'research-link':     'recherche',
+  'research-link-check': 'recherche',
+  'research-crosscheck': 'recherche',
   'source-detect':     'sources',
   'rueckblick':        'tagebuchRueckblick',
   'finetune-export':   'finetuneExport',
@@ -364,7 +368,7 @@ export const appJobsCoreMethods = {
   // Prüft ob ein gespeicherter Job noch läuft und reconnected ggf.
   // onRunning(job, jobId) wird aufgerufen wenn der Job aktiv ist.
   async _reconnectJob(lsKey, onRunning) {
-    const jobId = localStorage.getItem(lsKey);
+    const jobId = lsGet(lsKey);
     if (!jobId) return;
     try {
       const resp = await fetch('/jobs/' + jobId);
@@ -373,7 +377,7 @@ export const appJobsCoreMethods = {
         if (job.status === 'running') { onRunning(job, jobId); return; }
       }
     } catch { /* ignore */ }
-    localStorage.removeItem(lsKey);
+    lsRemove(lsKey);
   },
 
   // Prüft beim Laden eines Buchs ob noch ein Job aus einer früheren Session
@@ -395,7 +399,7 @@ export const appJobsCoreMethods = {
     for (const [index, item] of (this.$store.nav.tree || []).entries()) {
       if (item.type !== 'chapter' || item.solo) continue;
       const lsKey = `lektorat_chapter_review_job_${bookId}_${item.id}`;
-      const jobIdLs = localStorage.getItem(lsKey);
+      const jobIdLs = lsGet(lsKey);
       if (!jobIdLs) continue;
       chapterCandidates.push({ index, chapterId: item.id, lsKey, jobId: jobIdLs });
     }
@@ -407,7 +411,7 @@ export const appJobsCoreMethods = {
           if (job.status === 'running') return { ...c, job };
         }
       } catch { /* ignore */ }
-      localStorage.removeItem(c.lsKey);
+      lsRemove(c.lsKey);
       return null;
     }));
     const winners = chapterProbes

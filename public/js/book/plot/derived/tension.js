@@ -9,7 +9,8 @@ export const tensionMethods = {
   // Bogen nicht) in Board-Lesereihenfolge (Akt-Position → sort_order) zu einer
   // Kurve. Punkte als Prozent-Koordinaten + Polyline-String für die SVG-Linie.
   tensionCurve() {
-    return this._memo('tension', [this.beats, this.acts, this.threads], () => {
+    const locale = globalThis.window?.Alpine?.store('shell')?.uiLocale;
+    return this._memo('tension', [this.beats, this.acts, this.threads, locale], () => {
       const actPos = new Map((this.acts || []).map(a => [a.id, a.position]));
       const actById = new Map((this.acts || []).map(a => [a.id, a]));
       const order = (a, b) =>
@@ -44,15 +45,23 @@ export const tensionMethods = {
       });
 
       // Pro-Strang-Serien (nur wenn Stränge existieren) — je Strang eine eigene
-      // farbige Polyline. Leere Stränge fallen raus.
-      const series = (this.threads || [])
-        .slice()
-        .sort((a, b) => a.position - b.position)
-        .map(t => {
+      // farbige Polyline, dazu eine Serie für die „ohne Strang"-Lane (thread
+      // null, Karten-Akzent; Beats mit unbekanntem Strang zählen dazu). So deckt
+      // die Summe der Serien genau die Punkte von `count` ab — die Sichtbarkeit
+      // (count >= 2) passt immer zu dem, was gerendert wird. Leere Serien raus.
+      const threadList = (this.threads || []).slice().sort((a, b) => a.position - b.position);
+      const known = new Set(threadList.map(t => t.id));
+      const series = threadList.length ? [
+        ...threadList.map(t => {
           const line = _line((this.beats || []).filter(b => b.thread_id === t.id), this.threadAccent(t));
           return { key: `t${t.id}`, thread: t, label: t.name, ...line };
-        })
-        .filter(s => s.count >= 1);
+        }),
+        (() => {
+          const line = _line((this.beats || []).filter(b => b.thread_id == null || !known.has(b.thread_id)), this.threadAccent(null));
+          const label = globalThis.window?.__app?.t('plot.thread.noThread') || '';
+          return { key: 'tnone', thread: null, label, ...line };
+        })(),
+      ].filter(s => s.count >= 1) : [];
 
       return { points, polyline: points.map(p => `${p.xSvg},${p.ySvg}`).join(' '), count: nAll, series };
     });
@@ -64,7 +73,11 @@ export const tensionMethods = {
   // encodiert `c:<figId>` / `w:<draftId>`, damit beide Quellen in EINER Combobox
   // (plain) leben.
   tensionFigurOptions() {
-    return this._memo('tFigOpts', [this.beats, this.threads, this.draftFiguren], () => {
+    // Deps vollständig: Labels kommen aus dem Figuren-Katalog ($store.catalog,
+    // via figurenById) und den Werkstatt-Figuren — ohne den Katalog fröre ein
+    // vor dem Figuren-Load berechnetes Label als rohe ID ein.
+    const catalogFiguren = globalThis.window?.Alpine?.store('catalog')?.figuren;
+    return this._memo('tFigOpts', [this.beats, this.threads, this.draftFiguren, catalogFiguren], () => {
       const withInt = (this.beats || []).filter(b => !b.verworfen && b.intensitaet != null);
       const catIds = new Set(); const draftIds = new Set();
       for (const b of withInt) {

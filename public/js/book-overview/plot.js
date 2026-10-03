@@ -3,7 +3,7 @@
 // beats }, jeder Beat mit status/verworfen/occ_count. Rein abgeleitet, kein
 // KI-Job. Reader ohne Editor-Recht bekommen 403 auf /plot → overviewPlot=null
 // → Tile via x-if aus (siehe load.js).
-import { classifyBeatAnchor } from '../book/plot/constants.js';
+import { classifyBeatAnchor, beatAnchorKnown } from '../book/plot/constants.js';
 
 export const plotMethods = {
   // True, sobald das Buch ein Beat-Board mit Inhalt hat (Akte oder Beats).
@@ -26,11 +26,13 @@ export const plotMethods = {
       const beats = Array.isArray(p?.beats) ? p.beats : [];
       const by = { geplant: 0, im_buch: 0, verworfen: 0 };
       let drift = 0, confirmed = 0;
+      // Nie verankert → keine Drift-Warnung (0 Fundstellen hiesse „nie gesucht").
+      const anchored = beatAnchorKnown(p?.beatAnchor, beats);
       for (const b of beats) {
         if (b.verworfen) { by.verworfen++; continue; }
         if (b.status === 'im_buch') by.im_buch++;
         else by.geplant++;
-        const cls = classifyBeatAnchor(b.status, b.occ_count, b.verworfen);
+        const cls = classifyBeatAnchor(b.status, b.occ_count, b.verworfen, anchored);
         if (cls === 'drift') drift++;
         else if (cls === 'confirmed') confirmed++;
       }

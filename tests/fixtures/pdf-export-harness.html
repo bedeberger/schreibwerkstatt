@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/public/css/analysis/kontinuitaet.css">
   <link rel="stylesheet" href="/public/css/book/export-shared.css">
   <link rel="stylesheet" href="/public/css/book/pdf-export.css">
+  <link rel="stylesheet" href="/public/css/book/book-settings.css">
   <style>body { padding: 1rem; max-width: 1200px; margin: 0 auto; }</style>
 
   <!-- Alpine als globaler Script-Tag (gleich wie public/index.html) -->
@@ -56,6 +57,12 @@
       selectedBookName: 'Test',
       showPdfExportCard: true,
       t: tStub,
+      // appConfirm-Stub (echter Dialog lebt in app-chrome.js): Antwort per
+      // window.__confirmAnswer steuerbar, Aufrufe in window.__confirmCalls.
+      appConfirm(opts) {
+        (window.__confirmCalls = window.__confirmCalls || []).push(opts);
+        return Promise.resolve(window.__confirmAnswer !== false);
+      },
       togglePdfExportCard() { this.showPdfExportCard = !this.showPdfExportCard; },
     };
 

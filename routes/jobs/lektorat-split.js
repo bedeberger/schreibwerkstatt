@@ -87,9 +87,9 @@ function _statusLine(jobId, total) {
 // werden gestaffelt, damit der Prompt-Cache greift. Split AUS oder lokaler Provider:
 // genau EIN kombinierter Call (Rechtschreibung + Stil + Szenen zusammen). Rückgabe
 // hat stets die Form { fehler, szenen, stilanalyse, fazit } — Cache/History/Frontend gleich.
-async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promptOpts, single, fromPct, toPct, buchtyp = null }) {
+async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promptOpts, fromPct, toPct, buchtyp = null }) {
   const {
-    buildLektoratPrompt, buildBatchLektoratPrompt,
+    buildLektoratPrompt,
     buildObjektivLektoratPrompt, buildStilLektoratPrompt,
     buildLektoratSchema, buildObjektivLektoratSchema,
   } = prompts;
@@ -109,7 +109,7 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
   if (status) tok.onThinking = status.onThinking;
 
   if (!split) {
-    const prompt = single ? buildLektoratPrompt(text, promptOpts) : buildBatchLektoratPrompt(text, promptOpts);
+    const prompt = buildLektoratPrompt(text, promptOpts);
     const result = await aiCall(jobId, tok, prompt, system, fromPct, toPct, 5000, 0.2, null, undefined, kombiSchema);
     if (!Array.isArray(result?.fehler)) throw i18nError('job.error.fehlerArrayMissing');
     return result;
@@ -139,6 +139,8 @@ async function lektoratAnalyze({ jobId, tok, text, local, prompts, system, promp
     // Rechtschreibung/Grammatik und würde Autorennamen + Jahreszahlen im
     // Kurzbeleg sonst anstreichen.
     hatBelege: promptOpts.hatBelege,
+    // Benutzer-Wörterbuch: der Objektiv-Pass ist der, der Rechtschreibung prüft.
+    woerterbuch: promptOpts.woerterbuch,
     langCode: promptOpts.langCode,
     // Buchtyp entscheidet, welche objektiven Typen es überhaupt gibt (Fach-Profile:
     // nur rechtschreibung + grammatik, kein Dialogformat/Figurenkonsistenz).

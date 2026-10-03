@@ -25,6 +25,7 @@ import {
 } from '../../sortable-dnd.js';
 import { STATUSES, PLACE_LINK_KINDS } from './shared.js';
 import { memoMethods } from '../../cards/card-memo.js';
+import { tzOpts, localeTag } from '../../utils.js';
 
 export const rechercheStatusMethods = {
   // ── Ansicht ────────────────────────────────────────────────────────────────
@@ -41,6 +42,20 @@ export const rechercheStatusMethods = {
   // angeheftet" traegt auch kein Abzeichen). Wer die Achse nie benutzt, sieht
   // die Liste unveraendert.
   showStatusBadge(item) { return this.itemStatus(item) !== STATUSES[0]; },
+
+  // Tooltip der Plakette: wer den Status wann gesetzt hat (status_by/_at, das
+  // Board ist geteilt). Ohne Zuschreibung (Alt-Datensatz) nur die Achse.
+  statusTip(item) {
+    const app = window.__app;
+    if (!item?.status_at) return app.t('recherche.status.label');
+    const d = new Date(item.status_at);
+    if (isNaN(d.getTime())) return app.t('recherche.status.label');
+    const when = d.toLocaleDateString(localeTag(Alpine.store('shell').uiLocale), tzOpts({ day: 'numeric', month: 'short', year: 'numeric' }));
+    const who = item.status_by_name || item.status_by || '';
+    return who
+      ? app.t('recherche.status.setBy', { who, when })
+      : app.t('recherche.status.setAt', { when });
+  },
 
   // Ein Pass ueber `items` fuer alle vier Spalten (Memo-Pattern: die Spalten
   // fragen ihre Liste mehrfach pro Render — Karten UND Zaehler). Deps sind die

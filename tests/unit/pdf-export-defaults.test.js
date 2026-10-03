@@ -113,8 +113,10 @@ test('Heading-Skala ist absteigend: Kapitel > Seitentitel > Autoren-Ueberschrift
 test('validateConfig: h4/h5/h6 clamped, toc.includePages als Bool', () => {
   assert.equal(validateConfig({ font: { heading: { sizes: { h4: 999 } } } }).font.heading.sizes.h4, 30);
   assert.equal(validateConfig({ font: { heading: { sizes: { h5: 999 } } } }).font.heading.sizes.h5, 28);
-  assert.equal(validateConfig({ font: { heading: { sizes: { h6: 1 } } } }).font.heading.sizes.h6, 7);
-  assert.equal(validateConfig({ font: { heading: { sizes: { h4: 1 } } } }).font.heading.sizes.h4, 7);
+  // Untergrenze 7 — mit kleinem Fliesstext, sonst hebt die Kette (h6 ≥ body) wieder an.
+  const small = { sizePt: 6 };
+  assert.equal(validateConfig({ font: { body: small, heading: { sizes: { h6: 1 } } } }).font.heading.sizes.h6, 7);
+  assert.equal(validateConfig({ font: { body: small, heading: { sizes: { h4: 1, h5: 1, h6: 1 } } } }).font.heading.sizes.h4, 7);
   assert.equal(validateConfig({ toc: { includePages: false } }).toc.includePages, false);
   // Unbekannter Wert faellt auf den Default zurueck, nicht auf `false`.
   assert.equal(validateConfig({ toc: { includePages: 'ja' } }).toc.includePages, true);
@@ -250,33 +252,25 @@ test('validateConfig: Bad Hex fällt auf Default zurück', () => {
   assert.equal(c.font.byline.color,  d.font.byline.color);
 });
 
-test('defaultConfig: neue Extras + Font-Rollen für Frontmatter/Autor', () => {
+test('defaultConfig: Font-Rollen für Frontmatter/Autor + imprintPosition', () => {
   const d = defaultConfig();
-  assert.equal(d.extras.isbn, '');
-  assert.equal(d.extras.copyright, '');
-  assert.equal(d.extras.frontMatter, '');
-  assert.equal(d.extras.authorBio, '');
   assert.equal(d.extras.imprintPosition, 'front');
   assert.ok(d.font.frontMatter && d.font.authorBio, 'Font-Rollen frontMatter/authorBio fehlen');
 });
 
-test('validateConfig: neue Extras + imprintPosition-Enum', () => {
+test('validateConfig: Titelei-TEXTE sind keine Profilfelder (Spiegelung aus book_publication im Job)', () => {
+  // routes/jobs/pdf-export.js spiegelt book_publication NACH der Validierung in
+  // config.extras — ein Profilfeld daneben waere ein zweiter, unsichtbarer Stand.
   const c = validateConfig({ extras: {
-    isbn: '978-3-16-148410-0',
-    copyright: '© 2026 X',
-    frontMatter: 'Motto',
-    authorBio: 'Bio',
+    isbn: '978-3-16-148410-0', copyright: '© 2026 X', frontMatter: 'Motto',
+    authorBio: 'Bio', dedication: 'D', imprint: 'I', subtitle: 'S', year: '2026',
     imprintPosition: 'back',
   }});
-  assert.equal(c.extras.isbn, '978-3-16-148410-0');
-  assert.equal(c.extras.copyright, '© 2026 X');
-  assert.equal(c.extras.frontMatter, 'Motto');
-  assert.equal(c.extras.authorBio, 'Bio');
+  for (const k of ['isbn', 'copyright', 'frontMatter', 'authorBio', 'dedication', 'imprint', 'subtitle', 'year']) {
+    assert.equal(c.extras[k], undefined, `extras.${k} darf das Profil nicht tragen`);
+  }
   assert.equal(c.extras.imprintPosition, 'back');
-  // Junk-Position fällt auf Default 'front' zurück.
   assert.equal(validateConfig({ extras: { imprintPosition: 'sideways' } }).extras.imprintPosition, 'front');
-  // ISBN über 20 Zeichen wird getrimmt.
-  assert.ok(validateConfig({ extras: { isbn: 'x'.repeat(50) } }).extras.isbn.length <= 20);
 });
 
 test('validateConfig: print.padToEvenPages — Default an, Bool-validiert', () => {
@@ -363,4 +357,62 @@ test('defaultConfig: Font-Rolle footnote vorhanden und kleiner als der Fliesstex
   assert.equal(typeof font.footnote.family, 'string');
   assert.ok(font.footnote.sizePt < font.body.sizePt, 'Apparat wird kleiner gesetzt als der Fliesstext');
   assert.equal(validateConfig({ font: { footnote: { sizePt: 999 } } }).font.footnote.sizePt, 72);
+});
+
+test('validateConfig: fehlende Slot-Keys behalten den Default, explizites "" bleibt leer', () => {
+  // Teilkonfiguration (Vorlage/Import) ohne footerCenter darf '{page}' nicht leeren.
+  const c = validateConfig({ layout: { footerLeft: 'x' } });
+  assert.equal(c.layout.footerCenter, '{page}');
+  assert.equal(c.layout.headerCenter, '{title}');
+  assert.equal(c.layout.footerLeft, 'x');
+  assert.equal(validateConfig({ layout: { footerCenter: '' } }).layout.footerCenter, '');
+  assert.equal(validateConfig({ layout: { footerCenter: 42 } }).layout.footerCenter, '{page}');
+});
+
+test('validateConfig: Ganzzahl-Felder werden gerundet', () => {
+  const c = validateConfig({ layout: { pageNumberStart: 2.6, pageNumberFirstVisible: 3.2, frontMatterNumberFirstVisible: 1.5 }, print: { dpiWarnThreshold: 299.6 } });
+  assert.equal(c.layout.pageNumberStart, 3);
+  assert.equal(c.layout.pageNumberFirstVisible, 3);
+  assert.equal(c.layout.frontMatterNumberFirstVisible, 2);
+  assert.equal(c.print.dpiWarnThreshold, 300);
+});
+
+test('validateConfig: Ueberschriften-Kette h1 ≥ … ≥ h6 ≥ body wird erzwungen', () => {
+  const c = validateConfig({ font: { body: { sizePt: 14 }, heading: { sizes: { h1: 24, h2: 18, h3: 20, h4: 13, h5: 12, h6: 11 } } } });
+  const s = c.font.heading.sizes;
+  const chain = [s.h1, s.h2, s.h3, s.h4, s.h5, s.h6, c.font.body.sizePt];
+  for (let i = 1; i < chain.length; i++) assert.ok(chain[i] <= chain[i - 1], `Kette bricht bei Index ${i}: ${chain}`);
+  // Angehoben, nicht abgeschnitten: h3 20 hebt h2 auf 20, body 14 hebt h4..h6.
+  assert.equal(s.h2, 20);
+  assert.equal(s.h6, 14);
+  // Defaults bleiben unberuehrt.
+  assert.deepEqual(validateConfig({}).font.heading.sizes, defaultConfig().font.heading.sizes);
+});
+
+test('validateConfig: Satzspiegel-Mindestmass kuerzt Raender proportional', () => {
+  const { textBlockMm, MIN_TEXT_WIDTH_MM, MIN_TEXT_HEIGHT_MM } = require('../../lib/pdf-export-defaults/geometry');
+  const c = validateConfig({ layout: {
+    pageSize: 'A6', marginsMm: { top: 80, right: 80, bottom: 80, left: 80 },
+    bodyInsetMm: { top: 0, right: 10, bottom: 0, left: 10 },
+  } });
+  const tb = textBlockMm(c.layout);
+  assert.ok(tb.width >= MIN_TEXT_WIDTH_MM - 0.05, `Breite ${tb.width}`);
+  assert.ok(tb.height >= MIN_TEXT_HEIGHT_MM - 0.05, `Hoehe ${tb.height}`);
+  // proportional: links/rechts bleiben gleich, Raender ≥ Feld-Minimum 5 mm.
+  assert.equal(c.layout.marginsMm.left, c.layout.marginsMm.right);
+  for (const k of ['top', 'right', 'bottom', 'left']) assert.ok(c.layout.marginsMm[k] >= 5);
+  // Custom-Format, schmal: 60 mm Breite mit 25+25 mm Rand.
+  const n = validateConfig({ layout: { pageSize: 'custom', customWidthMm: 60, customHeightMm: 120, marginsMm: { top: 10, right: 25, bottom: 10, left: 25 } } });
+  assert.ok(textBlockMm(n.layout).width >= MIN_TEXT_WIDTH_MM - 0.05);
+  // Ein brauchbares Layout bleibt unangetastet.
+  assert.deepEqual(validateConfig({}).layout.marginsMm, defaultConfig().layout.marginsMm);
+});
+
+test('Geometrie Server ↔ Frontend: gleiche Formate und Mindestmasse (Drift)', async () => {
+  const srv = require('../../lib/pdf-export-defaults/geometry');
+  const fe = await import('../../public/js/cards/pdf-export-geometry.js');
+  assert.deepEqual(fe.PAGE_DIMS_MM, srv.PAGE_DIMS_MM);
+  assert.equal(fe.MIN_TEXT_WIDTH_MM, srv.MIN_TEXT_WIDTH_MM);
+  assert.equal(fe.MIN_TEXT_HEIGHT_MM, srv.MIN_TEXT_HEIGHT_MM);
+  assert.deepEqual(fe.HEADING_LEVELS, srv.HEADING_LEVELS);
 });

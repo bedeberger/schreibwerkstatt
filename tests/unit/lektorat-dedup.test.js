@@ -1,5 +1,5 @@
 'use strict';
-// Tests fuer dedupFehler aus routes/jobs/lektorat.js.
+// Tests fuer die Findings-Nachbearbeitung aus routes/jobs/lektorat-filter.js.
 //
 // AI-Output (insb. lokale Modelle) enthaelt gelegentlich byte-gleiche
 // Duplikate desselben Findings — typisch bei mehrfachem Vorkommen eines
@@ -17,7 +17,7 @@ useTmpDb('lektorat-dedup');
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 require('../../db/migrations');
 
-const { dedupFehler, validateLektoratFehler, capStylisticFehler, STYLISTIC_TYPEN, _runSig } = require('../../routes/jobs/lektorat');
+const { dedupFehler, validateLektoratFehler, capStylisticFehler, STYLISTIC_TYPEN, _runSig } = require('../../routes/jobs/lektorat-filter');
 
 // validateLektoratFehler filtert gegen das Typ-Set des Buchtyp-Profils (SSoT:
 // public/js/prompts/lektorat-typen.js, ESM — hier nicht importierbar, weil diese
@@ -91,6 +91,24 @@ test('validateLektoratFehler verwirft Selbst-Widerruf-Einträge (DE + EN)', () =
   const out = validateLektoratFehler(input, 'en-US', NARRATIV);
   assert.equal(out.length, 1, 'nur der echte Genitiv-Fehler bleibt');
   assert.equal(out[0].original, 'wegen dem Regen');
+});
+
+test('validateLektoratFehler: blosse Abschwaecher kippen keinen echten Befund', () => {
+  // «möglicherweise», «vertretbar», «akzeptabel» stehen auch in echten Befunden —
+  // nur als Widerrufsform («ist vertretbar») verwerfen sie einen Eintrag.
+  const WISS = new Set([...NARRATIV, 'unbelegt']);
+  const keep = [
+    { typ: 'stil', original: 'Er ging.', korrektur: 'Er schlich.', erklaerung: 'Die Formulierung ist möglicherweise zu blass für die Szene.' },
+    { typ: 'unbelegt', original: 'Die Zahl stieg stark.', korrektur: 'Die Zahl stieg.', erklaerung: 'Die Behauptung ist möglicherweise nicht belegt.' },
+    { typ: 'stil', original: 'sehr sehr gross', korrektur: 'riesig', erklaerung: 'Eine vertretbare, aber schwache Doppelung; ein Wort trägt mehr.' },
+    { typ: 'grammatik', original: 'wegen dem', korrektur: 'wegen des', erklaerung: 'Umgangssprachlich akzeptabel klingend, schriftsprachlich Genitiv.' },
+  ];
+  const drop = [
+    { typ: 'grammatik', original: 'sassen', korrektur: 'sahsen', erklaerung: 'Die Schreibung ist hier vertretbar.' },
+    { typ: 'stil', original: 'ging', korrektur: 'lief', erklaerung: 'Beide Varianten sind stilistisch akzeptabel.' },
+  ];
+  const out = validateLektoratFehler([...keep, ...drop], 'de-DE', WISS);
+  assert.deepEqual(out.map(f => f.original), keep.map(f => f.original));
 });
 
 test('dedupFehler behaelt Reihenfolge des ersten Vorkommens', () => {

@@ -98,7 +98,8 @@ textarea:disabled,
    sitzt versetzt rechts daneben. Block + Top-Divider = eigenständige Section,
    Toggle linksbündig als Header, Body fliesst darunter. */
 .card-form-row--dict,
-.card-form-row--devices {
+.card-form-row--devices,
+.card-form-row--ai-access {
   display: block;
   border-top: var(--border-thin) solid var(--color-border);
   padding-top: var(--space-10);

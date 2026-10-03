@@ -127,12 +127,12 @@ export {
   SYSTEM_KOMPLETT_ORTE_PASS,
   SYSTEM_KOMPLETT_FAKTEN_PASS,
   getLocalePromptsForBook,
+  getResearchPromptContext,
   getBuchtypReviewSchwerpunkt,
 } from './prompts/core.js';
 
 export {
   buildLektoratPrompt,
-  buildBatchLektoratPrompt,
   buildStilLektoratPrompt,
   buildLektoratSchema,
   SCHEMA_LEKTORAT,
@@ -144,7 +144,7 @@ export {
 } from './prompts/lektorat-objektiv.js';
 
 // Fehlertyp-Profile pro Buchtyp – SSoT auch für die Server-Seite (Validierung des
-// AI-Outputs in routes/jobs/lektorat.js).
+// AI-Outputs in routes/jobs/lektorat-page.js).
 export {
   lektoratProfil,
   lektoratTypen,
@@ -297,6 +297,14 @@ export {
   SCHEMA_CHAT_TITLE,
 } from './prompts/chat.js';
 
+export { formatHistoryVorschlaege, historyTrimNote, formatPageChange } from './prompts/page-chat.js';
+
+// Buch-Chat-only: Aussenwelt-Regel + Synthese-Aufforderung beim Kosten-Deckel.
+export {
+  BOOK_CHAT_OUTSIDE_WORLD_RULE,
+  BOOK_CHAT_BUDGET_FINAL_INSTRUCTION,
+} from './prompts/book-chat-tools.js';
+
 export {
   buildSynonymPrompt,
   SCHEMA_SYNONYM,
@@ -334,8 +342,21 @@ export {
   buildPlotConsistencyPrompt,
   SCHEMA_PLOT_BRAINSTORM,
   SCHEMA_PLOT_CONSISTENCY,
+  buildPlotConsistencySchema,
   PLOT_SEVERITY_ENUM,
+  PLOT_KONFLIKT_TYP_ENUM,
+  PLOT_AKTION_REL_TYPES,
 } from './prompts/plot.js';
+
+export {
+  buildPlotChatSystemPrompt,
+  buildPlotProposalMemoryBlock,
+  PLOT_CHAT_PROPOSE_TOOLS,
+  PLOT_CHAT_READ_TOOL_NAMES,
+  PLOT_CHAT_SLIM_READ_TOOL_NAMES,
+  PLOT_CHAT_FORCE_FINAL_INSTRUCTION,
+  SCHEMA_PLOT_CHAT_CLASSIC,
+} from './prompts/plot-chat.js';
 
 export {
   buildMotivSystemPrompt,
@@ -379,6 +400,11 @@ export {
   buildResearchLinkPrompt,
   SCHEMA_RESEARCH_LINK,
   buildResearchChatAgentSystemPrompt,
+  buildResearchProposalMemoryBlock,
+  buildResearchWritingContextBlock,
+  buildSystemResearchCrosscheck,
+  buildResearchCrosscheckPrompt,
+  SCHEMA_RESEARCH_CROSSCHECK,
   RESEARCH_CHAT_TOOLS,
   buildResearchChatTools,
   RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION,

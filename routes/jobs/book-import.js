@@ -15,7 +15,7 @@ const {
 const contentStore = require('../../lib/content-store');
 const { validateManifest, validateBookJson, planFromNodes, normalizeIncludes } = require('../../lib/book-bundle');
 const { restoreExtras } = require('../../db/book-migration-data');
-const { saveBookSettings, setBookEntitiesEnabled } = require('../../db/schema');
+const { materializeOps, applyBundleSettings } = require('../../lib/bundle-apply');
 const { setContext } = require('../../lib/log-context');
 const bookAccess = require('../../db/book-access');
 const { db } = require('../../db/connection');
@@ -86,70 +86,28 @@ async function runBookImportJob(jobId, { userEmail }) {
 
     // Buch-Konfig (authored). allow_lektor_book_chat bewusst auf 0 — ACL-relevant,
     // instanzspezifisch.
-    const s = bookJson.book.settings;
-    if (s && typeof s === 'object') {
-      try {
-        saveBookSettings(
-          bookId, s.language || 'de', s.region || 'CH', s.buchtyp || null, s.buch_kontext || null,
-          s.erzaehlperspektive || null, s.erzaehlzeit || null, s.is_finished ? 1 : 0, 0,
-          Number.isFinite(s.daily_goal_chars) ? s.daily_goal_chars : null,
-          s.orte_real ? 1 : 0, s.schauplatz_land || null,
-        );
-        if (s.entities_enabled) setBookEntitiesEnabled(bookId, 1);
-      } catch (e) { log.warn(`book-import: Settings-Uebernahme fehlgeschlagen: ${e.message}`); }
-    }
+    try { applyBundleSettings(bookId, bookJson.book.settings, { allowLektorBookChat: 0 }); }
+    catch (e) { log.warn(`book-import: Settings-Uebernahme fehlgeschlagen: ${e.message}`); }
 
-    // Kapitel + Seiten in Op-Reihenfolge anlegen. tempId -> echte chapter_id.
-    // srcId -> neue ID baut die Remap-Maps fuer die optionalen Extra-Bloecke.
-    const chapterIdByTemp = new Map();
-    const pageIdMap = new Map();    // srcPageId    -> neue page_id
-    const chapterIdMap = new Map(); // srcChapterId -> neue chapter_id
-    const total = ops.length;
-    let done = 0;
-    let pagesCreated = 0;
-    let chaptersCreated = 0;
-
-    for (const o of ops) {
-      done += 1;
-      if (done % 10 === 0 || done === total) {
+    // Kapitel + Seiten anlegen (gemeinsamer Schreibpfad mit dem Fassungs-Restore):
+    // Reihenfolge inkl. Interleaving, excluded-Flag, Kapitel-Querverweise auf die
+    // neuen IDs. srcId -> neue ID fuellt die Remap-Maps fuer die Extra-Bloecke.
+    const applied = await materializeOps(bookId, ops, ctx, {
+      replace: true,
+      onProgress: (done, total) => {
+        if (done % 10 !== 0 && done !== total) return;
         updateJob(jobId, {
           progress: 25 + Math.round(65 * (done / total)),
           statusText: 'job.book-import.creatingPages',
           statusParams: { current: done, total },
         });
-      }
-      const parentChapterId = o.parentTempId == null ? null : (chapterIdByTemp.get(o.parentTempId) ?? null);
-      if (o.op === 'chapter') {
-        try {
-          const ch = await contentStore.createChapter(
-            { book_id: bookId, name: o.name || '', parent_chapter_id: parentChapterId },
-            ctx,
-          );
-          chapterIdByTemp.set(o.tempId, ch.id);
-          if (o.srcId != null) chapterIdMap.set(o.srcId, ch.id);
-          chaptersCreated += 1;
-        } catch (e) { log.warn(`book-import: createChapter «${o.name}» fail: ${e.message}`); }
-      } else if (o.op === 'page') {
-        try {
-          const pg = await contentStore.createPage(
-            { book_id: bookId, chapter_id: parentChapterId, name: o.name || '', html: o.html || '' },
-            ctx,
-          );
-          if (o.srcId != null && pg?.id) pageIdMap.set(o.srcId, pg.id);
-          pagesCreated += 1;
-          // Mitgefuehrte Manuskript-Bilder unter der neuen page_id neu einfuegen
-          // + /content/page-image/<oldId>-Refs im HTML auf die neuen IDs mappen.
-          if (pg?.id && o.images?.length) {
-            const { restorePageImages } = require('../../db/page-images');
-            const rewritten = restorePageImages(pg.id, o.html || '', o.images);
-            if (rewritten != null) {
-              try { await contentStore.savePage(pg.id, { html: rewritten, source: 'import' }, ctx); }
-              catch (e) { log.warn(`book-import: Bild-Rewrite «${o.name}» fail: ${e.message}`); }
-            }
-          }
-        } catch (e) { log.warn(`book-import: createPage «${o.name}» fail: ${e.message}`); }
-      }
-    }
+      },
+    });
+    const pageIdMap = applied.pageIdBySrc;       // srcPageId    -> neue page_id
+    const chapterIdMap = applied.chapterIdBySrc; // srcChapterId -> neue chapter_id
+    const pagesCreated = applied.created.pages;
+    const chaptersCreated = applied.created.chapters;
+    if (applied.failed) log.warn(`book-import: ${applied.failed} Kapitel/Seiten nicht angelegt`);
 
     log.info(`book-import abgeschlossen: ${pagesCreated} Seiten, ${chaptersCreated} Kapitel`);
 
@@ -157,13 +115,14 @@ async function runBookImportJob(jobId, { userEmail }) {
     // Non-fatal: scheitert das, bleibt das Buch mit Inhalt erhalten.
     const includes = normalizeIncludes(manifest.includes);
     let extrasResult = null;
-    if (includes.analysis || includes.lektorat || includes.chats) {
+    if (includes.analysis || includes.lektorat || includes.chats || includes.research) {
       updateJob(jobId, { progress: 92, statusText: 'job.book-import.restoringExtras' });
       const extras = {};
       try {
         if (includes.analysis) extras.analysis = await _readJsonEntry(zip, 'analysis.json');
         if (includes.lektorat) extras.lektorat = await _readJsonEntry(zip, 'lektorat.json');
         if (includes.chats)    extras.chats = await _readJsonEntry(zip, 'chats.json');
+        if (includes.research) extras.research = await _readJsonEntry(zip, 'research.json');
         extrasResult = restoreExtras(bookId, extras, { pageIdMap, chapterIdMap }, userEmail);
         log.info(`book-import Extras wiederhergestellt: ${JSON.stringify(extrasResult)}`);
       } catch (e) {

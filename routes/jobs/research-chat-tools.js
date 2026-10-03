@@ -16,9 +16,11 @@ const searchIndex = require('../../lib/search');
 const embed = require('../../lib/embed');
 const semanticRetrieval = require('../../lib/semantic-retrieval');
 const {
-  PROPOSAL_KINDS, LIST_FILTER_KINDS, TITLE_MAX, BODY_MAX, SOURCE_MAX,
-  cleanStr, normalizeUrls, normalizeTags,
+  PROPOSAL_KINDS, LIST_FILTER_KINDS, TITLE_MAX, BODY_MAX, SOURCE_MAX, RESEARCH_STATUS_SET,
+  cleanStr, normalizeUrls, normalizeTags, normalizeTitleForMatch,
 } = require('../../lib/research-validate');
+const { findDuplicateItem, attachRelations, itemIdsAtPlace } = require('../../db/research-items');
+const sourceLookup = require('../../lib/source-lookup');
 
 // FTS-Vorfilter weit fassen (wie das Board), dann auf ITEM_LIST_MAX kappen.
 const FTS_LIMIT = 500;
@@ -29,11 +31,36 @@ const MAX_PROPOSALS = 12;
 
 const _snip = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 
+// Verknuepfungen eines Fundstuecks, kompakt fuers Modell: `stellen` = Kapitel/
+// Seiten (wo es im Buch steht bzw. eingearbeitet ist), `bezug` = Figuren, Orte,
+// Szenen, Beats, Straenge. Labels kommen aus db/research-items#attachRelations.
+function _linkView(links) {
+  const stellen = [];
+  const bezug = [];
+  for (const l of (links || [])) {
+    const e = { art: l.target_kind, id: l.target_id, name: l.label || '' };
+    (l.target_kind === 'chapter' || l.target_kind === 'page' ? stellen : bezug).push(e);
+  }
+  return { stellen, bezug };
+}
+
 // ── list_research_items ──────────────────────────────────────────────────────
+// Geteilt mit dem Buch-Chat (book-chat-tools/tools-research.js).
 function tool_list_research_items(input, ctx) {
   const where = ['ri.book_id = ?', 'ri.archived = 0'];
   const vals = [ctx.bookId];
   if (LIST_FILTER_KINDS.has(input.kind)) { where.push('ri.kind = ?'); vals.push(input.kind); }
+  if (RESEARCH_STATUS_SET.has(input.status)) { where.push('ri.status = ?'); vals.push(input.status); }
+  // Kapitel-Filter umfasst direkt am Kapitel verknuepfte Fundstuecke UND solche an
+  // Seiten des Kapitels (gleiche Regel wie list_ideen).
+  const chapterId = parseInt(input.chapter_id, 10);
+  const pageId = parseInt(input.page_id, 10);
+  if (pageId || chapterId) {
+    const ids = itemIdsAtPlace(ctx.bookId, pageId ? { pageId } : { chapterId });
+    if (!ids.length) return { items: [], count: 0, total: 0, truncated: false };
+    where.push(`ri.id IN (${ids.map(() => '?').join(',')})`);
+    vals.push(...ids);
+  }
 
   const q = String(input.q || '').trim();
   if (q) {
@@ -53,7 +80,7 @@ function tool_list_research_items(input, ctx) {
   const total = db.prepare(`SELECT COUNT(*) AS n FROM research_items ri WHERE ${where.join(' AND ')}`).get(...vals)?.n || 0;
 
   const rows = db.prepare(
-    `SELECT ri.id, ri.kind, ri.title, ri.body, ri.source, ri.doc_name,
+    `SELECT ri.id, ri.kind, ri.title, ri.body, ri.source, ri.doc_name, ri.status,
             (ri.doc_mime IS NOT NULL) AS has_doc
        FROM research_items ri
       WHERE ${where.join(' AND ')}
@@ -74,14 +101,18 @@ function tool_list_research_items(input, ctx) {
   const urlsBy = new Map();
   for (const u of urlRows) { if (!urlsBy.has(u.item_id)) urlsBy.set(u.item_id, []); urlsBy.get(u.item_id).push(u.url); }
 
+  const linksBy = new Map(attachRelations(rows.map(r => ({ id: r.id }))).map(r => [r.id, r.links]));
+
   const items = rows.map(r => {
     const urls = urlsBy.get(r.id) || [];
     return {
       id: r.id,
       kind: r.kind,
+      status: r.status,
       title: r.title || '',
       snippet: _snip(r.body || urls[0] || r.source, SNIPPET_MAX),
       tags: tagsBy.get(r.id) || [],
+      ..._linkView(linksBy.get(r.id)),
       url_count: urls.length,
       has_doc: !!r.has_doc,
       ...(r.doc_name ? { doc_name: r.doc_name } : {}),
@@ -95,7 +126,7 @@ function tool_read_research_item(input, ctx) {
   const id = parseInt(input.id, 10);
   if (!id) return { error: 'id fehlt oder ungültig.' };
   const row = db.prepare(
-    `SELECT id, kind, title, body, source, doc_name, doc_text
+    `SELECT id, kind, title, body, source, doc_name, doc_text, status
        FROM research_items WHERE id = ? AND book_id = ?`
   ).get(id, ctx.bookId);
   if (!row) return { error: 'Eintrag nicht gefunden.' };
@@ -108,9 +139,16 @@ function tool_read_research_item(input, ctx) {
   // search_research_passages(item_id) erreichbar.
   const docText = String(row.doc_text || '');
   const docTruncated = docText.length > DOC_TEXT_MAX;
+  const [withLinks] = attachRelations([{ id: row.id }]);
+  // Der Buch-Chat hat kein search_research_passages — sein Hinweis darf es nicht empfehlen.
+  const moreHint = ctx.researchPassages === false
+    ? 'Der Rest des Dokuments ist im Buch-Chat nicht erreichbar; für Stellen weiter hinten den Recherche-Chat empfehlen.'
+    : `Für Stellen weiter hinten: search_research_passages mit item_id=${row.id} und deiner Frage.`;
   return {
     id: row.id,
     kind: row.kind,
+    status: row.status,
+    ..._linkView(withLinks.links),
     title: row.title || '',
     body: row.body || '',
     urls,
@@ -121,7 +159,7 @@ function tool_read_research_item(input, ctx) {
       doc_text: docText.slice(0, DOC_TEXT_MAX),
       doc_chars: docText.length,
       doc_truncated: docTruncated,
-      ...(docTruncated ? { hinweis: `Nur die ersten ${DOC_TEXT_MAX} von ${docText.length} Zeichen. Für Stellen weiter hinten: search_research_passages mit item_id=${row.id} und deiner Frage.` } : {}),
+      ...(docTruncated ? { hinweis: `Nur die ersten ${DOC_TEXT_MAX} von ${docText.length} Zeichen. ${moreHint}` } : {}),
     } : {}),
   };
 }
@@ -225,6 +263,69 @@ function tool_list_book_entities(input, ctx) {
   };
 }
 
+// ── lookup_literature ────────────────────────────────────────────────────────
+// Bibliografische Register statt Web-Trefferseiten: Crossref (Aufsaetze, alles
+// mit DOI) und OpenLibrary (Buecher), feste Hosts in lib/source-lookup.js — kein
+// SSRF-Pfad, der User-Input landet nur URL-encodiert in Query/Pfad. Liefert
+// zitierfaehige Kerndaten (Autoren, Jahr, DOI/ISBN). Die Treffer-URLs merkt sich
+// ctx.literatureHits: sie sind in diesem Lauf gesehen und darum als Beleg in
+// final_answer.quellen zulaessig (validateAnswerSources, `extra`).
+const LITERATURE_ROWS_DEFAULT = 5;
+
+function _persons(list) {
+  return (list || []).slice(0, 6).map(a => (typeof a === 'string' ? a : [a?.given, a?.family].filter(Boolean).join(' ') || a?.literal || ''))
+    .filter(Boolean).join(', ');
+}
+
+function _literatureView(draft, register) {
+  const url = draft.doi ? `https://doi.org/${draft.doi}`
+    : (draft.url || (draft.isbn ? `https://openlibrary.org/isbn/${encodeURIComponent(draft.isbn)}` : null));
+  return {
+    titel: draft.title || '',
+    autoren: _persons(draft.authors) || _persons(draft.editors),
+    jahr: draft.year || null,
+    typ: draft.csl_type,
+    ...(draft.container_title ? { in: draft.container_title } : {}),
+    ...(draft.publisher ? { verlag: draft.publisher } : {}),
+    ...(draft.doi ? { doi: draft.doi } : {}),
+    ...(draft.isbn ? { isbn: draft.isbn } : {}),
+    ...(url ? { url } : {}),
+    register,
+  };
+}
+
+function _rememberLiterature(ctx, views) {
+  if (!ctx) return;
+  if (!Array.isArray(ctx.literatureHits)) ctx.literatureHits = [];
+  for (const v of views) if (v.url) ctx.literatureHits.push({ url: v.url, title: v.titel || v.url });
+}
+
+async function tool_lookup_literature(input, ctx) {
+  try {
+    if (input.doi || input.isbn) {
+      const draft = input.doi ? await sourceLookup.lookupDoi(input.doi) : await sourceLookup.lookupIsbn(input.isbn);
+      if (!draft) return { treffer: [], hinweis: 'Unter dieser Kennung kein Eintrag im Register.' };
+      const view = _literatureView(draft, input.doi ? 'crossref' : 'openlibrary');
+      _rememberLiterature(ctx, [view]);
+      return { treffer: [view] };
+    }
+    const q = String(input.q || '').trim();
+    if (!q) return { error: 'q, doi oder isbn angeben.' };
+    const register = ['artikel', 'buch', 'beide'].includes(input.register) ? input.register : 'beide';
+    const { hits, failed } = await sourceLookup.searchLiterature(q, { register, rows: input.anzahl || LITERATURE_ROWS_DEFAULT });
+    const views = hits.map(h => _literatureView(h.draft, h.register));
+    _rememberLiterature(ctx, views);
+    return {
+      q, treffer: views, count: views.length,
+      // Ein ausgefallenes Register ist kein „dazu gibt es nichts".
+      ...(failed.length ? { register_ausgefallen: failed, hinweis: 'Ein Register war nicht erreichbar — fehlende Treffer dort sind keine Fehlanzeige.' } : {}),
+    };
+  } catch (e) {
+    ctx?.logger?.warn?.(`[research-chat] Literatur-Suche fehlgeschlagen: ${e.message}`);
+    return { error: 'Literatur-Register nicht erreichbar. Nutze web_search.' };
+  }
+}
+
 // ── propose_research_item ────────────────────────────────────────────────────
 // Persistiert NICHTS — sammelt nur in ctx.proposals; der User bestätigt im Frontend.
 function tool_propose_research_item(input, ctx) {
@@ -247,9 +348,29 @@ function tool_propose_research_item(input, ctx) {
   if ((ctx.proposals?.length || 0) >= MAX_PROPOSALS) {
     return { ok: false, error: `Maximal ${MAX_PROPOSALS} Vorschläge pro Antwort.` };
   }
+  // Wortgleicher Titel schon in DIESER Antwort vorgeschlagen → kein zweiter Knopf.
+  const tNorm = normalizeTitleForMatch(title);
+  if (tNorm && ctx.proposals.some(p => normalizeTitleForMatch(p.title) === tNorm)) {
+    return { ok: false, error: 'Ein Vorschlag mit diesem Titel steht in dieser Antwort schon.' };
+  }
+
   const proposal = { kind, title, body, urls, source, tags };
+  // Abgleich mit dem Archiv (gleiche URL oder wortgleicher Titel): der Vorschlag
+  // bleibt stehen, trägt aber die Id des bestehenden Eintrags — das Frontend
+  // zeigt „schon im Board" statt eines blinden Speichern-Knopfs.
+  const dup = findDuplicateItem(ctx.bookId, { urls, title });
+  if (dup) {
+    proposal.exists_item_id = dup.id;
+    proposal.exists_match = dup.match;
+  }
   ctx.proposals.push(proposal);
-  return { ok: true, accepted_as_proposal: true, kind, title: title || urls[0]?.url || _snip(body, 60) };
+  return {
+    ok: true, accepted_as_proposal: true, kind, title: title || urls[0]?.url || _snip(body, 60),
+    ...(dup ? {
+      already_in_archive: { id: dup.id, title: dup.title || '', match: dup.match },
+      hinweis: 'Ein Eintrag mit dieser URL bzw. diesem Titel liegt schon im Archiv. Der User sieht das am Vorschlag; erwähne es in der Antwort.',
+    } : {}),
+  };
 }
 
 // ── Dispatcher ───────────────────────────────────────────────────────────────
@@ -257,6 +378,7 @@ const TOOLS = {
   list_research_items: tool_list_research_items,
   read_research_item:  tool_read_research_item,
   search_research_passages: tool_search_research_passages,
+  lookup_literature:   tool_lookup_literature,
   list_book_entities:  tool_list_book_entities,
   propose_research_item: tool_propose_research_item,
 };

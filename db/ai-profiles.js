@@ -3,6 +3,14 @@
 // User zugewiesen werden (app_users.ai_profile_id). Keine direkte SQL aus
 // Konsumenten.
 //
+// Zwei Arten von Profil:
+//   - Admin-Profil (`owner_email IS NULL`) — Instanz-Konfiguration, im Admin
+//     gepflegt und Usern zugewiesen.
+//   - Eigener Zugang (`owner_email` gesetzt) — ein Konto traegt seinen eigenen
+//     API-Zugang (Claude oder OpenAI-kompatibel), hoechstens einen. Er taucht in
+//     keiner Admin-Liste auf und ist nicht zuweisbar; ob er greift, entscheidet
+//     lib/ai/profile.js#activeProfile (App-Setting `ai.user_api.enabled`).
+//
 // JEDE Parameter-Spalte ist NULLBAR und bedeutet dann „nimm den globalen Wert
 // `ai.<provider>.<key>`" — die Aufloesung dieses Overlays liegt in
 // lib/ai/profile.js#aiSetting, NICHT hier. Dieses Modul ist reine Persistenz und
@@ -34,23 +42,25 @@ const PROFILE_FIELD_KEYS = PROFILE_FIELDS.map(f => f.key);
 const _SELECT = `
   SELECT id, name, provider, model, host, api_key, cloud, temperature,
          context_window, max_tokens_out, repeat_penalty, think, max_parallel,
-         notes, created_by, created_at, updated_at
+         notes, created_by, owner_email, created_at, updated_at
     FROM ai_profiles
 `;
 
 const _stmtGet     = db.prepare(`${_SELECT} WHERE id = ?`);
 const _stmtGetName = db.prepare(`${_SELECT} WHERE name = ?`);
-const _stmtList    = db.prepare(`${_SELECT} ORDER BY provider, name`);
+const _stmtList    = db.prepare(`${_SELECT} WHERE owner_email IS NULL ORDER BY provider, name`);
+const _stmtGetOwn  = db.prepare(`${_SELECT} WHERE owner_email = ?`);
+const _stmtDelOwn  = db.prepare('DELETE FROM ai_profiles WHERE owner_email = ?');
 const _stmtDelete  = db.prepare('DELETE FROM ai_profiles WHERE id = ?');
 const _stmtUsage   = db.prepare('SELECT COUNT(*) AS n FROM app_users WHERE ai_profile_id = ?');
 
 const _stmtInsert = db.prepare(`
   INSERT INTO ai_profiles (name, provider, model, host, api_key, cloud, temperature,
                            context_window, max_tokens_out, repeat_penalty, think,
-                           max_parallel, notes, created_by, created_at, updated_at)
+                           max_parallel, notes, created_by, owner_email, created_at, updated_at)
   VALUES (@name, @provider, @model, @host, @api_key, @cloud, @temperature,
           @context_window, @max_tokens_out, @repeat_penalty, @think,
-          @max_parallel, @notes, @created_by, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
+          @max_parallel, @notes, @created_by, @owner_email, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})
 `);
 
 const _stmtUpdate = db.prepare(`
@@ -149,7 +159,7 @@ function createProfile(src, createdBy) {
   const p = _normalize(src || {}, null);
   if (!p.name) throw new Error('createProfile: name required');
   if (!p.provider) throw new Error('createProfile: provider required');
-  const info = _stmtInsert.run({ ...p, created_by: createdBy || null });
+  const info = _stmtInsert.run({ ...p, created_by: createdBy || null, owner_email: null });
   return getProfile(info.lastInsertRowid);
 }
 
@@ -176,6 +186,38 @@ function deleteProfile(id) {
   return { deleted: info.changes > 0, detachedUsers: affected };
 }
 
+// ── Eigener Zugang eines Kontos ─────────────────────────────────────────────
+// Der Name ist nur das Pflichtfeld der Tabelle (UNIQUE, NOT NULL) und wird nirgends
+// angezeigt; die E-Mail macht ihn eindeutig.
+function _ownName(email) { return `own:${email}`; }
+
+/** Eigener Zugang dieses Kontos (oder null). Ohne API-Key, wie getProfile. */
+function getOwnProfile(email) {
+  if (!email) return null;
+  return _shape(_stmtGetOwn.get(String(email).toLowerCase()));
+}
+
+/** Legt den eigenen Zugang an oder ersetzt ihn. `api_key: '__unchanged__'` behaelt
+ *  den gespeicherten Key — die Profil-Seite bekommt ihn nie im Klartext zurueck. */
+function saveOwnProfile(email, src) {
+  const owner = String(email || '').toLowerCase();
+  if (!owner) throw new Error('saveOwnProfile: email required');
+  const prev = _stmtGetOwn.get(owner);
+  const p = _normalize({ ...src, name: _ownName(owner) }, prev);
+  if (!p.provider) throw new Error('saveOwnProfile: provider required');
+  if (prev) {
+    _stmtUpdate.run({ ...p, id: prev.id });
+  } else {
+    _stmtInsert.run({ ...p, created_by: owner, owner_email: owner });
+  }
+  return getOwnProfile(owner);
+}
+
+function deleteOwnProfile(email) {
+  if (!email) return false;
+  return _stmtDelOwn.run(String(email).toLowerCase()).changes > 0;
+}
+
 function profileUsageCount(id) {
   const n = parseInt(id, 10);
   if (!Number.isInteger(n)) return 0;
@@ -186,4 +228,5 @@ module.exports = {
   PROFILE_FIELDS, PROFILE_FIELD_KEYS,
   getProfile, getProfileByName, listProfiles, apiKeyOf,
   createProfile, updateProfile, deleteProfile, profileUsageCount,
+  getOwnProfile, saveOwnProfile, deleteOwnProfile,
 };

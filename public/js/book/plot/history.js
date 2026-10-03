@@ -37,6 +37,7 @@ export const historyMethods = {
   _clearHistory() {
     this._undoStack = [];
     this._redoStack = [];
+    this._historyEpoch = (this._historyEpoch || 0) + 1;
   },
 
   _pushUndo(record, { clearRedo = true } = {}) {
@@ -130,18 +131,27 @@ export const historyMethods = {
   // wiederhergestellte Mutation sich selbst wieder aufzeichnet). Innerhalb des
   // try-Blocks aufgezeichnet, fiele der Redo→Undo-Rückweg genau darauf herein —
   // nach einem Redo wäre nichts mehr rückgängig zu machen.
+  // Während des Flights steht zusätzlich `busy`: die Buttons sind gesperrt (kein
+  // Doppelklick-Doppel-Undo) und jede interaktive Mutation kehrt früh zurück —
+  // sonst landete ihr Record zwischen Pop und Gegen-Push. Leert ein Applier die
+  // Historie (Fehler → loadBoard-Rollback), wird der Record nicht zurückgelegt:
+  // er gehörte zu einem Stack, den es nicht mehr gibt (`_historyEpoch`).
   async plotHistoryUndo() {
     if (this.busy || this._inHistoryFlight) return;
     this._closeOpenBeatEdit();
     const rec = this._undoStack.pop();
     if (!rec) return;
+    const epoch = this._historyEpoch || 0;
     this._inHistoryFlight = true;
+    this.busy = true;
     let ok = false;
     try {
       ok = await this._applyInverse(rec);
     } finally {
       this._inHistoryFlight = false;
+      this.busy = false;
     }
+    if ((this._historyEpoch || 0) !== epoch) return;
     if (!ok) { this._undoStack.push(rec); return; }
     // Nach dem Undo eines Create wäre jedes Redo eine Neuanlage mit neuer ID →
     // Records, die die alte referenzieren, wären Nieten. Stack komplett fallen lassen.
@@ -154,13 +164,17 @@ export const historyMethods = {
     this._closeOpenBeatEdit();
     const rec = this._redoStack.pop();
     if (!rec) return;
+    const epoch = this._historyEpoch || 0;
     this._inHistoryFlight = true;
+    this.busy = true;
     let ok = false;
     try {
       ok = await this._applyForward(rec);
     } finally {
       this._inHistoryFlight = false;
+      this.busy = false;
     }
+    if ((this._historyEpoch || 0) !== epoch) return;
     if (!ok) { this._redoStack.push(rec); return; }
     this._pushUndo(rec, { clearRedo: false });
   },
@@ -233,10 +247,8 @@ export const historyMethods = {
       const updated = await fetchJson(`/plot/beats/${id}`, {
         method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(fields),
       });
-      // Die PATCH-Antwort trägt kein occ_count/occ_top (nur GET /plot hängt sie an) —
-      // vorhandene Werte übernehmen, sonst kippt das Anchor-Badge auf 'drift'.
-      const cur = (this.beats || []).find(b => b.id === id);
-      this._replaceBeat(cur ? { ...updated, occ_count: cur.occ_count, occ_top: cur.occ_top } : updated);
+      // _replaceBeat merged über _mergeBeatRow (occ_count/occ_top bleiben stehen).
+      this._replaceBeat(updated);
       app.refreshPlotBeatCounts?.();
       this.errorMessage = '';
       return true;
@@ -282,6 +294,7 @@ export const historyMethods = {
   // Scopes, Index = Position — wie moveAct sendet).
   async _hApplyActOrder(ids) {
     const app = window.__app;
+    const snapshot = this.acts;
     const pos = new Map((ids || []).map((id, i) => [id, i]));
     this.acts = (this.acts || []).map(a => (pos.has(a.id) ? { ...a, position: pos.get(a.id) } : a));
     this._memos = {};
@@ -293,6 +306,9 @@ export const historyMethods = {
       this.errorMessage = '';
       return true;
     } catch (e) {
+      // Lokalen Stand zurückdrehen — der Server hat die Reihenfolge nicht übernommen.
+      this.acts = snapshot;
+      this._memos = {};
       this.errorMessage = app.t('plot.error.save');
       return false;
     }
@@ -300,6 +316,7 @@ export const historyMethods = {
 
   async _hApplyThreadOrder(ids) {
     const app = window.__app;
+    const snapshot = this.threads;
     const pos = new Map((ids || []).map((id, i) => [id, i]));
     this.threads = (this.threads || [])
       .map(t => (pos.has(t.id) ? { ...t, position: pos.get(t.id) } : t))
@@ -313,6 +330,8 @@ export const historyMethods = {
       this.errorMessage = '';
       return true;
     } catch (e) {
+      this.threads = snapshot;
+      this._memos = {};
       this.errorMessage = app.t('plot.error.save');
       return false;
     }
@@ -322,12 +341,9 @@ export const historyMethods = {
     const app = window.__app;
     try {
       await fetchJson(`/plot/beats/${id}`, { method: 'DELETE' });
-      this.beats = (this.beats || []).filter(b => b.id !== id);
-      // Server kaskadiert die Kanten dieses Beats — lokal nachziehen.
-      this.relations = (this.relations || []).filter(r => r.from_beat_id !== id && r.to_beat_id !== id);
-      this._memos = {};
-      if (this.editingBeatId === id) this.cancelEditBeat();
-      app.refreshPlotBeatCounts?.();
+      // Server kaskadiert die Kanten — _pruneBeatsLocal zieht Beat, Kanten, Edit,
+      // Kapitel-Indikator und Zeit-Messung lokal nach (Historie bleibt: Applier).
+      this._pruneBeatsLocal([id]);
       this.errorMessage = '';
       return true;
     } catch (e) {
@@ -352,14 +368,10 @@ export const historyMethods = {
     }
     try {
       await fetchJson(`/plot/acts/${id}`, { method: 'DELETE' });
+      const gone = (this.beats || []).filter(b => b.act_id === id).map(b => b.id);
       this.acts = (this.acts || []).filter(a => a.id !== id);
-      const gone = new Set((this.beats || []).filter(b => b.act_id === id).map(b => b.id));
-      this.beats = (this.beats || []).filter(b => b.act_id !== id);
-      this.relations = (this.relations || []).filter(r => !gone.has(r.from_beat_id) && !gone.has(r.to_beat_id));
-      this._memos = {};
       if (this.editingActId === id) this.cancelEditAct();
-      if (gone.has(this.editingBeatId)) this.cancelEditBeat();
-      app.refreshPlotBeatCounts?.();
+      this._pruneBeatsLocal(gone);
       this.errorMessage = '';
       return true;
     } catch (e) {

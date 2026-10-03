@@ -14,7 +14,9 @@ export const coverageMethods = {
   // (operiert weiter auf beatsForAct/filteredBeatsForAct mit allen Beats).
   visibleBeatsForAct(actId) {
     const base = this.filteredBeatsForAct(actId);
-    if (this.verworfenOpen[actId]) return base;
+    // Status-Filter „verworfen" zeigt genau die verworfenen — eingeklappt
+    // bliebe die Spalte leer.
+    if (this.verworfenOpen[actId] || this.plotFilters.status === 'verworfen') return base;
     return this._memo(`vbeats:${actId}`, [base], () => base.filter(b => !b.verworfen));
   },
 
@@ -174,7 +176,9 @@ export const coverageMethods = {
     return (!txt || (b.titel || '').toLowerCase().includes(txt) || (b.beschreibung || '').toLowerCase().includes(txt)) &&
            (!f.kapitel || this.effectiveChapterNameForBeat(b) === f.kapitel) &&
            (!this.plotHideImBuch || b.status !== 'im_buch') &&
-           (!f.status || b.status === f.status) &&
+           // „verworfen" ist kein Status-Wert, sondern die Flag-Achse — als
+           // Filter-Option zeigt sie nur die verworfenen Beats.
+           (!f.status || (f.status === 'verworfen' ? !!b.verworfen : b.status === f.status)) &&
            (!f.figurId || this._beatInvolvesCatalog(b, f.figurId)) &&
            (!f.draftFigurId || this._beatInvolvesDraft(b, f.draftFigurId));
   },

@@ -274,9 +274,18 @@ export const adminUsageMethods = {
     }
     qs.set('limit', '50');
     qs.set('offset', String(this.adminUsageChatOffset || 0));
-    await this._adminUsageRun('chat', () => this._adminUsageFetch(`/admin/usage/chat?${qs.toString()}`), (data) => {
+    // Chat-Qualitaet je Chat-Art (Zeitraum, ohne User-Filter) laeuft im selben
+    // Load mit — eine Sequenz pro Tab, damit eine spaete Antwort nicht ueber
+    // einen neueren Zeitraum schreibt.
+    await this._adminUsageRun('chat', () => Promise.all([
+      this._adminUsageFetch(`/admin/usage/chat?${qs.toString()}`),
+      this._adminUsageFetch('/admin/usage/chat-quality'),
+    ]), ([data, quality]) => {
       this.adminUsageChatList = data.rows || [];
       this.adminUsageChatTotal = data.total || 0;
+      this.adminUsageChatQuality = (quality.rows || []).map(r => ({
+        ...r, label: this._adminUsageTypeLabel(r.kind),
+      }));
     });
   },
 

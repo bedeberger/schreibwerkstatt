@@ -46,6 +46,8 @@ export function registerAdminUsageCard() {
     adminUsageChatList: [],
     adminUsageChatTotal: 0,
     adminUsageChatOffset: 0,
+    // Chat-Qualitaet je Chat-Art (partials/admin-usage-chat-quality.html)
+    adminUsageChatQuality: [],
 
     // Summary-Tab
     adminUsageSummary: null,

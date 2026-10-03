@@ -112,7 +112,75 @@ function listTimelineEventPages(eventIds) {
   `).all(...idVals);
 }
 
+// ── get_figure_age ──────────────────────────────────────────────────────────
+// Gleiche Vorrangregel wie lib/figure-years.js: der konsolidierte Zeitstrahl ist die
+// kanonische Quelle; erst wenn für (Buch, User) keiner existiert, die rohen
+// figure_events. Zwei Quellen nebeneinander lieferten dasselbe Ereignis doppelt.
+
+const _stmtHasZeitstrahl = db.prepare(
+  'SELECT 1 FROM zeitstrahl_events WHERE book_id = ? AND user_email = ? LIMIT 1'
+);
+
+function _hasZeitstrahl(bookId, userEmail) {
+  return !!_stmtHasZeitstrahl.get(bookId, userEmail || '');
+}
+
+const _stmtZsEventsLike = db.prepare(`
+    SELECT ereignis, datum, datum_year AS y, datum_month AS m, datum_day AS d,
+           datum_ende_year AS ye, datum_unsicher AS unsicher, 'zeitstrahl' AS quelle
+    FROM zeitstrahl_events
+    WHERE book_id = ? AND user_email = ? AND datum_year IS NOT NULL
+      AND ereignis LIKE ? ESCAPE '\\'
+    ORDER BY sort_order, id
+    LIMIT ?
+  `);
+const _stmtFigEventsLike = db.prepare(`
+    SELECT fe.ereignis, fe.datum, fe.datum_year AS y, fe.datum_month AS m, fe.datum_day AS d,
+           fe.datum_ende_year AS ye, fe.datum_unsicher AS unsicher, 'figure_events' AS quelle
+    FROM figure_events fe
+    JOIN figures f ON f.id = fe.figure_id
+    WHERE f.book_id = ? AND f.user_email = ? AND fe.datum_year IS NOT NULL
+      AND fe.ereignis LIKE ? ESCAPE '\\'
+    ORDER BY fe.datum_year, fe.sort_order, fe.id
+    LIMIT ?
+  `);
+
+/** Datierte Ereignisse von (Buch, User), deren Text `needle` enthält (Teilstring,
+ *  case-insensitive für ASCII). Unsicher datierte bleiben drin, `unsicher` markiert sie. */
+function findDatedEvents(bookId, userEmail, needle, limit = 10) {
+  const like = '%' + String(needle).replace(/[\\%_]/g, c => '\\' + c) + '%';
+  const stmt = _hasZeitstrahl(bookId, userEmail) ? _stmtZsEventsLike : _stmtFigEventsLike;
+  return stmt.all(bookId, userEmail || '', like, limit);
+}
+
+const _stmtZsBirth = db.prepare(`
+    SELECT ze.datum_year AS y, ze.datum_month AS m, ze.datum_day AS d
+    FROM zeitstrahl_event_figures zef
+    JOIN zeitstrahl_events ze ON ze.id = zef.event_id
+    WHERE zef.figure_id = ? AND ze.book_id = ? AND ze.user_email = ?
+      AND ze.subtyp = 'geburt' AND ze.datum_unsicher = 0 AND ze.datum_year IS NOT NULL
+    ORDER BY ze.datum_year
+    LIMIT 1
+  `);
+const _stmtFigBirth = db.prepare(`
+    SELECT datum_year AS y, datum_month AS m, datum_day AS d
+    FROM figure_events
+    WHERE figure_id = ? AND subtyp = 'geburt' AND datum_unsicher = 0 AND datum_year IS NOT NULL
+    ORDER BY datum_year
+    LIMIT 1
+  `);
+
+/** Frühestes sicher datiertes Geburts-Ereignis einer Figur ({y,m,d}) oder undefined.
+ *  Quelle nach derselben Vorrangregel wie findDatedEvents. */
+function getBirthEvent(bookId, userEmail, figureId) {
+  return _hasZeitstrahl(bookId, userEmail)
+    ? _stmtZsBirth.get(figureId, bookId, userEmail || '')
+    : _stmtFigBirth.get(figureId);
+}
+
 module.exports = {
+  findDatedEvents,
+  getBirthEvent,
   getLatestContinuityCheck,
   listContinuityIssuesForCheck,
   listContinuityIssueFigures,

@@ -1,7 +1,7 @@
 ---
 description: Versionsnummer erhöhen + Git-Tag + GitHub-Release erstellen
 argument-hint: "[patch|minor|major|x.y.z]  (Default: patch)"
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(npm run version:sync), Bash(npm run sw:manifest), Bash(npm run squash:regen), Bash(npm run test:unit), Read, Write
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(npm run version:sync), Bash(npm run sw:manifest), Bash(npm run squash:regen), Bash(npm run test:unit), Bash(npm test), Read, Write
 ---
 
 Du führst einen Release der App durch. SSoT der Version ist die Datei `VERSION` im Projektroot; `package.json#version` folgt via `npm run version:sync`. Zu **jeder** Version gehören Release-Notizen in `changelog/<version>.json` — die App zeigt sie den Usern unter **Hilfe → Neuigkeiten** ([changelog/README.md](../../changelog/README.md)).
@@ -50,7 +50,7 @@ Schritt 11 committet den **gesamten** Tree — auch Fremdarbeit, die nicht durch
 
 10a. `npm run sw:manifest` — Content-Hash `__SHELL_BUILD` in `public/sw-manifest.js` neu berechnen (gegated durch `sw-manifest-drift.test`).
 10b. Enthält der Tree eine neue Migration in `db/migrations.js`: `npm run squash:regen` (bei Recreate-Pattern `FORCE_LEGACY_MIGRATIONS=1 npm run squash:regen`) und [docs/erd.md](../../docs/erd.md)-Stand prüfen.
-10c. `npm run test:unit` — deckt `sw-manifest-drift`, `squash-drift`, `erd-drift`, `loc-limits` **und `changelog`** ab. Letzteres läuft erst hier scharf, weil `VERSION` schon auf dem neuen Wert steht: fehlt `changelog/<neueVersion>.json` oder fehlt einem Eintrag `de`/`en`, ist der Lauf rot. **Rot ⇒ abbrechen**, kein Tag, kein Push. Stand melden.
+10c. `npm test` — die **volle** Suite (Import-Gate → Unit → Integration → E2E → Smoke), nicht nur `test:unit`. Unit deckt `sw-manifest-drift`, `squash-drift`, `erd-drift`, `loc-limits` **und `changelog`** ab; Letzteres läuft erst hier scharf, weil `VERSION` schon auf dem neuen Wert steht: fehlt `changelog/<neueVersion>.json` oder fehlt einem Eintrag `de`/`en`, ist der Lauf rot. E2E und Smoke fangen, was Unit nicht sieht — ein Harness, das zu einer Code-Änderung nicht mehr passt, läuft in CI in Timeouts samt Retries, und das Job-Timeout bricht die Pipeline ab, bevor deployt wird. **Rot ⇒ abbrechen**, kein Tag, kein Push — Ursache klären statt Tests anpassen, Stand melden. Scheitert eine fremde Spec, erst einen Rest-Server auf Port 8766 ausschliessen (alte `smoke.db`), dann erneut laufen lassen.
 
 ## Durchführung
 

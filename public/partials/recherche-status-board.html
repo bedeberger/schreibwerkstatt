@@ -72,6 +72,11 @@
             <p class="research-status-noplace" x-show="statusNeedsPlace(item)" x-cloak>
               <svg class="icon" aria-hidden="true"><use href="/icons.svg#alert-triangle"/></svg>
               <span x-text="$app.t('recherche.status.noPlace')"></span>
+              <!-- Vorschlag statt Suche: der Verknuepfungs-Job liefert auch die
+                   inhaltlich naechsten Manuskriptseiten (Embeddings). Die
+                   Vorschlaege erscheinen im Detail-Dialog. -->
+              <button type="button" class="btn-compact research-status-suggest" @click.stop="openDetail(item); suggestLinks(item)"
+                      :disabled="busy || suggestItemId === item.id" x-text="$app.t('recherche.status.suggestPlace')"></button>
             </p>
 
             <span class="research-status-otherlinks" x-show="otherLinkCount(item) > 0"

@@ -123,6 +123,31 @@
           </div>
 
           <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('pdfExport.table.borderWidthPt')"></label>
+            <div class="card-form-field">
+              <input type="text" x-data="numInput({ step: 0.25, min: 0, max: 3 })"
+                     x-modelable="value" x-model="activeProfile.config.table.borderWidthPt"
+                     class="pdfx-num-input">
+            </div>
+          </div>
+
+          <div class="card-form-row">
+            <label class="card-form-label" x-text="$app.t('pdfExport.table.borderColor')"></label>
+            <div class="card-form-field pdfx-color-field">
+              <input type="color" class="pdfx-color-picker" x-model="activeProfile.config.table.borderColor" :aria-label="$app.t('pdfExport.table.borderColor')">
+              <span class="pdfx-color-text" x-text="activeProfile.config.table.borderColor"></span>
+            </div>
+          </div>
+
+          <div class="card-form-row" x-show="activeProfile.config.table.zebra">
+            <label class="card-form-label" x-text="$app.t('pdfExport.table.zebraColor')"></label>
+            <div class="card-form-field pdfx-color-field">
+              <input type="color" class="pdfx-color-picker" x-model="activeProfile.config.table.zebraColor" :aria-label="$app.t('pdfExport.table.zebraColor')">
+              <span class="pdfx-color-text" x-text="activeProfile.config.table.zebraColor"></span>
+            </div>
+          </div>
+
+          <div class="card-form-row">
             <label class="card-form-label" x-text="$app.t('pdfExport.table.captionPosition')"></label>
             <div class="card-form-field">
               <div x-data="combobox($app.t('pdfExport.table.captionPosition'))"

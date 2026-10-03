@@ -21,11 +21,12 @@
       </div>
       <template x-for="(f, i) in $app.lektoratFindings" :key="i">
         <label class="finding"
-               :class="{ 'error': _isHardFinding(f.typ), 'style': !_isHardFinding(f.typ), 'finding--deselected': !$app.selectedFindings[i], 'finding--applied': $app.appliedOriginals.includes(f.original) }"
+               :class="{ 'error': _findingKind(f.typ) === 'hard', 'style': _findingKind(f.typ) === 'soft', 'editorial': _findingKind(f.typ) === 'editorial', 'finding--deselected': !$app.selectedFindings[i], 'finding--applied': $app.appliedOriginals.includes(f.original) }"
                :data-finding-idx="i"
                @pointerenter="handleFindingPointer(i)">
           <input type="checkbox" class="finding-checkbox" :checked="$app.selectedFindings[i]" :disabled="$app.appliedOriginals.includes(f.original)" @change="$app.toggleFinding(i)">
-          <span class="badge" :class="_isHardFinding(f.typ) ? 'badge-err' : 'badge-warn'" x-text="$app.t('finding.' + f.typ)"></span>
+          <span class="badge" :class="_findingBadgeClass(f.typ)" x-text="$app.t('finding.' + f.typ)"
+                :data-tip="_findingKind(f.typ) === 'editorial' ? $app.t('editor.findings.editorialTip') : null"></span>
           <span x-show="$app.appliedOriginals.includes(f.original)" class="tag" x-text="$app.t('editor.findings.applied')"></span>
           <span class="finding-content">
             <span class="finding-original" x-text="f.original"></span>
@@ -117,7 +118,7 @@
       </div>
       <template x-for="(f, i) in $app.appliedHistoricCorrections" :key="i">
         <div class="applied-history-item">
-          <span class="badge" :class="_isHardFinding(f.typ) ? 'badge-err' : 'badge-warn'" x-text="$app.t('finding.' + f.typ)"></span>
+          <span class="badge" :class="_findingBadgeClass(f.typ)" x-text="$app.t('finding.' + f.typ)"></span>
           <span class="applied-history-text">
             <span class="finding-original" x-text="f.original"></span>
             <template x-if="f.korrektur">

@@ -65,21 +65,55 @@
   font-weight: var(--fw-semibold);
   color: var(--color-muted);
 }
+.research-chat-proposals-headrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
 .research-chat-proposal {
   display: flex;
   align-items: flex-start;
   gap: var(--space-md);
   padding: var(--space-2xs) 0;
 }
-/* Button als eigene rechte Spalte: feste Breite, oben ausgerichtet, schrumpft
-   nicht — der Vorschlagstext bricht davor um (saubere zweispaltige Optik). */
-.research-chat-proposal > .btn-compact,
-.research-chat-proposal > .research-chat-proposal-saved {
+.research-chat-proposal-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+/* Aktionen als eigene rechte Spalte: oben ausgerichtet, schrumpft nicht — der
+   Vorschlagstext bricht davor um (saubere zweispaltige Optik). */
+.research-chat-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2xs);
   flex-shrink: 0;
-  align-self: flex-start;
   margin-left: auto;
 }
-.research-chat-proposal--saved { opacity: 0.6; }
+.research-chat-proposal-exists-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+.research-chat-proposal--saved .research-chat-proposal-main { opacity: 0.6; }
+.research-chat-proposal-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  flex: 1;
+  min-width: 0;
+}
+.research-chat-proposal-tags,
+.research-chat-proposal-exists {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+.research-chat-proposal-exists { font-style: italic; }
 .research-chat-proposal-body {
   display: flex;
   flex-direction: column;
@@ -122,6 +156,41 @@
 }
 .chat-cite a:hover { text-decoration: underline; }
 .chat-cite--dim { color: var(--color-muted); }
+.chat-cite--loose a { padding: 0 var(--space-1); }
+
+/* Gelaufene Web-Suchbegriffe unter einer Antwort */
+.research-chat-queries {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2xs);
+  margin-top: var(--space-2xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+.research-chat-queries-head { font-weight: var(--fw-semibold); }
+.research-chat-query {
+  padding: 0 var(--space-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* Kontext-Chip über der Eingabe: „für Seite/Kapitel recherchieren" */
+.research-chat-context-chip {
+  align-self: flex-start;
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.research-chat-context-chip--on {
+  border-style: solid;
+  border-color: var(--card-accent);
+  color: var(--card-accent);
+}
 
 /* Quellenliste unter einer Assistant-Antwort */
 .research-chat-sources {
@@ -152,5 +221,6 @@
 /* ── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .research-chat-proposal { flex-wrap: wrap; }
+  .research-chat-proposal-actions { margin-left: 0; justify-content: flex-start; }
 }
 }

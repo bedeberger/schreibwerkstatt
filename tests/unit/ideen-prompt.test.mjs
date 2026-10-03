@@ -41,5 +41,5 @@ test('Seiten-Chat-Job übergibt offene Ideen + letztes Lektorat an den Builder',
   const src = readFileSync(new URL('../../routes/jobs/chat/page-chat.js', import.meta.url), 'utf8');
   assert.match(src, /getOpenIdeen\(session\.page_id, userEmail\)/);
   assert.match(src, /getLatestPageCheck\(session\.page_id, userEmail\)/);
-  assert.match(src, /buildChatSystemPrompt\([\s\S]*?openingPageText, ideen, lektorat,/);
+  assert.match(src, /buildChatSystemPrompt\([\s\S]*?pageChangeNote, ideen, lektorat,/);
 });

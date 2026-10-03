@@ -13,6 +13,7 @@
 import { fetchJson, sendJson } from '../../utils/net.js';
 import { startPoll } from '../../cards/job-helpers.js';
 import { formatTimecode, durationLabel, speakerLabel } from '../../interview/timecode.js';
+import { lsSet } from '../../safe-storage.js';
 
 const LS_KEY = (itemId) => `interview_job_${itemId}`;
 
@@ -120,7 +121,7 @@ export const rechercheInterviewMethods = {
     this.ivStatus = window.__app.t('interview.starting');
     try {
       const { jobId } = await sendJson('/jobs/interview-transcribe', 'POST', { item_id: itemId });
-      localStorage.setItem(LS_KEY(itemId), jobId);
+      lsSet(LS_KEY(itemId), jobId);
       this._ivPoll(jobId, itemId);
     } catch (e) {
       this._ivIdle();

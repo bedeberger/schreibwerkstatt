@@ -6,8 +6,15 @@
 export const BOOK_CHAT_TOOLS = [
   {
     name: 'list_chapters',
-    description: 'Liefert die komplette Kapitel- und Seitenliste: pro Kapitel chapter_id, Name, Seitenzahl, Wortzahl UND pages[{page_id,page_name,words}]. Zusätzlich total_pages/total_words für das ganze Buch. Nutze dies zuerst für einen Überblick – und um page_ids für get_pages zu bekommen, z.B. wenn du bei einem kleinen Buch alle Seiten laden willst. Nicht nutzen für Detailstatistik eines einzelnen Kapitels (Dialoganteil, Top-Figuren-Erwähnungen) – dafür `get_stil_metrics` (scope=chapter, include_figures).',
-    input_schema: { type: 'object', properties: {}, required: [] },
+    description: 'Liefert die Kapitel- und Seitenliste: vorne total_chapters/total_pages/total_words/hint, dann pro Kapitel chapter_id, Name, Wortzahl und pages als Tupel [page_id, page_name, words] (siehe page_format). Bei grossen Büchern paginiert: steht next_offset im Ergebnis, mit offset=next_offset weiterblättern. Nutze dies für einen Überblick – und um page_ids für get_pages zu bekommen. Nicht nutzen für Detailstatistik eines einzelnen Kapitels (Dialoganteil, Top-Figuren-Erwähnungen) – dafür `get_stil_metrics` (scope=chapter, include_figures).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        offset: { type: 'integer', description: 'Optional: erstes Kapitel (0-basiert, default 0). Aus next_offset übernehmen.' },
+        limit:  { type: 'integer', description: 'Optional: max. Anzahl Kapitel (default alle, die in die Antwort passen).' },
+      },
+      required: [],
+    },
   },
   {
     name: 'list_figures',
@@ -170,6 +177,20 @@ export const BOOK_CHAT_TOOLS = [
     },
   },
   {
+    name: 'get_figure_age',
+    description: 'Alter bzw. Jahrgang einer Figur — deterministisch im Server gerechnet, nicht von dir. Liefert Geburtsjahr (mit Quelle), wörtliche Altersangaben aus dem Text (Alters-Index) und, mit `jahr` oder `ereignis`, das Alter zu diesem Jahr bzw. zu den passenden datierten Ereignissen des Zeitstrahls. Ideal für „wie alt war X, als Y passierte?", „wie alt ist X 1989?", „welcher Jahrgang ist X?". Rechne Alter NIE selbst aus Jahreszahlen — nutze dieses Werkzeug.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        figur_id:   { type: 'string',  description: 'fig_id der Figur.' },
+        figur_name: { type: 'string',  description: 'Alternative: Name/Kurzname der Figur.' },
+        jahr:       { type: 'integer', description: 'Optional: Kalenderjahr, für das das Alter gerechnet wird.' },
+        ereignis:   { type: 'string',  description: 'Optional: Stichwort eines Ereignisses (Teilstring, z.B. "Mauerfall", "Hochzeit"); gesucht in den datierten Zeitstrahl-Ereignissen.' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'list_ideen',
     description: 'Listet die Notizen/Ideen/Pendenzen, die der User zu einzelnen Seiten oder ganzen Kapiteln gespeichert hat (mit Kapitel-/Seitenkontext). Jede Idee hat `scope: "page"` oder `"chapter"` und einen `status`: offen → in_arbeit → erledigt, daneben verworfen. VERWORFEN heisst: der Autor hat sie geprüft und sich dagegen entschieden — schlage sie nicht erneut vor. Ideal um offene Anmerkungen aufzugreifen, oder zu beantworten "was wollte ich an Kapitel X noch ändern?". Filterbar nach status bzw. offen_only, page_id, chapter_id (Chapter-Filter umfasst sowohl direkt-am-Kapitel-Ideen als auch Ideen zu Seiten des Kapitels). Noch offene Ideen erscheinen zuerst.',
     input_schema: {
@@ -182,6 +203,30 @@ export const BOOK_CHAT_TOOLS = [
         limit:      { type: 'integer', description: 'Maximale Anzahl (default 50, max 200).' },
       },
       required: [],
+    },
+  },
+  {
+    name: 'list_research_items',
+    description: 'Listet das Recherche-Board des Buchs: vom Autor gesammelte Fakten, Zitate, Links, Notizen, PDFs und Interviews (id, kind, status, Titel, Kurztext, Tags). `stellen` nennt die Kapitel/Seiten, mit denen ein Fundstück verknüpft ist, `bezug` die Figuren/Orte/Szenen. `status`: offen → in_arbeit → eingearbeitet, daneben verworfen (geprüft, bewusst nicht verwendet). Beantwortet "was habe ich zu X recherchiert?", "welche Fakten gehören zu Kapitel 3?", "was ist noch nicht eingearbeitet?". Filter: q (Volltext), kind, status, chapter_id (Kapitel + seine Seiten), page_id. Das Board ist Material des Autors, KEIN Manuskripttext — zitiere daraus nie als Buchstelle.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        q:          { type: 'string', description: 'Optionale Volltextsuche.' },
+        kind:       { type: 'string', enum: ['note', 'link', 'quote', 'fact', 'image', 'document', 'transcript'], description: 'Optionaler Typfilter.' },
+        status:     { type: 'string', enum: ['offen', 'in_arbeit', 'eingearbeitet', 'verworfen'], description: 'Nur Fundstücke dieser Stufe.' },
+        chapter_id: { type: 'integer', description: 'Nur Fundstücke an diesem Kapitel oder an einer seiner Seiten.' },
+        page_id:    { type: 'integer', description: 'Nur Fundstücke an dieser Seite.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'read_research_item',
+    description: 'Volltext EINES Recherche-Fundstücks: Titel, Inhalt, URLs, Quelle, Tags, Status, Verknüpfungen und bei angehängtem PDF den Anfang des Dokumenttexts (Kappung wird ausgewiesen). Nutze es, um einen Fakt aus dem Board mit dem Manuskript abzugleichen.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'id aus list_research_items.' } },
+      required: ['id'],
     },
   },
   {
@@ -464,7 +509,7 @@ export const BOOK_CHAT_TOOLS = [
   },
   {
     name: 'final_answer',
-    description: 'Liefert die finale Antwort an den User. Rufe dieses Werkzeug als ALLERLETZTEN Aufruf einer Runde — danach folgt keine weitere Iteration und keine weitere Recherche. Pflicht-Endpunkt: jede Antwort an den User MUSS über dieses Werkzeug laufen. Freitext ohne final_answer wird nicht als Antwort akzeptiert. Schreibe die Antwort in der Sprache der Userfrage. Wenn du in der antwort wörtlich zitierst: hänge JEDES Zitat in das Feld `zitate` mit {page_id, offset, length, quote} aus quote_passage/quote_match/search_passages. Der Server validiert post-hoc; ungültige Zitate werden geloggt.',
+    description: 'Liefert die finale Antwort an den User. Rufe dieses Werkzeug als ALLERLETZTEN Aufruf einer Runde — danach folgt keine weitere Iteration und keine weitere Recherche. Pflicht-Endpunkt: jede Antwort an den User MUSS über dieses Werkzeug laufen. Freitext ohne final_answer wird nicht als Antwort akzeptiert. Schreibe die Antwort in der Sprache der Userfrage. Wenn du in der antwort wörtlich zitierst: hänge JEDES Zitat in das Feld `zitate` mit {page_id, offset, length, quote} aus quote_passage/quote_match/search_passages. Der Server validiert post-hoc und zeigt die Zitate als Fussnoten; ungültige werden markiert. Fragen zu realen Ereignissen oder Fakten AUSSERHALB des Manuskripts (Geschichte, Orte, Technik, Personen der Wirklichkeit) kannst du nicht nachprüfen — du hast keine Web-Suche: sag das offen, beantworte nur, was das Buch hergibt, und setze `recherche_hinweis: true` mit einer präzisen `recherche_frage` für den Recherche-Chat.',
     input_schema: {
       type: 'object',
       properties: {
@@ -483,6 +528,8 @@ export const BOOK_CHAT_TOOLS = [
             required: ['page_id', 'offset', 'length', 'quote'],
           },
         },
+        recherche_hinweis: { type: 'boolean', description: 'Optional: true, wenn die Frage (auch) reale Fakten ausserhalb des Manuskripts betrifft, die nur eine Web-Recherche klären kann.' },
+        recherche_frage:   { type: 'string',  description: 'Optional (mit recherche_hinweis): die Frage, eigenständig formuliert, wie sie der Recherche-Chat bekommen soll.' },
       },
       required: ['antwort'],
     },
@@ -492,8 +539,8 @@ export const BOOK_CHAT_TOOLS = [
 // ── Slim-Werkzeugsatz (lokale/kleine Modelle) ─────────────────────────────────
 // Der volle Katalog kostet ~10k Input-Tokens PRO Iteration. Bei Claude trägt das
 // Prompt-Caching diesen Präfix; ein lokaler Endpunkt hat kein Caching und bezahlt
-// ihn jede Runde neu — und ein kleineres Modell trifft aus 37 Werkzeugen ohnehin
-// schlechter als aus 16. Darum eine kuratierte Teilmenge: Überblick, Suche
+// ihn jede Runde neu — und ein kleineres Modell trifft aus dem vollen Katalog ohnehin
+// schlechter als aus einer kleinen Auswahl. Darum eine kuratierte Teilmenge: Überblick, Suche
 // (Wortlaut + Sinn), Volltext, Zitat-Verifikation, die Figuren-Achse, Orte/Szenen,
 // Bewertung — plus der Pflicht-Endpunkt.
 //
@@ -517,6 +564,9 @@ export const BOOK_CHAT_SLIM_TOOL_NAMES = [
   'get_figure_mentions',
   'get_figure_relations',
   'get_timeline',
+  // Alter/Jahrgang ist die häufigste schmale Faktenfrage — und genau die Rechnung,
+  // bei der ein kleines Modell sich verrechnet.
+  'get_figure_age',
   'list_scenes',
   'list_locations',
   // Welt-Fakten sind der billigste Weg zu etabliertem Buch-Wissen: schon verdichtete
@@ -528,3 +578,23 @@ export const BOOK_CHAT_SLIM_TOOL_NAMES = [
   'generate_image',
   'final_answer',
 ];
+
+// Regel für Fragen zur Aussenwelt — wird im Job (routes/jobs/chat/book-chat.js#prepare)
+// an den stabilen System-Block 1 gehängt. Der Buch-Chat hat KEINE Web-Suche; ohne
+// diese Regel beantwortet das Modell reale Fakten aus seinem Trainingswissen, und die
+// Antwort sieht im Buch-Chat aus wie ein Befund aus dem Manuskript.
+export const BOOK_CHAT_OUTSIDE_WORLD_RULE = [
+  'AUSSENWELT: Du hast KEINE Web-Suche und kein Wissen ausser dem Manuskript und den Index-Werkzeugen.',
+  'Betrifft eine Frage reale Ereignisse, Orte, Personen oder Fakten ausserhalb des Buchs (z.B. «stimmt das historisch?», «wann fiel die Mauer wirklich?»), sag klar, dass der Buch-Chat das nicht prüfen kann, und verweise auf den Recherche-Chat.',
+  'Setze dann in `final_answer` `recherche_hinweis: true` und `recherche_frage` (eigenständig formuliert, ohne Bezug auf diesen Chat). Was das Manuskript selbst dazu sagt, beantwortest du trotzdem.',
+  'Ausnahme: was der Autor selbst recherchiert hat, steht im Recherche-Board (list_research_items/read_research_item). Das darfst du heranziehen — kennzeichne es als gesammeltes Material des Autors, nicht als geprüfte Tatsache und nicht als Buchstelle.',
+].join('\n');
+
+// Synthese-Aufforderung, wenn der Kosten-Deckel pro Antwort
+// (`jobs.book_chat.max_input_tokens_per_answer`) erreicht ist — Gegenstück zu
+// BOOK_CHAT_FORCE_FINAL_INSTRUCTION (Iterationsdeckel), gleicher Ablauf.
+export const BOOK_CHAT_BUDGET_FINAL_INSTRUCTION =
+  'Das Recherche-Budget für diese Antwort ist aufgebraucht — keine weitere Recherche mehr möglich. '
+  + 'Fasse JETZT aus den bereits gesammelten Informationen die bestmögliche Antwort zusammen und liefere sie über das Werkzeug `final_answer`. '
+  + 'Wenn die Recherche unvollständig blieb, beantworte die Frage so weit wie möglich und nenne kurz, was offen blieb. '
+  + 'Sprache der Antwort: die der Userfrage.';

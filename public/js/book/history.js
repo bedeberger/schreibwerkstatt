@@ -2,7 +2,7 @@
 // `this` bezieht sich auf die Alpine-Komponente.
 
 import { escHtml, fetchJson } from '../utils.js';
-import { sortByPosition, SOFT_TYPEN } from './page-view.js';
+import { sortByPosition, isHardFinding } from './page-view.js';
 import { contentRepo } from '../repo/content.js';
 
 export const historyMethods = {
@@ -131,10 +131,10 @@ export const historyMethods = {
       return true;
     });
 
-    // Selection: bereits angewendete Korrekturen + weiche Typen + Stil default unselected
-    this.selectedFindings = findings.map(f => !appliedSet.has(f.original) && !SOFT_TYPEN.has(f.typ) && f.typ !== 'stil');
+    // Selection: bereits angewendete Korrekturen + weiche/redaktionelle Typen default unselected
+    this.selectedFindings = findings.map(f => !appliedSet.has(f.original) && isHardFinding(f.typ));
 
-    const hardErrors = findings.filter(f => !SOFT_TYPEN.has(f.typ) && f.typ !== 'stil');
+    const hardErrors = findings.filter(f => isHardFinding(f.typ));
     this.hasErrors = hardErrors.length > 0;
     this.correctedHtml = hardErrors.length > 0
       ? this._applyCorrections(this.originalHtml, hardErrors)

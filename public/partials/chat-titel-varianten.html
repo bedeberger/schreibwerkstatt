@@ -1,0 +1,25 @@
+<!--
+  Fragment (via @include in chat.html, innerhalb des x-for über chatMessages):
+  Titelvarianten einer Seiten-Chat-Antwort (context_info.titel_varianten).
+  „Übernehmen" setzt den Seitentitel über renameCurrentPage, „Kopieren" legt ihn
+  in die Zwischenablage. Methoden: chat/page-chat-apply.js.
+-->
+<template x-if="msg.role === 'assistant' && chatTitelVarianten(msg).length > 0">
+  <div class="chat-titel-varianten">
+    <div class="chat-vorschlag-label" x-text="$app.t('chat.titleVariants')"></div>
+    <ul class="chat-titel-list">
+      <template x-for="(titel, ti) in chatTitelVarianten(msg)" :key="ti">
+        <li class="chat-titel-item">
+          <span class="chat-titel-text" x-text="titel"></span>
+          <span class="chat-vorschlag-actions">
+            <button type="button" class="chat-vorschlag-btn" x-show="$app.canEdit()"
+              @click="applyChatTitel(titel)" :disabled="$app.currentPage?.name === titel"
+              x-text="$app.currentPage?.name === titel ? $app.t('chat.titleCurrent') : $app.t('chat.apply')"></button>
+            <button type="button" class="chat-vorschlag-btn chat-vorschlag-btn--ghost"
+              @click="copyChatTitel(titel)" x-text="$app.t('chat.titleCopy')"></button>
+          </span>
+        </li>
+      </template>
+    </ul>
+  </div>
+</template>

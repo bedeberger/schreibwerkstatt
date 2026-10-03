@@ -1,5 +1,5 @@
 'use strict';
-// Chat-Job-Router — Facade über routes/jobs/chat/. Drei Chats teilen den
+// Chat-Job-Router — Facade über routes/jobs/chat/. Vier Chats teilen den
 // gemeinsamen POST-Handler + das Storage-Modell, laufen aber als getrennte
 // Job-Typen (siehe docs/chats.md).
 //
@@ -7,6 +7,7 @@
 //   chat/page-chat.js — Seiten-Chat (kind='page', vorschlaege-Envelope).
 //   chat/book-chat.js — Buch-Chat (kind='book', klassisch + agentisch + Dispatch).
 //   ../research-chat  — Recherche-Chat (kind='research', Claude-only, Web-Suche).
+//   ../plot-chat      — Plot-Chat (kind='plot', Panel der Plot-Werkstatt, Vorschläge ans Board).
 
 const express = require('express');
 const { toIntId } = require('../../lib/validate');
@@ -15,7 +16,12 @@ const { _handleChatPost, bookPageCache, invalidateBookPageCache } = require('./c
 const { runChatJob } = require('./chat/page-chat');
 const { runBookChatJobDispatch } = require('./chat/book-chat');
 const { runResearchChatJob } = require('./research-chat');
+const { runPlotChatJobDispatch } = require('./plot-chat');
 const { guardBook, sessionEmail } = require('../../lib/acl');
+const { getBookSettings } = require('../../db/schema');
+const { setContext } = require('../../lib/log-context');
+const { researchChatGate } = require('../../lib/research-chat-gate');
+const { researchMessageContext } = require('./research-chat-helpers');
 
 const chatRouter = express.Router();
 
@@ -44,12 +50,37 @@ chatRouter.post('/research-chat', jsonBody, (req, res) => _handleChatPost(req, r
     ? { key: 'job.label.researchChatBook', params: { name: s.book_name } }
     : { key: 'job.label.researchChat', params: null },
   runFn: runResearchChatJob,
+  // Kontext-Chip (Seite/Kapitel) → context_info.research_context der Frage.
+  contextFn: (req2, session) => researchMessageContext(req2.body?.context, session.book_id),
+  // Kill-Switch + Claude-only VOR dem Speichern der User-Nachricht prüfen —
+  // sonst bliebe bei abgeschaltetem Chat eine Frage ohne Antwort in der Session.
+  preflight: (req2, res2, { userEmail }) => {
+    const block = researchChatGate(userEmail);
+    if (!block) return true;
+    res2.status(block.status).json({ error_code: block.error_code });
+    return false;
+  },
+}));
+
+chatRouter.post('/plot-chat', jsonBody, (req, res) => _handleChatPost(req, res, {
+  jobType: 'plot-chat',
+  kind: 'plot',
+  labelFn: s => s.book_name
+    ? { key: 'job.label.plotChatBook', params: { name: s.book_name } }
+    : { key: 'job.label.plotChat', params: null },
+  // Agentisch bei Providern mit Werkzeug-Protokoll, sonst klassischer JSON-Call.
+  runFn: runPlotChatJobDispatch,
 }));
 
 chatRouter.delete('/book-chat-cache', (req, res) => {
   const book_id = toIntId(req.query.book_id);
   if (!book_id) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
-  if (!guardBook(req, res, book_id, 'editor')) return;
+  setContext({ book: book_id });
+  // Gleiche Rolle wie Buch-Chat-Session/-Job (routes/chat.js, chat/shared.js): mit
+  // allow_lektor_book_chat darf ein Lektor chatten — dann auch seinen Cache leeren
+  // (sonst stilles 403 beim «Neues Gespräch»).
+  const minRole = getBookSettings(book_id)?.allow_lektor_book_chat ? 'lektor' : 'editor';
+  if (!guardBook(req, res, book_id, minRole)) return;
   const userEmail = sessionEmail(req);
   const key = `${book_id}:${userEmail}`;
   bookPageCache.delete(key);

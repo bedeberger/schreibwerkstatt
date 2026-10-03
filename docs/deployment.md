@@ -76,6 +76,16 @@ Die **macOS-App** braucht das Token nicht: sie kommt aus dem [Mac App Store](htt
 git pull && npm ci --omit=dev && systemctl restart schreibwerkstatt
 ```
 
+### Logs
+
+Winston schreibt `schreibwerkstatt.log` (current) und rotiert bei 5 MB nach `schreibwerkstatt1.log` … `schreibwerkstatt5.log` — die Ziffer steht **vor** der Endung. Ablageort: `LOG_DIR` (ENV, Default App-Verzeichnis; [lib/log-file.js](lib/log-file.js), von Logger und Admin-Log-Ansicht geteilt). Der CD-Deploy ([deploy/deploy.sh](deploy/deploy.sh)) synchronisiert mit `rsync --delete` und schliesst deshalb `schreibwerkstatt*.log*` aus; empfohlen ist trotzdem ein Verzeichnis ausserhalb des Installationsziels, damit die Historie nicht an einem Exclude-Muster hängt:
+
+```bash
+mkdir -p /var/log/schreibwerkstatt && chown github-runner:github-runner /var/log/schreibwerkstatt
+echo 'LOG_DIR=/var/log/schreibwerkstatt' >> /opt/schreibwerkstatt/.env
+systemctl restart schreibwerkstatt
+```
+
 ## Backup
 
 Tägliches Online-Backup der SQLite-DB via systemd-Timer (`schreibwerkstatt-backup.timer`, Default 03:00). `sqlite3 .backup` (lock-frei, WAL-konsistent), gzip-komprimiert, Retention nach `mtime`. Pre-Deploy zusätzlicher Snapshot.

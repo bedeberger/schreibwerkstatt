@@ -5,16 +5,20 @@
           <div class="card-form-row card-form-row--top">
             <label class="card-form-label" x-text="$app.t('pdfExport.layout.trimPreset')"></label>
             <div class="card-form-field">
+              <!-- value spiegelt den echten Zustand (Profilwechsel, Vorlage,
+                   Handeingabe der Masse) — kein Treffer → «Benutzerdefiniert». -->
               <div x-data="combobox($app.t('pdfExport.layout.trimPresetPlaceholder'))"
                    x-modelable="value" x-model="trimPresetSel"
-                   x-effect="options = trimPresetOptions()"
+                   x-effect="options = trimPresetOptions(); value = currentTrimPreset()"
                    @combobox-change="applyTrimPreset($event.detail)"
 ></div>
               <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.trimPresetHint')"></p>
             </div>
           </div>
 
-          <div class="card-form-row">
+          <!-- @include pdf-export-satzspiegel -->
+
+          <div class="card-form-row" x-show="uiMode === 'expert'">
             <label class="card-form-label" x-text="$app.t('pdfExport.layout.pageSize')"></label>
             <div class="card-form-field">
               <div x-data="combobox($app.t('pdfExport.layout.pageSize'))"
@@ -24,7 +28,7 @@
             </div>
           </div>
 
-          <template x-if="activeProfile.config.layout.pageSize === 'custom'">
+          <template x-if="uiMode === 'expert' && activeProfile.config.layout.pageSize === 'custom'">
             <div class="card-form-row">
               <label class="card-form-label" x-text="$app.t('pdfExport.layout.widthMm') + ' / ' + $app.t('pdfExport.layout.heightMm')"></label>
               <div class="card-form-field pdfx-inline-pair">
@@ -34,27 +38,31 @@
             </div>
           </template>
 
-          <div class="card-form-row">
+          <div class="card-form-row" x-show="uiMode === 'expert'">
             <label class="card-form-label" x-text="$app.t('pdfExport.layout.columns')"></label>
-            <div class="card-form-field">
+            <div class="card-form-field pdfx-inline-pair">
               <div x-data="combobox($app.t('pdfExport.layout.columns'))"
                    x-modelable="value" x-model="activeProfile.config.layout.columns"
                    x-effect="options = [{ value: 1, label: '1' }, { value: 2, label: '2' }]"
 ></div>
+              <label class="pdfx-num-field" x-show="activeProfile.config.layout.columns == 2">
+                <span x-text="$app.t('pdfExport.layout.columnGapMm')"></span>
+                <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 30 })" x-modelable="value" x-model="activeProfile.config.layout.columnGapMm" class="pdfx-num-input">
+              </label>
             </div>
           </div>
 
-          <div class="collapsible-wrap" x-data="collapsible()">
+          <div class="collapsible-wrap" x-data="collapsible()" x-show="uiMode === 'expert'">
             <button type="button" class="collapsible-toggle" x-bind="trigger">
               <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
               <span x-text="$app.t('pdfExport.layout.margins')"></span>
             </button>
             <div x-bind="panel" x-cloak class="collapsible-section">
               <div class="pdfx-num-grid pdfx-num-grid--4">
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.top" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.right" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.bottom" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="text" x-data="numInput({ step: 1, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.left" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="text" x-data="numInput({ step: 0.5, decimals: 2, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.top" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="text" x-data="numInput({ step: 0.5, decimals: 2, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.right" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="text" x-data="numInput({ step: 0.5, decimals: 2, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.bottom" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="text" x-data="numInput({ step: 0.5, decimals: 2, min: 5, max: 80 })" x-modelable="value" x-model="activeProfile.config.layout.marginsMm.left" class="pdfx-num-input"></label>
               </div>
               <label class="pdfx-check">
                 <input type="checkbox" x-model="activeProfile.config.layout.mirrorMargins">
@@ -74,7 +82,7 @@
             </div>
           </div>
 
-          <div class="collapsible-wrap" x-data="collapsible()">
+          <div class="collapsible-wrap" x-data="collapsible()" x-show="uiMode === 'expert'">
             <button type="button" class="collapsible-toggle" x-bind="trigger">
               <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
               <span x-text="$app.t('pdfExport.layout.bodyInset')"></span>
@@ -82,10 +90,10 @@
             <div x-bind="panel" x-cloak class="collapsible-section">
               <p class="card-form-field-note" x-text="$app.t('pdfExport.layout.bodyInsetHint')"></p>
               <div class="pdfx-num-grid pdfx-num-grid--4">
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.top" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.right" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.bottom" class="pdfx-num-input"></label>
-                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="text" x-data="numInput({ step: 1, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.left" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.top')"></span><input type="text" x-data="numInput({ step: 0.5, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.top" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.right')"></span><input type="text" x-data="numInput({ step: 0.5, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.right" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.bottom')"></span><input type="text" x-data="numInput({ step: 0.5, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.bottom" class="pdfx-num-input"></label>
+                <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.layout.edge.left')"></span><input type="text" x-data="numInput({ step: 0.5, min: 0, max: 60 })" x-modelable="value" x-model="activeProfile.config.layout.bodyInsetMm.left" class="pdfx-num-input"></label>
               </div>
             </div>
           </div>

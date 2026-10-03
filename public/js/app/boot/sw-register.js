@@ -1,4 +1,5 @@
 import { EVT } from '../../events.js';
+import { lsGet } from '../../safe-storage.js';
 
 // Service Worker: cached SPA-Shell für Offline/Zug-Modus. Nur über HTTPS bzw.
 // localhost registrierbar. Fehler schlucken – SW ist Progressive Enhancement.
@@ -7,7 +8,7 @@ import { EVT } from '../../events.js';
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
 
-  const swPref = localStorage.getItem('sw');
+  const swPref = lsGet('sw');
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const swEnabled = swPref === '1'
     || (swPref !== '0' && location.protocol === 'https:' && !isLocal);

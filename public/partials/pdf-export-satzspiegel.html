@@ -1,0 +1,38 @@
+          <!-- Satzspiegel-Vorschau: Doppelseite (Verso | Recto) rein reaktiv aus
+               der Config (pdf-export-geometry.js#satzspiegelPreview). viewBox
+               ist Literal (ein gebundenes :viewBox schreibt der Parser klein);
+               die Zahlen pinnt PREVIEW_VB, Drift-Test in
+               tests/unit/pdf-export-geometry.test.mjs. Farben über CSS-Klassen
+               (Tokens, Dark-Mode), keine Inline-Styles. -->
+          <div class="pdfx-ss" x-data="{ get g() { return satzspiegel(); } }">
+            <template x-if="g">
+              <figure class="pdfx-ss-figure">
+                <svg class="pdfx-ss-svg" viewBox="0 0 320 200" role="img"
+                     :aria-label="$app.t('pdfExport.layout.preview.aria', { w: g.textWidthMm, h: g.textHeightMm })">
+                  <!-- Kein <template> im SVG: der Parser legt es dort im SVG-
+                       Namespace ohne .content an, x-if/x-for liefen ins Leere. -->
+                  <rect class="pdfx-ss-bleed" x-show="g.bleed" :x="g.bleed?.x || 0" :y="g.bleed?.y || 0" :width="g.bleed?.w || 0" :height="g.bleed?.h || 0"></rect>
+                  <rect class="pdfx-ss-page" :x="g.pages[0].x" :y="g.pages[0].y" :width="g.pages[0].w" :height="g.pages[0].h"></rect>
+                  <rect class="pdfx-ss-frame" :x="g.pages[0].frame.x" :y="g.pages[0].frame.y" :width="g.pages[0].frame.w" :height="g.pages[0].frame.h"></rect>
+                  <rect class="pdfx-ss-text" :x="g.pages[0].text.x" :y="g.pages[0].text.y" :width="g.pages[0].text.w" :height="g.pages[0].text.h"></rect>
+                  <rect class="pdfx-ss-gap" x-show="g.pages[0].gap" :x="g.pages[0].gap?.x || 0" :y="g.pages[0].gap?.y || 0" :width="g.pages[0].gap?.w || 0" :height="g.pages[0].gap?.h || 0"></rect>
+                  <rect :class="g.hasHeader ? 'pdfx-ss-hf' : 'pdfx-ss-hf is-empty'" :x="g.pages[0].header.x" :y="g.pages[0].header.y" :width="g.pages[0].header.w" :height="g.pages[0].header.h"></rect>
+                  <rect :class="g.hasFooter ? 'pdfx-ss-hf' : 'pdfx-ss-hf is-empty'" :x="g.pages[0].footer.x" :y="g.pages[0].footer.y" :width="g.pages[0].footer.w" :height="g.pages[0].footer.h"></rect>
+                  <rect class="pdfx-ss-page" :x="g.pages[1].x" :y="g.pages[1].y" :width="g.pages[1].w" :height="g.pages[1].h"></rect>
+                  <rect class="pdfx-ss-frame" :x="g.pages[1].frame.x" :y="g.pages[1].frame.y" :width="g.pages[1].frame.w" :height="g.pages[1].frame.h"></rect>
+                  <rect class="pdfx-ss-text" :x="g.pages[1].text.x" :y="g.pages[1].text.y" :width="g.pages[1].text.w" :height="g.pages[1].text.h"></rect>
+                  <rect class="pdfx-ss-gap" x-show="g.pages[1].gap" :x="g.pages[1].gap?.x || 0" :y="g.pages[1].gap?.y || 0" :width="g.pages[1].gap?.w || 0" :height="g.pages[1].gap?.h || 0"></rect>
+                  <rect :class="g.hasHeader ? 'pdfx-ss-hf' : 'pdfx-ss-hf is-empty'" :x="g.pages[1].header.x" :y="g.pages[1].header.y" :width="g.pages[1].header.w" :height="g.pages[1].header.h"></rect>
+                  <rect :class="g.hasFooter ? 'pdfx-ss-hf' : 'pdfx-ss-hf is-empty'" :x="g.pages[1].footer.x" :y="g.pages[1].footer.y" :width="g.pages[1].footer.w" :height="g.pages[1].footer.h"></rect>
+                  <line class="pdfx-ss-fold" :x1="g.fold.x" :x2="g.fold.x" :y1="g.fold.y1" :y2="g.fold.y2"></line>
+                </svg>
+                <figcaption class="card-form-field-note">
+                  <span x-text="$app.t('pdfExport.layout.preview.summary', { w: g.textWidthMm, h: g.textHeightMm, cpl: g.charsPerLine })"></span>
+                  <span x-show="estimatedPages() > 0" x-text="' · ' + $app.t('pdfExport.layout.preview.estimate', { n: estimatedPages() })"></span>
+                </figcaption>
+              </figure>
+            </template>
+            <template x-for="w in geometryWarnings()" :key="w">
+              <p class="card-form-warn" role="status" x-text="w"></p>
+            </template>
+          </div>

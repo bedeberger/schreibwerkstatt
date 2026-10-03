@@ -179,6 +179,7 @@ body.research-dnd-active .research-status-cell {
    aber nicht rot (nichts ist kaputt, es fehlt nur die Angabe). */
 .research-status-noplace {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   margin: 0;
@@ -186,6 +187,7 @@ body.research-dnd-active .research-status-cell {
   color: var(--color-warn-text);
 }
 .research-status-noplace .icon { width: 13px; height: 13px; flex: 0 0 auto; }
+.research-status-suggest { margin-left: auto; }
 
 .research-status-otherlinks {
   font-size: var(--font-size-micro);

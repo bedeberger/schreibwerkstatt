@@ -68,11 +68,32 @@ test('Einstellungs-Aenderung macht empfehlenswert', () => {
   const c = content([{ id: 1, html: '<p>gleich</p>' }]);
   const d = computeDrift({
     baselineContent: c, currentContent: c,
-    baselineSettings: { buchtyp: 'roman', is_finished: 0 },
-    currentSettings: { buchtyp: 'roman', is_finished: 1 },
+    baselineSettings: { buchtyp: 'roman', citation_style: 'apa7' },
+    currentSettings: { buchtyp: 'roman', citation_style: 'chicago' },
   });
   assert.equal(d.settingsChanged, true);
-  assert.deepEqual(d.settingsFields, ['is_finished']);
+  assert.deepEqual(d.settingsFields, ['citation_style']);
+  assert.equal(d.worthwhile, true);
+});
+
+test('Arbeits-/Status-Felder (fertig, Tagesziel, Stilprofil) sind keine Drift', () => {
+  const c = content([{ id: 1, html: '<p>gleich</p>' }]);
+  const d = computeDrift({
+    baselineContent: c, currentContent: c,
+    baselineSettings: { is_finished: 0, daily_goal_chars: 1000, stilprofil: 'a', goal_deadline: null },
+    currentSettings: { is_finished: 1, daily_goal_chars: 3000, stilprofil: 'b', goal_deadline: '2027-01-01' },
+  });
+  assert.equal(d.settingsChanged, false);
+  assert.equal(d.worthwhile, false);
+});
+
+test('Buchtitel-Aenderung macht empfehlenswert', () => {
+  const pages = [{ id: 1, html: '<p>gleich</p>' }];
+  const base = { ...content(pages), book: { name: 'Alt', description: '' } };
+  const cur = { ...content(pages), book: { name: 'Neu', description: '' } };
+  const d = computeDrift({ baselineContent: base, currentContent: cur });
+  assert.equal(d.bookChanged, true);
+  assert.deepEqual(d.bookFields, ['name']);
   assert.equal(d.worthwhile, true);
 });
 

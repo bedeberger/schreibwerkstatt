@@ -185,9 +185,9 @@
     </div>
     <div x-show="!adminUsageJobsList.length && !adminUsageLoading" class="muted-msg" x-text="$app.t('admin.usage.empty')"></div>
   </div>
-
   <!-- ── Chat-Tab ──────────────────────────────────────────────────────── -->
   <div x-show="adminUsageTab === 'chat'" class="admin-usage-pane">
+    <div id="partial-admin-usage-chat-quality"></div>
     <div class="admin-usage-filter">
       <label>
         <span x-text="$app.t('admin.usage.filter.user')"></span>

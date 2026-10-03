@@ -4,7 +4,7 @@
 // ctx = { bookId, userEmail, jobSignal, logger }
 // Uebersicht aller Tools + Vertrag: docs/buchchat-tools.md
 
-const { _truncateResult } = require('./shared');
+const { _truncateResult, resultCapFor } = require('./shared');
 const catalog = require('./tools-catalog');
 const timeline = require('./tools-timeline');
 const text = require('./tools-text');
@@ -15,6 +15,7 @@ const werkstatt = require('./tools-werkstatt');
 const plot = require('./tools-plot');
 const motif = require('./tools-motif');
 const image = require('./tools-image');
+const research = require('./tools-research');
 const { validateFinalAnswerCitations } = require('./citations');
 
 const TOOLS = {
@@ -31,6 +32,7 @@ const TOOLS = {
 
   list_continuity_issues: timeline.tool_list_continuity_issues,
   get_timeline:           timeline.tool_get_timeline,
+  get_figure_age:         timeline.tool_get_figure_age,
 
   count_pronouns:         figures.tool_count_pronouns,
   get_figure_mentions:    figures.tool_get_figure_mentions,
@@ -62,6 +64,9 @@ const TOOLS = {
   get_motifs:             motif.tool_get_motifs,
   get_motif_occurrences:  motif.tool_get_motif_occurrences,
 
+  list_research_items:    research.tool_list_research_items,
+  read_research_item:     research.tool_read_research_item,
+
   generate_image:         image.tool_generate_image,
 };
 
@@ -69,7 +74,7 @@ async function executeTool(name, input, ctx) {
   const fn = TOOLS[name];
   if (!fn) throw new Error(`Unbekanntes Werkzeug: ${name}`);
   const result = await fn(input || {}, ctx);
-  return _truncateResult(result);
+  return _truncateResult(result, resultCapFor(ctx));
 }
 
 module.exports = { executeTool, TOOLS, validateFinalAnswerCitations };

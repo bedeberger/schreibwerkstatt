@@ -131,6 +131,9 @@ Reihenfolge = Pflicht-Invariante #11: Draft → Snapshot → Autosave → Online
 
 **Warum `resetPage` zwingend delegiert:** Lock- und Presence-Heartbeat erneuern sich selbst (5 min bzw. 30 s) und werden ausschliesslich hier abgeräumt. Ein Teilabbau im Root liesse beide auf der verlassenen Seite weiterlaufen — andere ACL-User sähen sie für den Rest der Session als „wird bearbeitet". Gegated: [tests/unit/notebook-teardown.test.mjs](../tests/unit/notebook-teardown.test.mjs).
 
+### Programmatische Ersetzung (Seiten-Chat)
+`_applyTextReplacement(original, replacement)` ([edit/input.js](../public/js/editor/notebook/edit/input.js), Root-Forwarder in [trampoline.js](../public/js/editor/notebook/trampoline.js)) ersetzt eine Textstelle im Live-Editor: Guards gegen die Save-Normalform (`stripLektoratMarks` → `countInHtml` 0/>1 → `replaceInHtml`-No-Op/`skipReason`), `_historyPushNow` (eigener Undo-Schritt), Mount über `mountEditorHtml`, dann `_markEditDirty` (Draft/Autosave). Notebook-only: im Fokusmodus liefert sie `{ reason: 'focus' }` und fasst nichts an. Aufrufer: Seiten-Chat „Übernehmen"/„Rückgängig" ([chat/page-chat-apply.js](../public/js/chat/page-chat-apply.js)).
+
 ## Undo/Redo (Session-scoped, pro Seite)
 
 Eigener Stack statt Browser-Stack — der kollabiert, sobald wir `innerHTML` oder `replaceChild` aufrufen (Slash-Menü, HR, Paste-Cleaner). Der Kern liegt in [shared/edit-history.js](../public/js/editor/shared/edit-history.js) (`createEditHistory`, framework-frei, ohne Import) und wird mit dem **Fokusmodus in fremden Schalen** geteilt; [editor/notebook/history.js](../public/js/editor/notebook/history.js) ist nur noch die Karten-Glue darum: Container-Lookup, Mount-Pipeline, Dirty-Flag + Draft/Autosave. Der zweite Grund für den eigenen Stack steht in [focus-editor.md → Invariante 19](focus-editor.md) (WebKit führt eine ganze Tippstrecke als EINEN Schritt).

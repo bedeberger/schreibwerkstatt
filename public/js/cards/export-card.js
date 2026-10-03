@@ -16,6 +16,7 @@ export function registerExportCard() {
     migrateAnalysis: false,
     migrateLektorat: false,
     migrateChats: false,
+    migrateResearch: false,
     _lifecycle: null,
 
     init() {
@@ -29,6 +30,7 @@ export function registerExportCard() {
           migrateAnalysis: false,
           migrateLektorat: false,
           migrateChats: false,
+          migrateResearch: false,
         },
         extraListeners: [
           { type: 'export:preset', handler: (e) => this._applyExportPreset(e.detail) },

@@ -3,14 +3,17 @@
 // fachlicher State + Lifecycle; Root-Zugriffe via window.__app / $app.
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { attachFullscreenSync } from '../fullscreen.js';
-import { rechercheMethods } from '../book/recherche.js';
+import { rechercheMethods, rechercheBulkState, rechercheCrosscheckState } from '../book/recherche.js';
 import { ideenBacklinkMethods } from '../book/ideen-backlinks.js';
 import { rechercheToSourceMethods } from '../sources/from-research.js';
 import { rechercheScrapeMethods } from '../book/recherche/scrape.js';
-import { researchChatMethods } from '../chat/research-chat.js';
+import {
+  researchChatMethods, researchProposalState, installResearchChatAskBridge, RESEARCH_CHAT_ASK_PENDING,
+} from '../chat/research-chat.js';
 import { EVT } from '../events.js';
 import { emptyDraft as _emptyDraft } from '../book/recherche/shared.js';
 import { rechercheInterviewMethods, rechercheInterviewState } from '../book/recherche/interview.js';
+import { lsGet, lsSet } from '../safe-storage.js';
 
 // Filterleiste + Sortierung pro Buch im localStorage (siehe
 // public/js/filter-persist.js). `filterLinked` ist der aus Kategorie + Ziel
@@ -28,6 +31,9 @@ const RECHERCHE_FILTER_SCOPES = [
 
 export function registerRechercheCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
+  // Event `research-chat:ask` (z.B. aus dem Buch-Chat) → Karte öffnen + Frage
+  // vorbelegen. Global, weil die Karte lazy ist (docs/recherche-chat.md).
+  installResearchChatAskBridge();
   window.Alpine.data('rechercheCard', () => ({
     items: [],
 
@@ -43,7 +49,7 @@ export function registerRechercheCard() {
     // Global im localStorage, nicht pro Buch — es ist eine Arbeitsweise, keine
     // Eigenschaft des Buchs (gleiche Wahl wie `viewMode` der Orte-Karte). Darum
     // bewusst NICHT in RECHERCHE_FILTER_SCOPES: das ist der Filter-Stand.
-    viewMode: localStorage.getItem('recherche.viewMode') === 'status' ? 'status' : 'list',
+    viewMode: lsGet('recherche.viewMode') === 'status' ? 'status' : 'list',
     // SortableJS-Instanzen der vier Status-Spalten (recherche/status.js).
     _statusSortables: [],
     // Speicher des EINEN Memo-Helfers der Karte (_memo in recherche/status.js).
@@ -107,6 +113,11 @@ export function registerRechercheCard() {
     suggestStatus: '',
     _suggestTimer: null,
 
+    // Link-Pruefung (links.js#checkLinks, Job research-link-check).
+    linkCheckRunning: false,
+    linkCheckStatus: '',
+    _linkCheckTimer: null,
+
     // Deep-Link-Ziel (#book/X/recherche/<itemId>): gemerkt, bis die Liste geladen
     // ist. loadRecherche fokussiert es danach; _focusRechercheItemById in recherche.js.
     _pendingFocusItemId: null,
@@ -126,13 +137,20 @@ export function registerRechercheCard() {
     _researchChatPollTimer: null,
     _researchChatGen: 0,       // Generationszähler des Recherche-Chats (chat-base.js)
 
-    // Saving-/Saved-Status der Chat-Speicher-Vorschläge — Card-Level statt auf dem
+    // Laufende Speicher-Klicks der Chat-Vorschläge — Card-Level statt auf dem
     // verschachtelten proposal-Objekt, weil Mutationen am x-for-Item-Proxy nach
     // einem await nicht zuverlässig ins Template durchschlagen (Reactive-Proxy-
-    // Identity). Schlüssel: `${sessionId}:${msgIdx}:${pi}`. Reassign (kein In-Place-
-    // Mutate), damit Alpine die Änderung sicher sieht.
-    _proposalSaved: {},
+    // Identity). Schlüssel: `${msg.id}:${index}`. Reassign (kein In-Place-Mutate).
+    // Der Gespeichert-Status selbst ist serverseitig persistiert
+    // (context_info.proposals[i].saved_item_id).
     _proposalSaving: {},
+    // Bearbeitungs-Entwürfe + Kontext-Chip der Vorschläge (research-chat-proposals.js).
+    ...researchProposalState(),
+
+    // Mehrfachauswahl der Liste (book/recherche/bulk.js).
+    ...rechercheBulkState(),
+    // Recherche-Abgleich gegen das Manuskript (book/recherche/crosscheck.js).
+    ...rechercheCrosscheckState(),
 
     // Interview-Transkription (Slice book/recherche/interview.js): Aufnahme,
     // Wortlaut, Sprecher. Buch-skopiert, darum aus der Factory.
@@ -161,8 +179,8 @@ export function registerRechercheCard() {
       this._lifecycle = setupCardLifecycle(this, {
         name: 'recherche',
         showFlag: 'showRechercheCard',
-        timerKeys: ['_suggestTimer', '_researchChatPollTimer', '_ivPollTimer'],
-        resetState: { detailEditing: false, menuOpenId: null, linkPickerItemId: null, busy: false },
+        timerKeys: ['_suggestTimer', '_researchChatPollTimer', '_ivPollTimer', '_linkCheckTimer', '_crosscheckTimer'],
+        resetState: { detailEditing: false, menuOpenId: null, linkPickerItemId: null, busy: false, linkCheckRunning: false, linkCheckStatus: '', crosscheckRunning: false, crosscheckItemId: null, crosscheckStatus: '', ...rechercheBulkState() },
         filterScopes: RECHERCHE_FILTER_SCOPES,
         load: async () => { await this.loadRecherche(); await this._ensureStatusBoard(); },
         extraListeners: [
@@ -171,6 +189,8 @@ export function registerRechercheCard() {
           // Deep-Link-Permalink #book/X/recherche/<itemId>: Hash-Router dispatcht das
           // Event; _focusRechercheItemById öffnet das Item (bzw. merkt es bis zum Load vor).
           { type: EVT.RECHERCHE_FOCUS_ITEM, handler: (e) => this._focusRechercheItemById(e.detail?.itemId) },
+          // Vorbelegte Recherche-Frage (research-chat-ask.js) bei schon lebender Karte.
+          { type: RESEARCH_CHAT_ASK_PENDING, handler: () => this._consumeResearchChatAsk() },
           // Transkriptionslauf nach Reload/Tab-Wechsel wieder aufnehmen.
           { type: 'job:reconnect', handler: (e) => {
             if (e.detail?.type !== 'interview-transcribe') return;
@@ -209,9 +229,12 @@ export function registerRechercheCard() {
       // seine Spalten gar nicht, danach sind es frische Knoten; eine einmal
       // gebundene Instanz zeigte auf einen abgeraeumten Container.
       this.$watch('viewMode', (v) => {
-        localStorage.setItem('recherche.viewMode', v === 'status' ? 'status' : 'list');
+        lsSet('recherche.viewMode', v === 'status' ? 'status' : 'list');
         this._ensureStatusBoard();
       });
+
+      // Frage, die vor dem Mount der (lazy) Karte ankam, jetzt abholen.
+      this._consumeResearchChatAsk();
 
       // Native Fullscreen-API: Status spiegeln (Toggle-Button + Esc-Exit).
       // $root = die Karten-Wurzel (.card--recherche), unabhängig vom Klick-Kontext.

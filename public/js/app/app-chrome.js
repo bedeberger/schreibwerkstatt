@@ -2,6 +2,7 @@
 // UI-Bereiche, die ausserhalb der normalen Buch-/Seiten-Flows leben und keine
 // Querabhängigkeiten zu Job-Queue oder Hash-Router haben.
 import { bindScrollFade } from '../scroll-fade.js';
+import { lsGet, lsSet } from '../safe-storage.js';
 
 export const appChromeMethods = {
   // ── Theme (Hell/Dunkel/Auto) ─────────────────────────────────────────────
@@ -15,7 +16,7 @@ export const appChromeMethods = {
     if (pref !== 'auto' && pref !== 'light' && pref !== 'dark') return;
     if (this.$store.shell.themePref === pref) return;
     this.$store.shell.themePref = pref;
-    try { localStorage.setItem('theme', this.$store.shell.themePref); } catch (e) {}
+    try { lsSet('theme', this.$store.shell.themePref); } catch (e) {}
     this._applyTheme();
     fetch('/me/settings', {
       method: 'PATCH',
@@ -72,7 +73,7 @@ export const appChromeMethods = {
       return clamped;
     };
 
-    const saved = parseInt(localStorage.getItem('sidebar-width'), 10);
+    const saved = parseInt(lsGet('sidebar-width'), 10);
     if (Number.isFinite(saved)) apply(saved);
 
     const handle = document.createElement('div');
@@ -94,7 +95,7 @@ export const appChromeMethods = {
     const persist = () => {
       const cur = parseInt(getComputedStyle(layout).getPropertyValue('--sidebar-w'), 10);
       if (Number.isFinite(cur)) {
-        try { localStorage.setItem('sidebar-width', String(cur)); } catch {}
+        try { lsSet('sidebar-width', String(cur)); } catch {}
       }
     };
     const onUp = () => {

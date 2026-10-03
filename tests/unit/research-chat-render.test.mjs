@@ -9,6 +9,8 @@ import {
   citedSources,
   parseCiteDocNums,
   resolveSource,
+  displaySources,
+  effectiveAnswerText,
 } from '../../public/js/chat/research-chat-render.js';
 
 const ID = (s) => s;          // escHtml mock: passthrough
@@ -146,4 +148,55 @@ test('citedSources: Index ohne Source wird übersprungen', () => {
   const out = citedSources('<cite index="1-1">x</cite><cite index="3-1">y</cite>', sources);
   // Index 1 → ok, Index 3 → keine Source → nicht in der Liste.
   assert.deepEqual(out, [{ n: 1, url: 'https://a.example', title: 'A' }]);
+});
+// ── Geprüfte Belege (final_answer.quellen → context_info.answer_sources) ────
+
+const SRCS = [
+  { url: 'https://a.example', title: 'A' },
+  { url: 'https://b.example', title: 'B' },
+  { url: 'https://c.example', title: 'C' },
+];
+const ANS = [
+  { url: 'https://c.example', title: 'C-Beleg', doc_nums: [3] },
+  { url: 'https://a.example', title: 'A-Beleg', doc_nums: [1] },
+];
+
+test('displaySources: answer_sources haben Vorrang und werden 1..k nummeriert', () => {
+  const out = displaySources('<cite index="2-1">x</cite>', SRCS, ANS);
+  assert.deepEqual(out, [
+    { n: 1, url: 'https://c.example', title: 'C-Beleg' },
+    { n: 2, url: 'https://a.example', title: 'A-Beleg' },
+  ]);
+});
+
+test('displaySources: ohne answer_sources → Fallback auf cite-Marker', () => {
+  const out = displaySources('<cite index="2-1">x</cite>', SRCS, []);
+  assert.deepEqual(out, [{ n: 2, url: 'https://b.example', title: 'B' }]);
+});
+
+test('renderResearchAnswer: Marker nimmt die Nummer der Belegliste (über doc_nums)', () => {
+  const html = renderResearchAnswer({
+    text: 'Fakt <cite index="3-1">eins</cite>.', sources: SRCS, answerSources: ANS,
+    renderChatMarkdown: MK, escHtml: ID, t: T,
+  });
+  assert.match(html, /href="https:\/\/c\.example"[^>]*>1<\/a>/);
+});
+
+test('renderResearchAnswer: zitierter, aber nicht belegter Treffer → Link ohne Nummer', () => {
+  const html = renderResearchAnswer({
+    text: 'Fakt <cite index="2-1">zwei</cite>.', sources: SRCS, answerSources: ANS,
+    renderChatMarkdown: MK, escHtml: ID, t: T,
+  });
+  assert.match(html, /chat-cite--loose/);
+  assert.match(html, /href="https:\/\/b\.example"/);
+  assert.doesNotMatch(html, />2<\/a>/);
+});
+
+test('effectiveAnswerText: leer/Abbruch + Vorschläge → proposalsOnly-Marker', () => {
+  assert.equal(effectiveAnswerText('', 2), '__i18n:recherche.chat.proposalsOnly__');
+  assert.equal(effectiveAnswerText('__i18n:chat.errors.emptyAnswer__', 1), '__i18n:recherche.chat.proposalsOnly__');
+  assert.equal(effectiveAnswerText('__i18n:chat.errors.maxIterReached__', 0), '__i18n:chat.errors.maxIterReached__');
+  assert.equal(effectiveAnswerText('Text', 4), 'Text');
+  const html = renderResearchAnswer({ text: '', sources: [], proposalCount: 1, renderChatMarkdown: MK, escHtml: ID, t: T });
+  assert.equal(html, '[i18n]recherche.chat.proposalsOnly');
 });

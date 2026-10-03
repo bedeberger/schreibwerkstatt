@@ -5,8 +5,13 @@
 // Buffers darin nichts zu suchen haben. Frontend laedt das fertige PDF ueber
 // einen separaten Endpoint als Stream.
 //
-// Job-Result-JSON enthaelt nur Metadaten: Groesse, MIME, Validation-Status. Der
-// eigentliche Buffer wird in `pdfResults`-Map gehalten und nach 2 h gecleart.
+// Job-Result-JSON enthaelt nur Metadaten: Groesse, MIME, Validation-Status,
+// Render-Hinweise. Der eigentliche Buffer liegt im Result-Store
+// (./pdf-export-results.js: 2 h TTL + Gesamt-Byte-Deckel mit LRU).
+//
+// Probeseiten (`sample: true`): nur das erste Kapitel der Einheit, ohne
+// Verzeichnis/Apparat/Backmatter (Renderer honoriert `sample`), ohne
+// veraPDF/Ghostscript — schnelle Satzprobe vor dem langen Volllauf.
 
 const express = require('express');
 const {
@@ -28,7 +33,7 @@ const { loadContents } = require('../../lib/load-contents');
 const { getSnapshot } = require('../../db/book-snapshots');
 const { snapshotToBundle, snapshotPublication } = require('../../lib/snapshot-export');
 const { renderPdfBuffer } = require('../../lib/pdf-render');
-const { buildBibliography, pageIdsFromGroups } = require('../../lib/bibliography');
+const { buildBibliography, pageIdsFromGroups, citationsFromGroups } = require('../../lib/bibliography');
 const { renderCoverBuffer, computeSpineMm } = require('../../lib/pdf-cover-render');
 const { validatePdfa } = require('../../lib/pdfa-validate');
 const { convertToPdfX } = require('../../lib/pdfx-convert');
@@ -38,6 +43,9 @@ const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const logger = require('../../logger');
 const { guardBook, sessionEmail } = require('../../lib/acl');
+const { abortError } = require('../../lib/http-util');
+const contentStore = require('../../lib/content-store');
+const { createResultStore } = require('./pdf-export-results');
 
 const router = express.Router();
 
@@ -45,17 +53,56 @@ const VALID_SCOPES = new Set(['book', 'chapter', 'page']);
 const VALID_TARGETS = new Set(['interior', 'cover']);
 
 // jobId → { buffer, mime, filename }
-const pdfResults = new Map();
-const RESULT_TTL_MS = 2 * 60 * 60 * 1000;
+const pdfResults = createResultStore();
 
-function _scheduleResultCleanup(jobId) {
-  const t = setTimeout(() => pdfResults.delete(jobId), RESULT_TTL_MS);
-  t.unref?.();
+// Probeseiten: Gruppen auf das erste Kapitel der Einheit kuerzen.
+//  - scope 'book': erstes Top-Level-Kapitel, das Seiten traegt, samt seinen
+//    Unterkapiteln (Gruppen sind depth-first sortiert). Kapitellose Seiten am
+//    Buchanfang fallen weg, ausser das Buch hat gar keine Kapitel.
+//  - scope 'chapter': die erste Gruppe (Kapitel selbst bzw. erstes Unterkapitel).
+//  - scope 'page': unveraendert.
+// Wurzel-Schluessel: Kette ueber parent_chapter_id, soweit die Eltern in den
+// Gruppen vorkommen; ein Elternkapitel ohne eigene Seiten taucht nicht als
+// Gruppe auf und ist dann selbst der Schluessel.
+function sampleGroups(groups, scope) {
+  if (!Array.isArray(groups) || !groups.length || scope === 'page') return groups;
+  const chaptered = groups.filter(g => g.chapter);
+  if (!chaptered.length) return groups.slice(0, 1);
+  if (scope === 'chapter') return [chaptered[0]];
+  const byId = new Map(chaptered.map(g => [g.chapter.id, g.chapter]));
+  const rootKey = (ch) => {
+    let cur = ch;
+    const seen = new Set();
+    while (cur.parent_chapter_id != null && byId.has(cur.parent_chapter_id) && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      cur = byId.get(cur.parent_chapter_id);
+    }
+    return cur.parent_chapter_id ?? cur.id;
+  };
+  const root = rootKey(chaptered[0].chapter);
+  return chaptered.filter(g => rootKey(g.chapter) === root);
 }
 
-async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target = 'interior', snapshotId = null, userEmail }) {
+// Renderer-Hinweise ins Job-Result (non-fatal). Fehlende Felder → leerer Default.
+function renderWarningsFromMeta(meta = {}) {
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  const num = (v) => (Number.isFinite(v) ? v : (Array.isArray(v) ? v.length : 0));
+  return {
+    footnoteFallback:      !!meta.footnoteFallback,
+    footnoteOverflowPages: num(meta.footnoteOverflowPages),
+    xrefUnresolved:        arr(meta.xrefUnresolved),
+    fontFallbacks:         arr(meta.fontFallbacks),
+    dpiWarnings:           arr(meta.dpiWarnings),
+    hyphenationDisabled:   arr(meta.hyphenationDisabled),
+    oversizeImages:        num(meta.oversizeImages),
+  };
+}
+
+async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target = 'interior', snapshotId = null, sample = false, userEmail }) {
   const log = makeJobLogger(jobId);
   const ctrl = jobAbortControllers.get(jobId);
+  const signal = ctrl?.signal;
+  const checkCancelled = () => { if (signal?.aborted || jobs.get(jobId)?.cancelled) throw abortError('job.cancelled'); };
 
   try {
     updateJob(jobId, { progress: 5, statusText: 'job.phase.loadProfile' });
@@ -80,16 +127,18 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     } else {
       bundle = await loadContents({ scope, id: entityId, includeSubchapters: !!includeSubchapters });
     }
-    const { book, chapter, page, groups } = bundle;
+    const { book, chapter, page } = bundle;
+    const groups = sample ? sampleGroups(bundle.groups, scope) : bundle.groups;
     const snapDetail = snapshotId ? `, fassungId=${snapshotId}` : '';
     const scopeDetail = scope === 'chapter' && chapter?.id ? `, chapter=${chapter.id}${includeSubchapters ? '+sub' : ''}`
                       : scope === 'page'    && page?.id    ? `, page=${page.id}`
                       : '';
-    log.info(`Start PDF-Export «${book.name}» (scope=${scope}${scopeDetail}${snapDetail}, profile=${profile.name})`);
+    const sampleDetail = sample ? `, probe=${groups.length} Gruppe(n)` : '';
+    log.info(`Start PDF-Export «${book.name}» (scope=${scope}${scopeDetail}${snapDetail}${sampleDetail}, profile=${profile.name})`);
 
     updateJob(jobId, { progress: 30, statusText: 'job.phase.loadPages' });
 
-    if (ctrl?.signal.aborted) throw new Error('job.cancelled');
+    checkCancelled();
 
     const { language: bookLang } = getBookSettings(book.id, userEmail);
     const standard = profile.config.pdfa?.standard || (profile.config.pdfa?.enabled ? 'pdfa' : 'none');
@@ -114,6 +163,11 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       ex.copyright   = pub.copyright || '';
       ex.frontMatter = pub.frontmatter || '';
       ex.authorBio   = pub.author_bio || '';
+      // PDF-Info-Dictionary/XMP (Subject, Keywords) — der Renderer liest sie
+      // aus extras. Nur Laufzeit-Spiegel: validateConfig kennt die Keys nicht,
+      // im gespeicherten Profil landen sie also nie.
+      ex.description = pub.description || '';
+      ex.keywords    = pub.keywords || '';
       if (frozenPub) {
         if (frozenPub.cover) pubCoverBuf = frozenPub.cover.image;
         if (frozenPub.authorImage) pubAuthorBuf = frozenPub.authorImage.image;
@@ -130,6 +184,7 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     let hyphenationDisabled = [];
     let coverInInterior = false;
     let interiorPages = null;
+    let renderWarnings = renderWarningsFromMeta();
 
     if (target === 'cover') {
       // Separates Umschlag-PDF: nur fuer das ganze Buch sinnvoll. Front =
@@ -159,9 +214,18 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       // Quellenverzeichnis + Kurzbeleg-Kontext der gerenderten Einheit. Nummern
       // im numerischen Stil folgen der Einheit: ganzes Buch → Buch-Leserichtung,
       // Kapitel-/Seiten-Scope → nur deren Fundstellen ab 1 (lib/bibliography.js).
+      // Fassung: Fundstellen aus deren eingefrorenem HTML, nicht aus dem
+      // source_citations-Index des heutigen Seitenstands (gleiche Regel wie der
+      // synchrone Fassungs-Export in routes/snapshots.js).
+      let citations = null;
+      if (snapshotId) {
+        try { citations = await citationsFromGroups(bundle.groups); }
+        catch (e) { log.warn(`Fassungs-PDF: Fundstellen nicht lesbar (${e.message})`); }
+      }
       const bibliography = await buildBibliography({
         bookId: book.id,
         pageIds: scope === 'book' ? null : pageIdsFromGroups(groups),
+        citations,
         userEmail,
       });
 
@@ -171,7 +235,9 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
         book, groups, profile,
         coverBuf, authorImageBuf, lang: bookLang,
         scope, chapter, page, meta, bibliography,
+        signal, sample,
       });
+      renderWarnings = renderWarningsFromMeta(meta);
       lowResImages = Array.isArray(meta.dpiWarnings) ? meta.dpiWarnings.length : 0;
       interiorPages = Number.isInteger(meta.totalPages) ? meta.totalPages : null;
       if (lowResImages) log.warn(`${lowResImages} Bild(er) unter ${profile.config.print?.dpiWarnThreshold || 300} dpi (scope=${scope})`);
@@ -182,14 +248,15 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       if (coverInInterior) log.warn(`Innenteil enthaelt Cover trotz Beschnitt — separates Umschlag-PDF empfohlen (job=${jobId})`);
     }
 
-    if (ctrl?.signal.aborted) throw new Error('job.cancelled');
+    checkCancelled();
 
     let validation = { available: false };
-    if (standard === 'pdfa') {
+    if (standard === 'pdfa' && !sample) {
       updateJob(jobId, { progress: 85, statusText: 'job.phase.validatePdfa' });
       try {
-        validation = await validatePdfa(buffer);
+        validation = await validatePdfa(buffer, { signal });
       } catch (e) {
+        if (e?.name === 'AbortError') throw e;
         log.warn(`PDF/A validation failed (${e.message}); ignoring`);
         validation = { available: false, reason: 'validator-error' };
       }
@@ -202,12 +269,13 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     // RGB bleibt, keine CMYK-Separation. Non-fatal — fehlt gs/ICC, bleibt das
     // unkonvertierte PDF mit Warnung im Result.
     let pdfx = null;
-    if (standard === 'pdfx') {
+    if (standard === 'pdfx' && !sample) {
       updateJob(jobId, { progress: 85, statusText: 'job.phase.convertPdfx' });
       let conv = { available: false, reason: 'convert-error' };
       try {
-        conv = await convertToPdfX(buffer, { title: book.name || 'Document' });
+        conv = await convertToPdfX(buffer, { title: book.name || 'Document', signal });
       } catch (e) {
+        if (e?.name === 'AbortError') throw e;
         log.warn(`PDF/X conversion threw (${e.message}); ignoring`);
       }
       if (conv.available && conv.buffer) {
@@ -220,12 +288,15 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
     }
 
     const slug = resolveSlug(bundle);
-    const filename = buildExportFilename({
+    let filename = buildExportFilename({
       prefix: target === 'cover' ? 'umschlag' : scope, slug, ext: 'pdf', date: new Date(),
     });
+    if (sample) filename = filename.replace(/\.pdf$/i, '-probe.pdf');
 
+    // Abbruch waehrend veraPDF/Ghostscript: kein Ergebnis ablegen, nicht
+    // als fertig melden.
+    checkCancelled();
     pdfResults.set(jobId, { buffer, mime: 'application/pdf', filename });
-    _scheduleResultCleanup(jobId);
 
     const sizeKb = Math.round(buffer.length / 1024);
     const normLog = standard === 'pdfx'
@@ -241,14 +312,16 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       profileName: profile.name,
       scope,
       target,
+      sample: !!sample,
       coverInInterior,
       interiorPages,
       lowResImages,
       hyphenationDisabled,
+      renderWarnings,
       dpiThreshold: profile.config.print?.dpiWarnThreshold || 0,
       standard,
       pdfa: {
-        requested: standard === 'pdfa',
+        requested: standard === 'pdfa' && !sample,
         validatorAvailable: !!validation.available,
         passed: validation.available ? !!validation.passed : null,
         reason: validation.reason || null,
@@ -261,8 +334,12 @@ async function runPdfExportJob(jobId, { scope, entityId, profileId, includeSubch
       } : { requested: false, applied: false, reason: null, identifier: null },
     });
   } catch (e) {
-    if (e?.name === 'AbortError' || e?.message === 'job.cancelled') {
-      failJob(jobId, e);
+    if (e?.name === 'AbortError' || e?.message === 'job.cancelled' || signal?.aborted) {
+      pdfResults.delete(jobId);
+      // failJob erkennt den Abbruch am Namen (bzw. job.cancelled) — ein vom
+      // Renderer als plain Error('job.cancelled') geworfener Abbruch wird
+      // hier normalisiert, damit er sicher als 'cancelled' endet.
+      failJob(jobId, e?.name === 'AbortError' ? e : abortError('job.cancelled'));
       return;
     }
     const empty = emptyScopeError(e);
@@ -291,7 +368,32 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
   const profileId = toIntId(req.body?.profile_id || req.body?.profileId);
   if (!entityId || !profileId) return res.status(400).json({ error_code: 'ENTITY_OR_PROFILE_REQUIRED' });
   const includeSubchapters = scope === 'chapter' && (req.body?.include_subchapters === true || req.body?.includeSubchapters === true);
+  // Probeseiten nur fuer den Innenteil — ein Umschlag ist ein einziger Bogen.
+  const sample = req.body?.sample === true && target === 'interior';
 
+  // 1) Buch-ID aufloesen: scope='book' (inkl. Fassung) → entityId, sonst ueber
+  //    den Content-Store. Nicht aufloesbar → 404, der Guard wird nie
+  //    uebersprungen.
+  let bookId = scope === 'book' ? entityId : null;
+  if (scope !== 'book') {
+    try {
+      const row = scope === 'chapter'
+        ? await contentStore.loadChapter(entityId, req)
+        : await contentStore.loadPage(entityId, req);
+      bookId = toIntId(row?.book_id);
+    } catch (e) {
+      if (e.status !== 404) return res.status(502).json({ error_code: 'CONTENT_LOAD_FAILED' });
+    }
+  }
+  if (!bookId) return res.status(404).json({ error_code: 'NOT_FOUND' });
+  setContext({ book: bookId });
+
+  // 2) Buch-ACL vor jeder weiteren Bestandsfrage (Profil, Fassung) — sonst
+  //    beantwortet der Server einem Fremden erst, ob es die Fassung gibt.
+  //    PDF-Export: viewer reicht (Export gilt fuer alle Rollen).
+  if (!guardBook(req, res, bookId, 'viewer')) return;
+
+  // 3) Existenzpruefungen.
   const profile = getPdfExportProfile(profileId);
   if (!profile) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
   if (profile.user_email !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
@@ -301,45 +403,23 @@ router.post('/pdf-export', jsonBody, async (req, res) => {
     return res.status(404).json({ error_code: 'SNAPSHOT_NOT_FOUND' });
   }
 
-  // Buch-ID fuer Logging + Dedup ableiten: bei scope='book' === entityId,
-  // sonst via content-store-Lookup (Chapter/Page).
-  let bookId = entityId;
-  if (scope !== 'book') {
-    const contentStore = require('../../lib/content-store');
-    try {
-      if (scope === 'chapter') {
-        const ch = await contentStore.loadChapter(entityId, req);
-        bookId = ch?.book_id || 0;
-      } else if (scope === 'page') {
-        const pg = await contentStore.loadPage(entityId, req);
-        bookId = pg?.book_id || 0;
-      }
-    } catch (e) {
-      if (e.status === 404) return res.status(404).json({ error_code: 'NOT_FOUND' });
-      return res.status(502).json({ error_code: 'CONTENT_LOAD_FAILED' });
-    }
-  }
-  if (bookId) setContext({ book: bookId });
-
-  // PDF-Export: viewer reicht (Export gilt fuer alle Rollen).
-  if (bookId) {
-    if (!guardBook(req, res, bookId, 'viewer')) return;
-  }
-
-  const dedupId = `${target}:${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}`;
+  const dedupId = `${target}:${scope}:${entityId}:${profileId}${includeSubchapters ? ':sub' : ''}${snapshotId ? `:snap${snapshotId}` : ''}${sample ? ':sample' : ''}`;
   const existing = findActiveJobId('pdf-export', dedupId, userEmail);
   if (existing) return res.json({ jobId: existing, deduplicated: true });
 
   const jobId = createJob('pdf-export', bookId, userEmail, 'job.label.pdfExportProfile', { profile: profile.name }, dedupId);
-  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target, snapshotId, userEmail }));
-  res.status(202).json({ jobId });
+  enqueueJob(jobId, () => runPdfExportJob(jobId, { scope, entityId, profileId, includeSubchapters, target, snapshotId, sample, userEmail }));
+  res.status(202).json({ jobId, sample });
 });
 
 router.get('/pdf-export/:id/file', (req, res) => {
   const userEmail = sessionEmail(req);
   const job = jobs.get(req.params.id);
-  if (!job) return res.status(404).json({ error_code: 'JOB_NOT_FOUND' });
+  if (!job || job.type !== 'pdf-export') return res.status(404).json({ error_code: 'JOB_NOT_FOUND' });
   if (job.userEmail !== userEmail) return res.status(403).json({ error_code: 'FORBIDDEN' });
+  // Buchzugriff kann seit dem Export entzogen worden sein.
+  const jobBookId = toIntId(job.bookId);
+  if (jobBookId && !guardBook(req, res, jobBookId, 'viewer')) return;
   if (job.status !== 'done') return res.status(409).json({ error_code: 'JOB_NOT_READY', params: { status: job.status } });
   const r = pdfResults.get(req.params.id);
   if (!r) return res.status(410).json({ error_code: 'RESULT_EXPIRED' });
@@ -350,4 +430,4 @@ router.get('/pdf-export/:id/file', (req, res) => {
   res.end(r.buffer);
 });
 
-module.exports = { pdfExportRouter: router, runPdfExportJob };
+module.exports = { pdfExportRouter: router, runPdfExportJob, pdfResults, sampleGroups, renderWarningsFromMeta };

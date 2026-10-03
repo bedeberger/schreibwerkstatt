@@ -1,0 +1,18 @@
+<!-- Befunde des Recherche-Abgleichs am Fundstueck (book/recherche/crosscheck.js,
+     Job research-crosscheck). Je Befund: Art, Seite (Sprung dorthin), der
+     woertliche Ausschnitt aus dem Manuskript und die Abweichung. Ein Hinweis,
+     keine Korrektur — der Text bleibt, wie er ist. -->
+<section class="research-findings" x-show="itemFindings(item).length" x-cloak>
+  <h3 class="research-findings__head" x-text="$app.t('recherche.crosscheck.heading')"></h3>
+  <template x-for="f in itemFindings(item)" :key="f.id">
+    <div class="research-finding">
+      <div class="research-finding__meta">
+        <span class="research-finding__typ" x-text="findingTypeLabel(f)"></span>
+        <button type="button" class="research-finding__page" @click="gotoFinding(f)"
+                :data-tip="$app.t('recherche.link.goto')" x-text="f.page_name"></button>
+      </div>
+      <blockquote class="research-finding__stelle" x-text="f.stelle"></blockquote>
+      <p class="research-finding__why" x-show="f.erklaerung" x-text="f.erklaerung"></p>
+    </div>
+  </template>
+</section>

@@ -10,9 +10,10 @@ Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama
 
 `lib/ai.js#resolveProvider({ userEmail })`:
 
-1. Provider des zugewiesenen KI-Profils (`app_users.ai_profile_id`; NULL = folgt global)
-2. `app_settings.ai.provider`
-3. Hardcoded `'claude'`
+1. Provider des **eigenen KI-Zugangs** des Kontos (`ai_profiles.owner_email`), solange `ai.user_api.enabled` an ist — siehe „Eigener KI-Zugang"
+2. Provider des zugewiesenen KI-Profils (`app_users.ai_profile_id`; NULL = folgt global)
+3. `app_settings.ai.provider`
+4. Hardcoded `'claude'`
 
 `userEmail` kommt aus dem ALS-Context (Job-Queue: `runWithContext({ user: job.userEmail, … })`) oder explizit (Routes/SSE via `req.session.email`). Job-Pfade resolven den Provider einmalig am Job-Start (siehe `effectiveProvider` in `routes/jobs/review.js`, `kapitel.js`, `lektorat.js`, `synonyme.js`, `komplett/`). In-Flight-Override-Wechsel ändert den laufenden Job nicht.
 
@@ -22,7 +23,7 @@ Admin setzt `ai.provider` global in `app_settings` (`claude` (Default) | `ollama
 - Admin weist es in der AdminUsersCard zu (Combobox `Global (…)` | Profilname · Provider). PUT `/admin/users/:email` mit `{ ai_profile_id: 7 | null }`; NULL/'' löst die Zuweisung.
 - API-Guard: Profil, dessen effektive Konfiguration (Profil ODER global) keinen Host bzw. Schlüssel hat → `400 AI_PROVIDER_NOT_CONFIGURED`. Unbekannte ID → `404 AI_PROFILE_NOT_FOUND`.
 - `GET /config` liefert den resolvten Provider read-only (`apiProvider`, `effectiveProvider`, `effectiveProviderClass`) plus die Modellnamen des effektiven Profils für die Frontend-Statuszeile.
-- Self-Service nein. Cost-Verteilung gehört zum Admin-Kontrakt.
+- Self-Service gibt es nur als **eigenen KI-Zugang** mit eigenem Schlüssel (Admin-Freigabe `ai.user_api.enabled`); eine Admin-Zuweisung kann der User nicht ändern.
 
 ### Concurrency-Locks bleiben endpunkt-spezifisch
 
@@ -299,7 +300,7 @@ Die Klassen-Entscheidung ist SSoT in `providerClass(provider)` ([lib/ai/config.j
 
 Konsumenten der Klasse (nicht des Provider-Namens):
 - **Prompt-Variante** — `promptVariantFor` in [lib/prompts-loader.js](../lib/prompts-loader.js) (volle Cloud-Prompts inkl. `JSON_ONLY` vs. Slim-Prompts).
-- **Lektorat-Kontext + Split** — `_isLocalProvider` in [routes/jobs/lektorat.js](../routes/jobs/lektorat.js): Klasse `cloud` lädt Nachbarseiten-Kontext (letzter Absatz der Vorseite, erster der Folgeseite — reiner Lesekontext, Findings daraus verwirft [lektorat-context.js](../routes/jobs/lektorat-context.js)#`dropNeighbourFindings`)/Figuren-Beziehungen/POV-Block wieder und lässt den fokussierten Objektiv/Stil-Split zu (sofern `ai.lektorat_split` aktiv).
+- **Lektorat-Kontext + Split** — `_isLocalProvider` in [routes/jobs/lektorat-page.js](../routes/jobs/lektorat-page.js): Klasse `cloud` lädt Nachbarseiten-Kontext (letzter Absatz der Vorseite, erster der Folgeseite — reiner Lesekontext, Findings daraus verwirft [lektorat-context.js](../routes/jobs/lektorat-context.js)#`dropNeighbourFindings`)/Figuren-Beziehungen/POV-Block wieder und lässt den fokussierten Objektiv/Stil-Split zu (sofern `ai.lektorat_split` aktiv).
 - **Call-Serialisierung** — `settledAll` in [routes/jobs/shared/ai.js](../routes/jobs/shared/ai.js): Klasse `cloud` fährt parallel statt seriell; die Obergrenze bleibt die `max_parallel`-Semaphore.
 - **Komplettanalyse-Strategie** — die Pipeline entscheidet durchgehend an der Klasse (`isCloudModel` in [job-komplett.js](../routes/jobs/komplett/job-komplett.js), `providerClass(effectiveProvider)` in den Phasen): kombinierter Extraktions-Pass statt Pass-A/B-Split, Single-Pass für Kontinuität und Erzählprofil, Completeness-Gap-Pässe, Coverage-Feedback + Self-Audit, Szenen-Backfill, Alias-Cluster, Entity-Reconcile-Judge, Soziogramm-Refine, Attribut-Check, Verify-Filter, Remap-Rescue und das Buchtext-Preprocessing.
 - **Kontinuität + Erzählprofil auf allen drei Schichten** — `/config` (`komplett.continuity`/`narrativeProfile`, [routes/proxies.js](../routes/proxies.js)), Karten-Gate (`requiresCloudModel` in [feature-registry.js](../public/js/cards/feature-registry.js), gelesen aus `$store.config.effectiveProviderClass`) und Route-Guard (`400 CONTINUITY_PROVIDER_UNSUPPORTED` / `NARRATIVE_PROFILE_PROVIDER_UNSUPPORTED` in [routes/jobs/komplett/index.js](../routes/jobs/komplett/index.js)) stellen **dieselbe** Frage. Weichen sie auseinander, ist die Karte sichtbar und der Knopf antwortet 400.
@@ -356,6 +357,19 @@ Drei Folgen, die leicht übersehen werden:
 - **Fenster-Validierung beim Speichern.** Der Boot-Check in [lib/ai/config.js](../lib/ai/config.js) prüft nur die globalen Keys. Ein Profil mit `max_tokens_out + Puffer >= context_window` würde das Input-Budget still auf den 2000-Token-Floor kollabieren lassen — deshalb scheitert es in [routes/admin-ai-profiles.js](../routes/admin-ai-profiles.js) beim Speichern mit `CONTEXT_WINDOW_TOO_SMALL`, und `getContextConfigFor` warnt zusätzlich im Log.
 
 Der API-Key liegt verschlüsselt (`enc:v1:`, [lib/crypto.js](../lib/crypto.js)) und verlässt den Server nie; die Admin-UI schickt beim Bearbeiten `__unchanged__`, wenn das Feld leer bleibt. `has_api_key` ist das einzige, was die Liste darüber verrät.
+
+## Eigener KI-Zugang (Profil, Self-Service)
+
+Ein Konto kann im Profil (**Profil → Eigener KI-Zugang**) einen eigenen API-Zugang hinterlegen — **Claude** (eigener Anthropic-Key, Modell optional) oder **OpenAI-kompatibel** (Endpunkt + Modell, Key optional, Klassen-Schalter `cloud`). Ollama ist ausgenommen: ein lokaler Server ist aus Sicht der Instanz immer ein internes Ziel. Der Admin öffnet bzw. schliesst das Feature über `ai.user_api.enabled` (Einstellungen → Provider → KI-Profile, Default aus). Zu heisst: Abschnitt weg, gespeicherte Zugänge bleiben liegen, greifen aber nicht; Entfernen geht weiterhin.
+
+Gespeichert wird der Zugang als **KI-Profil mit `owner_email`** (höchstens eins pro Konto, `ON DELETE CASCADE`). Damit gelten Cache-Trennung (`_modelName`), Semaphore-Bucket je Profil und Key-Auflösung (`aiApiKey`) ohne zweite Mechanik. Er steht in keiner Admin-Liste und ist nicht zuweisbar (`/admin/ai-profiles` und `PUT /admin/users/:email` behandeln ihn als nicht vorhanden); im Benutzer-Tab zeigt ein Hinweis „Eigener Zugang: <Provider>". Routen: `GET|PUT|DELETE /me/ai-access` ([routes/me-ai-access.js](../routes/me-ai-access.js)); der Key geht nie zurück, nur `has_api_key`, und `__unchanged__` behält ihn — aber nur beim selben Provider.
+
+Drei Invarianten, alle in [lib/ai/profile.js](../lib/ai/profile.js) bzw. [lib/ai/openai-compat.js](../lib/ai/openai-compat.js):
+- **Kein Rückfall auf Host oder Key der Instanz.** `aiApiKey` liefert beim eigenen Zugang den eigenen Key oder `''`, nie `ai.<provider>.api_key`; `aiSetting(…, 'host')` erbt nie den Instanz-Host. **Why:** der Host kommt vom User — ein Rückfall schickte den Schlüssel des Betreibers an dessen Server bzw. den Key des Users ins interne Netz.
+- **SSRF-Guard an zwei Stellen.** Beim Speichern `assertPublicUrl` (früh lesbar: `400 AI_ACCESS_HOST_BLOCKED`), bei jedem Call `safeFetch` mit `maxRedirects: 0` und ungelesenem Body (der Stream läuft wie gewohnt). Ein blockierter Host scheitert im Job als `error.AI_OWN_HOST_BLOCKED`.
+- **Instanz-Overrides gelten nicht.** `usesOwnAccess()` → `jobOverride` liefert nur `timeoutMs`, `_resolveClaudeModel` ignoriert das Tier-Modell. Job-Modelle, Fenster und Effort beschreiben die Modelle der Instanz; an den Endpunkt des Users geschickt wären sie ein fremder Modellname bzw. liefen auf seine Kosten.
+
+Der eigene Zugang schlägt die Admin-Zuweisung; die Kosten landen weiter im Ledger (`ai_cost_ledger`) unter dem Konto, das harte Monatsbudget ([lib/budget.js](../lib/budget.js)#`enforceBudget`) blockt ihn aber nicht — es deckelt die Kosten der Instanz, und die trägt hier der User. Test: [tests/unit/own-ai-access.test.js](../tests/unit/own-ai-access.test.js).
 
 ## Chat-Temperatur
 

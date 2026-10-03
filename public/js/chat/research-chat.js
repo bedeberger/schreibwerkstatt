@@ -1,9 +1,16 @@
 import { makeChatMethods } from './chat-base.js';
-import { fetchJson, escHtml, renderChatMarkdown } from '../utils.js';
+import { escHtml, renderChatMarkdown } from '../utils.js';
 import {
   renderResearchAnswer as _renderResearchAnswerText,
-  citedSources as _citedSources,
+  displaySources as _displaySources,
 } from './research-chat-render.js';
+import { researchProposalMethods } from './research-chat-proposals.js';
+import { takePendingResearchAsk } from './research-chat-ask.js';
+
+// Für rechercheCard: Zusatz-State der Vorschläge + die Frage-Brücke (Buch-Chat →
+// Recherche-Chat), damit die Karte nur dieses Modul importiert.
+export { researchProposalState } from './research-chat-proposals.js';
+export { installResearchChatAskBridge, RESEARCH_CHAT_ASK_PENDING } from './research-chat-ask.js';
 
 // Recherche-Chat-Methoden (gespreadet in die rechercheCard). Agentischer Chat
 // NEBEN dem Wissensboard: recherchiert im Netz + im vorhandenen Material und
@@ -22,9 +29,17 @@ export const researchChatMethods = {
     }
   },
 
-  // Vorschläge einer Assistant-Nachricht (aus context_info.proposals).
-  researchProposals(msg) {
-    return (msg?.context_info?.proposals) || [];
+  // Vorbelegte Frage aus einer anderen Oberfläche (Event `research-chat:ask`,
+  // research-chat-ask.js) übernehmen: Panel auf, Eingabe vorbelegen, NICHT senden.
+  async _consumeResearchChatAsk() {
+    const ask = takePendingResearchAsk();
+    if (!ask) return;
+    if (!this.researchChatOpen) await this.toggleResearchChat();
+    this.researchChatInput = ask.question;
+    this.$nextTick(() => {
+      const ta = this.$root?.querySelector('.research-chat-input');
+      if (ta) { ta.focus(); ta.setSelectionRange?.(ta.value.length, ta.value.length); }
+    });
   },
 
   // Web-Such-Trefferdokumente (1-basiert, Auftrittsreihenfolge) aus dem Backend.
@@ -39,60 +54,42 @@ export const researchChatMethods = {
     return _renderResearchAnswerText({
       text: msg?.content || '',
       sources: this.researchSources(msg),
+      answerSources: msg?.context_info?.answer_sources || [],
+      proposalCount: this.researchProposals(msg).length,
       renderChatMarkdown,
       escHtml,
       t: (k) => app?.t?.(k) ?? k,
     });
   },
 
-  // Distinkte, in der Antwort tatsächlich zitierte Quellen — für die Quellenliste
-  // unter der Antwort. Pure Helper genutzt, das schliesst Drift zwischen Render
-  // und Digest aus (vorher zwei handgeschriebene Loops über denselben Regex).
+  // Quellenliste unter der Antwort: geprüfte Belege aus final_answer.quellen,
+  // sonst die aus den cite-Markern abgeleiteten Treffer (pure Helper, Test teilt ihn).
   researchCitedSources(msg) {
-    return _citedSources(msg?.content || '', this.researchSources(msg));
+    return _displaySources(msg?.content || '', this.researchSources(msg), msg?.context_info?.answer_sources);
   },
 
-  // Stabiler Schlüssel für den Speicher-Status eines Vorschlags (pro Session,
-  // Nachricht und Vorschlags-Index). Trägt den UI-Status auf Card-Ebene statt auf
-  // dem x-for-Item-Proxy — siehe `_proposalSaved`/`_proposalSaving` in recherche-card.js.
-  _proposalKey(msgIdx, pi) { return `${this.researchChatSessionId}:${msgIdx}:${pi}`; },
-  isProposalSaved(msgIdx, pi) { return !!this._proposalSaved[this._proposalKey(msgIdx, pi)]; },
-  isProposalSaving(msgIdx, pi) { return !!this._proposalSaving[this._proposalKey(msgIdx, pi)]; },
+  // Gelaufene Suchbegriffe (server_tool_use.input.query), sichtbar am Fuss.
+  researchWebQueries(msg) {
+    return (msg?.context_info?.web_queries || []).filter(q => typeof q === 'string' && q.trim());
+  },
 
-  // Einen vom Chat vorgeschlagenen Eintrag tatsächlich ins Board speichern.
-  // Persistiert erst HIER (POST /research) — der Chat hat nur vorgeschlagen.
-  async saveResearchProposal(msgIdx, pi, proposal) {
+  // Werkzeugname → i18n-Label (Fallback: roher Name, z.B. für künftige Werkzeuge).
+  researchToolLabel(name) {
     const app = window.__app;
-    const bookId = Alpine.store('nav').selectedBookId;
-    const key = this._proposalKey(msgIdx, pi);
-    if (!bookId || !proposal || this._proposalSaved[key] || this._proposalSaving[key]) return;
-    this._proposalSaving = { ...this._proposalSaving, [key]: true };
-    try {
-      await fetchJson('/research', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          book_id: bookId,
-          kind: proposal.kind || 'note',
-          title: proposal.title || '',
-          body: proposal.body || '',
-          urls: Array.isArray(proposal.urls) ? proposal.urls : [],
-          source: proposal.source || '',
-          tags: Array.isArray(proposal.tags) ? proposal.tags : [],
-        }),
-      });
-      // Board aus Server-Wahrheit neu laden (respektiert aktive Filter/Sortierung
-      // + frischt den Tag-Pool mit) statt das Item blind oben einzufügen.
-      await this.loadRecherche();
-      this._proposalSaved = { ...this._proposalSaved, [key]: true };
-    } catch (e) {
-      this.errorMessage = app.t('recherche.chat.saveError');
-    } finally {
-      const next = { ...this._proposalSaving };
-      delete next[key];
-      this._proposalSaving = next;
-    }
+    const key = `recherche.chat.tool.${name}`;
+    const label = app?.t?.(key);
+    return label && label !== key ? label : name;
   },
+
+  // Kosten dieser Antwort (Tokens + Web-Suchen) aus context_info.cost_usd.
+  researchCostLabel(msg) {
+    const usd = Number(msg?.context_info?.cost_usd);
+    if (!Number.isFinite(usd) || usd <= 0) return '';
+    const v = usd < 0.1 ? usd.toFixed(3) : usd.toFixed(2);
+    return window.__app.t('recherche.chat.cost', { usd: v });
+  },
+
+  ...researchProposalMethods,
 
   ...makeChatMethods({
     label: 'ResearchChat',
@@ -118,5 +115,11 @@ export const researchChatMethods = {
       book_name: ctx.$app.selectedBookName,
     }),
     sendUrl: '/jobs/research-chat',
+    // Kontext-Chip an → Seite/Kapitel geht mit der Frage an den Server; das
+    // Modell bekommt Name, Textauszug und dort verknüpftes Material.
+    sendExtra: (ctx) => {
+      const t = ctx.researchChatUseContext ? ctx.researchChatContextTarget() : null;
+      return t ? { context: { kind: t.kind, id: t.id } } : {};
+    },
   }),
 };

@@ -11,6 +11,8 @@ import { FILTER_SCOPES } from './app-view.js';
 import { EVT } from '../events.js';
 import { reconcileSessionCaches } from './boot/session-change.js';
 import { installContentUpdatedBridge } from './boot/content-updated.js';
+import { setDraftOwner } from '../editor/draft-storage.js';
+import { sweepStaleJobKeys } from '../storage-sweep.js';
 
 export const appInitMethods = {
   // AbortController `_abortCtrl` (initialisiert via app-state.js) hält alle
@@ -198,6 +200,12 @@ export const appInitMethods = {
       if (cfg.ollamaModel) this.$store.config.ollamaModel = cfg.ollamaModel;
       if (cfg.openaiCompatModel) this.$store.config.openaiCompatModel = cfg.openaiCompatModel;
       this.$store.session.currentUser = cfg.user || null;
+      // Entwürfe gehören dem angemeldeten User — der Pending-Zähler, der beim
+      // Boot noch ungefiltert lief, wird danach neu gerechnet.
+      setDraftOwner(cfg.user?.email);
+      this._refreshPendingSyncCount();
+      // Verwaiste Job-Merker räumen — abseits des Boot-Pfads, ein Request.
+      if (cfg.user) setTimeout(() => sweepStaleJobKeys(() => fetchJson('/jobs/queue')), 5000);
       // First-Login-Willkommens-Banner („Erste Schritte"): non-blocking laden,
       // sobald ein User da ist. Serverseitig gemerkt (welcomeDismissed).
       if (cfg.user) this._loadOnboardingWelcome?.();

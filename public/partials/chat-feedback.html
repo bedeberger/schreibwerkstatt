@@ -1,0 +1,20 @@
+<!--
+  Feedback (Daumen hoch/runter) unter einer Assistant-Antwort. Per
+  String-Include in die Nachrichten-Schleifen von chat.html (Seiten- und
+  Buch-Chat), recherche-chat.html (Recherche-Chat) und plot-chat.html
+  (Plot-Chat); Scope: `msg`.
+  Methode `_chatFeedback` aus public/js/chat/chat-base.js — erneuter Klick
+  auf denselben Daumen nimmt das Feedback zurueck.
+-->
+<div x-show="msg.role === 'assistant' && msg.id" class="chat-feedback">
+  <button type="button" class="icon-btn icon-btn--ghost"
+          :aria-pressed="msg.feedback === 1 ? 'true' : 'false'"
+          :disabled="!!msg._feedbackSaving"
+          @click="_chatFeedback(msg, 1)"
+          :data-tip="$app.t('chat.feedbackUp')" :aria-label="$app.t('chat.feedbackUp')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#thumbs-up"/></svg></button>
+  <button type="button" class="icon-btn icon-btn--ghost"
+          :aria-pressed="msg.feedback === -1 ? 'true' : 'false'"
+          :disabled="!!msg._feedbackSaving"
+          @click="_chatFeedback(msg, -1)"
+          :data-tip="$app.t('chat.feedbackDown')" :aria-label="$app.t('chat.feedbackDown')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#thumbs-down"/></svg></button>
+</div>

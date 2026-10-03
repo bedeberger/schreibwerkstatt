@@ -14,9 +14,11 @@
 
 const { db } = require('./connection');
 const { NOW_ISO_SQL } = require('./now');
-const { normalizeUrls, normalizeTags, RESEARCH_KINDS } = require('../lib/research-validate');
+const { normalizeUrls, normalizeTags, RESEARCH_KINDS, normalizeTitleForMatch, TITLE_MATCH_MIN } = require('../lib/research-validate');
+const { normalizeUrl } = require('../lib/url-normalize');
 const { MAX_TEXT_CHARS } = require('../lib/pdf-extract');
 const searchIndex = require('../lib/search');
+const { findingsByItem } = require('./research-findings');
 
 // target_kind → { col, table, pk, nameCol, orderCol } für Validierung,
 // Display-JOIN und Sortierung „nach verknüpfter Entität". orderCol ist die Spalte,
@@ -47,13 +49,17 @@ function attachRelations(items) {
   }
 
   const urlRows = db.prepare(
-    `SELECT id AS url_id, item_id, url, label FROM research_item_urls
+    `SELECT id AS url_id, item_id, url, label, checked_at, check_ok, check_code, check_error
+       FROM research_item_urls
       WHERE item_id IN (${ph}) ORDER BY item_id, position, id`
   ).all(...ids);
   const urlsByItem = new Map();
   for (const r of urlRows) {
     if (!urlsByItem.has(r.item_id)) urlsByItem.set(r.item_id, []);
-    urlsByItem.get(r.item_id).push({ url_id: r.url_id, url: r.url, label: r.label || '' });
+    urlsByItem.get(r.item_id).push({
+      url_id: r.url_id, url: r.url, label: r.label || '',
+      ...(r.checked_at ? { checked_at: r.checked_at, check_ok: r.check_ok === 1, check_code: r.check_code, check_error: r.check_error } : {}),
+    });
   }
 
   // Links inkl. Display-Label per target_kind-spezifischem JOIN (ein Pass je Kind).
@@ -73,7 +79,11 @@ function attachRelations(items) {
     }
   }
 
+  // Befunde des Recherche-Abgleichs (db/research-findings.js).
+  const findings = findingsByItem(ids);
+
   for (const it of items) {
+    it.findings = findings.get(it.id) || [];
     it.tags = tagsByItem.get(it.id) || [];
     it.urls = urlsByItem.get(it.id) || [];
     it.links = linksByItem.get(it.id) || [];
@@ -89,12 +99,18 @@ function attachRelations(items) {
 }
 
 /** Ausgabeform eines Fundstuecks (ohne BLOBs, mit Relationen). */
+// Status-Zuschreibung fuer die Ausgabe: wer hat den Status gesetzt (Anzeigename
+// zur Lesezeit per Subselect, keine Snapshot-Spalte). Geteilt von emitItem und
+// der Listen-Route, damit beide dieselbe Form liefern.
+const STATUS_SELECT_SQL = `ri.status_at, ri.status_by,
+            (SELECT display_name FROM app_users au WHERE au.email = ri.status_by) AS status_by_name`;
+
 function emitItem(id) {
   const row = db.prepare(
-    `SELECT id, book_id, user_email, kind, title, body, source, image_mime,
-            doc_mime, doc_name, doc_pages, doc_chars, status, pinned, archived,
-            created_at, updated_at
-       FROM research_items WHERE id = ?`
+    `SELECT ri.id, ri.book_id, ri.user_email, ri.kind, ri.title, ri.body, ri.source, ri.image_mime,
+            ri.doc_mime, ri.doc_name, ri.doc_pages, ri.doc_chars, ri.status, ri.pinned, ri.archived,
+            ri.created_at, ri.updated_at, ${STATUS_SELECT_SQL}
+       FROM research_items ri WHERE ri.id = ?`
   ).get(id);
   if (!row) return null;
   attachRelations([row]);
@@ -103,16 +119,45 @@ function emitItem(id) {
 
 // urls → geordnete Kind-Tabelle. Normalisierung (http(s)-only, Dedup, Cap, Label)
 // kommt aus lib/research-validate (geteilt mit dem Chat-Vorschlag).
+//
+// Das Ergebnis der Link-Pruefung haengt an der URL, nicht an der Zeile: bleibt
+// eine URL beim Bearbeiten stehen, behaelt sie ihren Pruefstand.
 function replaceUrls(itemId, urls) {
+  const prevChecks = new Map(db.prepare(
+    'SELECT url, checked_at, check_ok, check_code, check_error FROM research_item_urls WHERE item_id = ?'
+  ).all(itemId).map(r => [r.url, r]));
   db.prepare('DELETE FROM research_item_urls WHERE item_id = ?').run(itemId);
   const { urls: clean } = normalizeUrls(urls);
   if (!clean.length) return;
+  const keepCheck = db.prepare(
+    `UPDATE research_item_urls SET checked_at = ?, check_ok = ?, check_code = ?, check_error = ?
+      WHERE id = ?`
+  );
   const ins = db.prepare(
     `INSERT INTO research_item_urls (item_id, url, label, position, created_at)
      VALUES (?, ?, ?, ?, ${NOW_ISO_SQL})`
   );
   let pos = 0;
-  for (const { url, label } of clean) ins.run(itemId, url, label || null, pos++);
+  for (const { url, label } of clean) {
+    const newId = ins.run(itemId, url, label || null, pos++).lastInsertRowid;
+    const prev = prevChecks.get(url);
+    if (prev?.checked_at) keepCheck.run(prev.checked_at, prev.check_ok, prev.check_code, prev.check_error, newId);
+  }
+}
+
+/** Status mehrerer Fundstuecke setzen — der EINE Schreibweg fuer Einzel-PATCH,
+ *  Status-Board-Drag und Mehrfachauswahl. Haelt fest, wer und wann
+ *  (`status_by` nur, wenn das Konto existiert: FK auf app_users). Gibt die Zahl
+ *  geaenderter Zeilen zurueck. Aufrufer pruefen Status-Wert und Buch-Zugehoerigkeit. */
+function setItemsStatus(ids, status, userEmail) {
+  if (!ids.length) return 0;
+  const ph = ids.map(() => '?').join(',');
+  return db.prepare(
+    `UPDATE research_items
+        SET status = ?, status_at = ${NOW_ISO_SQL}, updated_at = ${NOW_ISO_SQL},
+            status_by = (SELECT email FROM app_users WHERE email = ? COLLATE NOCASE)
+      WHERE id IN (${ph})`
+  ).run(status, userEmail || null, ...ids).changes;
 }
 
 function replaceTags(itemId, tags) {
@@ -141,6 +186,69 @@ const createItem = db.transaction(({ bookId, userEmail, kind, title, body, sourc
   searchIndex.upsertResearch(id);
   return id;
 });
+
+/** Bestehendes, nicht archiviertes Fundstueck desselben Buchs, das denselben
+ *  Inhalt bezeichnet — oder null. Zwei Achsen, in dieser Rangfolge:
+ *    `url`   eine der URLs ist (normalisiert, lib/url-normalize) schon erfasst
+ *    `title` der Titel ist (case-/whitespace-normalisiert) wortgleich
+ *  Die URL-Achse ist hart (POST /research antwortet 409), die Titel-Achse nur
+ *  ein Hinweis (Chat-Vorschlag „schon im Board?"): zwei Notizen duerfen gleich
+ *  heissen, ein Link zweimal erfasst ist fast immer ein Versehen.
+ *  @returns {null | { id, title, match: 'url'|'title', url? }} */
+function findDuplicateItem(bookId, { urls = [], title = '' } = {}) {
+  const wanted = new Map();
+  for (const u of Array.isArray(urls) ? urls : []) {
+    const raw = typeof u === 'string' ? u : u?.url;
+    const n = normalizeUrl(raw);
+    if (n && !wanted.has(n)) wanted.set(n, raw);
+  }
+  if (wanted.size) {
+    const rows = db.prepare(
+      `SELECT u.item_id, u.url, ri.title
+         FROM research_item_urls u JOIN research_items ri ON ri.id = u.item_id
+        WHERE ri.book_id = ? AND ri.archived = 0
+        ORDER BY u.item_id`
+    ).all(bookId);
+    for (const r of rows) {
+      if (wanted.has(normalizeUrl(r.url))) {
+        return { id: r.item_id, title: r.title || '', match: 'url', url: r.url };
+      }
+    }
+  }
+  const t = normalizeTitleForMatch(title);
+  if (t.length >= TITLE_MATCH_MIN) {
+    const rows = db.prepare(
+      `SELECT id, title FROM research_items
+        WHERE book_id = ? AND archived = 0 AND title IS NOT NULL AND title != ''
+        ORDER BY id`
+    ).all(bookId);
+    const hit = rows.find(r => normalizeTitleForMatch(r.title) === t);
+    if (hit) return { id: hit.id, title: hit.title, match: 'title' };
+  }
+  return null;
+}
+
+/** Verknuepfung Fundstueck → Buch-Entitaet anlegen (idempotent). Das Ziel muss
+ *  zum Buch des Fundstuecks gehoeren. Geteilt von POST /research/:id/links und
+ *  dem Speichern eines Chat-Vorschlags mit Seiten-/Kapitel-Kontext.
+ *  @returns {null | 'INVALID_TARGET' | 'BOOK_MISMATCH'} null = ok */
+function addItemLink(itemId, bookId, targetKind, targetId) {
+  const t = LINK_TARGETS[targetKind];
+  const tid = parseInt(targetId, 10);
+  if (!t || !Number.isInteger(tid) || tid <= 0) return 'INVALID_TARGET';
+  const owner = db.prepare(`SELECT book_id FROM ${t.table} WHERE ${t.pk} = ?`).get(tid);
+  if (!owner || owner.book_id !== bookId) return 'BOOK_MISMATCH';
+  try {
+    db.prepare(
+      `INSERT INTO research_item_links (item_id, target_kind, ${t.col}, created_at)
+       VALUES (?, ?, ?, ${NOW_ISO_SQL})`
+    ).run(itemId, targetKind, tid);
+  } catch (e) {
+    // UNIQUE-Verstoss = Verknuepfung existiert bereits → idempotent.
+    if (!/UNIQUE/.test(e.message)) throw e;
+  }
+  return null;
+}
 
 /** Buch-ID eines Items (oder null) — Lookup statt padden: ACL-/Media-Wege
  *  brauchen diese Information, ohne die ganze Zeile zu laden. */
@@ -235,13 +343,43 @@ function setUrlLabel(itemId, urlId, label) {
   return _stmtSetUrlLabel.run(String(label || '') || null, parseInt(urlId), parseInt(itemId)).changes > 0;
 }
 
+// Fundstueck-Ids eines Buchs an einer Stelle: `pageId` = an dieser Seite
+// verknuepft; `chapterId` = am Kapitel selbst ODER an einer seiner Seiten
+// (dieselbe Regel wie der Kapitel-Filter von list_ideen). Liegt hier, weil der
+// Seiten-JOIN Buchstruktur liest — Handler fragen das Modul, nicht `pages`.
+function itemIdsAtPlace(bookId, { pageId = null, chapterId = null } = {}) {
+  if (pageId) {
+    return db.prepare(
+      `SELECT DISTINCT l.item_id AS id FROM research_item_links l
+         JOIN research_items ri ON ri.id = l.item_id
+        WHERE ri.book_id = ? AND l.target_kind = 'page' AND l.page_id = ?`
+    ).all(bookId, pageId).map(r => r.id);
+  }
+  if (chapterId) {
+    return db.prepare(
+      `SELECT DISTINCT l.item_id AS id FROM research_item_links l
+         JOIN research_items ri ON ri.id = l.item_id
+         LEFT JOIN pages p ON l.target_kind = 'page' AND p.page_id = l.page_id
+        WHERE ri.book_id = ?
+          AND ((l.target_kind = 'chapter' AND l.chapter_id = ?)
+            OR (l.target_kind = 'page' AND p.chapter_id = ?))`
+    ).all(bookId, chapterId, chapterId).map(r => r.id);
+  }
+  return [];
+}
+
 module.exports = {
   LINK_TARGETS,
+  STATUS_SELECT_SQL,
+  setItemsStatus,
+  itemIdsAtPlace,
   attachRelations,
   emitItem,
   replaceUrls,
   replaceTags,
   createItem,
+  findDuplicateItem,
+  addItemLink,
   itemBookId,
   listEntityLinkTargets,
   setItemKind,

@@ -14,9 +14,41 @@ const {
 const { toIntId } = require('../../lib/validate');
 const { setContext } = require('../../lib/log-context');
 const { guardBook, sessionEmail } = require('../../lib/acl');
+const { researchPageHits } = require('../../lib/research-retrieval');
+const { pageTitle } = require('../../db/content-names');
 
 const researchLinkRouter = express.Router();
 const MAX_CANDIDATES = 200;
+
+// Seiten-Vorschlaege kommen nicht vom Modell, sondern aus den Embeddings: welche
+// Manuskriptseiten stehen dem Fundstueck inhaltlich am naechsten. Das ist genau
+// die Verknuepfung, die „eingearbeitet" belegt — und die das Modell ohne den Text
+// aller Seiten nicht finden kann. `grund` ist ein Auszug der Fundstelle (Zitat,
+// sprachneutral), kein KI-Text.
+const PAGE_SUGGEST_MAX = 3;
+const PAGE_SNIPPET_MAX = 160;
+
+async function _semanticPageSuggestions(item, bookId, signal) {
+  const hits = await researchPageHits(bookId, item, { topK: PAGE_SUGGEST_MAX * 3, signal });
+  const out = [];
+  const seen = new Set();
+  for (const h of hits) {
+    if (h.kind !== 'page' || seen.has(h.entity_id)) continue;
+    const meta = pageTitle(h.entity_id);
+    if (!meta || meta.book_id !== bookId) continue;
+    seen.add(h.entity_id);
+    const snip = String(h.text || '').replace(/\s+/g, ' ').trim();
+    out.push({
+      target_kind: 'page',
+      target_id: h.entity_id,
+      label: meta.title || '',
+      grund: snip ? `„${snip.slice(0, PAGE_SNIPPET_MAX)}${snip.length > PAGE_SNIPPET_MAX ? '…' : ''}"` : '',
+      source: 'semantic',
+    });
+    if (out.length >= PAGE_SUGGEST_MAX) break;
+  }
+  return out;
+}
 
 // KI-«art» → research_item_links.target_kind.
 const ART_TO_KIND = { figur: 'figure', ort: 'location', szene: 'scene', beat: 'beat', strang: 'thread' };
@@ -32,7 +64,7 @@ function _loadCandidates(bookId, userEmail) {
   };
 }
 
-async function runResearchLinkJob(jobId, itemId, bookId, userEmail) {
+async function runResearchLinkJob(jobId, itemId, bookId, userEmail, { signal } = {}) {
   const logger = makeJobLogger(jobId);
   try {
     updateJob(jobId, { statusText: 'job.phase.researchLinking', progress: 15 });
@@ -42,11 +74,29 @@ async function runResearchLinkJob(jobId, itemId, bookId, userEmail) {
     if (!item) throw i18nError('job.error.researchItemMissing');
     item.urls = db.prepare('SELECT url, label FROM research_item_urls WHERE item_id = ? ORDER BY position, id').all(itemId);
 
+    // Bereits bestehende Verknüpfungen ausblenden (Welt-Entitäten wie Seiten).
+    const existing = new Set(
+      db.prepare('SELECT target_kind, chapter_id, page_id, figure_id, location_id, scene_id, beat_id, thread_id FROM research_item_links WHERE item_id = ?')
+        .all(itemId)
+        .map(r => `${r.target_kind}:${r.chapter_id ?? r.page_id ?? r.figure_id ?? r.location_id ?? r.scene_id ?? r.beat_id ?? r.thread_id}`)
+    );
+
+    // Seiten zuerst (billig, ohne Modell). Ein Embedding-Ausfall kostet nur sie.
+    let pageSuggestions = [];
+    try {
+      pageSuggestions = (await _semanticPageSuggestions(item, bookId, signal))
+        .filter(sg => !existing.has(`page:${sg.target_id}`));
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      logger.warn(`Recherche-Verknüpfung: Seiten-Vorschläge nicht verfügbar (${e.message})`);
+    }
+
     const cands = _loadCandidates(bookId, userEmail);
     const total = cands.figur.length + cands.ort.length + cands.szene.length
       + cands.beat.length + cands.strang.length;
     if (!total) {
-      completeJob(jobId, { suggestions: [], empty: true }, null, '0 Kandidaten');
+      completeJob(jobId, { suggestions: pageSuggestions, empty: !pageSuggestions.length }, null,
+        `${pageSuggestions.length} Seiten, 0 Kandidaten`);
       return;
     }
 
@@ -66,15 +116,8 @@ async function runResearchLinkJob(jobId, itemId, bookId, userEmail) {
     );
     if (!Array.isArray(result?.links)) throw i18nError('job.error.researchLinksMissing');
 
-    // Bereits bestehende Verknüpfungen ausblenden.
-    const existing = new Set(
-      db.prepare('SELECT target_kind, chapter_id, page_id, figure_id, location_id, scene_id, beat_id FROM research_item_links WHERE item_id = ?')
-        .all(itemId)
-        .map(r => `${r.target_kind}:${r.chapter_id ?? r.page_id ?? r.figure_id ?? r.location_id ?? r.scene_id ?? r.beat_id}`)
-    );
-
     const seen = new Set();
-    const suggestions = [];
+    const suggestions = [...pageSuggestions];
     for (const l of result.links) {
       const art = String(l?.art || '').trim();
       const cand = byArtId.get(`${art}:${toIntId(l?.id)}`);
@@ -90,7 +133,7 @@ async function runResearchLinkJob(jobId, itemId, bookId, userEmail) {
       });
     }
 
-    logger.info(`Recherche-Verknüpfung: ${suggestions.length} Vorschlag/Vorschläge aus ${total} Kandidaten`);
+    logger.info(`Recherche-Verknüpfung: ${suggestions.length} Vorschlag/Vorschläge (${pageSuggestions.length} Seiten) aus ${total} Kandidaten`);
     completeJob(jobId, { suggestions, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${suggestions.length} Vorschlaege`);
   } catch (e) {

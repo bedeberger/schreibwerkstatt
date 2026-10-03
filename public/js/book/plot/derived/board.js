@@ -2,7 +2,7 @@
 // Stränge/Swimlanes, Hybrid-Akte, Grid-Render-Plan, Live-Vererbung, Akt-Farben.
 // Reine Compute aus Board-State (memoized), keine Server-Mutationen.
 
-import { STATUSES, DIST_SEGMENTS, ACT_PALETTE, BEAT_REL_TYPES, classifyBeatAnchor } from '../constants.js';
+import { STATUSES, DIST_SEGMENTS, ACT_PALETTE, BEAT_REL_TYPES, classifyBeatAnchor, beatAnchorKnown } from '../constants.js';
 
 export const boardMethods = {
   // ── Derived (memoized) ──────────────────────────────────────────────────────
@@ -299,8 +299,17 @@ export const boardMethods = {
   // ── Beat-Verankerung (Soll status vs. Ist-Fundstellen aus plot_beat_occurrences) ──
   // Klassifikation via reiner Funktion (constants.js, unit-getestet). Der Server
   // hängt occ_count + occ_top an jeden Beat (routes/plot.js). 'none' → kein Badge.
+  // Ohne je gelaufenen Anchor (beatAnchorKnown) gibt es kein rotes 'drift' —
+  // „0 Fundstellen" hiesse dort nur „nie gesucht".
   beatAnchorState(beat) {
-    return classifyBeatAnchor(beat && beat.status, beat && beat.occ_count, beat && beat.verworfen);
+    return classifyBeatAnchor(beat && beat.status, beat && beat.occ_count, beat && beat.verworfen, this.beatAnchorIndexKnown());
+  },
+
+  // Wurde für dieses Buch je verankert? Payload `beatAnchor.ranAt`, sonst
+  // Heuristik „mindestens ein Beat trägt eine Fundstelle" (constants.js).
+  beatAnchorIndexKnown() {
+    return this._memo('anchorKnown', [this.beats, this.beatAnchorInfo], () =>
+      beatAnchorKnown(this.beatAnchorInfo, this.beats));
   },
 
   // ── Beat-zu-Beat-Beziehungen (Kausalität + Setup/Payoff) ────────────────────
@@ -315,8 +324,8 @@ export const boardMethods = {
     return label === key ? typ : label;
   },
 
-  // Ausgehende Kanten eines Beats (from_beat_id === beat.id), lesefertig mit
-  // Ziel-Titel (aus dem Payload-JOIN) — read-only Badges + Edit-Chips.
+  // Ausgehende Kanten eines Beats (from_beat_id === beat.id) — read-only Badges +
+  // Edit-Chips. Den Ziel-Titel liefert relTargetTitle (live aus this.beats).
   beatRelationsOut(beat) {
     if (!beat) return [];
     return this._memo(`relOut:${beat.id}`, [this.relations, beat.id], () =>
@@ -327,10 +336,25 @@ export const boardMethods = {
   // selbst) als { value: id, label: titel }. Verworfene werden mit Marker gezeigt.
   relTargetOptions(beat) {
     if (!beat) return [];
-    return this._memo(`relTargets:${beat.id}`, [this.beats, beat.id], () =>
+    const app = globalThis.window?.__app;
+    const locale = globalThis.window?.Alpine?.store('shell')?.uiLocale;
+    return this._memo(`relTargets:${beat.id}`, [this.beats, beat.id, locale], () =>
       (this.beats || [])
         .filter(b => b.id !== beat.id)
-        .map(b => ({ value: b.id, label: b.titel + (b.verworfen ? ' (verworfen)' : '') })));
+        .map(b => ({
+          value: b.id,
+          label: b.verworfen ? (app?.t('plot.relation.targetDiscarded', { titel: b.titel }) || b.titel) : b.titel,
+        })));
+  },
+
+  // Ziel-Titel einer Kante, LIVE aus dem Board (Map id→titel) — der Payload-
+  // Snapshot `to_titel` stammt vom Board-Load und veraltet beim Umbenennen des
+  // Ziel-Beats. Fallback auf den Snapshot, falls der Beat lokal (noch) fehlt.
+  relTargetTitle(rel) {
+    if (!rel) return '';
+    const byId = this._memo('beatTitleById', [this.beats], () =>
+      new Map((this.beats || []).map(b => [b.id, b.titel])));
+    return byId.get(rel.to_beat_id) ?? rel.to_titel ?? '';
   },
 
   // Tooltip des Anchor-Badges: Zustands-Satz + die Top-Fundstellen (Seitenname).

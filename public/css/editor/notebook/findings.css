@@ -14,6 +14,9 @@
 }
 .finding.error { border-color: var(--color-err-border); }
 .finding.style { border-color: var(--color-style-border); }
+/* Redaktionelle Befunde (unbelegt/zuschreibung/wertung): Korrektur ändert die
+   Aussage — eigene, wertfreie Kante statt Fehlerrot/Stilorange. */
+.finding.editorial { border-color: var(--color-mark-border); }
 .finding.ok    { border-color: var(--color-ok-border); }
 .finding.finding--deselected { opacity: 0.55; }
 .finding.finding--applied {

@@ -15,6 +15,7 @@
 
 import { fetchJson } from '../../utils.js';
 import { startPoll } from '../../cards/job-helpers.js';
+import { befundSeverityClass } from '../../utils/befund-severity.js';
 
 export const consistencyMethods = {
   async loadMotifChecks() {
@@ -59,20 +60,10 @@ export const consistencyMethods = {
   },
 
   // Visuelle Klasse des Schwere-Chips. NICHT einfach `severity-tag--<schwere>`:
-  // die geteilte Palette (entity-list.css) kodiert STÄRKE, nicht Schwere — dort
-  // ist `stark` grün (starker Beleg = gut) und `schwach` rot. Für einen Befund
-  // heisst `stark` aber „schwerwiegend"; ungemappt wäre der schlimmste Befund
-  // grün und der harmloseste rot. Darum die Zuordnung hier explizit:
-  // schwerwiegend → rot, mittel → amber, leicht → neutral.
+  // die geteilte Palette kodiert STÄRKE, nicht Schwere — Zuordnung zentral in
+  // utils/befund-severity.js (schwerwiegend → rot, mittel → amber, leicht → neutral).
   checkSeverityClass(f) {
-    const map = {
-      kritisch: 'severity-tag--kritisch',
-      stark: 'severity-tag--kritisch',
-      mittel: 'severity-tag--mittel',
-      schwach: 'severity-tag--niedrig',
-      niedrig: 'severity-tag--niedrig',
-    };
-    return map[f && f.schwere] || 'severity-tag--niedrig';
+    return befundSeverityClass(f && f.schwere);
   },
 
   // Befund anklicken → Motiv in der Konstellation auswählen (und dorthin wechseln).

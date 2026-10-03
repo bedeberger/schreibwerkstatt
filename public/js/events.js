@@ -107,6 +107,11 @@ export const EVT = {
   // ── Chats ────────────────────────────────────────────────────────────────
   CHAT_RESET: 'chat:reset',                     // kein detail
   BOOK_CHAT_RESET: 'book-chat:reset',           // kein detail
+  // Buch-Chat → Recherche-Chat: Frage zur Aussenwelt übergeben (Empfänger:
+  // rechercheCard; Panel öffnen + Eingabe vorbelegen, nicht automatisch senden).
+  RESEARCH_CHAT_ASK: 'research-chat:ask',       // detail: { question, bookId }
+  // Intern (research-chat-ask.js → rechercheCard): wartende Frage abholen.
+  RESEARCH_CHAT_ASK_PENDING: 'research-chat:ask-pending', // kein detail
 
   // ── Bucheditor / Kommentar-Rail ──────────────────────────────────────────
   BOOK_EDITOR_OPEN_FIND: 'book-editor:open-find',     // kein detail

@@ -79,12 +79,13 @@ function listFigureEventsWithNames(bookId, userEmail, limit) {
 }
 
 /** Szenen eines Buchs mit Kapitelname (Plot-KI-Kontext). */
-function listScenesWithChapterNames(bookId, userEmail, limit) {
+function listScenesWithChapterNames(bookId, userEmail, limit, { excludeStale = false } = {}) {
   return db.prepare(`
-    SELECT fs.id, fs.titel, c.chapter_name AS kapitel
+    SELECT fs.id, fs.titel, fs.chapter_id, c.chapter_name AS kapitel
       FROM figure_scenes fs
       LEFT JOIN chapters c ON c.chapter_id = fs.chapter_id
      WHERE fs.book_id = ? AND fs.user_email = ?
+       ${excludeStale ? 'AND fs.stale = 0' : ''}
      ORDER BY fs.sort_order, fs.id
      LIMIT ?
   `).all(bookId, userEmail, limit);

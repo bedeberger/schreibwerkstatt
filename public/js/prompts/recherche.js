@@ -89,7 +89,53 @@ export const RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION =
   + 'Fasse JETZT aus dem bereits Gesammelten die bestmögliche Antwort zusammen und liefere sie über das Werkzeug `final_answer`. '
   + 'Wenn etwas offen blieb, weise kurz darauf hin. Sprache der Antwort: die der Userfrage.';
 
-export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolIter = 6, figures = [], locations = [], profile = {}) {
+/**
+ * Kompakter Block der früheren Speicher-Vorschläge dieser Session (Titel, Typ,
+ * gespeichert ja/nein). Steht am ENDE des System-Prompts, damit der stabile Teil
+ * davor cachebar bleibt. Leere Liste → ''.
+ * @param {Array<{title,kind,saved_item_id?,exists_item_id?}>} list
+ */
+export function buildResearchProposalMemoryBlock(list = []) {
+  if (!Array.isArray(list) || !list.length) return '';
+  const lines = list.map(p => {
+    const state = p.saved_item_id
+      ? `gespeichert als Eintrag id=${p.saved_item_id}`
+      : (p.exists_item_id ? `nicht gespeichert (lag schon im Archiv als id=${p.exists_item_id})` : 'nicht gespeichert');
+    return `- «${p.title}» (${p.kind}) — ${state}`;
+  });
+  return 'BISHERIGE SPEICHER-VORSCHLÄGE IN DIESEM GESPRÄCH (Stand jetzt; schlage dasselbe nicht erneut vor — gespeicherte Einträge liegen im Archiv und sind über list_research_items/read_research_item lesbar):\n'
+    + lines.join('\n');
+}
+
+// Schreibkontext der aktuellen Frage (Kontext-Chip „Für Seite/Kapitel …
+// recherchieren"): wo im Buch der Autor gerade steht, ein Textauszug und das
+// dort schon verknüpfte Material. Volatil (je Frage) → ans Prompt-Ende.
+// ctx = { kind: 'page'|'chapter', name, excerpt, items: [{id, kind, title, status}] }
+export function buildResearchWritingContextBlock(ctx) {
+  if (!ctx) return '';
+  const where = ctx.kind === 'chapter' ? `Kapitel «${ctx.name}»` : `Seite «${ctx.name}»`;
+  const lines = [
+    `SCHREIBKONTEXT DIESER FRAGE: Der Autor recherchiert für ${where}. Richte Suche und Vorschläge auf das aus, was diese Stelle braucht (Zeit, Ort, Sachverhalte, Figuren darin). Gespeicherte Vorschläge werden mit dieser Stelle verknüpft.`,
+  ];
+  if (ctx.excerpt) {
+    lines.push('', `Textauszug (nur zur Orientierung — NICHT umschreiben, NICHT fortsetzen, keine Stil-Hinweise):`, ', ctx.excerpt, ');
+  }
+  if (Array.isArray(ctx.items) && ctx.items.length) {
+    lines.push('', 'Schon mit dieser Stelle verknüpftes Material (nicht erneut vorschlagen; Details via read_research_item):');
+    for (const it of ctx.items) lines.push(`- id=${it.id} [${it.kind}, ${it.status}] ${it.title || '(ohne Titel)'}`);
+  }
+  return lines.join('\n');
+}
+
+export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolIter = 6, figures = [], locations = [], profile = {}, extra = {}) {
+  // extra = { maxWebSearches, bookContext, proposalMemory, writingContext }
+  //   bookContext    — Sprachnorm + Buchtyp/Autoren-Angaben (prompts/core.js#getResearchPromptContext),
+  //                    bewusst OHNE Buch-Chat-Persona: die erlaubt Stil-Feedback, das hier verboten ist.
+  //   proposalMemory — Ergebnis von buildResearchProposalMemoryBlock (volatil, ans Ende).
+  const maxWebSearches = Number(extra?.maxWebSearches) || 0;
+  const bookContext = String(extra?.bookContext || '').trim();
+  const proposalMemory = String(extra?.proposalMemory || '').trim();
+  const writingContext = String(extra?.writingContext || '').trim();
   // Figuren + Schauplätze werden vorgeladen (kompakte Liste), damit das Modell
   // schon bei der ERSTEN Web-Suche den Welt-Kontext in den Suchbegriff
   // einarbeiten kann — ohne erst eine list_book_entities-Runde zu verbrauchen.
@@ -127,6 +173,7 @@ export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolI
     '- `web_search` — durchsucht das offene Web in Echtzeit. Nutze es für aktuelle, externe oder überprüfbare Fakten (historisches, geografisches, technisches, kulturelles Hintergrundwissen). Gib in der Antwort die Quelle/URL an, auf die du dich stützt.',
     '- `list_research_items` / `read_research_item` — durchsuche und lies das vorhandene Recherche-Material des Autors (inkl. PDF-Volltext). Prüfe es, bevor du etwas Neues recherchierst — vieles ist evtl. schon gesammelt.',
     '- `search_research_passages` — semantische Passagen-Suche über das Archiv: findet Stellen nach BEDEUTUNG, auch bei anderer Wortwahl. Mit `item_id` durchsuchst du EIN langes PDF gezielt (`read_research_item` liefert davon nur den Anfang) — genau der Weg zu Stellen weiter hinten im Dokument.',
+    '- `lookup_literature` — Fachliteratur und Bücher aus bibliografischen Registern (Crossref, OpenLibrary) mit DOI/ISBN. Bevorzugt vor `web_search`, wenn zitierfähige Literatur gefragt ist; schlägst du einen Treffer vor, nimm die doi.org-URL in `urls` und Autoren/Jahr in `source`. Die gelieferten URLs darfst du in `final_answer.quellen` nennen.',
     '- `list_book_entities` — Szenen, Plot-Abschnitte und Handlungsstränge des Buchs (sowie die oben gelisteten Figuren und Schauplätze in voller Tiefe), damit du gezielt FÜR die Geschichte recherchieren kannst.',
     '- `propose_research_item` — schlage ein konkretes Fundstück als neuen Recherche-Eintrag vor (Notiz/Link/Zitat/Fakt). Es wird NICHT automatisch gespeichert — der User bestätigt jeden Vorschlag selbst. Nutze dies großzügig, wenn du Brauchbares findest: knackiger Titel, präziser Inhalt, bei Web-Quellen die URL als Quelle.',
     '- `final_answer` — Pflicht-Endpunkt: jede Antwort an den User MUSS hierüber laufen.',
@@ -137,9 +184,14 @@ export function buildResearchChatAgentSystemPrompt(bookName, itemCount, maxToolI
     '- Bittet dich der User ausdrücklich, etwas als Recherche-Eintrag/Item anzulegen, zu speichern oder ins Board zu legen, MUSST du `propose_research_item` aufrufen (der User bestätigt danach) — antworte das nicht nur in Prosa.',
     '- Bündle unabhängige Werkzeug-Aufrufe in EINER Runde (mehrere Suchen / Lese-Calls parallel), statt seriell.',
     `- Maximal ${maxToolIter} Werkzeug-Iterationen pro Antwort (eine Iteration = eine Runde, nicht ein Call). Geh effizient damit um.`,
+    ...(maxWebSearches ? [`- Insgesamt höchstens ${maxWebSearches} Web-Suchen pro Antwort (über alle Runden; jede Suche kostet). Formuliere gezielte Suchbegriffe statt vieler ähnlicher.`] : []),
     '- WICHTIG — rückwärtsgewandt: Du schreibst NIEMALS Manuskripttext, formulierst keine Romanszenen und machst keine Stil-Vorschläge für den Fließtext. Du sammelst und ordnest Wissen. Wenn der User um Textgenerierung für das Buch bittet, biete stattdessen Recherche/Strukturierung an.',
-    '- Wenn du Material vorschlägst, das es im Archiv schon gibt (via list_research_items geprüft), weise darauf hin statt zu duplizieren.',
+    '- Wenn du Material vorschlägst, das es im Archiv schon gibt (via list_research_items geprüft), weise darauf hin statt zu duplizieren. `propose_research_item` meldet einen Treffer im Archiv als `already_in_archive` — schlage dann nur vor, wenn dein Vorschlag wirklich Neues ergänzt.',
+    '- Nenne in `final_answer` unter `quellen` die Web-Quellen (URL + Titel), auf die sich deine Antwort stützt — nur URLs, die dir `web_search` in diesem Durchgang tatsächlich geliefert hat.',
     'Liefere die finale Antwort IMMER über `final_answer`. Sprache: passe dich der Userfrage an, nicht diesem Prompt.',
+    ...(bookContext ? ['', bookContext] : []),
+    ...(proposalMemory ? ['', proposalMemory] : []),
+    ...(writingContext ? ['', writingContext] : []),
   ].join('\n');
 }
 
@@ -153,12 +205,15 @@ export const RESEARCH_CHAT_TOOLS = [
   { type: 'web_search_20250305', name: 'web_search', max_uses: 6 },
   {
     name: 'list_research_items',
-    description: 'Listet die vorhandenen Recherche-Einträge des Buchs (id, kind, Titel, Kurztext, Tags, ob ein PDF/Dokument angehängt ist). Optional nach kind filtern oder mit q volltextsuchen. Nutze dies zuerst, um zu sehen, was schon gesammelt wurde.',
+    description: 'Listet die vorhandenen Recherche-Einträge des Buchs (id, kind, status, Titel, Kurztext, Tags, `stellen` = verknüpfte Kapitel/Seiten, `bezug` = Figuren/Orte/Szenen, ob ein PDF/Dokument angehängt ist). Optional nach kind/status/Kapitel/Seite filtern oder mit q volltextsuchen. Nutze dies zuerst, um zu sehen, was schon gesammelt wurde.',
     input_schema: {
       type: 'object',
       properties: {
-        kind: { type: 'string', enum: ['note', 'link', 'quote', 'fact', 'image', 'document'], description: 'Optionaler Typfilter.' },
+        kind: { type: 'string', enum: ['note', 'link', 'quote', 'fact', 'image', 'document', 'transcript'], description: 'Optionaler Typfilter.' },
         q: { type: 'string', description: 'Optionale Volltextsuche über die Einträge.' },
+        status: { type: 'string', enum: ['offen', 'in_arbeit', 'eingearbeitet', 'verworfen'], description: 'Optional: nur Einträge dieser Einarbeitungs-Stufe.' },
+        chapter_id: { type: 'integer', description: 'Optional: nur Einträge an diesem Kapitel oder einer seiner Seiten.' },
+        page_id: { type: 'integer', description: 'Optional: nur Einträge an dieser Seite.' },
       },
       required: [],
     },
@@ -170,6 +225,21 @@ export const RESEARCH_CHAT_TOOLS = [
       type: 'object',
       properties: { id: { type: 'integer', description: 'id des Recherche-Eintrags (aus list_research_items).' } },
       required: ['id'],
+    },
+  },
+  {
+    name: 'lookup_literature',
+    description: 'Sucht in bibliografischen Registern statt im offenen Web: Crossref (Fachaufsätze, Berichte, alles mit DOI) und OpenLibrary (Bücher). Liefert zitierfähige Kerndaten je Treffer — Titel, Autoren, Jahr, Zeitschrift/Verlag, DOI bzw. ISBN und eine stabile URL (doi.org). Nutze es, wenn der User Fachliteratur, Studien oder Bücher zu einem Thema will, oder um eine bekannte DOI/ISBN aufzulösen. Kein Volltext und keine Studiendetails (Design, Fallzahl) — die stehen nur im Werk selbst (ggf. danach `web_search` auf die DOI-Seite).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        q: { type: 'string', description: 'Thema oder Titel-/Autorenstichworte (bei Fachdatenbanken englische Begriffe bevorzugen).' },
+        doi: { type: 'string', description: 'Alternativ: eine bekannte DOI exakt auflösen.' },
+        isbn: { type: 'string', description: 'Alternativ: eine bekannte ISBN exakt auflösen.' },
+        register: { type: 'string', enum: ['artikel', 'buch', 'beide'], description: 'artikel = nur Crossref, buch = nur OpenLibrary, beide (Default).' },
+        anzahl: { type: 'integer', description: 'Treffer je Register (1–10, Default 5).' },
+      },
+      required: [],
     },
   },
   {
@@ -232,6 +302,18 @@ export const RESEARCH_CHAT_TOOLS = [
       type: 'object',
       properties: {
         antwort: { type: 'string', description: 'Antwort an den User als Freitext, Markdown erlaubt. Pflichtfeld.' },
+        quellen: {
+          type: 'array',
+          description: 'Optional: die Web-Quellen, auf die sich die Antwort stützt (nur URLs aus web_search dieses Durchgangs; andere werden verworfen). Reihenfolge = Nummerierung in der Quellenliste.',
+          items: {
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'URL eines web_search-Treffers.' },
+              titel: { type: 'string', description: 'Kurzer Titel der Quelle.' },
+            },
+            required: ['url'],
+          },
+        },
       },
       required: ['antwort'],
     },
@@ -253,3 +335,47 @@ export function buildResearchChatTools({ allowedDomains = [] } = {}) {
     t.name === 'web_search' ? { ...t, allowed_domains: domains } : t
   ));
 }
+
+// ── Recherche-Abgleich (Job research-crosscheck) ────────────────────────────
+// Prüft Manuskriptstellen gegen das, was der Autor SELBST gesammelt hat (Fakten,
+// Zitate im Recherche-Board) — nicht gegen die Wirklichkeit (das ist der
+// Weltfakten-Faktencheck mit Web-Suche). Rückwärtsgewandt: meldet Befunde,
+// schlägt keinen neuen Text vor.
+
+export function buildSystemResearchCrosscheck() {
+  return `Du gleichst ein Buchmanuskript mit dem Recherche-Material seines Autors ab. Du bekommst Fundstücke (gesammelte FAKTEN und ZITATE, je mit id) und zu jedem Fundstück Textstellen aus dem Manuskript (je mit page_id).
+
+Deine Aufgabe: finde Stellen, an denen das Manuskript dem Fundstück widerspricht.
+- typ «widerspruch»: das Manuskript behauptet etwas, das dem gesammelten FAKT widerspricht (anderes Datum, andere Zahl, anderer Ort, andere Person, umgekehrter Sachverhalt).
+- typ «zitat»: das Manuskript gibt ein gesammeltes ZITAT wieder, aber im Wortlaut abweichend (andere Wörter, fehlende/zusätzliche Teile, anderer Sprecher). Nur für Fundstücke vom Typ quote.
+
+Regeln:
+- Melde NUR echte Abweichungen. Eine Stelle, die das Thema bloss streift, nichts dazu sagt oder es bestätigt, ist KEIN Befund.
+- Fiktion darf erfinden: was das Fundstück nicht berührt, ist kein Widerspruch. Eine bewusst als Figurenmeinung, Irrtum oder Lüge markierte Aussage ist kein Widerspruch.
+- «stelle» ist ein WÖRTLICHER, zusammenhängender Ausschnitt aus der gelieferten Textstelle (höchstens etwa 300 Zeichen), exakt so wie dort geschrieben — keine Paraphrase, keine Auslassungszeichen.
+- «item_id» und «page_id» stammen exakt aus den gelieferten Daten.
+- «erklaerung»: ein Satz, worin die Abweichung besteht (Fundstück sagt X, Manuskript sagt Y). Keine Formulierungsvorschläge.
+- Keine Abweichung gefunden → leeres Array «befunde».${_jsonOnly()}`;
+}
+
+/**
+ * @param {Array<{id, kind, title, body, source, passages: Array<{page_id, page_name, text}>}>} candidates
+ */
+export function buildResearchCrosscheckPrompt(candidates) {
+  const trunc = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const blocks = candidates.map(c => {
+    const head = `FUNDSTÜCK id=${c.id} (${c.kind === 'quote' ? 'ZITAT' : 'FAKT'})${c.title ? ` — ${trunc(c.title, 200)}` : ''}`;
+    const body = trunc(c.body, 1500);
+    const src = c.source ? `\nQuelle: ${trunc(c.source, 200)}` : '';
+    const passages = c.passages.map(p => `  [page_id=${p.page_id}${p.page_name ? `, «${trunc(p.page_name, 80)}»` : ''}]\n  ${p.text}`).join('\n\n');
+    return `${head}\n${body}${src}\n\nTextstellen aus dem Manuskript:\n${passages}`;
+  });
+  return blocks.join('\n\n────────\n\n');
+}
+
+export const SCHEMA_RESEARCH_CROSSCHECK = _obj({
+  befunde: {
+    type: 'array',
+    items: _obj({ item_id: _str, page_id: _str, typ: _str, stelle: _str, erklaerung: _str }),
+  },
+});

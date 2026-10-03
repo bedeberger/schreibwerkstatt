@@ -14,6 +14,9 @@ export const actsMethods = {
     this.actColorPickerId = null;
     const farbe = ACT_PALETTE.includes(key) ? key : null;
     if (farbe === (act.farbe || null)) return;
+    // Kein Schreiben während Undo/Redo/anderer Mutation (Record-Verlust).
+    if (this.busy || this._inHistoryFlight) return;
+    this.busy = true;
     try {
       const updated = await fetchJson(`/plot/acts/${act.id}`, {
         method: 'PATCH',
@@ -21,11 +24,12 @@ export const actsMethods = {
         body: JSON.stringify({ farbe }),
       });
       this.acts = this.acts.map(a => (a.id === updated.id ? updated : a));
+      this._memos = {};
       this._recordActFields(act.id, { farbe: act.farbe || null }, { farbe });
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.save');
-    }
+    } finally { this.busy = false; }
   },
 
   // ── Akte ─────────────────────────────────────────────────────────────────
@@ -33,6 +37,7 @@ export const actsMethods = {
     const app = window.__app;
     const name = (this.newActName || '').trim();
     if (!name) { this.errorMessage = app.t('plot.error.nameRequired'); return; }
+    if (this.busy || this._inHistoryFlight) return;
     this.busy = true;
     try {
       const act = await fetchJson('/plot/acts', {
@@ -106,6 +111,7 @@ export const actsMethods = {
   // ist derselbe Knopf (und Undo trägt es ohnehin).
   async toggleActArchive(act) {
     const app = window.__app;
+    if (this.busy || this._inHistoryFlight) return;
     const next = act.archiviert ? 0 : 1;
     this.busy = true;
     try {
@@ -143,9 +149,11 @@ export const actsMethods = {
       // Hard-Delete samt Beats des Akts → jeder Record im Stack kann ins Leere
       // zeigen (siehe plot/history.js).
       this._clearHistory();
+      const gone = this.beats.filter(b => b.act_id === act.id).map(b => b.id);
       this.acts = this.acts.filter(a => a.id !== act.id);
-      this.beats = this.beats.filter(b => b.act_id !== act.id);
-      this._memos = {};
+      if (this.editingActId === act.id) this.cancelEditAct();
+      // Server kaskadiert die Beats des Akts samt ihrer Kanten — lokal nachziehen.
+      this._pruneBeatsLocal(gone);
       this.errorMessage = '';
     } catch (e) {
       this.errorMessage = app.t('plot.error.delete');
@@ -157,6 +165,7 @@ export const actsMethods = {
   // thread_id-Scopes umsortieren, der andere Scope bleibt unberührt.
   async moveAct(act, dir) {
     const app = window.__app;
+    if (this.busy || this._inHistoryFlight) return;
     const scope = act.thread_id ?? null;
     const ordered = (this.acts || [])
       .filter(a => (a.thread_id ?? null) === scope)
@@ -170,20 +179,28 @@ export const actsMethods = {
     while (swap >= 0 && swap < ordered.length && !this._actVisible(ordered[swap])) swap += dir;
     if (swap < 0 || swap >= ordered.length) return;
     const orderBefore = ordered.map(a => a.id); // Undo-Ziel (Reihenfolge dieses Scopes)
-    [ordered[idx], ordered[swap]] = [ordered[swap], ordered[idx]];
-    ordered.forEach((a, i) => { a.position = i; });
-    // Nur die Akte dieses Scopes ersetzen, der Rest bleibt.
-    const byId = new Map(ordered.map(a => [a.id, a]));
-    this.acts = (this.acts || []).map(a => byId.get(a.id) || a);
+    const orderAfter = [...orderBefore];
+    [orderAfter[idx], orderAfter[swap]] = [orderAfter[swap], orderAfter[idx]];
+    // Unveränderlich umbauen (neue Objekte statt In-place-position), damit der
+    // Snapshot bei einem PUT-Fehler den alten Stand unversehrt zurückgeben kann.
+    const snapshot = this.acts;
+    const pos = new Map(orderAfter.map((id, i) => [id, i]));
+    this.acts = (this.acts || []).map(a => (pos.has(a.id) ? { ...a, position: pos.get(a.id) } : a));
     this._memos = {};
+    this.busy = true;
     try {
       await fetchJson('/plot/acts/order', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, order: ordered.map(a => a.id) }),
+        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, order: orderAfter }),
       });
-      this._recordActOrder(orderBefore, ordered.map(a => a.id));
-    } catch (e) { this.errorMessage = app.t('plot.error.save'); }
+      this._recordActOrder(orderBefore, orderAfter);
+      this.errorMessage = '';
+    } catch (e) {
+      this.acts = snapshot;
+      this._memos = {};
+      this.errorMessage = app.t('plot.error.save');
+    } finally { this.busy = false; }
   },
 
   // ── Akt scoped hinzufügen (Grid: geteilt ODER strang-eigen) ─────────────────
@@ -206,6 +223,7 @@ export const actsMethods = {
     const threadId = this.addingActScope; // false darf hier nicht ankommen
     const name = (this.newActName || '').trim();
     if (!name) { this.errorMessage = app.t('plot.error.nameRequired'); return; }
+    if (this.busy || this._inHistoryFlight) return;
     this.busy = true;
     try {
       const act = await fetchJson('/plot/acts', {

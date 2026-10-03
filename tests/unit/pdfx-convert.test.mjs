@@ -53,3 +53,72 @@ test('fehlendes gs-Binary → non-fatal, available:false (binary-missing)', asyn
     if (prevBin === undefined) delete process.env.GS_BIN; else process.env.GS_BIN = prevBin;
   }
 });
+
+// ── SAFER-Modus ─────────────────────────────────────────────────────────────
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+function withEnv(vars, fn) {
+  const prev = {};
+  for (const k of Object.keys(vars)) { prev[k] = process.env[k]; if (vars[k] === undefined) delete process.env[k]; else process.env[k] = vars[k]; }
+  return Promise.resolve().then(fn).finally(() => {
+    for (const k of Object.keys(prev)) { if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k]; }
+  });
+}
+
+test('gs laeuft mit -dSAFER + --permit-file-read=<ICC>, nie mit -dNOSAFER', async () => {
+  // Fake-gs: protokolliert seine Argumente und schreibt eine Ausgabedatei.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pdfx-fake-'));
+  const log = path.join(dir, 'args.txt');
+  const bin = path.join(dir, 'gs');
+  fs.writeFileSync(bin, `#!/bin/sh\nprintf '%s\\n' "$@" > '${log}'\nfor a in "$@"; do case "$a" in -sOutputFile=*) printf '%%PDF-fake' > "\${a#-sOutputFile=}";; esac; done\n`);
+  fs.chmodSync(bin, 0o755);
+  const icc = new URL(import.meta.url).pathname;
+  try {
+    await withEnv({ GS_DISABLED: undefined, GS_BIN: bin, PDFX_ICC_PATH: icc }, async () => {
+      const r = await convertToPdfX(DUMMY);
+      assert.equal(r.available, true, JSON.stringify(r));
+      const args = fs.readFileSync(log, 'utf8').split('\n');
+      assert.ok(args.includes('-dSAFER'));
+      assert.ok(!args.includes('-dNOSAFER'));
+      assert.ok(args.includes(`--permit-file-read=${icc}`));
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('abgebrochenes Signal → AbortError (kein stilles Fallback)', async () => {
+  await withEnv({ GS_DISABLED: undefined, PDFX_ICC_PATH: new URL(import.meta.url).pathname }, async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    await assert.rejects(convertToPdfX(DUMMY, { signal: ctrl.signal }), { name: 'AbortError' });
+  });
+});
+
+// Echtes Ghostscript (falls installiert) mit einem System-ICC: belegt, dass
+// SAFER + permit-file-read reicht, damit das PDFX_def das ICC lesen darf.
+const SYSTEM_ICC = ['/usr/share/color/icc/colord/FOGRA39L_coated.icc', '/usr/share/color/icc/ghostscript/default_cmyk.icc']
+  .find(p => fs.existsSync(p));
+let HAS_GS = false;
+try { execFileSync('gs', ['--version'], { stdio: 'ignore' }); HAS_GS = true; } catch { /* kein gs */ }
+
+test('echtes gs: pdfkit-PDF → PDF/X-3 unter -dSAFER', { skip: !(HAS_GS && SYSTEM_ICC) && 'gs oder System-ICC fehlt' }, async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const PDFDocument = require('pdfkit');
+  const pdf = await new Promise((resolve) => {
+    const d = new PDFDocument(); const ch = [];
+    d.on('data', c => ch.push(c)); d.on('end', () => resolve(Buffer.concat(ch)));
+    d.text('Probe'); d.end();
+  });
+  await withEnv({ GS_DISABLED: undefined, GS_BIN: undefined, PDFX_ICC_PATH: SYSTEM_ICC }, async () => {
+    const r = await convertToPdfX(pdf, { title: 'T' });
+    assert.equal(r.available, true, JSON.stringify({ reason: r.reason }));
+    const s = r.buffer.toString('latin1');
+    assert.match(s, /GTS_PDFX/);
+    assert.match(s, /PDF\/X-3:2003/);
+  });
+});

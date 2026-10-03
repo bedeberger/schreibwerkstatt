@@ -27,24 +27,33 @@
           <div x-show="msg.role === 'user'" class="chat-msg-text" x-text="msg.content"></div>
           <div x-show="msg.role === 'assistant'" class="chat-msg-text" x-html="_renderResearchAnswer(msg)"></div>
 
-          <!-- Web-Such-/Tool-Hinweis -->
+          <!-- Web-Such-/Tool-Hinweis: Suchen (mit Begriffen), Werkzeuge (i18n), Kosten -->
           <template x-if="msg.role === 'assistant' && msg.context_info">
             <div class="chat-context-info">
               <template x-if="msg.context_info.web_searches > 0">
                 <span class="chat-context-tool" x-text="$app.t('recherche.chat.webSearches', { n: msg.context_info.web_searches })"></span>
               </template>
               <template x-for="(entry, ei) in _toolSummary(msg.context_info.tool_calls, { skip: ['final_answer'] })" :key="ei">
-                <span class="chat-context-tool" x-text="entry.name + (entry.count > 1 ? ' ×' + entry.count : '')"></span>
+                <span class="chat-context-tool" x-text="researchToolLabel(entry.name) + (entry.count > 1 ? ' ×' + entry.count : '')"></span>
+              </template>
+              <span class="chat-context-tool" x-show="researchCostLabel(msg)" x-text="researchCostLabel(msg)"></span>
+            </div>
+          </template>
+          <template x-if="msg.role === 'assistant' && researchWebQueries(msg).length">
+            <div class="research-chat-queries">
+              <span class="research-chat-queries-head" x-text="$app.t('recherche.chat.queriesHead')"></span>
+              <template x-for="(q, qi) in researchWebQueries(msg)" :key="qi">
+                <span class="research-chat-query" x-text="q"></span>
               </template>
             </div>
           </template>
 
-          <!-- Quellen: in der Antwort zitierte Web-Such-Fundstellen (klickbar) -->
+          <!-- Quellen: geprüfte Belege (final_answer.quellen) bzw. zitierte Web-Treffer -->
           <template x-if="msg.role === 'assistant' && researchCitedSources(msg).length">
             <div class="research-chat-sources">
               <div class="research-chat-sources-head" x-text="$app.t('recherche.chat.sourcesHead')"></div>
               <template x-for="src in researchCitedSources(msg)" :key="src.n">
-                <a class="research-chat-source" :href="src.url" target="_blank" rel="noopener noreferrer">
+                <a class="research-chat-source" :href="src.url" target="_blank" rel="noopener noreferrer" :data-tip="src.url">
                   <span class="research-chat-source-num" x-text="'[' + src.n + ']'"></span>
                   <span class="research-chat-source-title" x-text="src.title"></span>
                 </a>
@@ -52,30 +61,79 @@
             </div>
           </template>
 
-          <!-- Speicher-Vorschläge: erst beim Klick wird gespeichert (POST /research) -->
+          <!-- Speicher-Vorschläge: erst der Klick speichert (POST /research/chat-proposal);
+               Gespeichert-Status ist serverseitig persistiert. -->
           <template x-if="msg.role === 'assistant' && researchProposals(msg).length">
             <div class="research-chat-proposals">
-              <div class="research-chat-proposals-head" x-text="$app.t('recherche.chat.proposalsHead')"></div>
+              <div class="research-chat-proposals-headrow">
+                <span class="research-chat-proposals-head" x-text="$app.t('recherche.chat.proposalsHead')"></span>
+                <button type="button" class="btn-compact" x-show="researchSavableProposals(msg).length > 1"
+                        @click="saveAllResearchProposals(msg)"
+                        x-text="$app.t('recherche.chat.proposalSaveAll', { n: researchSavableProposals(msg).length })"></button>
+              </div>
               <template x-for="(prop, pi) in researchProposals(msg)" :key="pi">
-                <div class="research-chat-proposal" :class="{ 'research-chat-proposal--saved': isProposalSaved(msgIdx, pi) }">
-                  <span class="research-kind-badge palette-badge" :class="'research-kind-badge--' + prop.kind" x-text="kindLabel(prop.kind)"></span>
-                  <div class="research-chat-proposal-body">
-                    <span class="research-chat-proposal-title" x-show="prop.title" x-text="prop.title"></span>
-                    <span class="research-chat-proposal-snippet" x-show="prop.body" x-text="prop.body"></span>
-                    <template x-for="(u, ui) in (prop.urls || [])" :key="ui">
-                      <a class="research-chat-proposal-url" :href="u.url" target="_blank" rel="noopener noreferrer" x-text="u.label || u.url"></a>
+                <div class="research-chat-proposal" :class="{ 'research-chat-proposal--saved': isProposalSaved(msg, pi) }">
+                  <div class="research-chat-proposal-main">
+                    <span class="research-kind-badge palette-badge" :class="'research-kind-badge--' + prop.kind" x-text="kindLabel(prop.kind)"></span>
+                    <div class="research-chat-proposal-body" x-show="!proposalEdit(msg, pi)">
+                      <span class="research-chat-proposal-title" x-show="prop.title" x-text="prop.title"></span>
+                      <span class="research-chat-proposal-snippet" x-show="prop.body" x-text="prop.body"></span>
+                      <template x-for="(u, ui) in (prop.urls || [])" :key="ui">
+                        <a class="research-chat-proposal-url" :href="u.url" target="_blank" rel="noopener noreferrer" x-text="u.label || u.url"></a>
+                      </template>
+                      <span class="research-chat-proposal-tags" x-show="(prop.tags || []).length" x-text="(prop.tags || []).join(' · ')"></span>
+                      <span class="research-chat-proposal-exists" x-show="proposalExistsId(msg, pi)"
+                            x-text="$app.t(prop.exists_match === 'title' ? 'recherche.chat.proposalExistsTitle' : 'recherche.chat.proposalExists')"></span>
+                    </div>
+                    <!-- Bearbeiten vor dem Speichern (Felder, die das Board ohnehin kennt) -->
+                    <template x-if="proposalEdit(msg, pi)">
+                      <div class="research-chat-proposal-edit">
+                        <div x-data="combobox($app.t('recherche.kindLabel'))"
+                             x-modelable="value" x-model="proposalEdit(msg, pi).kind"
+                             x-effect="options = proposalKindOptions()" class="recherche-kind-combo"></div>
+                        <input type="text" class="recherche-input" x-model="proposalEdit(msg, pi).title"
+                               :placeholder="$app.t('recherche.field.title')" :aria-label="$app.t('recherche.field.title')" data-spellcheck="spelling">
+                        <textarea class="recherche-input" rows="3" x-model="proposalEdit(msg, pi).body"
+                                  :placeholder="$app.t('recherche.field.body')" :aria-label="$app.t('recherche.field.body')" data-spellcheck="spelling"></textarea>
+                        <input type="text" class="recherche-input" x-model="proposalEdit(msg, pi).tagsText"
+                               :placeholder="$app.t('recherche.chat.proposalTagsPlaceholder')" :aria-label="$app.t('recherche.chat.proposalTagsPlaceholder')">
+                      </div>
                     </template>
                   </div>
-                  <button type="button" class="btn-compact" x-show="!isProposalSaved(msgIdx, pi)"
-                          @click="saveResearchProposal(msgIdx, pi, prop)" :disabled="isProposalSaving(msgIdx, pi)"
-                          x-text="$app.t('recherche.chat.proposalSave')"></button>
-                  <span class="research-chat-proposal-saved" x-show="isProposalSaved(msgIdx, pi)" x-text="$app.t('recherche.chat.proposalSaved')"></span>
+                  <div class="research-chat-proposal-actions">
+                    <template x-if="!isProposalSaved(msg, pi) && !proposalExistsId(msg, pi)">
+                      <button type="button" class="btn-compact" @click="saveResearchProposal(msg, pi)" :disabled="isProposalSaving(msg, pi)"
+                              x-text="$app.t('recherche.chat.proposalSave')"></button>
+                    </template>
+                    <template x-if="!isProposalSaved(msg, pi) && proposalExistsId(msg, pi)">
+                      <span class="research-chat-proposal-exists-actions">
+                        <button type="button" class="btn-compact" @click="openResearchProposalItem(proposalExistsId(msg, pi))"
+                                x-text="$app.t('recherche.chat.proposalOpenExisting')"></button>
+                        <button type="button" class="btn-compact" @click="saveResearchProposal(msg, pi, { allowDuplicate: true })"
+                                :disabled="isProposalSaving(msg, pi)" x-text="$app.t('recherche.chat.proposalSaveAnyway')"></button>
+                      </span>
+                    </template>
+                    <template x-if="isProposalSaved(msg, pi)">
+                      <button type="button" class="btn-compact research-chat-proposal-saved"
+                              @click="openResearchProposalItem(prop.saved_item_id)"
+                              :data-tip="$app.t('recherche.chat.proposalOpenSaved')"
+                              x-text="$app.t('recherche.chat.proposalSaved')"></button>
+                    </template>
+                    <button type="button" class="icon-btn icon-btn--ghost" x-show="!isProposalSaved(msg, pi)"
+                            @click="toggleProposalEdit(msg, pi)"
+                            :data-tip="$app.t(proposalEdit(msg, pi) ? 'recherche.chat.proposalEditDone' : 'recherche.chat.proposalEdit')"
+                            :aria-label="$app.t(proposalEdit(msg, pi) ? 'recherche.chat.proposalEditDone' : 'recherche.chat.proposalEdit')"><svg class="icon" aria-hidden="true"><use :href="proposalEdit(msg, pi) ? '/icons.svg#x' : '/icons.svg#pencil'"/></svg></button>
+                    <button type="button" class="icon-btn icon-btn--ghost" x-show="(prop.urls || []).length"
+                            @click="proposalToSource(msg, pi)" :disabled="isProposalToSourceBusy(msg, pi) || isProposalSaving(msg, pi)"
+                            :data-tip="$app.t('recherche.chat.proposalToSource')" :aria-label="$app.t('recherche.chat.proposalToSource')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#book-open"/></svg></button>
+                  </div>
                 </div>
               </template>
             </div>
           </template>
 
           <div x-show="msg.role === 'assistant' && _chatTokenInfo(msg)" class="chat-token-info" :title="_chatTokenTitle(msg)" x-text="_chatTokenInfo(msg)"></div>
+          <!-- @include chat-feedback -->
         </div>
       </div>
     </template>
@@ -84,6 +142,15 @@
       <div class="chat-skeleton"></div>
     </div>
   </div>
+
+  <!-- Kontext-Chip: gespeicherte Vorschläge mit der Seite/dem Kapitel verknüpfen -->
+  <template x-if="researchChatContextTarget()">
+    <button type="button" class="research-chat-context-chip" :class="{ 'research-chat-context-chip--on': researchChatUseContext }"
+            :aria-pressed="researchChatUseContext ? 'true' : 'false'"
+            @click="researchChatUseContext = !researchChatUseContext"
+            :data-tip="$app.t('recherche.chat.contextChipTip')"
+            x-text="$app.t(researchChatContextTarget().kind === 'chapter' ? 'recherche.chat.contextChipChapter' : 'recherche.chat.contextChipPage', { name: researchChatContextTarget().label || ('#' + researchChatContextTarget().id) })"></button>
+  </template>
 
   <div class="chat-input-row">
     <textarea class="chat-input research-chat-input" x-model="researchChatInput" rows="1"

@@ -11,8 +11,12 @@
 // Seiten-Vorladen/Zitat-Validierung).
 
 const { db, getBookSettings } = require('../../db/schema');
-const { resolveProvider } = require('../../lib/ai');
-const { getPrompts, getBookPrompts, i18nError } = require('./shared');
+const { getPrompts, i18nError } = require('./shared');
+const { researchChatGate } = require('../../lib/research-chat-gate');
+const {
+  toolsForRound, validateAnswerSources, sessionProposalMemory, proposalsOnlyFallback,
+  readMessageContext, loadResearchContext,
+} = require('./research-chat-helpers');
 const { executeResearchTool, entityList } = require('./research-chat-tools');
 const embed = require('../../lib/embed');
 const { makeAgenticChatJob, stripTrailingEmptyJson } = require('./agentic-chat');
@@ -21,6 +25,9 @@ const { getSessionWithBookName } = require('../../db/chat-sessions');
 
 function _maxToolIter() {
   return parseInt(appSettings.get('jobs.research_chat.max_tool_iter'), 10) || 6;
+}
+function _maxWebSearches() {
+  return parseInt(appSettings.get('jobs.research_chat.max_web_searches'), 10) || 10;
 }
 
 const runResearchChatJob = makeAgenticChatJob({
@@ -31,17 +38,24 @@ const runResearchChatJob = makeAgenticChatJob({
   // Guard erzwingt es hier zur Sicherheit serverseitig.
   callProvider: 'claude',
   resolveProvider: () => 'claude',
+  // Dieselbe Prüfung blockt schon POST /jobs/research-chat (vor dem Speichern der
+  // Frage); hier nochmals, weil Setting/Provider zwischen POST und Queue-Start
+  // wechseln können.
   validate: ({ userEmail }) => {
-    if (resolveProvider({ userEmail }) !== 'claude') throw i18nError('job.error.researchChatClaudeOnly');
+    const block = researchChatGate(userEmail);
+    if (block) throw i18nError(block.i18nKey);
   },
 
   loadSession: (sessionId, userEmail) => getSessionWithBookName(parseInt(sessionId), userEmail, 'research'),
 
-  async prepare({ session, userEmail, aiCfg, logger, jobSignal }) {
-    const { buildResearchChatAgentSystemPrompt, buildResearchChatTools, RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION } = await getPrompts(userEmail);
+  async prepare({ session, userEmail, aiCfg, logger, jobSignal, userMsgId }) {
+    const {
+      buildResearchChatAgentSystemPrompt, buildResearchChatTools, buildResearchProposalMemoryBlock,
+      getResearchPromptContext, RESEARCH_CHAT_FORCE_FINAL_INSTRUCTION, buildResearchWritingContextBlock,
+    } = await getPrompts(userEmail);
     const itemCount = db.prepare('SELECT COUNT(*) AS n FROM research_items WHERE book_id = ? AND archived = 0').get(session.book_id)?.n || 0;
-    const { SYSTEM_BOOK_CHAT } = await getBookPrompts(session.book_id, userEmail);
     const maxToolIter = _maxToolIter();
+    const maxWebSearches = _maxWebSearches();
     // Figuren + Schauplätze vorladen, damit das Modell den Welt-Kontext schon in
     // der ersten Web-Suche nutzen kann (ohne list_book_entities-Runde). Gleiche
     // Quelle wie das Tool → kein Drift.
@@ -57,9 +71,31 @@ const runResearchChatJob = makeAgenticChatJob({
       text: bookSettings.research_profile || '',
       domains: bookSettings.research_domains || [],
     };
-    const baseSystemPrompt = buildResearchChatAgentSystemPrompt(session.book_name || '', itemCount, maxToolIter, figures, locations, researchProfile);
-    // Per-Buch-Override (Buchtyp/Autoren-Freitext) als zusätzlichen Kontext anhängen.
-    const systemPrompt = SYSTEM_BOOK_CHAT ? `${baseSystemPrompt}\n\n${SYSTEM_BOOK_CHAT}` : baseSystemPrompt;
+    // Buch-Kontext: NUR Sprachnorm + Buchtyp/Autoren-Angaben/Hauptland — nicht der
+    // ganze Buch-Chat-Prompt. Dessen Persona („kritischer Lektor, Feedback zu Stil")
+    // überstimmte sonst das Verbot von Stil-Vorschlägen weiter oben.
+    const bookContext = getResearchPromptContext(`${bookSettings.language || 'de'}-${bookSettings.region || 'CH'}`, {
+      buchtyp: bookSettings.buchtyp || null,
+      buchKontext: bookSettings.buch_kontext || null,
+      hauptland: bookSettings.schauplatz_land || null,
+    });
+    // Frühere Vorschläge dieser Session (gespeichert ja/nein) — Folge-Turns sollen
+    // sie kennen, ohne dass sie in der Gesprächshistorie stehen.
+    const proposalMemory = buildResearchProposalMemoryBlock(sessionProposalMemory(session.id));
+    // Schreibkontext DIESER Frage (Kontext-Chip): an der User-Nachricht abgelegt
+    // (_handleChatPost → context_info.research_context). Ein Lesefehler kostet
+    // nur den Block, nicht die Antwort.
+    let writingContext = '';
+    try {
+      const wc = await loadResearchContext(readMessageContext(userMsgId), session.book_id);
+      writingContext = buildResearchWritingContextBlock(wc);
+    } catch (e) {
+      logger.warn(`Schreibkontext nicht geladen: ${e.message}`);
+    }
+    const systemPrompt = buildResearchChatAgentSystemPrompt(
+      session.book_name || '', itemCount, maxToolIter, figures, locations, researchProfile,
+      { maxWebSearches, bookContext, proposalMemory, writingContext },
+    );
 
     // Ohne Embedding-Endpunkt hat die Passagen-Suche keine Datenbasis — das
     // Werkzeug gar nicht erst anbieten, statt das Modell eine Runde an einen
@@ -71,7 +107,11 @@ const runResearchChatJob = makeAgenticChatJob({
 
     return {
       systemPrompt,
-      tools,
+      // Erste Runde schon unter dem Gesamtdeckel (wirkt auch ohne Runden-Hook).
+      tools: toolsForRound(tools, 0, maxWebSearches),
+      // Web-Such-Gesamtdeckel über alle Runden: der Loop fragt pro Runde nach der
+      // Werkzeugliste (max_uses = Rest, Werkzeug weg bei 0).
+      toolsForIter: ({ webSearches }) => toolsForRound(tools, webSearches, maxWebSearches),
       maxToolIter,
       tokenBudget: aiCfg.inputBudgetTokens,
       toolResultCap: null,   // kein Cap — Recherche-Tool-Results sind klein und truncieren würde Fundstücke verstümmeln
@@ -80,6 +120,9 @@ const runResearchChatJob = makeAgenticChatJob({
         bookId: session.book_id, sessionId: session.id, userEmail,
         jobSignal, logger,
         proposals: [], // propose_research_item sammelt hier; nach dem Loop in context_info
+        answerSourcesRaw: null, // final_answer.quellen (ungeprüft) → buildContextInfo validiert
+        literatureHits: [],     // lookup_literature-Treffer (url/title) — zulässige Belege neben den Web-Treffern
+        maxWebSearches,
       },
     };
   },
@@ -87,8 +130,12 @@ const runResearchChatJob = makeAgenticChatJob({
   executeTool: (name, input, ctx) => executeResearchTool(name, input, ctx),
 
   // Recherche kennt keine Zitat-Validierung — antwort schlicht extrahieren.
-  consumeFinalAnswer: ({ finalUse, toolLog, iterNum, logger }) => {
-    const antwort = typeof finalUse.input?.antwort === 'string' ? finalUse.input.antwort : '';
+  consumeFinalAnswer: ({ finalUse, ctx, toolLog, iterNum, logger }) => {
+    const raw = typeof finalUse.input?.antwort === 'string' ? finalUse.input.antwort : '';
+    // Leere Antwort trotz Vorschlägen ist kein Abbruch: eigener Hinweis statt
+    // „Iterationen erschöpft".
+    const antwort = proposalsOnlyFallback(raw, ctx?.proposals?.length || 0);
+    if (ctx && Array.isArray(finalUse.input?.quellen)) ctx.answerSourcesRaw = finalUse.input.quellen;
     toolLog.push({ name: 'final_answer', input: { antwort_chars: antwort.length }, ok: true, durationMs: 0, resultBytes: antwort.length, truncated: false, iter: iterNum });
     logger.info(`tool=final_answer antwort_chars=${antwort.length} iter=${iterNum} (terminal)`);
     return JSON.stringify({ antwort });
@@ -102,15 +149,27 @@ const runResearchChatJob = makeAgenticChatJob({
     return antwort;
   },
 
-  buildContextInfo: ({ toolLog, iter, webSearches, webResults, ctx }) => ({
+  buildContextInfo: ({ toolLog, iter, webSearches, webResults, webQueries, ctx, stopReason, costUsd }) => ({
     mode: 'research',
     tool_calls: toolLog,
     iterations: iter + 1,
     web_searches: webSearches,
+    web_search_cap: ctx.maxWebSearches,
+    ...(stopReason ? { stop_reason: stopReason } : {}),
+    // Kosten dieser Antwort (Tokens + Web-Suchen, lib/pricing) — UI zeigt sie am Fuss.
+    ...(Number.isFinite(costUsd) ? { cost_usd: Math.round(costUsd * 10000) / 10000 } : {}),
+    // Gelaufene Suchbegriffe (server_tool_use.input.query), falls der Loop sie liefert.
+    ...(Array.isArray(webQueries) && webQueries.length ? { web_queries: webQueries.slice(0, 50) } : {}),
     // Web-Such-Trefferdokumente in Auftrittsreihenfolge (1-basiert). Das Frontend
     // löst die `<cite index="N-…">`-Marker des Modells über die Position N auf und
     // rendert klickbare Quell-Links + eine Quellenliste.
     ...(webResults.length ? { sources: webResults } : {}),
+    // Vom Modell benannte Belege (final_answer.quellen), gegen webResults geprüft.
+    // Das Frontend bevorzugt sie vor den cite-Markern (robuster als Index-Zuordnung).
+    ...(() => {
+      const answerSources = validateAnswerSources(ctx.answerSourcesRaw, webResults, { extra: ctx.literatureHits });
+      return answerSources.length ? { answer_sources: answerSources } : {};
+    })(),
     // Speicher-Vorschläge — Frontend rendert sie als „Als … speichern"-Buttons.
     ...(ctx.proposals.length ? { proposals: ctx.proposals } : {}),
   }),

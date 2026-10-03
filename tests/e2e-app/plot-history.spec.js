@@ -36,7 +36,7 @@ async function openPlot(page) {
 async function addAct(page, name) {
   const input = page.locator(`${BOARD} .plot-new-act-input`);
   if (!(await input.isVisible())) {
-    const emptyBtn = page.locator('.card--plot .card-empty .btn-primary');
+    const emptyBtn = page.locator('.card--plot .card-empty .card-empty-cta');
     if (await emptyBtn.isVisible()) await emptyBtn.click();
     else await page.locator(`${BOARD} .plot-add-act-btn`).first().click();
   }

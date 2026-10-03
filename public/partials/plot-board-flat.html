@@ -6,7 +6,7 @@
 <div class="plot-board" x-show="(acts.length || addingAct) && !threads.length" x-cloak>
   <template x-for="act in sharedActs()" :key="act.id">
     <div class="plot-column"
-         :class="{ 'plot-column--archiviert': !!act.archiviert }"
+         :class="{ 'plot-column--archiviert': !!act.archiviert, 'plot-column--collapsed': isActCollapsed(act.id) }"
          :style="{ '--col-accent': actAccent(act) }">
 
       <!-- Spalten-Kopf -->
@@ -26,7 +26,7 @@
               <button type="button" class="color-picker__opt"
                       :style="{ '--col-accent': 'var(--palette-' + key + ')' }"
                       :class="{ 'color-picker__opt--on': act.farbe === key }"
-                      @click="setActColor(act, key)" :aria-label="key"></button>
+                      @click="setActColor(act, key)" :aria-label="$app.t('plot.palette.' + key)" :data-tip="$app.t('plot.palette.' + key)"></button>
             </template>
           </div>
         </div>
@@ -42,6 +42,13 @@
                  @blur="onActBlur(act, $event)">
         </template>
         <span class="board-col-count" x-text="filteredBeatsForAct(act.id).length"></span>
+        <!-- Akt einklappen (Ansicht, pro Buch + User gemerkt — book/plot/board-ui.js) -->
+        <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn plot-act-collapse"
+                @click="toggleActCollapsed(act.id)" :aria-expanded="isActCollapsed(act.id) ? 'false' : 'true'"
+                :data-tip="isActCollapsed(act.id) ? $app.t('plot.act.expand') : $app.t('plot.act.collapse')"
+                :aria-label="isActCollapsed(act.id) ? $app.t('plot.act.expand') : $app.t('plot.act.collapse')">
+          <svg class="icon" aria-hidden="true"><use :href="'/icons.svg#' + (isActCollapsed(act.id) ? 'chevron-right' : 'chevron-down')"/></svg>
+        </button>
         <div class="plot-column-actions">
           <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="moveAct(act, -1)" :data-tip="$app.t('plot.act.moveLeft')" :aria-label="$app.t('plot.act.moveLeft')">
             <svg class="icon" aria-hidden="true"><use href="/icons.svg#chevron-left"/></svg>
@@ -96,7 +103,7 @@
 
         <!-- Verworfene Beats ein-/ausklappen -->
         <button type="button" class="collapsible-toggle plot-verworfen-toggle"
-                x-show="verworfenCountForAct(act.id) > 0"
+                x-show="verworfenCountForAct(act.id) > 0 && plotFilters.status !== 'verworfen'"
                 @click="toggleVerworfen(act.id)" :aria-expanded="!!verworfenOpen[act.id]">
           <span class="history-chevron" :class="{ open: verworfenOpen[act.id] }" aria-hidden="true"></span>
           <span x-text="$app.t('plot.verworfen.toggle', { n: verworfenCountForAct(act.id) })"></span>
@@ -132,7 +139,7 @@
           <button type="button" class="btn-compact btn-compact--ghost" @click="cancelBrainstorm()" x-text="$app.t('plot.brainstorm.cancel')"></button>
         </div>
 
-        <div class="plot-brainstorm-panel" x-show="brainstormResult && brainstormResult.actId === act.id" x-cloak>
+        <div class="plot-brainstorm-panel" x-show="brainstormResult && brainstormResult.actId === act.id && !act.archiviert" x-cloak>
           <div class="plot-brainstorm-head">
             <span class="entity-meta-label" x-text="$app.t('plot.brainstorm.title')"></span>
             <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" @click="dismissBrainstorm()" :data-tip="$app.t('common.close')" :aria-label="$app.t('common.close')">

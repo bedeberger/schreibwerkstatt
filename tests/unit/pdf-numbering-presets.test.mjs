@@ -58,7 +58,8 @@ test('kdpMinGutterMm: Schwellen der KDP-Tabelle', () => {
   assert.equal(presets.kdpMinGutterMm(300), 12.7);
   assert.equal(presets.kdpMinGutterMm(500), 15.88);
   assert.equal(presets.kdpMinGutterMm(600), 19.05);
-  assert.equal(presets.kdpMinGutterMm(601), 22.23);
+  assert.equal(presets.kdpMinGutterMm(700), 19.05); // KDP: 501–700 Seiten 0.75″
+  assert.equal(presets.kdpMinGutterMm(701), 22.23);
 });
 
 test('applyKdpPreset: hebt Bund-/Aussenränder auf die Minima + setzt Druck-Flags', () => {

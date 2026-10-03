@@ -1,10 +1,12 @@
 // Geometrie der am Trigger verankerten, nach <body> teleportierten Popover.
 //
 // Konsumenten: das Ideen-Meatball-Menue (book/ideen.js#openMenu), das Plot-Lane-
-// Menue (book/plot/threads.js#openThreadMenu) und der Verknuepfungs-Picker der
-// Ideen (book/ideen-links.js#openLinkPicker). Alle drei teleportieren nach
-// <body>, weil ihr Container scrollt oder `overflow` klippt, und brauchen
-// dieselbe Rechnung — sie liegt darum hier und nicht dreimal daneben.
+// Menue (book/plot/threads.js#openThreadMenu), das Plot-Fundstellen-Popover
+// (book/plot/ai.js#openBeatOccPopover) und der Verknuepfungs-Picker der Ideen
+// (book/ideen-links.js#openLinkPicker). Alle teleportieren aus ihrem Container
+// heraus (nach <body>, die beiden Plot-Popover in die Karten-Wurzel `.card--plot`
+// wegen des Native-Vollbilds), weil der Container scrollt oder `overflow` klippt,
+// und brauchen dieselbe Rechnung — sie liegt darum hier und nicht mehrfach daneben.
 //
 // Zwei Paesse sind Pflicht, nicht Geschmack: `computePopoverPos` positioniert mit
 // einer Schaetzung, damit im ersten Frame nichts an der falschen Stelle

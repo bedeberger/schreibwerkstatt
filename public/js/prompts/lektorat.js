@@ -58,6 +58,7 @@ import {
   _buildErzaehlformBlock,
   _buildAiSmellBlock,
   _buildBelegBlock,
+  _buildWoerterbuchBlock,
 } from './blocks.js';
 import { textsorteLabel } from './textsorten.js';
 import { STOPWORDS, ERKLAERUNG_RULE, KORREKTUR_REGELN } from './core.js';
@@ -82,6 +83,7 @@ function _buildLektoratPromptBody(text, textLabel, {
   // durch (routes/jobs/lektorat.js#stylisticCap), dessen Backstop denselben Wert kappt.
   stylisticCap = 10,
   hatBelege = false,
+  woerterbuch = [],
   langCode = 'de',
   mode = 'full',
 } = {}) {
@@ -175,6 +177,10 @@ function _buildLektoratPromptBody(text, textLabel, {
   // Klammer-Einschübe besonders gern weg, und ein zerstörter Beleg verliert den
   // Zeiger auf die Quelle.
   const belegBlock = hatBelege ? `\n${_buildBelegBlock(langCode)}\n` : '';
+
+  // Benutzer-Wörterbuch: auch im Stil-Pass und lokal — ein Stil-Vorschlag soll das
+  // gewollte Wort in seiner «korrektur» ebenso wenig «verbessern».
+  const woerterbuchBlock = woerterbuch.length ? `\n${_buildWoerterbuchBlock(woerterbuch, langCode)}\n` : '';
 
   // Nachbarseiten-Auszüge: reiner Lesekontext für Übergänge und die Stil-/
   // Szenenbewertung – lokal gedroppt (kleine Modelle prüfen solche Fragmente
@@ -444,7 +450,7 @@ ${journal ? _buildJournalStilBlock(typen) : fach ? _buildFachStilBlock(typen) : 
 ${fach ? _buildFachWiederholungBlock(stopwords) : _buildWiederholungBlock(stopwords)}
 ${aktiv('schwaches_verb') ? _buildSchwacheVerbenBlock() : ''}
 ${_buildFuellwortBlock()}
-${spezialBlocks}${figurenBlock}${beziehungenBlock}${orteBlock}${motivBlock}${belegBlock}${nachbarBlock}
+${spezialBlocks}${figurenBlock}${beziehungenBlock}${orteBlock}${motivBlock}${belegBlock}${woerterbuchBlock}${nachbarBlock}
 ${selbstkontrollBlock}
 <originaltext label="${textLabel.replace(/:\s*$/, '')}">
 ${text}
@@ -453,11 +459,6 @@ ${text}
 
 export function buildLektoratPrompt(text, opts = {}) {
   return _buildLektoratPromptBody(text, 'Originaltext:', opts);
-}
-
-// Batch-Variante ohne korrekturen_html (spart Output-Tokens, für Server-Side-Jobs)
-export function buildBatchLektoratPrompt(text, opts = {}) {
-  return _buildLektoratPromptBody(text, 'Text:', opts);
 }
 
 // Stil-Pass des Claude-Splits: kombinierter Prompt OHNE die objektiven Typen

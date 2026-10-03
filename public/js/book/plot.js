@@ -16,6 +16,10 @@
 //   - history.js   — Undo/Redo (max 10 Schritte) über alle reversiblen Mutationen
 //   - ai.js        — KI-Jobs (Brainstorm/Consistency), Lauf-Historie, Fullscreen
 //   - time-check.js — Zeit-Messung (deterministisch, GET /plot/time-check)
+//   - beat-move.js — Beat verschieben ohne Drag (Akt/Strang/oben-unten → _dropBeat)
+//   - board-ui.js  — Dichte-Modus, Akte einklappen, Menü-Tastatur, Leer-Zustand
+//   - konflikt-actions.js — Befund-Typen, Typ-Filter, Ein-Klick-Aktionen
+//   - utils/befund-severity.js — Schwere → Plaketten-Klasse (Befund-Skala)
 
 import { lifecycleMethods } from './plot/lifecycle.js';
 import { derivedMethods } from './plot/derived.js';
@@ -26,6 +30,10 @@ import { dndMethods } from './plot/dnd.js';
 import { historyMethods } from './plot/history.js';
 import { aiMethods } from './plot/ai.js';
 import { timeCheckMethods } from './plot/time-check.js';
+import { beatMoveMethods } from './plot/beat-move.js';
+import { boardUiMethods } from './plot/board-ui.js';
+import { konfliktActionMethods } from './plot/konflikt-actions.js';
+import { befundSeverityMethods } from '../utils/befund-severity.js';
 
 export const plotMethods = {
   ...lifecycleMethods,
@@ -37,4 +45,8 @@ export const plotMethods = {
   ...historyMethods,
   ...aiMethods,
   ...timeCheckMethods,
+  ...beatMoveMethods,
+  ...boardUiMethods,
+  ...konfliktActionMethods,
+  ...befundSeverityMethods,
 };

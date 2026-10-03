@@ -4,7 +4,8 @@
      Je Zeile: der Link selbst + zwei Aktionen, die BEIDE genau diese `url_id`
      mitschicken, weil nur der User weiss, welcher der Links gemeint ist:
        „Seite lesen"           POST /research/:id/scrape  (public/js/book/recherche/scrape.js)
-       „als Quelle uebernehmen" POST /sources/from-research (public/js/sources/from-research.js) -->
+       „als Quelle uebernehmen" POST /sources/from-research (public/js/sources/from-research.js)
+     Daneben das Ergebnis der Link-Pruefung (Job research-link-check). -->
 <div class="research-item-urls" x-show="item.urls && item.urls.length">
   <template x-for="u in item.urls" :key="u.url_id">
     <div class="research-item-url-row">
@@ -12,6 +13,14 @@
         <svg class="icon" aria-hidden="true"><use href="/icons.svg#external-link"/></svg>
         <span x-text="u.label || u.url"></span>
       </a>
+      <!-- Ergebnis der Link-Pruefung (links.js#checkLinks): tot → Hinweis + Weg zur
+           Archivkopie; gesperrt (401/403/429) → nur ein leiser Hinweis. -->
+      <span class="research-url-check research-url-check--dead" x-show="urlDead(u)" x-cloak
+            :data-tip="urlCheckTip(u)" x-text="$app.t('recherche.linkCheck.dead')"></span>
+      <a class="research-url-check research-url-check--archive" x-show="urlDead(u)" x-cloak
+         :href="waybackUrl(u)" target="_blank" rel="noopener noreferrer" x-text="$app.t('recherche.linkCheck.archive')"></a>
+      <span class="research-url-check research-url-check--blocked" x-show="urlBlocked(u)" x-cloak
+            :data-tip="urlCheckTip(u)" x-text="$app.t('recherche.linkCheck.blocked')"></span>
       <button type="button" class="icon-btn icon-btn--ghost research-url-action"
               @click="scrapeUrl(item, u)"
               :disabled="urlScrapeBusy(item, u)"

@@ -74,6 +74,9 @@ const SEED_STMTS = [
   `INSERT INTO job_runs VALUES ('old-done','x','done', ${STALE}, NULL, NULL)`,
   `INSERT INTO job_runs VALUES ('old-queued','x','queued', ${STALE}, NULL, NULL)`,
   `INSERT INTO job_runs VALUES ('fresh-done','x','done', ${FRESH}, NULL, NULL)`,
+  // Chat-Job-Typen: 365 Tage statt 30 (Fehlerquote der Chats, db/chat-quality.js).
+  `INSERT INTO job_runs VALUES ('old-chat-error','book-chat','error', ${STALE}, NULL, NULL)`,
+  `INSERT INTO job_runs VALUES ('ancient-chat-error','chat','error', datetime('now','-400 days'), NULL, NULL)`,
 
   `INSERT INTO page_checks (page_id, checked_at) VALUES (1, ${STALE})`,
   `INSERT INTO page_checks (page_id, checked_at) VALUES (2, ${FRESH})`,
@@ -125,6 +128,12 @@ test('job_runs: stale queued bleibt (status-Filter), stale done weg', () => {
   assert.ok(ids.includes('fresh-done'));
   assert.ok(ids.includes('old-queued'));
   assert.ok(!ids.includes('old-done'));
+});
+
+test('job_runs: Chat-Typen bleiben 365 Tage (200 Tage alt bleibt, 400 Tage alt weg)', () => {
+  const ids = db.prepare('SELECT job_id FROM job_runs').all().map(r => r.job_id);
+  assert.ok(ids.includes('old-chat-error'));
+  assert.ok(!ids.includes('ancient-chat-error'));
 });
 
 test('page_checks: bleibt vollstaendig erhalten (nicht geprunt)', () => {

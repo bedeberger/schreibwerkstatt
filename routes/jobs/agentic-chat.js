@@ -13,13 +13,22 @@
 //   resolveProvider(userEmail, logger),    // effektiver Provider-String; darf setContext-Overrides setzen
 //   validate({ userEmail }),               // optional, läuft im try → wirft via i18nError (z.B. Claude-only-Guard)
 //   loadSession(sessionId, userEmail),     // Session-Row (inkl. book_name) oder null
-//   prepare(args) → { systemPrompt, tools, maxToolIter, tokenBudget, toolResultCap?, forceFinalInstruction, ctx }
-//     args enthält u.a. `message` (die aktuelle Userfrage) — der Buch-Chat zieht
-//     daraus seinen semantischen Erst-Kontext, bevor der Loop startet.
+//   prepare(args) → { systemPrompt, tools, maxToolIter, tokenBudget, toolResultCap?, forceFinalInstruction, ctx,
+//                     toolsForIter?, inputTokenCap?, inputCapInstruction? }
+//     args enthält u.a. `message` (die aktuelle Userfrage) und `history` (bisheriger
+//     Verlauf ohne die aktuelle Frage) — der Buch-Chat zieht daraus seinen
+//     semantischen Erst-Kontext, bevor der Loop startet.
+//     toolsForIter({ iter, webSearches }) → Werkzeugliste dieser Runde (opt-in; ohne
+//       Hook gilt `tools`). Der Synthese-Turn bietet immer nur final_answer aus `tools`.
+//     inputTokenCap: Kosten-Deckel — kumulierte Input-Tokens pro Antwort. Erreicht,
+//       läuft statt weiterer Runden der erzwungene Synthese-Turn (mit
+//       inputCapInstruction ?? forceFinalInstruction). 0/undefined = aus.
 //   executeTool(name, input, ctx),
 //   consumeFinalAnswer({ finalUse, ctx, toolLog, iterNum, logger }) → finalText (JSON-String),
 //   parseFinal(finalText, logger) → antwort-String,
-//   buildContextInfo({ toolLog, iter, webSearches, webResults, ctx }) → object,
+//   buildContextInfo({ toolLog, iter, webSearches, webResults, webQueries, ctx, stopReason, costUsd }) → object,
+//     stopReason: 'final_answer' | 'prose' | 'max_iter' | 'input_cap' | 'context_budget'
+//     costUsd:    Kosten dieser Antwort (lib/pricing, 0 für Nicht-Claude)
 //   buildCompletePayload?({ base, ctx }) → object (default: base),
 //   buildSummary({ session, sessionId, toolLog, iter, webSearches, ctx }) → string,
 //   fallbackJob?(jobId, sessionId, userMsgId, message, userEmail),
@@ -30,7 +39,11 @@
 // }
 
 const { db } = require('../../db/schema');
-const { callAIWithTools, getContextConfigFor } = require('../../lib/ai');
+// Spät gebunden (ai.callAIWithTools statt Destructuring): der Loop-Unit-Test ersetzt
+// den Provider-Call am Modul-Export.
+const ai = require('../../lib/ai');
+const { getContextConfigFor } = ai;
+const { costUsd } = require('../../lib/pricing');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
   jobAbortControllers, buildChatMessageHistory,
@@ -74,6 +87,30 @@ function buildAgenticHistory(sessionId, tailMessages = 10) {
   return anchorInTail ? tail : [...anchor, ...tail];
 }
 
+// Leere Antwort (final_answer mit antwort:"" oder Prosa ohne Text) nie roh speichern:
+// _parseChatResponse fiele sonst auf den Rohtext zurück, und im Chat stünde
+// `{"antwort":""}`. Stattdessen ein i18n-Marker, den das Frontend auflöst.
+const EMPTY_ANSWER_MARKER = '__i18n:chat.errors.emptyAnswer__';
+function _ensureNonEmptyFinal(finalText) {
+  if (typeof finalText !== 'string' || !finalText.trim()) return JSON.stringify({ antwort: EMPTY_ANSWER_MARKER });
+  const t = finalText.trim();
+  if (!t.startsWith('{')) return finalText;
+  try {
+    const obj = JSON.parse(t);
+    if (obj && typeof obj === 'object' && 'antwort' in obj && !String(obj.antwort ?? '').trim()) {
+      return JSON.stringify({ ...obj, antwort: EMPTY_ANSWER_MARKER });
+    }
+  } catch { /* kein JSON → Parser des Chats entscheidet */ }
+  return finalText;
+}
+
+// Prosa-Abschluss (Modell beendet ohne final_answer): Prosa IST die Antwort.
+function _proseFinal(text) {
+  const raw = (text || '').trim();
+  if (!raw) return null;
+  return raw.startsWith('{') ? raw : JSON.stringify({ antwort: stripTrailingEmptyJson(raw) || raw });
+}
+
 function makeAgenticChatJob(config) {
   return async function runAgenticChatJob(jobId, sessionId, userMsgId, message, userEmail) {
     const logger = makeJobLogger(jobId);
@@ -88,17 +125,18 @@ function makeAgenticChatJob(config) {
       logger.info(`Start (${config.startLabel}): «${session.book_name || '-'}» session=${sessionId}, msg-len=${message.length}`);
 
       const jobSignal = jobAbortControllers.get(jobId)?.signal;
-      const prep = await config.prepare({ session, userEmail, aiCfg, logger, jobSignal, message });
+      const historyWithoutLast = buildAgenticHistory(session.id).slice(0, -1);
+      const prep = await config.prepare({ session, userEmail, aiCfg, logger, jobSignal, message, userMsgId, history: historyWithoutLast });
       const { systemPrompt, tools, maxToolIter, tokenBudget, forceFinalInstruction, ctx } = prep;
       const toolResultCap = prep.toolResultCap ?? Infinity;
+      const inputTokenCap = Number(prep.inputTokenCap) > 0 ? Number(prep.inputTokenCap) : Infinity;
 
-      const historyWithoutLast = buildAgenticHistory(session.id).slice(0, -1);
       let messages = [...historyWithoutLast, { role: 'user', content: message }];
 
       const state = {
         totalTokIn: 0, totalTokOut: 0,
         totalCacheRead: 0, totalCacheCreation: 0, totalCacheCreation1h: 0,
-        genMs: 0, lastModel: null, webSearches: 0, webResults: [],
+        genMs: 0, lastModel: null, webSearches: 0, webResults: [], webQueries: [],
       };
       // Token-Summen fortschreiben + UI mit echten Provider-Zahlen nachziehen
       // (onProgress liefert nur chars-basierte Schätzung, die bei reinen
@@ -118,7 +156,10 @@ function makeAgenticChatJob(config) {
         if (result.genDurationMs) state.genMs += result.genDurationMs;
         if (result.model) state.lastModel = result.model;
         for (const b of result.rawContentBlocks || []) {
-          if (b.type === 'server_tool_use' && b.name === 'web_search') state.webSearches++;
+          if (b.type === 'server_tool_use' && b.name === 'web_search') {
+            state.webSearches++;
+            state.webQueries.push(String(b.input?.query || ''));
+          }
           // Fehler-Results haben content als Objekt (nicht Array) → Array-Guard.
           if (b.type === 'web_search_tool_result' && Array.isArray(b.content)) {
             for (const r of b.content) {
@@ -144,47 +185,16 @@ function makeAgenticChatJob(config) {
 
       const toolLog = [];
       let finalText = null;
+      let stopReason = null;
       let iter = 0;
 
-      for (iter = 0; iter < maxToolIter; iter++) {
-        if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
-        updateJob(jobId, {
-          statusText: 'job.phase.agentTools',
-          statusParams: { current: iter + 1, total: maxToolIter },
-          progress: Math.min(90, 10 + iter * 12),
-        });
-
-        const result = await callAIWithTools(messages, systemPrompt, tools, onProgress, undefined, jobSignal, config.callProvider);
-        accumulate(result);
-
-        if (result.truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: state.totalTokIn, tokOut: state.totalTokOut, total: state.totalTokIn + state.totalTokOut });
-
-        if (result.tokensIn > tokenBudget) {
-          logger.warn(`Context-Budget überschritten (${result.tokensIn}/${tokenBudget} Input-Tokens) – Loop abgebrochen.`);
-          finalText = result.text || JSON.stringify({ antwort: '__i18n:chat.errors.contextExceeded__' });
-          break;
-        }
-
-        if (result.stopReason !== 'tool_use') {
-          // Modell beendet mit Prosa statt final_answer-Tool (Sonnet-Drift).
-          // Prosa IST die finale Antwort — direkt als antwort-Envelope verpacken
-          // (Ausnahme: Modell lieferte bereits {antwort:…}-JSON → unverändert).
-          const raw = (result.text || '').trim();
-          finalText = raw.startsWith('{') ? raw : JSON.stringify({ antwort: stripTrailingEmptyJson(raw) || raw });
-          break;
-        }
-
-        // final_answer ist Pflicht-Endpunkt: beendet Loop ohne Reply-Round.
-        const finalUse = result.toolUses.find(tu => tu.name === 'final_answer');
-        if (finalUse) {
-          finalText = await config.consumeFinalAnswer({ finalUse, ctx, toolLog, iterNum: iter + 1, logger });
-          break;
-        }
-
-        // Tool-Use: alle tool_uses ausführen, als user-tool_result anhängen.
-        messages.push({ role: 'assistant', content: result.rawContentBlocks });
+      // Werkzeuge einer Runde ausführen (Ergebnisse als tool_result-Blöcke). Auch in
+      // der final_answer-Runde: Seiteneffekte in ctx (propose_research_item,
+      // generate_image) dürfen nicht verloren gehen, nur weil das Modell in derselben
+      // Runde schon abschliesst.
+      const runTools = async (toolUses, iterNum) => {
         const toolResults = [];
-        for (const tu of result.toolUses) {
+        for (const tu of toolUses) {
           if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
           const t0 = Date.now();
           let out, ok = true, errMsg = null;
@@ -197,41 +207,111 @@ function makeAgenticChatJob(config) {
           const durationMs = Date.now() - t0;
           const content = JSON.stringify(out);
           const resultBytes = content.length;
-          const truncated = resultBytes > toolResultCap;
-          toolLog.push({ name: tu.name, input: tu.input, ok, durationMs, resultBytes, truncated, iter: iter + 1, ...(errMsg ? { error: errMsg } : {}) });
-          if (ok) logger.info(`tool=${tu.name} dur=${durationMs}ms bytes=${resultBytes}${truncated ? ' truncated' : ''} iter=${iter + 1}`);
-          else    logger.warn(`tool=${tu.name} dur=${durationMs}ms bytes=${resultBytes} iter=${iter + 1} FAILED: ${errMsg}`);
+          const truncated = resultBytes > toolResultCap || !!(out && typeof out === 'object' && out.truncated);
+          if (out && typeof out === 'object' && out.error && ok) errMsg = String(out.error);
+          toolLog.push({ name: tu.name, input: tu.input, ok: ok && !(out && out.error), durationMs, resultBytes, truncated, iter: iterNum, ...(errMsg ? { error: errMsg } : {}) });
+          if (ok) logger.info(`tool=${tu.name} dur=${durationMs}ms bytes=${resultBytes}${truncated ? ' truncated' : ''} iter=${iterNum}`);
+          else    logger.warn(`tool=${tu.name} dur=${durationMs}ms bytes=${resultBytes} iter=${iterNum} FAILED: ${errMsg}`);
           toolResults.push({
             type: 'tool_result',
             tool_use_id: tu.id,
-            content: truncated ? content.slice(0, toolResultCap) + '…' : content,
+            content: resultBytes > toolResultCap ? content.slice(0, toolResultCap) + '…' : content,
             ...(out && out.error ? { is_error: true } : {}),
           });
         }
+        return toolResults;
+      };
+
+      for (iter = 0; iter < maxToolIter; iter++) {
+        if (jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        updateJob(jobId, {
+          statusText: 'job.phase.agentTools',
+          statusParams: { current: iter + 1, total: maxToolIter },
+          progress: Math.min(90, 10 + iter * 12),
+        });
+
+        const roundTools = prep.toolsForIter ? prep.toolsForIter({ iter, webSearches: state.webSearches }) : tools;
+        const result = await ai.callAIWithTools(messages, systemPrompt, roundTools, onProgress, undefined, jobSignal, config.callProvider);
+        accumulate(result);
+
+        if (result.truncated) throw i18nError('job.error.aiTruncated', { max: aiCfg.maxTokensOut, tokIn: state.totalTokIn, tokOut: state.totalTokOut, total: state.totalTokIn + state.totalTokOut });
+
+        // Serverseitiges Werkzeug (Anthropic-Web-Suche) hat den Turn pausiert: den
+        // bisherigen Assistant-Inhalt zurückspielen, dann setzt die API fort. Kein
+        // Abschluss — die Runde zählt aber gegen den Iterationsdeckel.
+        if (result.stopReason === 'pause_turn') {
+          messages.push({ role: 'assistant', content: result.rawContentBlocks });
+          if (state.totalTokIn >= inputTokenCap) { stopReason = 'input_cap'; break; }
+          continue;
+        }
+
+        const toolUses = result.stopReason === 'tool_use' ? (result.toolUses || []) : [];
+        // final_answer zuerst auswerten — auch eine Runde über dem Kontext-Budget
+        // liefert damit ihre fertige Antwort aus, statt sie zu verwerfen.
+        const finalUse = toolUses.find(tu => tu.name === 'final_answer');
+        if (finalUse) {
+          const others = toolUses.filter(tu => tu.name !== 'final_answer');
+          if (others.length) await runTools(others, iter + 1);
+          finalText = await config.consumeFinalAnswer({ finalUse, ctx, toolLog, iterNum: iter + 1, logger });
+          stopReason = 'final_answer';
+          break;
+        }
+
+        if (result.stopReason !== 'tool_use') {
+          // Modell beendet mit Prosa statt final_answer-Tool (Sonnet-Drift).
+          // Prosa IST die finale Antwort (Ausnahme: schon {antwort:…}-JSON → unverändert).
+          finalText = _proseFinal(result.text) ?? '';
+          stopReason = 'prose';
+          break;
+        }
+
+        if (result.tokensIn > tokenBudget) {
+          logger.warn(`Context-Budget überschritten (${result.tokensIn}/${tokenBudget} Input-Tokens) – Loop abgebrochen.`);
+          finalText = _proseFinal(result.text) || JSON.stringify({ antwort: '__i18n:chat.errors.contextExceeded__' });
+          stopReason = 'context_budget';
+          break;
+        }
+
+        // Tool-Use: alle tool_uses ausführen, als user-tool_result anhängen.
+        messages.push({ role: 'assistant', content: result.rawContentBlocks });
+        const toolResults = await runTools(toolUses, iter + 1);
         messages.push({ role: 'user', content: toolResults });
+
+        // Kosten-Deckel: die Ergebnisse dieser Runde sind bezahlt und hängen an —
+        // daraus synthetisieren, statt eine weitere Recherche-Runde zu starten.
+        if (state.totalTokIn >= inputTokenCap) {
+          logger.warn(`Input-Deckel pro Antwort erreicht (${state.totalTokIn}/${inputTokenCap} Tokens) – erzwinge Synthese.`);
+          stopReason = 'input_cap';
+          break;
+        }
       }
 
       if (finalText == null) {
-        // Iterationen erschöpft, ohne dass final_answer gerufen wurde. Statt mit
-        // Fehler aufzugeben: ein erzwungener Synthese-Turn. Die bereits
-        // gesammelten tool_results hängen in `messages`; wir bieten dem Modell
-        // nur noch final_answer als Werkzeug an (kein tool_choice-Forcing — das
-        // kollidiert mit adaptive thinking; die Werkzeug-Beschränkung reicht:
+        // Iterationen erschöpft (oder Kosten-Deckel erreicht), ohne dass final_answer
+        // gerufen wurde. Statt mit Fehler aufzugeben: ein erzwungener Synthese-Turn.
+        // Die bereits gesammelten tool_results hängen in `messages`; wir bieten dem
+        // Modell nur noch final_answer als Werkzeug an (kein tool_choice-Forcing —
+        // das kollidiert mit adaptive thinking; die Werkzeug-Beschränkung reicht:
         // das Modell ruft final_answer oder antwortet in Prosa, beides terminal).
-        logger.warn(`Max-Iterationen (${maxToolIter}) erreicht – erzwinge Synthese aus dem bereits gesammelten Kontext.`);
+        if (!stopReason) {
+          stopReason = 'max_iter';
+          logger.warn(`Max-Iterationen (${maxToolIter}) erreicht – erzwinge Synthese aus dem bereits gesammelten Kontext.`);
+        }
         updateJob(jobId, { statusText: 'job.phase.agentSynthesize', progress: 92 });
-        messages.push({ role: 'user', content: forceFinalInstruction });
+        const instruction = stopReason === 'input_cap' ? (prep.inputCapInstruction ?? forceFinalInstruction) : forceFinalInstruction;
+        messages.push({ role: 'user', content: instruction });
         const finalOnlyTools = tools.filter(t => t.name === 'final_answer');
         try {
-          const result = await callAIWithTools(messages, systemPrompt, finalOnlyTools, onProgress, undefined, jobSignal, config.callProvider);
+          const result = await ai.callAIWithTools(messages, systemPrompt, finalOnlyTools, onProgress, undefined, jobSignal, config.callProvider);
           accumulate(result);
           const finalUse = result.toolUses?.find(tu => tu.name === 'final_answer');
           if (finalUse) {
-            finalText = await config.consumeFinalAnswer({ finalUse, ctx, toolLog, iterNum: maxToolIter + 1, logger });
+            // Bei Deckel-Abbruch steht `iter` noch auf der letzten Runde (0-basiert).
+            const synthIter = stopReason === 'max_iter' ? iter + 1 : iter + 2;
+            finalText = await config.consumeFinalAnswer({ finalUse, ctx, toolLog, iterNum: synthIter, logger });
           } else {
             // Modell antwortete in Prosa statt via final_answer — Prosa IST die Antwort.
-            const raw = (result.text || '').trim();
-            if (raw) finalText = raw.startsWith('{') ? raw : JSON.stringify({ antwort: stripTrailingEmptyJson(raw) || raw });
+            finalText = _proseFinal(result.text);
           }
         } catch (e) {
           if (e.name === 'AbortError') throw e;
@@ -240,12 +320,21 @@ function makeAgenticChatJob(config) {
         if (finalText == null) finalText = JSON.stringify({ antwort: '__i18n:chat.errors.maxIterReached__' });
       }
 
+      finalText = _ensureNonEmptyFinal(finalText);
       const antwort = config.parseFinal(finalText, logger);
 
       const assistantNow = new Date().toISOString();
       const tpsVal = (state.genMs > 0 && state.totalTokOut > 0) ? state.totalTokOut / (state.genMs / 1000) : null;
-      const contextInfo = config.buildContextInfo({ toolLog, iter, webSearches: state.webSearches, webResults: state.webResults, ctx });
       const model = state.lastModel || _defaultModelFor(provider);
+      const answerUsd = costUsd({
+        provider, model, tokensIn: state.totalTokIn, tokensOut: state.totalTokOut,
+        cacheReadIn: state.totalCacheRead, cacheCreationIn: state.totalCacheCreation,
+        cacheCreation1hIn: state.totalCacheCreation1h, webSearches: state.webSearches,
+      });
+      const contextInfo = config.buildContextInfo({
+        toolLog, iter, webSearches: state.webSearches, webResults: state.webResults,
+        webQueries: state.webQueries, ctx, stopReason, costUsd: answerUsd,
+      });
       const asstMsgResult = db.prepare(`
         INSERT INTO chat_messages (session_id, role, content, tokens_in, tokens_out, cache_read_in, cache_creation_in, cache_creation_1h_in, web_searches, provider, model, tps, context_info, created_at)
         VALUES (?, 'assistant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -279,4 +368,4 @@ function makeAgenticChatJob(config) {
   };
 }
 
-module.exports = { makeAgenticChatJob, buildAgenticHistory, stripTrailingEmptyJson };
+module.exports = { makeAgenticChatJob, buildAgenticHistory, stripTrailingEmptyJson, EMPTY_ANSWER_MARKER };

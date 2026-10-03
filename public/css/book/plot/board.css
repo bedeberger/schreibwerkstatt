@@ -104,7 +104,7 @@
 
   /* SortableJS-Container: hält ausser dem x-for-Anker nur die Beat-Karten (Add-/
      Toggle-/Brainstorm-Elemente liegen ausserhalb). Eigener Beat-Abstand; der
-     Container-Abstand zum Rest kommt vom .plot-column-body/.plot-swim-cell-gap.
+     Container-Abstand zum Rest kommt vom .plot-column-body bzw. der .plot-swim-cell.
      min-height macht leere Zellen zum erreichbaren Drop-Ziel. */
   .plot-beats {
     display: flex;
@@ -197,18 +197,26 @@
     align-items: flex-start;
     gap: var(--space-xs);
   }
+  /* Titel = <button> (Bearbeiten-Einstieg): globale Button-Optik zurücknehmen,
+     Fokus-Ring bleibt der Browser-Default. */
   .plot-beat-title {
+    font: inherit;
     font-size: var(--font-size-sm);
     color: var(--color-text);
+    text-align: left;
+    padding: 0; border: 0; border-radius: 0; background: none;
     cursor: pointer;
     flex: 1 1 auto;
     overflow-wrap: anywhere;
   }
+  .plot-beat-title:hover { background: none; text-decoration: underline; }
+  .plot-beat-title:active { transform: none; }
   .plot-beat--verworfen .plot-beat-title { text-decoration: line-through; }
 
   /* Konsistenz-Warn-Badge am Beat — sichtbar, solange ein Prüflauf angezeigt wird
-     und diesen Beat beanstandet. Farbe = höchste Schwere (gleiche Tokens wie die
-     severity-tags). Klick öffnet den passenden Befund im Consistency-Panel. */
+     und diesen Beat beanstandet. Farbe = Ton der höchsten Schwere
+     (befundSeverityTone, utils/befund-severity.js: kritisch|mittel|niedrig —
+     Befund-Skala, nicht Szenen-Stärke). Klick öffnet den Befund im Panel. */
   .plot-beat-warn {
     flex: 0 0 auto;
     display: inline-flex;
@@ -220,11 +228,9 @@
     color: var(--color-muted);
   }
   .plot-beat-warn .icon { width: 14px; height: 14px; }
-  .plot-beat-warn--kritisch,
-  .plot-beat-warn--schwach { color: var(--color-schwach); }
-  .plot-beat-warn--stark   { color: var(--color-stark); }
-  .plot-beat-warn--mittel  { color: var(--color-mittel); }
-  .plot-beat-warn--niedrig { color: var(--color-muted); }
+  .plot-beat-warn--kritisch { color: var(--color-schwach); }
+  .plot-beat-warn--mittel   { color: var(--color-mittel); }
+  .plot-beat-warn--niedrig  { color: var(--color-muted); }
 
   /* Verankerungs-Badge am Beat — Soll (status) vs. Ist (Fundstellen im Buchtext,
      aus der semantischen Suche). Eckiges Mini-Chip mit Fundstellen-Zahl; 'drift'
@@ -345,11 +351,14 @@
     20%, 65% { box-shadow: 0 0 0 2px var(--card-accent); }
   }
   .plot-beat--flash { animation: plotBeatFlash 1.6s ease; }
+  /* Ansichtsmodus: Beschreibung auf drei Zeilen gekappt (volle Länge im Edit). */
   .plot-beat-desc {
     margin: var(--space-xs) 0 0;
     font-size: var(--font-size-xs);
     color: var(--color-muted);
     overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
   }
   .plot-beat-meta {
     display: flex;
@@ -448,6 +457,13 @@
   .plot-beat-meta .tag--ort,
   .plot-fig-chip.tag--ort { border-left: 3px solid var(--card-accent-orte, var(--color-accent)); }
   .plot-beat-meta .tag--zeit { font-variant-numeric: tabular-nums; color: var(--color-muted); }
+  /* Live-Vererbung Strang → Beat (nie gespeichert): gedämpft + gepunktet. */
+  .plot-beat-meta .tag--inherited,
+  .plot-beat-meta .kapitel-badge--inherited {
+    background: transparent;
+    color: var(--color-muted);
+    border: 1px dotted var(--color-border-input);
+  }
   .plot-beat-edit-actions {
     display: flex;
     align-items: center;
@@ -567,7 +583,11 @@
     .plot-column { width: 100%; }
     .plot-column--add { min-width: 0; }
     .plot-column-header { position: static; }
-    .plot-icon-btn { width: 20px; height: 20px; }
-    .plot-icon-btn .icon { width: 13px; height: 13px; }
+  }
+  /* Touch (kein Hover): Icon-Buttons nicht unter 32px, und der Drag-Griff ist
+     dauerhaft sichtbar — „erst beim Hover deutlich" gibt es dort nicht. */
+  @media (hover: none) {
+    .plot-icon-btn { min-width: 32px; min-height: 32px; }
+    .plot-beat-grip { color: var(--color-muted); }
   }
 }

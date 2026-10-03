@@ -8,12 +8,17 @@
      ::backdrop — ein body-Kind läge dahinter und wäre unsichtbar. `position: fixed`
      bleibt viewport-verankert (die Karte etabliert keinen Containing-Block: die
      cardFadeIn-Animation läuft mit `backwards`, lässt also keinen Transform stehen).
-     Content-Popover (reiche Zeilen), kein Aktions-Menü — Pattern-Ausnahme siehe DESIGN.md. -->
+     Content-Popover (reiche Zeilen), kein Aktions-Menü — Pattern-Ausnahme siehe DESIGN.md.
+     Tastatur wie das Strang-Menü (book/plot/board-ui.js): Fokus beim Öffnen auf
+     die erste Fundstelle, Pfeiltasten wandern, Esc gibt den Fokus ans Badge zurück. -->
 <template x-teleport=".card--plot">
   <div class="context-menu plot-occ-popover" x-ref="occPopover" role="menu"
        x-show="beatOccPopoverBeatId !== null && !!beatOccPopoverBeat()" x-cloak
        :style="`top:${beatOccPopoverPos.top}px;left:${beatOccPopoverPos.left}px`"
-       @click.outside="closeBeatOccPopover()" @keydown.escape.window="closeBeatOccPopover()">
+       @click.outside="closeBeatOccPopover()"
+       @keydown.escape.window="if (beatOccPopoverBeatId !== null) { closeBeatOccPopover(); plotMenuRestoreFocus(); }"
+       @keydown="plotMenuKeydown($event, $el)"
+       x-effect="beatOccPopoverBeatId !== null && plotMenuFocusFirst($el)">
     <template x-if="beatOccPopoverBeat()">
       <div>
         <div class="context-menu-header" x-text="$app.t('plot.anchor.popover.title', { n: beatOccPopoverBeat().occ_count || 0 })"></div>
@@ -23,7 +28,7 @@
                   @click.stop="gotoOccurrence(occ)"
                   :aria-label="$app.t('plot.anchor.popover.jump')">
             <span class="plot-occ-item-head">
-              <span class="plot-occ-item-name" x-text="occ.page_name || (occ.scene_titel ? '„' + occ.scene_titel + '“' : $app.t('plot.anchor.popover.unknownPlace'))"></span>
+              <span class="plot-occ-item-name" x-text="occ.page_name || (occ.scene_titel ? $app.t('plot.anchor.popover.scene', { titel: occ.scene_titel }) : $app.t('plot.anchor.popover.unknownPlace'))"></span>
               <span class="plot-occ-item-score" x-show="occ.score != null && Math.round(occ.score * 100) >= 1" x-text="Math.round((occ.score || 0) * 100) + '%'"></span>
             </span>
             <span class="plot-occ-item-snippet" x-show="occ.snippet" x-text="occ.snippet"></span>

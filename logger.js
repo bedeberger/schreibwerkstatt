@@ -1,9 +1,9 @@
-const path = require('path');
 const winston = require('winston');
 const { getContext } = require('./lib/log-context');
 const jobLogBuffer = require('./lib/job-log-buffer');
 
-const LOG_FILE = path.join(__dirname, 'schreibwerkstatt.log');
+// Pfad aus lib/log-file.js (ENV LOG_DIR, Default: App-Wurzel).
+const { LOG_FILE } = require('./lib/log-file');
 
 // Merged ALS-Context in jedes Log-Info-Objekt; explizite Felder am Call-Site
 // haben Vorrang (info.job ?? c.job).

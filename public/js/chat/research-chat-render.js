@@ -63,6 +63,33 @@ export function citedSources(text, sources) {
 }
 
 /**
+ * Quellenliste unter der Antwort. Bevorzugt die vom Modell in `final_answer.quellen`
+ * benannten, serverseitig gegen die Web-Treffer geprüften Belege
+ * (`context_info.answer_sources`, nummeriert in ihrer Reihenfolge); ohne sie die
+ * aus den cite-Markern abgeleitete Liste (Fallback, Nummer = Treffer-Index).
+ */
+export function displaySources(text, sources, answerSources) {
+  if (Array.isArray(answerSources) && answerSources.length) {
+    return answerSources
+      .filter(s => s && s.url)
+      .map((s, i) => ({ n: i + 1, url: s.url, title: s.title || s.url }));
+  }
+  return citedSources(text, Array.isArray(sources) ? sources : []);
+}
+
+// Platzhalter des Loops für „keine Antwort" (routes/jobs/agentic-chat.js). Mit
+// Vorschlägen ist das kein Fehlschlag — Server-Pendant: research-chat-helpers.js.
+const EMPTY_MARKERS = new Set(['__i18n:chat.errors.maxIterReached__', '__i18n:chat.errors.emptyAnswer__']);
+export const PROPOSALS_ONLY_MARKER = '__i18n:recherche.chat.proposalsOnly__';
+
+/** Antworttext, der angezeigt wird: leerer/Abbruch-Text + Vorschläge → eigener Hinweis. */
+export function effectiveAnswerText(text, proposalCount) {
+  const t = String(text || '').trim();
+  if (proposalCount > 0 && (!t || EMPTY_MARKERS.has(t))) return PROPOSALS_ONLY_MARKER;
+  return String(text || '');
+}
+
+/**
  * Rendert eine Assistant-Antwort in HTML. Ersetzt `<cite index="N-…">TEXT</cite>`
  * durch TEXT + klickbaren Superscript-Marker [N] (verlinkt auf das N-te Treffer-
  * dokument). Ohne Quellen werden die Tags still entwrapt. Sentinels umgehen den
@@ -76,9 +103,10 @@ export function citedSources(text, sources) {
  * @param {(key:string)=>string} [opts.t]                i18n-Resolver für `__i18n:`-Marker.
  * @returns {string} HTML-String.
  */
-export function renderResearchAnswer({ text, sources, renderChatMarkdown, escHtml, t }) {
-  const txt = String(text || '');
+export function renderResearchAnswer({ text, sources, answerSources, proposalCount = 0, renderChatMarkdown, escHtml, t }) {
+  const txt = effectiveAnswerText(text, proposalCount);
   const srcs = Array.isArray(sources) ? sources : [];
+  const ans = Array.isArray(answerSources) ? answerSources.filter(a => a && a.url) : [];
   const i18nMatch = /^__i18n:([a-zA-Z0-9_.-]+)__$/.exec(txt);
   if (i18nMatch) {
     const resolved = t ? t(i18nMatch[1]) : i18nMatch[1];
@@ -97,6 +125,22 @@ export function renderResearchAnswer({ text, sources, renderChatMarkdown, escHtm
   let html = renderChatMarkdown(transformed);
   html = html.replace(new RegExp(`${CITE_OPEN}(\\d+)${CITE_CLOSE}`, 'g'), (_s, nStr) => {
     const n = parseInt(nStr, 10);
+    // Mit geprüften Belegen: Marker über die Treffer-Position (doc_nums) auf die
+    // Nummer der Quellenliste abbilden, damit Text und Liste dieselbe Zahl tragen.
+    if (ans.length) {
+      const i = ans.findIndex(a => Array.isArray(a.doc_nums) && a.doc_nums.includes(n));
+      if (i >= 0) {
+        const a = ans[i];
+        return `<sup class="chat-cite"><a href="${escHtml(a.url)}" target="_blank" rel="noopener noreferrer" data-tip="${escHtml(a.title || a.url)}">${i + 1}</a></sup>`;
+      }
+      // Zitierter Treffer, den das Modell nicht als Beleg benannt hat: verlinken,
+      // aber ohne Nummer — sie gäbe es in der Liste nicht.
+      const loose = resolveSource(srcs, n);
+      if (loose && loose.url) {
+        return `<sup class="chat-cite chat-cite--loose"><a href="${escHtml(loose.url)}" target="_blank" rel="noopener noreferrer" data-tip="${escHtml(loose.title || loose.url)}">↗</a></sup>`;
+      }
+      return '';
+    }
     const src = resolveSource(srcs, n);
     if (src && src.url) {
       return `<sup class="chat-cite"><a href="${escHtml(src.url)}" target="_blank" rel="noopener noreferrer" data-tip="${escHtml(src.title || src.url)}">${n}</a></sup>`;

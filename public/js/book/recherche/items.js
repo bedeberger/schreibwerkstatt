@@ -84,11 +84,29 @@ export const rechercheItemMethods = {
       // Reiner Datei-Eintrag ohne Text: Server verlangt ein nicht-leeres Feld →
       // Dateiname als Titel, damit das Item benannt ist (kind setzt der Upload).
       if (!hasText && file && !payload.title) payload.title = file.name.slice(0, 300);
-      const row = await fetchJson('/research', {
+      const post = (extra = {}) => fetchJson('/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: bookId, ...payload }),
+        body: JSON.stringify({ book_id: bookId, ...payload, ...extra }),
       });
+      let row;
+      try {
+        row = await post();
+      } catch (e) {
+        // Link liegt schon an einem Fundstück dieses Buchs (409 DUPLICATE_URL):
+        // nachfragen statt still eine Dublette anzulegen — zwei Zitate aus
+        // derselben Seite sind aber legitim, darum übersteuerbar.
+        if (e?.status !== 409 || e.body?.error_code !== 'DUPLICATE_URL') throw e;
+        const ok = await app.appConfirm({
+          message: app.t('recherche.error.duplicateUrlConfirm', { title: e.body?.params?.title || '' }),
+        });
+        if (!ok) {
+          this.closeCreate();
+          this._focusRechercheItemById(e.body.existing_id);
+          return;
+        }
+        row = await post({ allow_duplicate: true });
+      }
       this.items = [row, ...this.items];
       // Datei nachladen (image/* → Bild, application/pdf → Dokument); uploadXxx
       // ersetzt das eben eingefügte Item per id und setzt kind serverseitig.
@@ -177,6 +195,8 @@ export const rechercheItemMethods = {
   onItemBodyClick(item, ev) {
     if (this.busy) return;
     if (ev.target.closest('a, button, input, label, .research-tag, .research-link-chip, .recherche-linkpicker, .combobox-wrap')) return;
+    // Im Auswahl-Modus markiert ein Klick, statt den Dialog zu oeffnen.
+    if (this.bulkMode) { this.toggleBulkSelect(item); return; }
     // Textselektion nicht abwürgen: hat der User Text markiert (Drag löst am
     // Ende ebenfalls ein click aus), nicht den Dialog aufziehen.
     const sel = window.getSelection();

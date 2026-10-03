@@ -25,6 +25,8 @@
   </div>
 
   <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>
+  <div x-show="linkCheckStatus" x-cloak class="card-status" x-text="linkCheckStatus"></div>
+  <div x-show="crosscheckStatus" x-cloak class="card-status" x-text="crosscheckStatus"></div>
 
   <!-- Zweispaltiges Raster: Board links, Recherche-Chat rechts daneben (ab
        1280px, Muster des Seiten-Chats neben dem Editor). Darunter klappt der
@@ -54,6 +56,13 @@
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
       <span x-text="$app.t('recherche.new')"></span>
     </button>
+    <button type="button" class="btn-compact" x-show="viewMode === 'list' && items.length > 0"
+            :class="{ 'is-active': bulkMode }" :aria-pressed="bulkMode ? 'true' : 'false'"
+            @click="toggleBulkMode()" x-text="$app.t(bulkMode ? 'recherche.bulk.done' : 'recherche.bulk.start')"></button>
+    <button type="button" class="btn-compact" x-show="items.length > 0" @click="checkLinks()" :disabled="linkCheckRunning"
+            :data-tip="$app.t('recherche.linkCheck.tip')" x-text="$app.t('recherche.linkCheck.btn')"></button>
+    <button type="button" class="btn-compact" x-show="items.length > 0" @click="runCrosscheck()" :disabled="crosscheckRunning"
+            :data-tip="$app.t('recherche.crosscheck.tip')" x-text="$app.t('recherche.crosscheck.btn')"></button>
     <div class="filter-bar filter-bar--inline">
       <div x-data="combobox($app.t('recherche.filter.allKinds'), $app.t('recherche.filter.allKinds'))"
            x-modelable="value" x-model="filterKind"
@@ -90,6 +99,8 @@
       </label>
     </div>
   </div>
+
+  <!-- @include recherche-bulk-bar -->
 
   <!-- Skeleton während Loading vor erstem Datensatz -->
   <div x-show="loading" class="recherche-skeleton entity-list--accented" x-cloak>

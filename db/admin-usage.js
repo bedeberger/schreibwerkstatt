@@ -440,8 +440,19 @@ function dailyTimeSeries(email, bookId, { from, to } = {}) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// ── Chat-Qualitaet (je Chat-Art) ────────────────────────────────────────────
+
+// Antworten, Fehlerquote, Feedback, Wiederholungen und Kosten je Chat-Art —
+// Rechnung in db/chat-quality.js, hier nur Zeitraum + Admin-Ausschluss.
+function chatQuality({ from, to, includeAdmins = false } = {}) {
+  const { fromIso, toIso } = _resolveRange({ from, to });
+  const { chatQualityStats } = require('./chat-quality');
+  return chatQualityStats({ fromIso, toIso, excludedEmails: _excludedEmails(includeAdmins) });
+}
+
 module.exports = {
   listUsersWithUsage,
+  chatQuality,
   getJobRuns, getChatMessages,
   monthlyTotals,
   userJobBreakdown,

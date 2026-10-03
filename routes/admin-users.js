@@ -324,7 +324,8 @@ router.put('/:email', express.json(), (req, res) => {
     }
     if (next !== null) {
       const prof = aiProfiles.getProfile(next);
-      if (!prof) return res.status(404).json({ error_code: 'AI_PROFILE_NOT_FOUND' });
+      // Der eigene KI-Zugang eines Kontos ist nicht zuweisbar.
+      if (!prof || prof.owner_email) return res.status(404).json({ error_code: 'AI_PROFILE_NOT_FOUND' });
       const missing = _profileConfigGap(prof);
       if (missing) return res.status(400).json({ error_code: 'AI_PROVIDER_NOT_CONFIGURED', detail: missing });
     }

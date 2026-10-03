@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, reconcilePageIds, pruneStaleBookData, upsertBook } = require('../db/schema');
+const { db, reconcilePageIds, upsertBook } = require('../db/schema');
 const logger = require('../logger');
 const { runWithContext, getContext } = require('../lib/log-context');
 const { aclParamGuard } = require('../lib/acl');
@@ -90,30 +90,20 @@ const upsertPageStatsMany = db.transaction((items) => {
   for (const item of items) upsertPageStats.run(item);
 });
 
-const _upsertPageCacheStmt = db.prepare(`
-  INSERT INTO pages (page_id, book_id, page_name, chapter_id, updated_at, last_seen_at)
-  VALUES (?, ?, ?, ?, ?, ?)
-  ON CONFLICT(page_id) DO UPDATE SET
-    book_id=excluded.book_id, page_name=excluded.page_name,
-    chapter_id=excluded.chapter_id, updated_at=excluded.updated_at,
-    last_seen_at=excluded.last_seen_at
-`);
-
-const _upsertChapterStmt = db.prepare(`
-  INSERT INTO chapters (chapter_id, book_id, chapter_name, updated_at, last_seen_at)
-  VALUES (?, ?, ?, ?, ?)
-  ON CONFLICT(chapter_id) DO UPDATE SET
-    book_id=excluded.book_id, chapter_name=excluded.chapter_name,
-    updated_at=excluded.updated_at, last_seen_at=excluded.last_seen_at
-`);
-
 // Mig 75: chapter_extract_cache.chapter_id INTEGER FK; Rename invalidiert alle phases.
 const _delChapterCacheByChapterId = db.prepare(
   'DELETE FROM chapter_extract_cache WHERE book_id = ? AND chapter_id = ?'
 );
 
-// Leichtgewichtiger pages-Cache-Update (ohne Seiten-Inhalte laden).
+// Abgeleitete Daten nach einem Sync nachziehen (ohne Seiten-Inhalte laden).
 // Wird sowohl von syncBook() als auch vom /sync/pages/:book_id-Endpunkt genutzt.
+// In `pages`/`chapters` schreibt der Sync nichts: die Tabellen SIND der
+// Content-Store, `pages`/`chapters` aus dem Aufrufer sind ein Snapshot, und
+// syncBook braucht fuer ein grosses Buch Sekunden (Batch-Loop mit _yield), in
+// denen Saves, Renames, Neuanlagen und Loeschungen weiterlaufen. Ein Upsert aus
+// dem Snapshot setzte updated_at einer frisch gespeicherten Seite zurueck
+// (Folge-Save → PAGE_CONFLICT), ein Abgleich gegen ihn hielte eine im Fenster
+// angelegte Seite fuer geloescht. Geloescht wird nur ueber contentStore.delete*.
 function _upsertPagesCache(bookId, pages, chapters) {
   // Kapitel-Umbenennungen erkennen → Extrakt-Cache für alle User invalidieren.
   const storedChapters = db.prepare('SELECT chapter_id, chapter_name FROM chapters WHERE book_id = ?').all(bookId);
@@ -123,35 +113,6 @@ function _upsertPagesCache(bookId, pages, chapters) {
       logger.info(`Kapitel ${c.id} (Buch ${bookId}) umbenannt: «${storedChMap[c.id]}» → «${c.name}» – Extrakt-Cache invalidiert.`);
       _delChapterCacheByChapterId.run(bookId, c.id);
     }
-  }
-
-  const seenAt = new Date().toISOString();
-  db.transaction(() => {
-    // Chapters VOR pages upsertten — pages.chapter_id ist FK auf chapters(chapter_id).
-    for (const c of chapters) {
-      _upsertChapterStmt.run(c.id, bookId, c.name, c.updated_at || null, seenAt);
-    }
-    for (const p of pages) {
-      _upsertPageCacheStmt.run(
-        p.id, bookId, p.name,
-        p.chapter_id || null,
-        // updated_at nie NULL schreiben — sonst blockiert die Row den Sync-Keyset-
-        // Cursor (pagesChangedSince). seenAt als Fallback fuer Quellen ohne Stamp.
-        p.updated_at || seenAt,
-        seenAt
-      );
-    }
-  })();
-
-  // Gelöschte Seiten/Kapitel aus Cache + Historie entfernen.
-  // Muss VOR reconcilePageIds() laufen, damit reconcile nicht versucht, verwaiste
-  // Einträge anhand der (bereits gelöschten) Pages zu heilen.
-  const pruned = pruneStaleBookData(bookId, pages.map(p => p.id), chapters.map(c => c.id));
-  if (pruned.stale_pages || pruned.stale_chapters) {
-    logger.info(`Prune Buch ${bookId}: ${pruned.stale_pages} Seiten, ${pruned.stale_chapters} Kapitel entfernt ` +
-      `(page_checks=${pruned.page_checks}, page_stats=${pruned.page_stats}, chat_sessions=${pruned.chat_sessions}, ` +
-      `chapter_reviews=${pruned.chapter_reviews}, chapter_extract_cache=${pruned.chapter_extract_cache}, ` +
-      `figure_appearances=${pruned.figure_appearances}, location_chapters=${pruned.location_chapters}).`);
   }
 
   reconcilePageIds(bookId);
@@ -286,10 +247,15 @@ async function syncBook(bookId, ctx) {
   const avgLix = lixWords > 0 ? Math.round((lixSum / lixWords) * 10) / 10 : null;
   const avgFleschDe = fleschWords > 0 ? Math.round((fleschSum / fleschWords) * 10) / 10 : null;
 
-  // pages-Cache VOR page_stats: page_stats.page_id REFERENCES pages(page_id).
-  // Bei Erst-Sync eines Buchs sind die pages-Rows sonst noch nicht da → FK-Fail.
   _upsertPagesCache(bookId, pages, chapters);
-  upsertPageStatsMany(statsItems);
+  // Im Sync-Fenster geloeschte Seiten fallen raus: page_stats/Index haengen per
+  // FK an pages, und eine Seite darf nicht ueber den Sync zurueckkommen.
+  const livePageIds = new Set(
+    db.prepare('SELECT page_id FROM pages WHERE book_id = ?').all(bookId).map(r => r.page_id)
+  );
+  const isLive = (it) => livePageIds.has(it.page_id);
+  upsertPageStatsMany(statsItems.filter(isLive));
+  const liveIndexItems = indexItems.filter(isLive);
 
   if (previewItems.length) {
     const stmtPrev = db.prepare('UPDATE pages SET preview_text = ? WHERE page_id = ?');
@@ -298,26 +264,24 @@ async function syncBook(bookId, ctx) {
 
   // Index-Felder (Pronomen, Dialog, Sätze, Content-Sig) schreiben —
   // muss nach upsertPageStatsMany laufen, weil es UPDATE auf existierende Rows nutzt.
-  if (indexItems.length) {
-    db.transaction(() => { for (const item of indexItems) writePageIndex(item.page_id, item.index); })();
+  if (liveIndexItems.length) {
+    db.transaction(() => { for (const item of liveIndexItems) writePageIndex(item.page_id, item.index); })();
   }
 
   // Figuren-Mentions mit Volltext neu berechnen (präziser als preview_text-Hook in saveFigurenToDb).
   // Läuft über alle User, die Figuren für dieses Buch haben (figure_id ist eindeutig pro User).
   // Figuren-Liste einmal pro Buch laden und durchreichen — die Query ist pro Seite identisch.
   const bookFigures = loadBookFiguresForMentions(bookId);
-  for (const item of indexItems) {
+  for (const item of liveIndexItems) {
     try { writeFigureMentionsForPageAllUsers(item.page_id, bookId, item.fullText, bookFigures); }
     catch (e) { logger.warn(`Figuren-Mentions für Seite ${item.page_id} fehlgeschlagen: ${e.message}`); }
   }
 
-  // Volltext-Index nach Sync-Pull aktualisieren. Buch-Meta + Kapitel
-  // werden ueber upsertBook/upsertChapters in _upsertPagesCache implizit
-  // beruehrt; Seiten haben nach upsertPageStatsMany die neuen body_html-Werte.
+  // Volltext-Index nach dem Sync aktualisieren (Buch-Meta, Kapitel, Seiten).
   try {
     searchIndex.upsertBookMeta(bookId);
     for (const ch of chapters) searchIndex.upsertChapter(ch.id);
-    for (const item of indexItems) searchIndex.upsertPage(item.page_id);
+    for (const item of liveIndexItems) searchIndex.upsertPage(item.page_id);
   } catch (e) {
     logger.warn(`Search-Index Sync Buch ${bookId} fehlgeschlagen: ${e.message}`);
   }
@@ -423,7 +387,7 @@ async function _recomputeStalePageStats(bookId, pages, requestedSet, ctx) {
   return { computed: newItems.length, total: pages.length };
 }
 
-// Full-Backfill: vollwertiger pages-Cache-Update (Chapters, Prune, Reconcile) +
+// Full-Backfill: Nachzug der abgeleiteten Daten (Kapitel-Rename, Reconcile) +
 // Stats für alle veralteten Seiten. Wird beim Buchwechsel per Coalescing entzerrt.
 async function _backfillPageStatsFull(bookId, ctx) {
   const pages = await contentStore.listPages(bookId, ctx);
@@ -434,8 +398,8 @@ async function _backfillPageStatsFull(bookId, ctx) {
   return _recomputeStalePageStats(bookId, pages, null, ctx);
 }
 
-// Lazy-Pfad (IntersectionObserver): nur die angefragten pages-Rows einsetzen,
-// kein Chapter-/Prune-Aufwand — viewport-priorisiert, daher nicht coalesced.
+// Lazy-Pfad (IntersectionObserver): nur die Stats der angefragten Seiten,
+// kein Chapter-Aufwand — viewport-priorisiert, daher nicht coalesced.
 async function _backfillPageStatsLazy(bookId, requestedIds, ctx) {
   const pages = await contentStore.listPages(bookId, ctx);
   const bookRow = db.prepare('SELECT 1 FROM books WHERE book_id = ?').get(bookId);
@@ -443,19 +407,7 @@ async function _backfillPageStatsLazy(bookId, requestedIds, ctx) {
     const bookMeta = await contentStore.loadBook(bookId, ctx).catch(() => null);
     if (bookMeta) upsertBook(bookMeta);
   }
-  const stmt = db.prepare(`
-    INSERT INTO pages (page_id, book_id, page_name, chapter_id, updated_at, last_seen_at)
-    VALUES (?, ?, ?, NULL, ?, ?)
-    ON CONFLICT(page_id) DO UPDATE SET
-      book_id=excluded.book_id, page_name=excluded.page_name,
-      updated_at=excluded.updated_at, last_seen_at=excluded.last_seen_at
-  `);
-  const seenAt = new Date().toISOString();
   const want = new Set(requestedIds);
-  db.transaction(() => {
-    // updated_at nie NULL — sonst blockiert die Row den Sync-Keyset-Cursor.
-    for (const p of pages) if (want.has(p.id)) stmt.run(p.id, bookId, p.name, p.updated_at || seenAt, seenAt);
-  })();
   return _recomputeStalePageStats(bookId, pages, want, ctx);
 }
 

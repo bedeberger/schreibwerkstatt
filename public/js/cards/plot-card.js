@@ -1,6 +1,6 @@
 // Alpine.data('plotCard') — Sub-Komponente für die Plot-Werkstatt (Beat-Board).
 // Buchebenen-Karte (exklusiv): Akte (Spalten) + Beats (Karten) + zwei KI-Jobs
-// (Brainstorm, Consistency). Fachdaten leben lokal in der Karte (nicht im
+// (Brainstorm, Consistency) + Plot-Chat-Panel (Vorschläge ans Board). Fachdaten leben lokal in der Karte (nicht im
 // catalog-store), weil sie rein planend und nicht mit Figuren/Orten geteilt sind.
 
 import { plotMethods } from '../book/plot.js';
@@ -10,6 +10,9 @@ import { loadSortable } from '../lazy-libs.js';
 import { EVT } from '../events.js';
 import { getUserPref, setUserPref } from '../local-prefs.js';
 import { ideenBacklinkMethods } from '../book/ideen-backlinks.js';
+import { plotChatMethods, plotChatState } from '../chat/plot-chat.js';
+import { plotBoardUiState } from '../book/plot/board-ui.js';
+import { konfliktActionState } from '../book/plot/konflikt-actions.js';
 
 const HIDE_IM_BUCH_PREF_KEY = 'plotHideImBuch';
 const SHOW_ARCHIVED_PREF_KEY = 'plotShowArchived';
@@ -109,12 +112,12 @@ export function registerPlotCard() {
 
     // Strang-Edit / -Add / -Farbe (Swimlanes)
     editingThreadId: null,
-    threadDraft: { name: '', farbe: null, figure_id: '', draft_figure_id: '' },
+    threadDraft: { name: '', farbe: null, figure_id: '', draft_figure_id: '', chapter_id: '' },
     addingThread: false,
     newThreadName: '',
     threadColorPickerId: null,
     // ID der Lane, deren Aktions-Dropdown (Kebab) offen ist (Single-Select wie die
-    // Color-Picker-IDs). Das Menü ist ein einzelnes, nach <body> teleportiertes
+    // Color-Picker-IDs). Das Menü ist ein einzelnes, nach .card--plot teleportiertes
     // .context-menu (JS-positioniert) — die Lane lebt in einem overflow/transform-
     // Scrollcontainer, in dem ein verankertes Popover geclippt würde.
     threadActionsOpenId: null,
@@ -124,7 +127,7 @@ export function registerPlotCard() {
     _threadMenuCloseHandler: null,
 
     // ID des Beats, dessen Anchor-Fundstellen-Popover offen ist (Single-Select).
-    // Das Popover ist ein einzelnes, nach <body> teleportiertes .context-menu
+    // Das Popover ist ein einzelnes, nach .card--plot teleportiertes .context-menu
     // (JS-positioniert) — die Beat-Karte lebt in einem overflow/transform-
     // Scrollcontainer, in dem ein verankertes Popover geclippt würde.
     beatOccPopoverBeatId: null,
@@ -156,6 +159,9 @@ export function registerPlotCard() {
     _undoStack: [],
     _redoStack: [],
     _inHistoryFlight: false,
+    // Zähler je _clearHistory — ein Undo/Redo, dessen Applier die Historie
+    // geleert hat (loadBoard-Rollback), legt seinen Record nicht zurück.
+    _historyEpoch: 0,
 
     // KI: Brainstorm
     brainstormActId: null,
@@ -174,6 +180,9 @@ export function registerPlotCard() {
     anchorStatus: '',
     anchorProgress: 0,
     beatAnchorStale: false,
+    // `beatAnchor`-Block des /plot-Payloads (stale, ggf. ranAt). Speist zusammen
+    // mit den Beats beatAnchorKnown(): ohne je gelaufenen Anchor kein rotes 'drift'.
+    beatAnchorInfo: null,
     _anchorJobId: null,
     _anchorPollTimer: null,
 
@@ -202,7 +211,23 @@ export function registerPlotCard() {
     // Deep-Link-Ziel (#book/X/plot/<beatId>): gemerkt, bis das Board geladen ist.
     _pendingFocusBeatId: null,
 
+    // Laufender Beat-Save (saveEditBeat) — teilt sein Ergebnis mit parallelen
+    // Commit-Wegen (Klick ausserhalb + Wechsel auf anderen Beat im selben Klick).
+    _beatSavePromise: null,
+    // Sequenz der Board-Loads: eine überholte Antwort (Buchwechsel, Doppel-Load)
+    // schreibt nicht mehr in den State.
+    _boardLoadSeq: 0,
+
     _lifecycle: null,
+
+    // Plot-Chat: Panel neben dem Board (chat/plot-chat.js). Vorschläge des Chats
+    // laufen beim Übernehmen über dieselben Mutations- und Undo-Pfade wie oben.
+    ...plotChatState(),
+
+    // Dichte-Modus, eingeklappte Akte, Menü-Fokus (book/plot/board-ui.js) und
+    // Befund-Typ-Filter + angewendete Befund-Aktionen (book/plot/konflikt-actions.js).
+    ...plotBoardUiState(),
+    ...konfliktActionState(),
 
     init() {
       // „im Buch ausblenden" ist eine Arbeitsgewohnheit, kein Buch-Datum —
@@ -227,6 +252,8 @@ export function registerPlotCard() {
         if (v && this.plotFilters.status === 'im_buch') this.plotFilters.status = '';
       });
 
+      this._initPlotBoardUi();
+
       this._lifecycle = setupCardLifecycle(this, {
         name: 'plot',
         showFlag: 'showPlotCard',
@@ -240,6 +267,8 @@ export function registerPlotCard() {
         onBookChanged: () => {
           this._destroySortables();
           this.resetPlot();
+          this.resetPlotChat();
+          this.plotChatOpen = false;
           const bookId = Alpine.store('nav').selectedBookId;
           if (window.__app.showPlotCard && bookId) {
             this.loadBoard();
@@ -248,7 +277,10 @@ export function registerPlotCard() {
             if (!Alpine.store('catalog').figuren?.length) window.__app.loadFiguren(bookId);
           }
         },
-        onViewReset: () => { this._destroySortables(); this.resetPlot(); },
+        onViewReset: () => {
+          this._destroySortables(); this.resetPlot();
+          this.resetPlotChat(); this.plotChatOpen = false;
+        },
         onCardRefresh: () => this.loadBoard(),
       });
 
@@ -308,6 +340,7 @@ export function registerPlotCard() {
 
     destroy() {
       this._clearJobs();
+      this.resetPlotChat();
       this._destroySortables();
       this._detachOccPopoverListeners?.();
       this._detachThreadMenuListeners?.();
@@ -316,5 +349,6 @@ export function registerPlotCard() {
 
     ...plotMethods,
     ...ideenBacklinkMethods,
+    ...plotChatMethods,
   }));
 }

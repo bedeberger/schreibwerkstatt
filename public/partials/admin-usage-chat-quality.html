@@ -1,0 +1,67 @@
+<!-- Admin-Usage → Chat-Tab: Chat-Qualitaet je Chat-Art -->
+<!--
+  Sub-Partial von admin-usage.html (Scope: adminUsageCard), oben im Chat-Tab.
+  Quelle: GET /admin/usage/chat-quality (db/chat-quality.js) — Zaehler je
+  Chat-Art (page/book/research), keine Chat-Texte. Zeitraum + „Admins
+  einbeziehen" wirken, der User-Filter der Nachrichtenliste darunter nicht.
+-->
+<section class="card-section" x-show="adminUsageChatQuality.length">
+  <h4 class="card-section-title" x-text="$app.t('admin.usage.chatQuality.title')"></h4>
+  <p class="card-hint card-hint--sm" x-text="$app.t('admin.usage.chatQuality.hint')"></p>
+  <div class="table-scroll">
+  <table class="data-table"
+         x-data="sortableTable({
+           rows: () => adminUsageChatQuality,
+           defaultKey: 'answers',
+           defaultDir: 'desc',
+           persistKey: 'admin.usage.chatQuality',
+           types: { answers: 'number', errors: 'number', errorRate: 'number', cancelled: 'number',
+                    feedbackUp: 'number', feedbackDown: 'number', upShare: 'number',
+                    repeats: 'number', usd: 'number', usdPerAnswer: 'number' },
+         })">
+    <thead>
+      <tr>
+        <th class="sortable-th" :class="sortClass('label')" :aria-sort="ariaSort('label')"
+            @click="sortBy('label')" x-text="$app.t('admin.usage.chat.kind')"></th>
+        <th class="sortable-th" :class="sortClass('answers')" :aria-sort="ariaSort('answers')"
+            @click="sortBy('answers')" x-text="$app.t('admin.usage.chatQuality.answers')"></th>
+        <th class="sortable-th" :class="sortClass('errors')" :aria-sort="ariaSort('errors')"
+            @click="sortBy('errors')" x-text="$app.t('admin.usage.chatQuality.errors')"></th>
+        <th class="sortable-th" :class="sortClass('errorRate')" :aria-sort="ariaSort('errorRate')"
+            @click="sortBy('errorRate')" x-text="$app.t('admin.usage.chatQuality.errorRate')"></th>
+        <th class="sortable-th" :class="sortClass('cancelled')" :aria-sort="ariaSort('cancelled')"
+            @click="sortBy('cancelled')" x-text="$app.t('admin.usage.chatQuality.cancelled')"></th>
+        <th class="sortable-th" :class="sortClass('feedbackUp')" :aria-sort="ariaSort('feedbackUp')"
+            @click="sortBy('feedbackUp')" x-text="$app.t('admin.usage.chatQuality.up')"></th>
+        <th class="sortable-th" :class="sortClass('feedbackDown')" :aria-sort="ariaSort('feedbackDown')"
+            @click="sortBy('feedbackDown')" x-text="$app.t('admin.usage.chatQuality.down')"></th>
+        <th class="sortable-th" :class="sortClass('upShare')" :aria-sort="ariaSort('upShare')"
+            @click="sortBy('upShare')" x-text="$app.t('admin.usage.chatQuality.upShare')"></th>
+        <th class="sortable-th" :class="sortClass('repeats')" :aria-sort="ariaSort('repeats')"
+            @click="sortBy('repeats')" x-text="$app.t('admin.usage.chatQuality.repeats')"></th>
+        <th class="sortable-th" :class="sortClass('usd')" :aria-sort="ariaSort('usd')"
+            @click="sortBy('usd')" x-text="$app.t('admin.usage.column.cost')"></th>
+        <th class="sortable-th" :class="sortClass('usdPerAnswer')" :aria-sort="ariaSort('usdPerAnswer')"
+            @click="sortBy('usdPerAnswer')" x-text="$app.t('admin.usage.chatQuality.costPerAnswer')"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <template x-for="r in sorted" :key="r.kind">
+        <tr>
+          <td x-text="r.label"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsageInt(r.answers)"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsageInt(r.errors)"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsagePct(r.errorRate)"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsageInt(r.cancelled)"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsageInt(r.feedbackUp)"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsageInt(r.feedbackDown)"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsagePct(r.upShare)"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsageInt(r.repeats) + (r.repeatShare != null ? ' (' + adminUsagePct(r.repeatShare) + ')' : '')"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsageMoney(r.usd)"></td>
+          <td class="admin-usage-cell-num" x-text="adminUsageMoney(r.usdPerAnswer)"></td>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+  </div>
+</section>

@@ -1,0 +1,141 @@
+{
+  "version": "4.15.0",
+  "date": "2026-10-03",
+  "entries": [
+    {
+      "kind": "neu",
+      "de": "Plot-Werkstatt, neues Chat-Panel: Du entwickelst die Handlung im Gespräch. Der Chat kennt Board, Figuren und Text und schlägt Beats, Akte und Stränge vor – übernommen wird jeder einzelne, selbst schreibt er nichts ins Board.",
+      "en": "Plot workshop, new chat panel: develop the story in conversation. The chat knows the board, the figures and the text and suggests beats, acts and threads – you accept each one, it never writes to the board itself."
+    },
+    {
+      "kind": "neu",
+      "de": "Profil, Abschnitt „Eigener KI-Zugang“: Hinterlegst du deinen eigenen Schlüssel für Claude oder einen OpenAI-kompatiblen Anbieter, laufen alle deine KI-Funktionen darüber und auf deine Kosten.",
+      "en": "Profile, “Own AI access” section: store your own key for Claude or an OpenAI-compatible provider and every AI feature runs through it, at your own cost."
+    },
+    {
+      "kind": "neu",
+      "de": "PDF-Export: Vier fertige Vorlagen zum Start – Roman-Taschenbuch 12 × 19 cm, Sachbuch 17 × 24 cm, Lyrik 13.5 × 21.5 cm und Manuskript A5. Seitengrösse, Schrift, Kopfzeilen und Verzeichnis sind aufeinander abgestimmt.",
+      "en": "PDF export: four finished templates to start from – 12 × 19 cm paperback, 17 × 24 cm nonfiction, 13.5 × 21.5 cm poetry and A5 manuscript. Trim size, fonts, running heads and contents are tuned to each other."
+    },
+    {
+      "kind": "neu",
+      "de": "PDF-Export: Die Ansicht „Einfach“ zeigt nur die wichtigsten Einstellungen, „Experte“ reicht bis in den Feinsatz. Neu ausserdem „Probeseiten“ (nur das erste Kapitel) und eine Liste mit Hinweisen nach jedem Export.",
+      "en": "PDF export: the “Simple” view keeps to the essentials, “Expert” goes down to fine typesetting. Also new: “Sample pages” (just the first chapter) and a list of notes after every export."
+    },
+    {
+      "kind": "neu",
+      "de": "PDF-Export, Layout: Fertige Seitenformate für Amazon KDP, BoD, epubli, tredition und IngramSpark – bei KDP mit den Mindest-Rändern und ohne Schnittmarken – und eine Doppelseiten-Vorschau des Satzspiegels mit geschätzter Seitenzahl.",
+      "en": "PDF export, layout: ready-made page formats for Amazon KDP, BoD, epubli, tredition and IngramSpark – KDP with its minimum margins and no crop marks – plus a two-page preview of the type area with an estimated page count."
+    },
+    {
+      "kind": "neu",
+      "de": "Fassungen-Karte, Abschnitt „Gelöschte Seiten“: Eine versehentlich gelöschte Seite kommt mit Text und Bildern ins alte Kapitel zurück. Der Seitenverlauf der gelöschten Seite fehlt dabei.",
+      "en": "Versions card, “Deleted pages” section: a page you deleted by mistake returns with its text and images into its old chapter. The page history of the deleted page does not come back."
+    },
+    {
+      "kind": "neu",
+      "de": "Fassungen: Im Reader einer Fassung trägt jetzt jede geänderte Seite und jedes Kapitel einen Knopf „übernehmen“ – so holst du einzelne Teile zurück, ohne das ganze Buch auf die Fassung zu setzen.",
+      "en": "Versions: in the reader of a version, every changed page and chapter now has an “accept” button, so you can bring back single parts without resetting the whole book."
+    },
+    {
+      "kind": "neu",
+      "de": "Recherche-Karte, Knopf „Mit Manuskript abgleichen“: Die KI prüft den Buchtext gegen deine gesammelten Fakten und Zitate und meldet Stellen, die widersprechen oder ein Zitat anders wiedergeben.",
+      "en": "Research card, “Compare with manuscript” button: the AI checks your text against the facts and quotes you collected and reports passages that contradict them or render a quote differently."
+    },
+    {
+      "kind": "neu",
+      "de": "Recherche-Karte, Knopf „Links prüfen“: Die App testet, ob die Links deiner Fundstücke noch erreichbar sind, und schlägt für einen toten Link die Suche nach einer Archivkopie vor.",
+      "en": "Research card, “Check links” button: the app tests whether the links of your findings still work and, for a dead one, offers to search for an archived copy."
+    },
+    {
+      "kind": "neu",
+      "de": "Recherche-Karte, Listenansicht: „Auswählen“ schaltet die Mehrfachauswahl ein – Status setzen, Schlagwort ergänzen, verknüpfen, archivieren oder löschen gilt dann für alle markierten Fundstücke zugleich.",
+      "en": "Research card, list view: “Select” turns on multi-selection – setting status, adding a tag, linking, archiving or deleting then applies to every marked finding at once."
+    },
+    {
+      "kind": "neu",
+      "de": "Recherche-Chat: Vorschläge lassen sich vor dem Speichern bearbeiten, Dubletten erkennt er und schickt dich zum vorhandenen Eintrag, und ein Schalter recherchiert gezielt für die offene Seite. Dazu Suche in bibliografischen Registern (Crossref, Open Library) mit DOI und ISBN.",
+      "en": "Research chat: suggestions can be edited before saving, duplicates are recognised and point to the existing entry, and one switch researches specifically for the open page. Plus searches in bibliographic registers (Crossref, Open Library) with DOI and ISBN."
+    },
+    {
+      "kind": "neu",
+      "de": "Buch-Chat: Antworten weisen ihre Belege als Fussnoten mit Sprung zur Seite aus und nennen ihre geschätzten Kosten; ein Knopf bricht eine Antwort ab. Braucht eine Frage Wissen ausserhalb des Buchs, steht sie auf Knopfdruck vorausgefüllt im Recherche-Chat.",
+      "en": "Book chat: answers list their evidence as footnotes that jump to the page and name their estimated cost; a button stops an answer running on. If a question needs knowledge outside the book, it opens pre-filled in the research chat at a click."
+    },
+    {
+      "kind": "neu",
+      "de": "Plot-Werkstatt: Ein Beat kann jetzt eine Zeit („Sommer 1987“) und einen Schauplatz tragen. Beides zieht die Konsistenz-Prüfung mit hinein, sie meldet damit auch Brüche in der Chronologie.",
+      "en": "Plot workshop: a beat can now carry a time (“summer 1987”) and a setting. The consistency check uses both, so it also reports breaks in the chronology."
+    },
+    {
+      "kind": "neu",
+      "de": "Seiten-Chat: Fragst du nach Titeln oder Überschriften, antwortet er mit drei bis fünf Varianten – „übernehmen“ setzt den Seitentitel, „kopieren“ legt ihn in die Zwischenablage.",
+      "en": "Page chat: ask for titles or headlines and you get three to five variants – “apply” sets the page title, “copy” puts it on the clipboard."
+    },
+    {
+      "kind": "neu",
+      "de": "Alle vier Chats: Unter jeder Antwort stehen Daumen hoch und runter. Wie viele Antworten ankommen, sieht die Betreuung unter Verwaltung → Nutzung, Reiter „Chat“.",
+      "en": "All four chats: every answer now has a thumbs up and a thumbs down. How many answers land is visible under Administration → Usage, “Chat” tab."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Seiten-Chat: Änderungsvorschläge übernimmt du jetzt direkt im Editor, auch alle auf einmal, nimmst sie mit „Rückgängig“ zurück oder verwirfst sie. Die Stelle im Text wird hervorgehoben, wenn du über den Vorschlag fährst.",
+      "en": "Page chat: you now apply suggestions right in the editor, all of them at once, take them back with “undo” or discard them. The passage in the text is highlighted when you hover the suggestion."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Fassungen: Zurücksetzen auf eine Fassung überschreibt die Seiten, die es noch gibt, statt sie neu anzulegen. Verknüpfungen, Leser-Kommentare, Seitenverlauf und Blog-Anbindung bleiben dadurch erhalten.",
+      "en": "Versions: resetting to a version rewrites the pages that still exist instead of recreating them, so links, reader comments, page history and blog connections survive."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Plot-Werkstatt, Konsistenz-Prüfung: Befunde sind nach Typ filterbar und als „neu seit dem letzten Lauf“ markiert, ein Klick springt zum Beat, und ein Klick erledigt den Vorschlag – Status setzen, Beat verwerfen oder Beats verknüpfen.",
+      "en": "Plot workshop, consistency check: findings are filterable by type and marked “new since the last run”, one click jumps to the beat, another carries out the suggestion – set status, discard the beat or link beats."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Plot-Werkstatt, Board: Akte lassen sich einklappen, Beat-Karten auf die Titelzeile reduzieren, und ohne Maus verschiebst du einen Beat über „Verschieben“ im Beat selbst.",
+      "en": "Plot workshop, board: acts can be collapsed, beat cards reduced to their title line, and without a mouse you move a beat using “Move” inside the beat itself."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Lektorat: Befunde, die die Aussage ändern – fehlender Beleg, fremde Zuschreibung, Wertung – sind nicht mehr vorausgewählt und tragen eine eigene, neutrale Markierung mit Erklärung.",
+      "en": "Copy editing: findings that change what you say – missing evidence, an attributed claim, a value judgement – are no longer preselected and carry their own neutral mark with an explanation."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Buch-Lektorat: Nach dem Lauf nennt die Karte die Seiten, die nicht geprüft werden konnten, und wie viele leeren Seiten übersprungen wurden.",
+      "en": "Book-wide copy editing: after a run the card names the pages it could not check and how many empty pages were skipped."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Ausnahmeliste: Wörter, die du von der Rechtschreibprüfung ausnimmst, meldet jetzt auch das KI-Lektorat nicht mehr.",
+      "en": "Exception list: words you exempt from the spell checker are no longer flagged by the AI copy edit either."
+    },
+    {
+      "kind": "verbessert",
+      "de": "Buch-Migration (.swbook): Beim Export lässt sich jetzt auch das Recherche-Board mitnehmen – mit Anhängen, Interviews und Verknüpfungen auf Figuren, Orte und Szenen.",
+      "en": "Book migration (.swbook): the export can now include the research board too – with attachments, interviews and links to figures, places and scenes."
+    },
+    {
+      "kind": "behoben",
+      "de": "Grosses Buch: Eine frisch angelegte Seite konnte danach verschwinden, und der nächste Speicherversuch brach mit einem Konflikt ab. Beides passiert nicht mehr.",
+      "en": "Large book: a page you had just created could disappear afterwards, and the next save failed with a conflict. Neither happens now."
+    },
+    {
+      "kind": "behoben",
+      "de": "Gleicher Browser, verschiedene Konten: Ein offline gespeicherter Entwurf eines anderen Kontos wurde nach der Anmeldung angezeigt und konnte überschrieben werden. Entwürfe gehören jetzt zum Konto.",
+      "en": "Same browser, different accounts: an offline draft belonging to another account showed up after sign-in and could be overwritten. Drafts now belong to an account."
+    },
+    {
+      "kind": "behoben",
+      "de": "Seiten-Chat: War eine Seite zu lang oder das Gespräch zu voll, kam ein unklarer Fehlertext oder eine Antwort ins Leere. Jetzt sagt der Chat, woran es liegt und was zu tun ist.",
+      "en": "Page chat: when a page was too long or the conversation too full, you got an unclear error or an answer into the void. The chat now says what the problem is and what to do about it."
+    },
+    {
+      "kind": "behoben",
+      "de": "Diktat: Nach einem abgebrochenen Start – etwa wenn man die Seite verliess – reagierte der Mikrofon-Knopf nicht mehr. Er ist wieder benutzbar.",
+      "en": "Dictation: after an aborted start, for instance when you left the page, the microphone button stopped responding. It works again."
+    }
+  ]
+}

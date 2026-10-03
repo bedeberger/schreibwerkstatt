@@ -12,6 +12,7 @@
 //     + FTS-Rebuild via PUT /locations/:id)
 import { setupCardLifecycle } from './card-lifecycle.js';
 import { orteMapMethods } from '../book/orte-map.js';
+import { lsGet, lsSet } from '../safe-storage.js';
 
 export function registerOrteCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -19,14 +20,14 @@ export function registerOrteCard() {
     orteLoading: false,
     orteProgress: 0,
     orteStatus: '',
-    viewMode: localStorage.getItem('orte.viewMode') === 'grid' ? 'grid' : 'list', // 'list' | 'grid' | 'map'
+    viewMode: lsGet('orte.viewMode') === 'grid' ? 'grid' : 'list', // 'list' | 'grid' | 'map'
     // Geo-Karte (View-Mode 'map') — siehe book/orte-map.js.
     orteRealEnabled: false,   // book_settings.orte_real → blendet Karten-Tab ein
     geocodingId: null,        // loc-id, fuer die gerade ein Geocode laeuft
     geocodingAll: false,      // Batch-Geocode laeuft (sperrt Einzel-Buttons)
     highlightOrtId: null,     // Cross-Highlight Marker ↔ Locate-Liste
     orteMapStatus: '',
-    geoLocked: localStorage.getItem('orte.geoLocked') !== '0', // verortete Marker gegen versehentliches Ziehen sperren (Default an)
+    geoLocked: lsGet('orte.geoLocked') !== '0', // verortete Marker gegen versehentliches Ziehen sperren (Default an)
     _geoUndoStack: [],        // Pin-Positions-History (max 10) — siehe orte-map.js
     _geoRedoStack: [],
     _geoLang: 'de',
@@ -49,7 +50,7 @@ export function registerOrteCard() {
     init() {
       this.$watch('viewMode', (v) => {
         // 'map' nicht persistieren — Tab existiert nur bei orte_real.
-        if (v === 'list' || v === 'grid') localStorage.setItem('orte.viewMode', v);
+        if (v === 'list' || v === 'grid') lsSet('orte.viewMode', v);
         if (v === 'map') this.ensureOrteMap();
       });
       // Karten-Marker reaktiv an den Filter koppeln. orteFiltered ist die

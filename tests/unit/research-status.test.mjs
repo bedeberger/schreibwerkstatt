@@ -174,8 +174,12 @@ test('Die Plakette erscheint nur, wenn die Stufe gesetzt wurde', () => {
 
 test('Der PATCH-Deskriptor validiert gegen dieselbe Menge', () => {
   const src = read('routes/research.js');
-  assert.match(src, /name: 'status',\s+validate: \(v\) => RESEARCH_STATUS_SET\.has\(v\)/,
+  assert.match(src, /!RESEARCH_STATUS_SET\.has\(b\.status\)/,
     'PATCH /research/:id muss `status` gegen RESEARCH_STATUS_SET pruefen, nicht gegen eine eigene Liste');
+  assert.match(src, /setItemsStatus\(\[id\], b\.status/,
+    'PATCH /research/:id schreibt den Status ueber setItemsStatus (haelt fest, wer und wann)');
+  assert.match(read('routes/research-bulk.js'), /RESEARCH_STATUS_SET\.has\(b\.status\)/,
+    'POST /research/bulk prueft gegen dieselbe Menge');
   assert.match(src, /ri\.status/, 'Die Listen-Route muss `status` mitliefern, sonst hat das Board keine Spalte');
   assert.ok(RESEARCH_STATUS_SET.has('offen') && !RESEARCH_STATUS_SET.has('offen '),
     'RESEARCH_STATUS_SET enthaelt getrimmte Werte');

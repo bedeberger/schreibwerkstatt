@@ -16,6 +16,7 @@ import {
   _buildDialogformatBlock,
   _buildFigurenkonsistenzBlock,
   _buildBelegBlock,
+  _buildWoerterbuchBlock,
 } from './blocks.js';
 
 export function buildObjektivLektoratPrompt(text, {
@@ -25,6 +26,7 @@ export function buildObjektivLektoratPrompt(text, {
   pageName = null,
   chapterName = null,
   hatBelege = false,
+  woerterbuch = [],
   langCode = 'de',
   buchtyp = null,
   textsorte = null,
@@ -118,6 +120,7 @@ Enthält der Text keine objektiven Fehler, gib { "fehler": [] } zurück.`;
   // Quellennachweis-Schutz auch hier: dieser Pass prueft Rechtschreibung und
   // Grammatik und wuerde „Mueller 2020" bzw. „[12]" sonst anstreichen.
   const belegBlock = hatBelege ? `\n${_buildBelegBlock(langCode)}\n` : '';
+  const woerterbuchBlock = woerterbuch.length ? `\n${_buildWoerterbuchBlock(woerterbuch, langCode)}\n` : '';
 
   const selbstkontroll = en
     ? `
@@ -148,7 +151,7 @@ ${schemaBlock}
 ${_buildRechtschreibungBlock(langCode)}
 ${_buildGrammatikBlock(langCode)}
 ${hatDialogformat ? _buildDialogformatBlock(langCode) : ''}
-${figurenkonsistenzBlock}${figurenBlock}${beziehungenBlock}${orteBlock}${belegBlock}
+${figurenkonsistenzBlock}${figurenBlock}${beziehungenBlock}${orteBlock}${belegBlock}${woerterbuchBlock}
 ${selbstkontroll}
 <originaltext label="${en ? 'Original text' : 'Originaltext'}">
 ${text}

@@ -5,7 +5,7 @@
 // (Pages/Kapitel/Settings) bleibt in lib/book-bundle.js — hier liegt nur das,
 // was direkten DB-Zugriff braucht (zu viele Tabellen fuer eine pure Facade).
 //
-//   collectExtras(bookId, { analysis, lektorat, chats })  → plain JSON
+//   collectExtras(bookId, { analysis, lektorat, chats, research })  → plain JSON
 //   restoreExtras(bookId, extras, maps, importerEmail)    → counts
 //
 // `maps` = { pageIdMap: Map<srcPageId,newPageId>, chapterIdMap: Map<...> } —
@@ -28,6 +28,8 @@ const { db } = require('./connection');
 // beim Import bereinigen, sonst wandert der Defekt mit dem Buch mit.
 const { normalizeDatumFields } = require('../lib/datum-parse');
 const { normalizeIdeeStatus } = require('../lib/ideen-status');
+const searchIndex = require('../lib/search');
+const { collectResearch, restoreResearch } = require('./book-migration-data/research');
 
 function _now() { return new Date().toISOString(); }
 
@@ -132,7 +134,7 @@ function collectChats(bookId) {
 // waehrend zwei Analyse-Kataloge desselben Buchs sich beim Restore vermischen.
 // Die uebersprungenen Scopes stehen in `out.analysisScope` — der Aufrufer soll
 // sagen koennen, dass er nicht alles mitnimmt.
-function collectExtras(bookId, { analysis = false, lektorat = false, chats = false } = {}, scopeEmail = null) {
+function collectExtras(bookId, { analysis = false, lektorat = false, chats = false, research = false } = {}, scopeEmail = null) {
   const out = {};
   if (analysis) {
     const scope = _pickScope(_analysisScopes(bookId), scopeEmail);
@@ -145,6 +147,7 @@ function collectExtras(bookId, { analysis = false, lektorat = false, chats = fal
   }
   if (lektorat) out.lektorat = collectLektorat(bookId);
   if (chats)    out.chats = collectChats(bookId);
+  if (research) out.research = collectResearch(bookId);
   return out;
 }
 
@@ -435,7 +438,8 @@ function restoreAnalysis(bookId, data, ctx) {
   // 9) ideen (XOR page/chapter — die remappte Referenz muss gesetzt bleiben)
   //
   // `idea_links` reist NICHT mit: die Bruecke zeigt auf Recherche-Fundstuecke,
-  // Plot-Beats und Motive, und keiner der drei Kataloge steht im Bundle. Eine
+  // Plot-Beats und Motive; die Fundstuecke stehen nur im optionalen
+  // Recherche-Block, Beats und Motive gar nicht im Bundle. Eine
   // mitgenommene Kante haette auf der Zielinstanz kein Gegenueber — sie waere
   // entweder ein Fremdschluss-Fehler oder, schlimmer, ein Treffer auf eine
   // gleich nummerierte fremde Zeile.
@@ -456,6 +460,10 @@ function restoreAnalysis(bookId, data, ctx) {
     insIdee.run(bookId, pid, cid, email, r.content, status, r.status_at ?? r.erledigt_at ?? null,
       r.created_at || _now(), r.updated_at || _now());
   }
+
+  // Fuer den Recherche-Block: dessen Verknuepfungen auf Figuren/Orte/Szenen
+  // zeigen auf genau diese neu angelegten Zeilen.
+  ctx.entityMaps = { figure: figMap, location: locMap, scene: sceneMap };
 
   counts.figures = figMap.size;
   counts.locations = locMap.size;
@@ -486,6 +494,10 @@ function restoreLektorat(bookId, data, ctx) {
   return { pageChecks: n };
 }
 
+// Buchweite Session-Arten (page_id IS NULL). Alles andere ist eine Seiten-Session
+// und braucht eine remappte page_id (CHECK auf chat_sessions).
+const BUNDLE_SESSION_KINDS = new Set(['page', 'book', 'research', 'plot']);
+
 function restoreChats(bookId, data, ctx) {
   if (!data || typeof data !== 'object') return { sessions: 0, messages: 0 };
   const { pageOf, email } = ctx;
@@ -494,8 +506,8 @@ function restoreChats(bookId, data, ctx) {
     (book_id,kind,page_id,user_email,title,created_at,last_message_at,opening_page_text) VALUES (?,?,?,?,?,?,?,?)`);
   for (const r of (Array.isArray(data.sessions) ? data.sessions : [])) {
     let pid = null;
-    if (r.kind === 'page') { pid = pageOf(r.page_id); if (!pid) continue; } // CHECK: page-Session braucht page_id
-    const res = insSession.run(bookId, r.kind === 'book' ? 'book' : 'page', pid, email, r.title ?? null,
+    if (!BUNDLE_SESSION_KINDS.has(r.kind) || r.kind === 'page') { pid = pageOf(r.page_id); if (!pid) continue; } // CHECK: page-Session braucht page_id
+    const res = insSession.run(bookId, BUNDLE_SESSION_KINDS.has(r.kind) ? r.kind : 'page', pid, email, r.title ?? null,
       r.created_at || _now(), r.last_message_at || r.created_at || _now(), r.opening_page_text ?? null);
     sessionMap.set(r.id, res.lastInsertRowid);
   }
@@ -531,12 +543,19 @@ function restoreExtras(bookId, extras, maps, importerEmail) {
     if (extras.analysis) result.analysis = restoreAnalysis(bookId, extras.analysis, ctx);
     if (extras.lektorat) result.lektorat = restoreLektorat(bookId, extras.lektorat, ctx);
     if (extras.chats)    result.chats = restoreChats(bookId, extras.chats, ctx);
+    // Nach der Analyse: die Recherche-Verknuepfungen brauchen deren id-Maps.
+    if (extras.research) result.research = restoreResearch(bookId, extras.research, ctx);
   });
   run();
+  // Suchindex ausserhalb der Transaktion (FTS-Schreibfehler duerfen den Import
+  // nicht zurueckrollen).
+  for (const id of (ctx.researchIds || [])) {
+    try { searchIndex.upsertResearch(id); } catch { /* Index-Rebuild faengt es */ }
+  }
   return result;
 }
 
 module.exports = {
-  collectExtras, collectAnalysis, collectLektorat, collectChats,
+  collectExtras, collectAnalysis, collectLektorat, collectChats, collectResearch,
   restoreExtras,
 };

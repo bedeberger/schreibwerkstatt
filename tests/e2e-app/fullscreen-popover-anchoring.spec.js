@@ -20,7 +20,7 @@ const CARDS = [
     card: '.card--plot',
     popovers: [
       '.plot-occ-popover',                      // Anchor-Fundstellen (plot-anchor-popover.html)
-      '.context-menu[x-ref="threadMenu"]',      // Strang-Aktionen (plot-board-grid.html)
+      '.context-menu[x-ref="threadMenu"]',      // Strang-Aktionen (plot-thread-menu.html)
     ],
   },
   {

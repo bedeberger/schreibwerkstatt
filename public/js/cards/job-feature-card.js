@@ -5,6 +5,7 @@
 
 import { fetchJson, escHtml } from '../utils.js';
 import { startPoll, runningJobStatus } from './job-helpers.js';
+import { lsSet } from '../safe-storage.js';
 
 // cfg:
 //   name              — logischer Feature-Name (z. B. 'review').
@@ -111,7 +112,7 @@ export function createCardJobFeature(cfg) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cfg.buildPayload.call(this)),
       });
-      localStorage.setItem(lsKeyFn(bookId, this), jobId);
+      lsSet(lsKeyFn(bookId, this), jobId);
       this[names.start](jobId);
     } catch (e) {
       console.error(`[${names.run}]`, e);

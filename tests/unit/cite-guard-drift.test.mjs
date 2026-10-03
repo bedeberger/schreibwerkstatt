@@ -209,15 +209,16 @@ test('Beleg-Schutzblock haengt nur bei Seiten mit Belegen im Lektorat-Prompt', a
   assert.ok(buildObjektivLektoratPrompt(text, { hatBelege: true }).includes('Quellennachweise'));
 });
 
-test('Lektorat-Job reicht das Beleg-Flag in beide Pfade und in die Cache-Signatur', () => {
+test('Lektorat-Job reicht das Beleg-Flag in Prompt und Cache-Signatur', () => {
   // Ohne den Signatur-Anteil liefert der Cache einer Seite, die frisch Belege
-  // bekommen hat, das alte Ergebnis ohne Schutzregel zurueck.
+  // bekommen hat, das alte Ergebnis ohne Schutzregel zurueck. Seiten- und
+  // Buch-Lektorat teilen den Kern lektorat-page.js#checkOnePage.
+  const page = readFileSync(resolve(ROOT, 'routes', 'jobs', 'lektorat-page.js'), 'utf8');
+  assert.match(page, /const hatBelege\s*=\s*_pageHasCitations\(pageId\)/);
+  assert.match(page, /bl: hatBelege/, 'Flag muss in der Cache-Signatur stehen');
+  assert.match(page, /orte, motive, hatBelege/, 'Flag muss in promptOpts');
   const job = readFileSync(resolve(ROOT, 'routes', 'jobs', 'lektorat.js'), 'utf8');
-  assert.match(job, /_pageHasCitations/);
-  assert.match(job, /bl: hatBelege/, 'Einzel-Pfad: Flag muss in der Cache-Signatur stehen');
-  assert.match(job, /bl: batchHatBelege/, 'Batch-Pfad: dito');
-  assert.match(job, /hatBelege: batchHatBelege/, 'Batch-Pfad: Flag muss in promptOpts');
-  assert.match(job, /orte, motive, hatBelege/, 'Einzel-Pfad: Flag muss in promptOpts');
+  assert.equal((job.match(/checkOnePage\(run,/g) || []).length, 2, 'beide Jobs pruefen ueber checkOnePage');
 
   const split = readFileSync(resolve(ROOT, 'routes', 'jobs', 'lektorat-split.js'), 'utf8');
   assert.match(split, /hatBelege: promptOpts\.hatBelege/, 'Split: Objektiv-Pass braucht das Flag');

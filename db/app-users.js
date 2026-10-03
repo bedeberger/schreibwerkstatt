@@ -94,9 +94,11 @@ const _stmtListUsers = db.prepare(`
          inv.display_name AS invited_by_name,
          u.monthly_budget_usd, u.budget_mode, u.ai_profile_id,
          p.name     AS ai_profile_name,
-         p.provider AS ai_profile_provider
+         p.provider AS ai_profile_provider,
+         own.provider AS own_ai_provider
     FROM app_users u
     LEFT JOIN ai_profiles p ON p.id = u.ai_profile_id
+    LEFT JOIN ai_profiles own ON own.owner_email = u.email
     LEFT JOIN app_users inv ON inv.email = u.invited_by COLLATE NOCASE
    ORDER BY u.created_at DESC, u.email
 `);

@@ -21,7 +21,7 @@
         <h2 class="research-dialog__title" x-text="item.title || kindLabel(item.kind)"></h2>
         <span class="research-status-badge" :class="'research-status-badge--' + itemStatus(item)"
                   x-show="showStatusBadge(item)" x-cloak
-                  :data-tip="$app.t('recherche.status.label')" x-text="statusLabel(itemStatus(item))"></span>
+                  :data-tip="statusTip(item)" x-text="statusLabel(itemStatus(item))"></span>
         <div class="research-item-actions research-dialog__actions" x-data="{ menuCtx: 'detail' }">
           <button type="button" class="btn-compact" x-show="!detailEditing" @click="startEdit(item)" :disabled="busy">
             <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
@@ -91,6 +91,8 @@
           <div x-show="item.source" class="research-item-source" x-text="item.source"></div>
         </div>
 
+        <!-- @include recherche-findings -->
+
         <!-- Verknuepfen/Tags/KI-Vorschlaege bleiben in BEIDEN Modi bedienbar. -->
         <!-- @include recherche-item-relations -->
 
@@ -103,6 +105,8 @@
             <svg class="icon" aria-hidden="true"><use href="/icons.svg#zap"/></svg>
             <span x-text="$app.t('recherche.suggest.btn')"></span>
           </button>
+          <button type="button" class="btn-compact" x-show="canCrosscheck(item)" @click="runCrosscheck(item)" :disabled="crosscheckRunning"
+                  :data-tip="$app.t('recherche.crosscheck.itemTip')" x-text="$app.t('recherche.crosscheck.itemBtn')"></button>
         </div>
       </div>
     </div>

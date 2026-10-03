@@ -21,6 +21,7 @@
 import { fetchJson, tzOpts, localeTag } from '../utils.js';
 import { startPoll } from '../cards/job-helpers.js';
 import { draftToPayload, draftFromSource } from './fields.js';
+import { lsSet } from '../safe-storage.js';
 
 // Reconnect-Anker: ueberlebt den Reload, damit ein laufender Buch-Lauf nach
 // F5 weiterverfolgt wird (app-jobs-core.js#checkPendingJobs liest denselben Key).
@@ -77,7 +78,7 @@ export const sourcesDetectMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      localStorage.setItem(DETECT_LS_KEY(bookId), jobId);
+      lsSet(DETECT_LS_KEY(bookId), jobId);
       this._pollSourceDetect(jobId);
     } catch (e) {
       this._srcDetectIdle();

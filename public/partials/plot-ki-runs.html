@@ -45,13 +45,24 @@
   </div>
   <p class="plot-consistency-fazit" x-show="consistencyResult && consistencyResult.fazit" x-text="consistencyResult && consistencyResult.fazit"></p>
   <div x-show="consistencyResult && !consistencyResult.konflikte.length" class="card-status" x-text="$app.t('plot.consistency.noFindings')"></div>
+  <!-- Typ-Filter (Befund-Typ aus dem Job, book/plot/konflikt-actions.js). Erst ab
+       zwei verschiedenen Typen sinnvoll; Alt-Läufe ohne `typ` blenden ihn aus. -->
+  <div class="plot-konflikt-filter" x-show="konfliktTypOptions().length > 1">
+    <div x-data="combobox({ placeholder: $app.t('plot.konflikt.typFilter'), emptyLabel: $app.t('plot.konflikt.typAll') })"
+         x-modelable="value" x-model="konfliktTypFilter"
+         x-effect="consistencyResult; options = konfliktTypOptions()"></div>
+  </div>
   <div class="plot-konflikt-list">
     <template x-for="(k, idx) in (consistencyResult ? consistencyResult.konflikte : [])" :key="idx">
-      <div class="plot-konflikt internal-link" :class="{ 'plot-konflikt--open': selectedKonfliktIdx === idx }"
+      <div class="plot-konflikt internal-link" x-show="konfliktVisible(k)"
+           :class="{ 'plot-konflikt--open': selectedKonfliktIdx === idx }"
            :aria-expanded="selectedKonfliktIdx === idx"
            @click="selectedKonfliktIdx = selectedKonfliktIdx === idx ? null : idx">
         <div class="plot-konflikt-head">
-          <span class="severity-tag" :class="'severity-tag--' + k.schwere" x-text="$app.t('plot.severity.' + k.schwere)"></span>
+          <span class="severity-tag" :class="befundSeverityClass(k.schwere)" x-text="$app.t('plot.severity.' + k.schwere)"></span>
+          <span class="tag plot-konflikt-typ" x-show="konfliktHasTyp(k)" x-text="konfliktHasTyp(k) ? konfliktTypLabel(k.typ) : ''"></span>
+          <span class="badge badge-warn" x-show="k.seit_letztem_lauf === 'neu'"
+                :data-tip="$app.t('plot.konflikt.neuTip')" x-text="$app.t('plot.konflikt.neu')"></span>
           <span class="plot-konflikt-beat" :class="{ 'internal-link': k.beat && k.beat !== '—' }"
                 :data-tip="(k.beat && k.beat !== '—') ? $app.t('plot.consistency.gotoBeat') : null"
                 @click="if (k.beat && k.beat !== '—') { gotoKonfliktBeat(k); $event.stopPropagation(); }"
@@ -64,6 +75,14 @@
                   @click.stop="$app.gotoPageById(k.fundstelle.page_id)"
                   :data-tip="$app.t('plot.consistency.gotoBeleg')"
                   x-text="k.fundstelle && k.fundstelle.page_name ? $app.t('plot.consistency.beleg', { seite: k.fundstelle.page_name }) : $app.t('plot.consistency.belegGeneric')"></button>
+          <!-- Ein-Klick-Aktion des Befunds (Status / verwerfen / Beziehung) über die
+               bestehenden Mutationspfade inkl. Undo. Verschwindet, sobald sie
+               erfüllt ist oder der Beat fehlt; danach „angewendet". -->
+          <button type="button" class="btn-compact plot-konflikt-action"
+                  x-show="konfliktActionPending(k, idx)" :disabled="busy"
+                  @click.stop="applyKonfliktAction(k, idx)"
+                  x-text="konfliktActionLabel(k)"></button>
+          <span class="badge badge-ok" x-show="konfliktApplied(idx)" x-text="$app.t('plot.konflikt.applied')"></span>
           <span class="history-chevron" :class="{ open: selectedKonfliktIdx === idx }" aria-hidden="true"></span>
         </div>
         <div x-show="selectedKonfliktIdx === idx && k.vorschlag" class="plot-konflikt-vorschlag" x-cloak>
@@ -72,6 +91,18 @@
         </div>
       </div>
     </template>
+  </div>
+  <!-- Seit dem letzten Lauf erledigte Befunde (result.erledigt, optional). -->
+  <div class="plot-konflikt-erledigt" x-show="konfliktErledigt().length" x-data="collapsible(false)">
+    <button type="button" class="collapsible-toggle" x-bind="trigger">
+      <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+      <span x-text="$app.t('plot.konflikt.erledigt', { n: konfliktErledigt().length })"></span>
+    </button>
+    <ul class="plot-konflikt-erledigt-list" x-bind="panel" x-cloak>
+      <template x-for="(e, i) in konfliktErledigt()" :key="i">
+        <li x-text="e"></li>
+      </template>
+    </ul>
   </div>
 </div>
 
@@ -100,8 +131,11 @@
 <div class="history-bar" x-show="brainstormRuns.length > 0" x-cloak>
   <div class="history-heading" x-text="$app.t('plot.brainstorm.runs', { count: brainstormRuns.length })"></div>
   <template x-for="r in brainstormRuns" :key="r.id">
-    <div class="history-item" :class="{ 'history-item--open': selectedBrainstormRunId === r.id, 'history-item--disabled': r.act_id === null }"
-         @click="r.act_id !== null && openBrainstormRun(r)">
+    <!-- Lauf eines archivierten Akts: kein Panel im Archiv → Hinweis statt
+         stillem Nichts (openBrainstormRunChecked, board-ui.js). -->
+    <div class="history-item" :class="{ 'history-item--open': selectedBrainstormRunId === r.id, 'history-item--disabled': r.act_id === null || brainstormRunActArchived(r) }"
+         :data-tip="brainstormRunActArchived(r) ? $app.t('plot.brainstorm.actArchived') : null"
+         @click="r.act_id !== null && openBrainstormRunChecked(r)">
       <span class="history-date" x-text="formatRunDate(r.created_at)"></span>
       <span class="tag" x-text="r.act_name || $app.t('plot.brainstorm.actDeleted')"></span>
       <span x-show="r.thread_name" class="tag tag--werkstatt" x-text="r.thread_name"></span>

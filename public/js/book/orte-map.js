@@ -15,6 +15,7 @@ import { loadLeaflet } from '../lazy-libs.js';
 import { countryLabel } from '../country-codes.js';
 import { startPoll } from '../cards/job-helpers.js';
 import { isSelectedBook } from '../cards/book-guard.js';
+import { lsSet } from '../safe-storage.js';
 
 // Fallback-Tile-URL, falls /config noch nicht geladen ist ($store.config.mapTiles
 // liefert die konfigurierte URL — self-hosted Tile-Server via app_settings
@@ -262,7 +263,7 @@ export const orteMapMethods = {
   // Marker live um (kein Re-Render → Popup/Position bleiben erhalten).
   toggleGeoLock() {
     this.geoLocked = !this.geoLocked;
-    localStorage.setItem('orte.geoLocked', this.geoLocked ? '1' : '0');
+    lsSet('orte.geoLocked', this.geoLocked ? '1' : '0');
     this._applyGeoLock();
   },
 

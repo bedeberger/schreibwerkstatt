@@ -19,7 +19,7 @@
 //   <div x-data="settingField({ k: 'app.timezone', help: 'admin.settings.help.appTimezone' })"></div>
 //
 //   <!-- Zahl / Auswahl / Boolean -->
-//   <div x-data="settingField({ k: 'cron.stale_days', type: 'num', num: { step: 1, min: 1, max: 365 } })"></div>
+//   <div x-data="settingField({ k: 'editor.lock_ttl_min', type: 'num', num: { step: 1, min: 1, max: 1440 } })"></div>
 //   <div x-data="settingField({ k: 'pdfa.flavour', type: 'select', opts: [{ value:'2b', label:'2b' }, { value:'3b', label:'3b' }] })"></div>
 //   <div x-data="settingField({ k: 'tts.enabled', type: 'toggle', base: 'tts.enabled' })"></div>
 //

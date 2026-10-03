@@ -197,3 +197,31 @@ test('_beatFieldSnapshot laesst kein PATCH-Feld aus (auch bei leerem Beat)', () 
   assert.deepEqual(snap.location_ids, []);
   assert.equal(snap.zeit, null);
 });
+
+// Doku-Invariante (docs/plot.md, Undo/Redo): jede Board-Mutation zeichnet auf
+// (_record*), leert die Historie (_clearHistory) oder lädt neu (loadBoard leert
+// selbst). Quelltext-Tripwire über die Methods-Module: jede Methode, die eine
+// schreibende /plot-Route anspricht, muss einen der drei Wege gehen. Ausgenommen
+// sind die _h*-Applier (die sind der Undo-Weg selbst), _persistCells (Helfer,
+// dessen Aufrufer aufzeichnen) und die KI-Lauf-Historie (keine Board-Daten).
+import { readFileSync } from 'node:fs';
+test('jede schreibende Plot-Methode zeichnet auf oder leert die Historie', () => {
+  const files = ['acts', 'beats', 'threads', 'ai', 'history'].map(f => `public/js/book/plot/${f}.js`);
+  const exempt = new Set(['_persistCells', 'deleteConsistencyRun', 'deleteBrainstormRun']);
+  const offenders = [];
+  for (const f of files) {
+    const src = readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8');
+    const parts = src.split(/\n {2}(?=(?:async )?[A-Za-z_$][\w$]*\([^)]*\)\s*\{)/);
+    for (const part of parts) {
+      const m = part.match(/^(?:async )?([A-Za-z_$][\w$]*)\(/);
+      if (!m) continue;
+      const name = m[1];
+      if (name.startsWith('_h') || exempt.has(name)) continue;
+      const writes = /fetchJson\(`?'?\/plot\/[^,]*,\s*\{[^}]*method:\s*'(PATCH|POST|PUT|DELETE)'/s.test(part)
+        || /method:\s*'(PATCH|POST|PUT|DELETE)'/.test(part) && /\/plot\//.test(part);
+      if (!writes) continue;
+      if (!/_record\w*\(|_clearHistory\(|loadBoard\(/.test(part)) offenders.push(`${f}#${name}`);
+    }
+  }
+  assert.deepEqual(offenders, []);
+});

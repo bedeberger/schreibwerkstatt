@@ -12,7 +12,7 @@ const path = require('path');
 // Echte PDF-Default-Config, damit der Mock-Profile-POST dieselbe vollstaendige
 // Struktur liefert wie die Produktion — sonst rendert die pdfExportCard gegen
 // fehlende Felder (marginsMm/bodyInsetMm/font[role] …) und wirft Alpine-Errors.
-const { defaultConfig } = require('../lib/pdf-export-defaults');
+const { defaultConfig, validateConfig } = require('../lib/pdf-export-defaults');
 
 const PORT = 8765;
 const ROOT = path.resolve(__dirname, '..');
@@ -37,6 +37,10 @@ let lastBsPut = null;
 let lastHistoryPatch = null;
 let pdfProfiles = [];
 let pdfProfileSeq = 0;
+// PDF-Export-Jobs: letzter POST-Body (Probeseiten-Flag pruefen) + Result-Szenario.
+let pdfJobSeq = 0;
+let lastPdfJobBody = null;
+const pdfJobs = new Map();
 
 // Publication-Tab + EPUB-Export-Mock-State.
 let publication = {};       // bookId -> { …meta, has_cover, has_author_image }
@@ -200,6 +204,8 @@ async function handleMockRoute(req, res, urlPath) {
   if (urlPath === '/__mock/pdf-reset' && req.method === 'POST') {
     pdfProfiles = [];
     pdfProfileSeq = 0;
+    pdfJobs.clear();
+    lastPdfJobBody = null;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end('{}');
     return true;
@@ -224,7 +230,10 @@ async function handleMockRoute(req, res, urlPath) {
     const id = ++pdfProfileSeq;
     const profile = {
       id, book_id: payload.book_id || 0, user_email: 'test@x',
-      name: payload.name || 'Profil', config: defaultConfig(),
+      name: payload.name || 'Profil',
+      // Wie routes/pdf-export.js: mitgegebene (Teil-)Konfiguration ueber
+      // validateConfig auffuellen (Vorlagen, Import).
+      config: payload.config ? validateConfig(payload.config) : defaultConfig(),
       is_default: false, has_cover: false, has_back_cover: false,
     };
     pdfProfiles.push(profile);
@@ -238,6 +247,66 @@ async function handleMockRoute(req, res, urlPath) {
     if (!p) { res.writeHead(404); return res.end('{}'); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(p));
+    return true;
+  }
+  if (profileMatch && req.method === 'PUT') {
+    const p = pdfProfiles.find(x => x.id === parseInt(profileMatch[1]));
+    if (!p) { res.writeHead(404); return res.end('{}'); }
+    let payload = {};
+    try { payload = JSON.parse(await readBody(req)); } catch {}
+    if (payload.name) p.name = payload.name;
+    if (payload.config) p.config = validateConfig(payload.config);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(p));
+    return true;
+  }
+  const defMatch = urlPath.match(/^\/pdf-export\/profiles\/(\d+)\/default$/);
+  if (defMatch && req.method === 'POST') {
+    const id = parseInt(defMatch[1]);
+    pdfProfiles.forEach(x => { x.is_default = x.id === id; });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{}');
+    return true;
+  }
+  // Job-Start: `sample: true` → Probeseiten (Server rendert nur das erste
+  // Kapitel). Result traegt renderWarnings wie routes/jobs/pdf-export.js.
+  if (urlPath === '/jobs/pdf-export' && req.method === 'POST') {
+    try { lastPdfJobBody = JSON.parse(await readBody(req)); } catch { lastPdfJobBody = {}; }
+    const jobId = 'pdf-' + (++pdfJobSeq);
+    const sample = !!lastPdfJobBody.sample;
+    pdfJobs.set(jobId, {
+      ready: true, filename: sample ? 'buch-probe.pdf' : 'buch.pdf', mime: 'application/pdf',
+      scope: lastPdfJobBody.scope || 'book', target: lastPdfJobBody.target || 'interior', sample,
+      interiorPages: sample ? 12 : null, lowResImages: 0, hyphenationDisabled: [], dpiThreshold: 300,
+      standard: 'pdfa',
+      pdfa: { requested: true, validatorAvailable: false, passed: null, reason: null },
+      pdfx: { requested: false, applied: false, reason: null, identifier: null },
+      renderWarnings: {
+        footnoteFallback: false, footnoteOverflowPages: 2, xrefUnresolved: ['a', 'b', 'c'],
+        fontFallbacks: [{ role: 'body', requested: 'Foo Serif', used: 'Lora' }],
+        dpiWarnings: [{ src: 'x.png', dpi: 120, px: 400 }], hyphenationDisabled: false, oversizeImages: 0,
+      },
+    });
+    res.writeHead(202, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ jobId }));
+    return true;
+  }
+  const pdfJobMatch = urlPath.match(/^\/jobs\/(pdf-\d+)$/);
+  if (pdfJobMatch && req.method === 'GET') {
+    const result = pdfJobs.get(pdfJobMatch[1]);
+    if (!result) { res.writeHead(404); return res.end('{}'); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'done', progress: 100, result }));
+    return true;
+  }
+  if (urlPath.match(/^\/jobs\/pdf-export\/pdf-\d+\/file$/) && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="buch.pdf"' });
+    res.end(Buffer.from('%PDF-mock'));
+    return true;
+  }
+  if (urlPath === '/__mock/pdf-state' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ lastPdfJobBody, profiles: pdfProfiles }));
     return true;
   }
   if (profileMatch && req.method === 'DELETE') {

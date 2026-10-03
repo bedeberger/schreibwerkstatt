@@ -1,15 +1,21 @@
       <!-- Schrift-Tab -->
       <div class="export-tab-panel" x-bind="panel('font')">
+        <!-- Kette h1 ≥ … ≥ h6 ≥ Fliesstext: der Server hebt beim Speichern an,
+             die Warnung sagt es vorher (pdf-export-geometry.js). -->
+        <template x-for="w in headingWarnings()" :key="w">
+          <p class="card-form-warn" role="status" x-text="w"></p>
+        </template>
+        <!-- Verzeichnis-Schriften (toc/tocTitle) leben nur im Tab
+             „Titelei & Verzeichnis" — ein Ort, kein Doppel-Regler. -->
         <template x-for="group in [
             { key: 'body',       roles: ['body','heading'] },
             { key: 'runningHead', roles: ['header','footer'] },
             { key: 'titlePages', roles: ['title','subtitle','byline','dedication','frontMatter','year'] },
-            { key: 'toc',        roles: ['tocTitle','toc'] },
             { key: 'backmatter', roles: ['authorBio','bibliography'] },
             { key: 'apparat',    roles: ['footnote'] },
             { key: 'imprint',    roles: ['imprint'] }
           ]" :key="group.key">
-          <div class="pdfx-font-group">
+          <div class="pdfx-font-group" x-show="uiMode === 'expert' || group.key === 'body'">
             <h4 class="card-section-title" x-text="$app.t('pdfExport.font.group.' + group.key)"></h4>
 
             <template x-for="role in group.roles" :key="role">
@@ -30,6 +36,8 @@
                            x-effect="options = fontList.map(f => ({ value: f.family, label: f.family }))"
                            @combobox-change="onFontPick(role, $event.detail)"
 ></div>
+                      <p class="card-form-warn" role="status" x-show="isHyphenBroken(activeProfile.config.font[role].family)" x-cloak
+                         x-text="$app.t('pdfExport.font.hyphenBroken', { family: activeProfile.config.font[role].family })"></p>
                       <button type="button" class="btn-compact btn-compact--ghost pdfx-font-apply-all"
                               @click="applyFamilyToAll(role)"
                               x-text="$app.t('pdfExport.font.applyToAll')"></button>
@@ -50,19 +58,16 @@
                     <div class="card-form-row">
                       <label class="card-form-label" x-text="$app.t('pdfExport.font.sizePt')"></label>
                       <div class="card-form-field">
-                        <input type="text" x-data="numInput({ step: 1, min: 6, max: 72 })" x-modelable="value" x-model="activeProfile.config.font[role].sizePt" class="pdfx-num-input">
+                        <input type="text" x-data="numInput({ step: 0.5, min: 6, max: 72 })" x-modelable="value" x-model="activeProfile.config.font[role].sizePt" class="pdfx-num-input">
                       </div>
                     </div>
                   </template>
 
                   <template x-if="role === 'heading'">
-                    <div class="pdfx-num-grid pdfx-num-grid--3">
-                      <label class="pdfx-num-field"><span>h1 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 10, max: 60 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h1" class="pdfx-num-input"></label>
-                      <label class="pdfx-num-field"><span>h2 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 9,  max: 48 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h2" class="pdfx-num-input"></label>
-                      <label class="pdfx-num-field"><span>h3 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 8,  max: 36 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h3" class="pdfx-num-input"></label>
-                      <label class="pdfx-num-field"><span>h4 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 7,  max: 30 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h4" class="pdfx-num-input"></label>
-                      <label class="pdfx-num-field"><span>h5 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 7,  max: 28 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h5" class="pdfx-num-input"></label>
-                      <label class="pdfx-num-field"><span>h6 (pt)</span><input type="text" x-data="numInput({ step: 1, min: 7,  max: 26 })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes.h6" class="pdfx-num-input"></label>
+                    <div class="pdfx-num-grid pdfx-num-grid--3" x-show="uiMode === 'expert'">
+                      <template x-for="lv in [['h1', 10, 60], ['h2', 9, 48], ['h3', 8, 36], ['h4', 7, 30], ['h5', 7, 28], ['h6', 7, 26]]" :key="lv[0]">
+                        <label class="pdfx-num-field"><span x-text="$app.t('pdfExport.font.headingSize.' + lv[0])"></span><input type="text" x-data="numInput({ step: 0.5, min: lv[1], max: lv[2] })" x-modelable="value" x-model="activeProfile.config.font.heading.sizes[lv[0]]" class="pdfx-num-input"></label>
+                      </template>
                     </div>
                   </template>
 
@@ -74,19 +79,19 @@
                           <input type="text" x-data="numInput({ step: 0.05, min: 0.8, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.lineHeight" class="pdfx-num-input">
                         </div>
                       </div>
-                      <div class="card-form-row">
+                      <div class="card-form-row" x-show="uiMode === 'expert'">
                         <label class="card-form-label" x-text="$app.t('pdfExport.font.paragraphGap')"></label>
                         <div class="card-form-field">
                           <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.body.paragraphGap" class="pdfx-num-input">
                         </div>
                       </div>
-                      <div class="card-form-row">
+                      <div class="card-form-row" x-show="uiMode === 'expert'">
                         <label class="card-form-label" x-text="$app.t('pdfExport.font.firstLineIndentMm')"></label>
                         <div class="card-form-field">
                           <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 30 })" x-modelable="value" x-model="activeProfile.config.font.body.firstLineIndentMm" class="pdfx-num-input">
                         </div>
                       </div>
-                      <div class="card-form-row">
+                      <div class="card-form-row" x-show="uiMode === 'expert'">
                         <label class="card-form-label" x-text="$app.t('pdfExport.font.numerals')"></label>
                         <div class="card-form-field">
                           <div x-data="combobox($app.t('pdfExport.font.numerals'))"
@@ -98,24 +103,7 @@
                     </div>
                   </template>
 
-                  <template x-if="role === 'toc'">
-                    <div>
-                      <div class="card-form-row">
-                        <label class="card-form-label" x-text="$app.t('pdfExport.font.lineHeight')"></label>
-                        <div class="card-form-field">
-                          <input type="text" x-data="numInput({ step: 0.05, min: 0.8, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.toc.lineHeight" class="pdfx-num-input">
-                        </div>
-                      </div>
-                      <div class="card-form-row">
-                        <label class="card-form-label" x-text="$app.t('pdfExport.font.paragraphGap')"></label>
-                        <div class="card-form-field">
-                          <input type="text" x-data="numInput({ step: 0.05, min: 0, max: 3 })" x-modelable="value" x-model="activeProfile.config.font.toc.paragraphGap" class="pdfx-num-input">
-                        </div>
-                      </div>
-                    </div>
-                  </template>
-
-                  <div class="card-form-row">
+                  <div class="card-form-row" x-show="uiMode === 'expert'">
                     <label class="card-form-label">
                       <span x-text="$app.t('pdfExport.font.color')"></span>
                       <template x-if="role === 'heading'">
@@ -148,4 +136,11 @@
             </template>
           </div>
         </template>
+        <div class="pdfx-font-group" x-show="uiMode === 'expert'">
+          <h4 class="card-section-title" x-text="$app.t('pdfExport.font.group.toc')"></h4>
+          <p class="card-form-field-note">
+            <span x-text="$app.t('pdfExport.font.tocMoved')"></span>
+            <button type="button" class="btn-compact btn-compact--ghost" @click="activeTab = 'frontmatter'" x-text="$app.t('pdfExport.font.tocMovedLink')"></button>
+          </p>
+        </div>
       </div>

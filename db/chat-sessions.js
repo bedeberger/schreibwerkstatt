@@ -37,7 +37,7 @@ function deleteEmptyPageSessions(pageId, userEmail, now = Date.now()) {
   return _stmtDelEmptyPage.run(pageId, userEmail, _orphanCutoffIso(now)).changes;
 }
 
-/** Leere, aeltere buchweite Sessions (kind 'book'/'research') loeschen. */
+/** Leere, aeltere buchweite Sessions (kind 'book'/'research'/'plot') loeschen. */
 function deleteEmptyBookSessions(bookId, kind, userEmail, now = Date.now()) {
   return _stmtDelEmptyBook.run(bookId, kind, userEmail, _orphanCutoffIso(now)).changes;
 }
@@ -77,19 +77,22 @@ function listBookSessions(bookId, kind, userEmail, previewChars) {
   `).all(bookId, kind, userEmail);
 }
 
+// Vollständig (kein LIMIT): ein Zeilen-Deckel liesse ältere Gespräche der Seite
+// unerreichbar in der DB liegen. Der Antwort-Umfang bleibt über den gekappten
+// `preview` begrenzt (wie listBookSessions).
 const _stmtListPage = db.prepare(`
   SELECT cs.id, cs.book_id, cs.page_id, p.page_name, cs.title, cs.created_at, cs.last_message_at,
-         (SELECT content FROM chat_messages WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
+         (SELECT substr(content, 1, ?) FROM chat_messages WHERE session_id = cs.id ORDER BY created_at ASC LIMIT 1) AS preview
   FROM chat_sessions cs
   LEFT JOIN pages p ON p.page_id = cs.page_id
   WHERE cs.page_id = ? AND cs.user_email = ?
     AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = cs.id)
   ORDER BY cs.last_message_at DESC
-  LIMIT ?
 `);
 
-function listPageSessions(pageId, userEmail, limit = 20) {
-  return _stmtListPage.all(pageId, userEmail, limit);
+function listPageSessions(pageId, userEmail, previewChars = 200) {
+  const n = Math.max(1, parseInt(previewChars, 10) || 200);
+  return _stmtListPage.all(n, pageId, userEmail);
 }
 
 // Session fuer die Detail-Ansicht. `opening_page_text` bleibt serverseitig: der

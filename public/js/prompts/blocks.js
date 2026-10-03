@@ -209,6 +209,21 @@ Quellennachweise (WICHTIG — nicht anfassen):
 - Namen und Jahreszahlen in Kurzbelegen sind keine Rechtschreib- oder Grammatikfehler`;
 }
 
+// Benutzer-Wörterbuch (dasselbe wie im LanguageTool-Spellcheck): nur die Einträge,
+// die auf der Seite vorkommen (routes/jobs/lektorat-dictionary.js). Der Server
+// verwirft «rechtschreibung»-Findings auf diesen Wörtern zusätzlich als Backstop.
+export function _buildWoerterbuchBlock(woerter = [], langCode = 'de') {
+  if (!woerter.length) return '';
+  const liste = woerter.map(w => '- ' + w).join('\n');
+  return langCode === 'en'
+    ? `
+Author's dictionary (these spellings are intentional and are NOT spelling errors – never report them as «rechtschreibung», do not "correct" them inside a «korrektur» either):
+${liste}`
+    : `
+Wörterbuch des Autors (diese Schreibweisen sind gewollt und KEINE Rechtschreibfehler – nie als «rechtschreibung» melden und auch innerhalb einer «korrektur» nicht «verbessern»):
+${liste}`;
+}
+
 export function _buildShowVsTellBlock() {
   return `
 Show-vs-Tell-Regeln (typ: «show_vs_tell»):

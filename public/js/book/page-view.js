@@ -21,16 +21,34 @@ const DIAGRAM_FALLBACK_PX = 320;
 // width/height-Attribute, die Höhe ist vorher also unbekannt).
 const IMAGE_FALLBACK_PX = 320;
 
-// Weiche Typen: standardmässig nicht vorausgewählt (User entscheidet pro Finding).
-// `hedging` ist weich (Absicherungs-Mass ist Autorenentscheid); die übrigen
-// Fach-Typen (unbelegt, begriffsinkonsistenz, autorenform) sind hart – das sind
-// Belegs- und Formbefunde, keine Geschmacksfragen.
+// Drei Klassen von Findings, die Vorauswahl und Einfärbung steuern:
+//   hart        — mechanische/Konsistenz-Befunde (rechtschreibung, grammatik,
+//                 begriffsinkonsistenz, autorenform …): vorausgewählt, rot.
+//   weich       — Stil und Handwerk (SOFT_TYPEN + 'stil'): Autorenentscheid,
+//                 nicht vorausgewählt, orange. `hedging` ist weich
+//                 (Absicherungs-Mass ist Autorenentscheid).
+//   redaktionell — Beleg-/Zuschreibungs-/Wertungsbefunde (EDITORIAL_TYPEN): die
+//                 Korrektur schreibt die AUSSAGE um (abschwächen, Zuschreibung
+//                 streichen, Wertung neutralisieren), oft ist statt dessen ein
+//                 Beleg die richtige Antwort. Nie vorausgewählt, eigene Farbe.
 export const SOFT_TYPEN = new Set(['satzbau', 'wiederholung', 'schwaches_verb', 'fuellwort', 'filterwort', 'klischee', 'pleonasmus', 'ki_geruch', 'show_vs_tell', 'passiv', 'perspektivbruch', 'tempuswechsel', 'hedging', 'amtsdeutsch']);
+export const EDITORIAL_TYPEN = new Set(['unbelegt', 'zuschreibung', 'wertung']);
+
+/** 'hard' | 'soft' | 'editorial' */
+export function findingKind(typ) {
+  if (EDITORIAL_TYPEN.has(typ)) return 'editorial';
+  if (typ === 'stil' || SOFT_TYPEN.has(typ)) return 'soft';
+  return 'hard';
+}
 
 // Harte Typen = Default-selektiert → rote Einfärbung (Badge, Border, Inline-Mark --selected).
-// Weiche Typen und 'stil' = Default-unselektiert → orange Einfärbung.
 export function isHardFinding(typ) {
-  return typ !== 'stil' && !SOFT_TYPEN.has(typ);
+  return findingKind(typ) === 'hard';
+}
+
+const _BADGE_BY_KIND = { hard: 'badge-err', soft: 'badge-warn', editorial: 'badge-neutral' };
+export function findingBadgeClass(typ) {
+  return _BADGE_BY_KIND[findingKind(typ)];
 }
 
 /** Sortiert Fehler nach Position im HTML (toleranter Match via `findInHtml`,
@@ -155,7 +173,7 @@ function showTip(mark, errors) {
   const tip = ensureTipEl();
 
   const typLabel = tRaw('finding.' + f.typ);
-  const badgeCls = isHardFinding(f.typ) ? 'badge-err' : 'badge-warn';
+  const badgeCls = findingBadgeClass(f.typ);
   tip.innerHTML =
     `<span class="badge ${badgeCls}">${escHtml(typLabel)}</span>`
     + (f.erklaerung ? `<span class="lektorat-tip-erkl">${escHtml(f.erklaerung)}</span>` : '');
@@ -296,24 +314,11 @@ export const pageViewMethods = {
     }
     const allErrors = this.lektoratFindings || [];
     const allSelected = this.selectedFindings || [];
-    const chatProposals = [];
-    // Nur die letzte Assistant-Nachricht als Quelle für Inline-Marks: sonst
-    // mischen sich frische Vorschläge mit denen aus der Historie und das
-    // Ergebnis ist unübersichtlich. Ältere Vorschläge bleiben in den
-    // Chat-Bubbles sichtbar.
-    const msgs = this.chatMessages || [];
-    let lastAsstIdx = -1;
-    for (let mi = msgs.length - 1; mi >= 0; mi--) {
-      if (msgs[mi].role === 'assistant') { lastAsstIdx = mi; break; }
-    }
-    if (lastAsstIdx !== -1 && Array.isArray(msgs[lastAsstIdx].vorschlaege)) {
-      const lastMsg = msgs[lastAsstIdx];
-      for (let vi = 0; vi < lastMsg.vorschlaege.length; vi++) {
-        const v = lastMsg.vorschlaege[vi];
-        if (v._applied || !v.original || !v.ersatz) continue;
-        chatProposals.push({ msgIdx: lastAsstIdx, vIdx: vi, original: v.original, ersatz: v.ersatz });
-      }
-    }
+    // Offene Seiten-Chat-Vorschläge (nur die letzte Assistant-Nachricht) kommen
+    // über den Store — die Nachrichten selbst leben in der Sub-Karte `chatCard`,
+    // nicht am Root (Auswahl: chat/page-chat-marks.js#_publishChatMarks).
+    // Nur solange der Seiten-Chat offen ist.
+    const chatProposals = this.showChatCard ? (this.$store.pageChat?.proposals || []) : [];
     if (allErrors.length > 0 || chatProposals.length > 0) {
       this.renderedPageHtml = decorateMentions(buildHighlightedHtml(this.originalHtml, allErrors, allSelected, chatProposals));
     } else {

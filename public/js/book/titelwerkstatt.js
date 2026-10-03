@@ -20,6 +20,7 @@ import {
   channelFit, fieldLen, fillPct, fitState, fieldLabelKey, channelLabelKey,
 } from '../headline/channels.js';
 import { memoMethods } from '../cards/card-memo.js';
+import { lsSet } from '../safe-storage.js';
 
 const LS_KEY = (pageId) => `headline_job_${pageId}`;
 
@@ -299,7 +300,7 @@ export const titelwerkstattMethods = {
       const { jobId } = await sendJson('/jobs/headline-variants', 'POST', {
         page_id: pageId, felder: this.twSuggestFields.slice(),
       });
-      localStorage.setItem(LS_KEY(pageId), jobId);
+      lsSet(LS_KEY(pageId), jobId);
       this._twPoll(jobId, pageId);
     } catch {
       this._twIdle();

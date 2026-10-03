@@ -3,15 +3,17 @@
 // (Capture des ganzen Buchs) + Vergleich zweier Fassungen (Buch-Level-Diff via
 // book-snapshot-diff.js, Seiten-Diff via page-revision-diff.js#renderSideBySide)
 // + Reader (Fassung nur-lesend oeffnen) + Export (HTML/TXT/MD/EPUB/DOCX sync,
-// PDF via Job) + destruktiver Restore.
+// PDF via Job) + Restore (ganzes Buch / einzelne Seite, snapshots-restore.js).
 
-import { fetchJson, numberFormat } from '../utils.js';
+import { fetchJson, numberFormat, fmtBytes } from '../utils.js';
 import { loadDiff } from '../lazy-libs.js';
 import { fromSnapshotTree } from '../manuscript-stream.js';
 import { renderInline } from '../page-revision-diff.js';
 import { snapshotsPdfMethods } from './snapshots-pdf-export.js';
 import { snapshotsCompareMethods } from './snapshots-compare.js';
 import { snapshotsDriftMethods } from './snapshots-drift.js';
+import { snapshotsTrashMethods } from './snapshots-trash.js';
+import { snapshotsRestoreMethods } from './snapshots-restore.js';
 import { setupCardLifecycle } from './card-lifecycle.js';
 
 // Modul-Cache fuer Fassungs-Vollzeilen. Das `content_json` einer Fassung kann
@@ -29,11 +31,14 @@ export function registerSnapshotsCard() {
     ...snapshotsPdfMethods,
     ...snapshotsCompareMethods,
     ...snapshotsDriftMethods,
+    ...snapshotsTrashMethods,
+    ...snapshotsRestoreMethods,
     snapshots: [],
     loading: false,
     capturing: false,
     deletingId: null,
     restoringId: null,
+    restoringNodeKey: null, // Reader: Sektions-Key der gerade wiederhergestellten Seite/des Kapitels
     publishingId: null,
     newLabel: '',
     newDescription: '',
@@ -43,6 +48,10 @@ export function registerSnapshotsCard() {
     drift: null,           // { hasBaseline, baseline?, drift? } aus GET …/drift
     driftLoading: false,
     driftDismissed: false, // Hinweis weggeklickt (fuer die aktuelle Drift-Signatur)
+
+    // Papierkorb: geloeschte, wiederherstellbare Seiten (GET /content/books/:id/trash).
+    trash: [],
+    trashRestoringId: null,
 
     // Vergleich.
     compareFrom: '',
@@ -100,6 +109,7 @@ export function registerSnapshotsCard() {
       this.capturing = false;
       this.deletingId = null;
       this.restoringId = null;
+      this.restoringNodeKey = null;
       this.publishingId = null;
       this.newLabel = '';
       this.newDescription = '';
@@ -107,6 +117,8 @@ export function registerSnapshotsCard() {
       this.drift = null;
       this.driftLoading = false;
       this.driftDismissed = false;
+      this.trash = [];
+      this.trashRestoringId = null;
       this._resetCompare();
       this.closeReader();
     },
@@ -139,6 +151,7 @@ export function registerSnapshotsCard() {
       }
       // Drift gegen die juengste Fassung nachladen (nur wenn es eine gibt).
       this.loadDrift(bookId);
+      this.loadTrash(bookId);
     },
 
     // Default: juengste vs. zweitjuengste Fassung (Liste ist DESC sortiert).
@@ -231,6 +244,11 @@ export function registerSnapshotsCard() {
           if (ok) return this.deleteSnapshot(snap, true);
           return;
         }
+        if (r.status === 403 && force) {
+          // Veroeffentlichte Fassung: nur der Owner darf sie loeschen.
+          app.setStatus?.(app.t('snapshots.deletePublishedOwnerOnly'), true, 6000);
+          return;
+        }
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
           throw new Error(body?.error_code || `HTTP ${r.status}`);
@@ -272,56 +290,7 @@ export function registerSnapshotsCard() {
       }
     },
 
-    // ── Restore (Buch auf eine Fassung zuruecksetzen) ──────────────────────────────
-    async restoreSnapshot(snap, force = false) {
-      const app = window.__app;
-      const bookId = Alpine.store('nav').selectedBookId;
-      if (!snap?.id || !bookId || this.restoringId || this.deletingId) return;
-      if (!force) {
-        const ok = await app.appConfirm({
-          message: app.t('snapshots.restoreConfirm', { n: snap.seq }),
-          confirmLabel: app.t('snapshots.restore'),
-          danger: true,
-        });
-        if (!ok) return;
-      }
-      this.restoringId = snap.id;
-      try {
-        const url = `/snapshots/${bookId}/${snap.id}/restore${force ? '?force=1' : ''}`;
-        const r = await fetch(url, { method: 'POST' });
-        if (r.status === 409) {
-          // Buch wird gerade von anderen editiert → staerkere Bestaetigung mit den
-          // aktiven Namen, dann mit force erneut (parallele Writes gehen dabei verloren).
-          this.restoringId = null;
-          const body = await r.json().catch(() => ({}));
-          if (body?.error_code === 'BOOK_BUSY') {
-            const who = Array.isArray(body.editors) && body.editors.length
-              ? body.editors.join(', ') : app.t('snapshots.busyOthers');
-            const ok = await app.appConfirm({
-              message: app.t('snapshots.busyConfirm', { who }),
-              confirmLabel: app.t('snapshots.restore'),
-              danger: true,
-            });
-            if (ok) return this.restoreSnapshot(snap, true);
-          }
-          return;
-        }
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(body?.error_code || `HTTP ${r.status}`);
-        }
-        // Inhalt wurde serverseitig komplett ersetzt → Buch/Tree neu laden und
-        // die Fassungs-Liste auffrischen (Auto-Sicherung ist neu dazugekommen).
-        await app.loadPages?.();
-        await this.loadSnapshots(bookId, { fresh: true });
-        app.setStatus?.(app.t('snapshots.restored', { n: snap.seq }), false, 5000);
-      } catch (e) {
-        console.error('[snapshots:restore]', e);
-        app.setStatus?.(app.t('snapshots.restoreFailed') + ' ' + (e.message || ''), true, 6000);
-      } finally {
-        this.restoringId = null;
-      }
-    },
+    // Restore (ganzes Buch + einzelne Seite/Kapitel): ...snapshotsRestoreMethods.
 
     // ── Reader (Fassung nur-lesend, Bucheditor-Look, Diff gegen aktuell) ────────────
     async openSnapshot(snap) {
@@ -498,6 +467,10 @@ export function registerSnapshotsCard() {
 
     formatNum(n) {
       return numberFormat(Alpine.store('shell').uiLocale).format(Number(n || 0));
+    },
+
+    formatSize(bytes) {
+      return fmtBytes(bytes, Alpine.store('shell').uiLocale);
     },
 
     formatDelta(d) {

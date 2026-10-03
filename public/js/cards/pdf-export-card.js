@@ -17,6 +17,7 @@ import { EVT } from '../events.js';
 import { exportScopeSlice, exportJobSlice, unnumberedChipsSlice, exportSnapshotSlice, profileTransferSlice, uniqueProfileName } from './export-card-base.js';
 import * as presets from './pdf-export-presets.js';
 import * as templates from './pdf-export-templates.js';
+import { pdfExportUiSlice } from './pdf-export-ui.js';
 
 export function registerPdfExportCard() {
   if (typeof window === 'undefined' || !window.Alpine) return;
@@ -29,42 +30,33 @@ export function registerPdfExportCard() {
       i18nPrefix: 'pdfExport',
       // PDF mappt Fehler-Codes in den karteneigenen Namespace `pdfExport.error.*`
       // (nicht den globalen `tError`-Namespace `error.*` wie EPUB/DOCX).
-      errorFor: (self, d) => window.__app.t(d.error_code ? 'pdfExport.error.' + d.error_code : 'pdfExport.error.startFailed'),
+      errorFor: (self, d) => window.__app.t(d.error_code ? 'pdfExport.error.' + d.error_code : 'pdfExport.error.startFailed', d.params),
       resolveDone: (self, result) => {
         self.exportLowRes = result.lowResImages || 0;
-        // Silbentrennung fiel aus (Schrift legt Soft-Hyphen und Bindestrich auf
-        // denselben Glyph) — non-fatal, aber sichtbar: sonst sieht der Satz
-        // ohne erkennbaren Grund anders aus.
         self.exportHyphenOff = Array.isArray(result.hyphenationDisabled) ? result.hyphenationDisabled : [];
-        const pdfaWarn = result.pdfa?.requested && result.pdfa.validatorAvailable && !result.pdfa.passed;
-        const pdfxWarn = result.pdfx?.requested && !result.pdfx.applied;
-        const coverWarn = !!result.coverInInterior;
-        const hyphenWarn = self.exportHyphenOff.length > 0;
-        const isWarning = pdfaWarn || pdfxWarn || coverWarn || hyphenWarn;
+        // Alle Befunde als bleibende, wegklickbare Liste (pdf-export-warnings.js).
+        self._collectWarnings(result);
         // Ganzes-Buch-Innenteil gerendert → die echte physische Seitenzahl
         // (inkl. manueller Umbrüche/Leerseiten) in die Cover-Innenteil-Seitenzahl
         // spiegeln, die Rückenbreite + KDP-Bundsteg treibt. Nur bei Abweichung
         // schreiben+persistieren, damit ein unveränderter Re-Export nicht speichert.
+        // Probeseiten (sample) zählen nur das erste Kapitel — nie übernehmen.
         const cs = self.activeProfile?.config?.coverSpec;
-        const pagesCounted = result.target !== 'cover' && result.scope === 'book'
+        const pagesCounted = !result.sample && result.target !== 'cover' && result.scope === 'book'
           && Number.isInteger(result.interiorPages) && result.interiorPages > 0
           && cs && cs.pageCount !== result.interiorPages;
         if (pagesCounted) {
           cs.pageCount = result.interiorPages;
           self.saveActiveProfile();
         }
-        const statusKey = pdfxWarn ? 'pdfExport.pdfxWarning'
-          : pdfaWarn ? 'pdfExport.pdfaWarning'
-          : coverWarn ? 'pdfExport.coverInInteriorWarning'
-          : hyphenWarn ? 'pdfExport.hyphenationWarning'
+        const statusKey = result.sample ? 'pdfExport.sampleDone'
+          : self.exportWarnings.length ? 'pdfExport.doneWithWarnings'
           : pagesCounted ? 'pdfExport.donePagesCounted'
           : 'pdfExport.done';
         return {
           statusKey,
-          statusParams: pagesCounted ? { n: result.interiorPages }
-            : hyphenWarn ? { fonts: self.exportHyphenOff.join(', ') }
-            : undefined,
-          ttl: (isWarning || pagesCounted) ? 8000 : 3500,
+          statusParams: pagesCounted ? { n: result.interiorPages } : { count: self.exportWarnings.length },
+          ttl: pagesCounted ? 8000 : 3500,
         };
       },
     }),
@@ -73,6 +65,7 @@ export function registerPdfExportCard() {
       setIds: (s, arr) => { s.activeProfile.config.chapter.unnumberedChapterIds = arr; },
     }),
     ...profileTransferSlice({ basePath: '/pdf-export', type: 'pdf-export-profile', i18nPrefix: 'pdfExport' }),
+    ...pdfExportUiSlice(),
 
     profiles: [],
     activeProfileId: null,
@@ -120,10 +113,12 @@ export function registerPdfExportCard() {
 
     _onBookChanged: null,
     _onViewReset: null,
+    _onBeforeUnload: null,
 
     init() {
+      this._initUiMode();
       this.$watch(() => window.__app.showPdfExportCard, async (visible) => {
-        if (!visible) return;
+        if (!visible) { await this._onHiddenWhileDirty(); return; }
         await this.loadFonts();
         // Profile sind user-scoped → einmal geladen reicht; selectedBookId-
         // Wechsel triggert KEINE Neuladung.
@@ -155,9 +150,20 @@ export function registerPdfExportCard() {
           this.activeProfile = null;
           this.activeProfileId = null;
           this.savedAt = null;
+          this._savedSnapshot = '';
+          this.exportWarnings = [];
         });
       };
       window.addEventListener(EVT.VIEW_RESET, this._onViewReset);
+
+      // Reload/Tab-Close mit ungespeichertem Profil: nativer Prompt (appConfirm
+      // geht in beforeunload nicht — Browser blockiert Modals dort).
+      this._onBeforeUnload = (e) => {
+        if (!this.isDirty()) return;
+        e.preventDefault();
+        e.returnValue = '';
+      };
+      window.addEventListener('beforeunload', this._onBeforeUnload);
     },
 
     destroy() {
@@ -166,6 +172,7 @@ export function registerPdfExportCard() {
       if (this._exportStatusTimer) { clearTimeout(this._exportStatusTimer); this._exportStatusTimer = null; }
       if (this._onBookChanged)  window.removeEventListener(EVT.BOOK_CHANGED, this._onBookChanged);
       if (this._onViewReset)    window.removeEventListener(EVT.VIEW_RESET,   this._onViewReset);
+      if (this._onBeforeUnload) window.removeEventListener('beforeunload',   this._onBeforeUnload);
       this._unbindPreset();
     },
 
@@ -211,31 +218,19 @@ export function registerPdfExportCard() {
       mutate();
     },
 
-    // Slot-Auszeichnung (bold/italic/upper) einer Kopf-/Fusszeilen-Zelle
-    // umschalten bzw. abfragen. Die Struktur wird beim ersten Toggle lazy
-    // angelegt (ältere Profile ohne layout.hfStyle crashen so nicht; Server-
-    // Validierung ergänzt den Rest beim Speichern), Alpine wrappt sie reaktiv.
-    hfStyleActive(zone, side, pos, attr) {
-      return !!this.activeProfile?.config?.layout?.hfStyle?.[zone]?.[side]?.[pos]?.[attr];
-    },
-    toggleHfStyle(zone, side, pos, attr) {
-      const lay = this.activeProfile?.config?.layout;
-      if (!lay) return;
-      const hf = lay.hfStyle || (lay.hfStyle = {});
-      const zo = hf[zone] || (hf[zone] = {}), si = zo[side] || (zo[side] = {});
-      const cell = si[pos] || (si[pos] = { bold: false, italic: false, upper: false });
-      cell[attr] = !cell[attr];
-    },
-
     async selectProfile(id) {
       // Form unmounten, dann State wechseln, dann neu mounten.
       await this._unmountFormThen(() => { this.activeProfileId = id; });
       try {
         const r = await fetch(`/pdf-export/profiles/${id}`);
-        if (!r.ok) { this.activeProfile = null; return; }
+        if (!r.ok) { this.activeProfile = null; this._savedSnapshot = ''; return; }
         this.activeProfile = await r.json();
         this.coverPreviewVersion++;
         this._formMounted = true;
+        // Vergleichsbasis erst nach dem Mount: Felder, die beim Einhängen ihren
+        // Wert normalisieren, sollen nicht als „ungespeichert" zählen.
+        await this.$nextTick();
+        this._takeSnapshot();
       } catch {}
     },
 
@@ -259,7 +254,7 @@ export function registerPdfExportCard() {
         });
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
-          this.exportError = window.__app.t(d.error_code ? 'pdfExport.error.' + d.error_code : 'pdfExport.error.createFailed');
+          this.exportError = window.__app.t(d.error_code ? 'pdfExport.error.' + d.error_code : 'pdfExport.error.createFailed', d.params);
           return;
         }
         const profile = await r.json();
@@ -274,6 +269,7 @@ export function registerPdfExportCard() {
     },
 
     async createProfile() {
+      if (!(await this._confirmDiscard())) return;
       await this._createProfileNamed(this.newProfileName, this.cloneFromId);
     },
 
@@ -287,6 +283,7 @@ export function registerPdfExportCard() {
     async applyTemplate() {
       const cfg = templates.templateConfig(this.templateSel);
       if (!cfg || this.creating) return;
+      if (!(await this._confirmDiscard())) return;
       this.exportError = '';
       const base = templates.templateName(this.templateSel, window.__app.t);
       const name = uniqueProfileName(base, this.profiles);
@@ -298,12 +295,20 @@ export function registerPdfExportCard() {
 
     async deleteProfile(id) {
       if (this.profiles.length <= 1) return; // letztes Profil nicht löschen
-      if (!confirm(window.__app.t('pdfExport.confirmDelete'))) return;
+      const app = window.__app;
+      const ok = await app.appConfirm({ message: app.t('pdfExport.confirmDelete'), confirmLabel: app.t('pdfExport.deleteProfile'), danger: true });
+      if (!ok) return;
+      const wasDefault = !!this.profiles.find(p => p.id === id)?.is_default;
       const r = await fetch(`/pdf-export/profiles/${id}`, { method: 'DELETE' });
       if (!r.ok) return;
       this.profiles = this.profiles.filter(p => p.id !== id);
+      // Ohne Standard fiele das nächste Öffnen auf ein beliebiges Profil —
+      // das erste verbleibende übernimmt die Rolle.
+      if (wasDefault && this.profiles.length && !this.profiles.some(p => p.is_default)) {
+        await this.setDefault(this.profiles[0].id);
+      }
       if (this.activeProfileId === id) {
-        await this._unmountFormThen(() => { this.activeProfileId = null; this.activeProfile = null; });
+        await this._unmountFormThen(() => { this.activeProfileId = null; this.activeProfile = null; this._savedSnapshot = ''; });
         await this.selectProfile(this.profiles[0].id);
       }
     },
@@ -333,6 +338,7 @@ export function registerPdfExportCard() {
           return;
         }
         this.activeProfile = await r.json();
+        this._takeSnapshot();
         this.savedAt = Date.now();
         if (this._savedAtTimer) clearTimeout(this._savedAtTimer);
         this._savedAtTimer = setTimeout(() => { this.savedAt = null; this._savedAtTimer = null; }, 2500);
@@ -354,10 +360,13 @@ export function registerPdfExportCard() {
         });
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
-          this.backCoverError = window.__app.t('pdfExport.error.backCoverInvalid', d.params);
+          this.backCoverError = window.__app.t(d.message_key || 'pdfExport.error.backCoverInvalid', d.params);
           return;
         }
-        await this.selectProfile(this.activeProfile.id);
+        // Nur das Flag nachziehen statt das Profil neu zu laden — ein Reload
+        // verwürfe ungespeicherte Änderungen in den anderen Tabs.
+        this.activeProfile.has_back_cover = true;
+        this.coverPreviewVersion++;
       } finally {
         this.backCoverUploading = false;
       }
@@ -367,7 +376,7 @@ export function registerPdfExportCard() {
       if (!this.activeProfile) return;
       const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/back-cover`, { method: 'DELETE' });
       if (!r.ok) return;
-      await this.selectProfile(this.activeProfile.id);
+      this.activeProfile.has_back_cover = false;
     },
 
     backCoverUrl() {
@@ -388,10 +397,11 @@ export function registerPdfExportCard() {
         });
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
-          this.spineImageError = window.__app.t('pdfExport.error.spineImageInvalid', d.params);
+          this.spineImageError = window.__app.t(d.message_key || 'pdfExport.error.spineImageInvalid', d.params);
           return;
         }
-        await this.selectProfile(this.activeProfile.id);
+        this.activeProfile.has_spine = true;
+        this.coverPreviewVersion++;
       } finally {
         this.spineImageUploading = false;
       }
@@ -401,7 +411,7 @@ export function registerPdfExportCard() {
       if (!this.activeProfile) return;
       const r = await fetch(`/pdf-export/profiles/${this.activeProfile.id}/spine-image`, { method: 'DELETE' });
       if (!r.ok) return;
-      await this.selectProfile(this.activeProfile.id);
+      this.activeProfile.has_spine = false;
     },
 
     spineImageUrl() {
@@ -420,21 +430,10 @@ export function registerPdfExportCard() {
       return !!(cs && cs.pageCount > 0 && cs.paperBulkMmPer1000 > 0);
     },
 
-    // ── Druck-/Cover-Tab: Presets (Daten + Logik in pdf-export-presets.js) ────
-    trimPresetOptions() { return presets.trimPresetOptions(); },
-    applyTrimPreset(value) {
-      if (this.activeProfile) presets.applyTrimPreset(this.activeProfile.config, value);
-    },
+    // ── Cover-Tab: Papier-Presets (Trim/KDP: pdf-export-ui.js) ─────────────
     paperPresetOptions() { return presets.paperPresetOptions(window.__app.t); },
     applyPaperPreset(value) {
       if (this.activeProfile) presets.applyPaperPreset(this.activeProfile.config, value);
-    },
-    applyKdpPreset() {
-      if (this.activeProfile) presets.applyKdpPreset(this.activeProfile.config);
-    },
-    kdpMarginWarnings() {
-      const cfg = this.activeProfile?.config;
-      return cfg ? presets.kdpMarginWarnings(cfg, window.__app.t) : [];
     },
 
     // ── Font-Preview ──────────────────────────────────────────────────────
@@ -491,7 +490,8 @@ export function registerPdfExportCard() {
 
     // ── Export-Trigger ────────────────────────────────────────────────────
     // target: 'interior' (Standard) oder 'cover' (separates Umschlag-PDF).
-    async exportPdf(target = 'interior') {
+    // opts.sample: Probeseiten — der Server rendert nur das erste Kapitel.
+    async exportPdf(target = 'interior', opts = {}) {
       if (!this.activeProfile) return;
       // Vor Export speichern (Config könnte ungespeichert sein).
       await this.saveActiveProfile();
@@ -506,7 +506,10 @@ export function registerPdfExportCard() {
       const snapId = target === 'interior' ? this._exportSnapshotIdForSubmit() : null;
       this.exportLowRes = 0;
       this.exportHyphenOff = [];
+      this.dismissWarnings();
+      const sample = target === 'interior' && !!opts.sample;
       await this._runExportJob({
+        ...(sample ? { sample: true } : {}),
         scope: ref.scope,
         entityId: ref.id,
         profile_id: this.activeProfile.id,
@@ -514,58 +517,6 @@ export function registerPdfExportCard() {
         ...(snapId ? { snapshot_id: snapId } : {}),
         ...(target === 'interior' && ref.scope === 'chapter' ? { include_subchapters: !!this.exportIncludeSubchapters } : {}),
       });
-    },
-
-    // ── PDF-eigene Picker (Seitenzähler-Skip) ─────────────────────────────
-    // Picker fuer Seitenzaehler-Skip: gleicher Tree-Lookup wie bei
-    // unnumberedChapterPickOptions; Kapitel-Auswahl ohne Numbering-Mode-Gate
-    // (gilt auch wenn Kapitel-Titel-Nummern aus sind).
-    skipPageCounterChapterPickOptions() {
-      return this.unnumberedChapterPickOptions();
-    },
-    skipPageCounterChapterChips() {
-      const ids = this.activeProfile?.config?.chapter?.skipPageCounterChapterIds || [];
-      const opts = this.skipPageCounterChapterPickOptions();
-      return ids.map(id => {
-        const o = opts.find(x => x.value === id);
-        return o ? { id, label: o.label } : { id, label: '#' + id };
-      });
-    },
-    removeSkipPageCounterChapter(id) {
-      if (!this.activeProfile) return;
-      const arr = this.activeProfile.config.chapter.skipPageCounterChapterIds || [];
-      this.activeProfile.config.chapter.skipPageCounterChapterIds = arr.filter(v => v !== id);
-    },
-    // Seiten-Picker: Pages mit Kapitel-Prefix gruppiert (Label "Kapitel — Seite").
-    skipPageCounterPagePickOptions() {
-      const app = window.__app;
-      if (!app || !Array.isArray(Alpine.store('nav').pages)) return [];
-      const chapterById = new Map();
-      if (Array.isArray(Alpine.store('nav').tree)) {
-        for (const c of Alpine.store('nav').tree) {
-          if (c.type === 'chapter') chapterById.set(c.id, c.name);
-        }
-      }
-      return Alpine.store('nav').pages.map(p => {
-        const chName = p.chapter_id ? chapterById.get(p.chapter_id) : null;
-        return {
-          value: p.id,
-          label: chName ? `${chName} — ${p.name}` : p.name,
-        };
-      });
-    },
-    skipPageCounterPageChips() {
-      const ids = this.activeProfile?.config?.chapter?.skipPageCounterPageIds || [];
-      const opts = this.skipPageCounterPagePickOptions();
-      return ids.map(id => {
-        const o = opts.find(x => x.value === id);
-        return o ? { id, label: o.label } : { id, label: '#' + id };
-      });
-    },
-    removeSkipPageCounterPage(id) {
-      if (!this.activeProfile) return;
-      const arr = this.activeProfile.config.chapter.skipPageCounterPageIds || [];
-      this.activeProfile.config.chapter.skipPageCounterPageIds = arr.filter(v => v !== id);
     },
 
     // ── Helpers fürs Template ────────────────────────────────────────────

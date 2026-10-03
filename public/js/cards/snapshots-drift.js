@@ -39,7 +39,7 @@ export const snapshotsDriftMethods = {
     return [
       this.drift.baseline?.id ?? '',
       t.changePct, t.changedPages, t.addedPages, t.removedPages,
-      d.publicationChanged ? 1 : 0, d.settingsChanged ? 1 : 0,
+      d.publicationChanged ? 1 : 0, d.settingsChanged ? 1 : 0, d.bookChanged ? 1 : 0,
     ].join(':');
   },
 
@@ -86,7 +86,7 @@ export const snapshotsDriftMethods = {
   },
 
   // Detail-Tags (nur zutreffende): Text-Anteil, Seiten neu/geaendert/entfernt,
-  // Publikation/Einstellungen geaendert.
+  // Buchtitel/Publikation/Einstellungen geaendert.
   driftItems() {
     if (!this.hasDrift()) return [];
     const app = window.__app;
@@ -96,6 +96,7 @@ export const snapshotsDriftMethods = {
     if (d.text.changedPages) out.push({ key: 'changed', text: app.t('snapshots.drift.changedPages', { n: this.formatNum(d.text.changedPages) }) });
     if (d.text.addedPages) out.push({ key: 'added', text: app.t('snapshots.drift.addedPages', { n: this.formatNum(d.text.addedPages) }) });
     if (d.text.removedPages) out.push({ key: 'removed', text: app.t('snapshots.drift.removedPages', { n: this.formatNum(d.text.removedPages) }) });
+    if (d.bookChanged) out.push({ key: 'book', text: app.t('snapshots.drift.book') });
     if (d.publicationChanged) out.push({ key: 'pub', text: app.t('snapshots.drift.publication', { n: this.formatNum(d.publicationFields.length) }) });
     if (d.settingsChanged) out.push({ key: 'settings', text: app.t('snapshots.drift.settings', { n: this.formatNum(d.settingsFields.length) }) });
     return out;

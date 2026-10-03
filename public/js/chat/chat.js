@@ -1,9 +1,16 @@
-import { escHtml, findInHtml, countInHtml, replaceInHtml, skipReason, clearStatusAfter } from '../utils.js';
 import { makeChatMethods } from './chat-base.js';
 import { contentRepo } from '../repo/content.js';
+import { pageChatMarksMethods } from './page-chat-marks.js';
+import { pageChatApplyMethods } from './page-chat-apply.js';
 
 // Seiten-Chat-Methoden (werden in Alpine.data('chatCard') gespreadet).
-// Gemeinsame Logik kommt aus chat-base.js; hier nur Seiten-Chat-Spezifika.
+// Gemeinsame Logik kommt aus chat-base.js; hier nur Seiten-Chat-Spezifika:
+// Vorschlags-Zustand + Inline-Marken (page-chat-marks.js) und Übernehmen /
+// Rückgängig / Verwerfen / Titelvarianten (page-chat-apply.js).
+
+// Der KI-Titel einer neuen Session entsteht serverseitig NACH dem Job-Ende
+// (routes/jobs/chat/page-chat.js) — die Historie holt ihn einmal verzögert nach.
+const TITLE_REFRESH_MS = 6000;
 
 const baseMethods = makeChatMethods({
   label: 'Chat',
@@ -50,10 +57,19 @@ const baseMethods = makeChatMethods({
       console.warn('[sendChatMessage] Seiteninhalt konnte nicht geladen werden:', e.message);
     }
   },
-  // Historie frischt die Basis auf; hier bleibt nur die Seitenansicht (die
-  // Vorschlags-Marken im Text hängen an den neuen Nachrichten).
+  // Historie frischt die Basis auf; hier bleiben Vorschlags-Zustand + Marken
+  // (loadSession → onAfterSessionLoad hat sie für die sichtbare Session schon
+  // gesetzt) und der verzögerte Titel-Nachzug.
   onPollDone: function () {
-    window.__app.updatePageView();
+    this._refreshVorschlagStates();
+    const row = (this.chatSessions || []).find(s => s.id === this.chatSessionId);
+    if (row && !row.title && !this._chatTitleTimer) {
+      const gen = this._chatGen;
+      this._chatTitleTimer = setTimeout(() => {
+        this._chatTitleTimer = null;
+        if (this._chatGen === gen) this.loadChatSessions();
+      }, TITLE_REFRESH_MS);
+    }
   },
   onSessionsChanged: function () {
     const root = window.__app;
@@ -62,125 +78,17 @@ const baseMethods = makeChatMethods({
     root.currentPageChatSessionCount = (this.chatSessions || []).length;
   },
   onAfterSessionLoad: function () {
-    for (const m of this.chatMessages) {
-      if (Array.isArray(m.vorschlaege)) {
-        for (const v of m.vorschlaege) if (v.applied) v._applied = true;
-      }
-    }
-    window.__app.updatePageView();
+    this._refreshVorschlagStates();
   },
   onReset: function () {
+    if (this._chatTitleTimer) { clearTimeout(this._chatTitleTimer); this._chatTitleTimer = null; }
+    this._clearChatMarks();
     window.__app.updatePageView();
   },
 });
 
 export const chatMethods = {
   ...baseMethods,
-
-  // ── Seiten-Chat-spezifisch: Vorschlag übernehmen ──────────────────────────
-
-  async applyChatVorschlag(vorschlag, msgIdx, vIdx) {
-    const root = window.__app;
-    const v = () => this.chatMessages[msgIdx].vorschlaege[vIdx];
-    const setErr = (msg) => { v()._error = msg; };
-
-    if (!root.currentPage) {
-      setErr(root.t('chat.pageNotLoaded'));
-      return;
-    }
-
-    // User kann zwischen den awaits unten zur nächsten Seite wechseln; ohne
-    // Snapshot würde der Vorschlag dann auf der falschen Seite landen
-    // (= stiller Datenverlust auf der ursprünglichen Seite).
-    const pageIdAtStart = root.currentPage.id;
-    const samePage = () => root.currentPage?.id === pageIdAtStart;
-
-    // Vorab prüfen ob der Originaltext noch existiert – sonst meldet _loadApplyAndSave
-    // nur einen No-Op, was sich fälschlich wie ein Erfolg anfühlt.
-    // Tolerant suchen: die KI sieht die Seite als Plaintext, im HTML stecken aber
-    // Tags und Entities (z.B. `das <em>magische</em> Wort` vs Plaintext
-    // `das magische Wort`). Ohne Tolerant-Match würde die Mehrheit realistischer
-    // KI-Vorschläge fälschlich abgelehnt.
-    try {
-      // `fresh: true`: Stale-Check vor dem Apply muss den aktuellen Server-Stand
-      // sehen — sonst kann der gleich folgende _loadApplyAndSave-PUT Edits
-      // überschreiben, die zwischen letztem GET und jetzt geschrieben wurden.
-      const page = await contentRepo.loadPage(pageIdAtStart, { fresh: true });
-      if (!samePage()) return;
-      const occurrences = countInHtml(page.html, vorschlag.original);
-      if (occurrences === 0) {
-        setErr(root.t('chat.originalNotFound'));
-        return;
-      }
-      // Mehrdeutig: findInHtml/replaceInHtml greifen immer das erste Vorkommen —
-      // bei mehrfachem Text würde also evtl. die falsche Stelle ersetzt. Lieber
-      // abbrechen als still-falsch ersetzen.
-      if (occurrences > 1) {
-        setErr(root.t('chat.originalAmbiguous'));
-        return;
-      }
-      // Block-Grenzen-/Link-/Marker-Vorschlag: countInHtml findet ihn zwar
-      // (Tag-agnostische Text-View), aber replaceInHtml lässt ihn zum Schutz der
-      // Absatzstruktur, des Hyperlinks bzw. des Quellen-/Verweis-Zeigers
-      // unangetastet. Ohne Abfang wäre das ein stiller No-Op, der sich unten
-      // fälschlich wie „gespeichert" anfühlt (_applied + Erfolgsmeldung).
-      // Grund über `skipReason` statt eigener Fallunterscheidung — derselbe
-      // Entscheidungsbaum wie im Lektorat-Apply, nur andere Meldungs-Keys.
-      if (replaceInHtml(page.html, vorschlag.original, vorschlag.ersatz) === page.html) {
-        setErr(root.t({
-          spansLink: 'chat.spansLink',
-          spansMarker: 'chat.spansMarker',
-        }[skipReason(page.html, vorschlag.original)] || 'chat.crossesBlockBoundary'));
-        return;
-      }
-    } catch (e) {
-      console.error('[chat applyVorschlag pageLoad]', e);
-      if (samePage()) setErr(root.t('chat.pageLoadFailed'));
-      return;
-    }
-
-    if (!samePage()) return;
-    v()._applying = true;
-    v()._error = null;
-    try {
-      // Gleiche Pipeline wie beim Lektorat: laden → anwenden → Safety-Check → speichern.
-      // onProgress setzt saveApplying (→ Editor-Progressbar) und chatStatus.
-      const { finalHtml } = await root._loadApplyAndSave(
-        [{ original: vorschlag.original, korrektur: vorschlag.ersatz }],
-        (pct, text) => {
-          root.saveApplying = pct;
-          if (text) this.chatStatus = `<span class="spinner"></span>${escHtml(text)}`;
-        },
-        'chat-apply',
-      );
-      if (!samePage()) return;
-      root.originalHtml = finalHtml;
-      this._chatPendingRefresh = true;
-      v()._applied = true;
-      root.updatePageView();
-      const msgId = this.chatMessages[msgIdx]?.id;
-      if (msgId) {
-        try {
-          const r = await fetch(`/chat/message/${msgId}/vorschlag/${vIdx}/applied`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-          });
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          v().applied = true;
-        } catch (e) {
-          console.warn('[applyChatVorschlag] Markierung nicht persistiert:', e.message);
-        }
-      }
-      const successMsg = `<span class="success-msg">${escHtml(root.t('chat.changeSaved'))}</span>`;
-      this.chatStatus = successMsg;
-      clearStatusAfter(this, 'chatStatus', successMsg, 3000);
-    } catch (e) {
-      console.error('[applyChatVorschlag]', e);
-      setErr(root.t('chat.saveFailedPrefix') + e.message);
-      this.chatStatus = '';
-    } finally {
-      v()._applying = false;
-      root.saveApplying = null;
-    }
-  },
+  ...pageChatMarksMethods,
+  ...pageChatApplyMethods,
 };

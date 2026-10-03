@@ -175,10 +175,17 @@ async function tool_get_pages(input, ctx) {
   const missing = [];
   for (const pageId of toFetch) {
     if (ctx.jobSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    // Buch-Scope VOR dem Laden: die ids kommen vom Modell (und damit indirekt aus
+    // jeder Userfrage). Eine Seite eines fremden Buchs wird wie eine fehlende gemeldet
+    // — ohne Inhalt und ohne Hinweis, dass sie existiert.
+    const pageRow = getPageWithChapter(pageId);
+    if (!pageRow || pageRow.book_id !== ctx.bookId) {
+      missing.push({ page_id: pageId, error: 'Seite nicht im aktuellen Buch.' });
+      continue;
+    }
     try {
       const pd = await contentStore.loadPage(pageId);
       const text = htmlToText(pd.html || '');
-      const pageRow = getPageWithChapter(pageId);
       const latestCheck = _latestCheckForPage(pageId, ctx.userEmail);
       results.push({
         page_id: pageId,
@@ -562,7 +569,8 @@ async function tool_search_similar(input, ctx) {
 
   const results = [];
   for (const h of raw) {
-    const title = resolveEntityTitle(h.kind, h.entity_id);
+    // User-Scope: Szenen/Figuren anderer Mitautoren im selben Buch fallen weg.
+    const title = resolveEntityTitle(h.kind, h.entity_id, { userEmail: ctx.userEmail ?? null });
     if (title == null) continue; // gelöschte Entität → überspringen
     const text = String(h.text || '');
     results.push({

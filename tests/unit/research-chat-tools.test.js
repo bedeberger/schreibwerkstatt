@@ -116,3 +116,80 @@ test('propose_research_item: leerer Vorschlag wird abgelehnt', async () => {
 test('unbekanntes Werkzeug wirft', async () => {
   await assert.rejects(() => executeResearchTool('nope', {}, mkCtx()), /Unbekanntes Werkzeug/);
 });
+
+// ── Abgleich mit dem Archiv (Dubletten) ─────────────────────────────────────
+
+test('propose_research_item: URL schon im Archiv → exists_item_id + already_in_archive', async () => {
+  const ctx = mkCtx();
+  const out = await executeResearchTool('propose_research_item', {
+    kind: 'link', title: 'Bronzezeit nochmal',
+    urls: [{ url: 'https://de.wikipedia.org/wiki/Bronzezeit/' }],
+  }, ctx);
+  assert.equal(out.ok, true);
+  assert.equal(out.already_in_archive.id, ITEM_ID);
+  assert.equal(out.already_in_archive.match, 'url');
+  assert.equal(ctx.proposals[0].exists_item_id, ITEM_ID);
+  assert.equal(ctx.proposals[0].exists_match, 'url');
+});
+
+test('propose_research_item: neuer Fund → kein exists_item_id', async () => {
+  const ctx = mkCtx();
+  const out = await executeResearchTool('propose_research_item', {
+    kind: 'fact', title: 'Eisenverhüttung im Jura', body: 'Rennöfen ab 600 v. Chr.',
+  }, ctx);
+  assert.equal(out.ok, true);
+  assert.equal(out.already_in_archive, undefined);
+  assert.equal(ctx.proposals[0].exists_item_id, undefined);
+});
+
+test('propose_research_item: gleicher Titel zweimal in einer Antwort → zweiter abgelehnt', async () => {
+  const ctx = mkCtx();
+  await executeResearchTool('propose_research_item', { kind: 'note', title: 'Schmiedetechnik', body: 'a' }, ctx);
+  const out = await executeResearchTool('propose_research_item', { kind: 'note', title: ' schmiedetechnik ', body: 'b' }, ctx);
+  assert.equal(out.ok, false);
+  assert.equal(ctx.proposals.length, 1);
+});
+
+// ── lookup_literature (Register-Suche) ──────────────────────────────────────
+// Kein Netz: globalThis.fetch wird pro Test ersetzt. Geprueft wird die Form fuers
+// Modell, das Merken der Treffer als zulaessige Belege und dass ein
+// ausgefallenes Register als Ausfall gemeldet wird statt als „nichts gefunden".
+test('lookup_literature: Crossref-Treffer mit doi.org-URL, OpenLibrary-Ausfall gemeldet, Treffer gemerkt', async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).startsWith('https://api.crossref.org/works?')) {
+      return new Response(JSON.stringify({ message: { items: [{
+        DOI: '10.1000/xyz', type: 'journal-article', title: ['Bronze Age Mining'],
+        author: [{ given: 'Ada', family: 'Muster' }], issued: { 'date-parts': [[2019]] },
+        'container-title': ['Journal of Archaeology'],
+      }] } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response('down', { status: 503 });
+  };
+  try {
+    const ctx = mkCtx();
+    const out = await executeResearchTool('lookup_literature', { q: 'bronze age mining' }, ctx);
+    assert.equal(out.count, 1);
+    assert.deepEqual(out.treffer[0], {
+      titel: 'Bronze Age Mining', autoren: 'Ada Muster', jahr: '2019', typ: 'article',
+      in: 'Journal of Archaeology', doi: '10.1000/xyz', url: 'https://doi.org/10.1000/xyz', register: 'crossref',
+    });
+    assert.deepEqual(out.register_ausgefallen, ['openlibrary']);
+    assert.deepEqual(ctx.literatureHits, [{ url: 'https://doi.org/10.1000/xyz', title: 'Bronze Age Mining' }]);
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test('lookup_literature: ohne q/doi/isbn → Fehler, kein Request', async () => {
+  const orig = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = async () => { called = true; return new Response('{}'); };
+  try {
+    const out = await executeResearchTool('lookup_literature', {}, mkCtx());
+    assert.ok(out.error);
+    assert.equal(called, false);
+  } finally {
+    globalThis.fetch = orig;
+  }
+});

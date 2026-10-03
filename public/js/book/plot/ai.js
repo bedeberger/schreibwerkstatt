@@ -8,6 +8,7 @@ import { toggleWrapFullscreen } from '../../fullscreen.js';
 import { normTitle } from './constants.js';
 import { EVT } from '../../events.js';
 import { attachDismiss, detachDismiss } from '../../cards/dismiss.js';
+import { computePopoverPos, refinePopoverPos } from '../../popover-anchor.js';
 
 export const aiMethods = {
   // ── KI: Brainstorm ──────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ export const aiMethods = {
   // mitgegeben → die KI grundiert den Vorschlag mit Strang + gebundener Figur).
   async runBrainstorm(act, thread = null) {
     const app = window.__app;
+    const bookId = Alpine.store('nav').selectedBookId;
     this.brainstormActId = act.id;
     this.brainstormThreadId = thread ? thread.id : null;
     this.brainstormLoading = true;
@@ -24,8 +26,11 @@ export const aiMethods = {
       const resp = await fetchJson('/jobs/plot-brainstorm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId, act_id: act.id, thread_id: thread ? thread.id : null }),
+        body: JSON.stringify({ book_id: bookId, act_id: act.id, thread_id: thread ? thread.id : null }),
       });
+      // Buch inzwischen gewechselt → resetPlot hat den Lauf-State schon geräumt;
+      // kein Poll mehr ans neue Board hängen.
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this._brainstormJobId = resp.jobId;
       startPoll(this, {
         timerProp: '_brainstormPollTimer',
@@ -58,6 +63,7 @@ export const aiMethods = {
         },
       });
     } catch (e) {
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this.brainstormLoading = false;
       this.errorMessage = app.t('plot.error.brainstorm');
     }
@@ -68,7 +74,7 @@ export const aiMethods = {
     if (!this.brainstormResult) return;
     const v = this.brainstormResult.vorschlaege[idx];
     const actId = this.brainstormResult.actId;
-    if (!v || !actId) return;
+    if (!v || !actId || this.busy || this._inHistoryFlight) return;
     this.busy = true;
     try {
       const beat = await fetchJson('/plot/beats', {
@@ -119,8 +125,10 @@ export const aiMethods = {
     if (!bookId) { this.brainstormRuns = []; return; }
     try {
       const rows = await fetchJson(`/plot/brainstorm-runs?book_id=${bookId}`);
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this.brainstormRuns = Array.isArray(rows) ? rows : [];
     } catch (e) {
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this.brainstormRuns = [];
     }
   },
@@ -174,6 +182,7 @@ export const aiMethods = {
   async runConsistency() {
     const app = window.__app;
     if (!this.beats.length) { this.errorMessage = app.t('plot.error.boardEmpty'); return; }
+    const bookId = Alpine.store('nav').selectedBookId;
     this.consistencyLoading = true;
     this.consistencyStatus = '';
     this.consistencyResult = null;
@@ -182,8 +191,9 @@ export const aiMethods = {
       const resp = await fetchJson('/jobs/plot-consistency', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId }),
+        body: JSON.stringify({ book_id: bookId }),
       });
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this._consistencyJobId = resp.jobId;
       startPoll(this, {
         timerProp: '_consistencyPollTimer',
@@ -198,7 +208,7 @@ export const aiMethods = {
           this.consistencyLoading = false;
           this.consistencyStatus = '';
           this._consistencyJobId = null;
-          this.consistencyResult = { konflikte: job.result.konflikte || [], fazit: job.result.fazit || '' };
+          this.consistencyResult = { konflikte: job.result.konflikte || [], fazit: job.result.fazit || '', erledigt: Array.isArray(job.result.erledigt) ? job.result.erledigt : [] };
           this.selectedKonfliktIdx = null;
           // Frisch persistierten Lauf als ausgewählt markieren + Historie neu laden.
           this.selectedRunId = job.result.runId || null;
@@ -217,6 +227,7 @@ export const aiMethods = {
         },
       });
     } catch (e) {
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this.consistencyLoading = false;
       this.errorMessage = app.t('plot.error.consistency');
     }
@@ -289,8 +300,10 @@ export const aiMethods = {
     if (!bookId) { this.consistencyRuns = []; return; }
     try {
       const rows = await fetchJson(`/plot/consistency-runs?book_id=${bookId}`);
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this.consistencyRuns = Array.isArray(rows) ? rows : [];
     } catch (e) {
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this.consistencyRuns = [];
     }
   },
@@ -304,7 +317,7 @@ export const aiMethods = {
     try {
       const run = await fetchJson(`/plot/consistency-runs/${runId}`);
       if (!run?.result) throw new Error('no result');
-      this.consistencyResult = { konflikte: run.result.konflikte || [], fazit: run.result.fazit || '' };
+      this.consistencyResult = { konflikte: run.result.konflikte || [], fazit: run.result.fazit || '', erledigt: Array.isArray(run.result.erledigt) ? run.result.erledigt : [] };
       this.selectedKonfliktIdx = null;
       this.selectedRunId = run.id;
     } catch (e) {
@@ -345,6 +358,7 @@ export const aiMethods = {
   async runBeatAnchor() {
     const app = window.__app;
     if (!this.beats.length || this.anchorLoading) return;
+    const bookId = Alpine.store('nav').selectedBookId;
     this.anchorLoading = true;
     this.anchorStatus = '';
     this.anchorProgress = 0;
@@ -353,8 +367,9 @@ export const aiMethods = {
       const resp = await fetchJson('/jobs/beat-anchor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: Alpine.store('nav').selectedBookId }),
+        body: JSON.stringify({ book_id: bookId }),
       });
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this._anchorJobId = resp.jobId;
       startPoll(this, {
         timerProp: '_anchorPollTimer',
@@ -385,6 +400,7 @@ export const aiMethods = {
         },
       });
     } catch (e) {
+      if (Alpine.store('nav').selectedBookId !== bookId) return;
       this.anchorLoading = false;
       this.errorMessage = app.t('plot.error.anchor');
     }
@@ -392,7 +408,7 @@ export const aiMethods = {
 
   // ── Anchor-Fundstellen-Popover ────────────────────────────────────────────
   // Klick aufs Anchor-Badge listet die Top-Fundstellen (occ_top, nach Score
-  // vorsortiert) in einem nach <body> teleportierten .context-menu; jede Zeile
+  // vorsortiert) in einem nach .card--plot teleportierten .context-menu; jede Zeile
   // springt an die belegende Textstelle. Die Beat-Karte lebt in einem
   // overflow/transform-Scrollcontainer, in dem ein verankertes Popover geclippt
   // würde → JS-positioniert aus dem Trigger-Rect (Pattern wie das Strang-Menü).
@@ -404,22 +420,14 @@ export const aiMethods = {
     this._occTriggerRect = ev.currentTarget.getBoundingClientRect();
     // Schätzung vor dem Render, danach mit der echten Popover-Grösse nachjustieren
     // (sonst schiebt sich das Menü beim Hochklappen mit fester Höhe über den Button).
-    this.beatOccPopoverPos = this._computeOccPopoverPos(this._occTriggerRect, 280, 220);
+    // Geometrie-SSoT popover-anchor.js (wie das Strang-Menü): Schätzung, dann messen.
+    this.beatOccPopoverPos = computePopoverPos(this._occTriggerRect, 280, 220);
     this.beatOccPopoverBeatId = beat.id;
     this._attachOccPopoverListeners();
     this.$nextTick(() => {
-      const el = this.$refs.occPopover;
-      if (!el || !this._occTriggerRect) return;
-      this.beatOccPopoverPos = this._computeOccPopoverPos(this._occTriggerRect, el.offsetWidth, el.offsetHeight);
+      const pos = refinePopoverPos(this.$refs.occPopover, this._occTriggerRect);
+      if (pos) this.beatOccPopoverPos = pos;
     });
-  },
-
-  _computeOccPopoverPos(r, pw, ph) {
-    const left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.right - pw));
-    const top = (r.bottom + ph + 8 > window.innerHeight)
-      ? Math.max(8, r.top - ph - 4)
-      : r.bottom + 4;
-    return { top, left };
   },
 
   closeBeatOccPopover() {
@@ -453,7 +461,7 @@ export const aiMethods = {
   // die Fundstellen im Popover davor gesehen und bestätigt so bewusst.
   async promoteBeat(beat) {
     const app = window.__app;
-    if (!beat || beat.status === 'im_buch') return;
+    if (!beat || beat.status === 'im_buch' || this.busy || this._inHistoryFlight) return;
     this.busy = true;
     try {
       const updated = await fetchJson(`/plot/beats/${beat.id}`, {
@@ -461,10 +469,10 @@ export const aiMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'im_buch' }),
       });
-      // Die PATCH-Antwort trägt kein occ_count/occ_top (nur GET /plot hängt sie an);
-      // die Fundstellen bleiben in der DB. Vorhandene Werte übernehmen, damit das
-      // Badge sofort von 'promote' auf 'confirmed' wechselt statt fälschlich 'drift'.
-      this._replaceBeat({ ...updated, occ_count: beat.occ_count, occ_top: beat.occ_top });
+      // _replaceBeat merged über _mergeBeatRow: fehlen occ_count/occ_top in der
+      // Antwort, bleiben die bisherigen stehen → Badge wechselt von 'promote' auf
+      // 'confirmed' statt fälschlich auf 'drift'.
+      this._replaceBeat(updated);
       this._recordBeatFields(beat.id, { status: beat.status }, { status: 'im_buch' });
       this.closeBeatOccPopover();
       app.refreshPlotBeatCounts?.();

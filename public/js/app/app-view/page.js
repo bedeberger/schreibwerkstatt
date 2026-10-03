@@ -1,5 +1,6 @@
 // Teil von appViewMethods (siehe Facade app-view.js).
 import { EVT, clearDraft, contentRepo, decorateMentions, escHtml, fetchJson, getDeviceId, htmlToText, readDraft, setLastPageId } from './_shared.js';
+import { lsSet, lsRemove } from '../../safe-storage.js';
 
 export const pageMethods = {
   async selectPage(p) {
@@ -68,7 +69,7 @@ export const pageMethods = {
     try {
       const { jobId: activeJobId } = await fetchJson(`/jobs/active?type=check&page_id=${p.id}`);
       if (activeJobId) {
-        localStorage.setItem('lektorat_check_job_' + p.id, activeJobId);
+        lsSet('lektorat_check_job_' + p.id, activeJobId);
         this.checkLoading = true;
         this.checkProgress = 0;
         this.analysisOut = '';
@@ -76,7 +77,7 @@ export const pageMethods = {
         this.startCheckPoll(activeJobId);
       } else {
         // Kein aktiver Job → stale localStorage-Eintrag bereinigen
-        localStorage.removeItem('lektorat_check_job_' + p.id);
+        lsRemove('lektorat_check_job_' + p.id);
       }
     } catch (e) { console.error('[selectPage active-job check]', e); }
 

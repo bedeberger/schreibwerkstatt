@@ -100,3 +100,56 @@ test('Befunde sind nach Schwere sortiert', () => {
   assert.deepEqual(codes(f), ['beatVorGeburt', 'chronologieBruch', 'zeitAusserhalbBuch']);
   assert.ok(f.every(x => x.quelle === 'messung'));
 });
+
+// ── Lesereihenfolge pro Lane (lib/plot-reading-order.js) ─────────────────────
+const { laneReadingOrder, beatsInReadingOrder } = require('../../lib/plot-reading-order.js');
+
+test('chronologieBruch nur innerhalb einer Lane — parallele Stränge sind kein Rückschritt', () => {
+  const beats = [
+    beat({ id: 1, titel: 'A1', jahr: 1987, lane: 't1', ordnung: 0 }),
+    beat({ id: 2, titel: 'B1', jahr: 1950, lane: 't2', ordnung: 0 }),
+    beat({ id: 3, titel: 'B2', jahr: 1955, lane: 't2', ordnung: 1 }),
+  ];
+  assert.deepEqual(computeTimeFindings({ beats, figures: FIGS }), []);
+  const back = [...beats, beat({ id: 4, titel: 'A2', jahr: 1980, lane: 't1', ordnung: 1 })];
+  const f = computeTimeFindings({ beats: back, figures: FIGS });
+  assert.deepEqual(codes(f), ['chronologieBruch']);
+  assert.equal(f[0].beat_id, 4);
+  assert.equal(f[0].params.vorBeat, 'A1');
+});
+
+test('laneReadingOrder: geforkter Strang liest seine eigenen Akte, andere die geteilten', () => {
+  const acts = [
+    { id: 10, thread_id: null, position: 1 }, { id: 11, thread_id: null, position: 0 },
+    { id: 20, thread_id: 2, position: 1 }, { id: 21, thread_id: 2, position: 0 },
+  ];
+  const threads = [{ id: 2, position: 1 }, { id: 1, position: 0 }];
+  const beats = [
+    { id: 100, act_id: 10, thread_id: 1, sort_order: 0 },
+    { id: 101, act_id: 11, thread_id: 1, sort_order: 1 },
+    { id: 102, act_id: 11, thread_id: 1, sort_order: 0 },
+    { id: 200, act_id: 20, thread_id: 2, sort_order: 0 },
+    { id: 201, act_id: 21, thread_id: 2, sort_order: 0 },
+    { id: 300, act_id: 10, thread_id: null, sort_order: 0 },
+  ];
+  const lanes = laneReadingOrder({ acts, threads, beats });
+  assert.deepEqual(lanes.map(l => l.key), ['t1', 't2', 'none']);
+  assert.deepEqual(lanes[0].acts.map(a => a.id), [11, 10]);
+  assert.deepEqual(lanes[0].beats.map(b => b.id), [102, 101, 100]);
+  assert.deepEqual(lanes[1].acts.map(a => a.id), [21, 20]);
+  assert.deepEqual(lanes[1].beats.map(b => b.id), [201, 200]);
+  assert.deepEqual(lanes[2].beats.map(b => b.id), [300]);
+  const flat = beatsInReadingOrder({ acts, threads, beats });
+  assert.deepEqual(flat.map(b => [b.id, b.lane, b.ordnung]),
+    [[102, 't1', 0], [101, 't1', 1], [100, 't1', 2], [201, 't2', 0], [200, 't2', 1], [300, 'none', 0]]);
+});
+
+test('laneReadingOrder: Beat auf lane-fremdem Akt (Altdaten) landet am Lane-Ende statt zu verschwinden', () => {
+  const acts = [{ id: 10, thread_id: null, position: 0 }, { id: 20, thread_id: 2, position: 0 }];
+  const beats = [
+    { id: 1, act_id: 10, thread_id: 2, sort_order: 0 },
+    { id: 2, act_id: 20, thread_id: 2, sort_order: 5 },
+  ];
+  const lanes = laneReadingOrder({ acts, threads: [{ id: 2, position: 0 }], beats });
+  assert.deepEqual(lanes[0].beats.map(b => b.id), [2, 1]);
+});

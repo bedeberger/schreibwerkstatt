@@ -80,3 +80,20 @@ test('Font-Cache miss liefert null', () => {
   assert.equal(miss, null);
 });
 
+
+test('Timestamps sind ISO+Z; korrupte config_json bricht weder Get noch Listing', () => {
+  const user = 'c@x.test';
+  appUsers.createUser({ email: user, displayName: 'C' });
+  const p = schema.createPdfExportProfile(0, user, 'Kaputt', {});
+  assert.match(String(p.created_at), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.match(String(p.updated_at), /Z$/);
+
+  const { db } = require('../../db/connection');
+  db.prepare('UPDATE pdf_export_profile SET config_json = ? WHERE id = ?').run('{nicht json', p.id);
+  const { defaultConfig } = require('../../lib/pdf-export-defaults');
+  const got = schema.getPdfExportProfile(p.id);
+  assert.deepEqual(got.config, defaultConfig());
+  const list = schema.listPdfExportProfiles(0, user);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].id, p.id);
+});

@@ -20,7 +20,7 @@ function installLocalStorage() {
 }
 
 const store = installLocalStorage();
-const { listDraftPageIds, writeDraft, clearDraft } = await import('../../public/js/editor/draft-storage.js');
+const { listDraftPageIds, writeDraft, clearDraft, readDraft, setDraftOwner } = await import('../../public/js/editor/draft-storage.js');
 
 test('leerer Store → keine Draft-IDs', () => {
   store.clear();
@@ -66,4 +66,53 @@ test('writeDraft liefert true bei Erfolg, false bei Quota-Fehler', () => {
   }
   // Der fehlgeschlagene Draft darf nicht als vorhanden gelten.
   assert.deepEqual(listDraftPageIds(), [1]);
+});
+
+// Zwei Konten nacheinander auf demselben Browser: der Entwurf von A darf B
+// weder angezeigt noch von dessen Outbox gespeichert werden — und Bs Entwurf
+// derselben Seite darf As nicht überschreiben.
+test('Entwürfe sind pro Konto getrennt', () => {
+  store.clear();
+  setDraftOwner('a@example.com');
+  writeDraft(10, '<p>von A</p>', '<p>base</p>', null);
+  assert.ok(store.has('editor_draft_u:a@example.com:10'));
+  assert.equal(readDraft(10)?.owner, 'a@example.com');
+
+  setDraftOwner('b@example.com');
+  assert.equal(readDraft(10), null, 'fremder Entwurf unsichtbar');
+  assert.deepEqual(listDraftPageIds(), [], 'fremder Entwurf zählt nicht als wartend');
+  writeDraft(10, '<p>von B</p>', '<p>base</p>', null);
+  clearDraft(10);
+
+  setDraftOwner('a@example.com');
+  assert.equal(readDraft(10)?.html, '<p>von A</p>', 'As Entwurf übersteht Bs Schreiben und Löschen');
+  assert.deepEqual(listDraftPageIds(), [10]);
+  setDraftOwner(null);
+});
+
+test('Alt-Entwurf wird beim Anmelden in den Konto-Schlüssel migriert', () => {
+  store.clear();
+  store.set('editor_draft_3', JSON.stringify({ html: '<p>alt</p>', originalHtml: '', savedAt: 1 }));
+  store.set('editor_draft_4', JSON.stringify({ html: '<p>von A</p>', owner: 'a@example.com', savedAt: 1 }));
+  setDraftOwner('b@example.com');
+  assert.equal(store.has('editor_draft_3'), false);
+  assert.equal(readDraft(3)?.html, '<p>alt</p>', 'ownerloser Alt-Entwurf gehört dem ersten Konto');
+  assert.equal(readDraft(4), null, 'Alt-Entwurf mit owner bleibt dessen Konto');
+  assert.ok(store.has('editor_draft_u:a@example.com:4'));
+  assert.deepEqual(listDraftPageIds(), [3]);
+  setDraftOwner(null);
+});
+
+test('Migration scheitert an Quota → Alt-Entwurf bleibt les- und löschbar', () => {
+  store.clear();
+  store.set('editor_draft_8', JSON.stringify({ html: '<p>alt</p>', savedAt: 1 }));
+  const orig = globalThis.localStorage.setItem;
+  globalThis.localStorage.setItem = () => { throw new Error('quota'); };
+  try { setDraftOwner('b@example.com'); } finally { globalThis.localStorage.setItem = orig; }
+  assert.ok(store.has('editor_draft_8'), 'nichts verloren');
+  assert.equal(readDraft(8)?.html, '<p>alt</p>');
+  assert.deepEqual(listDraftPageIds(), [8]);
+  clearDraft(8);
+  assert.equal(store.has('editor_draft_8'), false);
+  setDraftOwner(null);
 });

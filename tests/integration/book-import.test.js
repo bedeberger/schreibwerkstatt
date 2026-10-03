@@ -45,7 +45,7 @@ async function buildBundleBuffer(bookId, includes = null, opts = {}) {
   const zip = new JSZip();
   zip.file('manifest.json', JSON.stringify(manifest));
   zip.file('book.json', JSON.stringify(bookJson));
-  if (norm.analysis || norm.lektorat || norm.chats) {
+  if (norm.analysis || norm.lektorat || norm.chats || norm.research) {
     const { collectExtras } = require('../../db/book-migration-data');
     const extras = collectExtras(bookId, norm, opts.scopeEmail ?? null);
     // `analysisOverride` baut ein Alt-Bundle nach: vor der Scope-Regel sammelte
@@ -54,6 +54,7 @@ async function buildBundleBuffer(bookId, includes = null, opts = {}) {
     if (analysis) zip.file('analysis.json', JSON.stringify(analysis));
     if (extras.lektorat) zip.file('lektorat.json', JSON.stringify(extras.lektorat));
     if (extras.chats)    zip.file('chats.json', JSON.stringify(extras.chats));
+    if (extras.research) zip.file('research.json', JSON.stringify(extras.research));
   }
   return zip.generateAsync({ type: 'nodebuffer' });
 }
@@ -197,6 +198,53 @@ test('Extra-Round-Trip: Analyse/Lektorat/Chats werden mit remappten IDs uebernom
   assert.equal(cs.page_id, newPageId);
   const msgCount = db.prepare('SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ?').get(cs.id);
   assert.equal(msgCount.c, 1);
+});
+
+test('Recherche-Round-Trip: Fundstuecke samt Anhang, URLs, Tags und Verknuepfungen; buchweite Chat-Sessions', async () => {
+  ctxBoot.dbSeed.setBook({
+    books: [{ id: 960, name: 'RechercheQuelle' }],
+    chapters: [{ id: 9601, book_id: 960, name: 'Kap', position: 0 }],
+    pages: [{ id: 96001, book_id: 960, name: 'Seite1', chapter_id: 9601, position: 0 }],
+    pageBodies: { 96001: '<p>Text</p>' },
+  });
+  const { db } = require('../../db/connection');
+  const iso = '2026-05-30T10:00:00.000Z';
+  const fig = db.prepare(`INSERT INTO figures (book_id,fig_id,name,updated_at,user_email) VALUES (?,?,?,?,?)`)
+    .run(960, 'fig-a', 'Anna', iso, OWNER).lastInsertRowid;
+  const item = db.prepare(`INSERT INTO research_items (book_id,user_email,kind,title,body,image,image_mime,status)
+              VALUES (?,?,?,?,?,?,?,?)`).run(960, OWNER, 'fact', 'Mondlandung', '1969', Buffer.from([1, 2, 3]), 'image/png', 'eingearbeitet').lastInsertRowid;
+  db.prepare('INSERT INTO research_item_urls (item_id,url,label,position) VALUES (?,?,?,?)').run(item, 'https://example.org/a', 'A', 0);
+  db.prepare('INSERT INTO research_item_tags (item_id,tag) VALUES (?,?)').run(item, 'raumfahrt');
+  db.prepare("INSERT INTO research_item_links (item_id,target_kind,page_id) VALUES (?,'page',?)").run(item, 96001);
+  db.prepare("INSERT INTO research_item_links (item_id,target_kind,figure_id) VALUES (?,'figure',?)").run(item, fig);
+  db.prepare(`INSERT INTO chat_sessions (book_id,kind,page_id,user_email,created_at,last_message_at)
+              VALUES (?,?,?,?,?,?)`).run(960, 'research', null, OWNER, iso, iso);
+
+  // Ohne Analyse: die Figuren-Verknuepfung hat kein Gegenueber und faellt weg.
+  let job = await runImport(await buildBundleBuffer(960, { research: true, chats: true }));
+  assert.equal(job.status, 'done', job.error || '');
+  assert.deepEqual(job.result.extras.research, { items: 1, links: 1, linksDropped: 1 });
+  assert.equal(job.result.extras.chats.sessions, 1);
+  let nb = job.result.bookId;
+  const ri = db.prepare('SELECT * FROM research_items WHERE book_id = ?').get(nb);
+  assert.equal(ri.title, 'Mondlandung');
+  assert.equal(ri.status, 'eingearbeitet');
+  assert.deepEqual([...ri.image], [1, 2, 3]);
+  assert.equal(db.prepare('SELECT url FROM research_item_urls WHERE item_id = ?').get(ri.id).url, 'https://example.org/a');
+  assert.equal(db.prepare('SELECT tag FROM research_item_tags WHERE item_id = ?').get(ri.id).tag, 'raumfahrt');
+  const flat = contentStore.flattenTree(await contentStore.bookTree(nb, reqCtx));
+  const newPage = flat.find(f => f.page.name === 'Seite1').page.id;
+  assert.equal(db.prepare("SELECT page_id FROM research_item_links WHERE item_id = ? AND target_kind='page'").get(ri.id).page_id, newPage);
+  assert.equal(db.prepare('SELECT kind FROM chat_sessions WHERE book_id = ?').get(nb).kind, 'research');
+
+  // Mit Analyse: die Figuren-Verknuepfung zeigt auf die neu angelegte Figur.
+  job = await runImport(await buildBundleBuffer(960, { research: true, analysis: true }, { scopeEmail: OWNER }));
+  assert.equal(job.status, 'done', job.error || '');
+  assert.deepEqual(job.result.extras.research, { items: 1, links: 2, linksDropped: 0 });
+  nb = job.result.bookId;
+  const newFig = db.prepare('SELECT id FROM figures WHERE book_id = ?').get(nb).id;
+  const ri2 = db.prepare('SELECT id FROM research_items WHERE book_id = ?').get(nb).id;
+  assert.equal(db.prepare("SELECT figure_id FROM research_item_links WHERE item_id = ? AND target_kind='figure'").get(ri2).figure_id, newFig);
 });
 
 test('Content-only-Export (keine includes) laesst Extra-Tabellen leer', async () => {

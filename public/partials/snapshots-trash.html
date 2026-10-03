@@ -1,0 +1,49 @@
+<!-- Papierkorb: geloeschte Seiten des Buchs wiederherstellen — via Fragment-Include
+     aus snapshots.html eingebunden (LOC-Split). Methoden: snapshots-trash.js.
+     Nur sichtbar, wenn es etwas wiederherzustellen gibt. Siehe docs/fassungen.md. -->
+<section x-show="trash.length" x-cloak class="snapshots-trash">
+  <h3 class="snapshots-trash__title"
+      x-text="$app.t('snapshots.trash.title') + ' (' + trash.length + ')'"></h3>
+  <p class="form-lead" x-text="$app.t('snapshots.trash.lead')"></p>
+  <div class="table-scroll">
+    <table class="entity-grid-table snapshots-table"
+           x-data="sortableTable({
+             rows: () => trash,
+             defaultKey: 'deleted_at',
+             persistKey: 'book.snapshots.trash',
+             types: { deleted_at: 'date', name: 'string', chapter_name: 'string', deleted_by: 'string' },
+           })">
+      <thead>
+        <tr>
+          <th class="sortable-th" :class="sortClass('name')" :aria-sort="ariaSort('name')"
+              @click="sortBy('name')" x-text="$app.t('snapshots.trash.col.page')"></th>
+          <th class="sortable-th" :class="sortClass('chapter_name')" :aria-sort="ariaSort('chapter_name')"
+              @click="sortBy('chapter_name')" x-text="$app.t('snapshots.trash.col.chapter')"></th>
+          <th class="sortable-th" :class="sortClass('deleted_at')" :aria-sort="ariaSort('deleted_at')"
+              @click="sortBy('deleted_at')" x-text="$app.t('snapshots.trash.col.deletedAt')"></th>
+          <th class="sortable-th" :class="sortClass('deleted_by')" :aria-sort="ariaSort('deleted_by')"
+              @click="sortBy('deleted_by')" x-text="$app.t('snapshots.trash.col.deletedBy')"></th>
+          <th x-text="$app.t('snapshots.col.actions')"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="item in sorted" :key="item.id">
+          <tr>
+            <td x-text="item.name || $app.t('snapshots.untitled')"></td>
+            <td x-text="item.chapter_name || $app.t('snapshots.trash.noChapter')"></td>
+            <td x-text="$app.formatDate(item.deleted_at)"></td>
+            <td x-text="item.deleted_by || '–'"></td>
+            <td>
+              <div class="snapshots-actions">
+                <button type="button" class="btn-compact"
+                        @click="restoreTrashItem(item)"
+                        :disabled="!!trashRestoringId"
+                        x-text="trashRestoringId === item.id ? $app.t('snapshots.trash.restoring') : $app.t('snapshots.trash.restore')"></button>
+              </div>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</section>

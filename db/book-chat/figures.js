@@ -121,6 +121,20 @@ function getFigureName(figureId) {
   return _stmtFigureName.get(figureId)?.t;
 }
 
+const _stmtSceneTitleForUser = db.prepare('SELECT titel AS t FROM figure_scenes WHERE id = ? AND user_email IS ?');
+const _stmtFigureNameForUser = db.prepare('SELECT name AS t FROM figures WHERE id = ? AND user_email IS ?');
+
+/** Szenentitel nur, wenn die Szene dem User gehört (Analyse-Daten sind user-scoped,
+ *  der Embedding-Index ist es nicht — er hängt nur am Buch). */
+function getSceneTitleForUser(sceneId, userEmail) {
+  return _stmtSceneTitleForUser.get(sceneId, userEmail)?.t;
+}
+
+/** Figurenname nur, wenn die Figur dem User gehört (siehe getSceneTitleForUser). */
+function getFigureNameForUser(figureId, userEmail) {
+  return _stmtFigureNameForUser.get(figureId, userEmail)?.t;
+}
+
 const _stmtFigureNamesForUser = db.prepare(
     'SELECT fig_id, name, kurzname FROM figures WHERE book_id = ? AND user_email = ?'
   );
@@ -205,6 +219,8 @@ module.exports = {
   findFigureByName,
   getSceneTitle,
   getFigureName,
+  getSceneTitleForUser,
+  getFigureNameForUser,
   listFigureNamesForUser,
   listPronounCounts,
   listFigureRelationsWithNames,

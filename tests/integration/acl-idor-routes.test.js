@@ -340,3 +340,60 @@ test('startBookJob: 400 ohne book_id, 403 fremdes Buch, sonst Job mit String-Ded
   assert.equal(job.dedupId, `${MY_BOOK}:2026`);
   await waitForJob(ctx.shared, ok.json.jobId);
 });
+
+// ── Seiten-Chat: Vorschlags-Status, Nachrichtentyp, Session-Liste ───────────
+
+function seedPageChat(email = ME, vorschlaege = [{ original: 'Eigener', ersatz: 'Mein' }]) {
+  const sid = db.prepare(`INSERT INTO chat_sessions (book_id, page_id, kind, user_email, created_at, last_message_at)
+                          VALUES (?, ?, 'page', ?, ?, ?)`).run(MY_BOOK, MY_PAGE, email, NOW, NOW).lastInsertRowid;
+  const mid = db.prepare(`INSERT INTO chat_messages (session_id, role, content, vorschlaege, created_at) VALUES (?, 'assistant', 'A', ?, ?)`)
+    .run(sid, JSON.stringify(vorschlaege), NOW).lastInsertRowid;
+  return { sid, mid };
+}
+const vorschlagOf = (mid) => JSON.parse(db.prepare('SELECT vorschlaege FROM chat_messages WHERE id = ?').get(mid).vorschlaege)[0];
+
+test('PATCH /chat/message/:id/vorschlag/:idx/status: verwerfen ↔ öffnen, übernommen hebt verworfen auf', async () => {
+  const { mid } = seedPageChat();
+  assert.equal((await api('PATCH', `/chat/message/${mid}/vorschlag/0/status`, { status: 'discarded' })).status, 200);
+  assert.equal(vorschlagOf(mid).status, 'discarded');
+  assert.equal((await api('PATCH', `/chat/message/${mid}/vorschlag/0/status`, { status: null })).status, 200);
+  assert.equal(vorschlagOf(mid).status, undefined);
+
+  await api('PATCH', `/chat/message/${mid}/vorschlag/0/status`, { status: 'discarded' });
+  assert.equal((await api('PATCH', `/chat/message/${mid}/vorschlag/0/applied`, {})).status, 200);
+  const v = vorschlagOf(mid);
+  assert.equal(v.applied, true);
+  assert.equal(v.status, undefined, 'Übernehmen hebt „verworfen" auf');
+  const conflict = await api('PATCH', `/chat/message/${mid}/vorschlag/0/status`, { status: 'discarded' });
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.json.error_code, 'VORSCHLAG_ALREADY_APPLIED');
+
+  assert.equal((await api('PATCH', `/chat/message/${mid}/vorschlag/0/applied`, { applied: false })).status, 200);
+  assert.equal(vorschlagOf(mid).applied, undefined, 'Rückgängig nimmt applied zurück');
+});
+
+test('PATCH …/vorschlag/:idx/status: ungültiger Status 400, fremde Nachricht 404', async () => {
+  const { mid } = seedPageChat(OTHER);
+  assert.equal((await api('PATCH', `/chat/message/${mid}/vorschlag/0/status`, { status: 'applied' })).status, 400);
+  const r = await api('PATCH', `/chat/message/${mid}/vorschlag/0/status`, { status: 'discarded' });
+  assert.equal(r.status, 404);
+  assert.equal(vorschlagOf(mid).status, undefined);
+});
+
+test('POST /jobs/chat: message ohne String-Typ → 400 statt 500', async () => {
+  const { sid } = seedPageChat();
+  for (const message of [42, { x: 1 }, ['a'], null]) {
+    const r = await api('POST', '/jobs/chat', { session_id: sid, message });
+    assert.equal(r.status, 400, `message=${JSON.stringify(message)}`);
+    assert.equal(r.json.error_code, 'SESSION_ID_MSG_REQUIRED');
+  }
+});
+
+test('GET /chat/sessions/:page_id: vollständige Liste (kein 20er-Deckel), Preview gekappt', async () => {
+  for (let i = 0; i < 25; i++) seedPageChat();
+  db.prepare(`UPDATE chat_messages SET content = ?`).run('x'.repeat(500));
+  const r = await api('GET', `/chat/sessions/${MY_PAGE}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.length, 25);
+  assert.ok(r.json.every(s => s.preview.length <= 200));
+});

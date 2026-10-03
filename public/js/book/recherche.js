@@ -12,6 +12,11 @@ import { rechercheItemMethods } from './recherche/items.js';
 import { rechercheLinkMethods } from './recherche/links.js';
 import { rechercheMediaMethods } from './recherche/media.js';
 import { rechercheStatusMethods } from './recherche/status.js';
+import { rechercheBulkMethods } from './recherche/bulk.js';
+import { rechercheCrosscheckMethods } from './recherche/crosscheck.js';
+
+export { rechercheBulkState } from './recherche/bulk.js';
+export { rechercheCrosscheckState } from './recherche/crosscheck.js';
 
 export const rechercheMethods = {
   ...rechercheBoardMethods,
@@ -19,4 +24,6 @@ export const rechercheMethods = {
   ...rechercheLinkMethods,
   ...rechercheMediaMethods,
   ...rechercheStatusMethods,
+  ...rechercheBulkMethods,
+  ...rechercheCrosscheckMethods,
 };

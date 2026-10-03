@@ -94,9 +94,11 @@
   color: var(--color-muted);
   cursor: pointer;
 }
-.pdfx-hf-sbtn b, .pdfx-hf-sbtn i { font-style: normal; font-weight: inherit; }
-.pdfx-hf-sbtn b { font-weight: var(--fw-bold); }
-.pdfx-hf-sbtn i { font-style: italic; }
+.pdfx-hf-sbtn--bold { font-weight: var(--fw-bold); }
+.pdfx-hf-sbtn--italic { font-style: italic; }
+/* Buchseiten-Zeile (Recto/Verso) als x-for-Wrapper: löst sich im Raster auf,
+   damit Zeilenkopf + 3 Zellen direkte Grid-Items bleiben. */
+.pdfx-hf-row { display: contents; }
 .pdfx-hf-sbtn:hover { border-color: var(--card-accent, var(--color-accent)); }
 .pdfx-hf-sbtn.is-on {
   background: var(--card-accent, var(--color-accent));
@@ -287,6 +289,68 @@
   transition: background var(--transition-base), border-color var(--transition-base);
 }
 .pdfx-file-btn:hover { border-color: var(--color-accent); background: var(--color-bg); }
+
+/* === Modus-Leiste (Einfach/Experte) + Ungespeichert-Marke === */
+.pdfx-mode-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+.pdfx-mode-bar .card-form-label { margin: 0; }
+.pdfx-dirty-mark {
+  font-size: var(--font-size-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--color-warn-text);
+  background: var(--color-warn-bg);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2xs) var(--space-sm);
+}
+.pdfx-mode-bar .pdfx-dirty-mark { margin-left: auto; }
+
+/* === Export-Befunde (bleibende Liste statt Toast) === */
+.pdfx-warn-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.pdfx-warn-list ul {
+  margin: var(--space-xs) 0 0;
+  padding-left: var(--space-lg);
+}
+.pdfx-warn-list li + li { margin-top: var(--space-3); }
+.pdfx-warn-list li.is-info { color: var(--color-muted); }
+
+/* === Satzspiegel-Vorschau (Doppelseite, SVG) ===
+   Papier in Surface-Token (folgt Dark-Mode), Satzspiegel in Karten-Akzent,
+   Kopf-/Fusszeilen-Bänder gedämpft; leere Bänder nur als Kontur. */
+.pdfx-ss { margin: var(--space-sm) 0 var(--space-10); }
+.pdfx-ss-figure { margin: 0; }
+.pdfx-ss-svg {
+  display: block;
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  background: var(--color-bg);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.pdfx-ss-page { fill: var(--color-surface); stroke: var(--color-muted); stroke-width: 0.6; }
+.pdfx-ss-frame { fill: none; stroke: var(--color-border); stroke-width: 0.5; stroke-dasharray: 2 2; }
+.pdfx-ss-text {
+  fill: var(--card-accent, var(--color-accent));
+  fill-opacity: 0.18;
+  stroke: var(--card-accent, var(--color-accent));
+  stroke-width: 0.6;
+}
+.pdfx-ss-gap { fill: var(--color-surface); }
+.pdfx-ss-hf { fill: var(--color-muted); fill-opacity: 0.35; }
+.pdfx-ss-hf.is-empty { fill-opacity: 0; stroke: var(--color-muted); stroke-width: 0.4; stroke-dasharray: 1.5 1.5; }
+.pdfx-ss-fold { stroke: var(--color-muted); stroke-width: 0.6; stroke-dasharray: 3 2; }
+.pdfx-ss-bleed { fill: none; stroke: var(--color-err-text, var(--color-warn-text)); stroke-width: 0.5; stroke-dasharray: 2 1.5; }
+.pdfx-ss .card-form-warn { margin-top: var(--space-xs); }
 
 /* === Mobile-Breakpoints (PDF-spezifisch) === */
 @media (max-width: 600px) {

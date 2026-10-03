@@ -5,6 +5,7 @@
 // book:changed-Hook nötig.
 
 import { userSettingsMethods } from '../user-settings.js';
+import { aiAccessState, aiAccessMethods } from '../user-settings-ai-access.js';
 import { EVT } from '../events.js';
 
 export function registerUserSettingsCard() {
@@ -43,6 +44,8 @@ export function registerUserSettingsCard() {
     // Chrome-Erweiterung (schreibwerkstatt-browser-extension): storeUrl = Chrome
     // Web Store (regulaerer Weg), available/zip = ZIP-Release als Zweitweg
     extensionRelease: { available: false, storeUrl: '' },
+    // Eigener KI-Zugang (routes/me-ai-access.js)
+    ...aiAccessState(),
     _savedAtTimer: null,
 
     get dictEntriesFiltered() {
@@ -58,6 +61,7 @@ export function registerUserSettingsCard() {
         if (!visible) return;
         await this.loadUserSettings();
         await this.loadDictEntries();
+        await this.loadAiAccess();
         await this.loadDeviceTokens();
         await this.loadMacRelease();
         await this.loadAndroidRelease();
@@ -100,5 +104,6 @@ export function registerUserSettingsCard() {
     },
 
     ...userSettingsMethods,
+    ...aiAccessMethods,
   }));
 }

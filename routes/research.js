@@ -13,7 +13,7 @@ const express = require('express');
 const { db } = require('../db/schema');
 const {
   LINK_TARGETS, attachRelations, emitItem, replaceUrls, replaceTags, createItem,
-  listEntityLinkTargets,
+  listEntityLinkTargets, findDuplicateItem, addItemLink, STATUS_SELECT_SQL, setItemsStatus,
 } = require('../db/research-items');
 const { toIntId } = require('../lib/validate');
 const { guardBook, sessionEmail } = require('../lib/acl');
@@ -30,6 +30,8 @@ const logger = require('../logger');
 const { researchMediaRouter } = require('./research-media');
 const { interviewMediaRouter } = require('./interview');
 const { researchScrapeRouter } = require('./research-scrape');
+const { researchChatProposalsRouter } = require('./research-chat-proposals');
+const { researchBulkRouter } = require('./research-bulk');
 
 const router = express.Router();
 const jsonBody = express.json();
@@ -44,6 +46,11 @@ router.use('/', interviewMediaRouter);
 // Request samt SSRF-Schutz, Timeout und Fehlerabbildung nichts mit dem CRUD des
 // Boards zu tun hat. Siehe routes/research-scrape.js.
 router.use('/', researchScrapeRouter);
+// Speichern eines Recherche-Chat-Vorschlags (POST /chat-proposal): legt das
+// Fundstück an UND persistiert den Gespeichert-Status am Vorschlag.
+router.use('/', researchChatProposalsRouter);
+// Mehrfachauswahl (POST /bulk): eine Aktion auf viele Fundstuecke, eine Transaktion.
+router.use('/', researchBulkRouter);
 
 // Item-Modell (Anlegen, Kind-Tabellen, Ausgabeform, LINK_TARGETS) liegt in
 // db/research-items.js, weil routes/capture.js (Browser-Erweiterung) denselben
@@ -66,7 +73,6 @@ const PATCH_FIELDS = [
   { name: 'title',    clean: (v) => cleanStr(v, TITLE_MAX) },
   { name: 'body',     clean: (v) => cleanStr(v, BODY_MAX) },
   { name: 'source',   clean: (v) => cleanStr(v, SOURCE_MAX) },
-  { name: 'status',   validate: (v) => RESEARCH_STATUS_SET.has(v), error: 'INVALID_STATUS' },
   { name: 'pinned',   clean: (v) => v ? 1 : 0 },
   { name: 'archived', clean: (v) => v ? 1 : 0 },
 ];
@@ -161,7 +167,8 @@ router.get('/', (req, res) => {
   const rows = db.prepare(
     `SELECT ri.id, ri.book_id, ri.user_email, ri.kind, ri.title, ri.body,
             ri.source, ri.image_mime, ri.doc_mime, ri.doc_name, ri.doc_pages, ri.doc_chars,
-            ri.status, ri.pinned, ri.archived, ri.created_at, ri.updated_at${selectExtra}
+            ri.status, ri.pinned, ri.archived, ri.created_at, ri.updated_at,
+            ${STATUS_SELECT_SQL}${selectExtra}
        FROM research_items ri
       WHERE ${where.join(' AND ')}
       ORDER BY ${orderBy}${limit ? '\n      LIMIT ?' : ''}`
@@ -260,6 +267,21 @@ router.post('/', jsonBody, (req, res) => {
   const hasUrl = urls.some(u => /^https?:\/\//i.test(String(typeof u === 'string' ? u : u?.url || '').trim()));
   if (!title && !body && !hasUrl) return res.status(400).json({ error_code: 'EMPTY' });
 
+  // Dublette: eine der URLs liegt schon an einem (nicht archivierten) Fundstück
+  // dieses Buchs → 409 mit der bestehenden Id. Bewusst übersteuerbar
+  // (`allow_duplicate: true`): zwei verschiedene Zitate aus derselben Seite sind
+  // zwei Fundstücke. Client-Vertrag: docs/clients.md („Recherche-Board").
+  if (hasUrl && req.body?.allow_duplicate !== true) {
+    const dup = findDuplicateItem(bookId, { urls });
+    if (dup && dup.match === 'url') {
+      return res.status(409).json({
+        error_code: 'DUPLICATE_URL',
+        existing_id: dup.id,
+        params: { existing_id: dup.id, title: dup.title || dup.url || '' },
+      });
+    }
+  }
+
   const id = createItem({
     bookId, userEmail, kind, title, body, source, urls, tags: req.body?.tags,
   });
@@ -276,6 +298,10 @@ router.patch('/:id', jsonBody, (req, res) => {
   const sets = [];
   const vals = [];
   const b = req.body || {};
+  // Status laeuft ueber den gemeinsamen Schreibweg (haelt fest, wer und wann) —
+  // geprueft VOR den uebrigen Feldern, damit ein ungueltiger Wert nichts schreibt.
+  const hasStatus = typeof b.status !== 'undefined';
+  if (hasStatus && !RESEARCH_STATUS_SET.has(b.status)) return res.status(400).json({ error_code: 'INVALID_STATUS' });
   for (const f of PATCH_FIELDS) {
     if (typeof b[f.name] === 'undefined') continue;
     if (f.validate && !f.validate(b[f.name])) {
@@ -287,7 +313,8 @@ router.patch('/:id', jsonBody, (req, res) => {
 
   const hasTags = typeof b.tags !== 'undefined';
   const hasUrls = typeof b.urls !== 'undefined';
-  if (!sets.length && !hasTags && !hasUrls) return res.status(400).json({ error_code: 'NO_FIELDS' });
+  if (!sets.length && !hasTags && !hasUrls && !hasStatus) return res.status(400).json({ error_code: 'NO_FIELDS' });
+  if (hasStatus) setItemsStatus([id], b.status, sessionEmail(req));
 
   // urls sind Kerninhalt → updated_at auch dann bumpen, wenn nur sie sich ändern.
   if (sets.length || hasUrls) {
@@ -318,21 +345,10 @@ router.post('/:id/links', jsonBody, (req, res) => {
 
   const targetKind = String(req.body?.target_kind || '').trim();
   const targetId = toIntId(req.body?.target_id);
-  const t = LINK_TARGETS[targetKind];
-  if (!t || !targetId) return res.status(400).json({ error_code: 'INVALID_TARGET' });
-  // Ziel muss zum Buch gehören.
-  const owner = db.prepare(`SELECT book_id FROM ${t.table} WHERE ${t.pk} = ?`).get(targetId);
-  if (!owner || owner.book_id !== bookId) return res.status(400).json({ error_code: 'BOOK_MISMATCH' });
-
-  try {
-    db.prepare(
-      `INSERT INTO research_item_links (item_id, target_kind, ${t.col}, created_at)
-       VALUES (?, ?, ?, ${NOW_ISO_SQL})`
-    ).run(id, targetKind, targetId);
-  } catch (e) {
-    // UNIQUE-Verstoß = Verknüpfung existiert bereits → idempotent.
-    if (!/UNIQUE/.test(e.message)) throw e;
-  }
+  if (!LINK_TARGETS[targetKind] || !targetId) return res.status(400).json({ error_code: 'INVALID_TARGET' });
+  // Ziel muss zum Buch gehören (Prüfung + idempotenter Insert in db/research-items.js).
+  const err = addItemLink(id, bookId, targetKind, targetId);
+  if (err) return res.status(400).json({ error_code: err });
   res.json(emitItem(id));
 });
 

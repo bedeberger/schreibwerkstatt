@@ -203,6 +203,19 @@ export const contentRepo = {
     return _write('DELETE', path, undefined, inv);
   },
 
+  // GET /content/books/:id/trash — Papierkorb (geloeschte, wiederherstellbare
+  // Seiten). Immer frisch: der Eintrag aendert sich mit jedem Delete/Restore.
+  listTrash(bookId) {
+    return _get('books/' + bookId + '/trash', { fresh: true });
+  },
+
+  // POST /content/books/:id/trash/:deletion_id/restore — legt die Seite neu an
+  // (neue page_id) → Tree-Cache busten wie bei createPage.
+  restoreFromTrash(bookId, deletionId) {
+    return _write('POST', 'books/' + bookId + '/trash/' + deletionId + '/restore', {},
+      ['pages', 'books/' + bookId + '/tree']);
+  },
+
   // POST /content/pages/:id/revisions/:rev_id/restore — schreibt den Body der
   // Revision zurueck. Der Restore ist selbst ein Body-Write und erzeugt darum
   // eine neue Revision; er muss BEIDE Cache-Eintraege busten. Ohne den Bust auf

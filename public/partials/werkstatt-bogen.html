@@ -138,7 +138,7 @@
       <div class="entity-list entity-list--accented">
         <template x-for="(b, idx) in arcFindings()" :key="b.code + ':' + b.kern + ':' + idx">
           <div class="entity-row">
-            <span class="severity-tag" :class="'severity-tag--' + b.schwere"
+            <span class="severity-tag" :class="befundSeverityClass(b.schwere)"
                   x-text="$app.t('werkstatt.severity.' + b.schwere)"></span>
             <span class="entity-row-title" x-text="arcKernLabel(b.kern)"></span>
             <span class="entity-row-meta" x-text="arcFindingText(b)"></span>

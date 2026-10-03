@@ -46,12 +46,19 @@ function _toOcc(kind, entityId, score, snippet, source) {
 // interner FTS-Fusion) wenn das Embedding-Backend läuft, sonst reine FTS über den
 // Titel. Dedup pro (kind, entity) — ein Ort zählt einmal.
 //
-// minScore: Score-Untergrenze fürs Speichern. 0 für „im Buch"-Beats (alle Treffer
-// zählen — es geht um Drift-Erkennung). Für „geplant"-Beats die hohe Promotion-
-// Schwelle, damit nur starke Treffer als „offenbar schon geschrieben" durchkommen
-// (sonst Vorschlags-Flut). Bei minScore > 0 wird der reine FTS-Fallback übersprungen:
-// ein wörtlicher Titel-Treffer ist ohne Semantik ein zu schwaches Promotion-Signal.
-async function _anchorBeat(bookId, beat, useSemantic, signalFn, minScore = 0) {
+// Konfidenz ist der ROHE COSINUS (`semScore`, 0–1), nicht `score`: bei Hybrid ist
+// `score` der RRF-Wert (Rang-Fusion, max. ~0.03), mit Rerank die Rerank-Relevanz —
+// beides nicht gegen eine absolute Schwelle vergleichbar. Reine FTS-Fusions-
+// Kandidaten (semScore null) sind semantisch nicht belegt und werden übersprungen
+// (Muster routes/jobs/motif-scan.js). Gespeichert wird semScore.
+//
+// minScore: Cosinus-Untergrenze fürs Speichern. Für „im Buch"-Beats die Bestätigungs-
+// Schwelle (plot.anchor.confirm_min_score) — ohne sie liefert die Nächster-Nachbar-
+// Suche für JEDEN Beat Treffer, und „confirmed" hiesse nichts. Für „geplant"-Beats die
+// höhere Promotion-Schwelle (sonst Vorschlags-Flut). Ist der Beat geplant (minScore
+// = Promotion), wird der reine FTS-Fallback übersprungen: ein wörtlicher Titel-
+// Treffer ist ohne Semantik ein zu schwaches Promotion-Signal.
+async function _anchorBeat(bookId, beat, useSemantic, signalFn, minScore = 0, { promote = minScore > 0 } = {}) {
   const found = new Map();
   const query = [beat.titel, beat.beschreibung].map(s => String(s || '').trim()).filter(Boolean).join('. ');
   if (!query) return [];
@@ -59,11 +66,12 @@ async function _anchorBeat(bookId, beat, useSemantic, signalFn, minScore = 0) {
   if (useSemantic) {
     const hits = await semanticQuery(bookId, query, { kinds: SCAN_KINDS, topK: TOP_K, signal: signalFn() });
     for (const h of hits) {
-      if (minScore > 0 && h.score != null && h.score < minScore) continue;
-      found.set(_occKey(h.kind, h.entity_id), _toOcc(h.kind, h.entity_id, h.score, _plainSnippet(h.text), 'semantic'));
+      if (h.semScore == null) continue;
+      if (minScore > 0 && h.semScore < minScore) continue;
+      found.set(_occKey(h.kind, h.entity_id), _toOcc(h.kind, h.entity_id, h.semScore, _plainSnippet(h.text), 'semantic'));
     }
   } else {
-    if (minScore > 0) return []; // Promotion nur mit Semantik — FTS-Titel-Treffer zu schwach.
+    if (promote) return []; // Promotion nur mit Semantik — FTS-Titel-Treffer zu schwach.
     // Ohne Embedding-Backend: wörtliche FTS über den Beat-Titel (kürzer, präziser
     // als die ganze Beschreibung als Textblob).
     let r;
@@ -88,9 +96,11 @@ async function runBeatAnchorJob(jobId, bookId, userEmail) {
     const useSemantic = embed.isEnabled();
     // Promotion-Schwelle für GEPLANTE Beats (hoch, sonst Vorschlags-Flut). 0 = aus.
     const promoteFloor = Number(appSettings.get('plot.anchor.promote_min_score')) || 0;
+    // Bestätigungs-Schwelle für „im Buch"-Beats (Cosinus). 0 = jeder semantische Treffer.
+    const confirmFloor = Number(appSettings.get('plot.anchor.confirm_min_score')) || 0;
     // Verankert werden nicht-verworfene Beats beider Status:
-    //   - „im Buch": alle Treffer (Soll-Ist-Drift — ist das laut Plan Geschriebene
-    //     wirklich im Text?).
+    //   - „im Buch": Treffer ≥ confirmFloor (Soll-Ist-Drift — ist das laut Plan
+    //     Geschriebene wirklich im Text?).
     //   - „geplant": nur Treffer ≥ promoteFloor (Promotion-Erkennung — offenbar schon
     //     geschrieben? → Vorschlag „auf im Buch setzen"). Bei promoteFloor = 0 werden
     //     geplante Beats nicht gescannt (Feature aus).
@@ -106,21 +116,34 @@ async function runBeatAnchorJob(jobId, bookId, userEmail) {
     updateJob(jobId, { statusText: 'job.phase.beatAnchor', statusParams: { done: 0, total: beats.length }, progress: 5 });
 
     let totalOcc = 0;
+    let failed = 0;
     for (let i = 0; i < beats.length; i++) {
       throwIfAborted();
       const beat = beats[i];
-      const minScore = beat.status === 'im_buch' ? 0 : promoteFloor;
-      const rows = await _anchorBeat(bookId, beat, useSemantic, signal, minScore);
-      plotDb.replaceBeatOccurrences(beat.id, bookId, rows);
-      totalOcc += rows.length;
+      const promote = beat.status !== 'im_buch';
+      const minScore = promote ? promoteFloor : confirmFloor;
+      // Ein Fehler (Embedding-Endpunkt weg, kaputte Query) kostet nur diesen Beat:
+      // geloggt, übersprungen, seine bisherigen Fundstellen bleiben stehen (kein
+      // Full-Replace mit [] — ein Ausfall ist keine Aussage „nicht im Text").
+      let rows;
+      try {
+        rows = await _anchorBeat(bookId, beat, useSemantic, signal, minScore, { promote });
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        failed++;
+        log.warn(`Beat-Anchor: Beat ${beat.id} übersprungen: ${e.message}`);
+        continue;
+      }
+      // false = Beat während des Laufs gelöscht → nichts zu schreiben.
+      if (plotDb.replaceBeatOccurrences(beat.id, bookId, rows)) totalOcc += rows.length;
       updateJob(jobId, {
         statusText: 'job.phase.beatAnchor', statusParams: { done: i + 1, total: beats.length },
         progress: 5 + Math.round(((i + 1) / Math.max(beats.length, 1)) * 90),
       });
     }
 
-    log.info(`Beat-Anchor ${bookId}: ${beats.length} Beats, ${totalOcc} Fundstellen (semantisch=${useSemantic}).`);
-    completeJob(jobId, { beats: beats.length, occurrences: totalOcc, semantic: useSemantic }, null,
+    log.info(`Beat-Anchor ${bookId}: ${beats.length} Beats, ${totalOcc} Fundstellen, ${failed} fehlgeschlagen (semantisch=${useSemantic}).`);
+    completeJob(jobId, { beats: beats.length, occurrences: totalOcc, failed, semantic: useSemantic }, null,
       `${beats.length} Beats, ${totalOcc} Fundstellen`);
   } catch (e) {
     if (e.name !== 'AbortError') log.error(`Beat-Anchor Fehler: ${e.message}`, { stack: e.stack });
@@ -151,4 +174,4 @@ beatAnchorRouter.post('/beat-anchor', jsonBody, (req, res) => startBookJob(req, 
   run: (jobId, { bookId, userEmail }) => runBeatAnchorJob(jobId, bookId, userEmail),
 }));
 
-module.exports = { beatAnchorRouter, runBeatAnchorJob, anchorAllBooks };
+module.exports = { beatAnchorRouter, runBeatAnchorJob, anchorAllBooks, _anchorBeat };

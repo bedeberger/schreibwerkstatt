@@ -7,7 +7,8 @@
   Brainstorm (Beats vorschlagen) + Consistency (geplant vs. Buchrealität prüfen).
   Rahmen + verschachtelte Partials (File-Limit) via _loadPartials-Cascade.
 -->
-<div class="card card--plot fullscreen-shell" x-data="plotCard" x-show="$app.showPlotCard" x-cloak>
+<div class="card card--plot fullscreen-shell" x-data="plotCard" x-show="$app.showPlotCard" x-cloak
+     :class="{ 'plot--compact': plotDensity === 'compact' }">
   <div class="card-header card-header--subline">
     <div class="card-header-titlebar">
       <span class="card-eyebrow" x-text="$app.selectedBookName"></span>
@@ -40,7 +41,7 @@
                 :class="{ 'icon-btn--attention': beatAnchorStale && !anchorLoading }"
                 @click="runBeatAnchor()"
                 :disabled="anchorLoading || !beats.length"
-                :data-tip="anchorSemanticActive() ? $app.t('plot.anchor.run') : $app.t('plot.anchor.runLiteral')"
+                :data-tip="(anchorSemanticActive() ? $app.t('plot.anchor.run') : $app.t('plot.anchor.runLiteral')) + '\n' + $app.t('plot.help.anchor')"
                 :aria-label="$app.t('plot.anchor.run')">
           <span x-show="anchorLoading" class="spinner"></span>
           <svg x-show="!anchorLoading" class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
@@ -51,6 +52,10 @@
                 @click="togglePlotFullscreen()"
                 :aria-label="plotFullscreen ? $app.t('plot.fullscreenExit.tip') : $app.t('plot.fullscreen.tip')"
                 :data-tip="plotFullscreen ? $app.t('plot.fullscreenExit.tip') : $app.t('plot.fullscreen.tip')"><svg class="icon" aria-hidden="true"><use :href="plotFullscreen ? '/icons.svg#minimize-2' : '/icons.svg#maximize-2'"/></svg></button>
+        <!-- Plot-Chat-Panel (chat/plot-chat.js): Vorschläge ans Board, einzeln übernehmen -->
+        <button type="button" class="icon-btn icon-btn--ghost" :class="{ 'is-active': plotChatOpen }"
+                :aria-pressed="plotChatOpen" @click="togglePlotChat()"
+                :aria-label="$app.t('plot.chat.toggle')" :data-tip="$app.t('plot.chat.toggle')"><svg class="icon" aria-hidden="true"><use href="/icons.svg#message-square"/></svg></button>
       </div>
     </div>
   </div>
@@ -78,17 +83,27 @@
   <!-- Fehler -->
   <div x-show="errorMessage" class="card-status card-status--error" x-text="errorMessage"></div>
 
+  <!-- Board links, Plot-Chat rechts daneben (ab 1280px; schmaler klappt der Chat
+       per `order` über das Board). Reine Layout-Klammer. -->
+  <div class="plot-split" :class="{ 'plot-split--chat': plotChatOpen }">
+  <div class="plot-main">
+
   <!-- Skeleton -->
   <div x-show="loading && !acts.length" class="card-status" x-text="$app.t('plot.loading')"></div>
 
   <!-- Beat-Verankerungs-Lauf (Ist-Index gegen den Buchtext) -->
   <div x-show="anchorLoading" class="card-status" x-html="anchorStatus || $app.t('plot.anchor.running')"></div>
 
-  <!-- Leer-Hinweis -->
+  <!-- Leer-Hinweis (DESIGN.md „Empty-State mit CTA"). startFirstAct waehlt den
+       Weg: flaches Board (addingAct) bzw. — wenn schon Straenge existieren — den
+       geteilten Akt im Grid (addingActScope = null). -->
   <div x-show="!acts.length && !loading" class="card-empty">
-    <p x-text="$app.t('plot.empty.hint')"></p>
-    <button type="button" class="btn-primary" @click="addingAct = true; $nextTick(() => $el.parentElement.querySelector('.plot-new-act-input')?.focus())"
-            x-show="!addingAct" x-text="$app.t('plot.empty.addAct')"></button>
+    <p class="card-empty-text" x-text="$app.t('plot.empty.hint')"></p>
+    <button type="button" class="primary card-empty-cta" @click="startFirstAct()"
+            x-show="!addingAct && addingActScope === false">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
+      <span x-text="$app.t('plot.empty.addAct')"></span>
+    </button>
   </div>
 
   <!-- Filter-Leiste (Volltext / Kapitel / Figur) — filtert die Beats pro Akt-Spalte/Zelle.
@@ -118,17 +133,19 @@
          x-effect="options = plotKapitelListe().map(k => ({value: k, label: k}))">
     </div>
     <!-- „im Buch" fällt aus den Status-Optionen, solange der Ausblend-Schalter
-         steht — die Kombination beider wäre eine garantiert leere Auswahl. -->
+         steht — die Kombination beider wäre eine garantiert leere Auswahl.
+         „verworfen" ist kein Status, sondern die Flag-Achse: als Option zeigt
+         sie nur die verworfenen Beats (_beatMatchesFilter). -->
     <div x-data="catalogFilter('status')" x-show="beats.length > 0"
-         x-modelable="value" x-model="plotFilters.status"
-         x-effect="options = statusList().filter(s => !(plotHideImBuch && s === 'im_buch')).map(s => ({value: s, label: $app.t('plot.status.' + s)}))">
+         x-modelable="value" x-model="plotFilters.status" :data-tip="$app.t('plot.help.status')"
+         x-effect="options = [...statusList().filter(s => !(plotHideImBuch && s === 'im_buch')), 'verworfen'].map(s => ({value: s, label: $app.t('plot.status.' + s)}))">
     </div>
     <!-- Archiv-Schalter: abgeschlossene Akte (Beats eingearbeitet) sind aus den
          Board-Spalten raus — hier holt man sie zum Nachlesen/Wiederaufnehmen
          zurueck. Sagt etwas ueber die SPALTEN, nicht ueber die Beats, steht aber
          auf derselben Ebene wie der „im Buch"-Schalter: beides sind Schalter des
          Arbeitsmodus, und zwei getrennte Zeilen liessen sie unverwandt aussehen. -->
-    <label class="filter-toggle" x-show="archivedActCount() > 0">
+    <label class="filter-toggle" x-show="archivedActCount() > 0" :data-tip="$app.t('plot.help.archive')">
       <input type="checkbox" x-model="plotShowArchived">
       <span x-text="$app.t('plot.archive.show', { n: archivedActCount() })"></span>
     </label>
@@ -137,6 +154,12 @@
     <label class="filter-toggle" x-show="beats.length > 0">
       <input type="checkbox" x-model="plotHideImBuch">
       <span x-text="$app.t('plot.filter.hideImBuch')"></span>
+    </label>
+    <!-- Dichte: nur die Kopfzeile der Beat-Karten (per User persistiert wie
+         „im Buch ausblenden", book/plot/board-ui.js). -->
+    <label class="filter-toggle" x-show="beats.length > 0" :data-tip="$app.t('plot.density.tip')">
+      <input type="checkbox" :checked="plotDensity === 'compact'" @change="setPlotDensity($event.target.checked)">
+      <span x-text="$app.t('plot.density.compact')"></span>
     </label>
     <span class="filter-count" x-show="beats.length > 0" x-text="filteredBeatCount() + ' / ' + beats.length"></span>
   </div>
@@ -184,4 +207,9 @@
   <!-- KI-Konsistenz (Fortschritt + Ergebnis) + Lauf-Historien (Konsistenz + Brainstorm).
        Ausgelagert (File-Limit), via _loadPartials in den plotCard-Scope injiziert. -->
   <div id="partial-plot-ki-runs"></div>
+  </div><!-- /.plot-main -->
+
+  <!-- Plot-Chat-Panel (ausgelagert; File-Limit) -->
+  <div id="partial-plot-chat" class="plot-chat-slot"></div>
+  </div><!-- /.plot-split -->
 </div>

@@ -251,7 +251,8 @@ function register(router) {
     }
   });
 
-  // DELETE /content/pages/:page_id — Seite hart löschen (kein Papierkorb). minRole editor.
+  // DELETE /content/pages/:page_id — Seite hart löschen; Inhalt geht in den
+  // Papierkorb (content/trash.js). minRole editor.
   router.delete('/pages/:page_id', async (req, res) => {
     const pageId = toIntId(req.params.page_id);
     if (!pageId) return res.status(400).json({ error_code: 'INVALID_PAGE_ID' });

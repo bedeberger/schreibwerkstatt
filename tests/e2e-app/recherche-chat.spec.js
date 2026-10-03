@@ -36,7 +36,7 @@ test('recherche-chat: Toggle schaltet das Panel, Eingabefeld + Close arbeiten na
   // landet im Textarea (toggleResearchChat fokussiert beim Oeffnen).
   await toggleBtn.click();
   await expect(page.locator('#recherche-card .research-chat')).toBeVisible();
-  const textarea = page.locator('#research-chat-messages + .chat-input-row textarea.research-chat-input');
+  const textarea = page.locator('#research-chat-messages ~ .chat-input-row textarea.research-chat-input');
   await expect(textarea).toBeVisible();
   await expect(page.locator('#recherche-card .chat-send-btn')).toBeVisible();
   await expect(textarea).toBeFocused();

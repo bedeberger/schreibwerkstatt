@@ -11,7 +11,6 @@
 //   deleteSnapshot(bookId, id)     → boolean (true = geloescht)
 //   countSnapshots(bookId)         → number
 //   setPublished(bookId, id, on)   → boolean (true = Zeile getroffen)
-//   latestSignature(bookId)        → { chars, pages, chapters } | null (Auto-Capture-Dedup)
 
 const { db } = require('./connection');
 const { NOW_ISO_SQL } = require('./now');
@@ -44,12 +43,16 @@ function createSnapshot({
 
 // Liste fuer die Karte: bewusst OHNE content_json/extras_json (koennen MB gross
 // sein). DESC nach created_at (juengste Fassung zuerst). `has_extras` als Flag.
+// `size_bytes` = Speicherbedarf der Fassung; octet_length liest dafuer nur den
+// Zellen-Header, nicht den (MB-grossen) Inhalt — length() wuerde ihn dekodieren.
 function listSnapshots(bookId) {
   return db.prepare(`
     SELECT id, book_id, seq, label, description,
            chars, words, pages, chapters, user_email, created_at, published_at,
            (extras_json IS NOT NULL) AS has_extras,
-           (publication_json IS NOT NULL) AS has_publication
+           (publication_json IS NOT NULL) AS has_publication,
+           octet_length(content_json) + COALESCE(octet_length(extras_json), 0)
+             + COALESCE(octet_length(publication_json), 0) AS size_bytes
     FROM book_snapshots
     WHERE book_id = ?
     ORDER BY created_at DESC, id DESC
@@ -92,16 +95,6 @@ function setPublished(bookId, id, published) {
   return res.changes > 0;
 }
 
-// Content-Signatur der juengsten Fassung (fuer Auto-Capture-Dedup): identische
-// (chars, pages, chapters) → der aktuelle Stand wurde bereits festgehalten.
-function latestSignature(bookId) {
-  const row = db.prepare(`
-    SELECT chars, pages, chapters FROM book_snapshots
-    WHERE book_id = ? ORDER BY created_at DESC, id DESC LIMIT 1
-  `).get(bookId);
-  return row || null;
-}
-
 // Fehlerdichte-Trend: die Fassungen des Buchs mit ihrer verdichteten Lektorat-
 // Kennzahl (lektorat_metrics), aufsteigend nach seq (Meilenstein-Reihenfolge).
 // Nur Meta + Wörter-Nenner + Metrics-JSON — kein content_json/extras_json.
@@ -116,5 +109,5 @@ function listLektoratTrend(bookId) {
 
 module.exports = {
   createSnapshot, listSnapshots, getSnapshot, getLatestSnapshot, deleteSnapshot, countSnapshots,
-  setPublished, latestSignature, listLektoratTrend,
+  setPublished, listLektoratTrend,
 };

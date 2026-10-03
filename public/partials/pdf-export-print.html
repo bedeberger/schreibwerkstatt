@@ -14,13 +14,13 @@
         </div>
 
         <div class="card-form-grid">
-          <div class="card-form-row">
+          <div class="card-form-row" x-show="uiMode === 'expert'">
             <label class="card-form-label" x-text="$app.t('pdfExport.print.bleedMm')"></label>
             <div class="card-form-field">
               <input type="text" x-data="numInput({ step: 0.5, min: 0, max: 10 })" x-modelable="value" x-model="activeProfile.config.print.bleedMm" class="pdfx-num-input">
             </div>
           </div>
-          <div class="card-form-row card-form-row--top">
+          <div class="card-form-row card-form-row--top" x-show="uiMode === 'expert'">
             <label class="card-form-label">&nbsp;</label>
             <div class="card-form-field">
               <label class="pdfx-check">
@@ -30,13 +30,13 @@
               <p class="card-form-field-note" x-show="!(activeProfile.config.print.bleedMm > 0)" x-text="$app.t('pdfExport.print.cropMarksNeedsBleed')"></p>
             </div>
           </div>
-          <div class="card-form-row">
+          <div class="card-form-row" x-show="uiMode === 'expert'">
             <label class="card-form-label" x-text="$app.t('pdfExport.print.dpiWarnThreshold')"></label>
             <div class="card-form-field">
               <input type="text" x-data="numInput({ step: 10, min: 72, max: 1200, integer: true })" x-modelable="value" x-model="activeProfile.config.print.dpiWarnThreshold" class="pdfx-num-input">
             </div>
           </div>
-          <div class="card-form-row card-form-row--top">
+          <div class="card-form-row card-form-row--top" x-show="uiMode === 'expert'">
             <label class="card-form-label">&nbsp;</label>
             <div class="card-form-field">
               <label class="pdfx-check">
@@ -46,13 +46,14 @@
               <p class="card-form-field-note" x-text="$app.t('pdfExport.print.padToEvenPagesHint')"></p>
             </div>
           </div>
-          <div class="card-form-row card-form-row--top">
+          <div class="card-form-row card-form-row--top" x-show="uiMode === 'expert'">
             <label class="card-form-label">&nbsp;</label>
             <div class="card-form-field">
               <label class="pdfx-check">
-                <input type="checkbox" x-model="activeProfile.config.print.blackTextKOnly">
+                <input type="checkbox" x-model="activeProfile.config.print.blackTextKOnly" :disabled="activeProfile.config.pdfa.standard === 'pdfa'">
                 <span x-text="$app.t('pdfExport.print.blackTextKOnly')"></span>
               </label>
+              <p class="card-form-field-note" x-show="activeProfile.config.pdfa.standard === 'pdfa'" x-text="$app.t('pdfExport.print.blackTextKOnlyPdfa')"></p>
               <p class="card-form-field-note" x-text="$app.t('pdfExport.print.blackTextKOnlyHint')"></p>
             </div>
           </div>

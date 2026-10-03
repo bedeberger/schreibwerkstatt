@@ -8,6 +8,7 @@
 // der Server liefert `code` + `params`, der Betrachter bestimmt die Sprache.
 
 import { fetchJson } from '../../utils.js';
+import { befundSeverityClass } from '../../utils/befund-severity.js';
 
 export const timeCheckMethods = {
   async loadTimeChecks() {
@@ -28,10 +29,9 @@ export const timeCheckMethods = {
   },
 
   // `schwach` heisst hier „leichter Befund". Die geteilte Palette kodiert unter
-  // `severity-tag--schwach` aber Beleg-STÄRKE (schwach = rot) — darum explizit
-  // auf die Schwere-Klassen abbilden (gleiche Zuordnung wie die Motiv-Messung).
+  // `severity-tag--schwach` aber Beleg-STÄRKE (schwach = rot) — darum über die
+  // gemeinsame Befund-Zuordnung (utils/befund-severity.js) abbilden.
   timeCheckSeverityClass(f) {
-    const map = { kritisch: 'severity-tag--kritisch', mittel: 'severity-tag--mittel', schwach: 'severity-tag--niedrig' };
-    return map[f && f.schwere] || 'severity-tag--niedrig';
+    return befundSeverityClass(f && f.schwere);
   },
 };

@@ -1,0 +1,36 @@
+<!-- Beat verschieben ohne Drag: Tastatur-/Touch-Alternative zum Griff der
+     Beat-Karte. Fragment-Include aus plot-beat-edit.html (Scope: beat + plotCard-
+     State, x-id der Edit-Instanz). Akt-Combobox bietet nur zulaessige Akte
+     (Strang mit eigener Aktstruktur → dessen Akte, sonst die geteilten), die
+     Strang-Combobox erscheint erst, wenn es Straenge gibt. Ausgefuehrt wird alles
+     ueber _dropBeat (book/plot/beat-move.js) — Undo-Record, Persist, Rollback.
+     Lokaler mv-State: die Combobox braucht ein beschreibbares Ziel, der Beat
+     selbst darf erst in _dropBeat umgehaengt werden. Nach einem No-op wird der
+     Wert auf den Beat zurueckgesetzt. -->
+<div class="plot-beat-move" role="group" :aria-labelledby="$id('pbe-move')"
+     x-data="{ mvAct: beat.act_id, mvThread: beat.thread_id ?? '' }"
+     x-effect="mvAct = beat.act_id; mvThread = beat.thread_id ?? ''">
+  <span class="plot-edit-label" :id="$id('pbe-move')" x-text="$app.t('plot.move.label')"></span>
+  <div class="plot-beat-move-row">
+    <div class="plot-beat-move-act" :aria-label="$app.t('plot.move.act')"
+         x-data="combobox({ placeholder: $app.t('plot.move.act') })"
+         x-modelable="value" x-model="mvAct"
+         x-effect="acts; plotShowArchived; options = beatMoveActOptions(beat)"
+         @combobox-change="moveBeatTo(beat, $event.detail, beat.thread_id).then(() => { mvAct = beat.act_id })"></div>
+    <div class="plot-beat-move-thread" x-show="threads.length" :aria-label="$app.t('plot.move.thread')"
+         x-data="combobox({ placeholder: $app.t('plot.move.thread') })"
+         x-modelable="value" x-model="mvThread"
+         x-effect="threads; acts; plotShowArchived; options = beatMoveThreadOptions(beat)"
+         @combobox-change="moveBeatTo(beat, beat.act_id, $event.detail).then(() => { mvThread = beat.thread_id ?? '' })"></div>
+    <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" data-beat-move="up"
+            :disabled="busy || !canMoveBeatStep(beat, -1)" @click="moveBeatStep(beat, -1)"
+            :data-tip="$app.t('plot.move.up')" :aria-label="$app.t('plot.move.up')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-up"/></svg>
+    </button>
+    <button type="button" class="icon-btn icon-btn--ghost plot-icon-btn" data-beat-move="down"
+            :disabled="busy || !canMoveBeatStep(beat, 1)" @click="moveBeatStep(beat, 1)"
+            :data-tip="$app.t('plot.move.down')" :aria-label="$app.t('plot.move.down')">
+      <svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-down"/></svg>
+    </button>
+  </div>
+</div>

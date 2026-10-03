@@ -86,10 +86,10 @@ test('listForAdmin maskiert encrypted Werte', () => {
 
 test('listForAdmin enthaelt auch Default-Keys ohne DB-Row', () => {
   const list = settings.listForAdmin();
-  const cronStale = list.find(s => s.key === 'cron.stale_days');
-  assert.ok(cronStale);
-  assert.equal(cronStale.isDefault, true);
-  assert.equal(cronStale.value, 7);
+  const retryMax = list.find(s => s.key === 'ai.claude.retry_max');
+  assert.ok(retryMax);
+  assert.equal(retryMax.isDefault, true);
+  assert.equal(retryMax.value, 3);
 });
 
 test('audit-Tabelle erhaelt Hashes bei jedem set', () => {
@@ -111,14 +111,14 @@ test('isEncryptedKey: bekannte Keys werden erkannt', () => {
 test('bootstrapFromEnv: spiegelt nicht-gesetzte Keys aus ENV', () => {
   // Setze ENV-Werte → Bootstrap soll sie in DB schreiben
   process.env.OLLAMA_HOST = 'http://test-ollama:11434';
-  process.env.STALE_DAYS = '14';
+  process.env.CLAUDE_RETRY_MAX = '7';
   // Sicherstellen: Keys aktuell nicht in DB
   settings.remove('ai.ollama.host');
-  settings.remove('cron.stale_days');
+  settings.remove('ai.claude.retry_max');
   const mirrored = settings.bootstrapFromEnv();
   assert.ok(mirrored >= 2, `erwartet >=2 gespiegelt, got ${mirrored}`);
   assert.equal(settings.get('ai.ollama.host'), 'http://test-ollama:11434');
-  assert.equal(settings.get('cron.stale_days'), 14);
+  assert.equal(settings.get('ai.claude.retry_max'), 7);
 });
 
 test('bootstrapFromEnv: ueberschreibt bestehende DB-Werte NICHT', () => {
@@ -157,7 +157,7 @@ test('VALIDATORS: int-Range rejectet Werte ueber max', () => {
 
 test('VALIDATORS: int-Range rejectet Floats', () => {
   assert.throws(
-    () => settings.set('cron.stale_days', 1.5, { updatedBy: 'tester@x' }),
+    () => settings.set('ai.claude.retry_max', 1.5, { updatedBy: 'tester@x' }),
     err => err.code === 'INVALID_VALUE',
   );
 });

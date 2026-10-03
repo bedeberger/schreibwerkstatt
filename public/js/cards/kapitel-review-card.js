@@ -13,6 +13,7 @@ import { contentRepo } from '../repo/content.js';
 import { memoMethods } from './card-memo.js';
 import { tileFormatMethods } from './tile-format.js';
 import { kapitelDashboardMethods, initialKapitelDashboardState } from './kapitel-dashboard.js';
+import { lsSet } from '../safe-storage.js';
 
 function emptySlot() {
   return { loading: false, progress: 0, status: '', out: '', jobId: null, pollTimer: null };
@@ -265,7 +266,7 @@ export function registerKapitelReviewCard() {
             include_subchapters: includeSubchapters,
           }),
         });
-        localStorage.setItem(this._lsKeyKapitelReview(chapterId), jobId);
+        lsSet(this._lsKeyKapitelReview(chapterId), jobId);
         this.startKapitelReviewPoll(jobId, chapterId);
       } catch (e) {
         console.error('[runKapitelReview]', e);

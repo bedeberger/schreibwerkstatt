@@ -178,3 +178,15 @@ body.snapshot-reader-open { overflow: hidden; overscroll-behavior: contain; }
   .snapshot-reader__body { padding: var(--space-sm) var(--space-xs) var(--space-xl); }
 }
 }
+
+/* Restore-Knopf je Seite/Kapitel: rechts im Kopf. Kapitel-Kopf dafür als
+   Zeile (Name nimmt den Platz, Knopf sitzt auf der Grundlinie daneben); im
+   Seiten-Kopf schiebt der Name Badge + Knopf gemeinsam nach rechts. */
+.snapshot-reader .book-editor-chapter-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+.snapshot-reader .book-editor-chapter-header .book-editor-chapter-name { flex: 1; min-width: 0; }
+.snapshot-reader__page .book-editor-page-header .book-editor-page-name { margin-inline-end: auto; }
+.snapshot-reader__restore { flex: none; }

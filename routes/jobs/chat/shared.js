@@ -1,5 +1,5 @@
 'use strict';
-// Geteilte Bausteine der drei Chats (Seiten-/Buch-/Recherche-Chat):
+// Geteilte Bausteine der Chats (Seiten-/Buch-/Recherche-/Plot-Chat):
 // Antwort-Parsing (lenient), gemeinsamer POST-Handler (_handleChatPost), und der
 // Buch-Chat-Seiten-Cache (klassischer Pfad) inkl. Invalidierung.
 
@@ -8,19 +8,67 @@ const { stripTrailingEmptyJson } = require('../agentic-chat');
 const { toIntId } = require('../../../lib/validate');
 const { db, getBookSettings } = require('../../../db/schema');
 const { getSessionForJob } = require('../../../db/chat-sessions');
+const { recordRepeat } = require('../../../db/chat-quality');
+const logger = require('../../../logger');
 const { resolvePageBookId } = require('../../../lib/content-ownership');
 const { guardBook, sessionEmail } = require('../../../lib/acl');
 const {
   jobs, runningJobs, createJob, enqueueJob, jobKey, findActiveJobId,
 } = require('../shared');
 
+// Nur die drei Modell-Felder überleben: `applied`/`applied_at`/`status` setzt
+// ausschliesslich der User über die PATCH-Routen (routes/chat.js) — ein Modell,
+// das sie mitliefert, darf keinen Vorschlag als erledigt ausgeben.
 function _sanitizeVorschlaege(arr) {
   if (!Array.isArray(arr)) return [];
-  return arr.filter(v => {
+  const out = [];
+  for (const v of arr) {
     const orig = typeof v?.original === 'string' ? v.original.trim() : '';
     const ers  = typeof v?.ersatz   === 'string' ? v.ersatz.trim()   : '';
-    return orig && ers && orig !== ers;
-  });
+    if (!orig || !ers || orig === ers) continue;
+    out.push({
+      original: v.original,
+      ersatz: v.ersatz,
+      ...(typeof v.begruendung === 'string' && v.begruendung.trim() ? { begruendung: v.begruendung } : {}),
+    });
+  }
+  return out;
+}
+
+// Titelvarianten (Seiten-Chat, optional): reine Strings, getrimmt, ein
+// umschliessendes Anführungszeichen-Paar entfernt, Dubletten (case-insensitiv)
+// raus, höchstens TITEL_VARIANTEN_MAX. Überlange Einträge sind kein Titel.
+const TITEL_VARIANTEN_MAX = 5;
+const TITEL_MAX_CHARS = 200;
+const _QUOTE_CHARS = '"\'«»„“”‚‘’‹›';
+function _unquoteTitel(t) {
+  if (t.length < 2 || !_QUOTE_CHARS.includes(t[0]) || !_QUOTE_CHARS.includes(t[t.length - 1])) return t;
+  const inner = t.slice(1, -1);
+  return [...inner].some(ch => _QUOTE_CHARS.includes(ch)) ? t : inner.trim();
+}
+function _sanitizeTitelVarianten(arr) {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of arr) {
+    if (typeof raw !== 'string') continue;
+    const t = _unquoteTitel(raw.replace(/\s+/g, ' ').trim());
+    if (!t || t.length > TITEL_MAX_CHARS) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+    if (out.length >= TITEL_VARIANTEN_MAX) break;
+  }
+  return out;
+}
+
+// Kaputtes JSON: sagt die Rohantwort, dass Vorschläge drinstanden, die das
+// lenient-Parsing nicht retten konnte? Dann sieht der User das (Flag in
+// `context_info.parse_fallback`), statt eine Antwort ohne die angekündigten
+// Vorschläge vorzufinden.
+function _lostVorschlaege(text) {
+  return /"vorschlaege"\s*:\s*\[\s*\{/.test(String(text || ''));
 }
 
 function _parseChatResponse(text) {
@@ -32,18 +80,22 @@ function _parseChatResponse(text) {
     return {
       antwort: r.parsed.antwort,
       vorschlaege: _sanitizeVorschlaege(r.parsed.vorschlaege),
+      titel_varianten: _sanitizeTitelVarianten(r.parsed.titel_varianten),
       fallback: false,
+      lostVorschlaege: false,
     };
   }
   // r.ok-aber-antwort-leer = Modell schrieb Prosa und trailing leeres `{}`,
   // das extractBalancedJson erwischt hat. Roh-Prosa speichern, fence weg.
   if (r.ok) {
-    return { antwort: stripTrailingEmptyJson(text) || text, vorschlaege: [], fallback: true };
+    return { antwort: stripTrailingEmptyJson(text) || text, vorschlaege: [], titel_varianten: [], fallback: true, lostVorschlaege: _lostVorschlaege(text) };
   }
   return {
     antwort: r.partial.antwort ?? stripTrailingEmptyJson(r.partial._raw ?? text) ?? text,
     vorschlaege: [],
+    titel_varianten: [],
     fallback: true,
+    lostVorschlaege: _lostVorschlaege(text),
   };
 }
 
@@ -72,8 +124,14 @@ function invalidateBookPageCache(bookId) {
 // ── Gemeinsamer Route-Handler ────────────────────────────────────────────────
 // `kind` bindet den Job-Typ an die Session-Art: eine Session läuft nur unter
 // dem Chat, für den sie angelegt wurde.
-function _handleChatPost(req, res, { jobType, kind, labelFn, runFn }) {
-  const { message } = req.body;
+// `preflight(req, res, { session, userEmail })` (optional) läuft nach der ACL und
+// VOR dem Speichern der User-Nachricht: liefert es false, ist die Antwort schon
+// raus und es bleibt keine verwaiste Nachricht ohne Job in der Session liegen
+// (Recherche-Chat: Kill-Switch + Claude-only, lib/research-chat-gate.js).
+function _handleChatPost(req, res, { jobType, kind, labelFn, runFn, preflight, contextFn }) {
+  // Typprüfung vor `.trim()`: eine Zahl/ein Objekt als `message` wäre sonst ein
+  // TypeError → 500 statt der 400, die der Client-Vertrag für fehlende Felder hat.
+  const message = typeof req.body?.message === 'string' ? req.body.message : null;
   const session_id = toIntId(req.body?.session_id);
   const clientMsgId = typeof req.body?.client_msg_id === 'string' && req.body.client_msg_id.length <= 64
     ? req.body.client_msg_id
@@ -109,20 +167,37 @@ function _handleChatPost(req, res, { jobType, kind, labelFn, runFn }) {
 
   // ACL-Guard. Page-Chat: lektor+. Buch-Chat: editor+, ausser
   // book_settings.allow_lektor_book_chat=1 setzt es auf lektor+.
-  // Recherche-Chat: editor+ (das Recherche-Board ist editor-scoped).
+  // Recherche-/Plot-Chat: editor+ (Recherche-Board und Plot-Werkstatt sind editor-scoped).
   let minRole = 'lektor';
   if (jobType === 'book-chat') {
     minRole = getBookSettings(session.book_id)?.allow_lektor_book_chat ? 'lektor' : 'editor';
-  } else if (jobType === 'research-chat') {
+  } else if (jobType === 'research-chat' || jobType === 'plot-chat') {
     minRole = 'editor';
   }
   if (!guardBook(req, res, session.book_id, minRole)) return;
+  if (preflight && !preflight(req, res, { session, userEmail })) return;
+  // Optionaler Kontext der Frage (Recherche-Chat: Seite/Kapitel des Kontext-Chips).
+  // `contextFn` prueft ihn gegen das Buch der Session und liefert das, was an der
+  // User-Nachricht als context_info steht — der Job liest es von dort, statt die
+  // Job-Signatur aller Chats zu erweitern. Ungueltiges faellt still weg.
+  const msgContext = contextFn ? contextFn(req, session) : null;
 
   const now = new Date().toISOString();
   const userMsgResult = db.prepare(
-    `INSERT INTO chat_messages (session_id, role, content, created_at, client_msg_id) VALUES (?, 'user', ?, ?, ?)`
-  ).run(session.id, message.trim(), now, clientMsgId);
+    `INSERT INTO chat_messages (session_id, role, content, created_at, client_msg_id, context_info) VALUES (?, 'user', ?, ?, ?, ?)`
+  ).run(session.id, message.trim(), now, clientMsgId, msgContext ? JSON.stringify(msgContext) : null);
   db.prepare('UPDATE chat_sessions SET last_message_at = ? WHERE id = ?').run(now, session.id);
+  // Messung: dieselbe Frage desselben Users binnen 24 h (gleiches Buch, gleiche
+  // Chat-Art) → `context_info.repeat_of` an der neuen User-Nachricht
+  // (db/chat-quality.js). Darf das Senden nie aufhalten.
+  try {
+    recordRepeat({
+      messageId: userMsgResult.lastInsertRowid, userEmail, bookId: session.book_id,
+      kind: session.kind, content: message,
+    });
+  } catch (e) {
+    logger.warn(`[chat] Wiederholungs-Pruefung fehlgeschlagen: ${e.message}`);
+  }
 
   const { key: label, params: labelParams } = labelFn(session);
   const jobId = createJob(jobType, session.book_id || 0, userEmail, label, labelParams, session_id);
@@ -155,6 +230,6 @@ function weltfaktenBlockChars(aiCfg) {
 }
 
 module.exports = {
-  _sanitizeVorschlaege, _parseChatResponse, _handleChatPost, figurenBlockChars, weltfaktenBlockChars,
+  _sanitizeVorschlaege, _sanitizeTitelVarianten, _parseChatResponse, _handleChatPost, figurenBlockChars, weltfaktenBlockChars,
   bookPageCache, BOOK_PAGE_CACHE_TTL_MS, BOOK_PAGE_CACHE_MAX, invalidateBookPageCache,
 };

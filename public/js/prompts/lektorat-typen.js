@@ -5,7 +5,7 @@
 //   · die Anti-Doppelungs-Priorität im Prompt UND im Code (lib/lektorat-consolidate.js)
 //   · das JSON-Schema-Enum (buildLektoratSchema / buildObjektivLektoratSchema)
 //   · welche Regelblöcke der Prompt einhängt
-//   · welche Typen der stilistische Cap deckelt (routes/jobs/lektorat.js)
+//   · welche Typen der stilistische Cap deckelt (routes/jobs/lektorat-filter.js)
 //   · was der Server als gültigen Typ akzeptiert (validateLektoratFehler)
 //
 // Why: der Buchtyp erreichte den Lektorat-Prompt vorher nur als Kontext-Zusatz
@@ -200,7 +200,7 @@ export function verweisZiel(typ, typen) {
 // ── Cap-Zuständigkeit ────────────────────────────────────────────────────────
 // Subjektiv-stilistische Typen: unterliegen der Schwere-Schwelle und der
 // Mengen-Obergrenze (Prompt) sowie dem deterministischen Handler-Backstop
-// (capStylisticFehler in routes/jobs/lektorat.js). Alles andere — mechanische
+// (capStylisticFehler in routes/jobs/lektorat-filter.js). Alles andere — mechanische
 // Fehler und Konsistenz-Befunde inkl. `unbelegt`/`begriffsinkonsistenz`/
 // `autorenform` — wird NIE gekappt.
 export const STILISTISCHE_TYPEN = [

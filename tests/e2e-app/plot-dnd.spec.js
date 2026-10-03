@@ -24,14 +24,17 @@ test('plot: Beat per SortableJS-Drag umsortieren persistiert', async ({ page }) 
   // Plot-Karte öffnen + Board laden.
   await page.evaluate(() => window.__app.togglePlotCard());
   await page.waitForSelector('.card--plot .plot-beat[data-beat-id]');
-  await page.waitForFunction((n) => document.querySelectorAll('.card--plot .plot-board .plot-beat').length === n, 3);
+  // Nur die eigene Zelle zählen: die Specs teilen sich die Smoke-DB, andere
+  // Specs können Akte/Beats auf demselben Board hinterlassen.
+  const cell = `.card--plot .plot-board .plot-beats[data-act-id="${ids.actId}"]`;
+  await page.waitForFunction((sel) => document.querySelectorAll(`${sel} .plot-beat`).length === 3, cell);
   // SortableJS bindet die Zell-Container nach dem Board-Load asynchron neu
   // ($watch('acts') → nextTick → destroy → nextTick → init). Vor dem Drag kurz
   // abwarten, sonst greift der Drag eine noch ungebundene Zelle (Flake).
   await page.waitForTimeout(400);
 
   // Reihenfolge vor dem Drag (Board-Lesereihenfolge A,B,C).
-  const before = await page.$$eval('.card--plot .plot-board .plot-beat', els => els.map(e => e.dataset.beatId));
+  const before = await page.$$eval(`${cell} .plot-beat`, els => els.map(e => e.dataset.beatId));
   expect(before).toEqual([String(ids.b1), String(ids.b2), String(ids.b3)]);
 
   // Beat A (1.) per Drag über Beat C (3.) nach unten ziehen → erwartet B,C,A.
@@ -77,4 +80,5 @@ test('plot: Beat per SortableJS-Drag umsortieren persistiert', async ({ page }) 
       .sort((a, b) => a.sort_order - b.sort_order).map(b => b.id);
   }, { bookId, actId: ids.actId });
   expect(order).toEqual([ids.b2, ids.b3, ids.b1]);
+  await page.evaluate((id) => fetch(`/plot/acts/${id}`, { method: 'DELETE' }), ids.actId);
 });

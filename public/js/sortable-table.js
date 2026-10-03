@@ -32,6 +32,8 @@
 // `persistKey` (optional): merkt key+dir in localStorage unter
 // `sortableTable.<persistKey>`. Ohne Key: kein Persist.
 
+import { lsGetJSON, lsSetJSON } from './safe-storage.js';
+
 const COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 function detectType(sample) {
@@ -83,21 +85,15 @@ export function sortRows(rows, key, dir, typeHint) {
 }
 
 function loadPersisted(persistKey) {
-  if (!persistKey || typeof localStorage === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(`sortableTable.${persistKey}`);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (obj && typeof obj.key === 'string' && (obj.dir === 'asc' || obj.dir === 'desc')) return obj;
-  } catch { /* ignore */ }
+  if (!persistKey) return null;
+  const obj = lsGetJSON(`sortableTable.${persistKey}`);
+  if (obj && typeof obj.key === 'string' && (obj.dir === 'asc' || obj.dir === 'desc')) return obj;
   return null;
 }
 
 function savePersisted(persistKey, state) {
-  if (!persistKey || typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(`sortableTable.${persistKey}`, JSON.stringify(state));
-  } catch { /* ignore quota errors */ }
+  if (!persistKey) return;
+  lsSetJSON(`sortableTable.${persistKey}`, state);
 }
 
 export function registerSortableTable() {

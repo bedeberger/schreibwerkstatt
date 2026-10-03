@@ -18,6 +18,7 @@ import {
   STRUKTUR_URTEIL_RANG, STRUKTUR_STATUS_RANG,
 } from '../prompts/textsorten.js';
 import { memoMethods } from '../cards/card-memo.js';
+import { lsSet } from '../safe-storage.js';
 
 const LS_KEY = (bookId) => `struktur_job_${bookId}`;
 
@@ -169,7 +170,7 @@ export const strukturMethods = {
     try {
       const body = pageId ? { page_id: pageId } : { book_id: bookId };
       const { jobId } = await sendJson('/jobs/struktur-check', 'POST', body);
-      localStorage.setItem(LS_KEY(bookId), jobId);
+      lsSet(LS_KEY(bookId), jobId);
       this._pollStruktur(jobId);
     } catch {
       this._strukturIdle();

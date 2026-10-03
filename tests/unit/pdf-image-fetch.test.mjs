@@ -157,10 +157,47 @@ test('oeffentliches Bild wird geholt und normalisiert', async () => {
     assert.equal(out.width, 4);
     assert.equal(out.height, 4);
     assert.ok(out.buffer.length > 0);
-    // PDF/A: sharp liefert JPEG (SOI-Marker), kein PNG mehr.
-    assert.equal(out.buffer[0], 0xff);
-    assert.equal(out.buffer[1], 0xd8);
+    // Einfarbiges PNG = Grafik (niedrige Entropie) → bleibt verlustfrei PNG.
+    assert.equal(out.format, 'png');
+    assert.equal(out.buffer[0], 0x89);
   } finally { f.restore(); }
+});
+
+test('Foto wird JPEG, Grafik/Alpha bleibt PNG (Alpha auf Weiss geplaettet)', async () => {
+  // Rauschen ≈ Foto (hohe Entropie), als PNG geliefert → JPEG.
+  const noise = Buffer.alloc(64 * 64 * 3);
+  for (let i = 0; i < noise.length; i++) noise[i] = (i * 2654435761) >>> 24;
+  const photoPng = await sharp(noise, { raw: { width: 64, height: 64, channels: 3 } }).png().toBuffer();
+  const photo = await _fetchImage(`data:image/png;base64,${photoPng.toString('base64')}`, undefined);
+  assert.equal(photo.format, 'jpeg');
+  assert.equal(photo.buffer[0], 0xff);
+  assert.equal(photo.buffer[1], 0xd8);
+  // JPEG-Quelle bleibt JPEG.
+  const jpg = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#336699' } }).jpeg().toBuffer();
+  assert.equal((await _fetchImage(`data:image/jpeg;base64,${jpg.toString('base64')}`, undefined)).format, 'jpeg');
+  // Diagramm mit Alpha → PNG ohne Alpha-Kanal.
+  const alpha = await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0.5 } } }).png().toBuffer();
+  const g = await _fetchImage(`data:image/png;base64,${alpha.toString('base64')}`, undefined);
+  assert.equal(g.format, 'png');
+  const meta = await sharp(g.buffer).metadata();
+  assert.equal(meta.hasAlpha, false);
+});
+
+test('Zielaufloesung: grosses Bild wird heruntergerechnet, kleines nie hochgerechnet', async () => {
+  const big = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#88aacc' } }).png().toBuffer();
+  const out = await _fetchImage(`data:image/png;base64,${big.toString('base64')}`, undefined, { maxWidthPx: 1200, maxHeightPx: 2000 });
+  assert.equal(out.width, 1200);
+  assert.equal(out.srcWidth, 3000, 'Quellbreite bleibt fuer die dpi-Warnung erhalten');
+  // Ohne dpi-Angabe: nie groesser als 150 dpi gedruckt.
+  assert.ok(Math.abs(out.naturalWidthPt - 3000 * 72 / 150) < 0.01);
+  const small = await _fetchImage(`data:image/png;base64,${PNG_1x1.toString('base64')}`, undefined, { maxWidthPx: 1200 });
+  assert.equal(small.width, 4);
+});
+
+test('data:-URI ueber dem Groessendeckel wird ohne Decode verworfen', async () => {
+  const { MAX_DATA_URI_BYTES } = await import('../../lib/pdf-render/images.js');
+  const huge = 'data:image/png;base64,' + 'A'.repeat(Math.ceil(MAX_DATA_URI_BYTES * 4 / 3) + 16);
+  assert.equal(await _fetchImage(huge, undefined), null);
 });
 
 test('nicht-OK-Antwort liefert null (kein Abbruch des Exports)', async () => {
@@ -188,4 +225,25 @@ test('geblockte URL wird im imageCache als null gemerkt (kein Zweitversuch)', as
     await _fetchImage('http://10.1.2.3/x.png', cache);
     assert.equal(f.calls.length, 0);
   } finally { f.restore(); }
+});
+
+// ── Buch-Scope der Manuskript-Bilder ─────────────────────────────────────────
+
+test('page-image eines FREMDEN Buchs wird wie fehlend behandelt (kein IDOR)', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const modPath = require.resolve('../../db/page-images.js');
+  const prev = require.cache[modPath];
+  // Stub statt DB: Bild 5 gehoert zu Buch 1.
+  require.cache[modPath] = { id: modPath, filename: modPath, loaded: true, exports: {
+    getPageImage: (id) => (id === 5 ? { id: 5, book_id: 1, image: PNG_1x1 } : null),
+  } };
+  try {
+    const own = await _fetchImage('/content/page-image/5', new Map(), { bookId: 1 });
+    assert.equal(own.width, 4, 'eigenes Bild wird geladen');
+    assert.equal(await _fetchImage('/content/page-image/5', new Map(), { bookId: 2 }), null, 'fremdes Buch → null');
+    assert.equal(await _fetchImage('/content/page-image/5', new Map(), {}), null, 'ohne Buch-Scope → null');
+  } finally {
+    if (prev) require.cache[modPath] = prev; else delete require.cache[modPath];
+  }
 });

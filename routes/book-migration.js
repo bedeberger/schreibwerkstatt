@@ -23,13 +23,14 @@ router.get('/:bookId', async (req, res) => {
   if (!bookId) return res.status(400).json({ error_code: 'ID_REQUIRED' });
   setContext({ book: bookId });
 
-  // Optionale Extra-Bloecke via Query-Flags (?analysis=1&lektorat=1&chats=1).
+  // Optionale Extra-Bloecke via Query-Flags (?analysis=1&lektorat=1&chats=1&research=1).
   const includes = normalizeIncludes({
     analysis: req.query.analysis === '1' || req.query.analysis === 'true',
     lektorat: req.query.lektorat === '1' || req.query.lektorat === 'true',
     chats:    req.query.chats === '1' || req.query.chats === 'true',
+    research: req.query.research === '1' || req.query.research === 'true',
   });
-  const wantsExtras = includes.analysis || includes.lektorat || includes.chats;
+  const wantsExtras = includes.analysis || includes.lektorat || includes.chats || includes.research;
 
   // Extra-Bloecke enthalten potenziell personenbezogene Daten (Chats/Lektorat
   // aller Mitarbeitenden) → nur fuer Owner. Reiner Content-Export bleibt viewer.
@@ -76,7 +77,9 @@ router.get('/:bookId', async (req, res) => {
   // Zielinstanz mitwandern (die page_images-Bytes liegen sonst nur lokal).
   const { collectReferencedImages } = require('../db/page-images');
   const imagesByPage = collectReferencedImages(htmlById);
-  const nodes = treeToNodes(tree, htmlById, imagesByPage);
+  // Order-Tree: nur er kennt das Interleaving (Seite zwischen zwei Kapiteln).
+  const orderTree = (() => { try { return require('../db/book-order').getOrder(bookId)?.tree || null; } catch { return null; } })();
+  const nodes = treeToNodes(tree, htmlById, imagesByPage, orderTree);
   const settings = (() => { try { return getBookSettings(bookId); } catch { return null; } })();
 
   // Optionale Extra-Bloecke einsammeln (synchroner DB-Read, kein KI-Call).
@@ -108,6 +111,7 @@ router.get('/:bookId', async (req, res) => {
     if (extras.analysis) zip.file('analysis.json', JSON.stringify(extras.analysis));
     if (extras.lektorat) zip.file('lektorat.json', JSON.stringify(extras.lektorat));
     if (extras.chats)    zip.file('chats.json', JSON.stringify(extras.chats));
+    if (extras.research) zip.file('research.json', JSON.stringify(extras.research));
     buf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   } catch (e) {
     logger.error(`swbook-Export ZIP fehlgeschlagen (book=${bookId}): ${e.message}`);

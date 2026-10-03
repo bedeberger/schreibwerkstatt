@@ -20,20 +20,22 @@
 // das Board selbst. Schreibt nie.
 
 import { fetchJson } from '../utils.js';
+import { beatReadingOrder } from '../book/plot/constants.js';
 
 /** Aktiv = nicht verworfen (Spalte `verworfen` ODER Alt-Status 'verworfen'). */
 const isActive = (b) => !b?.verworfen && b?.status !== 'verworfen';
 
-/** Beats in Board-Lesereihenfolge (Akt-Position → sort_order → id) — dieselbe
- *  Ordnung wie Board und Spannungsbogen (plot/derived/tension.js). Pure. */
+/** Aktive Beats in Board-Lesereihenfolge — Lane für Lane (Stränge nach position,
+ *  „ohne Strang" zuletzt), je Lane deren Akte (strang-eigene, sonst geteilte,
+ *  nach position), dann sort_order. Regel-SSoT: plot/constants.js#beatReadingOrder.
+ *  Eine globale Akt-position-Sortierung mischte geteilte und strang-eigene
+ *  Positionen (zwei unabhängige 0..n-Sequenzen). Pure. */
 export function orderPlanBeats(plan) {
-  const acts = plan?.acts || [];
-  const actPos = new Map(acts.map((a, i) => [a.id, a.position ?? i]));
-  return (plan?.beats || [])
-    .filter(isActive)
-    .sort((a, b) => ((actPos.get(a.act_id) ?? 0) - (actPos.get(b.act_id) ?? 0))
-                 || ((a.sort_order ?? 0) - (b.sort_order ?? 0))
-                 || (a.id - b.id));
+  return beatReadingOrder({
+    acts: plan?.acts || [],
+    threads: plan?.threads || [],
+    beats: (plan?.beats || []).filter(isActive),
+  });
 }
 
 /** Kapitel eines Beats: das eigene, sonst das seines Strangs — Beats der
@@ -61,6 +63,27 @@ export function selectPlanBeatsForPage(ordered, { pageId, chapterId, threads = [
   ];
 }
 
+/** Besetzung eines Beats als Namensliste (dedupliziert, Reihenfolge: Katalog-
+ *  Figuren, Werkstatt-Figuren, geerbte Strang-Hauptfigur, Orte). Katalog-
+ *  Identitaet ist die TEXT-fig_id (nie durch Number() schicken), Werkstatt die
+ *  INTEGER draft_figures.id. Pure. */
+export function planCastNames(beat, { figuren = [], draftFigures = [], threads = [] } = {}) {
+  if (!beat) return [];
+  const figById = new Map((figuren || []).map(f => [String(f.id), f]));
+  const draftById = new Map((draftFigures || []).map(d => [String(d.id), d]));
+  const figName = (id) => { const f = figById.get(String(id)); return f ? (f.kurzname || f.name) : null; };
+  const draftName = (id) => draftById.get(String(id))?.name || null;
+  const names = [
+    ...(beat.fig_ids || []).map(figName),
+    ...(beat.draft_fig_ids || []).map(draftName),
+  ];
+  const t = beat.thread_id != null ? (threads || []).find(x => x.id === beat.thread_id) : null;
+  if (t?.fig_id) names.push(figName(t.fig_id));
+  else if (t?.draft_figure_id != null) names.push(draftName(t.draft_figure_id));
+  const orte = (beat.locations || []).map(l => l?.name);
+  return [...new Set([...names, ...orte].filter(Boolean))];
+}
+
 export function referencePlanState() {
   return {
     referencePlan: null,              // { acts, threads, beats } aus GET /plot/
@@ -69,15 +92,30 @@ export function referencePlanState() {
 }
 
 export const referencePlanMethods = {
+  // Buchwechsel-Race: nach jedem await prüfen, ob das Buch noch dasselbe ist.
+  // Werkstatt-Figuren (für die Besetzungszeile) best-effort dazu, im Plan-Objekt
+  // abgelegt — so räumt der Reset von referencePlan sie mit ab.
   async _loadReferencePlan() {
     const bookId = Alpine.store('nav').selectedBookId;
     if (!bookId) { this.referencePlan = null; return; }
+    const stale = () => Alpine.store('nav').selectedBookId !== bookId;
     this.referencePlanLoading = true;
     try {
       const r = await fetchJson(`/plot/?book_id=${encodeURIComponent(bookId)}`);
-      this.referencePlan = r && Array.isArray(r.beats) ? r : null;
-    } catch { this.referencePlan = null; }
-    finally { this.referencePlanLoading = false; }
+      if (stale()) return;
+      if (!r || !Array.isArray(r.beats)) { this.referencePlan = null; return; }
+      let draftFigures = [];
+      try {
+        const d = await fetchJson(`/draft-figures/${encodeURIComponent(bookId)}`);
+        draftFigures = Array.isArray(d) ? d.map(x => ({ id: x.id, name: x.name })) : [];
+      } catch { draftFigures = []; }
+      if (stale()) return;
+      this.referencePlan = { ...r, draftFigures };
+    } catch {
+      if (!stale()) this.referencePlan = null;
+    } finally {
+      if (!stale()) this.referencePlanLoading = false;
+    }
   },
 
   _planOrdered() {
@@ -108,14 +146,15 @@ export const referencePlanMethods = {
     return [act?.name, thread?.name, beat?.zeit].filter(Boolean).join(' · ');
   },
 
-  /** Beteiligte Figuren + Orte als eine Zeile. Figuren-Identitaet ist die
-   *  TEXT-fig_id (Katalog-`id`), nie durch Number() schicken. */
+  /** Beteiligte Figuren + Orte als eine Zeile: Katalog-Figuren, Werkstatt-
+   *  Figuren und die vom Strang geerbte Hauptfigur (Live-Vererbung, nie am Beat
+   *  gespeichert), dann Orte. Pure Rechnung in planCastNames. */
   referencePlanCast(beat) {
-    const figs = Alpine.store('catalog').figuren || [];
-    const byId = new Map(figs.map(f => [String(f.id), f]));
-    const names = (beat?.fig_ids || []).map(id => byId.get(String(id))?.name).filter(Boolean);
-    const orte = (beat?.locations || []).map(l => l?.name).filter(Boolean);
-    return [...names, ...orte].join(', ');
+    return planCastNames(beat, {
+      figuren: Alpine.store('catalog').figuren || [],
+      draftFigures: this.referencePlan?.draftFigures || [],
+      threads: this.referencePlan?.threads || [],
+    }).join(', ');
   },
 
   referencePlanMotifs(beat) {

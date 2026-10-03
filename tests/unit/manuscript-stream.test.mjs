@@ -57,7 +57,7 @@ test('fromPages: aufeinanderfolgende Pages im selben Kapitel → nur ein Header'
 test('fromSnapshotTree: Nesting → steigende depth, srcId→id, key stabil', () => {
   const tree = [
     { type: 'page', name: 'Solo', html: '<p>s</p>', srcId: 5 },
-    { type: 'chapter', name: 'K1', children: [
+    { type: 'chapter', name: 'K1', srcId: 70, children: [
       { type: 'page', name: 'A', html: '<p>a</p>', srcId: 1 },
       { type: 'chapter', name: 'K1.1', children: [
         { type: 'page', name: 'B', html: '<p>b</p>', srcId: 2 },
@@ -69,6 +69,8 @@ test('fromSnapshotTree: Nesting → steigende depth, srcId→id, key stabil', ()
   assert.equal(entries[0].depth, 0);   // Solo-Page
   assert.equal(entries[0].id, 5);
   assert.equal(entries[1].depth, 0);   // K1
+  assert.equal(entries[1].chapterId, 70); // srcId → chapterId (Kapitel-Restore)
+  assert.equal(entries[3].chapterId, null); // K1.1 ohne srcId
   assert.equal(entries[2].depth, 1);   // A unter K1
   assert.equal(entries[3].depth, 1);   // K1.1
   assert.equal(entries[4].depth, 2);   // B unter K1.1

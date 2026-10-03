@@ -2,346 +2,52 @@
 // Plot-Werkstatt (Beat-Board): Brainstorm + Consistency als Job-Queue-Operationen.
 // Beide Jobs operieren auf dem Board (plot_acts + plot_beats). Rein planend /
 // überwachend — es wird NIE Text ins Manuskript geschrieben.
+//
+// Kontext-Loader + Budget: ./plot/context.js. Pure Nachbearbeitung des Consistency-
+// Outputs + Vorlauf-Auswahl (Delta-Check): ./plot/result.js.
 
 const express = require('express');
 const {
   makeJobLogger, updateJob, completeJob, failJob, i18nError,
-  aiCall, getPrompts, getBookPrompts, getFiguren,
-  loadOrderedBookContents,
+  aiCall, getPrompts,
   tps, createJob, enqueueJob, findActiveJobId, jsonBody, _modelName,
 } = require('./shared');
 const { toIntId } = require('../../lib/validate');
 const { guardBook, sessionEmail } = require('../../lib/acl');
-const { getContextConfigFor, resolveProvider } = require('../../lib/ai');
-const { db } = require('../../db/connection');
+const { resolveProvider } = require('../../lib/ai');
+const { setContext } = require('../../lib/log-context');
 const plotDb = require('../../db/plot');
-const draftFiguresDb = require('../../db/draft-figures');
-const { extractPsychologie } = require('../../lib/draft-mindmap-extract');
-const { getLatestContinuityCheck, listWorldFacts, worldFactsScanState } = require('../../db/schema');
-const { listFigureEventsWithNames, listScenesWithChapterNames } = require('../../db/content-names');
+const {
+  commonPlotContext, consistencyExtras, rechercheContext, anchorContext, prioritize,
+} = require('./plot/context');
+const { normalizeKonflikte, normalizeErledigt, buildDeltaContext } = require('./plot/result');
 
 const plotRouter = express.Router();
 
-const SEVERITY = ['kritisch', 'stark', 'mittel', 'schwach', 'niedrig'];
+// Output-Budget: adaptives Denken (Claude 4.7+/5) zählt gegen max_tokens. Eine
+// knappe Grenze bricht die JSON-Antwort nach dem Denken ab (truncated → Job-Fehler).
+// Gedeckelt per Math.min gegen den Provider-Cap.
+const BRAINSTORM_MAX_TOKENS = 8000;
+const CONSISTENCY_MAX_TOKENS = 16000;
 
-// ── Kontext-Loader ────────────────────────────────────────────────────────────
-
-// Wandelt einen echten Lade-/DB-Fehler aus einem Kontext-Loader in einen
-// i18n-Job-Fehler um (Original-Fehler als `cause` für den Log). So failt der Job
-// sauber über failJob, statt mit halbem/falschem Board-Bild weiterzulaufen — ein
-// leeres Ergebnis (keine Stränge/Figuren) ist kein Fehler und kommt regulär als
-// [] zurück, nur ein geworfener Fehler landet hier.
-function _plotContextError(source, cause) {
-  const err = i18nError('job.error.plot.contextLoadFailed', { source });
-  err.cause = cause;
-  return err;
+// Zielakt passt zum Strang (Hybrid-Akte): ein Strang mit eigener Aktstruktur
+// brainstormt nur in seinen eigenen Akten, ein Strang ohne (und die „ohne
+// Strang"-Lane) nur in geteilten Akten — sonst landete ein Vorschlag in einer
+// Zelle, die das Board gar nicht rendert.
+function brainstormActFitsThread(act, threadId, threadHasOwnActs) {
+  if (threadId == null) return act.thread_id == null;
+  return threadHasOwnActs ? act.thread_id === threadId : act.thread_id == null;
 }
 
-// Sync-Kontext-Loader in ein einheitliches try/catch wickeln: ein echter Lade-/
-// DB-Fehler wird source-annotiert zum i18n-Job-Fehler (statt mit halbem Board-Bild
-// weiterzulaufen). Ein leeres Ergebnis (keine Orte/Szenen/…) ist kein Fehler und
-// kommt regulär durch. `_anchorContext` (loggt + liefert null) und `_kapitelContext`
-// (async) bleiben bewusst mit eigenem Handling.
-function _loadCtx(source, fn) {
-  try { return fn(); }
-  catch (e) { throw _plotContextError(source, e); }
-}
-
-// Figuren-Ensemble als Grundierung für beide Jobs — der volle reiche Kontext aus
-// getFiguren: Rollen-Meta, Tags, Beschreibung, Beziehungen (Soziogramm) und
-// Lebensereignisse (Figuren-Zeitstrahl). getFiguren liefert Beziehungspartner als
-// TEXT-fig_id (`mit`); hier auf Namen aufgelöst (id→name aus derselben Liste),
-// damit die reinen, frontend-geteilten Prompt-Builder namensbasiert bleiben.
-function _figurenContext(bookId, userEmail) {
-  const figuren = getFiguren(bookId, userEmail);
-  const nameById = {};
-  for (const f of figuren) nameById[f.id] = f.name;
-  return figuren.map(f => ({
-    name: f.name,
-    typ: f.typ || null,
-    kurzname: f.kurzname || null,
-    beschreibung: f.beschreibung || null,
-    beruf: f.beruf || null,
-    geschlecht: f.geschlecht || null,
-    tags: Array.isArray(f.eigenschaften) ? f.eigenschaften : [],
-    beziehungen: Array.isArray(f.beziehungen)
-      ? f.beziehungen
-          .map(b => ({ mit: nameById[b.mit] || null, typ: b.typ || null, beschreibung: b.beschreibung || null }))
-          .filter(b => b.mit)
-      : [],
-    lebensereignisse: Array.isArray(f.lebensereignisse)
-      ? f.lebensereignisse.map(e => ({ datum: e.datum || null, ereignis: e.ereignis || null, typ: e.typ || null, kapitel: e.kapitel || null }))
-      : [],
-  }));
-}
-
-// Schauplätze des Buchs (Orte). locations ist keine pages/chapters/books →
-// Direkt-SQL erlaubt. Ein Buch ohne Orte liefert regulär []; ein echter DB-Fehler
-// failt den Job source-annotiert (statt stillschweigend ohne Orte weiterzulaufen).
-function _orteContext(bookId, userEmail) {
-  return _loadCtx('orte', () => db.prepare(`
-    SELECT name, typ, beschreibung, stimmung
-      FROM locations
-     WHERE book_id = ? AND user_email = ?
-     ORDER BY sort_order, id
-  `).all(parseInt(bookId), userEmail).map(o => ({
-    name: o.name,
-    typ: o.typ || null,
-    beschreibung: o.beschreibung || null,
-    stimmung: o.stimmung || null,
-  })));
-}
-
-// Buchweiter Figuren-Zeitstrahl (figure_events, chronologisch nach sort_order)
-// mit aufgelöster Figur + Kapitel. figure_events/figures sind keine pages/
-// chapters/books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige zur Lesezeit).
-function _zeitstrahlContext(bookId, userEmail) {
-  return _loadCtx('zeitstrahl', () => listFigureEventsWithNames(parseInt(bookId), userEmail, 300).map(e => ({
-    datum: e.datum || null,
-    ereignis: e.ereignis,
-    typ: e.typ || null,
-    figur: e.figur || null,
-    kapitel: e.kapitel || null,
-  })));
-}
-
-// Offene Kontinuitäts-Befunde aus dem letzten Continuity-Check (nur Consistency).
-// Erdet den Plot-Check auf bereits bekannte Brüche, statt sie neu zu erfinden.
-// Kein Check vorhanden → regulär []; echter DB-Fehler failt den Job.
-function _kontinuitaetContext(bookId, userEmail) {
-  return _loadCtx('kontinuitaet', () => {
-    const check = getLatestContinuityCheck(bookId, userEmail);
-    if (!check || !Array.isArray(check.issues)) return [];
-    return check.issues
-      .filter(i => !i.resolved)
-      .map(i => ({
-        schwere: i.schwere || null,
-        typ: i.typ || null,
-        beschreibung: i.beschreibung || null,
-        figuren: Array.isArray(i.figuren) ? i.figuren : [],
-        kapitel: Array.isArray(i.kapitel) ? i.kapitel : [],
-        empfehlung: i.empfehlung || null,
-      }));
-  });
-}
-
-// Verknüpfte Recherche-Fundstücke: alle (nicht archivierten) Recherche-Items, die
-// der Autor an einen Plot-Beat ODER Handlungsstrang geknüpft hat — mit aufgelösten
-// Beat-Titeln / Strang-Namen für die Prompt-Annotation. research_*/plot_* sind keine
-// pages/chapters/books → Direkt-SQL erlaubt. Ein Item kann an mehrere Beats/Stränge
-// hängen (M:N), darum gruppiert pro Item. body fällt auf doc_text zurück (Dokument
-// ohne eigenen Notiztext). Kein Link/keine Recherche → regulär []; echter DB-Fehler
-// failt den Job (statt der KI stillschweigend das gesammelte Material zu unterschlagen).
-function _rechercheContext(bookId, userEmail) {
-  return _loadCtx('recherche', () => {
-    const rows = db.prepare(`
-      SELECT ri.id, ri.title, ri.body, ri.source, ri.doc_text,
-             ril.target_kind, ril.beat_id, ril.thread_id,
-             pb.titel AS beat_titel, pt.name AS thread_name
-        FROM research_item_links ril
-        JOIN research_items ri ON ri.id = ril.item_id
-        LEFT JOIN plot_beats   pb ON pb.id = ril.beat_id
-        LEFT JOIN plot_threads pt ON pt.id = ril.thread_id
-       WHERE ri.book_id = ? AND ri.user_email = ?
-         AND ri.archived = 0
-         AND ril.target_kind IN ('beat', 'thread')
-       ORDER BY ri.pinned DESC, ri.updated_at DESC, ri.id
-    `).all(parseInt(bookId), userEmail);
-    const byItem = new Map();
-    for (const r of rows) {
-      let it = byItem.get(r.id);
-      if (!it) {
-        it = {
-          id: r.id,
-          title: r.title || null,
-          body: (r.body && r.body.trim()) ? r.body : (r.doc_text || null),
-          source: r.source || null,
-          beats: [], beatIds: [], threads: [], threadIds: [],
-        };
-        byItem.set(r.id, it);
-      }
-      if (r.target_kind === 'beat' && r.beat_id != null) {
-        it.beatIds.push(r.beat_id);
-        if (r.beat_titel) it.beats.push(r.beat_titel);
-      } else if (r.target_kind === 'thread' && r.thread_id != null) {
-        it.threadIds.push(r.thread_id);
-        if (r.thread_name) it.threads.push(r.thread_name);
-      }
-    }
-    return [...byItem.values()];
-  });
-}
-
-// Adaptives Kontext-Budget: kleine (lokale) Modelle bekommen knappere Listen,
-// damit der Plot-Prompt das Eingabe-Budget nicht sprengt (Truncation-Schutz);
-// Claude (200k+) bekommt den vollen Kontext. Schwelle grob am Input-Budget in
-// Zeichen des effektiven Providers (Per-User-Override berücksichtigt).
-function _ctxLimits(userEmail) {
-  let budgetChars = 600000;
-  try {
-    budgetChars = getContextConfigFor(resolveProvider({ userEmail })).inputBudgetChars || budgetChars;
-  } catch { /* Default = grosszügig */ }
-  if (budgetChars < 80000) {
-    return { figuren: 25, relPerFig: 4, evtPerFig: 0, kapitel: 40, szenen: 30, orte: 15, zeitstrahl: 0, kontinuitaet: 8, recherche: 8, weltgesetze: 15 };
+// Belege je Beat aus dem Verankerungs-Index (stärkste Fundstelle mit page_id).
+function _belegById(beats, anchorMap) {
+  const out = {};
+  if (!anchorMap) return out;
+  for (const b of beats) {
+    const top = (anchorMap[b.id]?.top || []).find(t => t.page_id);
+    if (top) out[b.id] = { page_id: top.page_id, page_name: top.page_name || null };
   }
-  if (budgetChars < 250000) {
-    return { figuren: 45, relPerFig: 6, evtPerFig: 4, kapitel: 80, szenen: 70, orte: 30, zeitstrahl: 60, kontinuitaet: 15, recherche: 25, weltgesetze: 40 };
-  }
-  return { figuren: 120, relPerFig: 12, evtPerFig: 10, kapitel: 200, szenen: 150, orte: 60, zeitstrahl: 200, kontinuitaet: 40, recherche: 60, weltgesetze: 90 };
-}
-
-// Wendet die Figuren-Limits an: Figurenzahl kappen, Beziehungen/Ereignisse pro
-// Figur kürzen (auf knappen Modellen Ereignisse ganz weglassen).
-function _trimFiguren(figuren, limits) {
-  return figuren.slice(0, limits.figuren).map(f => ({
-    ...f,
-    beziehungen: (f.beziehungen || []).slice(0, limits.relPerFig),
-    lebensereignisse: limits.evtPerFig ? (f.lebensereignisse || []).slice(0, limits.evtPerFig) : [],
-  }));
-}
-
-// Werkstatt-Figuren (Figuren-Werkstatt-Drafts): vorwärts-entwickelte Figuren,
-// evtl. noch nicht im Manuskript. Brainstorm kann sie als Beat-Figuren vorschlagen;
-// Consistency darf sie als legitime Beat-Referenz erkennen statt sie als
-// „unbekannte Figur" zu beanstanden. Angereichert um die psychologischen Kerne der
-// Mindmap (Want/Need/Wound/Lie + Bogen + Konflikt) — so kann der Plot Beats
-// vorschlagen/prüfen, die den inneren Konflikt der Figur bedienen, statt nur ihren
-// Namen zu kennen. Echter DB-Fehler → Job failen (nicht stillschweigend ohne
-// Werkstatt-Figuren weiterlaufen).
-function _werkstattFigurenContext(bookId, userEmail) {
-  return _loadCtx('werkstattFiguren', () => draftFiguresDb.listDraftFigures(bookId, userEmail)
-    .map(d => ({ name: d.name, archetype: d.archetype || null, psychologie: extractPsychologie(d.mindmap) })));
-}
-
-// Kapitelnamen in echter Buchorganizer-Reihenfolge (über die Content-Store-
-// Facade — kein Direkt-SQL auf chapters). Ein Buch ohne Kapitel liefert regulär
-// []; ein echter Lade-Fehler failt den Job (statt der KI stillschweigend den
-// Kapitel-Kontext zu unterschlagen).
-async function _kapitelContext(bookId) {
-  try {
-    const { chaptersFlat } = await loadOrderedBookContents(bookId);
-    return (chaptersFlat || []).map(c => c.name);
-  } catch (e) {
-    throw _plotContextError('kapitel', e);
-  }
-}
-
-// „Buchrealität" für den Consistency-Check: extrahierte Szenen mit Kapitel +
-// beteiligten Figuren. figure_scenes/scene_figures sind keine pages/chapters/
-// books → Direkt-SQL erlaubt; chapter_name via JOIN (Anzeige-Wert zur Lesezeit).
-function _szenenContext(bookId, userEmail) {
-  return _loadCtx('szenen', () => {
-    const scenes = listScenesWithChapterNames(parseInt(bookId), userEmail, 150);
-    if (!scenes.length) return [];
-    const figRows = db.prepare(`
-      SELECT sf.scene_id, f.name
-        FROM scene_figures sf
-        JOIN figure_scenes fs ON fs.id = sf.scene_id
-        JOIN figures f ON f.id = sf.figure_id
-       WHERE fs.book_id = ? AND fs.user_email = ?
-    `).all(parseInt(bookId), userEmail);
-    const byScene = {};
-    for (const r of figRows) (byScene[r.scene_id] = byScene[r.scene_id] || []).push(r.name);
-    return scenes.map(s => ({ titel: s.titel, kapitel: s.kapitel, figuren: byScene[s.id] || [] }));
-  });
-}
-
-// Handlungsstränge (Swimlanes) mit aufgelöster Hauptfigur. Katalog-Bindung über
-// die TEXT-fig_id (figures), Werkstatt-Bindung über draft_figures.id. Ein Board
-// ohne Stränge liefert regulär [] (flaches Board, opt-in); ein echter DB-Fehler
-// failt den Job — sonst würde die KI mit falschem (flachem) statt Strang-Raster-
-// Kontext brainstormen/prüfen und der User bekäme stillschweigend schlechtere
-// Vorschläge. Der figures-/draft-Lookup ist Anreicherung, schlägt aber auf
-// denselben echten Fehler ebenfalls durch (keine stille Teil-Auflösung).
-function _threadContext(bookId, userEmail) {
-  const { threads, figByFigId, draftById } = _loadCtx('threads', () => {
-    const threads = plotDb.listThreads(bookId, userEmail);
-    const figByFigId = {}, draftById = {};
-    if (threads.length) {
-      for (const r of db.prepare('SELECT fig_id, name FROM figures WHERE book_id = ? AND user_email = ?').all(parseInt(bookId), userEmail)) {
-        figByFigId[r.fig_id] = r.name;
-      }
-      for (const d of draftFiguresDb.listDraftFigures(bookId, userEmail)) draftById[d.id] = d.name;
-    }
-    return { threads, figByFigId, draftById };
-  });
-  if (!threads.length) return [];
-  return threads.map(t => ({
-    id: t.id,
-    name: t.name,
-    figur: t.fig_id ? (figByFigId[t.fig_id] || null)
-      : (t.draft_figure_id ? (draftById[t.draft_figure_id] || null) : null),
-    // Beats der Lane erben dieses Kapitel implizit, sofern sie kein eigenes haben.
-    kapitel: t.chapter_name || null,
-  }));
-}
-
-// Textbeleg-Verankerung als Consistency-Kontext: der persistierte Ist-Index
-// (plot_beat_occurrences, aus dem beat-anchor-Job) als plain object beat_id →
-// { count, top[] }. NUR wenn der Index befüllt ist (occTotal > 0) — ein leerer
-// Index bedeutet „nie verankert", nicht „nichts im Buch"; dann liefern wir
-// anchorMap=null und die Consistency prüft wie bisher gegen den Szenen-Index.
-// Best-effort: ein Fehler hier darf den Check nicht failen (Belege sind Beilage).
-function _anchorContext(bookId, userEmail) {
-  try {
-    const map = plotDb.beatOccurrenceMap(bookId, userEmail);
-    let occTotal = 0;
-    const obj = {};
-    for (const [beatId, e] of map) { obj[beatId] = e; occTotal += e.count; }
-    if (occTotal === 0) return { anchorMap: null, anchorInfo: {} };
-    return { anchorMap: obj, anchorInfo: { stale: plotDb.beatAnchorStale(bookId, userEmail) } };
-  } catch (e) {
-    require('../../logger').warn(`[plot-consistency] Textbeleg-Kontext übersprungen: ${e.message}`);
-    return { anchorMap: null, anchorInfo: {} };
-  }
-}
-
-// Weltgesetze als Consistency-Kontext: die etablierten Regeln der Buchwelt aus
-// `world_facts` (Komplettanalyse). NUR die Kategorien `regel` + `technik` — sie sind
-// das, wogegen ein geplanter Beat VERSTOSSEN kann; die uebrigen Kategorien sind
-// Aussagen ueber die Welt, keine Gesetze, an die sich der Plan halten muss (und
-// Fakt-gegen-Fakt prueft ohnehin der Kontinuitaets-Check).
-//
-// Der Plan wurde bisher gegen Szenen, Kapitel und Textbelege geprueft — also gegen
-// das, was GESCHRIEBEN ist. Ein Beat, der gegen ein etabliertes Weltgesetz verstoesst
-// («die Tote erscheint», «er telefoniert 1890»), war damit strukturell unentdeckbar.
-//
-// Leerer Index heisst „nie analysiert", nicht „diese Welt hat keine Regeln" (gleiches
-// Muster wie `anchorMap === null`): ohne Fakten faellt der Block WEG statt zu behaupten,
-// es gaebe keine. Best-effort — ein Fehler hier darf den Check nicht failen.
-function _weltgesetzeContext(bookId, userEmail, limits) {
-  return _loadCtx('weltgesetze', () => {
-    try {
-      const { scanned } = worldFactsScanState(bookId, userEmail);
-      if (!scanned) return [];
-      return listWorldFacts(bookId, userEmail, { kategorien: ['regel', 'technik'] })
-        .slice(0, limits.weltgesetze)
-        .map(f => ({ kategorie: f.kategorie, subjekt: f.subjekt, fakt: f.fakt, kapitel: f.kapitel }));
-    } catch (e) {
-      require('../../logger').warn(`[plot-consistency] Weltgesetz-Kontext übersprungen: ${e.message}`);
-      return [];
-    }
-  });
-}
-
-// Gemeinsamer Kontext-Block beider Jobs (Brainstorm + Consistency): Buch-Kontext,
-// Kontext-Budget und die grundierenden Listen (Figuren, Werkstatt-Figuren, Kapitel,
-// Orte, Zeitstrahl, Stränge), bereits auf `limits` gekappt. Recherche bleibt
-// job-spezifisch (Brainstorm filtert auf die Zielzelle, Consistency nimmt alles);
-// Consistency lädt zusätzlich Szenen/Kontinuität/Textbelege separat.
-async function _commonPlotContext(bookId, userEmail) {
-  const { BUCH_KONTEXT } = await getBookPrompts(bookId, userEmail);
-  const limits = _ctxLimits(userEmail);
-  return {
-    BUCH_KONTEXT,
-    limits,
-    figuren: _trimFiguren(_figurenContext(bookId, userEmail), limits),
-    werkstattFiguren: _werkstattFigurenContext(bookId, userEmail),
-    kapitel: (await _kapitelContext(bookId)).slice(0, limits.kapitel),
-    orte: _orteContext(bookId, userEmail).slice(0, limits.orte),
-    zeitstrahl: limits.zeitstrahl ? _zeitstrahlContext(bookId, userEmail).slice(0, limits.zeitstrahl) : [],
-    threads: _threadContext(bookId, userEmail),
-  };
+  return out;
 }
 
 // ── Brainstorm-Job ────────────────────────────────────────────────────────────
@@ -354,28 +60,27 @@ async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
     const acts = plotDb.listActs(bookId, userEmail);
     const act = acts.find(a => a.id === actId);
     if (!act) throw i18nError('job.error.plot.actMissing');
-    const beats = plotDb.listBeats(bookId, userEmail);
 
-    const { BUCH_KONTEXT, limits, figuren, werkstattFiguren, kapitel, orte, zeitstrahl, threads } =
-      await _commonPlotContext(bookId, userEmail);
+    const ctx = await commonPlotContext(bookId, userEmail);
+    const { BUCH_KONTEXT, limits, beats, outlineBeats, figuren, werkstattFiguren, kapitel, orte, zeitstrahl, threads, kuerzungen, locale } = ctx;
     const threadInfo = threadId != null ? (threads.find(t => t.id === threadId) || null) : null;
-    // Recherche nur für die Zielzelle: Material, das an einen Beat dieses Akts ODER
-    // an den Ziel-Strang geknüpft ist — so erden neue Beats auf bereits gesammelte
-    // Fakten/Quellen genau zu diesem Abschnitt, ohne fremde Akte einzuschleppen.
+    // Recherche nur für die Zielzelle: an einen Beat dieses Akts ODER den Ziel-Strang
+    // geknüpftes Material.
     const actBeatIds = new Set(beats.filter(b => b.act_id === actId).map(b => b.id));
-    const recherche = _rechercheContext(bookId, userEmail)
+    const rech = prioritize(rechercheContext(bookId, userEmail)
       .filter(r => r.beatIds.some(id => actBeatIds.has(id))
-        || (threadId != null && r.threadIds.includes(threadId)))
-      .slice(0, limits.recherche);
+        || (threadId != null && r.threadIds.includes(threadId))), limits.recherche);
+    kuerzungen.recherche = { shown: rech.items.length, total: rech.total };
 
-    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}"${threadInfo ? ` strang="${threadInfo.name}"` : ''} beats=${beats.length} figuren=${figuren.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} werkstatt=${werkstattFiguren.length} recherche=${recherche.length}`);
+    logger.info(`Plot-Brainstorm Start: book=${bookId} akt="${act.name}"#${act.id}${threadInfo ? ` strang="${threadInfo.name}"` : ''} beats=${beats.length} figuren=${figuren.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} werkstatt=${werkstattFiguren.length} recherche=${rech.items.length} locale=${locale}`);
     updateJob(jobId, { statusText: 'job.plot.brainstorm.aiReply', progress: 10 });
 
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotBrainstormPrompt(act.name, acts, beats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren, threads, threadInfo, orte, zeitstrahl, recherche),
+      buildPlotBrainstormPrompt(act.id, acts, outlineBeats, BUCH_KONTEXT, figuren, kapitel, werkstattFiguren, threads, threadInfo, orte, zeitstrahl, rech.items,
+        { locale, kuerzungen, descMax: limits.descMax }),
       buildPlotSystemPrompt(),
-      10, 95, 1500, 0.3, 1500, undefined, SCHEMA_PLOT_BRAINSTORM,
+      10, 95, 1500, 0.3, BRAINSTORM_MAX_TOKENS, undefined, SCHEMA_PLOT_BRAINSTORM,
     );
 
     if (!Array.isArray(result?.vorschlaege)) throw i18nError('job.error.plot.vorschlaegeMissing');
@@ -386,9 +91,7 @@ async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
         begruendung: typeof v.begruendung === 'string' ? v.begruendung.trim() : '',
       }));
 
-    // Lauf historisieren (nur bei echten Vorschlägen), damit der User frühere
-    // Brainstorms später nochmal ansehen + anwenden kann. Best-effort: ein DB-
-    // Fehler hier darf das Job-Resultat nicht verschlucken.
+    // Lauf historisieren (nur bei echten Vorschlägen). Best-effort.
     let runId = null;
     if (vorschlaege.length) {
       try {
@@ -412,105 +115,78 @@ async function runPlotBrainstormJob(jobId, bookId, actId, threadId, userEmail) {
 
 // ── Consistency-Job ───────────────────────────────────────────────────────────
 
+// Neuester Konsistenz-Lauf (Buch + User) als Vorlauf. Best-effort: ohne lesbaren
+// Vorlauf läuft der Check normal.
+function _loadVorlauf(bookId, userEmail, logger) {
+  try {
+    const last = plotDb.listPlotConsistencyRuns(bookId, userEmail)[0];
+    return last ? plotDb.getPlotConsistencyRun(last.id) : null;
+  } catch (e) {
+    logger.warn(`Plot-Consistency: Vorlauf nicht lesbar book=${bookId}: ${e.message}`);
+    return null;
+  }
+}
+
 async function runPlotConsistencyJob(jobId, bookId, userEmail) {
   const logger = makeJobLogger(jobId);
-  const { buildPlotSystemPrompt, buildPlotConsistencyPrompt, SCHEMA_PLOT_CONSISTENCY } = await getPrompts(userEmail);
+  const {
+    buildPlotSystemPrompt, buildPlotConsistencyPrompt, buildPlotConsistencySchema,
+    PLOT_KONFLIKT_TYP_ENUM, PLOT_AKTION_REL_TYPES,
+  } = await getPrompts(userEmail);
 
   try {
     const acts = plotDb.listActs(bookId, userEmail);
-    const beats = plotDb.listBeats(bookId, userEmail);
+    const ctx = await commonPlotContext(bookId, userEmail);
+    const { BUCH_KONTEXT, limits, beats, outlineBeats, figuren, werkstattFiguren, kapitel, orte, zeitstrahl, threads, kuerzungen, locale } = ctx;
     if (!beats.length) throw i18nError('job.error.plot.boardEmpty');
 
-    const { BUCH_KONTEXT, limits, figuren, werkstattFiguren, kapitel, orte, zeitstrahl, threads } =
-      await _commonPlotContext(bookId, userEmail);
-    const szenen = _szenenContext(bookId, userEmail).slice(0, limits.szenen);
-    const kontinuitaet = _kontinuitaetContext(bookId, userEmail).slice(0, limits.kontinuitaet);
-    // Buchweiter Check: alles an Beats/Stränge geknüpfte Recherche-Material, damit
-    // die Prüfung Beats gegen das gesammelte Material abgleichen kann.
-    const recherche = _rechercheContext(bookId, userEmail).slice(0, limits.recherche);
+    const { szenen, kontinuitaet, recherche, relations, weltgesetze } = consistencyExtras(bookId, userEmail, ctx);
+    // Textbeleg-Verankerung: nur bei befülltem Index (sonst „nie gescannt" statt
+    // „nicht im Buch" → falsche Drift-Flut).
+    const { anchorMap, anchorInfo } = anchorContext(bookId, userEmail);
+    // Delta-Check gegen den letzten Lauf.
+    const vorlauf = _loadVorlauf(bookId, userEmail, logger);
+    const delta = buildDeltaContext(vorlauf, beats, { maxKonflikte: limits.vorlauf });
 
-    // Textbeleg-Verankerung (Ist-Index gegen das echte Manuskript, aus dem
-    // beat-anchor-Job persistiert). Nur mitgeben, wenn der Index BEFÜLLT ist —
-    // sonst hiesse „KEIN Textbeleg" bloss „nie gescannt" statt „nicht im Buch"
-    // (falsche Drift-Flut). Kein Embedding-Aufwand: reine Wiederverwendung.
-    const { anchorMap, anchorInfo } = _anchorContext(bookId, userEmail);
-    // Explizite Beat-zu-Beat-Kanten (Kausalität + Setup/Payoff) als Prompt-Kontext,
-    // damit die KI Setup/Payoff und Kausalketten strukturell prüfen kann statt sie
-    // nur aus der Prosa zu raten. Best-effort — leere Liste ist kein Fehler.
-    const relations = _loadCtx('relations', () => plotDb.listBeatRelations(bookId, userEmail));
-    // Weltgesetze (world_facts, Kategorien regel/technik): der Pruefstein, den weder
-    // Szenen-Index noch Textbelege liefern — verstoesst ein geplanter Beat gegen eine
-    // etablierte Regel der Buchwelt?
-    const weltgesetze = _weltgesetzeContext(bookId, userEmail, limits);
-
-    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length} recherche=${recherche.length} relationen=${relations.length} textbelege=${anchorMap ? Object.keys(anchorMap).length : 'aus'} weltgesetze=${weltgesetze.length}`);
+    logger.info(`Plot-Consistency Start: book=${bookId} beats=${beats.length}/${outlineBeats.length} szenen=${szenen.length} kapitel=${kapitel.length} orte=${orte.length} zeitstrahl=${zeitstrahl.length} kontinuitaet=${kontinuitaet.length} werkstatt=${werkstattFiguren.length} straenge=${threads.length} recherche=${recherche.length} relationen=${relations.length} textbelege=${anchorMap ? Object.keys(anchorMap).length : 'aus'} weltgesetze=${weltgesetze.length} vorlauf=${delta ? `#${delta.runId} (${delta.konflikteTotal} Befunde, ${delta.geaendert.length} geändert)` : 'keiner'} locale=${locale}`);
     updateJob(jobId, { statusText: 'job.plot.consistency.aiReply', progress: 10 });
 
-    // maxTokens grosszuegig: ein schonungsloser Check ueber alle Beats/Szenen/
-    // Straenge produziert leicht 15–40 Konflikte (je beat+schwere+problem+vorschlag).
-    // 3000 schnitt die JSON-Antwort regelmaessig mitten im Array ab → Truncation.
     const tok = { in: 0, out: 0, ms: 0 };
     const result = await aiCall(jobId, tok,
-      buildPlotConsistencyPrompt(acts, beats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet, recherche, anchorMap, anchorInfo, relations, weltgesetze),
+      buildPlotConsistencyPrompt(acts, outlineBeats, kapitel, szenen, figuren, BUCH_KONTEXT, werkstattFiguren, threads, orte, zeitstrahl, kontinuitaet, recherche, anchorMap, anchorInfo, relations, weltgesetze,
+        { locale, kuerzungen, descMax: limits.descMax, delta }),
       buildPlotSystemPrompt(),
-      10, 95, 6000, 0.3, 12000, undefined, SCHEMA_PLOT_CONSISTENCY,
+      10, 95, 6000, 0.3, CONSISTENCY_MAX_TOKENS, undefined, buildPlotConsistencySchema({ delta: !!delta }),
     );
 
     if (!Array.isArray(result?.konflikte)) throw i18nError('job.error.plot.konflikteMissing');
     if (typeof result.fazit !== 'string') throw i18nError('job.error.plot.fazitMissing');
+    if (result.erledigt != null && !Array.isArray(result.erledigt)) throw i18nError('job.error.plot.erledigtInvalid');
 
-    // Klickbare Fundstelle je Befund: deterministisch aus dem Verankerungs-Index
-    // (nicht aus dem KI-Text), gematcht über den Beat-Titel (gleiche normTitle-
-    // Basis wie Frontend + Prompt). Die stärkste Fundstelle des benannten Beats
-    // (occ_top[0], vorsortiert nach Score) mit einer page_id → { page_id, page_name }.
-    // So springt die Autorin aus dem Befund direkt an die belegende Textstelle.
-    const _norm = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    // Stabile Beat-ID als primärer Anker (überlebt Umbenennungen), Titel als
-    // Fallback für Modelle, die den [#…]-Marker nicht zurückgeben, und für Alt-Läufe.
-    const validBeatIds = new Set(beats.map(b => b.id));
-    const idByTitle = new Map(beats.map(b => [_norm(b.titel), b.id]));
-    const belegById = {};
-    if (anchorMap) {
-      for (const b of beats) {
-        const top = (anchorMap[b.id]?.top || []).find(t => t.page_id);
-        if (top) belegById[b.id] = { page_id: top.page_id, page_name: top.page_name || null };
-      }
-    }
-    const konflikte = result.konflikte
-      .filter(k => k && typeof k.problem === 'string')
-      .map(k => {
-        const beat = typeof k.beat === 'string' ? k.beat.trim() : '—';
-        // beat_id bevorzugen (aufs Board-Subset validiert), sonst Titel → id auflösen.
-        const rawId = k.beat_id != null ? parseInt(k.beat_id) : null;
-        let beatId = Number.isInteger(rawId) && validBeatIds.has(rawId) ? rawId : null;
-        if (beatId == null && beat !== '—') {
-          const byTitle = idByTitle.get(_norm(beat));
-          if (byTitle != null) beatId = byTitle;
-        }
-        return {
-          beat,
-          beat_id: beatId,
-          schwere: SEVERITY.includes(k.schwere) ? k.schwere : 'mittel',
-          problem: k.problem.trim(),
-          vorschlag: typeof k.vorschlag === 'string' ? k.vorschlag.trim() : '',
-          fundstelle: (beatId != null ? belegById[beatId] : null) || null,
-        };
-      });
+    // Befunde auf den Vertrag bringen: beat_id aufs volle Board validiert (eindeutiger
+    // Titel als Fallback), Typ/Schwere auf die Enums, Aktion serverseitig geprüft,
+    // klickbare Fundstelle deterministisch aus dem Verankerungs-Index.
+    const konflikte = normalizeKonflikte(result.konflikte, {
+      beats, belegById: _belegById(beats, anchorMap),
+      typEnum: PLOT_KONFLIKT_TYP_ENUM, relTypes: PLOT_AKTION_REL_TYPES, hasDelta: !!delta,
+    });
+    const erledigt = normalizeErledigt(result.erledigt, !!delta);
     const fazit = result.fazit.trim();
+    const vorlaufRunId = delta ? delta.runId : null;
 
-    // Lauf historisieren, damit der User die Prüfung später nochmal ansehen kann.
-    // Best-effort: ein DB-Fehler hier darf das Job-Resultat nicht verschlucken.
+    // Lauf historisieren. Best-effort: ein DB-Fehler hier darf das Resultat nicht verschlucken.
     let runId = null;
     try {
       runId = plotDb.insertPlotConsistencyRun({
         bookId, userEmail, konfliktCount: konflikte.length,
-        result: { konflikte, fazit }, model: _modelName(resolveProvider({ userEmail })),
+        result: { konflikte, fazit, erledigt, vorlauf_run_id: vorlaufRunId },
+        model: _modelName(resolveProvider({ userEmail })),
       });
     } catch (e) {
       logger.warn(`Plot-Consistency-Run-Insert fehlgeschlagen book=${bookId}: ${e.message}`);
     }
 
-    completeJob(jobId, { konflikte, fazit, runId, tokensIn: tok.in, tokensOut: tok.out },
+    completeJob(jobId, { konflikte, fazit, erledigt, vorlaufRunId, runId, tokensIn: tok.in, tokensOut: tok.out },
       tps(tok), `${konflikte.length} Konflikte`);
   } catch (e) {
     if (e.name !== 'AbortError') logger.error(`Plot-Consistency-Fehler book=${bookId}: ${e.message}${e.cause ? ` (${e.cause.message})` : ''}`, { stack: e.cause?.stack || e.stack });
@@ -525,6 +201,7 @@ plotRouter.post('/plot-brainstorm', jsonBody, (req, res) => {
   const actId = toIntId(req.body?.act_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
   if (!actId)  return res.status(400).json({ error_code: 'ACT_ID_REQUIRED' });
+  setContext({ book: bookId });
   if (!guardBook(req, res, bookId, 'editor')) return;
   const userEmail = sessionEmail(req);
 
@@ -534,6 +211,10 @@ plotRouter.post('/plot-brainstorm', jsonBody, (req, res) => {
   }
   // Optionaler Strang (Grid): aufs (Buch, User)-Subset validieren, Fremd/leer → null.
   const threadId = plotDb._validThreadId(bookId, userEmail, toIntId(req.body?.thread_id));
+  const ownActs = threadId != null && plotDb.threadHasOwnActs(bookId, userEmail, threadId);
+  if (!brainstormActFitsThread(act, threadId, ownActs)) {
+    return res.status(400).json({ error_code: 'ACT_THREAD_MISMATCH' });
+  }
 
   const entityKey = `${bookId}|brainstorm|${actId}|${threadId || 'none'}`;
   const existing = findActiveJobId('plot-brainstorm', entityKey, userEmail);
@@ -547,6 +228,7 @@ plotRouter.post('/plot-brainstorm', jsonBody, (req, res) => {
 plotRouter.post('/plot-consistency', jsonBody, (req, res) => {
   const bookId = toIntId(req.body?.book_id);
   if (!bookId) return res.status(400).json({ error_code: 'BOOK_ID_REQUIRED' });
+  setContext({ book: bookId });
   if (!guardBook(req, res, bookId, 'editor')) return;
   const userEmail = sessionEmail(req);
 
@@ -558,4 +240,4 @@ plotRouter.post('/plot-consistency', jsonBody, (req, res) => {
   res.json({ jobId });
 });
 
-module.exports = { plotRouter, runPlotBrainstormJob, runPlotConsistencyJob };
+module.exports = { plotRouter, runPlotBrainstormJob, runPlotConsistencyJob, brainstormActFitsThread };

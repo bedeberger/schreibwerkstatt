@@ -103,5 +103,9 @@ button.primary .btn-count {
   font-size: var(--size-compact-font-size);
   padding: var(--size-compact-padding);
 }
+/* Ghost-Variante: Nebenaktion neben einem .btn-compact (Abbrechen, „Später").
+   Randlos und gedämpft bis Hover — das Text-Pendant zu .icon-btn--ghost. */
+.btn-compact--ghost { border-color: transparent; color: var(--color-muted); }
+.btn-compact--ghost:hover:not(:disabled) { color: var(--color-text); }
 
 }

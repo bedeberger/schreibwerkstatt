@@ -9,6 +9,7 @@ const appUsers = require('../db/app-users');
 const { getPromptConfig } = require('../lib/prompts-loader');
 const { toIntId } = require('../lib/validate');
 const appSettings = require('../lib/app-settings');
+const { researchChatGate } = require('../lib/research-chat-gate');
 const { getVersion, getShellBuild } = require('../lib/version');
 const { getLatestVersion: getLatestChangelogVersion } = require('../lib/changelog');
 const { MAX_INPUT_BYTES: PDF_MAX_BYTES } = require('../lib/pdf-attachment');
@@ -145,10 +146,10 @@ router.get('/config', (req, res) => {
     // Recherche-Karte erscheint nur, wenn der EFFEKTIVE Provider dieses Users Claude
     // ist (Web-Suche gibt es nur über die Anthropic-API), ein API-Key gesetzt ist und
     // der Admin-Kill-Switch nicht auf false steht (Default an).
+    // SSoT der Bedingung: lib/research-chat-gate.js (dieselbe Prüfung blockt
+    // serverseitig POST /jobs/research-chat und den Job selbst).
     researchChat: {
-      enabled: appSettings.get('research_chat.enabled') !== false
-        && effectiveProvider === 'claude'
-        && !!String(appSettings.get('ai.claude.api_key') || '').trim(),
+      enabled: !researchChatGate(sessionUser ? sessionUser.email : null),
     },
     // PDF-Anhang (Quelle + Recherche-Fundstueck): Upload-Limit als SSoT vom
     // Server. Ohne das steht dieselbe Zahl im Browser, im express.raw-Body und

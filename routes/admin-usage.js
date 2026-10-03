@@ -88,6 +88,16 @@ router.get('/chat', (req, res) => {
   res.json(result);
 });
 
+// GET /admin/usage/chat-quality?from=&to=&includeAdmins=
+// Je Chat-Art: Antworten, Fehlerquote, Feedback-Anteile, Wiederholungen, Kosten.
+// Nur Zaehler — keine Chat-Texte (Privacy-Boundary oben).
+router.get('/chat-quality', (req, res) => {
+  const range = _range(req);
+  const rows = adminUsage.chatQuality({ ...range, includeAdmins: _includeAdmins(req) });
+  _auditView(req, 'chat-quality', range);
+  res.json({ rows, from: range.from || null, to: range.to || null });
+});
+
 // GET /admin/usage/summary?from=&to=
 router.get('/summary', (req, res) => {
   const range = _range(req);

@@ -202,19 +202,26 @@ function getFiguren(bookId, userEmail, chapterId = null) {
  * user/assistant-Alternation strikt bleibt (LM-Studio-Chat-Templates werfen
  * sonst eine Jinja-Exception). Das passiert z.B. nach einem abgebrochenen
  * Job, der eine User-Message ohne Antwort in der DB hinterlassen hat.
+ *
+ * `annotate(row)` (optional) hängt an eine Nachricht einen Zusatz an — der
+ * Seiten-Chat gibt so die früheren `vorschlaege` samt Status mit (die Zeile trägt
+ * `role`, `content`, `vorschlaege` als JSON-String). Ohne `annotate` ist die
+ * Historie reiner Gesprächstext (Buch-/Recherche-Chat).
  */
-function buildChatMessageHistory(sessionId) {
+function buildChatMessageHistory(sessionId, { annotate = null } = {}) {
   const rows = db.prepare(`
-    SELECT role, content FROM chat_messages
+    SELECT role, content, vorschlaege FROM chat_messages
     WHERE session_id = ? ORDER BY created_at ASC
   `).all(sessionId);
   const out = [];
   for (const r of rows) {
+    const extra = annotate ? annotate(r) : '';
+    const content = extra ? `${r.content}\n\n${extra}` : r.content;
     const last = out[out.length - 1];
     if (last && last.role === r.role) {
-      last.content += '\n\n' + r.content;
+      last.content += '\n\n' + content;
     } else {
-      out.push({ role: r.role, content: r.content });
+      out.push({ role: r.role, content });
     }
   }
   return out;

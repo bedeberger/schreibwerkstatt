@@ -141,3 +141,18 @@ test('snapshotPublication: nur Textfelder (keine BLOBs) → Flags false', () => 
   assert.equal(pub.meta.has_cover, false);
   assert.equal(pub.meta.imprint, 'x');
 });
+
+test('snapshotToBundle laesst ausgeschlossene Kapitel samt Unterkapiteln weg', () => {
+  const bundle = snapshotToBundle({
+    book: { name: 'B' },
+    tree: [
+      { type: 'chapter', name: 'Drin', srcId: 1, excluded: false, children: [{ type: 'page', name: 'p1', srcId: 10, html: '<p>a</p>' }] },
+      { type: 'chapter', name: 'Notizen', srcId: 2, excluded: true, children: [
+        { type: 'page', name: 'p2', srcId: 20, html: '<p>b</p>' },
+        { type: 'chapter', name: 'Sub', srcId: 3, children: [{ type: 'page', name: 'p3', srcId: 30, html: '<p>c</p>' }] },
+      ] },
+    ],
+  });
+  const ids = bundle.groups.flatMap(g => g.pages.map(p => p.p.id));
+  assert.deepEqual(ids, [10]);
+});

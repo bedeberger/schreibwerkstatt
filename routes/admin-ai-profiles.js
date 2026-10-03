@@ -20,6 +20,14 @@ const { sessionEmail } = require('../lib/acl');
 const router = express.Router();
 router.use(requireAdmin);
 
+// Nur Admin-Profile. Der eigene KI-Zugang eines Kontos (`owner_email`) ist fuer
+// den Admin unsichtbar: er traegt den Key des Users und wird im Profil gepflegt
+// (routes/me-ai-access.js).
+function _adminProfile(id) {
+  const p = aiProfiles.getProfile(id);
+  return p && !p.owner_email ? p : null;
+}
+
 // Effektiver Wert eines Profil-Felds (Profil-Spalte, sonst globales Setting).
 function _eff(body, provider, key) {
   const v = body[key];
@@ -107,7 +115,7 @@ router.post('/', express.json(), (req, res) => {
 
 router.put('/:id', express.json(), (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const existing = aiProfiles.getProfile(id);
+  const existing = _adminProfile(id);
   if (!existing) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
   const body = { ...req.body };
   // Der PUT ist ein Voll-Update (die Oberflaeche schickt das ganze Formular). Einzige
@@ -130,7 +138,7 @@ router.put('/:id', express.json(), (req, res) => {
 // Oberflaeche es sagen kann, statt es stillschweigend geschehen zu lassen.
 router.delete('/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const existing = aiProfiles.getProfile(id);
+  const existing = _adminProfile(id);
   if (!existing) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
   const { deleted, detachedUsers } = aiProfiles.deleteProfile(id);
   logger.info(`KI-Profil geloescht: ${existing.name} (${detachedUsers} User abgehaengt)`, { user: sessionEmail(req) });
@@ -140,7 +148,7 @@ router.delete('/:id', (req, res) => {
 // Wer haengt an diesem Profil? Fuer die Loesch-Rueckfrage in der Oberflaeche.
 router.get('/:id/users', (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (!aiProfiles.getProfile(id)) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
+  if (!_adminProfile(id)) return res.status(404).json({ error_code: 'PROFILE_NOT_FOUND' });
   const users = appUsers.listUsers().filter(u => u.ai_profile_id === id).map(u => u.email);
   res.json({ users });
 });

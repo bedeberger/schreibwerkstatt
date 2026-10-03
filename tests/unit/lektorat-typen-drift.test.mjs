@@ -3,10 +3,10 @@
 // SSoT ist public/js/prompts/lektorat-typen.js. An dem Typ-Set hängen fünf
 // Schichten, die es in eigenen Kopien bzw. Ableitungen führen MÜSSEN, weil sie in
 // anderen Modulsystemen oder anderen Runtimes leben:
-//   1. routes/jobs/lektorat.js#STYLISTIC_TYPEN (CJS, Cap-Backstop)
+//   1. routes/jobs/lektorat-filter.js#STYLISTIC_TYPEN (CJS, Cap-Backstop)
 //   2. lib/lektorat-consolidate.js#TYP_PRIORITY (CJS, Span-Overlap-Clustering)
 //   3. public/js/book/fehler-heatmap.js#FEHLER_CLUSTERS (Spalten der Heatmap)
-//   4. public/js/book/page-view.js#SOFT_TYPEN (Vorauswahl der Findings)
+//   4. public/js/book/page-view.js#SOFT_TYPEN + EDITORIAL_TYPEN (Vorauswahl der Findings)
 //   5. public/js/i18n/{de,en}.json (`finding.*`, `fehlerHeatmap.typ.*`)
 //
 // Ein neuer Fehlertyp, der nur in der SSoT landet, erscheint sonst in der App als
@@ -115,8 +115,8 @@ test('TYP_PRIORITAET deckt jeden Typ ab (sonst landen Typen gleichrangig im Dedu
 
 // ── 2. CJS-Spiegel der Server-Seite ──────────────────────────────────────────
 
-test('routes/jobs/lektorat.js#STYLISTIC_TYPEN spiegelt STILISTISCHE_TYPEN', () => {
-  const { STYLISTIC_TYPEN } = require(path.join(ROOT, 'routes/jobs/lektorat.js'));
+test('routes/jobs/lektorat-filter.js#STYLISTIC_TYPEN spiegelt STILISTISCHE_TYPEN', () => {
+  const { STYLISTIC_TYPEN } = require(path.join(ROOT, 'routes/jobs/lektorat-filter.js'));
   assert.deepEqual([...STYLISTIC_TYPEN].sort(), [...STILISTISCHE_TYPEN].sort());
   // Nur echte Typen im Cap-Set.
   for (const t of STILISTISCHE_TYPEN) {
@@ -162,6 +162,25 @@ test('SOFT_TYPEN enthält nur gültige Typen', () => {
   assert.ok(soft.length > 0);
   for (const t of soft) {
     assert.ok(ALLE_LEKTORAT_TYPEN.includes(t), `SOFT_TYPEN führt unbekannten Typ «${t}»`);
+  }
+});
+
+test('EDITORIAL_TYPEN: gültige Typen, disjunkt zu SOFT_TYPEN', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'public/js/book/page-view.js'), 'utf8');
+  const read = (name) => {
+    const m = src.match(new RegExp(`export const ${name} = new Set\\(\\[([^\\]]+)\\]\\)`));
+    assert.ok(m, `${name} nicht gefunden`);
+    return [...m[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1]);
+  };
+  const editorial = read('EDITORIAL_TYPEN');
+  const soft = new Set(read('SOFT_TYPEN'));
+  for (const t of editorial) {
+    assert.ok(ALLE_LEKTORAT_TYPEN.includes(t), `EDITORIAL_TYPEN führt unbekannten Typ «${t}»`);
+    assert.ok(!soft.has(t), `«${t}» steht in SOFT_TYPEN und EDITORIAL_TYPEN`);
+  }
+  // Die Aussage-ändernden Fach-Befunde dürfen nie vorausgewählt sein.
+  for (const t of ['unbelegt', 'zuschreibung', 'wertung']) {
+    assert.ok(editorial.includes(t), `«${t}» muss redaktionell sein`);
   }
 });
 

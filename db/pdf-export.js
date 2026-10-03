@@ -10,7 +10,9 @@
 // Pro Scope max. ein Profil mit is_default=1.
 
 const { db } = require('./connection');
-const { validateConfig } = require('../lib/pdf-export-defaults');
+const { NOW_ISO_SQL } = require('./now');
+const { validateConfig, defaultConfig } = require('../lib/pdf-export-defaults');
+const logger = require('../logger');
 
 function _scope(bookId) {
   const id = parseInt(bookId);
@@ -44,23 +46,23 @@ const _stmtGetSpine = db.prepare(
 );
 const _stmtInsert = db.prepare(
   `INSERT INTO pdf_export_profile (book_id, kind, user_email, name, config_json, is_default, created_at, updated_at)
-   VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+   VALUES (?, ?, ?, ?, ?, 0, ${NOW_ISO_SQL}, ${NOW_ISO_SQL})`
 );
 const _stmtUpdate = db.prepare(
-  `UPDATE pdf_export_profile SET name = ?, config_json = ?, updated_at = ? WHERE id = ?`
+  `UPDATE pdf_export_profile SET name = ?, config_json = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ?`
 );
 const _stmtDelete = db.prepare(`DELETE FROM pdf_export_profile WHERE id = ?`);
 const _stmtSetBackCover = db.prepare(
-  `UPDATE pdf_export_profile SET back_cover_image = ?, back_cover_image_mime = ?, updated_at = ? WHERE id = ?`
+  `UPDATE pdf_export_profile SET back_cover_image = ?, back_cover_image_mime = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ?`
 );
 const _stmtClearBackCover = db.prepare(
-  `UPDATE pdf_export_profile SET back_cover_image = NULL, back_cover_image_mime = NULL, updated_at = ? WHERE id = ?`
+  `UPDATE pdf_export_profile SET back_cover_image = NULL, back_cover_image_mime = NULL, updated_at = ${NOW_ISO_SQL} WHERE id = ?`
 );
 const _stmtSetSpine = db.prepare(
-  `UPDATE pdf_export_profile SET spine_image = ?, spine_image_mime = ?, updated_at = ? WHERE id = ?`
+  `UPDATE pdf_export_profile SET spine_image = ?, spine_image_mime = ?, updated_at = ${NOW_ISO_SQL} WHERE id = ?`
 );
 const _stmtClearSpine = db.prepare(
-  `UPDATE pdf_export_profile SET spine_image = NULL, spine_image_mime = NULL, updated_at = ? WHERE id = ?`
+  `UPDATE pdf_export_profile SET spine_image = NULL, spine_image_mime = NULL, updated_at = ${NOW_ISO_SQL} WHERE id = ?`
 );
 const _stmtClearDefaultsBook = db.prepare(
   `UPDATE pdf_export_profile SET is_default = 0
@@ -71,8 +73,20 @@ const _stmtClearDefaultsUserDefault = db.prepare(
     WHERE kind = 'user_default' AND user_email = ?`
 );
 const _stmtSetDefaultForId = db.prepare(
-  `UPDATE pdf_export_profile SET is_default = 1, updated_at = ? WHERE id = ?`
+  `UPDATE pdf_export_profile SET is_default = 1, updated_at = ${NOW_ISO_SQL} WHERE id = ?`
 );
+
+// Eine korrupte config_json-Zeile darf weder das Listing noch das Laden eines
+// Profils sprengen: Fallback auf die Default-Konfiguration + Warnung im Log.
+// Der naechste Speichervorgang ueberschreibt die Zeile mit gueltigem JSON.
+function _parseConfig(r) {
+  try {
+    return validateConfig(JSON.parse(r.config_json));
+  } catch (e) {
+    logger.warn(`pdf_export_profile ${r.id}: config_json unlesbar (${e.message}) — Default-Konfiguration verwendet`);
+    return defaultConfig();
+  }
+}
 
 function _row(r) {
   if (!r) return null;
@@ -82,7 +96,7 @@ function _row(r) {
     kind: r.kind,
     user_email: r.user_email,
     name: r.name,
-    config: validateConfig(JSON.parse(r.config_json)),
+    config: _parseConfig(r),
     is_default: !!r.is_default,
     has_cover: !!r.has_cover,
     cover_mime: r.cover_mime || null,
@@ -111,13 +125,12 @@ function getProfile(id) {
 
 function createProfile(bookId, userEmail, name, config) {
   const s = _scope(bookId);
-  const now = Date.now();
-  const info = _stmtInsert.run(s.bookId, s.kind, userEmail, name, JSON.stringify(config), now, now);
+  const info = _stmtInsert.run(s.bookId, s.kind, userEmail, name, JSON.stringify(config));
   return getProfile(info.lastInsertRowid);
 }
 
 function updateProfile(id, name, config) {
-  _stmtUpdate.run(name, JSON.stringify(config), Date.now(), parseInt(id));
+  _stmtUpdate.run(name, JSON.stringify(config), parseInt(id));
   return getProfile(id);
 }
 
@@ -126,11 +139,11 @@ function deleteProfile(id) {
 }
 
 function setBackCover(id, buffer, mime) {
-  _stmtSetBackCover.run(buffer, mime, Date.now(), parseInt(id));
+  _stmtSetBackCover.run(buffer, mime, parseInt(id));
 }
 
 function clearBackCover(id) {
-  _stmtClearBackCover.run(Date.now(), parseInt(id));
+  _stmtClearBackCover.run(parseInt(id));
 }
 
 function getBackCover(id) {
@@ -140,11 +153,11 @@ function getBackCover(id) {
 }
 
 function setSpineImage(id, buffer, mime) {
-  _stmtSetSpine.run(buffer, mime, Date.now(), parseInt(id));
+  _stmtSetSpine.run(buffer, mime, parseInt(id));
 }
 
 function clearSpineImage(id) {
-  _stmtClearSpine.run(Date.now(), parseInt(id));
+  _stmtClearSpine.run(parseInt(id));
 }
 
 function getSpineImage(id) {
@@ -157,7 +170,7 @@ const _setDefaultTx = db.transaction((bookId, userEmail, id) => {
   const s = _scope(bookId);
   if (s.kind === 'book') _stmtClearDefaultsBook.run(s.bookId, userEmail);
   else                   _stmtClearDefaultsUserDefault.run(userEmail);
-  _stmtSetDefaultForId.run(Date.now(), parseInt(id));
+  _stmtSetDefaultForId.run(parseInt(id));
 });
 
 function setDefault(bookId, userEmail, id) {

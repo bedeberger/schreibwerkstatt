@@ -101,6 +101,12 @@ let _localeMap  = new Map();
 let _rawLocales = new Map();
 let _autorenstilByLocale = new Map();
 let _localChatAddonByLocale = new Map();
+// Reine Sprachnorm je Locale (`baseRules` aus prompt-config.json OHNE die
+// angehängten Lektorat-`commonRules`) — für Prompts, die nur die Orthografie
+// brauchen, nicht die Fehlermelde-Regeln (Recherche-Chat). Liegt bewusst neben
+// `_localeMap`, nicht darin: der Content-Hash (PROMPTS_VERSION) liest nur die
+// Map, ein neuer Eintrag dort würde jeden persistenten Cache invalidieren.
+let _orthoRulesByLocale = new Map();
 let _werkAbgeschlossenByLang = {};
 let _buchtypen  = {};
 let _erklaerungRule = '';
@@ -286,6 +292,7 @@ export function configureLocales(cfg) {
   _rawLocales.clear();
   _autorenstilByLocale.clear();
   _localChatAddonByLocale.clear();
+  _orthoRulesByLocale.clear();
   _buchtypen     = cfg.buchtypen || {};
   _erklaerungRule = cfg.erklaerungRule || '';
   _werkAbgeschlossenByLang = cfg.werkAbgeschlossenRule || {};
@@ -314,6 +321,7 @@ export function configureLocales(cfg) {
         baseRules: common ? `${base}\n\n${common}` : base,
       };
       _rawLocales.set(key, mergedCfg);
+      _orthoRulesByLocale.set(key, base);
       _autorenstilByLocale.set(key, autorenstil);
       _localChatAddonByLocale.set(key, localChatAddon);
       _localeMap.set(key, _buildLocalePrompts(mergedCfg, cfg.erklaerungRule, '', autorenstil, localChatAddon));
@@ -329,6 +337,7 @@ export function configureLocales(cfg) {
     _defaultLocale = 'de-CH';
     const flatCfg = { baseRules: cfg.baseRules, stopwords: cfg.stopwords, systemPrompts: cfg.systemPrompts || {} };
     _rawLocales.set('de-CH', flatCfg);
+    _orthoRulesByLocale.set('de-CH', cfg.baseRules);
     _localeMap.set('de-CH', _buildLocalePrompts(flatCfg, cfg.erklaerungRule));
   }
 
@@ -357,20 +366,11 @@ export function configureLocales(cfg) {
   SYSTEM_KOMPLETT_FAKTEN_PASS   = def.SYSTEM_KOMPLETT_FAKTEN_PASS   ?? null;
 }
 
-/**
- * Gibt ein Locale-Prompts-Objekt zurück, das mit dem per-Buch-Kontext augmentiert ist.
- * Baut die baseRules dynamisch auf (Buchtyp-Block + Freitext-Block) und übergibt
- * buchKontext als soziogramm-Kontext an SYSTEM_KOMPLETT_EXTRAKTION / figurenBasisRules.
- * @param {string} localeKey   z.B. 'de-CH', 'en-US'
- * @param {string|null} buchtyp     Key aus prompt-config.json buchtypen (z.B. 'roman')
- * @param {string|null} buchKontext Freitext des Users (Schauplatz, Epoche, …)
- * @param {boolean}     isFinished  Buch wurde vom Autor als abgeschlossen markiert
- * @returns {{ SYSTEM_LEKTORAT, ..., BUCH_KONTEXT }}
- */
-export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false, hauptland = null, stilprofil = null, zeitlinieReal = false) {
-  const rawLocale = _rawLocales.get(localeKey) || _rawLocales.get(_defaultLocale) || {};
-  const kontext   = (buchKontext || '').trim();
-
+// Buchspezifische Kontext-Abschnitte (Buchtyp, Autoren-Freitext, Hauptland,
+// reale Zeitlinie, optional „Werk abgeschlossen"). Geteilt von
+// getLocalePromptsForBook und getResearchPromptContext — eine Quelle für den
+// Wortlaut der VORRANGIGEN ANGABEN.
+function _bookContextParts(localeKey, buchtyp, kontext, isFinished, hauptland, zeitlinieReal) {
   // Buchspezifische Sektion separat sammeln — KEIN Inline-Merge in baseRules mehr.
   // _buildLocalePrompts splittet sie via _toCacheBlocks in einen eigenen Cache-Block,
   // damit der stabile SYSTEM-Core (Persona + Regeln + Schema) buchübergreifend
@@ -397,6 +397,24 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinis
     const fertigRule = _werkAbgeschlossenByLang?.[langCode];
     if (fertigRule) bookCtxParts.push(fertigRule);
   }
+  return bookCtxParts;
+}
+
+/**
+ * Gibt ein Locale-Prompts-Objekt zurück, das mit dem per-Buch-Kontext augmentiert ist.
+ * Baut die baseRules dynamisch auf (Buchtyp-Block + Freitext-Block) und übergibt
+ * buchKontext als soziogramm-Kontext an SYSTEM_KOMPLETT_EXTRAKTION / figurenBasisRules.
+ * @param {string} localeKey   z.B. 'de-CH', 'en-US'
+ * @param {string|null} buchtyp     Key aus prompt-config.json buchtypen (z.B. 'roman')
+ * @param {string|null} buchKontext Freitext des Users (Schauplatz, Epoche, …)
+ * @param {boolean}     isFinished  Buch wurde vom Autor als abgeschlossen markiert
+ * @returns {{ SYSTEM_LEKTORAT, ..., BUCH_KONTEXT }}
+ */
+export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinished = false, hauptland = null, stilprofil = null, zeitlinieReal = false) {
+  const rawLocale = _rawLocales.get(localeKey) || _rawLocales.get(_defaultLocale) || {};
+  const kontext   = (buchKontext || '').trim();
+  const langCode  = (localeKey || _defaultLocale).split('-')[0];
+  const bookCtxParts = _bookContextParts(localeKey, buchtyp, kontext, isFinished, hauptland, zeitlinieReal);
   const bookContextStr = bookCtxParts.join('\n\n');
 
   // buchKontext als soziogramm-Kontext weitergeben (figurenBasisRules / SYSTEM_KOMPLETT_EXTRAKTION).
@@ -404,6 +422,21 @@ export function getLocalePromptsForBook(localeKey, buchtyp, buchKontext, isFinis
   const autorenstil = _autorenstilByLocale.get(localeKey) || _autorenstilByLocale.get(_defaultLocale) || '';
   const localChatAddon = _localChatAddonByLocale.get(localeKey) || _localChatAddonByLocale.get(_defaultLocale) || '';
   return _buildLocalePrompts(rawLocale, _erklaerungRule, kontext, autorenstil, localChatAddon, bookContextStr, (stilprofil || '').trim());
+}
+
+/**
+ * Buch-Kontext für den Recherche-Chat: Sprachnorm der Locale (nur `baseRules`,
+ * ohne die Lektorat-`commonRules`) + Buchtyp/Autoren-Angaben/Hauptland.
+ * Bewusst OHNE Chat-Persona, Stilprofil, „Werk abgeschlossen" und den
+ * Zeitlinien-Block (der spricht Extraktionsfelder an, keine Recherche):
+ * der Recherche-Chat erzeugt keinen Manuskripttext und gibt kein Stil-Feedback —
+ * die Buch-Chat-Persona („kritischer Lektor") würde genau das wieder erlauben.
+ * @returns {string} Kontext-Block ('' wenn nichts gesetzt)
+ */
+export function getResearchPromptContext(localeKey, { buchtyp = null, buchKontext = null, hauptland = null } = {}) {
+  const ortho = (_orthoRulesByLocale.get(localeKey) || _orthoRulesByLocale.get(_defaultLocale) || '').trim();
+  const parts = _bookContextParts(localeKey, buchtyp, (buchKontext || '').trim(), false, hauptland, false);
+  return [ortho, ...parts].filter(Boolean).join('\n\n');
 }
 
 /**

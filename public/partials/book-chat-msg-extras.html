@@ -1,0 +1,89 @@
+<!--
+  Buch-Chat: Zusätze unter einer Agent-Antwort (per String-Include in die
+  Nachrichten-Schleife von chat.html, Scope: `msg`, `msgIdx`). Methoden aus
+  public/js/chat/book-chat.js. Alle KI-/User-Felder per x-text — kein x-html.
+-->
+<template x-if="msg.role === 'assistant' && msg.context_info && msg.context_info.mode === 'agent'">
+  <div class="book-chat-extras">
+    <!-- Fussnoten: validierte Zitate aus final_answer -->
+    <template x-if="bookChatCitations(msg).length">
+      <div class="book-chat-citations">
+        <div class="book-chat-citations-title" x-text="$app.t('chat.citationsTitle')"></div>
+        <ol class="book-chat-citation-list">
+          <template x-for="c in bookChatCitations(msg)" :key="c.n">
+            <li class="book-chat-citation" :class="{ 'book-chat-citation--invalid': !c.valid }">
+              <span class="book-chat-citation-quote" x-text="'«' + c.quote + '»'"></span>
+              <template x-if="c.page_id">
+                <a class="chat-context-link"
+                   :href="'#book/' + $store.nav.selectedBookId + '/page/' + c.page_id"
+                   @click.prevent="$app.gotoPageById(c.page_id)"
+                   :data-tip="$app.t('chat.citationGoto', { name: c.page_name || '' })"
+                   x-text="c.page_name || ('#' + c.page_id)"></a>
+              </template>
+              <template x-if="!c.valid">
+                <span class="chat-context-badge chat-context-badge--error"
+                      :data-tip="$app.t('chat.citationInvalidTip')"
+                      x-text="$app.t('chat.citationInvalid')"></span>
+              </template>
+            </li>
+          </template>
+        </ol>
+      </div>
+    </template>
+
+    <!-- Im Chat generierte Bilder (Weltaufbau-/Chat-Visualisierung, nicht im Manuskript) -->
+    <template x-if="msg.role === 'assistant' && msg.context_info && Array.isArray(msg.context_info.images) && msg.context_info.images.length">
+      <div class="chat-images">
+        <template x-for="(img, ii) in msg.context_info.images" :key="ii">
+          <figure class="chat-image">
+            <img :src="'/chat/image/' + img.image_id" :alt="img.prompt || $app.t('chat.imageAlt')" loading="lazy">
+            <figcaption class="chat-image-cap">
+              <span class="chat-image-prompt" x-text="img.prompt" :data-tip="img.prompt"></span>
+              <a class="chat-image-dl"
+                 :href="'/chat/image/' + img.image_id + '?download=1'"
+                 :download="'bild-' + img.image_id"
+                 x-text="$app.t('chat.imageDownload')"></a>
+            </figcaption>
+          </figure>
+        </template>
+      </div>
+    </template>
+
+    <!-- Frage zur Aussenwelt: Übergabe an den Recherche-Chat -->
+    <template x-if="msg.context_info.recherche_hinweis && $store.config.researchChatEnabled">
+      <div class="book-chat-research-hint">
+        <span class="muted-msg" x-text="$app.t('chat.researchHint')"></span>
+        <button type="button" class="btn-compact" @click="askInResearchChat(msgIdx)" x-text="$app.t('chat.askResearchChat')"></button>
+      </div>
+    </template>
+
+    <!-- Abbruch-Grund (Deckel) -->
+    <template x-if="_bookChatStopNote(msg)">
+      <div class="muted-msg book-chat-stop-note" x-text="_bookChatStopNote(msg)"></div>
+    </template>
+
+    <!-- Werkzeug-Verlauf: Parameter, Runde, Dauer, gekürzt/Fehler -->
+    <template x-if="_bookChatToolRows(msg).length">
+      <div x-data="collapsible()" class="book-chat-tools">
+        <button type="button" class="collapsible-toggle" x-bind="trigger">
+          <span class="history-chevron" x-bind="chevron" aria-hidden="true"></span>
+          <span x-text="$app.t('chat.toolsToggle') + ' (' + _bookChatToolRows(msg).length + ')'"></span>
+        </button>
+        <div x-bind="panel" x-cloak class="book-chat-tools-panel">
+          <ul class="book-chat-tool-list">
+            <template x-for="(row, ri) in _bookChatToolRows(msg)" :key="ri">
+              <li class="book-chat-tool-row" :class="{ 'book-chat-tool-row--failed': row.failed }">
+                <span class="book-chat-tool-name" x-text="row.name"></span>
+                <span class="book-chat-tool-meta" x-show="row.iter != null" x-text="$app.t('chat.toolIter', { n: row.iter })"></span>
+                <span class="book-chat-tool-meta" x-show="row.durationMs != null" x-text="$app.t('chat.toolDuration', { ms: row.durationMs })"></span>
+                <span class="chat-context-badge" x-show="row.truncated" x-text="$app.t('chat.toolTruncated')"></span>
+                <span class="chat-context-badge chat-context-badge--error" x-show="row.failed" :data-tip="row.error" x-text="$app.t('chat.toolFailed')"></span>
+                <code class="book-chat-tool-args" x-show="row.args" x-text="row.args"></code>
+              </li>
+            </template>
+          </ul>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>

@@ -172,6 +172,42 @@ test('Batch-Lektorat-Cache: zweiter Lauf nur für geänderte Seite', async () =>
   assert.equal(ctx.mockAi.log.length, 3, '2. Batch = 3 Calls (geänderte Seite + beide Nachbarn via Auszug)');
 });
 
+test('Lektorat-Cache: Seiten-Lektorat nach Buch-Lektorat trifft denselben Cache', async () => {
+  const BOOK_ID = 203;
+  ctx.dbSeed.setBook({
+    chapters: [{ id: 2040, book_id: BOOK_ID, name: 'Kap D' }],
+    pages: [
+      { id: 2041, book_id: BOOK_ID, chapter_id: 2040, name: 'S 1', updated_at: '2026-05-01T10:00:00Z' },
+      { id: 2042, book_id: BOOK_ID, chapter_id: 2040, name: 'S 2', updated_at: '2026-05-01T10:00:00Z' },
+      { id: 2043, book_id: BOOK_ID, chapter_id: 2040, name: 'S 3 leer', updated_at: '2026-05-01T10:00:00Z' },
+    ],
+    pageBodies: {
+      2041: '<p>Seite eins inhaltsreich.</p>',
+      2042: '<p>Seite zwei inhaltsreich.</p>',
+      2043: '<p></p>',
+    },
+  });
+  ctx.mockAi.on(
+    (e) => e.schemaKeys.includes('fehler') && e.schemaKeys.includes('szenen'),
+    lektoratResponse(1),
+  );
+
+  const batchId = ctx.shared.createJob('batch-check', BOOK_ID, 'tester@test.dev', 'job.label.batchCheck');
+  ctx.shared.enqueueJob(batchId, () => ctx.lektorat.runBatchCheckJob(batchId, BOOK_ID, 'tester@test.dev'));
+  const batch = await waitForJob(ctx.shared, batchId, { timeoutMs: 8000 });
+  assert.equal(batch.status, 'done');
+  assert.equal(ctx.mockAi.log.length, 2, 'zwei nicht-leere Seiten');
+  assert.equal(batch.result.done, 2);
+  assert.equal(batch.result.skippedEmpty, 1, 'leere Seite wird gezählt, nicht verschluckt');
+  assert.deepEqual(batch.result.failed, []);
+
+  const checkId = ctx.shared.createJob('check', BOOK_ID, 'tester@test.dev', 'job.label.checkPage', null, 2042);
+  ctx.shared.enqueueJob(checkId, () => ctx.lektorat.runCheckJob(checkId, 2042, BOOK_ID, 'tester@test.dev'));
+  const check = await waitForJob(ctx.shared, checkId);
+  assert.equal(check.status, 'done', `expected done, got ${check.status}: ${check.error || ''}`);
+  assert.equal(ctx.mockAi.log.length, 2, 'Seiten-Lektorat = Cache-HIT aus dem Buch-Lektorat');
+});
+
 // ── Synonym-Cache ────────────────────────────────────────────────────────────
 
 test('Synonym-Cache: identischer Lookup → 0 AI-Calls', async () => {

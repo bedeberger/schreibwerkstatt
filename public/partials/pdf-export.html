@@ -45,6 +45,14 @@
              x-effect="options = exportPageOptions()"></div>
       </div>
       <button type="button"
+              x-show="!exporting"
+              :disabled="!$store.nav.selectedBookId || !activeProfile"
+              :data-tip="!$store.nav.selectedBookId ? $app.t('pdfExport.export.noBookHint') : $app.t('pdfExport.sampleTip')"
+              @click="exportSample()">
+        <svg class="icon" aria-hidden="true"><use href="/icons.svg#scan"/></svg>
+        <span x-text="$app.t('pdfExport.sample')"></span>
+      </button>
+      <button type="button"
               class="primary"
               x-show="!exporting"
               :disabled="!$store.nav.selectedBookId || !activeProfile"
@@ -71,7 +79,7 @@
          x-data="combobox({ placeholder: $app.t('pdfExport.profile'), compact: false })"
          x-modelable="value" x-model="activeProfileId"
          x-effect="options = profiles.map(p => ({ value: p.id, label: p.name + (p.is_default ? ' ★' : '') }))"
-         @combobox-change="selectProfile($event.detail)"></div>
+         @combobox-change="onProfilePick($event.detail)"></div>
     <button type="button" class="export-profile-btn" :data-tip="$app.t('pdfExport.newProfile')" :aria-label="$app.t('pdfExport.newProfile')"
             @click="_showCreate = !_showCreate">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#plus"/></svg>
@@ -85,7 +93,7 @@
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#pencil"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile"
-            :data-tip="$app.t('pdfExport.duplicateProfile')" :aria-label="$app.t('pdfExport.duplicateProfile')" @click="duplicateProfile()">
+            :data-tip="$app.t('pdfExport.duplicateProfile')" :aria-label="$app.t('pdfExport.duplicateProfile')" @click="withDirtyGuard(() => duplicateProfile())">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#copy"/></svg>
     </button>
     <button type="button" class="export-profile-btn" x-show="activeProfile && !activeProfile.is_default"
@@ -101,7 +109,7 @@
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#file-plus"/></svg>
     </button>
     <input type="file" hidden x-ref="importInput" accept="application/json,.json"
-           @change="importProfileConfig($event.target.files[0]); $event.target.value = ''">
+           @change="const f = $event.target.files[0]; $event.target.value = ''; withDirtyGuard(() => importProfileConfig(f))">
     <button type="button" class="export-profile-btn" x-show="profiles.length > 1"
             :data-tip="$app.t('pdfExport.deleteProfile')" :aria-label="$app.t('pdfExport.deleteProfile')" @click="deleteProfile(activeProfileId)">
       <svg class="icon" aria-hidden="true"><use href="/icons.svg#trash"/></svg>
@@ -156,10 +164,23 @@
   <template x-if="_formMounted && activeProfile">
     <div x-data="tabs(['layout','font','chapter','pagination','frontmatter','apparat','cover','print'])"
          x-modelable="value" x-model="activeTab">
+      <!-- Einfach/Experte (DESIGN.md .seg-toggle) + Ungespeichert-Marke -->
+      <div class="pdfx-mode-bar">
+        <span class="card-form-label" x-text="$app.t('pdfExport.mode.label')"></span>
+        <div class="seg-toggle" role="group" :aria-label="$app.t('pdfExport.mode.label')">
+          <button type="button" :class="{ 'seg-toggle--active': uiMode === 'simple' }" :aria-pressed="uiMode === 'simple'"
+                  @click="setUiMode('simple')" x-text="$app.t('pdfExport.mode.simple')"></button>
+          <button type="button" :class="{ 'seg-toggle--active': uiMode === 'expert' }" :aria-pressed="uiMode === 'expert'"
+                  @click="setUiMode('expert')" x-text="$app.t('pdfExport.mode.expert')"></button>
+        </div>
+        <span class="pdfx-dirty-mark" x-show="isDirty()" x-cloak role="status" x-text="$app.t('pdfExport.dirty.indicator')"></span>
+      </div>
+      <p class="card-form-field-note" x-show="uiMode === 'simple'" x-text="$app.t('pdfExport.mode.simpleHint')"></p>
       <!-- Tabs (DESIGN.md .tabs / Alpine.data('tabs')) -->
       <div class="tabs tabs--scrollable export-tabs" x-bind="tablist">
         <template x-for="tab in tabs" :key="tab">
           <button class="tabs-btn"
+                  x-show="tabVisible(tab)"
                   x-bind="tabBtn(tab)"
                   x-text="$app.t('pdfExport.tab.' + tab)"></button>
         </template>
@@ -174,27 +195,7 @@
       <!-- @include pdf-export-cover -->
       <!-- @include pdf-export-print -->
 
-      <!-- Persistenter Footer: Speichern gilt für alle Tabs (Profil-Config) -->
-      <div class="card-actions">
-        <span class="card-form-saved" x-show="savedAt" x-cloak x-transition.opacity.duration.250ms x-text="$app.t('pdfExport.saved')"></span>
-        <button type="button" data-label-ok :disabled="saving" @click="saveActiveProfile()">
-          <span x-show="saving" class="spinner"></span>
-          <span x-text="saving ? $app.t('common.saving') : $app.t('common.save')"></span>
-        </button>
-      </div>
-
-      <!-- Progress / Errors -->
-      <div class="export-progress" x-show="exporting || (exportProgress > 0 && !exportError)">
-        <div class="progress-bar-wrap">
-          <div class="progress-bar" :style="{ '--progress': exportProgress + '%' }"></div>
-        </div>
-        <p class="card-form-field-note" x-text="exportStatus"></p>
-      </div>
-      <p class="card-form-error" x-show="exportError" x-text="exportError"></p>
-      <p class="card-form-field-note pdfx-lowres-warn" x-show="exportLowRes > 0"
-         x-text="$app.t('pdfExport.print.lowResWarning', { count: exportLowRes })"></p>
-      <p class="card-form-field-note pdfx-lowres-warn" x-show="exportHyphenOff.length"
-         x-text="$app.t('pdfExport.hyphenationDisabled', { fonts: exportHyphenOff.join(', ') })"></p>
+      <!-- @include pdf-export-status -->
     </div>
   </template>
 </div>

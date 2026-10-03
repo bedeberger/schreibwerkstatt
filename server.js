@@ -447,6 +447,8 @@ app.use('/changelog', require('./routes/changelog'));
 app.use('/me/books', require('./routes/mybooks'));
 // Autorenprofil: dieselbe Begruendung fuer einen eigenen Router wie beim Regal.
 app.use('/me/author-profile', require('./routes/author-profile'));
+// Eigener KI-Zugang: dieselbe Begruendung fuer einen eigenen Router wie beim Regal.
+app.use('/me/ai-access', require('./routes/me-ai-access'));
 app.use('/me', userSettingsRouter);
 app.use('/sync', syncRouter);
 app.use('/export', exportRouter);

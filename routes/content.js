@@ -12,12 +12,14 @@
 //   content/pages.js     — Seiten-Ebene (Detail/Save/Create/Delete), Page-Presence,
 //                          Page-Revisions.
 //   content/chapters.js  — Kapitel-Ebene (Detail/Create/Update/Delete).
+//   content/trash.js     — Papierkorb geloeschter Seiten (Liste/Wiederherstellen).
 //   content/assets.js    — OTA-/Release-Assets der nativen Clients.
 //   content/shared.js    — geteilte Guards/Helfer/Konstanten.
 //
 // Routen-Pfade sind über die Module hinweg disjunkt (literale erste Segmente
 // /books · /chapters · /pages · /search · /editor-bundle.zip · /macclient* ·
-// /android*) → die Registrierungs-Reihenfolge ändert das Matching nicht.
+// /android*; unter /books trägt trash.js nur das eigene Segment /trash) → die
+// Registrierungs-Reihenfolge ändert das Matching nicht.
 
 const express = require('express');
 const { bookParamHandler } = require('../lib/log-context');
@@ -28,6 +30,7 @@ router.param('book_id', bookParamHandler);
 require('./content/books').register(router);
 require('./content/chapters').register(router);
 require('./content/pages').register(router);
+require('./content/trash').register(router);
 require('./content/assets').register(router);
 
 module.exports = router;

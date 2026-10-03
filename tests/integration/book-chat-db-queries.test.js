@@ -125,10 +125,26 @@ test.after(() => { ctx.cleanup(); });
 test('list_chapters: Kapitel und Seiten in Leserichtung, Seite ohne Kapitel separat', () => {
   const r = call('list_chapters');
   assert.deepEqual(r.chapters.map(c => c.chapter_name), ['Eins', 'Zwei']);
-  assert.deepEqual(r.chapters[0].pages.map(p => p.page_name), ['P-Eins-a', 'P-Eins-b']);
+  // Seiten kompakt als Tupel [page_id, page_name, words] (page_format).
+  assert.equal(r.page_format, '[page_id, page_name, words]');
+  assert.deepEqual(r.chapters[0].pages.map(p => p[1]), ['P-Eins-a', 'P-Eins-b']);
   assert.equal(r.chapters[0].words, 13);
-  assert.deepEqual(r.pages_without_chapter.map(p => p.page_name), ['P-ohne']);
+  assert.deepEqual(r.pages_without_chapter.map(p => p[1]), ['P-ohne']);
   assert.equal(r.total_pages, 5);
+  // Zusammenfassung steht VOR der Kapitelliste (überlebt jeden Schnitt).
+  const keys = Object.keys(r);
+  assert.ok(keys.indexOf('total_words') < keys.indexOf('chapters'));
+});
+
+test('list_chapters: Paginierung über offset/limit mit next_offset', () => {
+  const r1 = call('list_chapters', { limit: 1 });
+  assert.deepEqual(r1.chapters.map(c => c.chapter_name), ['Eins']);
+  assert.equal(r1.next_offset, 1);
+  assert.equal(r1.total_chapters, 2);
+  const r2 = call('list_chapters', { offset: 1, limit: 1 });
+  assert.deepEqual(r2.chapters.map(c => c.chapter_name), ['Zwei']);
+  assert.equal(r2.next_offset, undefined);
+  assert.equal(r2.pages_without_chapter, undefined);
 });
 
 test('list_ideen: Kapitelname über Seite oder Kapitel, Kapitel-Filter deckt beide Anker', () => {
@@ -425,4 +441,30 @@ test('resolveEntityTitle: Szene/Figur per id, gelöscht → null', () => {
   assert.equal(resolveEntityTitle('figure', o.zoe), 'Zoe');
   assert.equal(resolveEntityTitle('figure', 99999999), null);
   assert.equal(resolveEntityTitle('page', 910101), 'P-Zwei');
+});
+
+test('list_research_items: Kapitel-Filter deckt Kapitel- und Seiten-Verknüpfung, Status-Filter, Stellen mit Namen', () => {
+  const ins = db.prepare("INSERT INTO research_items (book_id, user_email, kind, title, status) VALUES (?, ?, 'fact', ?, ?)");
+  const atChapter = ins.run(BOOK, U, 'Am Kapitel', 'offen').lastInsertRowid;
+  const atPage = ins.run(BOOK, U, 'An Seite', 'eingearbeitet').lastInsertRowid;
+  const loose = ins.run(BOOK, U, 'Lose', 'offen').lastInsertRowid;
+  ins.run(OTHER, U, 'Fremdes Buch', 'offen');
+  db.prepare("INSERT INTO research_item_links (item_id, target_kind, chapter_id) VALUES (?, 'chapter', 91012)").run(atChapter);
+  db.prepare("INSERT INTO research_item_links (item_id, target_kind, page_id) VALUES (?, 'page', 910103)").run(atPage);
+
+  const all = call('list_research_items');
+  assert.deepEqual(all.items.map(i => i.id).sort(), [atChapter, atPage, loose].sort());
+
+  const kap = call('list_research_items', { chapter_id: 91012 });
+  assert.deepEqual(kap.items.map(i => i.id).sort(), [atChapter, atPage].sort());
+  assert.deepEqual(call('list_research_items', { page_id: 910103 }).items.map(i => i.id), [atPage]);
+  assert.deepEqual(call('list_research_items', { status: 'eingearbeitet' }).items.map(i => i.id), [atPage]);
+
+  const p = kap.items.find(i => i.id === atPage);
+  assert.deepEqual(p.stellen, [{ art: 'page', id: 910103, name: 'P-Eins-a' }]);
+  assert.equal(p.status, 'eingearbeitet');
+
+  const read = call('read_research_item', { id: atChapter });
+  assert.deepEqual(read.stellen, [{ art: 'chapter', id: 91012, name: 'Eins' }]);
+  assert.equal(call('read_research_item', { id: 999999 }).error.length > 0, true);
 });

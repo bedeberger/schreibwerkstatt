@@ -1,0 +1,69 @@
+/* Plot-Werkstatt — Board-Werkzeuge: Beat verschieben ohne Drag (Beat-Edit),
+   Dichte-Modus „nur Titel", einklappbare Akte (flach + Grid) und die
+   Befund-Typen/-Aktionen der Konsistenz-Liste. Lädt NACH board.css,
+   widgets.css, swimlane.css und relations.css (überschreibt deren Breiten). */
+
+@layer components {
+
+  /* ── Beat verschieben (plot-beat-move.html) ─────────────────────────────── */
+  .plot-beat-move { display: flex; flex-direction: column; gap: var(--space-2xs); }
+  .plot-beat-move-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2xs);
+  }
+  .plot-beat-move-act,
+  .plot-beat-move-thread { flex: 1 1 8rem; min-width: 0; }
+
+  /* ── Dichte „nur Titel": nur die Kopfzeile der Beat-Karte ───────────────── */
+  .plot--compact .plot-beat-view > :not(.plot-beat-head) { display: none; }
+  .plot--compact .plot-beat { padding-block: var(--space-xs); }
+
+  /* ── Eingeklappter Akt ──────────────────────────────────────────────────── */
+  /* Flach: schmale Spalte, nur die Kopfzeile (Titel einzeilig gekürzt). */
+  .plot-column.plot-column--collapsed { width: 9rem; }
+  .plot-column--collapsed .plot-column-actions,
+  .plot-column--collapsed .plot-dist-bar,
+  .plot-column--collapsed .plot-column-body { display: none; }
+  .plot-column--collapsed .plot-column-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Grid: Kopf + alle Zellen der Spalte schrumpfen gemeinsam (gleiche Breite,
+     sonst liefen die Spalten auseinander); die Zelle zeigt nur ihre Beat-Zahl. */
+  .plot-swim-acthead--collapsed,
+  .plot-swim-cell.plot-swim-cell--collapsed { flex-basis: 6rem; width: 6rem; }
+  /* Vollbild verteilt die Spalten fluid (board.css/swimlane.css) — eingeklappte
+     bleiben trotzdem schmal. */
+  .card--plot:fullscreen .plot-column.plot-column--collapsed { flex: 0 0 9rem; }
+  .card--plot:fullscreen .plot-swim-acthead.plot-swim-acthead--collapsed,
+  .card--plot:fullscreen .plot-swim-cell.plot-swim-cell--collapsed { flex: 0 0 6rem; min-width: 0; }
+  .plot-swim-acthead--collapsed .plot-column-actions { display: none; }
+  .plot-swim-acthead--collapsed .plot-column-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .plot-swim-cell--collapsed > :not(.plot-swim-cell-count) { display: none; }
+  .plot-swim-cell-count {
+    font-size: var(--font-size-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-muted);
+  }
+
+  /* ── Konsistenz-Liste: Typ-Filter, Typ-Tag, Aktion, „erledigt" ──────────── */
+  .plot-konflikt-filter { margin-bottom: var(--space-xs); }
+  .plot-konflikt-typ { flex: 0 0 auto; }
+  .plot-konflikt-action { flex: 0 0 auto; }
+  .plot-konflikt-erledigt { margin-top: var(--space-sm); }
+  .plot-konflikt-erledigt-list {
+    margin: var(--space-2xs) 0 0;
+    padding-left: var(--space-lg);
+    font-size: var(--font-size-xs);
+    color: var(--color-muted);
+  }
+}

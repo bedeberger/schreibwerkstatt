@@ -1,5 +1,5 @@
-// Per-User-/Per-Buch-Prefs im localStorage. Quota-tolerant (alle Calls in
-// try/catch). Keys: `sw:<bereich>:<email>:<bookId>[:<scope>]`.
+// Per-User-/Per-Buch-Prefs im localStorage. Quota-tolerant (über
+// safe-storage.js). Keys: `sw:<bereich>:<email>:<bookId>[:<scope>]`.
 //
 // Bereiche:
 //   - lastBookId:<email>                   -> Rückfall-Merker fürs Startbuch
@@ -7,14 +7,9 @@
 //   - filters:<email>:<bookId>:<scope>     -> Filter-Objekt pro Karten-Scope
 //   - userpref:<email>:<key>               -> book-unabhängiger User-Pref (JSON)
 
-const PREFIX = 'sw';
+import { lsGet as safeGet, lsSet as safeSet, lsGetJSON, lsSetJSON } from './safe-storage.js';
 
-function safeGet(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
-}
-function safeSet(key, value) {
-  try { localStorage.setItem(key, value); } catch {}
-}
+const PREFIX = 'sw';
 
 // Startbuch-Rückfall. Die WAHRHEIT dazu ist serverseitig
 // (`book_shelf.last_opened_at`, ein Zeitstempel pro Buch und User) — dieser
@@ -61,16 +56,12 @@ export function setLastPageId(email, bookId, pageId) {
 
 export function getFilters(email, bookId, scope) {
   if (!bookId || !scope) return null;
-  const raw = safeGet(filtersKey(email, bookId, scope));
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  return lsGetJSON(filtersKey(email, bookId, scope));
 }
 
 export function setFilters(email, bookId, scope, filters) {
   if (!bookId || !scope) return;
-  try {
-    safeSet(filtersKey(email, bookId, scope), JSON.stringify(filters || {}));
-  } catch {}
+  lsSetJSON(filtersKey(email, bookId, scope), filters || {});
 }
 
 // Book-unabhängiger User-Pref. Für View-Settings, die nicht pro Buch variieren
@@ -81,14 +72,10 @@ function userPrefKey(email, key) {
 
 export function getUserPref(email, key, fallback = null) {
   if (!key) return fallback;
-  const raw = safeGet(userPrefKey(email, key));
-  if (raw == null) return fallback;
-  try { return JSON.parse(raw); } catch { return fallback; }
+  return lsGetJSON(userPrefKey(email, key), fallback);
 }
 
 export function setUserPref(email, key, value) {
   if (!key) return;
-  try {
-    safeSet(userPrefKey(email, key), JSON.stringify(value));
-  } catch {}
+  lsSetJSON(userPrefKey(email, key), value);
 }

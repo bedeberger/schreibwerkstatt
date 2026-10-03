@@ -1,8 +1,9 @@
 import { escHtml, fetchJson, SAFETY_HTML_RATIO, replaceInHtml, skipReason, stripFocusArtefacts } from '../utils.js';
-import { sortByPosition, SOFT_TYPEN } from '../book/page-view.js';
+import { sortByPosition, isHardFinding } from '../book/page-view.js';
 import { contentRepo } from '../repo/content.js';
 import { savePage } from './shared/page-api.js';
 import { runQuoteNormalizeHtml } from './shared/quote-normalize.js';
+import { lsSet } from '../safe-storage.js';
 
 // Lektorat-Workflow-Methoden (werden in die Alpine-Komponente gespreadet)
 // `this` bezieht sich auf die Alpine-Komponente.
@@ -93,8 +94,10 @@ export const lektoratMethods = {
     const stale = this.currentPage?.id !== pageId;
     if (!stale && saved?.updated_at) this.currentPage.updated_at = saved.updated_at;
     // Uebernommene Korrekturen sind direkte Folge des Lektorats — Seite soll
-    // nicht unmittelbar danach auf "seit Lektorat bearbeitet" flippen.
-    this.markPageChecked?.(pageId);
+    // nicht unmittelbar danach auf "seit Lektorat bearbeitet" flippen. Ein
+    // Seiten-Chat-Vorschlag ('chat-apply') ist KEIN Lektorat: die Seite wurde
+    // bearbeitet und gilt danach zu Recht als „seit Lektorat geaendert".
+    if (source !== 'chat-apply') this.markPageChecked?.(pageId);
     this._syncPageStatsAfterSave?.({ id: pageId, updated_at: saved?.updated_at || null }, finalHtml);
     return { finalHtml, skipped, pageId, stale };
   },
@@ -172,7 +175,7 @@ export const lektoratMethods = {
         }),
       });
       if (this.currentPage?.id !== pageIdAtStart) return;
-      localStorage.setItem('lektorat_check_job_' + this.currentPage.id, jobId);
+      lsSet('lektorat_check_job_' + this.currentPage.id, jobId);
       this.startCheckPoll(jobId);
     } catch (e) {
       console.error('[runCheck]', e);
@@ -275,10 +278,10 @@ export const lektoratMethods = {
         }
         this.originalHtml = base;
         this.lektoratFindings = findings;
-        // Default selected: nur „harte" Typen (rechtschreibung, grammatik). Weiche Typen und Stil default unselected.
-        this.selectedFindings = findings.map(f => !SOFT_TYPEN.has(f.typ) && f.typ !== 'stil');
+        // Default selected: nur „harte" Typen (page-view.js#findingKind). Weiche und redaktionelle default unselected.
+        this.selectedFindings = findings.map(f => isHardFinding(f.typ));
         this.appliedOriginals = [];
-        const hardErrors = findings.filter(f => !SOFT_TYPEN.has(f.typ) && f.typ !== 'stil');
+        const hardErrors = findings.filter(f => isHardFinding(f.typ));
         this.hasErrors = hardErrors.length > 0;
         this.correctedHtml = hardErrors.length > 0
           ? this._applyCorrections(base, hardErrors)
@@ -413,7 +416,7 @@ export const lektoratMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ book_id: parseInt(this.$store.nav.selectedBookId), book_name: this.selectedBookName || null }),
       });
-      localStorage.setItem('lektorat_batchcheck_job_' + this.$store.nav.selectedBookId, jobId);
+      lsSet('lektorat_batchcheck_job_' + this.$store.nav.selectedBookId, jobId);
       this.startBatchPoll(jobId);
     } catch (e) {
       console.error('[batchCheck]', e);
@@ -446,7 +449,18 @@ export const lektoratMethods = {
         setTimeout(() => { this.batchProgress = 0; }, 400);
         if (job.result?.empty) { this.batchStatus = this.t('lektorat.batchNoPages'); return; }
         const r = job.result;
-        this.batchStatus = this.t('lektorat.batchDone', { done: r.done, total: r.pageCount, errors: r.totalErrors });
+        // Leere und gescheiterte Seiten getrennt nennen — „X/Y geprüft" allein
+        // lässt offen, ob der Rest leer war oder ein Fehler ihn übersprungen hat.
+        // x-html-Sink: Seitennamen escapen.
+        let status = escHtml(this.t('lektorat.batchDone', { done: r.done, total: r.pageCount, errors: r.totalErrors }));
+        if (r.skippedEmpty > 0) status += ' ' + escHtml(this.t('lektorat.batchSkippedEmpty', { n: r.skippedEmpty }));
+        const failed = Array.isArray(r.failed) ? r.failed : [];
+        if (failed.length > 0) {
+          const MAX_NAMES = 5;
+          const names = failed.slice(0, MAX_NAMES).map(p => `«${p.name}»`).join(', ') + (failed.length > MAX_NAMES ? ', …' : '');
+          status += ` <span class="error-msg">${escHtml(this.t('lektorat.batchFailed', { n: failed.length, names }))}</span>`;
+        }
+        this.batchStatus = status;
         this.refreshPageAges();
         if (this.currentPage) await this.loadPageHistory(this.currentPage.id);
       },

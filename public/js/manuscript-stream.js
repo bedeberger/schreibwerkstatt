@@ -65,7 +65,8 @@ export function fromSnapshotTree(tree) {
     for (const node of (list || [])) {
       if (!node || typeof node !== 'object') continue;
       if (node.type === 'chapter') {
-        _pushChapter(out, _str(node.name), depth, null);
+        // chapterId = srcId (alte chapter_id) — Adresse fuer den Kapitel-Restore im Reader.
+        _pushChapter(out, _str(node.name), depth, Number.isFinite(node.srcId) ? node.srcId : null);
         walk(node.children, depth + 1);
       } else if (node.type === 'page') {
         _pushPage(out, {
